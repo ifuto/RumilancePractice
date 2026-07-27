@@ -1,0 +1,32 @@
+# Database connection configuration.
+# type: SQLITE or MARIADB (also accepts MYSQL as an alias for MARIADB).
+storage:
+  type: SQLITE
+
+  sqlite:
+    # Relative to the plugin's data folder.
+    file: data/rumilance-practice.db
+
+  mariadb:
+    host: 127.0.0.1
+    port: 3306
+    database: rumilance_practice
+    username: rumilance
+    password: change-me
+    use-ssl: false
+    parameters: "useUnicode=true&characterEncoding=utf8"
+
+pool:
+  # HikariCP connection pool tuning.
+  maximum-pool-size: 10
+  minimum-idle: 2
+  connection-timeout-ms: 10000
+  idle-timeout-ms: 600000
+  max-lifetime-ms: 1800000
+  leak-detection-threshold-ms: 0
+  pool-name: RumilancePracticePool
+
+schema:
+  # Whether the plugin should automatically run pending migrations on startup.
+  auto-migrate: true
+  table-prefix: rp_

@@ -1,0 +1,51 @@
+# GUI layout configuration. Slot numbers are 0-based within the inventory.
+main-menu:
+  title: "<dark_purple>Rumilance Practice"
+  size: 27
+  slots:
+    kits: 10
+    ffa: 12
+    duel: 14
+    ranking: 16
+    settings: 22
+  filler-item: BLACK_STAINED_GLASS_PANE
+  filler-slots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 17, 18, 19, 20, 21, 23, 24, 25, 26]
+
+kit-select:
+  title: "<dark_aqua>Select a Kit"
+  size: 54
+  first-kit-slot: 10
+  last-kit-slot: 43
+  back-slot: 49
+
+ffa-select:
+  title: "<gold>Free For All"
+  size: 27
+  first-arena-slot: 10
+  last-arena-slot: 16
+  back-slot: 22
+
+settings-menu:
+  title: "<blue>Settings"
+  size: 45
+  slots:
+    locale: 11
+    sounds: 13
+    scoreboard: 15
+    arrow-effect: 20
+    spectate-visibility: 22
+  back-slot: 40
+
+spectator-menu:
+  title: "<gray>Spectator Options"
+  size: 27
+  slots:
+    teleport-to-player-a: 11
+    teleport-to-player-b: 15
+    leave: 22
+
+confirm-dialog:
+  title: "<red>Are you sure?"
+  size: 27
+  confirm-slot: 11
+  cancel-slot: 15

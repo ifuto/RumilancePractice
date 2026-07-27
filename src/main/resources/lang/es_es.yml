@@ -1,0 +1,34 @@
+# Locale en español. Si falta una clave, se usa en_us como respaldo.
+general:
+  prefix: "<dark_gray>[<gradient:#a855f7:#6d28d9>Rumilance</gradient><dark_gray>] </dark_gray>"
+  no-permission: "<red>No tienes permiso para hacer eso."
+  player-only: "<red>Solo los jugadores pueden usar este comando."
+  player-not-found: "<red>No se encontró al jugador '<target>'."
+  invalid-usage: "<red>Uso: <usage>"
+  reload-success: "<green>Configuración recargada correctamente."
+  unknown-error: "<red>Ocurrió un error inesperado. Contacta a un administrador."
+
+duel:
+  request-sent: "<gray>Solicitud de duelo enviada a <yellow><target></yellow>."
+  request-received: "<yellow><sender></yellow> <gray>te ha desafiado a un duelo. Escribe</gray> <green>/duel accept <sender></green> <gray>para aceptar."
+  request-accepted: "<green><target></green> <gray>aceptó tu solicitud de duelo."
+  request-denied: "<red><target></red> <gray>rechazó tu solicitud de duelo."
+
+match:
+  countdown: "<yellow>La partida comienza en <seconds>..."
+  start: "<green><bold>¡LUCHA!"
+  win: "<green><bold>¡Has ganado la partida!"
+  lose: "<red><bold>Has perdido la partida."
+  draw: "<yellow><bold>La partida terminó en empate."
+
+kit:
+  selected: "<green>Kit seleccionado: <yellow><kit></yellow>."
+
+ranking:
+  stats-header: "<gray>--- Estadísticas clasificatorias: <player> (<kit>) ---"
+
+settings:
+  locale-changed: "<green>Idioma cambiado a <locale>."
+
+arena:
+  created: "<green>Arena <arena> creada."

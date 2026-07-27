@@ -1,0 +1,34 @@
+# Deutsche Sprachdatei. Hier fehlende Schlüssel greifen auf en_us zurück.
+general:
+  prefix: "<dark_gray>[<gradient:#a855f7:#6d28d9>Rumilance</gradient><dark_gray>] </dark_gray>"
+  no-permission: "<red>Du hast keine Berechtigung dafür."
+  player-only: "<red>Nur Spieler können diesen Befehl verwenden."
+  player-not-found: "<red>Spieler '<target>' wurde nicht gefunden."
+  invalid-usage: "<red>Verwendung: <usage>"
+  reload-success: "<green>Konfiguration erfolgreich neu geladen."
+  unknown-error: "<red>Ein unerwarteter Fehler ist aufgetreten. Bitte kontaktiere einen Administrator."
+
+duel:
+  request-sent: "<gray>Duell-Anfrage an <yellow><target></yellow> gesendet."
+  request-received: "<yellow><sender></yellow> <gray>hat dich zu einem Duell herausgefordert! Tippe</gray> <green>/duel accept <sender></green> <gray>zum Annehmen."
+  request-accepted: "<green><target></green> <gray>hat deine Duell-Anfrage angenommen."
+  request-denied: "<red><target></red> <gray>hat deine Duell-Anfrage abgelehnt."
+
+match:
+  countdown: "<yellow>Match beginnt in <seconds>..."
+  start: "<green><bold>KAMPF!"
+  win: "<green><bold>Du hast das Match gewonnen!"
+  lose: "<red><bold>Du hast das Match verloren."
+  draw: "<yellow><bold>Das Match endete unentschieden."
+
+kit:
+  selected: "<green>Kit <yellow><kit></yellow> ausgewählt."
+
+ranking:
+  stats-header: "<gray>--- Ranglisten-Statistik: <player> (<kit>) ---"
+
+settings:
+  locale-changed: "<green>Sprache zu <locale> geändert."
+
+arena:
+  created: "<green>Arena <arena> erstellt."

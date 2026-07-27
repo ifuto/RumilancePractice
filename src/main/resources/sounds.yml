@@ -1,0 +1,63 @@
+# Sound effects. Keys use NamespacedKey form (minecraft: omitted ok).
+# Default pitch 0.0 for GUI sounds (client clamps). Countdown uses pitch 1.0 in code.
+sounds:
+  select:
+    key: entity.experience_orb.pickup
+    volume: 1.0
+    pitch: 0.0
+  queue-leave:
+    key: entity.glow_item_frame.remove_item
+    volume: 1.0
+    pitch: 0.0
+  gui-back:
+    key: block.end_portal_frame.fill
+    volume: 1.0
+    pitch: 0.0
+  gui-open:
+    key: block.end_portal_frame.fill
+    volume: 1.0
+    pitch: 1.4
+  kit-select:
+    key: ui.button.click
+    volume: 1.0
+    pitch: 0.0
+  gui-click:
+    key: block.note_block.hat
+    volume: 1.0
+    pitch: 0.0
+  duel-request-received:
+    key: block.note_block.chime
+    volume: 1.0
+    pitch: 0.0
+  duel-request-sent:
+    key: block.note_block.chime
+    volume: 1.0
+    pitch: 0.0
+  queue-joined:
+    key: block.anvil.place
+    volume: 1.0
+    pitch: 0.0
+  cancel:
+    key: entity.item.break
+    volume: 1.0
+    pitch: 0.0
+  match-start:
+    key: item.mace.smash_ground_heavy
+    volume: 1.0
+    pitch: 1.0
+  match-end-anvil:
+    key: block.anvil.land
+    volume: 1.0
+    pitch: 1.0
+  match-end-levelup:
+    key: entity.player.levelup
+    volume: 1.0
+    pitch: 1.0
+  match-countdown-tick:
+    key: block.note_block.hat
+    volume: 1.0
+    pitch: 1.0
+  error:
+    key: block.note_block.bass
+    volume: 1.0
+    pitch: 0.5

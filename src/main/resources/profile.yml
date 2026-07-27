@@ -1,0 +1,19 @@
+# Default values applied to newly created player profiles.
+defaults:
+  locale: null # null = use plugin default-locale
+  sounds-enabled: true
+  scoreboard-enabled: true
+  arrow-effect: none
+  spectate-visible: true
+  accept-duel-requests: true
+  show-ranked-prompt: true
+
+scoreboard:
+  enabled: true
+  update-interval-ticks: 20
+  title: "<dark_purple><bold>RUMILANCE"
+
+statistics:
+  track-unranked: true
+  track-ranked: true
+  track-block-and-item-usage: false

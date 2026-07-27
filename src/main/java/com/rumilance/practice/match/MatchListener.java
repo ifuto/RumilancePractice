@@ -1,0 +1,275 @@
+package com.rumilance.practice.match;
+
+import com.rumilance.practice.kit.KitService;
+import com.rumilance.practice.model.KitDefinition;
+import com.rumilance.practice.session.MatchSession;
+import com.rumilance.practice.state.MatchState;
+import com.rumilance.practice.util.ItemKeys;
+import org.bukkit.Bukkit;
+import org.bukkit.Material;
+import org.bukkit.entity.EnderCrystal;
+import org.bukkit.entity.Player;
+import org.bukkit.entity.Projectile;
+import org.bukkit.entity.TNTPrimed;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.Listener;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityRegainHealthEvent;
+import org.bukkit.event.entity.FoodLevelChangeEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.projectiles.ProjectileSource;
+import org.bukkit.util.Vector;
+
+import java.util.UUID;
+
+/**
+ * Match combat rules, lethal interception, rematch items, kit toggles.
+ */
+public final class MatchListener implements Listener {
+
+    private final MatchService matchService;
+    private final KitService kitService;
+
+    public MatchListener(MatchService matchService, KitService kitService) {
+        this.matchService = matchService;
+        this.kitService = kitService;
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onDamage(EntityDamageEvent event) {
+        if (!(event.getEntity() instanceof Player victim)) {
+            return;
+        }
+        MatchSession session = matchService.registry().byPlayer(victim.getUniqueId()).orElse(null);
+        if (session == null) {
+            return;
+        }
+        if (session.state() == MatchState.COUNTDOWN || session.state() == MatchState.ENDING) {
+            event.setCancelled(true);
+            return;
+        }
+        if (session.state() != MatchState.ACTIVE) {
+            return;
+        }
+
+        UUIDLikeAttacker attacker = resolveAttacker(event);
+        if (attacker != null && attacker.playerId() != null
+                && !session.isParticipant(attacker.playerId())) {
+            event.setCancelled(true);
+            return;
+        }
+
+        KitDefinition kit = kitService.get(session.kitName()).orElse(null);
+        if (kit != null && event instanceof EntityDamageByEntityEvent byEntity) {
+            applyCombatRules(byEntity, victim, kit);
+        }
+
+        double finalHealth = victim.getHealth() - event.getFinalDamage();
+        boolean hasTotem = kit != null && kit.totem() && hasTotem(victim);
+        if (finalHealth > 0 || hasTotem) {
+            return;
+        }
+
+        event.setCancelled(true);
+        event.setDamage(0);
+        UUID attackerId = attacker == null ? null : attacker.playerId();
+        matchService.handleLethal(session, victim.getUniqueId(), attackerId);
+    }
+
+    private void applyCombatRules(EntityDamageByEntityEvent event, Player victim, KitDefinition kit) {
+        Player attacker = null;
+        if (event.getDamager() instanceof Player player) {
+            attacker = player;
+        } else if (event.getDamager() instanceof Projectile projectile
+                && projectile.getShooter() instanceof Player shooter) {
+            attacker = shooter;
+        }
+        if (attacker == null) {
+            return;
+        }
+        if (kit.swordShieldBreak() && victim.isBlocking()
+                && attacker.getInventory().getItemInMainHand().getType().name().endsWith("_SWORD")) {
+            victim.setCooldown(Material.SHIELD, 100);
+            victim.clearActiveItem();
+        }
+        if (Math.abs(kit.knockbackMultiplier() - 1.0d) > 0.001d) {
+            double mult = kit.knockbackMultiplier();
+            Bukkit.getScheduler().runTask(
+                    Bukkit.getPluginManager().getPlugin("RumilancePractice"),
+                    () -> {
+                        Vector velocity = victim.getVelocity();
+                        victim.setVelocity(new Vector(velocity.getX() * mult, velocity.getY(), velocity.getZ() * mult));
+                    });
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onDeath(PlayerDeathEvent event) {
+        if (matchService.registry().byPlayer(event.getEntity().getUniqueId()).isPresent()) {
+            event.setCancelled(true);
+            event.getDrops().clear();
+            event.setKeepInventory(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onPlace(BlockPlaceEvent event) {
+        MatchSession session = matchService.registry().byPlayer(event.getPlayer().getUniqueId()).orElse(null);
+        if (session == null) {
+            return;
+        }
+        if (session.state() == MatchState.COUNTDOWN) {
+            event.setCancelled(true);
+            return;
+        }
+        if (session.state() == MatchState.ACTIVE) {
+            KitDefinition kit = kitService.get(session.kitName()).orElse(null);
+            if (kit == null || !kit.blockPlace()) {
+                event.setCancelled(true);
+            }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onBreak(BlockBreakEvent event) {
+        MatchSession session = matchService.registry().byPlayer(event.getPlayer().getUniqueId()).orElse(null);
+        if (session == null) {
+            return;
+        }
+        if (session.state() == MatchState.COUNTDOWN) {
+            event.setCancelled(true);
+            return;
+        }
+        if (session.state() == MatchState.ACTIVE) {
+            KitDefinition kit = kitService.get(session.kitName()).orElse(null);
+            if (kit == null) {
+                event.setCancelled(true);
+                return;
+            }
+            if (!kit.blockBreak() && !kit.isExplicitlyBreakable(event.getBlock().getType().name())) {
+                event.setCancelled(true);
+            }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onDrop(PlayerDropItemEvent event) {
+        MatchSession session = matchService.registry().byPlayer(event.getPlayer().getUniqueId()).orElse(null);
+        if (session != null && (session.state() == MatchState.COUNTDOWN || session.state() == MatchState.ENDING)) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onFood(FoodLevelChangeEvent event) {
+        if (!(event.getEntity() instanceof Player player)) {
+            return;
+        }
+        MatchSession session = matchService.registry().byPlayer(player.getUniqueId()).orElse(null);
+        if (session == null || session.state() != MatchState.ACTIVE) {
+            return;
+        }
+        KitDefinition kit = kitService.get(session.kitName()).orElse(null);
+        if (kit != null && kit.autoFood()) {
+            event.setCancelled(true);
+            player.setFoodLevel(20);
+            player.setSaturation(20f);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onRegen(EntityRegainHealthEvent event) {
+        if (!(event.getEntity() instanceof Player player)) {
+            return;
+        }
+        MatchSession session = matchService.registry().byPlayer(player.getUniqueId()).orElse(null);
+        if (session == null || session.state() != MatchState.ACTIVE) {
+            return;
+        }
+        KitDefinition kit = kitService.get(session.kitName()).orElse(null);
+        if (kit != null && !kit.naturalHealthRegen()
+                && event.getRegainReason() == EntityRegainHealthEvent.RegainReason.SATIATED) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onPearl(PlayerInteractEvent event) {
+        if (event.getHand() != EquipmentSlot.HAND || event.getItem() == null) {
+            return;
+        }
+        if (event.getItem().getType() != Material.ENDER_PEARL) {
+            return;
+        }
+        MatchSession session = matchService.registry().byPlayer(event.getPlayer().getUniqueId()).orElse(null);
+        if (session == null || session.state() != MatchState.ACTIVE) {
+            return;
+        }
+        KitDefinition kit = kitService.get(session.kitName()).orElse(null);
+        if (kit != null && !kit.pearl()) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        matchService.handleDisconnect(event.getPlayer().getUniqueId());
+    }
+
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onInteract(PlayerInteractEvent event) {
+        if (event.getHand() != EquipmentSlot.HAND) {
+            return;
+        }
+        if (event.getItem() == null || !event.getItem().hasItemMeta()) {
+            return;
+        }
+        var pdc = event.getItem().getItemMeta().getPersistentDataContainer();
+        if (pdc.has(ItemKeys.rematch(), PersistentDataType.BYTE)) {
+            event.setCancelled(true);
+            matchService.requestRematch(event.getPlayer());
+        } else if (pdc.has(ItemKeys.returnLobby(), PersistentDataType.BYTE)) {
+            event.setCancelled(true);
+            matchService.returnToLobby(event.getPlayer());
+        }
+    }
+
+    private boolean hasTotem(Player player) {
+        return player.getInventory().getItemInOffHand().getType().name().contains("TOTEM")
+                || player.getInventory().getItemInMainHand().getType().name().contains("TOTEM");
+    }
+
+    private UUIDLikeAttacker resolveAttacker(EntityDamageEvent event) {
+        if (!(event instanceof EntityDamageByEntityEvent byEntity)) {
+            return new UUIDLikeAttacker(null);
+        }
+        if (byEntity.getDamager() instanceof Player player) {
+            return new UUIDLikeAttacker(player.getUniqueId());
+        }
+        if (byEntity.getDamager() instanceof Projectile projectile) {
+            ProjectileSource source = projectile.getShooter();
+            if (source instanceof Player player) {
+                return new UUIDLikeAttacker(player.getUniqueId());
+            }
+        }
+        if (byEntity.getDamager() instanceof TNTPrimed tnt && tnt.getSource() instanceof Player player) {
+            return new UUIDLikeAttacker(player.getUniqueId());
+        }
+        if (byEntity.getDamager() instanceof EnderCrystal) {
+            return new UUIDLikeAttacker(null);
+        }
+        return new UUIDLikeAttacker(null);
+    }
+
+    private record UUIDLikeAttacker(java.util.UUID playerId) {
+    }
+}

@@ -1,0 +1,178 @@
+name: RumilancePractice
+main: com.rumilance.practice.RumilancePractice
+version: ${version}
+api-version: '1.21'
+author: Rumilance
+description: Practice PvP plugin for Paper (ranked/unranked duels, FFA, kits, arenas).
+folia-supported: false
+softdepend:
+  - FastAsyncWorldEdit
+  - WorldEdit
+
+commands:
+  duel:
+    description: Ranked queue GUI or send a ranked duel request.
+    usage: /duel [player|cancel|accept|deny]
+    aliases: [d]
+    permission: rumilance.user
+  unranked:
+    description: Unranked queue GUI or send an unranked duel request.
+    usage: /unranked [player]
+    aliases: [unrankduel, unduel, ud]
+    permission: rumilance.user
+  accept:
+    description: Accept a duel request.
+    usage: /accept [player]
+    permission: rumilance.user
+  deny:
+    description: Deny a duel request.
+    usage: /deny [player|all]
+    permission: rumilance.user
+  queue:
+    description: Leave the current matchmaking queue.
+    usage: /queue leave
+    permission: rumilance.user
+  players:
+    description: Open online players duel picker.
+    usage: /players
+    aliases: [dplayers]
+    permission: rumilance.user
+  spec:
+    description: Spectate a player's match.
+    usage: /spec <player>
+    permission: rumilance.user
+  specgui:
+    description: Open active matches spectate GUI.
+    usage: /specgui
+    permission: rumilance.user
+  setting:
+    description: Open personal settings GUI.
+    usage: /setting
+    permission: rumilance.user
+  stats:
+    description: View ranked kit statistics.
+    usage: /stats [player]
+    permission: rumilance.user
+  kdr:
+    description: View ranked K/D for a kit.
+    usage: /kdr <kit> [player]
+    permission: rumilance.user
+  profile:
+    description: View ranked profile summary.
+    usage: /profile [player]
+    permission: rumilance.user
+  ranking:
+    description: View ranked leaderboards.
+    usage: /ranking <elo|kill|matches|winstreak>
+    permission: rumilance.user
+  ffa:
+    description: Open FFA list GUI or manage FFA arenas.
+    usage: /ffa [create|selection|spawn|kit|enable|disable|delete|reset|leave]
+    permission: rumilance.user
+  adffa:
+    description: Admin FFA reset shortcut.
+    usage: /adffa reset <arena>
+    permission: rumilance.admin
+  ekit:
+    description: Edit official kit layout.
+    usage: /ekit
+    permission: rumilance.user
+  lobby:
+    description: Return to the practice lobby.
+    usage: /lobby
+    aliases: [spawn]
+    permission: rumilance.user
+  spawn:
+    description: Return to the practice lobby.
+    usage: /spawn
+    permission: rumilance.user
+  ping:
+    description: Show ping.
+    usage: /ping [player]
+    permission: rumilance.user
+  matchhistory:
+    description: Show recent ranked matches.
+    usage: /matchhistory [player]
+    permission: rumilance.user
+  objection:
+    description: Submit a ChatBan objection.
+    usage: /objection <reason>
+    permission: rumilance.user
+  arroweffect:
+    description: Select arrow trail effect.
+    usage: /arroweffect
+    permission: rumilance.user.mem
+  originalkit:
+    description: Open original kit editor.
+    usage: /originalkit
+    aliases: [okit]
+    permission: rumilance.user
+  practiceadmin:
+    description: Practice administration.
+    usage: /practiceadmin <tool|reload|status|matches|cleanup|maintenance>
+    permission: rumilance.admin
+  slobby:
+    description: Configure lobby region/spawn.
+    usage: /slobby <pos1|pos2|spawn|info|validate>
+    permission: rumilance.admin
+  setlobbyitem:
+    description: Save current inventory as lobby inventory.
+    usage: /setlobbyitem
+    permission: rumilance.admin
+  setfunc:
+    description: Mark held item as a functional lobby item.
+    usage: /setfunc <ranked|unranked|ffa|ekit|settings|spectate|leavequeue>
+    permission: rumilance.admin
+  arena:
+    description: Manage arena templates and paste pool.
+    usage: /arena <subcommand>
+    permission: rumilance.admin
+  kit:
+    description: Manage official kits.
+    usage: /kit <subcommand>
+    permission: rumilance.admin
+  toggle:
+    description: Enable/disable queues or maps.
+    usage: /toggle <queue|map> <enable|disable> <id>
+    permission: rumilance.admin
+  chatban:
+    description: Manually chatban a player.
+    usage: /chatban <player> <duration> <reason>
+    permission: rumilance.admin
+  chatunban:
+    description: Remove a chatban.
+    usage: /chatunban <player|chatban_id>
+    permission: rumilance.admin
+
+permissions:
+  rumilance.user:
+    description: Base practice player permission.
+    default: true
+  rumilance.duel.use:
+    description: Allow duel/queue commands.
+    default: true
+  rumilance.admin:
+    description: Full practice administration.
+    default: op
+    children:
+      rumilance.user: true
+      rumilance.lobby.bypass: true
+      rumilance.punishment.bypass: true
+  rumilance.lobby.bypass:
+    description: Bypass lobby region restrictions.
+    default: op
+  rumilance.punishment.bypass:
+    description: Bypass disconnect ChatBan.
+    default: op
+  rumilance.user.def:
+    description: Default original-kit plan.
+    default: true
+  rumilance.user.mem:
+    description: Member plan.
+    default: false
+  rumilance.user.vip:
+    description: VIP plan.
+    default: false
+  rumilance.user.vip_plus:
+    description: VIP+ plan.
+    default: false

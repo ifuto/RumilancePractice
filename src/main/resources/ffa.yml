@@ -1,0 +1,9 @@
+# Free-for-all arena and matchmaking configuration.
+arenas: []
+
+settings:
+  min-players-to-start: 1
+  max-players-per-arena: 24
+  respawn-delay-seconds: 3
+  kill-streak-announcements: true
+  environment-damage-enabled: false

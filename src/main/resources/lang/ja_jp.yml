@@ -1,0 +1,130 @@
+# 日本語ロケールファイル。値は MiniMessage 形式です。
+general:
+  prefix: "<dark_gray>[<gradient:#a855f7:#6d28d9>Rumilance</gradient><dark_gray>] </dark_gray>"
+  no-permission: "<red>この操作を行う権限がありません。"
+  player-only: "<red>このコマンドはプレイヤーのみ使用できます。"
+  player-not-found: "<red>プレイヤー「<target>」が見つかりませんでした。"
+  invalid-usage: "<red>使用法: <usage>"
+  reload-success: "<green>設定を再読み込みしました。"
+  unknown-error: "<red>予期しないエラーが発生しました。管理者に連絡してください。"
+  feature-disabled: "<red>この機能は現在無効化されています。"
+  loading: "<gray>読み込み中です、しばらくお待ちください..."
+
+duel:
+  request-sent: "<gray><yellow><target></yellow> にデュエル申請を送信しました。"
+  request-received: "<yellow><sender></yellow> <gray>からデュエルの挑戦状が届きました！</gray> <green>/duel accept <sender></green> <gray>で承認できます。"
+  request-accepted: "<green><target></green> <gray>があなたのデュエル申請を承認しました。"
+  request-denied: "<red><target></red> <gray>があなたのデュエル申請を拒否しました。"
+  request-cancelled: "<gray><yellow><target></yellow> へのデュエル申請をキャンセルしました。"
+  request-expired: "<gray><yellow><target></yellow> へのデュエル申請の有効期限が切れました。"
+  no-pending-request: "<red>そのプレイヤーからの保留中のデュエル申請はありません。"
+  already-in-match: "<red>あなたは既に試合中です。"
+  target-already-in-match: "<red><target> は既に試合中です。"
+  cannot-duel-self: "<red>自分自身とはデュエルできません。"
+  target-offline: "<red><target> はオフラインです。"
+  kit-required: "<red>デュエルを申請する前にキットを選択してください。"
+
+ffa:
+  joined: "<green><arena> のFFAアリーナに参加しました。"
+  left: "<gray>FFAアリーナから退出しました。"
+  arena-full: "<red>そのFFAアリーナは現在満員です。"
+  no-arenas: "<red>現在利用可能なFFAアリーナがありません。"
+  killed-by: "<red><yellow><killer></yellow> に討伐されました。"
+
+kit:
+  created: "<green>キット <kit> を作成しました。"
+  deleted: "<green>キット <kit> を削除しました。"
+  saved: "<green>キット <kit> を保存しました。"
+  selected: "<green>キット <yellow><kit></yellow> を選択しました。"
+  not-found: "<red>キット「<kit>」が見つかりませんでした。"
+  already-exists: "<red>キット名「<kit>」は既に使用されています。"
+  list-header: "<gray>--- 利用可能なキット ---"
+  list-entry: "<yellow><kit></yellow> <gray>-</gray> <ranked>"
+
+originalkit:
+  saved: "<green>元のキット構成を保存しました。"
+  loaded: "<green>元のキット構成を復元しました。"
+  reset: "<gray>元のキット構成をリセットしました。"
+  none-saved: "<red>保存された元のキット構成がありません。"
+
+arena:
+  created: "<green>アリーナ <arena> を作成しました。"
+  saved: "<green>アリーナ <arena> を保存しました（<count> ブロック）。"
+  removed: "<green>アリーナ <arena> を削除しました。"
+  pos1-set: "<green>座標1を <location> に設定しました。"
+  pos2-set: "<green>座標2を <location> に設定しました。"
+  positions-required: "<red>先に座標1と座標2の両方を設定してください。"
+  not-found: "<red>アリーナ「<arena>」が見つかりませんでした。"
+  list-header: "<gray>--- アリーナ一覧 (<count>) ---"
+  list-entry: "<yellow><arena></yellow> <gray>[<type>]</gray>"
+  regenerating: "<gray>アリーナ <arena> を再生成中です..."
+  regenerate-complete: "<green>アリーナ <arena> の再生成が完了しました。"
+  regenerate-failed: "<red>アリーナ <arena> の再生成に失敗しました: <reason>"
+  fawe-unavailable: "<red>FastAsyncWorldEdit/WorldEdit がインストールされていません。アリーナ再生成は無効です。"
+
+lobby:
+  spawn-set: "<green>ロビーのスポーン地点を更新しました。"
+  teleported: "<gray>ロビーにテレポートしました。"
+
+ranking:
+  stats-header: "<gray>--- ランク戦統計: <player> (<kit>) ---"
+  stats-line: "<gray>レート: <yellow><elo></yellow> <gray>| 勝: <green><wins></green> <gray>敗: <red><losses></red>"
+  leaderboard-header: "<gray>--- ランキング: <kit> ---"
+  leaderboard-entry: "<yellow>#<position></yellow> <white><player></white> <gray>-</gray> <elo> <gray>レート</gray>"
+  rank-up: "<green><kit> のレートが <elo> に上昇しました！"
+  rank-down: "<red><kit> のレートが <elo> に低下しました。"
+  no-stats: "<red><player> の <kit> ランク統計はありません。"
+
+match:
+  countdown: "<yellow>試合開始まで <seconds> 秒..."
+  start: "<green><bold>ファイト！"
+  win: "<green><bold>試合に勝利しました！"
+  lose: "<red><bold>試合に敗北しました。"
+  draw: "<yellow><bold>試合は引き分けとなりました。"
+  forfeit: "<gray><player> が試合を放棄しました。"
+  opponent-disconnected: "<gray>対戦相手が接続を切断したため、あなたの勝利となりました。"
+  ended: "<gray>試合が終了しました。"
+
+spectator:
+  now-spectating: "<gray><yellow><player></yellow> の観戦を開始しました。"
+  stopped-spectating: "<gray>観戦を終了しました。"
+  cannot-spectate: "<red>現在その試合は観戦できません。"
+  no-active-match: "<red><player> は現在試合中ではありません。"
+
+settings:
+  updated: "<green>設定 <key> を <value> に更新しました。"
+  locale-changed: "<green>言語を <locale> に変更しました。"
+  invalid-value: "<red>「<value>」は <key> に対する有効な値ではありません。"
+
+stats:
+  header: "<gray>--- 統計情報: <player> ---"
+  wins: "<gray>勝利数: <green><wins></green>"
+  losses: "<gray>敗北数: <red><losses></red>"
+  win-rate: "<gray>勝率: <yellow><rate>%</yellow>"
+  elo: "<gray>レート: <yellow><elo></yellow>"
+
+admin:
+  reload-success: "<green>RumilancePractice を再読み込みしました。"
+  debug-toggled: "<gray>デバッグモードを <enabled> に設定しました。"
+  migrate-started: "<gray>保留中のデータベースマイグレーションを実行しています..."
+  migrate-complete: "<green>データベースマイグレーションが完了しました（<count> 件適用）。"
+
+punishment:
+  issued: "<green><player> に処罰を適用しました（<type>）: <reason>"
+  revoked: "<green><player> の処罰 <id> を取り消しました。"
+  history-header: "<gray>--- 処罰履歴: <player> ---"
+  history-entry: "<gray>[<date>] <type> - <reason>（<staff>）"
+  you-are-punished: "<red>あなたは現在 <type> 状態です（<expiry> まで）: <reason>"
+  not-found: "<red>処罰「<id>」が見つかりませんでした。"
+
+plan:
+  created: "<green>練習プラン <plan> を作成しました。"
+  removed: "<green>練習プラン <plan> を削除しました。"
+  started: "<gray>練習プラン <plan> を開始しました。"
+  list-header: "<gray>--- 練習プラン一覧 ---"
+  not-found: "<red>練習プラン「<plan>」が見つかりませんでした。"
+
+arrow:
+  selected: "<green>矢の軌跡エフェクトを <effect> に設定しました。"
+  locked: "<red>エフェクト「<effect>」はまだ解除されていません。"
+  list-header: "<gray>--- 矢の軌跡エフェクト ---"

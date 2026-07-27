@@ -1,0 +1,121 @@
+package com.rumilance.practice.listener;
+
+import com.rumilance.practice.arrow.ArrowEffectService;
+import com.rumilance.practice.ffa.FfaService;
+import com.rumilance.practice.gui.GuiSessionRegistry;
+import com.rumilance.practice.punishment.ChatBanService;
+import com.rumilance.practice.settings.SettingsService;
+import com.rumilance.practice.spectator.SpectatorService;
+import io.papermc.paper.event.player.AsyncChatEvent;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+import org.bukkit.entity.AbstractArrow;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.Listener;
+import org.bukkit.event.entity.ProjectileLaunchEvent;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+
+import java.util.Locale;
+import java.util.Set;
+
+public final class PracticeSideListener implements Listener {
+
+    private static final Set<String> MSG_COMMANDS = Set.of(
+            "/msg", "/tell", "/w", "/whisper", "/reply", "/r", "/message", "/pm"
+    );
+
+    private final ChatBanService chatBanService;
+    private final SettingsService settingsService;
+    private final GuiSessionRegistry guiSessions;
+    private final ArrowEffectService arrowEffectService;
+    private final SpectatorService spectatorService;
+    private final FfaService ffaService;
+
+    public PracticeSideListener(
+            ChatBanService chatBanService,
+            SettingsService settingsService,
+            GuiSessionRegistry guiSessions,
+            ArrowEffectService arrowEffectService,
+            SpectatorService spectatorService,
+            FfaService ffaService
+    ) {
+        this.chatBanService = chatBanService;
+        this.settingsService = settingsService;
+        this.guiSessions = guiSessions;
+        this.arrowEffectService = arrowEffectService;
+        this.spectatorService = spectatorService;
+        this.ffaService = ffaService;
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onChat(AsyncChatEvent event) {
+        Player player = event.getPlayer();
+        if (chatBanService.isChatBanned(player.getUniqueId())
+                && !player.hasPermission("rumilance.punishment.bypass")) {
+            event.setCancelled(true);
+            player.sendMessage(net.kyori.adventure.text.Component.text(
+                    "You are ChatBanned. /objection <reason>",
+                    net.kyori.adventure.text.format.NamedTextColor.RED));
+            return;
+        }
+        guiSessions.get(player.getUniqueId()).ifPresent(session -> {
+            if (Boolean.TRUE.equals(session.get("await_whitelist", Boolean.class))) {
+                event.setCancelled(true);
+                String text = PlainTextComponentSerializer.plainText().serialize(event.message()).trim();
+                session.put("await_whitelist", Boolean.FALSE);
+                var settings = settingsService.get(player);
+                if (text.equalsIgnoreCase("clear")) {
+                    settingsService.update(settings.withChatWhitelist(java.util.Set.of()));
+                    player.sendMessage(net.kyori.adventure.text.Component.text("Whitelist cleared.",
+                            net.kyori.adventure.text.format.NamedTextColor.YELLOW));
+                } else {
+                    settingsService.update(settings.withChatWhitelistAdded(text));
+                    player.sendMessage(net.kyori.adventure.text.Component.text("Added to whitelist: " + text,
+                            net.kyori.adventure.text.format.NamedTextColor.GREEN));
+                }
+            }
+        });
+        // hide other chat setting
+        event.viewers().removeIf(audience -> {
+            if (!(audience instanceof Player viewer) || viewer.getUniqueId().equals(player.getUniqueId())) {
+                return false;
+            }
+            var settings = settingsService.get(viewer);
+            if (!settings.hideOtherChat()) {
+                return false;
+            }
+            return !settings.chatWhitelist().contains(player.getName().toLowerCase(Locale.ROOT));
+        });
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onCommand(PlayerCommandPreprocessEvent event) {
+        String msg = event.getMessage().toLowerCase(Locale.ROOT);
+        String base = msg.split(" ")[0];
+        if (MSG_COMMANDS.contains(base) && chatBanService.isChatBanned(event.getPlayer().getUniqueId())
+                && !event.getPlayer().hasPermission("rumilance.punishment.bypass")) {
+            event.setCancelled(true);
+            chatBanService.blockIfBanned(event.getPlayer(), "private message");
+        }
+    }
+
+    @EventHandler
+    public void onArrow(ProjectileLaunchEvent event) {
+        if (event.getEntity() instanceof AbstractArrow arrow && arrow.getShooter() instanceof Player player) {
+            arrowEffectService.track(arrow, player);
+        }
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        settingsService.unload(event.getPlayer().getUniqueId());
+        if (spectatorService.isSpectating(event.getPlayer().getUniqueId())) {
+            spectatorService.leave(event.getPlayer());
+        }
+        if (ffaService.isInFfa(event.getPlayer().getUniqueId())) {
+            ffaService.leave(event.getPlayer());
+        }
+    }
+}

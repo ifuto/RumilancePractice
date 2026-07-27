@@ -1,0 +1,34 @@
+# 한국어 로케일 파일. 이 파일에 없는 키는 en_us로 대체됩니다.
+general:
+  prefix: "<dark_gray>[<gradient:#a855f7:#6d28d9>Rumilance</gradient><dark_gray>] </dark_gray>"
+  no-permission: "<red>이 작업을 수행할 권한이 없습니다."
+  player-only: "<red>이 명령어는 플레이어만 사용할 수 있습니다."
+  player-not-found: "<red>플레이어 '<target>'을 찾을 수 없습니다."
+  invalid-usage: "<red>사용법: <usage>"
+  reload-success: "<green>설정을 다시 불러왔습니다."
+  unknown-error: "<red>예상치 못한 오류가 발생했습니다. 관리자에게 문의하세요."
+
+duel:
+  request-sent: "<gray><yellow><target></yellow>에게 듀얼 신청을 보냈습니다."
+  request-received: "<yellow><sender></yellow><gray>가 당신에게 듀얼을 신청했습니다! </gray><green>/duel accept <sender></green><gray>로 수락하세요."
+  request-accepted: "<green><target></green> <gray>가 듀얼 신청을 수락했습니다."
+  request-denied: "<red><target></red> <gray>가 듀얼 신청을 거절했습니다."
+
+match:
+  countdown: "<yellow>경기가 <seconds>초 후 시작됩니다..."
+  start: "<green><bold>싸워라!"
+  win: "<green><bold>경기에서 승리했습니다!"
+  lose: "<red><bold>경기에서 패배했습니다."
+  draw: "<yellow><bold>경기가 무승부로 끝났습니다."
+
+kit:
+  selected: "<green>키트 <yellow><kit></yellow>을 선택했습니다."
+
+ranking:
+  stats-header: "<gray>--- 랭크 통계: <player> (<kit>) ---"
+
+settings:
+  locale-changed: "<green>언어가 <locale>로 변경되었습니다."
+
+arena:
+  created: "<green>아레나 <arena>가 생성되었습니다."

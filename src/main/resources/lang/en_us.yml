@@ -1,0 +1,131 @@
+# English (US) - default/fallback locale for RumilancePractice.
+# Values are MiniMessage strings. Placeholders use <angle_bracket> tags, e.g. <player>, <amount>.
+general:
+  prefix: "<dark_gray>[<gradient:#a855f7:#6d28d9>Rumilance</gradient><dark_gray>] </dark_gray>"
+  no-permission: "<red>You do not have permission to do that."
+  player-only: "<red>Only players can use this command."
+  player-not-found: "<red>Player '<target>' could not be found."
+  invalid-usage: "<red>Usage: <usage>"
+  reload-success: "<green>Configuration reloaded successfully."
+  unknown-error: "<red>An unexpected error occurred. Please contact an administrator."
+  feature-disabled: "<red>This feature is currently disabled."
+  loading: "<gray>Loading, please wait..."
+
+duel:
+  request-sent: "<gray>Duel request sent to <yellow><target></yellow>."
+  request-received: "<yellow><sender></yellow> <gray>has challenged you to a duel! Type</gray> <green>/duel accept <sender></green> <gray>to accept."
+  request-accepted: "<green><target></green> <gray>accepted your duel request."
+  request-denied: "<red><target></red> <gray>denied your duel request."
+  request-cancelled: "<gray>Duel request to <yellow><target></yellow> was cancelled."
+  request-expired: "<gray>Your duel request to <yellow><target></yellow> has expired."
+  no-pending-request: "<red>You have no pending duel request from that player."
+  already-in-match: "<red>You are already in a match."
+  target-already-in-match: "<red><target> is already in a match."
+  cannot-duel-self: "<red>You cannot duel yourself."
+  target-offline: "<red><target> is not online."
+  kit-required: "<red>Please select a kit before requesting a duel."
+
+ffa:
+  joined: "<green>You joined the <arena> FFA arena."
+  left: "<gray>You left the FFA arena."
+  arena-full: "<red>That FFA arena is currently full."
+  no-arenas: "<red>There are no FFA arenas available right now."
+  killed-by: "<red>You were killed by <yellow><killer></yellow>."
+
+kit:
+  created: "<green>Kit <kit> created."
+  deleted: "<green>Kit <kit> deleted."
+  saved: "<green>Kit <kit> saved."
+  selected: "<green>Selected kit <yellow><kit></yellow>."
+  not-found: "<red>Kit '<kit>' could not be found."
+  already-exists: "<red>A kit named '<kit>' already exists."
+  list-header: "<gray>--- Available Kits ---"
+  list-entry: "<yellow><kit></yellow> <gray>-</gray> <ranked>"
+
+originalkit:
+  saved: "<green>Your original kit loadout has been saved."
+  loaded: "<green>Your original kit loadout has been restored."
+  reset: "<gray>Your original kit loadout has been reset."
+  none-saved: "<red>You have no saved original kit loadout."
+
+arena:
+  created: "<green>Arena <arena> created."
+  saved: "<green>Arena <arena> saved with <count> block(s)."
+  removed: "<green>Arena <arena> removed."
+  pos1-set: "<green>Position 1 set at <location>."
+  pos2-set: "<green>Position 2 set at <location>."
+  positions-required: "<red>Please set both position 1 and position 2 first."
+  not-found: "<red>Arena '<arena>' could not be found."
+  list-header: "<gray>--- Arenas (<count>) ---"
+  list-entry: "<yellow><arena></yellow> <gray>[<type>]</gray>"
+  regenerating: "<gray>Regenerating arena <arena>..."
+  regenerate-complete: "<green>Arena <arena> regeneration complete."
+  regenerate-failed: "<red>Failed to regenerate arena <arena>: <reason>"
+  fawe-unavailable: "<red>FastAsyncWorldEdit/WorldEdit is not installed. Arena regeneration is disabled."
+
+lobby:
+  spawn-set: "<green>Lobby spawn point updated."
+  teleported: "<gray>Teleported to the lobby."
+
+ranking:
+  stats-header: "<gray>--- Ranked Stats: <player> (<kit>) ---"
+  stats-line: "<gray>Elo: <yellow><elo></yellow> <gray>| W: <green><wins></green> <gray>L: <red><losses></red>"
+  leaderboard-header: "<gray>--- Leaderboard: <kit> ---"
+  leaderboard-entry: "<yellow>#<position></yellow> <white><player></white> <gray>-</gray> <elo> <gray>Elo</gray>"
+  rank-up: "<green>Your <kit> rating increased to <elo>!"
+  rank-down: "<red>Your <kit> rating decreased to <elo>."
+  no-stats: "<red><player> has no ranked statistics for <kit>."
+
+match:
+  countdown: "<yellow>Match starting in <seconds>..."
+  start: "<green><bold>FIGHT!"
+  win: "<green><bold>You won the match!"
+  lose: "<red><bold>You lost the match."
+  draw: "<yellow><bold>The match ended in a draw."
+  forfeit: "<gray><player> forfeited the match."
+  opponent-disconnected: "<gray>Your opponent disconnected. You win by default."
+  ended: "<gray>The match has ended."
+
+spectator:
+  now-spectating: "<gray>Now spectating <yellow><player></yellow>."
+  stopped-spectating: "<gray>You stopped spectating."
+  cannot-spectate: "<red>That match cannot be spectated right now."
+  no-active-match: "<red><player> is not currently in a match."
+
+settings:
+  updated: "<green>Setting <key> updated to <value>."
+  locale-changed: "<green>Language changed to <locale>."
+  invalid-value: "<red>'<value>' is not a valid value for <key>."
+
+stats:
+  header: "<gray>--- Statistics: <player> ---"
+  wins: "<gray>Wins: <green><wins></green>"
+  losses: "<gray>Losses: <red><losses></red>"
+  win-rate: "<gray>Win rate: <yellow><rate>%</yellow>"
+  elo: "<gray>Elo: <yellow><elo></yellow>"
+
+admin:
+  reload-success: "<green>RumilancePractice reloaded successfully."
+  debug-toggled: "<gray>Debug mode set to <enabled>."
+  migrate-started: "<gray>Running pending database migrations..."
+  migrate-complete: "<green>Database migrations complete (<count> applied)."
+
+punishment:
+  issued: "<green><player> was punished (<type>): <reason>"
+  revoked: "<green>Punishment <id> revoked for <player>."
+  history-header: "<gray>--- Punishment History: <player> ---"
+  history-entry: "<gray>[<date>] <type> - <reason> (<staff>)"
+  you-are-punished: "<red>You are currently <type> until <expiry>: <reason>"
+  not-found: "<red>Punishment '<id>' could not be found."
+
+plan:
+  created: "<green>Practice plan <plan> created."
+  removed: "<green>Practice plan <plan> removed."
+  started: "<gray>Practice plan <plan> started."
+  list-header: "<gray>--- Practice Plans ---"
+  not-found: "<red>Practice plan '<plan>' could not be found."
+
+arrow:
+  selected: "<green>Arrow trail effect set to <effect>."
+  locked: "<red>You have not unlocked the <effect> effect yet."
+  list-header: "<gray>--- Arrow Effects ---"

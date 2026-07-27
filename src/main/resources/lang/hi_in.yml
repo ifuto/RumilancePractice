@@ -1,0 +1,34 @@
+# हिन्दी लोकेल फ़ाइल। यहाँ अनुपस्थित कुंजियाँ en_us पर वापस चली जाएँगी।
+general:
+  prefix: "<dark_gray>[<gradient:#a855f7:#6d28d9>Rumilance</gradient><dark_gray>] </dark_gray>"
+  no-permission: "<red>आपको यह करने की अनुमति नहीं है।"
+  player-only: "<red>यह कमांड केवल खिलाड़ी ही उपयोग कर सकते हैं।"
+  player-not-found: "<red>खिलाड़ी '<target>' नहीं मिला।"
+  invalid-usage: "<red>उपयोग: <usage>"
+  reload-success: "<green>कॉन्फ़िगरेशन सफलतापूर्वक पुनः लोड हुआ।"
+  unknown-error: "<red>एक अप्रत्याशित त्रुटि हुई। कृपया व्यवस्थापक से संपर्क करें।"
+
+duel:
+  request-sent: "<gray><yellow><target></yellow> को द्वंद्व निवेदन भेजा गया।"
+  request-received: "<yellow><sender></yellow> <gray>ने आपको द्वंद्व के लिए चुनौती दी है! स्वीकार करने हेतु</gray> <green>/duel accept <sender></green> <gray>टाइप करें।"
+  request-accepted: "<green><target></green> <gray>ने आपका द्वंद्व निवेदन स्वीकार कर लिया।"
+  request-denied: "<red><target></red> <gray>ने आपका द्वंद्व निवेदन अस्वीकार कर दिया।"
+
+match:
+  countdown: "<yellow>मैच <seconds> सेकंड में शुरू हो रहा है..."
+  start: "<green><bold>लड़ो!"
+  win: "<green><bold>आपने मैच जीत लिया!"
+  lose: "<red><bold>आप मैच हार गए।"
+  draw: "<yellow><bold>मैच बराबरी पर समाप्त हुआ।"
+
+kit:
+  selected: "<green>किट <yellow><kit></yellow> चुनी गई।"
+
+ranking:
+  stats-header: "<gray>--- रैंक आँकड़े: <player> (<kit>) ---"
+
+settings:
+  locale-changed: "<green>भाषा <locale> में बदल दी गई।"
+
+arena:
+  created: "<green>अरीना <arena> बनाया गया।"

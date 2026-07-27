@@ -1,0 +1,125 @@
+package com.rumilance.practice.session;
+
+import com.rumilance.practice.state.PlayerState;
+
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Enforces the allowed {@link PlayerState} transition graph for every online player.
+ * Framework-agnostic and keyed purely by {@link UUID}, so it is trivially unit testable.
+ *
+ * <p>Allowed transitions:</p>
+ * <pre>
+ * IDLE              -&gt; LOBBY
+ * LOBBY             -&gt; OPENING_GUI, QUEUED_RANKED, QUEUED_UNRANKED, REQUESTING_DUEL, SPECTATING, FFA, EDITING_KIT
+ * OPENING_GUI       -&gt; LOBBY, QUEUED_RANKED, QUEUED_UNRANKED, REQUESTING_DUEL, SPECTATING, FFA, EDITING_KIT
+ * QUEUED_RANKED     -&gt; LOBBY, PREPARING_MATCH
+ * QUEUED_UNRANKED   -&gt; LOBBY, PREPARING_MATCH
+ * REQUESTING_DUEL   -&gt; LOBBY, PREPARING_MATCH
+ * PREPARING_MATCH   -&gt; COUNTDOWN, LOBBY
+ * COUNTDOWN         -&gt; FIGHTING, LOBBY
+ * FIGHTING          -&gt; ENDING
+ * ENDING            -&gt; LOBBY, PREPARING_MATCH
+ * SPECTATING        -&gt; LOBBY
+ * FFA               -&gt; LOBBY
+ * EDITING_KIT       -&gt; LOBBY
+ * </pre>
+ *
+ * <p>Bugs the spec explicitly calls out are prevented by this graph: a player cannot be in two
+ * queues at once (queue states only reachable from LOBBY/OPENING_GUI), cannot accept a duel while
+ * FIGHTING (FIGHTING only leaves via ENDING), and any player stuck in an unexpected state after a
+ * crash/restart can always be force-reset back to LOBBY via {@link #resetToLobby(UUID)}.</p>
+ */
+public final class PlayerStateManager {
+
+    private static final Map<PlayerState, Set<PlayerState>> ALLOWED = buildTransitionGraph();
+
+    private final Map<UUID, PlayerState> states = new ConcurrentHashMap<>();
+
+    public PlayerState getState(UUID uuid) {
+        Objects.requireNonNull(uuid, "uuid");
+        return states.getOrDefault(uuid, PlayerState.IDLE);
+    }
+
+    /**
+     * Registers a freshly joined player and places them directly into {@link PlayerState#LOBBY}
+     * (the spec's "IDLE -&gt; LOBBY on join" rule), bypassing transition validation since there is
+     * no prior state to validate against.
+     */
+    public PlayerState initialize(UUID uuid) {
+        Objects.requireNonNull(uuid, "uuid");
+        states.put(uuid, PlayerState.LOBBY);
+        return PlayerState.LOBBY;
+    }
+
+    public void remove(UUID uuid) {
+        states.remove(uuid);
+    }
+
+    /**
+     * Unconditionally forces {@code uuid} back to {@link PlayerState#LOBBY}, regardless of the
+     * transition graph. Used as a safety net (queue/match error handling, admin cleanup, plugin
+     * reload) so a player can never be permanently stuck in QUEUED or FIGHTING states.
+     */
+    public PlayerState resetToLobby(UUID uuid) {
+        Objects.requireNonNull(uuid, "uuid");
+        states.put(uuid, PlayerState.LOBBY);
+        return PlayerState.LOBBY;
+    }
+
+    public static boolean canTransition(PlayerState from, PlayerState to) {
+        Objects.requireNonNull(from, "from");
+        Objects.requireNonNull(to, "to");
+        if (from == to) {
+            return false;
+        }
+        return ALLOWED.getOrDefault(from, Set.of()).contains(to);
+    }
+
+    /**
+     * Attempts to move {@code uuid} from its current state to {@code target}.
+     *
+     * @throws IllegalStateTransitionException if the transition is not allowed from the
+     *                                          player's current state.
+     */
+    public PlayerState transition(UUID uuid, PlayerState target) {
+        Objects.requireNonNull(uuid, "uuid");
+        Objects.requireNonNull(target, "target");
+        PlayerState current = getState(uuid);
+        if (!canTransition(current, target)) {
+            throw new IllegalStateTransitionException(uuid, current, target);
+        }
+        states.put(uuid, target);
+        return target;
+    }
+
+    private static Map<PlayerState, Set<PlayerState>> buildTransitionGraph() {
+        Map<PlayerState, Set<PlayerState>> map = new EnumMap<>(PlayerState.class);
+        map.put(PlayerState.IDLE, Set.of(PlayerState.LOBBY));
+        map.put(PlayerState.LOBBY, Set.of(
+                PlayerState.OPENING_GUI, PlayerState.QUEUED_RANKED, PlayerState.QUEUED_UNRANKED,
+                PlayerState.REQUESTING_DUEL, PlayerState.SPECTATING, PlayerState.FFA, PlayerState.EDITING_KIT
+        ));
+        map.put(PlayerState.OPENING_GUI, Set.of(
+                PlayerState.LOBBY, PlayerState.QUEUED_RANKED, PlayerState.QUEUED_UNRANKED,
+                PlayerState.REQUESTING_DUEL, PlayerState.SPECTATING, PlayerState.FFA, PlayerState.EDITING_KIT
+        ));
+        map.put(PlayerState.QUEUED_RANKED, Set.of(PlayerState.LOBBY, PlayerState.PREPARING_MATCH));
+        map.put(PlayerState.QUEUED_UNRANKED, Set.of(PlayerState.LOBBY, PlayerState.PREPARING_MATCH));
+        map.put(PlayerState.REQUESTING_DUEL, Set.of(PlayerState.LOBBY, PlayerState.PREPARING_MATCH));
+        map.put(PlayerState.PREPARING_MATCH, Set.of(PlayerState.COUNTDOWN, PlayerState.LOBBY));
+        map.put(PlayerState.COUNTDOWN, Set.of(PlayerState.FIGHTING, PlayerState.LOBBY));
+        map.put(PlayerState.FIGHTING, Set.of(PlayerState.ENDING));
+        map.put(PlayerState.ENDING, Set.of(PlayerState.LOBBY, PlayerState.PREPARING_MATCH));
+        map.put(PlayerState.SPECTATING, Set.of(PlayerState.LOBBY));
+        map.put(PlayerState.FFA, Set.of(PlayerState.LOBBY));
+        map.put(PlayerState.EDITING_KIT, Set.of(PlayerState.LOBBY));
+        return Collections.unmodifiableMap(map);
+    }
+}
