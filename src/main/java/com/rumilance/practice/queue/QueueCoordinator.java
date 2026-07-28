@@ -7,6 +7,7 @@ import com.rumilance.practice.lobby.LobbyService;
 import com.rumilance.practice.match.MatchService;
 import com.rumilance.practice.model.RankedKitStats;
 import com.rumilance.practice.session.PlayerStateManager;
+import com.rumilance.practice.locale.MessageService;
 import com.rumilance.practice.sound.SoundService;
 import com.rumilance.practice.state.MatchMode;
 import com.rumilance.practice.state.PlayerState;
@@ -43,6 +44,7 @@ public final class QueueCoordinator {
     private final LobbyService lobbyService;
     private final PlayerStateManager stateManager;
     private final SoundService soundService;
+    private final MessageService messageService;
     private final RankedStatsRepository rankedStatsRepository;
     private final AsyncExecutor asyncExecutor;
     private final RuntimeFlags runtimeFlags;
@@ -63,7 +65,8 @@ public final class QueueCoordinator {
             AsyncExecutor asyncExecutor,
             RuntimeFlags runtimeFlags,
             boolean blockSameIp,
-            boolean avoidRecent
+            boolean avoidRecent,
+            MessageService messageService
     ) {
         this.plugin = plugin;
         this.queueService = queueService;
@@ -77,6 +80,7 @@ public final class QueueCoordinator {
         this.runtimeFlags = runtimeFlags;
         this.blockSameIp = blockSameIp;
         this.avoidRecent = avoidRecent;
+        this.messageService = messageService;
     }
 
     public void start() {
@@ -99,16 +103,16 @@ public final class QueueCoordinator {
             return;
         }
         if (runtimeFlags.maintenance() && !player.hasPermission("rumilance.admin")) {
-            player.sendMessage(Component.text("Practice is in maintenance mode.", NamedTextColor.RED));
+            messageService.send(player, "queue.maintenance");
             return;
         }
         if (!kitService.isQueueEnabled(kitId) || kitService.get(kitId).filter(k -> k.enabled()).isEmpty()) {
-            player.sendMessage(Component.text("That kit queue is disabled.", NamedTextColor.RED));
+            messageService.send(player, "queue.kit-disabled");
             return;
         }
         PlayerState state = stateManager.getState(player.getUniqueId());
         if (state != PlayerState.LOBBY && state != PlayerState.OPENING_GUI) {
-            player.sendMessage(Component.text("You cannot join a queue right now.", NamedTextColor.RED));
+            messageService.send(player, "queue.cannot-join");
             return;
         }
         if (queueService.isQueued(player.getUniqueId())) {
@@ -129,7 +133,7 @@ public final class QueueCoordinator {
 
         String ip = player.getAddress() == null ? null : player.getAddress().getAddress().getHostAddress();
         if (!queueService.join(player.getUniqueId(), kitId, mode, elo.get(), ip)) {
-            player.sendMessage(Component.text("Already queued.", NamedTextColor.RED));
+            messageService.send(player, "queue.already-queued");
             return;
         }
 
@@ -144,8 +148,8 @@ public final class QueueCoordinator {
         player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 40, 0, false, false, false));
         giveLeaveItem(player);
         soundService.play(player, "queue-joined");
-        player.sendMessage(Component.text("Joined " + mode.name().toLowerCase() + " queue: " + kitId,
-                NamedTextColor.GREEN));
+        messageService.send(player, "queue.joined",
+                MessageService.tags("mode", messageService.modeWord(player, mode == MatchMode.RANKED), "kit", kitId));
     }
 
     public void leave(Player player) {
@@ -153,7 +157,7 @@ public final class QueueCoordinator {
             stateManager.resetToLobby(player.getUniqueId());
             lobbyService.applyLobbyInventory(player);
             soundService.play(player, "queue-leave");
-            player.sendMessage(Component.text("Left the queue.", NamedTextColor.YELLOW));
+            messageService.send(player, "queue.left");
         });
     }
 

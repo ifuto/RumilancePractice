@@ -69,13 +69,14 @@ commands:
     description: Open FFA list GUI or manage FFA arenas.
     usage: /ffa [create|selection|spawn|kit|enable|disable|delete|reset|leave]
     permission: rumilance.user
-  adffa:
-    description: Admin FFA reset shortcut.
-    usage: /adffa reset <arena>
-    permission: rumilance.admin
   ekit:
     description: Edit official kit layout.
     usage: /ekit
+    permission: rumilance.user
+  leave:
+    description: Leave a match during the pre-match countdown.
+    usage: /leave
+    aliases: [le]
     permission: rumilance.user
   lobby:
     description: Return to the practice lobby.
@@ -128,8 +129,8 @@ commands:
     usage: /arena <subcommand>
     permission: rumilance.admin
   kit:
-    description: Manage official kits.
-    usage: /kit <subcommand>
+    description: Manage official kits (no args opens the Kit Management GUI).
+    usage: /kit [gui|help|create <name>|list|info <name>|enable|disable|delete <name>|timeout <name> <sec>|adventure <name> <on|off>|flag <name> <on|off>]
     permission: rumilance.admin
   toggle:
     description: Enable/disable queues or maps.

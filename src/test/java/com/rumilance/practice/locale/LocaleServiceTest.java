@@ -23,7 +23,7 @@ class LocaleServiceTest {
 
     @Test
     void bundlesEveryDocumentedLocale() {
-        assertEquals(14, LocaleService.BUILT_IN_LOCALES.size());
+        assertEquals(4, LocaleService.BUILT_IN_LOCALES.size());
         for (String locale : LocaleService.BUILT_IN_LOCALES) {
             assertTrue(localeService.isSupported(locale), "expected " + locale + " to be loaded");
         }

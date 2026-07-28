@@ -37,21 +37,6 @@ public final class FfaCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command,
                              @NotNull String label, @NotNull String[] args) {
-        String name = command.getName().toLowerCase(Locale.ROOT);
-        if (name.equals("adffa")) {
-            if (!sender.hasPermission("rumilance.admin")) {
-                sender.sendMessage(Component.text("No permission.", NamedTextColor.RED));
-                return true;
-            }
-            if (args.length < 2 || !args[0].equalsIgnoreCase("reset")) {
-                sender.sendMessage(Component.text("Usage: /adffa reset <arena>", NamedTextColor.YELLOW));
-                return true;
-            }
-            ffaService.reset(args[1]);
-            sender.sendMessage(Component.text("FFA reset started: " + args[1], NamedTextColor.GREEN));
-            return true;
-        }
-
         if (args.length == 0) {
             if (sender instanceof Player player) {
                 ffaListGui.open(player);
@@ -178,15 +163,6 @@ public final class FfaCommand implements CommandExecutor, TabCompleter {
     @Override
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command,
                                                 @NotNull String alias, @NotNull String[] args) {
-        if (command.getName().equalsIgnoreCase("adffa")) {
-            if (args.length == 1) {
-                return List.of("reset");
-            }
-            if (args.length == 2) {
-                return ffaService.list().stream().map(FfaService.FfaArena::id).toList();
-            }
-            return List.of();
-        }
         if (args.length == 1) {
             List<String> base = new ArrayList<>(List.of("leave"));
             if (sender.hasPermission("rumilance.admin")) {

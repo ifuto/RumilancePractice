@@ -1,28 +1,73 @@
 # 한국어 로케일 파일. 이 파일에 없는 키는 en_us로 대체됩니다.
+# 스타일: 채팅 접두사 없음, 굵게 글씨는 최소화(제목/버튼만), 깔끔하고 모던.
 general:
-  prefix: "<dark_gray>[<gradient:#a855f7:#6d28d9>Rumilance</gradient><dark_gray>] </dark_gray>"
+  prefix: ""
+  maintenance: "<red>현재 점검 중입니다."
   no-permission: "<red>이 작업을 수행할 권한이 없습니다."
   player-only: "<red>이 명령어는 플레이어만 사용할 수 있습니다."
   player-not-found: "<red>플레이어 '<target>'을 찾을 수 없습니다."
   invalid-usage: "<red>사용법: <usage>"
   reload-success: "<green>설정을 다시 불러왔습니다."
   unknown-error: "<red>예상치 못한 오류가 발생했습니다. 관리자에게 문의하세요."
+  mode-ranked: "랭크전"
+  mode-unranked: "비랭크전"
 
 duel:
-  request-sent: "<gray><yellow><target></yellow>에게 듀얼 신청을 보냈습니다."
-  request-received: "<yellow><sender></yellow><gray>가 당신에게 듀얼을 신청했습니다! </gray><green>/duel accept <sender></green><gray>로 수락하세요."
-  request-accepted: "<green><target></green> <gray>가 듀얼 신청을 수락했습니다."
-  request-denied: "<red><target></red> <gray>가 듀얼 신청을 거절했습니다."
+  request-sent: "<gray><yellow><target></yellow>에게 <mode> 듀얼 신청을 보냈습니다 (<kit>)."
+  request-received: "<yellow><sender></yellow> <gray>가 <mode> 듀얼을 신청했습니다 (<kit>)."
+  request-accepted: "<green><target> 님이 듀얼 신청을 수락했습니다."
+  request-denied: "<red><target> 님이 듀얼 신청을 거절했습니다."
+  request-cancelled: "<gray><yellow><target></yellow>에게 보낸 신청을 취소했습니다."
+  request-expired: "<gray><yellow><target></yellow>에게 보낸 신청이 만료되었습니다."
+  deny-own: "<gray><yellow><target></yellow>의 신청을 거절했습니다."
+  deny-all: "<gray>모든 듀얼 신청을 거절했습니다."
+  no-pending-request: "<red>해당 플레이어에게 받은 대기 중인 신청이 없습니다."
+  no-request-to-deny: "<red>거절할 신청이 없습니다."
+  already-in-match: "<red>이미 경기 중입니다."
+  target-already-in-match: "<red><target> 님은 이미 경기 중입니다."
+  cannot-duel-self: "<red>자신과는 대전할 수 없습니다."
+  target-offline: "<red><target> 님은 오프라인입니다."
+  kit-required: "<red>신청하기 전에 키트를 선택하세요."
+  could-not-send: "<red>신청을 보낼 수 없습니다. 다시 시도해 주세요."
+  accepted-own: "<green><target> 님의 신청을 수락했습니다."
+  target-denying: "<red><target> 님은 지금 듀얼 신청을 받지 않습니다."
 
-match:
-  countdown: "<yellow>경기가 <seconds>초 후 시작됩니다..."
-  start: "<green><bold>싸워라!"
-  win: "<green><bold>경기에서 승리했습니다!"
-  lose: "<red><bold>경기에서 패배했습니다."
-  draw: "<yellow><bold>경기가 무승부로 끝났습니다."
+duel-gui:
+  title-ranked: "<light_purple>랭크 듀얼"
+  title-unranked: "<aqua>비랭크 듀얼"
+  kit-select: "<aqua>키트 (<kit>)"
+  map-select: "<green>맵 (<map>)"
+  mode-ranked: "<white>모드: 랭크전"
+  mode-unranked: "<white>모드: 비랭크전"
+  cancel: "<red>취소"
+  best-of: "<yellow>Best of <n>"
+  pending: "<yellow>전송 중..."
+  send: "<green>전송"
+  ping: "<green>핑: <n>"
+  record: "<gray>승: <wins>  패: <losses>"
+  kd: "<aqua>K/D: <kd>  WR: <wr>"
+
+ffa:
+  maintenance: "<red>현재 점검 중입니다."
+  unavailable: "<red>FFA를 현재 이용할 수 없습니다."
+  cannot-join: "<red>지금은 FFA에 참여할 수 없습니다."
+  kit-missing: "<red>FFA 키트를 찾을 수 없습니다."
+  arena-full: "<red>해당 FFA 아레나가 가득 찼습니다."
+  no-arenas: "<red>현재 이용 가능한 FFA 아레나가 없습니다."
+  joined: "<green><arena> FFA 아레나에 참여했습니다."
+  left: "<gray>FFA에서 퇴장했습니다."
+  killed-by: "<red><yellow><killer></yellow>에게 처치당했습니다."
+  repairing-title: "<red>FFA 복구 중입니다"
 
 kit:
+  created: "<green>키트 <kit>를 생성했습니다."
+  deleted: "<green>키트 <kit>를 삭제했습니다."
+  saved: "<green>키트 <kit>를 저장했습니다."
   selected: "<green>키트 <yellow><kit></yellow>을 선택했습니다."
+  not-found: "<red>키트 '<kit>'을 찾을 수 없습니다."
+
+arena:
+  created: "<green>아레나 <arena>가 생성되었습니다."
 
 ranking:
   stats-header: "<gray>--- 랭크 통계: <player> (<kit>) ---"
@@ -30,5 +75,30 @@ ranking:
 settings:
   locale-changed: "<green>언어가 <locale>로 변경되었습니다."
 
-arena:
-  created: "<green>아레나 <arena>가 생성되었습니다."
+queue:
+  maintenance: "<red>현재 점검 중입니다."
+  kit-disabled: "<red>해당 키트 대기열이 비활성화되어 있습니다."
+  cannot-join: "<red>지금은 대기열에 참여할 수 없습니다."
+  already-queued: "<red>이미 대기열에 있습니다."
+  joined: "<green><yellow><kit></yellow> <mode> 대기열에 참여했습니다."
+  left: "<gray>대기열에서 나갔습니다."
+
+match:
+  countdown: "<yellow>경기가 <seconds>초 후 시작됩니다..."
+  found-title: "<gold><bold>⚔ 매치 발견 ⚔"
+  found-subtitle: "<dark_gray>----------------------------"
+  start-title: "<light_purple><bold>파이트!"
+  win-title: "<green><bold>승리!"
+  lose-title: "<red><bold>패배..."
+  draw-title: "<yellow><bold>무승부"
+  timeout-draw: "<yellow>시간 초과로 무승부 처리되었습니다."
+  could-not-start: "<red>경기를 시작할 수 없습니다: <reason>"
+  forfeit: "<gray><player> 님이 경기를 포기했습니다."
+  opponent-disconnected: "<gray>상대가 접속을 종료하여 기본 승리 처리되었습니다."
+  ended: "<gray>경기가 종료되었습니다."
+  rematch-requested: "<yellow><player> 님이 리매치를 원합니다!"
+  cannot-leave: "<red>경기에서 나갈 수 있는 건 시작 전 카운트다운 중에만 가능합니다."
+  leave-cancelled: "<gray>경기를 취소하고 나갔습니다."
+  opponent-left-countdown: "<gray>상대가 카운트다운 중에 나가 경기가 취소되었습니다."
+  leave-banned: "<red>카운트다운 중 연속 퇴장이 잦아 3일간 채팅이 제한되었습니다."
+  leave-ban-reason: "시작 전 카운트다운 중 연속 퇴장"

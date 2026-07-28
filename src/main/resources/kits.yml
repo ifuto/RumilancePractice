@@ -1,6 +1,11 @@
 # Default kit definitions. Additional kits can be created in-game with /kit create.
 # Item entries use Bukkit Material names; enchantments/nbt beyond the basics are
 # configured through the in-game kit editor and persisted via ItemSerializer.
+#
+# Per-kit options (all optional):
+#   adventure: true           -> forces Adventure mode for this kit (default Survival).
+#   arena-terrain: ANY|FLAT|BUMPY|CRYSTAL|NETHERITE  -> which arenas the kit may use.
+#   enabled / ranked / ffa-enabled / natural-health-regen / timeout-seconds / ...
 kits:
   nodebuff:
     display-name: "<gray>NoDebuff"

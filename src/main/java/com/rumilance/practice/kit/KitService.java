@@ -8,6 +8,7 @@ import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
+import org.bukkit.GameMode;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 
@@ -62,6 +63,7 @@ public final class KitService {
                     .blockBreak(section.getBoolean("block-break", false))
                     .pearl(section.getBoolean("pearl", true))
                     .totem(section.getBoolean("totem", true))
+                    .forceAdventure(section.getBoolean("adventure", false))
                     .timeoutSeconds(section.getInt("timeout-seconds", 0))
                     .canBreak(section.getStringList("can-break"));
 
@@ -180,6 +182,9 @@ public final class KitService {
         player.setHealth(Math.min(player.getMaxHealth(), kit.maxHealth()));
         player.setFoodLevel(20);
         player.setSaturation(20f);
+        // Default to SURVIVAL so PvP kits behave normally; kits flagged adventure force ADVENTURE
+        // (e.g. kits where block interaction should be fully disabled).
+        player.setGameMode(kit.forceAdventure() ? GameMode.ADVENTURE : GameMode.SURVIVAL);
     }
 
     private static ItemStack clean(ItemStack stack) {
@@ -235,6 +240,7 @@ public final class KitService {
         yaml.set(path + ".block-break", kit.blockBreak());
         yaml.set(path + ".pearl", kit.pearl());
         yaml.set(path + ".totem", kit.totem());
+        yaml.set(path + ".adventure", kit.forceAdventure());
         yaml.set(path + ".timeout-seconds", kit.timeoutSeconds());
         yaml.set(path + ".can-break", kit.canBreak());
         List<Map<String, Object>> itemMaps = new ArrayList<>();

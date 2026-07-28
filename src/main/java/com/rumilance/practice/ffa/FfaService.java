@@ -5,9 +5,11 @@ import com.rumilance.practice.config.RuntimeFlags;
 import com.rumilance.practice.database.repository.FfaStatsRepository;
 import com.rumilance.practice.kit.KitLayoutCache;
 import com.rumilance.practice.kit.KitService;
+import com.rumilance.practice.locale.MessageService;
 import com.rumilance.practice.lobby.LobbyService;
 import com.rumilance.practice.model.KitDefinition;
 import com.rumilance.practice.session.PlayerStateManager;
+import com.rumilance.practice.sound.SoundService;
 import com.rumilance.practice.state.PlayerState;
 import com.rumilance.practice.util.AsyncExecutor;
 import com.rumilance.practice.util.Cuboid;
@@ -64,6 +66,8 @@ public final class FfaService {
     private final FfaStatsRepository ffaStatsRepository;
     private final AsyncExecutor asyncExecutor;
     private final RuntimeFlags runtimeFlags;
+    private final MessageService messageService;
+    private final SoundService soundService;
     private final Map<String, FfaArena> arenas = new ConcurrentHashMap<>();
     private final Map<UUID, String> playerArena = new ConcurrentHashMap<>();
     private final Map<UUID, FfaStats> sessionStats = new ConcurrentHashMap<>();
@@ -79,7 +83,9 @@ public final class FfaService {
             PlayerStateManager stateManager,
             FfaStatsRepository ffaStatsRepository,
             AsyncExecutor asyncExecutor,
-            RuntimeFlags runtimeFlags
+            RuntimeFlags runtimeFlags,
+            MessageService messageService,
+            SoundService soundService
     ) {
         this.plugin = plugin;
         this.configService = configService;
@@ -90,6 +96,8 @@ public final class FfaService {
         this.ffaStatsRepository = ffaStatsRepository;
         this.asyncExecutor = asyncExecutor;
         this.runtimeFlags = runtimeFlags;
+        this.messageService = messageService;
+        this.soundService = soundService;
         reload();
     }
 
@@ -136,22 +144,22 @@ public final class FfaService {
 
     public boolean join(Player player, String arenaId) {
         if (runtimeFlags.maintenance() && !player.hasPermission("rumilance.admin")) {
-            player.sendMessage(Component.text("Practice is in maintenance mode.", NamedTextColor.RED));
+            messageService.send(player, "ffa.maintenance");
             return false;
         }
         FfaArena arena = arenas.get(arenaId.toLowerCase());
         if (arena == null || !arena.enabled() || Boolean.TRUE.equals(resetting.get(arena.id()))) {
-            player.sendMessage(Component.text("FFA unavailable.", NamedTextColor.RED));
+            messageService.send(player, "ffa.unavailable");
             return false;
         }
         PlayerState state = stateManager.getState(player.getUniqueId());
         if (state != PlayerState.LOBBY && state != PlayerState.OPENING_GUI) {
-            player.sendMessage(Component.text("Cannot join FFA now.", NamedTextColor.RED));
+            messageService.send(player, "ffa.cannot-join");
             return false;
         }
         KitDefinition kit = kitService.get(arena.kitId()).orElse(null);
         if (kit == null) {
-            player.sendMessage(Component.text("FFA kit missing.", NamedTextColor.RED));
+            messageService.send(player, "ffa.kit-missing");
             return false;
         }
         try {
@@ -165,7 +173,7 @@ public final class FfaService {
             player.teleport(LocationUtil.safeTeleportLocation(arena.spawn(), player));
         }
         applyKit(player, kit);
-        player.sendMessage(Component.text("Joined FFA: " + arena.id(), NamedTextColor.GREEN));
+        messageService.send(player, "ffa.joined", MessageService.tags("arena", arena.id()));
         return true;
     }
 
@@ -193,6 +201,7 @@ public final class FfaService {
         if (arenaId == null) {
             return;
         }
+        soundService.play(victim, "death");
         addDeath(victim.getUniqueId());
         asyncExecutor.execute(() -> {
             try {
@@ -344,7 +353,7 @@ public final class FfaService {
             Player player = Bukkit.getPlayer(uuid);
             if (player != null) {
                 player.showTitle(Title.title(
-                        Component.text("FFAは修復中です", NamedTextColor.RED),
+                        messageService.render(messageService.resolveLocale(player), "ffa.repairing-title"),
                         Component.empty(),
                         Title.Times.times(Duration.ZERO, Duration.ofSeconds(2), Duration.ofMillis(200))));
                 leave(player);

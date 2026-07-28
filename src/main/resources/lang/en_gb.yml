@@ -1,6 +1,7 @@
 # English (UK) locale. Falls back to en_us for any key not defined here.
 general:
-  prefix: "<dark_gray>[<gradient:#a855f7:#6d28d9>Rumilance</gradient><dark_gray>] </dark_gray>"
+  prefix: ""
+  maintenance: "<red>Practice is currently in maintenance mode."
   no-permission: "<red>You do not have permission to do that."
   player-only: "<red>Only players can use this command."
   player-not-found: "<red>Player '<target>' could not be found."
@@ -9,23 +10,36 @@ general:
   unknown-error: "<red>An unexpected error occurred. Please contact an administrator."
 
 duel:
-  request-sent: "<gray>Duel request sent to <yellow><target></yellow>."
-  request-received: "<yellow><sender></yellow> <gray>has challenged you to a duel! Type</gray> <green>/duel accept <sender></green> <gray>to accept."
-  request-accepted: "<green><target></green> <gray>accepted your duel request."
-  request-denied: "<red><target></red> <gray>declined your duel request."
+  request-sent: "<grey>Sent a <mode> duel request (<kit>) to <yellow><target></yellow>."
+  request-received: "<yellow><sender></yellow> <grey>challenged you to a <mode> duel (<kit>)."
+  request-accepted: "<green><target> accepted your duel request."
+  request-denied: "<red><target> declined your duel request."
+
+ffa:
+  joined: "<green>Joined the <arena> FFA arena."
+  left: "<grey>You left the FFA arena."
+  killed-by: "<red>You were killed by <yellow><killer></yellow>."
+
+queue:
+  maintenance: "<red>Practice is currently in maintenance mode."
+  kit-disabled: "<red>That kit queue is currently disabled."
+  cannot-join: "<red>You cannot join a queue right now."
+  already-queued: "<red>You are already in a queue."
+  joined: "<green>Joined the <mode> queue for <yellow><kit></yellow>."
+  left: "<grey>Left the queue."
 
 match:
   countdown: "<yellow>Match starting in <seconds>..."
-  start: "<green><bold>FIGHT!"
-  win: "<green><bold>You won the match!"
-  lose: "<red><bold>You lost the match."
-  draw: "<yellow><bold>The match ended in a draw."
+  start-title: "<light_purple><bold>FIGHT!"
+  win-title: "<green><bold>VICTORY"
+  lose-title: "<red><bold>DEFEAT"
+  draw-title: "<yellow><bold>DRAW"
 
 kit:
   selected: "<green>Selected kit <yellow><kit></yellow>."
 
 ranking:
-  stats-header: "<gray>--- Ranked Stats: <player> (<kit>) ---"
+  stats-header: "<grey>--- Ranked Stats: <player> (<kit>) ---"
 
 settings:
   locale-changed: "<green>Language changed to <locale>."

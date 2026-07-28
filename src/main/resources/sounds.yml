@@ -1,24 +1,26 @@
 # Sound effects. Keys use NamespacedKey form (minecraft: omitted ok).
+# Set a key to "none" to make that event silent (no sound is played).
 # Default pitch 0.0 for GUI sounds (client clamps). Countdown uses pitch 1.0 in code.
 sounds:
   select:
-    key: entity.experience_orb.pickup
+    key: block.note_block.xylophone
     volume: 1.0
     pitch: 0.0
   queue-leave:
     key: entity.glow_item_frame.remove_item
     volume: 1.0
     pitch: 0.0
+  # Menu open and back are intentionally silent.
   gui-back:
-    key: block.end_portal_frame.fill
+    key: none
     volume: 1.0
     pitch: 0.0
   gui-open:
-    key: block.end_portal_frame.fill
+    key: none
     volume: 1.0
     pitch: 1.4
   kit-select:
-    key: ui.button.click
+    key: entity.experience_orb.pickup
     volume: 1.0
     pitch: 0.0
   gui-click:
@@ -26,7 +28,7 @@ sounds:
     volume: 1.0
     pitch: 0.0
   duel-request-received:
-    key: block.note_block.chime
+    key: block.note_block.bell
     volume: 1.0
     pitch: 0.0
   duel-request-sent:
@@ -38,9 +40,21 @@ sounds:
     volume: 1.0
     pitch: 0.0
   cancel:
+    key: entity.item.pickup
+    volume: 1.0
+    pitch: 0.0
+  delete:
     key: entity.item.break
     volume: 1.0
     pitch: 0.0
+  match-found:
+    key: entity.player.levelup
+    volume: 1.0
+    pitch: 1.0
+  death:
+    key: entity.lightning_bolt.impact
+    volume: 1.0
+    pitch: 1.0
   match-start:
     key: item.mace.smash_ground_heavy
     volume: 1.0

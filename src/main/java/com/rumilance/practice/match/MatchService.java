@@ -4,6 +4,7 @@ import com.rumilance.practice.arena.ArenaService;
 import com.rumilance.practice.duel.DuelRequestService;
 import com.rumilance.practice.kit.KitLayoutCache;
 import com.rumilance.practice.kit.KitService;
+import com.rumilance.practice.locale.MessageService;
 import com.rumilance.practice.lobby.LobbyService;
 import com.rumilance.practice.match.result.FfaResultProcessor;
 import com.rumilance.practice.match.result.MatchResultProcessor;
@@ -71,10 +72,18 @@ public final class MatchService {
     private final int maxDurationSeconds;
     private final Map<UUID, BukkitTask> tasks = new ConcurrentHashMap<>();
     private volatile boolean shuttingDown;
+    /**
+     * In-memory tally of consecutive pre-match-countdown leaves per player. Incremented when a
+     * player runs {@code /leave} during the countdown, reset to 0 the moment one of their matches
+     * actually reaches FIGHT. Three in a row triggers a 3-day ChatBan. (Bans themselves persist;
+     * this streak resets on server restart.)
+     */
+    private final Map<UUID, Integer> countdownLeaveStreak = new ConcurrentHashMap<>();
     private com.rumilance.practice.spectator.SpectatorService spectatorService;
     private com.rumilance.practice.punishment.ChatBanService chatBanService;
     private SettingsService settingsService;
     private QueueCoordinator queueCoordinator;
+    private MessageService messageService;
 
     public MatchService(
             Plugin plugin,
@@ -128,6 +137,10 @@ public final class MatchService {
         this.chatBanService = chatBanService;
     }
 
+    public void setMessageService(MessageService messageService) {
+        this.messageService = messageService;
+    }
+
     public MatchRegistry registry() {
         return registry;
     }
@@ -163,6 +176,7 @@ public final class MatchService {
         tryTransition(playerA, PlayerState.PREPARING_MATCH);
         tryTransition(playerB, PlayerState.PREPARING_MATCH);
         session.setState(MatchState.RESERVING_ARENA);
+        announceMatchFound(session);
 
         arenaService.reserve(ArenaType.DUEL, terrain == null ? kit.arenaTerrain() : terrain, session.id())
                 .whenComplete((opt, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
@@ -191,24 +205,54 @@ public final class MatchService {
         }
         Location spawnA = LocationUtil.safeTeleportLocation(arenaService.spawnA(instance), p1);
         Location spawnB = LocationUtil.safeTeleportLocation(arenaService.spawnB(instance), p2);
-        // Wait for both teleports before countdown so clients never render a border-outside frame.
-        var futureA = p1.teleportAsync(spawnA);
-        var futureB = p2.teleportAsync(spawnB);
-        futureA.thenCombine(futureB, (a, b) -> a && b).whenComplete((ok, error) ->
-                Bukkit.getScheduler().runTask(plugin, () -> {
-                    if (error != null || !Boolean.TRUE.equals(ok)) {
-                        // Fallback sync teleport if async failed.
-                        p1.teleport(spawnA);
-                        p2.teleport(spawnB);
-                    }
-                    if (Bukkit.getPlayer(p1.getUniqueId()) == null || Bukkit.getPlayer(p2.getUniqueId()) == null) {
-                        failMatch(session, "Player offline during prepare");
-                        return;
-                    }
-                    applyKit(p1, kit);
-                    applyKit(p2, kit);
-                    startCountdown(session);
-                }));
+        // Brief beat (0.5s) so players register the MATCH FOUND notification before the teleport.
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (Bukkit.getPlayer(p1.getUniqueId()) == null || Bukkit.getPlayer(p2.getUniqueId()) == null) {
+                failMatch(session, "Player offline during prepare");
+                return;
+            }
+            // Wait for both teleports before countdown so clients never render a border-outside frame.
+            var futureA = p1.teleportAsync(spawnA);
+            var futureB = p2.teleportAsync(spawnB);
+            futureA.thenCombine(futureB, (a, b) -> a && b).whenComplete((ok, error) ->
+                    Bukkit.getScheduler().runTask(plugin, () -> {
+                        if (error != null || !Boolean.TRUE.equals(ok)) {
+                            // Fallback sync teleport if async failed.
+                            p1.teleport(spawnA);
+                            p2.teleport(spawnB);
+                        }
+                        if (Bukkit.getPlayer(p1.getUniqueId()) == null || Bukkit.getPlayer(p2.getUniqueId()) == null) {
+                            failMatch(session, "Player offline during prepare");
+                            return;
+                        }
+                        applyKit(p1, kit);
+                        applyKit(p2, kit);
+                        startCountdown(session);
+                    }));
+        }, 10L);
+    }
+
+    /**
+     * Shows the MATCH FOUND title and plays the match-found jingle to both participants the
+     * instant a match is created (before the arena is reserved and players are teleported).
+     */
+    private void announceMatchFound(MatchSession session) {
+        for (UUID id : session.participants()) {
+            Player player = Bukkit.getPlayer(id);
+            if (player == null) {
+                continue;
+            }
+            Component main = title(player, "match.found-title",
+                    Component.text("⚔ MATCH FOUND ⚔")
+                            .color(NamedTextColor.GOLD)
+                            .decorate(TextDecoration.BOLD));
+            Component sub = title(player, "match.found-subtitle",
+                    Component.text("----------------------------", NamedTextColor.DARK_GRAY));
+            player.showTitle(Title.title(
+                    main, sub,
+                    Title.Times.times(Duration.ZERO, Duration.ofMillis(700), Duration.ofMillis(300))));
+            soundService.play(player, "match-found");
+        }
     }
 
     private void applyKit(Player player, KitDefinition kit) {
@@ -249,6 +293,7 @@ public final class MatchService {
     private void beginFight(MatchSession session) {
         session.markActive();
         for (UUID id : session.participants()) {
+            countdownLeaveStreak.remove(id);
             tryTransition(id, PlayerState.FIGHTING);
             Player player = Bukkit.getPlayer(id);
             if (player != null) {
@@ -263,9 +308,10 @@ public final class MatchService {
                 }
                 soundService.play(player, "match-start");
                 player.showTitle(Title.title(
-                        Component.text("⚔ FIGHT ⚔")
-                                .color(TextColor.color(0xAA55FF))
-                                .decorate(TextDecoration.BOLD),
+                        title(player, "match.start-title",
+                                Component.text("FIGHT!")
+                                        .color(TextColor.color(0xAA55FF))
+                                        .decorate(TextDecoration.BOLD)),
                         Component.empty(),
                         Title.Times.times(Duration.ZERO, Duration.ofSeconds(1), Duration.ofMillis(200))
                 ));
@@ -286,7 +332,11 @@ public final class MatchService {
                 for (UUID id : session.participants()) {
                     Player player = Bukkit.getPlayer(id);
                     if (player != null) {
-                        player.sendMessage(Component.text("Match timed out — draw.", NamedTextColor.YELLOW));
+                        if (messageService != null) {
+                            messageService.send(player, "match.timeout-draw");
+                        } else {
+                            player.sendMessage(Component.text("Match timed out — draw.", NamedTextColor.YELLOW));
+                        }
                     }
                 }
                 endMatch(session, null, true);
@@ -298,6 +348,10 @@ public final class MatchService {
     public void handleLethal(MatchSession session, UUID victimId, UUID attackerId) {
         if (session.state() != MatchState.ACTIVE || session.isResultApplied()) {
             return;
+        }
+        Player victim = Bukkit.getPlayer(victimId);
+        if (victim != null) {
+            soundService.play(victim, "death");
         }
         boolean draw = attackerId != null && victimId.equals(attackerId);
         UUID winner = draw ? null : attackerId;
@@ -339,6 +393,74 @@ public final class MatchService {
         }
     }
 
+    /** Outcome of {@link #leaveDuringCountdown(Player)}, used by the {@code /leave} command. */
+    public enum LeaveOutcome {
+        /** Player is not in a match / not in the countdown phase. */
+        NOT_COUNTDOWN,
+        /** Match was cancelled, no result recorded. */
+        CANCELLED,
+        /** Match cancelled and a 3-day ChatBan issued for repeated dodging. */
+        CANCELLED_AND_BANNED
+    }
+
+    /**
+     * Lets a player leave a match during the pre-match countdown with no result recorded: the
+     * match is cancelled, both participants return to the lobby and no Elo/stats change happens.
+     * Repeated dodging is penalised - the third consecutive countdown-leave issues a 3-day
+     * ChatBan. The streak resets the moment one of the player's matches reaches FIGHT.
+     */
+    public LeaveOutcome leaveDuringCountdown(Player player) {
+        Optional<MatchSession> opt = registry.byPlayer(player.getUniqueId());
+        if (opt.isEmpty()) {
+            return LeaveOutcome.NOT_COUNTDOWN;
+        }
+        MatchSession session = opt.get();
+        if (session.state() != MatchState.COUNTDOWN) {
+            return LeaveOutcome.NOT_COUNTDOWN;
+        }
+        UUID leaverId = player.getUniqueId();
+        UUID opponentId = session.opponentOf(leaverId);
+        cancelMatchNoResult(session);
+
+        int streak = countdownLeaveStreak.merge(leaverId, 1, Integer::sum);
+        Player opponent = opponentId == null ? null : Bukkit.getPlayer(opponentId);
+        if (opponent != null && messageService != null) {
+            messageService.send(opponent, "match.opponent-left-countdown");
+        }
+        if (streak >= 3 && chatBanService != null) {
+            String reason = messageService != null
+                    ? messageService.localeService().rawMessage(messageService.resolveLocale(player), "match.leave-ban-reason")
+                    : "Repeated countdown leaves";
+            try {
+                chatBanService.issue(leaverId, null, "CHATBAN", reason, Duration.ofDays(3));
+            } catch (Exception ignored) {
+                // best-effort; the leave still succeeds
+            }
+            return LeaveOutcome.CANCELLED_AND_BANNED;
+        }
+        return LeaveOutcome.CANCELLED;
+    }
+
+    private void cancelMatchNoResult(MatchSession session) {
+        cancelTask(session.id());
+        if (spectatorService != null) {
+            spectatorService.clearMatch(session.id());
+        }
+        for (UUID id : session.participants()) {
+            Player p = Bukkit.getPlayer(id);
+            if (p != null) {
+                lobbyService.sendToLobby(p);
+            }
+            stateManager.resetToLobby(id);
+        }
+        UUID arenaId = session.arenaInstanceId();
+        registry.unregister(session.id());
+        session.setState(MatchState.CLOSED);
+        if (arenaId != null) {
+            arenaService.release(arenaId);
+        }
+    }
+
     public void endMatch(MatchSession session, UUID winnerId, boolean draw) {
         if (session.state() == MatchState.ENDING || session.state() == MatchState.CLOSED
                 || session.state() == MatchState.CLEANING || session.state() == MatchState.FAILED) {
@@ -358,10 +480,13 @@ public final class MatchService {
             }
             player.getInventory().clear();
             boolean win = !draw && winnerId != null && winnerId.equals(id);
+            Component resultTitle = title(player,
+                    draw ? "match.draw-title" : (win ? "match.win-title" : "match.lose-title"),
+                    Component.text(draw ? "DRAW" : (win ? "WIN" : "LOSE"))
+                            .color(draw ? NamedTextColor.YELLOW : (win ? NamedTextColor.GREEN : NamedTextColor.RED))
+                            .decorate(TextDecoration.BOLD));
             player.showTitle(Title.title(
-                    Component.text(draw ? "- DRAW -" : (win ? "- WIN -" : "- LOSE -"))
-                            .color(win ? NamedTextColor.RED : NamedTextColor.AQUA)
-                            .decorate(TextDecoration.BOLD),
+                    resultTitle,
                     Component.empty(),
                     Title.Times.times(Duration.ZERO, Duration.ofSeconds(2), Duration.ofMillis(400))
             ));
@@ -401,8 +526,13 @@ public final class MatchService {
             UUID opponentId = session.opponentOf(player.getUniqueId());
             Player opponent = opponentId == null ? null : Bukkit.getPlayer(opponentId);
             if (opponent != null) {
-                opponent.sendMessage(Component.text(player.getName() + " wants a rematch!")
-                        .color(NamedTextColor.YELLOW));
+                if (messageService != null) {
+                    messageService.send(opponent, "match.rematch-requested",
+                            MessageService.tags("player", player.getName()));
+                } else {
+                    opponent.sendMessage(Component.text(player.getName() + " wants a rematch!")
+                            .color(NamedTextColor.YELLOW));
+                }
             }
             if (session.bothRematchRequested()) {
                 cancelTask(session.id());
@@ -459,7 +589,11 @@ public final class MatchService {
             Player player = Bukkit.getPlayer(id);
             if (player != null) {
                 lobbyService.sendToLobby(player);
-                player.sendMessage(Component.text("Match could not start: " + reason, NamedTextColor.RED));
+                if (messageService != null) {
+                    messageService.send(player, "match.could-not-start", MessageService.tags("reason", reason));
+                } else {
+                    player.sendMessage(Component.text("Match could not start: " + reason, NamedTextColor.RED));
+                }
             }
             stateManager.resetToLobby(id);
         }
@@ -495,6 +629,21 @@ public final class MatchService {
         lobbyMeta.getPersistentDataContainer().set(ItemKeys.returnLobby(), PersistentDataType.BYTE, (byte) 1);
         lobby.setItemMeta(lobbyMeta);
         player.getInventory().setItem(5, lobby);
+    }
+
+    /**
+     * Resolves a locale-localised title component for {@code player}, falling back to
+     * {@code fallback} when no {@link MessageService} is wired (e.g. in tests).
+     */
+    private Component title(Player player, String key, Component fallback) {
+        if (messageService == null) {
+            return fallback;
+        }
+        try {
+            return messageService.render(messageService.resolveLocale(player), key);
+        } catch (Exception ignored) {
+            return fallback;
+        }
     }
 
     private void tryTransition(UUID playerId, PlayerState target) {
