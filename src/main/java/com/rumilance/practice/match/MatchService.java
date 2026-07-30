@@ -490,8 +490,13 @@ public final class MatchService {
                     Component.empty(),
                     Title.Times.times(Duration.ZERO, Duration.ofSeconds(2), Duration.ofMillis(400))
             ));
-            soundService.play(player, "match-end-anvil");
-            soundService.play(player, "match-end-levelup");
+            // Distinct end sting by outcome: winner hears the celebratory level-up jingle,
+            // loser/draw hears the heavy anvil thud. (Previously both played to both players.)
+            if (win) {
+                soundService.play(player, "match-end-levelup");
+            } else {
+                soundService.play(player, "match-end-anvil");
+            }
             giveRematchItems(player);
         }
 

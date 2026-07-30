@@ -130,13 +130,13 @@ public final class DuelRequestGui extends AbstractGui {
         inventory.setItem(GuiSlots.slot(3, 4), GuiDecorator.button(
                 session.ranked() ? Material.PURPLE_DYE : Material.BLUE_DYE,
                 messageService.render(locale, session.ranked() ? "duel-gui.mode-ranked" : "duel-gui.mode-unranked"), "mode"));
-        inventory.setItem(GuiSlots.slot(4, 2), GuiDecorator.button(Material.RED_STAINED_GLASS_PANE,
+        inventory.setItem(GuiSlots.slot(4, 2), GuiDecorator.button(Material.BARRIER,
                 messageService.render(locale, "duel-gui.cancel"), "cancel"));
         inventory.setItem(GuiSlots.slot(4, 4), GuiDecorator.button(Material.CLOCK,
                 messageService.render(locale, "duel-gui.best-of", MessageService.tags("n", String.valueOf(session.bestOf()))), "bestof"));
         boolean pending = Boolean.TRUE.equals(session.get("pending", Boolean.class));
         inventory.setItem(GuiSlots.slot(4, 6), GuiDecorator.button(
-                pending ? Material.YELLOW_STAINED_GLASS_PANE : Material.LIME_STAINED_GLASS_PANE,
+                pending ? Material.YELLOW_GLAZED_TERRACOTTA : Material.EMERALD,
                 messageService.render(locale, pending ? "duel-gui.pending" : "duel-gui.send"), "send"));
     }
 

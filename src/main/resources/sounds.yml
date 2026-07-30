@@ -3,7 +3,7 @@
 # Default pitch 0.0 for GUI sounds (client clamps). Countdown uses pitch 1.0 in code.
 sounds:
   select:
-    key: block.note_block.xylophone
+    key: block.note_block.iron_xylophone
     volume: 1.0
     pitch: 0.0
   queue-leave:
@@ -20,7 +20,7 @@ sounds:
     volume: 1.0
     pitch: 1.4
   kit-select:
-    key: entity.experience_orb.pickup
+    key: block.note_block.iron_xylophone
     volume: 1.0
     pitch: 0.0
   gui-click:
@@ -32,7 +32,7 @@ sounds:
     volume: 1.0
     pitch: 0.0
   duel-request-sent:
-    key: block.note_block.chime
+    key: block.note_block.pling
     volume: 1.0
     pitch: 0.0
   queue-joined:

@@ -104,7 +104,7 @@ public final class EditKitGui extends AbstractGui {
                 inventory.setItem(GuiSlots.slot(1 + i / 7, 1 + i % 7), icon);
                 i++;
             }
-            inventory.setItem(GuiSlots.slot(4, 4), GuiDecorator.button(Material.RED_STAINED_GLASS_PANE,
+            inventory.setItem(GuiSlots.slot(4, 4), GuiDecorator.button(Material.BARRIER,
                     Component.text("Close", NamedTextColor.RED), "close"));
             return;
         }

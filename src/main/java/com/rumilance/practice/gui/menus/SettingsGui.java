@@ -36,7 +36,6 @@ public final class SettingsGui extends AbstractGui {
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        GuiDecorator.decorateBorder(inventory, true);
         PlayerSettings s = settingsService.get(player);
         inventory.setItem(GuiSlots.slot(1, 1), toggle(Material.BARRIER, "Deny Duel Requests", !s.acceptDuelRequests()));
         inventory.setItem(GuiSlots.slot(1, 2), toggle(Material.COMPASS, "Auto Requeue", s.autoRequeue()));
@@ -46,7 +45,7 @@ public final class SettingsGui extends AbstractGui {
         inventory.setItem(GuiSlots.slot(1, 6), toggle(Material.PAINTING, "Scoreboard", s.scoreboardEnabled()));
         inventory.setItem(GuiSlots.slot(2, 1), GuiDecorator.button(Material.OAK_SIGN,
                 Component.text("Chat Whitelist: " + s.chatWhitelist().size(), NamedTextColor.AQUA), "whitelist"));
-        inventory.setItem(GuiSlots.slot(3, 4), GuiDecorator.button(Material.RED_STAINED_GLASS_PANE,
+        inventory.setItem(GuiSlots.slot(3, 4), GuiDecorator.button(Material.BARRIER,
                 Component.text("Close", NamedTextColor.RED), "close"));
     }
 

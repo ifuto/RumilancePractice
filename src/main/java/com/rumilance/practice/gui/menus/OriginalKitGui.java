@@ -63,7 +63,7 @@ public final class OriginalKitGui extends AbstractGui {
                 Component.text("Load Saved", NamedTextColor.AQUA), "load"));
         inventory.setItem(GuiSlots.slot(4, 5), GuiDecorator.button(Material.PAPER,
                 Component.text("Share Code", NamedTextColor.YELLOW), "share"));
-        inventory.setItem(GuiSlots.slot(4, 7), GuiDecorator.button(Material.RED_STAINED_GLASS_PANE,
+        inventory.setItem(GuiSlots.slot(4, 7), GuiDecorator.button(Material.BARRIER,
                 Component.text("Close", NamedTextColor.RED), "close"));
         int limit = originalKitService.monthlyEditLimit(plan);
         String limitLabel = limit < 0 ? "∞" : String.valueOf(limit);

@@ -59,7 +59,7 @@ public final class ArrowEffectGui extends AbstractGui {
             inventory.setItem(GuiSlots.slot(1, 1 + i), icon);
             i++;
         }
-        inventory.setItem(GuiSlots.slot(2, 4), GuiDecorator.button(Material.RED_STAINED_GLASS_PANE,
+        inventory.setItem(GuiSlots.slot(2, 4), GuiDecorator.button(Material.BARRIER,
                 Component.text("Close", NamedTextColor.RED), "close"));
     }
 

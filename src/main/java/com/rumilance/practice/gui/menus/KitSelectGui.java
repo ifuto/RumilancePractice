@@ -69,11 +69,11 @@ public final class KitSelectGui extends AbstractGui {
             index++;
         }
         String selectedName = session.selectedKit() == null ? "まだ選択されていません" : session.selectedKit();
-        inventory.setItem(GuiSlots.slot(2, 4), GuiDecorator.button(Material.LIGHT_BLUE_STAINED_GLASS_PANE,
+        inventory.setItem(GuiSlots.slot(2, 4), GuiDecorator.button(Material.BOOK,
                 Component.text(selectedName, NamedTextColor.AQUA), "selected"));
-        inventory.setItem(GuiSlots.slot(5, 1), GuiDecorator.button(Material.RED_STAINED_GLASS_PANE,
+        inventory.setItem(GuiSlots.slot(5, 1), GuiDecorator.button(Material.BARRIER,
                 Component.text("戻る", NamedTextColor.RED), "back"));
-        inventory.setItem(GuiSlots.slot(5, 7), GuiDecorator.button(Material.LIME_STAINED_GLASS_PANE,
+        inventory.setItem(GuiSlots.slot(5, 7), GuiDecorator.button(Material.EMERALD,
                 Component.text("選択", NamedTextColor.GREEN), "confirm"));
     }
 
