@@ -143,7 +143,7 @@ public final class LocationUtil {
         if (!needsClamp) {
             return new double[]{x, z};
         }
-        double effectiveMargin = currentlyInside ? Math.max(marginBlocks, 1.5d) : Math.max(1.0d, marginBlocks);
+        double effectiveMargin = currentlyInside ? Math.min(marginBlocks, 1.5d) : Math.max(1.0d, marginBlocks);
         double half = halfSize - effectiveMargin;
         if (half < 1.0d) {
             half = Math.max(0.5d, halfSize - 0.5d);
