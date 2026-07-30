@@ -6,6 +6,7 @@ import com.rumilance.practice.gui.menus.DuelRequestGui;
 import com.rumilance.practice.gui.menus.QueueKitGui;
 import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.lobby.LobbyService;
+import com.rumilance.practice.locale.MessageService;
 import com.rumilance.practice.match.MatchService;
 import com.rumilance.practice.queue.QueueCoordinator;
 import com.rumilance.practice.session.PlayerStateManager;
@@ -47,6 +48,7 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
     private final QueueCoordinator queueCoordinator;
     private final RuntimeFlags runtimeFlags;
     private final boolean rankedDefault;
+    private final MessageService messageService;
     private DuelRequestGui duelRequestGui;
 
     public DuelCommand(
@@ -60,7 +62,8 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
             LobbyService lobbyService,
             QueueCoordinator queueCoordinator,
             RuntimeFlags runtimeFlags,
-            boolean rankedDefault
+            boolean rankedDefault,
+            MessageService messageService
     ) {
         this.rankedGui = rankedGui;
         this.unrankedGui = unrankedGui;
@@ -73,6 +76,7 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
         this.queueCoordinator = queueCoordinator;
         this.runtimeFlags = runtimeFlags;
         this.rankedDefault = rankedDefault;
+        this.messageService = messageService;
     }
 
     public void setDuelRequestGui(DuelRequestGui duelRequestGui) {
@@ -83,15 +87,15 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command,
                              @NotNull String label, @NotNull String[] args) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage("Players only.");
+            messageService.send(sender, "general.player-only");
             return true;
         }
         if (!player.hasPermission("rumilance.user") && !player.hasPermission("rumilance.duel.use")) {
-            player.sendMessage(Component.text("No permission.", NamedTextColor.RED));
+            messageService.send(player, "general.no-permission");
             return true;
         }
         if (runtimeFlags.maintenance() && !player.hasPermission("rumilance.admin")) {
-            player.sendMessage(Component.text("Practice is in maintenance mode.", NamedTextColor.RED));
+            messageService.send(player, "general.maintenance");
             return true;
         }
 
@@ -116,8 +120,9 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
                 duelRequestService.latestOutgoing(player.getUniqueId()).ifPresentOrElse(req -> {
                     duelRequestService.cancel(req.id());
                     soundService.play(player, "queue-leave");
-                    player.sendMessage(Component.text("Duel request cancelled.", NamedTextColor.YELLOW));
-                }, () -> player.sendMessage(Component.text("No pending request.", NamedTextColor.RED)));
+                    messageService.send(player, "duel.request-cancelled",
+                            MessageService.tags("target", senderName(req.target())));
+                }, () -> messageService.send(player, "duel.no-pending-request"));
                 yield true;
             }
             case "accept" -> {
@@ -131,7 +136,8 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
             default -> {
                 Player target = Bukkit.getPlayerExact(args[0]);
                 if (target == null) {
-                    player.sendMessage(Component.text("Player not found.", NamedTextColor.RED));
+                    messageService.send(player, "general.player-not-found",
+                            MessageService.tags("target", args[0]));
                     yield true;
                 }
                 if (duelRequestGui != null) {
@@ -147,7 +153,7 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
     public void handleAccept(Player player, String fromName) {
         PlayerState state = stateManager.getState(player.getUniqueId());
         if (state == PlayerState.FIGHTING || state == PlayerState.COUNTDOWN || state == PlayerState.PREPARING_MATCH) {
-            player.sendMessage(Component.text("You cannot accept while in a match.", NamedTextColor.RED));
+            messageService.send(player, "duel.already-in-match");
             return;
         }
         DuelRequestService.RichDuelRequest request;
@@ -156,17 +162,18 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
         } else {
             Player from = Bukkit.getPlayerExact(fromName);
             if (from == null) {
-                player.sendMessage(Component.text("Player not found.", NamedTextColor.RED));
+                messageService.send(player, "general.player-not-found", MessageService.tags("target", fromName));
                 return;
             }
             request = duelRequestService.latestFromSenderToTarget(from.getUniqueId(), player.getUniqueId()).orElse(null);
         }
         if (request == null || request.isExpired(java.time.Instant.now())) {
-            player.sendMessage(Component.text("No valid duel request.", NamedTextColor.RED));
+            messageService.send(player, "duel.no-pending-request");
             return;
         }
         if (!duelRequestService.accept(request.id())) {
-            player.sendMessage(Component.text("Request expired.", NamedTextColor.RED));
+            messageService.send(player, "duel.request-expired",
+                    MessageService.tags("target", senderName(request.sender())));
             return;
         }
         matchService.startDuel(request.sender(), request.target(), request.kitName(),
@@ -177,50 +184,60 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
     public void handleDeny(Player player, String fromName) {
         if (fromName != null && fromName.equalsIgnoreCase("all")) {
             duelRequestService.denyAll(player.getUniqueId());
-            player.sendMessage(Component.text("Denied all requests.", NamedTextColor.YELLOW));
+            messageService.send(player, "duel.deny-all");
             return;
         }
         if (fromName == null) {
             duelRequestService.latestForTarget(player.getUniqueId()).ifPresentOrElse(req -> {
                 duelRequestService.cancel(req.id());
-                player.sendMessage(Component.text("Denied duel request.", NamedTextColor.YELLOW));
-            }, () -> player.sendMessage(Component.text("No request to deny.", NamedTextColor.RED)));
+                messageService.send(player, "duel.deny-own", MessageService.tags("target", senderName(req.sender())));
+            }, () -> messageService.send(player, "duel.no-request-to-deny"));
             return;
         }
         Player from = Bukkit.getPlayerExact(fromName);
         if (from == null) {
-            player.sendMessage(Component.text("Player not found.", NamedTextColor.RED));
+            messageService.send(player, "general.player-not-found", MessageService.tags("target", fromName));
             return;
         }
         duelRequestService.latestFromSenderToTarget(from.getUniqueId(), player.getUniqueId()).ifPresentOrElse(req -> {
             duelRequestService.cancel(req.id());
-            player.sendMessage(Component.text("Denied duel from " + from.getName() + ".", NamedTextColor.YELLOW));
-        }, () -> player.sendMessage(Component.text("No request from that player.", NamedTextColor.RED)));
+            messageService.send(player, "duel.deny-own", MessageService.tags("target", from.getName()));
+        }, () -> messageService.send(player, "duel.no-pending-request"));
+    }
+
+    private String senderName(UUID playerId) {
+        Player online = Bukkit.getPlayer(playerId);
+        return online != null ? online.getName() : "?";
     }
 
     private void sendRequest(Player sender, Player target, boolean ranked, String kit,
                              ArenaTerrain terrain, int bestOf) {
         if (sender.getUniqueId().equals(target.getUniqueId())) {
-            sender.sendMessage(Component.text("You cannot duel yourself.", NamedTextColor.RED));
+            messageService.send(sender, "duel.cannot-duel-self");
             return;
         }
         PlayerState targetState = stateManager.getState(target.getUniqueId());
         if (targetState == PlayerState.FIGHTING || targetState == PlayerState.COUNTDOWN) {
-            sender.sendMessage(Component.text("That player is in a match.", NamedTextColor.RED));
+            messageService.send(sender, "duel.target-already-in-match",
+                    MessageService.tags("target", target.getName()));
             return;
         }
         duelRequestService.create(sender.getUniqueId(), target.getUniqueId(), kit, ranked, terrain, bestOf)
                 .ifPresentOrElse(req -> {
                     soundService.play(sender, "duel-request-sent");
                     soundService.play(target, "duel-request-received");
-                    sender.sendMessage(Component.text("Sent " + (ranked ? "ranked" : "unranked")
-                            + " duel (" + kit + ") to " + target.getName() + ".", NamedTextColor.GREEN)
+                    String modeWord = messageService.modeWord(sender, ranked);
+                    String senderLocale = messageService.resolveLocale(sender);
+                    String targetLocale = messageService.resolveLocale(target);
+                    sender.sendMessage(messageService.render(senderLocale, "duel.request-sent",
+                                    MessageService.tags("mode", modeWord, "kit", kit, "target", target.getName()))
                             .append(Component.newline())
                             .append(Component.text("[CANCEL]", NamedTextColor.RED)
                                     .decorate(TextDecoration.BOLD)
                                     .clickEvent(ClickEvent.runCommand("/duel cancel"))));
-                    target.sendMessage(Component.text(sender.getName() + " challenged you to "
-                                    + (ranked ? "ranked" : "unranked") + " (" + kit + ").", NamedTextColor.GOLD)
+                    target.sendMessage(messageService.render(targetLocale, "duel.request-received",
+                                    MessageService.tags("mode", messageService.modeWord(target, ranked),
+                                            "kit", kit, "sender", sender.getName()))
                             .append(Component.newline())
                             .append(Component.text("[ACCEPT]", NamedTextColor.GREEN)
                                     .decorate(TextDecoration.BOLD)
@@ -229,7 +246,7 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
                             .append(Component.text("[DENY]", NamedTextColor.RED)
                                     .decorate(TextDecoration.BOLD)
                                     .clickEvent(ClickEvent.runCommand("/deny " + sender.getName()))));
-                }, () -> sender.sendMessage(Component.text("Could not send request (rate limit?).", NamedTextColor.RED)));
+                }, () -> messageService.send(sender, "duel.could-not-send"));
     }
 
     private String firstKit() {

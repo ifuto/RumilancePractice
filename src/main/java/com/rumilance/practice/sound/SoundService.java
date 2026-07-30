@@ -56,6 +56,9 @@ public final class SoundService {
             return;
         }
         SoundDefinition definition = cache.getOrDefault(soundId, SoundDefinition.FALLBACK);
+        if (isSilent(definition)) {
+            return;
+        }
         Sound sound = resolve(definition.key());
         player.playSound(player.getLocation(), sound, definition.volume(), definition.pitch());
     }
@@ -65,8 +68,20 @@ public final class SoundService {
             return;
         }
         SoundDefinition definition = cache.getOrDefault(soundId, SoundDefinition.FALLBACK);
+        if (isSilent(definition)) {
+            return;
+        }
         Sound sound = resolve(definition.key());
         player.playSound(player.getLocation(), sound, definition.volume(), pitchOverride);
+    }
+
+    /**
+     * A sound definition whose key is {@code none} (or blank) is treated as intentionally
+     * silent — the configured event simply does not play. Used for menu open/back where an
+     * audible cue is undesirable.
+     */
+    private boolean isSilent(SoundDefinition definition) {
+        return definition.key() == null || definition.key().isBlank() || definition.key().equalsIgnoreCase("none");
     }
 
     private boolean soundsAllowed(Player player) {

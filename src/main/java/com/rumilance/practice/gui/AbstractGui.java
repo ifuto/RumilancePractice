@@ -38,10 +38,6 @@ public abstract class AbstractGui {
         PracticeGuiHolder holder = new PracticeGuiHolder(session.sessionId(), type, rows);
         Inventory inventory = Bukkit.createInventory(holder, rows * 9, title(player, session));
         holder.bind(inventory);
-        if (rankedBorder || type == GuiType.RANKED_QUEUE || type == GuiType.UNRANKED_QUEUE
-                || type == GuiType.KIT_SELECT || type == GuiType.MAP_SELECT || type == GuiType.DUEL_REQUEST) {
-            GuiDecorator.decorateBorder(inventory, session.ranked() || type == GuiType.RANKED_QUEUE);
-        }
         render(player, session, inventory);
         player.openInventory(inventory);
         sounds.play(player, "gui-open");

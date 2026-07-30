@@ -38,6 +38,7 @@ public record KitDefinition(
         List<String> canBreak,
         boolean pearl,
         boolean totem,
+        boolean forceAdventure,
         int timeoutSeconds
 ) {
 
@@ -105,6 +106,7 @@ public record KitDefinition(
         private List<String> canBreak = new ArrayList<>();
         private boolean pearl = true;
         private boolean totem = true;
+        private boolean forceAdventure = false;
         private int timeoutSeconds = 0;
 
         private Builder(String name) {
@@ -132,6 +134,7 @@ public record KitDefinition(
             this.canBreak = new ArrayList<>(source.canBreak);
             this.pearl = source.pearl;
             this.totem = source.totem;
+            this.forceAdventure = source.forceAdventure;
             this.timeoutSeconds = source.timeoutSeconds;
         }
 
@@ -235,6 +238,11 @@ public record KitDefinition(
             return this;
         }
 
+        public Builder forceAdventure(boolean value) {
+            this.forceAdventure = value;
+            return this;
+        }
+
         public Builder timeoutSeconds(int value) {
             this.timeoutSeconds = value;
             return this;
@@ -244,7 +252,7 @@ public record KitDefinition(
             return new KitDefinition(
                     name, displayName, icon, ranked, ffaEnabled, maxHealth, naturalHealthRegen,
                     knockbackMultiplier, items, armor, enabled, arenaTerrain, autoFood,
-                    swordShieldBreak, blockPlace, blockBreak, canBreak, pearl, totem, timeoutSeconds
+                    swordShieldBreak, blockPlace, blockBreak, canBreak, pearl, totem, forceAdventure, timeoutSeconds
             );
         }
     }

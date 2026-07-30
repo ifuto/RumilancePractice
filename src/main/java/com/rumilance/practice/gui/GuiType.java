@@ -18,5 +18,6 @@ public enum GuiType {
     FFA_LIST,
     ARROW_EFFECT,
     ADMIN_MENU,
+    KIT_ADMIN,
     PROFILE
 }

@@ -5,10 +5,12 @@ import com.rumilance.practice.arena.ArenaService;
 import com.rumilance.practice.arena.ArenaTemplateStore;
 import com.rumilance.practice.arena.fawe.FaweBridge;
 import com.rumilance.practice.config.ConfigService;
+import com.rumilance.practice.gui.menus.KitAdminGui;
 import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.model.ArenaTemplate;
 import com.rumilance.practice.model.KitDefinition;
 import com.rumilance.practice.queue.QueueService;
+import com.rumilance.practice.sound.SoundService;
 import com.rumilance.practice.state.ArenaTerrain;
 import com.rumilance.practice.state.ArenaType;
 import com.rumilance.practice.util.Cuboid;
@@ -48,6 +50,8 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
     private final QueueService queueService;
     private final FaweBridge faweBridge;
     private final File schematicRoot;
+    private final SoundService soundService;
+    private final KitAdminGui kitAdminGui;
     private final Map<String, ArenaTemplate> drafts = new ConcurrentHashMap<>();
 
     public ArenaKitAdminCommand(
@@ -57,7 +61,9 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
             KitService kitService,
             QueueService queueService,
             FaweBridge faweBridge,
-            File schematicRoot
+            File schematicRoot,
+            SoundService soundService,
+            KitAdminGui kitAdminGui
     ) {
         this.configService = configService;
         this.arenaStore = arenaStore;
@@ -66,6 +72,8 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
         this.queueService = queueService;
         this.faweBridge = faweBridge;
         this.schematicRoot = schematicRoot;
+        this.soundService = soundService;
+        this.kitAdminGui = kitAdminGui;
     }
 
     @Override
@@ -113,12 +121,39 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
             return true;
         }
         if (args.length < 1) {
-            player.sendMessage(Component.text("/kit <create|overwrite|list|info|enable|disable|delete|timeout> ...",
-                    NamedTextColor.YELLOW));
+            // No args -> open the Kit Management GUI (clearer than the command flags).
+            kitAdminGui.open(player);
             return true;
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
         return switch (sub) {
+            case "gui" -> {
+                kitAdminGui.open(player);
+                yield true;
+            }
+            case "help" -> {
+                player.sendMessage(Component.text("/kit (no args) - open the Kit Management GUI", NamedTextColor.AQUA));
+                player.sendMessage(Component.text("/kit create <name> | list | info <name> | enable/disable <name>", NamedTextColor.GRAY));
+                player.sendMessage(Component.text("/kit delete <name> | timeout <name> <sec>", NamedTextColor.GRAY));
+                player.sendMessage(Component.text("/kit adventure <name> <on|off> - force Adventure mode", NamedTextColor.GRAY));
+                player.sendMessage(Component.text("/kit <flag> <name> <on|off> - regen/food/place/break/pearl/totem/shield", NamedTextColor.GRAY));
+                yield true;
+            }
+            case "adventure" -> {
+                if (args.length < 3) {
+                    player.sendMessage(Component.text("/kit adventure <name> <on|off>", NamedTextColor.YELLOW));
+                    yield true;
+                }
+                boolean value = parseToggle(args[2]);
+                boolean[] updated = {false};
+                kitService.get(args[1]).ifPresent(k -> {
+                    kitService.save(k.toBuilder().forceAdventure(value).build());
+                    updated[0] = true;
+                });
+                player.sendMessage(Component.text(updated[0] ? "Adventure " + (value ? "ON" : "OFF") + " for " + args[1] : "Unknown kit.",
+                        updated[0] ? NamedTextColor.GREEN : NamedTextColor.RED));
+                yield true;
+            }
             case "create", "overwrite" -> {
                 if (args.length < 2) {
                     player.sendMessage(Component.text("/kit create <name>", NamedTextColor.YELLOW));
@@ -158,6 +193,9 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                 }
                 boolean ok = kitService.delete(args[1]);
                 player.sendMessage(Component.text(ok ? "Deleted." : "Not found.", ok ? NamedTextColor.GREEN : NamedTextColor.RED));
+                if (ok) {
+                    soundService.play(player, "delete");
+                }
                 yield true;
             }
             case "timeout" -> {
@@ -174,8 +212,9 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                 if (args.length < 3) {
                     yield true;
                 }
-                boolean value = parseToggle(args[1]);
-                String kitName = args[2];
+                // Unified order: /kit <flag> <kit> <on|off>  (matches /kit timeout/adventure)
+                String kitName = args[1];
+                boolean value = parseToggle(args[2]);
                 kitService.get(kitName).ifPresent(k -> {
                     KitDefinition.Builder b = k.toBuilder();
                     switch (sub) {
@@ -345,6 +384,7 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                 arenaStore.delete(args[1]);
                 arenaService.setTemplates(arenaStore.templates());
                 player.sendMessage(Component.text("Deleted.", NamedTextColor.YELLOW));
+                soundService.play(player, "delete");
                 yield true;
             }
             default -> {
@@ -364,16 +404,94 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
     @Override
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command,
                                                 @NotNull String alias, @NotNull String[] args) {
-        List<String> out = new ArrayList<>();
-        if (command.getName().equalsIgnoreCase("kit") && args.length == 1) {
-            out.addAll(List.of("create", "list", "info", "enable", "disable", "delete", "timeout"));
+        String name = command.getName().toLowerCase(Locale.ROOT);
+        if (name.equals("kit")) {
+            return completeKit(args);
         }
-        if (command.getName().equalsIgnoreCase("arena") && args.length == 1) {
-            out.addAll(List.of("draft", "selection", "p1", "p2", "type", "save", "enable", "disable", "list", "info", "delete"));
+        if (name.equals("arena")) {
+            return completeArena(args);
         }
-        if (command.getName().equalsIgnoreCase("toggle") && args.length == 1) {
-            out.addAll(List.of("queue", "map"));
+        if (name.equals("toggle")) {
+            return completeToggle(args);
         }
-        return out;
+        return List.of();
+    }
+
+    private List<String> completeKit(String[] args) {
+        if (args.length == 1) {
+            return filter(List.of(
+                    "gui", "help", "create", "overwrite", "list", "info", "enable", "disable",
+                    "delete", "timeout", "adventure", "autoregen", "autofood", "blockplace",
+                    "blockbreak", "canbreak", "pearl", "totem", "swordshieldbreak"), args[0]);
+        }
+        String sub = args[0].toLowerCase(Locale.ROOT);
+        // Subcommands that take a kit name next.
+        if (args.length == 2 && List.of("info", "enable", "disable", "delete", "timeout", "adventure",
+                "autoregen", "autofood", "blockplace", "blockbreak", "canbreak", "pearl", "totem",
+                "swordshieldbreak").contains(sub)) {
+            return filter(kitService.all().stream().map(KitDefinition::name).toList(), args[1]);
+        }
+        // Third arg: on/off for toggles, numeric hint for timeout.
+        if (args.length == 3) {
+            if (sub.equals("timeout")) {
+                return filter(List.of("30", "60", "120", "300"), args[2]);
+            }
+            if (List.of("adventure", "autoregen", "autofood", "blockplace", "blockbreak", "canbreak",
+                    "pearl", "totem", "swordshieldbreak").contains(sub)) {
+                return filter(List.of("on", "off"), args[2]);
+            }
+        }
+        return List.of();
+    }
+
+    private List<String> completeArena(String[] args) {
+        if (args.length == 1) {
+            return filter(List.of(
+                    "draft", "selection", "p1", "p2", "type", "save", "enable", "disable",
+                    "list", "info", "delete"), args[0]);
+        }
+        String sub = args[0].toLowerCase(Locale.ROOT);
+        List<String> arenaNames = arenaStore.templates().stream().map(ArenaTemplate::name).toList();
+        List<String> draftNames = new ArrayList<>(drafts.keySet());
+        if (args.length == 2) {
+            return switch (sub) {
+                case "p1", "p2", "save", "enable", "disable", "info", "delete" ->
+                        filter(arenaNames, args[1]);
+                case "type" -> filter(List.of("ANY", "FLAT", "BUMPY", "CRYSTAL", "NETHERITE"), args[1]);
+                case "selection" -> filter(List.of("apply"), args[1]);
+                default -> List.of();
+            };
+        }
+        if (args.length == 3) {
+            // /arena type <terrain> <draft>  |  /arena selection apply <draft>
+            return filter(draftNames.isEmpty() ? arenaNames : draftNames, args[2]);
+        }
+        return List.of();
+    }
+
+    private List<String> completeToggle(String[] args) {
+        if (args.length == 1) {
+            return filter(List.of("queue", "map"), args[0]);
+        }
+        if (args.length == 2) {
+            return filter(List.of("enable", "disable"), args[1]);
+        }
+        if (args.length == 3) {
+            if (args[0].equalsIgnoreCase("queue")) {
+                return filter(kitService.all().stream().map(KitDefinition::name).toList(), args[2]);
+            }
+            if (args[0].equalsIgnoreCase("map")) {
+                return filter(arenaStore.templates().stream().map(ArenaTemplate::name).toList(), args[2]);
+            }
+        }
+        return List.of();
+    }
+
+    private static List<String> filter(List<String> options, String prefix) {
+        if (prefix == null || prefix.isEmpty()) {
+            return new ArrayList<>(options);
+        }
+        String lower = prefix.toLowerCase(Locale.ROOT);
+        return options.stream().filter(o -> o.toLowerCase(Locale.ROOT).startsWith(lower)).toList();
     }
 }

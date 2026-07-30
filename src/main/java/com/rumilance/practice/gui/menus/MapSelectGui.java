@@ -55,9 +55,9 @@ public final class MapSelectGui extends AbstractGui {
                 Component.text("地形マップ", NamedTextColor.DARK_GREEN), "map:BUMPY"));
         inventory.setItem(GuiSlots.slot(1, 6), GuiDecorator.button(Material.NETHERITE_BLOCK,
                 Component.text("ネザライトマップ", NamedTextColor.DARK_GRAY), "map:NETHERITE"));
-        inventory.setItem(GuiSlots.slot(2, 1), GuiDecorator.button(Material.RED_STAINED_GLASS_PANE,
+        inventory.setItem(GuiSlots.slot(2, 1), GuiDecorator.button(Material.BARRIER,
                 Component.text("戻る", NamedTextColor.RED), "back"));
-        inventory.setItem(GuiSlots.slot(2, 7), GuiDecorator.button(Material.LIME_STAINED_GLASS_PANE,
+        inventory.setItem(GuiSlots.slot(2, 7), GuiDecorator.button(Material.EMERALD,
                 Component.text("選択", NamedTextColor.GREEN), "confirm"));
     }
 

@@ -13,6 +13,7 @@ import com.rumilance.practice.command.ArenaKitAdminCommand;
 import com.rumilance.practice.command.ChatBanCommand;
 import com.rumilance.practice.command.DuelCommand;
 import com.rumilance.practice.command.FfaCommand;
+import com.rumilance.practice.command.LeaveCommand;
 import com.rumilance.practice.command.LobbyCommand;
 import com.rumilance.practice.command.PlayerCommands;
 import com.rumilance.practice.command.PracticeAdminCommand;
@@ -45,6 +46,7 @@ import com.rumilance.practice.gui.menus.ArrowEffectGui;
 import com.rumilance.practice.gui.menus.DuelRequestGui;
 import com.rumilance.practice.gui.menus.EditKitGui;
 import com.rumilance.practice.gui.menus.FfaListGui;
+import com.rumilance.practice.gui.menus.KitAdminGui;
 import com.rumilance.practice.gui.menus.KitSelectGui;
 import com.rumilance.practice.gui.menus.MapSelectGui;
 import com.rumilance.practice.gui.menus.PlayersGui;
@@ -174,6 +176,7 @@ public final class FeatureBootstrap {
         );
         services.register(MatchService.class, matchService);
         matchService.setSettingsService(settingsService);
+        matchService.setMessageService(messageService);
 
         chatBanService = new ChatBanService(punishmentRepository, auditLogRepository, objectionRepository,
                 asyncExecutor, plugin.getLogger(), Duration.ofDays(7));
@@ -186,7 +189,7 @@ public final class FeatureBootstrap {
         matchService.setSpectatorService(spectatorService);
 
         FfaService ffaService = new FfaService(plugin, configService, kitService, layoutCache, lobbyService,
-                stateManager, ffaStatsRepository, asyncExecutor, runtimeFlags);
+                stateManager, ffaStatsRepository, asyncExecutor, runtimeFlags, messageService, soundService);
         services.register(FfaService.class, ffaService);
 
         StatsService statsService = new StatsService(rankedStatsRepository, matchHistoryRepository,
@@ -199,7 +202,7 @@ public final class FeatureBootstrap {
 
         queueCoordinator = new QueueCoordinator(
                 plugin, queueService, matchService, kitService, lobbyService, stateManager,
-                soundService, rankedStatsRepository, asyncExecutor, runtimeFlags, false, true
+                soundService, rankedStatsRepository, asyncExecutor, runtimeFlags, false, true, messageService
         );
         services.register(QueueCoordinator.class, queueCoordinator);
         queueCoordinator.start();
@@ -210,7 +213,7 @@ public final class FeatureBootstrap {
         KitSelectGui kitSelectGui = new KitSelectGui(guiSessions, soundService, kitService);
         MapSelectGui mapSelectGui = new MapSelectGui(guiSessions, soundService);
         DuelRequestGui duelRequestGui = new DuelRequestGui(guiSessions, soundService, kitService, duelRequestService,
-                settingsService, statsService, mapSelectGui, kitSelectGui);
+                settingsService, statsService, mapSelectGui, kitSelectGui, messageService);
         kitSelectGui.setDuelRequestGui(duelRequestGui);
         mapSelectGui.setDuelRequestGui(duelRequestGui);
 
@@ -228,6 +231,7 @@ public final class FeatureBootstrap {
         services.register(ClientModBridge.class, ClientModBridge.NoOp.INSTANCE);
         OriginalKitGui originalKitGui = new OriginalKitGui(guiSessions, soundService, originalKitService,
                 services.get(ClientModBridge.class));
+        KitAdminGui kitAdminGui = new KitAdminGui(guiSessions, soundService, kitService, messageService);
 
         GuiListener guiListener = new GuiListener(guiSessions, stateManager);
         guiListener.register(rankedGui);
@@ -243,6 +247,7 @@ public final class FeatureBootstrap {
         guiListener.register(editKitGui);
         guiListener.register(arrowEffectGui);
         guiListener.register(originalKitGui);
+        guiListener.register(kitAdminGui);
 
         FunctionalItemListener functionalItemListener = new FunctionalItemListener(
                 soundService, queueCoordinator, rankedGui, unrankedGui);
@@ -272,15 +277,15 @@ public final class FeatureBootstrap {
                 arrowEffectService, spectatorService, ffaService), plugin);
 
         DuelCommand rankedDuel = new DuelCommand(rankedGui, unrankedGui, duelRequestService, matchService,
-                kitService, stateManager, soundService, lobbyService, queueCoordinator, runtimeFlags, true);
+                kitService, stateManager, soundService, lobbyService, queueCoordinator, runtimeFlags, true, messageService);
         DuelCommand unrankedDuel = new DuelCommand(rankedGui, unrankedGui, duelRequestService, matchService,
-                kitService, stateManager, soundService, lobbyService, queueCoordinator, runtimeFlags, false);
+                kitService, stateManager, soundService, lobbyService, queueCoordinator, runtimeFlags, false, messageService);
         rankedDuel.setDuelRequestGui(duelRequestGui);
         unrankedDuel.setDuelRequestGui(duelRequestGui);
 
         AcceptDenyCommand acceptDeny = new AcceptDenyCommand(rankedDuel);
         ArenaKitAdminCommand arenaKitAdmin = new ArenaKitAdminCommand(configService, arenaStore, arenaService,
-                kitService, queueService, faweBridge, new File(plugin.getDataFolder(), "schematics"));
+                kitService, queueService, faweBridge, new File(plugin.getDataFolder(), "schematics"), soundService, kitAdminGui);
         ChatBanCommand chatBanCommand = new ChatBanCommand(chatBanService);
         FfaCommand ffaCommand = new FfaCommand(ffaListGui, ffaService, kitService);
         PracticeAdminCommand practiceAdmin = new PracticeAdminCommand(plugin, configService, soundService,
@@ -303,7 +308,7 @@ public final class FeatureBootstrap {
         bind("chatban", chatBanCommand);
         bind("chatunban", chatBanCommand);
         bind("ffa", ffaCommand);
-        bind("adffa", ffaCommand);
+        bind("leave", new LeaveCommand(matchService, messageService));
 
         for (PlayerCommands.Type type : PlayerCommands.Type.values()) {
             if (type == PlayerCommands.Type.FFA) {

@@ -74,7 +74,7 @@ public final class SpectateListGui extends AbstractGui {
             inventory.setItem(GuiSlots.slot(1 + index / 7, 1 + index % 7), icon);
             index++;
         }
-        inventory.setItem(GuiSlots.slot(5, 4), GuiDecorator.button(Material.RED_STAINED_GLASS_PANE,
+        inventory.setItem(GuiSlots.slot(5, 4), GuiDecorator.button(Material.BARRIER,
                 Component.text("Close", NamedTextColor.RED), "close"));
     }
 

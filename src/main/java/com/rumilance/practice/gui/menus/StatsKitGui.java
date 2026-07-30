@@ -94,7 +94,7 @@ public final class StatsKitGui extends AbstractGui {
             inventory.setItem(GuiSlots.slot(row, col), icon);
             index++;
         }
-        inventory.setItem(GuiSlots.slot(5, 4), GuiDecorator.button(Material.RED_STAINED_GLASS_PANE,
+        inventory.setItem(GuiSlots.slot(5, 4), GuiDecorator.button(Material.BARRIER,
                 Component.text("Close", NamedTextColor.RED), "close"));
     }
 

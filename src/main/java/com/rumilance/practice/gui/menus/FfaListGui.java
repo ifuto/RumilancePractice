@@ -37,7 +37,6 @@ public final class FfaListGui extends AbstractGui {
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        GuiDecorator.decorateBorder(inventory, false);
         int index = 0;
         for (FfaService.FfaArena arena : ffaService.list()) {
             if (index >= 14) {
@@ -60,7 +59,7 @@ public final class FfaListGui extends AbstractGui {
             inventory.setItem(GuiSlots.slot(1 + index / 7, 1 + index % 7), icon);
             index++;
         }
-        inventory.setItem(GuiSlots.slot(3, 4), GuiDecorator.button(Material.RED_STAINED_GLASS_PANE,
+        inventory.setItem(GuiSlots.slot(3, 4), GuiDecorator.button(Material.BARRIER,
                 Component.text("Close", NamedTextColor.RED), "close"));
     }
 

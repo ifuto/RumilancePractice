@@ -7,6 +7,7 @@ import com.rumilance.practice.gui.GuiSession;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.GuiType;
 import com.rumilance.practice.kit.KitService;
+import com.rumilance.practice.locale.MessageService;
 import com.rumilance.practice.model.RankedKitStats;
 import com.rumilance.practice.settings.SettingsService;
 import com.rumilance.practice.sound.SoundService;
@@ -38,6 +39,7 @@ public final class DuelRequestGui extends AbstractGui {
     private final StatsService statsService;
     private final MapSelectGui mapSelectGui;
     private final KitSelectGui kitSelectGui;
+    private final MessageService messageService;
 
     public DuelRequestGui(
             GuiSessionRegistry registry,
@@ -47,7 +49,8 @@ public final class DuelRequestGui extends AbstractGui {
             SettingsService settingsService,
             StatsService statsService,
             MapSelectGui mapSelectGui,
-            KitSelectGui kitSelectGui
+            KitSelectGui kitSelectGui,
+            MessageService messageService
     ) {
         super(registry, sounds, GuiType.DUEL_REQUEST, 6, true);
         this.kitService = kitService;
@@ -56,6 +59,7 @@ public final class DuelRequestGui extends AbstractGui {
         this.statsService = statsService;
         this.mapSelectGui = mapSelectGui;
         this.kitSelectGui = kitSelectGui;
+        this.messageService = messageService;
     }
 
     public void openFor(Player sender, Player target, boolean ranked) {
@@ -77,13 +81,14 @@ public final class DuelRequestGui extends AbstractGui {
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return Component.text(session.ranked() ? "Ranked Duel" : "Unranked Duel",
-                        session.ranked() ? NamedTextColor.LIGHT_PURPLE : NamedTextColor.AQUA)
+        return messageService.render(messageService.resolveLocale(player),
+                        session.ranked() ? "duel-gui.title-ranked" : "duel-gui.title-unranked")
                 .decorate(TextDecoration.BOLD);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
+        String locale = messageService.resolveLocale(player);
         UUID targetId = session.targetPlayer();
         Player target = targetId == null ? null : Bukkit.getPlayer(targetId);
         ItemStack head = new ItemStack(Material.PLAYER_HEAD);
@@ -93,16 +98,20 @@ public final class DuelRequestGui extends AbstractGui {
             skull.displayName(Component.text(target.getName(), NamedTextColor.YELLOW)
                     .decoration(TextDecoration.ITALIC, false));
             List<Component> lore = new ArrayList<>();
-            lore.add(Component.text("Ping: " + target.getPing(), NamedTextColor.GREEN)
+            lore.add(messageService.render(locale, "duel-gui.ping",
+                    MessageService.tags("n", String.valueOf(target.getPing())))
                     .decoration(TextDecoration.ITALIC, false));
             try {
                 RankedKitStats stats = statsService.kitStats(targetId,
                                 session.selectedKit() == null ? "nodebuff" : session.selectedKit())
                         .orElse(RankedKitStats.starting(targetId, "nodebuff"));
-                lore.add(Component.text("Wins: " + stats.wins() + "  Losses: " + stats.losses(), NamedTextColor.GRAY)
+                lore.add(messageService.render(locale, "duel-gui.record",
+                                MessageService.tags("wins", String.valueOf(stats.wins()),
+                                        "losses", String.valueOf(stats.losses())))
                         .decoration(TextDecoration.ITALIC, false));
-                lore.add(Component.text(String.format("K/D: %.2f  WR: %s", statsService.kd(stats),
-                                statsService.winRateLabel(stats)), NamedTextColor.AQUA)
+                lore.add(messageService.render(locale, "duel-gui.kd",
+                                MessageService.tags("kd", String.format("%.2f", statsService.kd(stats)),
+                                        "wr", statsService.winRateLabel(stats)))
                         .decoration(TextDecoration.ITALIC, false));
             } catch (Exception ignored) {
                 // ignore
@@ -113,21 +122,22 @@ public final class DuelRequestGui extends AbstractGui {
         head.setItemMeta(skull);
         inventory.setItem(GuiSlots.slot(0, 4), head);
         inventory.setItem(GuiSlots.slot(2, 3), GuiDecorator.button(Material.DIAMOND_SWORD,
-                Component.text("キット選択 (" + session.selectedKit() + ")", NamedTextColor.AQUA), "kit"));
+                messageService.render(locale, "duel-gui.kit-select",
+                        MessageService.tags("kit", session.selectedKit() == null ? "nodebuff" : session.selectedKit())), "kit"));
         inventory.setItem(GuiSlots.slot(2, 5), GuiDecorator.button(Material.GRASS_BLOCK,
-                Component.text("マップ選択 (" + session.selectedMap() + ")", NamedTextColor.GREEN), "map"));
+                messageService.render(locale, "duel-gui.map-select",
+                        MessageService.tags("map", session.selectedMap() == null ? "ANY" : session.selectedMap())), "map"));
         inventory.setItem(GuiSlots.slot(3, 4), GuiDecorator.button(
                 session.ranked() ? Material.PURPLE_DYE : Material.BLUE_DYE,
-                Component.text(session.ranked() ? "Mode: Ranked" : "Mode: Unranked", NamedTextColor.WHITE), "mode"));
-        inventory.setItem(GuiSlots.slot(4, 2), GuiDecorator.button(Material.RED_STAINED_GLASS_PANE,
-                Component.text("キャンセル", NamedTextColor.RED), "cancel"));
+                messageService.render(locale, session.ranked() ? "duel-gui.mode-ranked" : "duel-gui.mode-unranked"), "mode"));
+        inventory.setItem(GuiSlots.slot(4, 2), GuiDecorator.button(Material.BARRIER,
+                messageService.render(locale, "duel-gui.cancel"), "cancel"));
         inventory.setItem(GuiSlots.slot(4, 4), GuiDecorator.button(Material.CLOCK,
-                Component.text("Best of " + session.bestOf(), NamedTextColor.YELLOW), "bestof"));
+                messageService.render(locale, "duel-gui.best-of", MessageService.tags("n", String.valueOf(session.bestOf()))), "bestof"));
         boolean pending = Boolean.TRUE.equals(session.get("pending", Boolean.class));
         inventory.setItem(GuiSlots.slot(4, 6), GuiDecorator.button(
-                pending ? Material.YELLOW_STAINED_GLASS_PANE : Material.LIME_STAINED_GLASS_PANE,
-                Component.text(pending ? "申請中..." : "送信", pending ? NamedTextColor.YELLOW : NamedTextColor.GREEN),
-                "send"));
+                pending ? Material.YELLOW_GLAZED_TERRACOTTA : Material.EMERALD,
+                messageService.render(locale, pending ? "duel-gui.pending" : "duel-gui.send"), "send"));
     }
 
     @Override
@@ -173,7 +183,7 @@ public final class DuelRequestGui extends AbstractGui {
         }
         if (!settingsService.get(target).acceptDuelRequests()) {
             sounds.play(player, "error");
-            player.sendMessage(Component.text("That player is denying duel requests.", NamedTextColor.RED));
+            messageService.send(player, "duel.target-denying");
             return;
         }
         String kit = session.selectedKit() == null ? "nodebuff" : session.selectedKit();
@@ -185,7 +195,7 @@ public final class DuelRequestGui extends AbstractGui {
         }
         if (duelRequestService.create(player.getUniqueId(), targetId, kit, session.ranked(), terrain, session.bestOf()).isEmpty()) {
             sounds.play(player, "error");
-            player.sendMessage(Component.text("Could not send request.", NamedTextColor.RED));
+            messageService.send(player, "duel.could-not-send");
             return;
         }
         session.put("pending", Boolean.TRUE);
@@ -193,11 +203,18 @@ public final class DuelRequestGui extends AbstractGui {
         if (settingsService.get(target).soundsEnabled()) {
             sounds.play(target, "duel-request-received");
         }
-        player.sendMessage(Component.text(target.getName() + " に " + kit + " でDuelを申し込みました。", NamedTextColor.GREEN)
+        boolean ranked = session.ranked();
+        String senderLocale = messageService.resolveLocale(player);
+        String targetLocale = messageService.resolveLocale(target);
+        player.sendMessage(messageService.render(senderLocale, "duel.request-sent",
+                        MessageService.tags("mode", messageService.modeWord(player, ranked),
+                                "kit", kit, "target", target.getName()))
                 .append(Component.newline())
                 .append(Component.text("[CANCEL]", NamedTextColor.RED).decorate(TextDecoration.BOLD)
                         .clickEvent(ClickEvent.runCommand("/duel cancel"))));
-        target.sendMessage(Component.text(player.getName() + " が " + kit + " でのDuelを申し込んでいます。", NamedTextColor.GOLD)
+        target.sendMessage(messageService.render(targetLocale, "duel.request-received",
+                        MessageService.tags("mode", messageService.modeWord(target, ranked),
+                                "kit", kit, "sender", player.getName()))
                 .append(Component.newline())
                 .append(Component.text("[ACCEPT]", NamedTextColor.GREEN).decorate(TextDecoration.BOLD)
                         .clickEvent(ClickEvent.runCommand("/accept " + player.getName())))
