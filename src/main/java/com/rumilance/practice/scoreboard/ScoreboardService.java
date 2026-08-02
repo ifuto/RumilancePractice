@@ -146,10 +146,11 @@ public final class ScoreboardService {
                 objective.getScore("§7Time: §f" + secs + "s").setScore(line--);
             }
         } else if (state == PlayerState.QUEUED_RANKED || state == PlayerState.QUEUED_UNRANKED) {
-            queueService.get(player.getUniqueId()).ifPresent(entry -> {
+            var entry = queueService.get(player.getUniqueId());
+            if (entry.isPresent()) {
                 hasContext = true;
-                objective.getScore("§fQueued: §7" + entry.kitId()).setScore(line--);
-            });
+                objective.getScore("§fQueued: §7" + entry.get().kitId()).setScore(line--);
+            }
         }
         if (hasContext) {
             objective.getScore("§r ").setScore(2);
