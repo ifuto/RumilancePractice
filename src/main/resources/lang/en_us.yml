@@ -133,8 +133,6 @@ match:
   opponent-left-countdown: "<gray>Your opponent left during the countdown - the match was cancelled."
   leave-banned: "<red>You left during the countdown too many times in a row - chat restricted for 3 days."
   leave-ban-reason: "Left during the pre-match countdown too many times in a row"
-  team-red: "<gray>You are on the <red>RED</red> team."
-  team-blue: "<gray>You are on the <blue>BLUE</blue> team."
 
 spectator:
   now-spectating: "<gray>You are now spectating <yellow><player></yellow>."

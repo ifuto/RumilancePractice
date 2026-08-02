@@ -10,6 +10,7 @@ import com.rumilance.practice.session.SessionManager;
 import com.rumilance.practice.settings.SettingsService;
 import com.rumilance.practice.state.PlayerState;
 import com.rumilance.practice.state.TeamColor;
+import com.rumilance.practice.stats.StatsService;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -111,18 +112,31 @@ public final class ScoreboardService {
         Optional<MatchSession> match = matchRegistry.byPlayer(player.getUniqueId());
         if (match.isPresent()) {
             MatchSession session = match.get();
+            // Team banner: "- YOU -" / "- OPPONENT -" with each name in its team color.
+            // Colors are stable for the whole rematch chain (participant order never changes).
+            UUID me = player.getUniqueId();
+            if (session.isParticipant(me) && session.participants().size() >= 2) {
+                UUID opponent = session.opponentOf(me);
+                TeamColor myColor = session.teamColor(me);
+                String myCode = myColor == TeamColor.RED ? "§c" : "§9";
+                String oppCode = myColor == TeamColor.RED ? "§9" : "§c";
+                objective.getScore("§7- YOU -").setScore(line--);
+                objective.getScore(myCode + player.getName()).setScore(line--);
+                if (opponent != null) {
+                    objective.getScore("§7- OPPONENT -").setScore(line--);
+                    objective.getScore(oppCode + StatsService.nameOf(opponent)).setScore(line--);
+                }
+            }
             objective.getScore("§fKit: §7" + session.kitName()).setScore(line--);
             objective.getScore("§fMode: §7" + session.mode()).setScore(line--);
             // Rematch-chain score: own wins (own color) - opponent wins (opponent color).
             // Fresh matches show 0-0; only rematch-confirmed matches carry the score over.
-            UUID me = player.getUniqueId();
             if (session.isParticipant(me)) {
-                UUID opponent = session.opponentOf(me);
                 TeamColor myColor = session.teamColor(me);
-                int myWins = session.seriesWinsOf(me);
-                int oppWins = opponent == null ? 0 : session.seriesWinsOf(opponent);
                 String myCode = myColor == TeamColor.RED ? "§c" : "§9";
                 String oppCode = myColor == TeamColor.RED ? "§9" : "§c";
+                int myWins = session.seriesWinsOf(me);
+                int oppWins = session.opponentOf(me) == null ? 0 : session.seriesWinsOf(session.opponentOf(me));
                 objective.getScore(myCode + myWins + " §7- " + oppCode + oppWins).setScore(line--);
             }
             if (session.startedAt() != null) {

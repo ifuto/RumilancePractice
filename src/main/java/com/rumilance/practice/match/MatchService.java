@@ -23,7 +23,6 @@ import com.rumilance.practice.state.ArenaType;
 import com.rumilance.practice.state.MatchMode;
 import com.rumilance.practice.state.MatchState;
 import com.rumilance.practice.state.PlayerState;
-import com.rumilance.practice.state.TeamColor;
 import com.rumilance.practice.util.AsyncExecutor;
 import com.rumilance.practice.util.ItemKeys;
 import com.rumilance.practice.util.LocationUtil;
@@ -266,23 +265,6 @@ public final class MatchService {
         }
     }
 
-    /**
-     * Tells each participant their assigned team color (RED/BLUE, never shared).
-     */
-    private void announceTeams(MatchSession session) {
-        if (messageService == null) {
-            return;
-        }
-        for (UUID id : session.participants()) {
-            Player player = Bukkit.getPlayer(id);
-            if (player == null) {
-                continue;
-            }
-            String key = session.teamColor(id) == TeamColor.RED ? "match.team-red" : "match.team-blue";
-            messageService.send(player, key);
-        }
-    }
-
     private void applyKit(Player player, KitDefinition kit) {
         layoutCache.loadSyncIfAbsent(player.getUniqueId(), kit.name());
         ItemStack[] layout = layoutCache.get(player.getUniqueId(), kit.name()).orElse(null);
@@ -294,7 +276,6 @@ public final class MatchService {
         for (UUID id : session.participants()) {
             tryTransition(id, PlayerState.COUNTDOWN);
         }
-        announceTeams(session);
         final int[] remaining = {countdownSeconds};
         BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             if (session.state() != MatchState.COUNTDOWN) {
