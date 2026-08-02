@@ -5,6 +5,7 @@ import com.rumilance.practice.gui.menus.EditKitGui;
 import com.rumilance.practice.gui.menus.FfaListGui;
 import com.rumilance.practice.gui.menus.PlayersGui;
 import com.rumilance.practice.gui.menus.ProfileGui;
+import com.rumilance.practice.gui.menus.EkitSelectGui;
 import com.rumilance.practice.gui.menus.SettingsGui;
 import com.rumilance.practice.gui.menus.SpectateListGui;
 import com.rumilance.practice.gui.menus.StatsKitGui;
@@ -45,6 +46,7 @@ public final class PlayerCommands implements CommandExecutor, TabCompleter {
     private final KitService kitService;
     private final StatsKitGui statsKitGui;
     private final ProfileGui profileGui;
+    private final EkitSelectGui ekitSelectGui;
     private final SettingsGui settingsGui;
     private final PlayersGui playersGui;
     private final SpectateListGui spectateListGui;
@@ -63,6 +65,7 @@ public final class PlayerCommands implements CommandExecutor, TabCompleter {
             StatsKitGui statsKitGui,
             ProfileGui profileGui,
             SettingsGui settingsGui,
+            EkitSelectGui ekitSelectGui,
             PlayersGui playersGui,
             SpectateListGui spectateListGui,
             SpectatorService spectatorService,
@@ -78,6 +81,7 @@ public final class PlayerCommands implements CommandExecutor, TabCompleter {
         this.kitService = kitService;
         this.statsKitGui = statsKitGui;
         this.profileGui = profileGui;
+        this.ekitSelectGui = ekitSelectGui;
         this.settingsGui = settingsGui;
         this.playersGui = playersGui;
         this.spectateListGui = spectateListGui;
@@ -143,7 +147,7 @@ public final class PlayerCommands implements CommandExecutor, TabCompleter {
             case SPECGUI -> spectateListGui.open(player);
             case SETTING -> settingsGui.open(player);
             case FFA -> ffaListGui.open(player);
-            case EKIT -> editKitGui.openKitPicker(player);
+            case EKIT -> ekitSelectGui.open(player);
             case ARROW -> {
                 if (!player.hasPermission("rumilance.user.mem")
                         && !player.hasPermission("rumilance.user.vip")

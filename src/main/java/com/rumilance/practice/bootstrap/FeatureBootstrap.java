@@ -33,7 +33,6 @@ import com.rumilance.practice.database.repository.PlayerRepository;
 import com.rumilance.practice.database.repository.PunishmentRepository;
 import com.rumilance.practice.database.repository.RankedStatsRepository;
 import com.rumilance.practice.database.repository.SettingsRepository;
-import com.rumilance.practice.originalkit.ClientModBridge;
 import com.rumilance.practice.originalkit.OriginalKitService;
 import com.rumilance.practice.duel.DuelRequestService;
 import com.rumilance.practice.elo.EloCalculator;
@@ -42,6 +41,15 @@ import com.rumilance.practice.ffa.FfaService;
 import com.rumilance.practice.gui.GuiListener;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.menus.OriginalKitGui;
+import com.rumilance.practice.gui.menus.ConfirmGui;
+import com.rumilance.practice.gui.menus.EkitAdminGui;
+import com.rumilance.practice.gui.menus.EkitChoiceGui;
+import com.rumilance.practice.gui.menus.EkitCopyGui;
+import com.rumilance.practice.gui.menus.EkitSelectGui;
+import com.rumilance.practice.gui.menus.EnchantGui;
+import com.rumilance.practice.gui.menus.OriginalKitEditGui;
+import com.rumilance.practice.gui.menus.PotionGui;
+import com.rumilance.practice.ekit.EkitItems;
 import com.rumilance.practice.gui.menus.ArrowEffectGui;
 import com.rumilance.practice.gui.menus.DuelRequestGui;
 import com.rumilance.practice.gui.menus.EditKitGui;
@@ -230,12 +238,35 @@ public final class FeatureBootstrap {
         OriginalKitService originalKitService = new OriginalKitService(originalKitRepository, asyncExecutor,
                 plugin.getLogger(), configService);
         services.register(OriginalKitService.class, originalKitService);
-        services.register(ClientModBridge.class, ClientModBridge.NoOp.INSTANCE);
-        OriginalKitGui originalKitGui = new OriginalKitGui(guiSessions, soundService, originalKitService,
-                services.get(ClientModBridge.class));
+        EkitItems ekitItems = new EkitItems(configService);
+        services.register(EkitItems.class, ekitItems);
+
+        ConfirmGui confirmGui = new ConfirmGui(guiSessions, soundService);
+        confirmGui.setOriginalKitService(originalKitService);
+        OriginalKitEditGui originalKitEditGui = new OriginalKitEditGui(guiSessions, soundService,
+                originalKitService, ekitItems);
+        EnchantGui enchantGui = new EnchantGui(guiSessions, soundService, originalKitService, originalKitEditGui);
+        PotionGui potionGui = new PotionGui(guiSessions, soundService, originalKitService, originalKitEditGui);
+        EkitCopyGui ekitCopyGui = new EkitCopyGui(guiSessions, soundService, kitService,
+                originalKitEditGui, originalKitService);
+        EkitChoiceGui ekitChoiceGui = new EkitChoiceGui(guiSessions, soundService, originalKitService,
+                originalKitEditGui, ekitCopyGui);
+        OriginalKitGui originalKitGui = new OriginalKitGui(guiSessions, soundService, originalKitService);
+        originalKitGui.setConfirmGui(confirmGui);
+        originalKitGui.setEditGui(originalKitEditGui);
+        originalKitGui.setChoiceGui(ekitChoiceGui);
+        originalKitEditGui.setEnchantGui(enchantGui);
+        originalKitEditGui.setPotionGui(potionGui);
+        originalKitEditGui.setConfirmGui(confirmGui);
+        originalKitEditGui.setOriginalKitGui(originalKitGui);
+        ekitCopyGui.setChoiceGui(ekitChoiceGui);
+        EkitSelectGui ekitSelectGui = new EkitSelectGui(guiSessions, soundService, kitService);
+        ekitSelectGui.setEditKitGui(editKitGui);
+        ekitSelectGui.setOriginalKitGui(originalKitGui);
+        EkitAdminGui ekitAdminGui = new EkitAdminGui(guiSessions, soundService, ekitItems);
         KitAdminGui kitAdminGui = new KitAdminGui(guiSessions, soundService, kitService, messageService);
 
-        GuiListener guiListener = new GuiListener(guiSessions, stateManager);
+        GuiListener guiListener = new GuiListener(guiSessions, stateManager, originalKitService);
         guiListener.register(rankedGui);
         guiListener.register(unrankedGui);
         guiListener.register(kitSelectGui);
@@ -245,6 +276,15 @@ public final class FeatureBootstrap {
         guiListener.register(statsKitGui);
         guiListener.register(profileGui);
         guiListener.register(playersGui);
+        guiListener.register(ekitSelectGui);
+        guiListener.register(originalKitGui);
+        guiListener.register(confirmGui);
+        guiListener.register(ekitChoiceGui);
+        guiListener.register(ekitCopyGui);
+        guiListener.register(originalKitEditGui);
+        guiListener.register(enchantGui);
+        guiListener.register(potionGui);
+        guiListener.register(ekitAdminGui);
         guiListener.register(spectateListGui);
         guiListener.register(ffaListGui);
         guiListener.register(editKitGui);
@@ -256,7 +296,7 @@ public final class FeatureBootstrap {
                 soundService, queueCoordinator, rankedGui, unrankedGui);
         functionalItemListener.setOpenSettings(settingsGui::open);
         functionalItemListener.setOpenFfa(ffaListGui::open);
-        functionalItemListener.setOpenEkit(editKitGui::openKitPicker);
+        functionalItemListener.setOpenEkit(ekitSelectGui::open);
         functionalItemListener.setOpenSpectate(spectateListGui::open);
 
         scoreboardService = new ScoreboardService(plugin, settings, sessionManager, stateManager,
@@ -277,7 +317,7 @@ public final class FeatureBootstrap {
         pm.registerEvents(functionalItemListener, plugin);
         pm.registerEvents(new AdminToolListener(lobbyService, soundService), plugin);
         pm.registerEvents(new PracticeSideListener(chatBanService, settingsService, guiSessions,
-                arrowEffectService, spectatorService, ffaService), plugin);
+                arrowEffectService, spectatorService, ffaService, originalKitService), plugin);
 
         DuelCommand rankedDuel = new DuelCommand(rankedGui, unrankedGui, duelRequestService, matchService,
                 kitService, stateManager, soundService, lobbyService, queueCoordinator, runtimeFlags, true, messageService);
@@ -308,6 +348,7 @@ public final class FeatureBootstrap {
         bind("toggle", arenaKitAdmin);
         bind("chatban", chatBanCommand);
         bind("chatunban", chatBanCommand);
+        bind("ekitadmin", new com.rumilance.practice.command.EkitAdminCommand(ekitAdminGui));
         bind("ffa", ffaCommand);
         bind("leave", new LeaveCommand(matchService, messageService));
 
@@ -333,7 +374,7 @@ public final class FeatureBootstrap {
             };
             bind(cmd, new PlayerCommands(type, plugin, asyncExecutor, statsService, kitService, statsKitGui,
                     profileGui, settingsGui, playersGui, spectateListGui, spectatorService, ffaListGui, editKitGui,
-                    arrowEffectGui, chatBanService));
+                    arrowEffectGui, chatBanService, ekitSelectGui));
         }
         bind("originalkit", (org.bukkit.command.CommandExecutor) (sender, command, label, args) -> {
             if (sender instanceof org.bukkit.entity.Player player) {

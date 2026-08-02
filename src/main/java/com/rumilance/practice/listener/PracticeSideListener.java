@@ -4,6 +4,7 @@ import com.rumilance.practice.arrow.ArrowEffectService;
 import com.rumilance.practice.ffa.FfaService;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.punishment.ChatBanService;
+import com.rumilance.practice.originalkit.OriginalKitService;
 import com.rumilance.practice.settings.SettingsService;
 import com.rumilance.practice.spectator.SpectatorService;
 import io.papermc.paper.event.player.AsyncChatEvent;
@@ -32,6 +33,7 @@ public final class PracticeSideListener implements Listener {
     private final ArrowEffectService arrowEffectService;
     private final SpectatorService spectatorService;
     private final FfaService ffaService;
+    private final OriginalKitService originalKitService;
 
     public PracticeSideListener(
             ChatBanService chatBanService,
@@ -39,7 +41,8 @@ public final class PracticeSideListener implements Listener {
             GuiSessionRegistry guiSessions,
             ArrowEffectService arrowEffectService,
             SpectatorService spectatorService,
-            FfaService ffaService
+            FfaService ffaService,
+            OriginalKitService originalKitService
     ) {
         this.chatBanService = chatBanService;
         this.settingsService = settingsService;
@@ -47,6 +50,7 @@ public final class PracticeSideListener implements Listener {
         this.arrowEffectService = arrowEffectService;
         this.spectatorService = spectatorService;
         this.ffaService = ffaService;
+        this.originalKitService = originalKitService;
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -116,6 +120,9 @@ public final class PracticeSideListener implements Listener {
         }
         if (ffaService.isInFfa(event.getPlayer().getUniqueId())) {
             ffaService.leave(event.getPlayer());
+        }
+        if (originalKitService != null) {
+            originalKitService.restoreOnQuit(event.getPlayer().getUniqueId());
         }
     }
 }

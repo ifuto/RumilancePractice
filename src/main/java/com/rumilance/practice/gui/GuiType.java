@@ -19,5 +19,13 @@ public enum GuiType {
     ARROW_EFFECT,
     ADMIN_MENU,
     KIT_ADMIN,
-    PROFILE
+    PROFILE,
+    EKIT_SELECT,
+    EKIT_EDIT,
+    EKIT_CHOICE,
+    EKIT_COPY,
+    CONFIRM,
+    ENCHANT,
+    POTION,
+    EKIT_ADMIN
 }

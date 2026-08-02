@@ -63,6 +63,24 @@ public final class EditKitGui extends AbstractGui {
         this.stateManager = stateManager;
     }
 
+    /** Opens the editor directly in edit mode for the given kit (/ekit select flow). */
+    public void openKitEditor(Player player, String kitName) {
+        GuiSession session = registry.open(player.getUniqueId(), type(), rows);
+        session.setSelectedKit(kitName);
+        session.put("mode", "edit");
+        session.put("selected_slot", null);
+        try {
+            if (stateManager.getState(player.getUniqueId()) == PlayerState.LOBBY
+                    || stateManager.getState(player.getUniqueId()) == PlayerState.OPENING_GUI) {
+                stateManager.transition(player.getUniqueId(), PlayerState.EDITING_KIT);
+            }
+        } catch (Exception ignored) {
+            // keep going
+        }
+        PracticeGuiOpen.open(this, player, session);
+        sounds.play(player, "gui-open");
+    }
+
     public void openKitPicker(Player player) {
         GuiSession session = registry.open(player.getUniqueId(), type(), rows);
         session.put("mode", "picker");

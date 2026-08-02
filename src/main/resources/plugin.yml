@@ -149,6 +149,10 @@ commands:
     description: Remove a chatban.
     usage: /chatunban <player|chatban_id>
     permission: rumilance.admin
+  ekitadmin:
+    description: Manage original-kit item categories.
+    usage: /ekitadmin
+    permission: rumilance.admin
 
 permissions:
   rumilance.user:

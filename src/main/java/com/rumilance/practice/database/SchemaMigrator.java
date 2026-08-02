@@ -230,6 +230,22 @@ public final class SchemaMigrator {
                         + ")"
         )));
 
+        migrations.add(new Migration(13, "create per-slot original kits table", List.of(
+                "CREATE TABLE IF NOT EXISTS " + databaseService.table("original_kit_slots") + " ("
+                        + "uuid CHAR(36) NOT NULL, "
+                        + "slot INTEGER NOT NULL, "
+                        + "item_data TEXT NOT NULL, "
+                        + "armor_data TEXT, "
+                        + "saved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                        + "PRIMARY KEY (uuid, slot)"
+                        + ")",
+                "INSERT INTO " + databaseService.table("original_kit_slots")
+                        + " (uuid, slot, item_data, armor_data, saved_at) "
+                        + "SELECT uuid, 22, item_data, armor_data, saved_at FROM "
+                        + databaseService.table("original_kits")
+                        + " WHERE item_data IS NOT NULL AND item_data <> ''"
+        )));
+
         return migrations;
     }
 }

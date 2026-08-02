@@ -5,10 +5,10 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * A snapshot of a player's original (non-kit) inventory and armor, saved before they enter
- * practice mode so it can be restored later via {@code /originalkit load}.
+ * A snapshot of an original kit assigned to one paper slot in the OriginalKitGUI.
+ * The same player can own multiple original kits, one per {@code slot}.
  */
-public record OriginalKitSnapshot(UUID uuid, String itemDataBase64, String armorDataBase64, Instant savedAt) {
+public record OriginalKitSnapshot(UUID uuid, int slot, String itemDataBase64, String armorDataBase64, Instant savedAt) {
 
     public OriginalKitSnapshot {
         Objects.requireNonNull(uuid, "uuid");
@@ -16,7 +16,7 @@ public record OriginalKitSnapshot(UUID uuid, String itemDataBase64, String armor
         Objects.requireNonNull(savedAt, "savedAt");
     }
 
-    public static OriginalKitSnapshot create(UUID uuid, String itemDataBase64, String armorDataBase64) {
-        return new OriginalKitSnapshot(uuid, itemDataBase64, armorDataBase64, Instant.now());
+    public static OriginalKitSnapshot create(UUID uuid, int slot, String itemDataBase64, String armorDataBase64) {
+        return new OriginalKitSnapshot(uuid, slot, itemDataBase64, armorDataBase64, Instant.now());
     }
 }

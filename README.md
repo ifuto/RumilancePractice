@@ -15,7 +15,7 @@ cd RumilancePractice
 ./gradlew.bat build
 ```
 
-成果物: `build/libs/RumilancePractice-1.1.0.jar`
+成果物: `build/libs/RumilancePractice-1.2.0.jar`
 
 ## 導入
 
@@ -46,6 +46,8 @@ cd RumilancePractice
 | `/queue leave` | キュー離脱 |
 | `/lobby` `/spawn` | ロビーへ帰還 |
 | `/setting` `/stats` `/profile` `/ranking` | 設定・統計・ランキング |
+| `/ekit` | キット選択 → 公式キット編集 / オリジナルキット編集（OrPlusGUI） |
+| `/ekitadmin` | オリジナルキットのカテゴリアイテム管理（チェスト式GUI・管理者） |
 
 ## 重要仕様
 
