@@ -185,23 +185,23 @@ public final class PlayerCommands implements CommandExecutor, TabCompleter {
                 String finalKit = kit;
                 asyncExecutor.execute(() -> {
                     try {
-                        String label;
+                        String statLabel;
                         double kd;
                         if (finalKit == null) {
                             var kits = statsService.allKits(finalTarget.getUniqueId());
                             int wins = kits.stream().mapToInt(RankedKitStats::wins).sum();
                             int losses = kits.stream().mapToInt(RankedKitStats::losses).sum();
                             kd = (double) wins / Math.max(1, losses);
-                            label = "overall";
+                            statLabel = "overall";
                         } else {
                             RankedKitStats stats = statsService.kitStats(finalTarget.getUniqueId(), finalKit)
                                     .orElse(RankedKitStats.starting(finalTarget.getUniqueId(), finalKit));
                             kd = statsService.kd(stats);
-                            label = finalKit;
+                            statLabel = finalKit;
                         }
                         double finalKd = kd;
                         plugin.getServer().getScheduler().runTask(plugin, () ->
-                                player.sendMessage(Component.text(finalTarget.getName() + " " + label + " K/D: "
+                                player.sendMessage(Component.text(finalTarget.getName() + " " + statLabel + " K/D: "
                                         + String.format("%.2f", finalKd)
                                         + " (ranked only)", NamedTextColor.GREEN)));
                     } catch (Exception e) {
