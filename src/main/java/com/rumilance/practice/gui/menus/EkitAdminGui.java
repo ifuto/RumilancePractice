@@ -37,7 +37,7 @@ public final class EkitAdminGui extends AbstractGui implements BottomInventoryCl
         this.ekitItems = ekitItems;
     }
 
-    public void open(Player player) {
+    public void openAdmin(Player player) {
         GuiSession session = registry.open(player.getUniqueId(), type(), rows);
         session.put("admin_view", "categories");
         PracticeGuiOpen.open(this, player, session);

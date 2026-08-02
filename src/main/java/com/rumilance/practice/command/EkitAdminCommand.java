@@ -27,7 +27,7 @@ public final class EkitAdminCommand implements CommandExecutor {
             sender.sendMessage(Component.text("No permission.", NamedTextColor.RED));
             return true;
         }
-        gui.open(player);
+        gui.openAdmin(player);
         return true;
     }
 }

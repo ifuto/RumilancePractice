@@ -373,8 +373,8 @@ public final class FeatureBootstrap {
                 case OBJECTION -> "objection";
             };
             bind(cmd, new PlayerCommands(type, plugin, asyncExecutor, statsService, kitService, statsKitGui,
-                    profileGui, settingsGui, playersGui, spectateListGui, spectatorService, ffaListGui, editKitGui,
-                    arrowEffectGui, chatBanService, ekitSelectGui));
+                    profileGui, settingsGui, ekitSelectGui, playersGui, spectateListGui, spectatorService,
+                    ffaListGui, editKitGui, arrowEffectGui, chatBanService));
         }
         bind("originalkit", (org.bukkit.command.CommandExecutor) (sender, command, label, args) -> {
             if (sender instanceof org.bukkit.entity.Player player) {
