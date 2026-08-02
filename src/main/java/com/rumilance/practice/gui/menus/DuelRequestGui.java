@@ -82,8 +82,7 @@ public final class DuelRequestGui extends AbstractGui {
     @Override
     protected Component title(Player player, GuiSession session) {
         return messageService.render(messageService.resolveLocale(player),
-                        session.ranked() ? "duel-gui.title-ranked" : "duel-gui.title-unranked")
-                .decorate(TextDecoration.BOLD);
+                session.ranked() ? "duel-gui.title-ranked" : "duel-gui.title-unranked");
     }
 
     @Override

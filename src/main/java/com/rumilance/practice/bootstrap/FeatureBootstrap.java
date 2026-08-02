@@ -51,6 +51,7 @@ import com.rumilance.practice.gui.menus.KitSelectGui;
 import com.rumilance.practice.gui.menus.MapSelectGui;
 import com.rumilance.practice.gui.menus.PlayersGui;
 import com.rumilance.practice.gui.menus.QueueKitGui;
+import com.rumilance.practice.gui.menus.ProfileGui;
 import com.rumilance.practice.gui.menus.SettingsGui;
 import com.rumilance.practice.gui.menus.SpectateListGui;
 import com.rumilance.practice.gui.menus.StatsKitGui;
@@ -219,6 +220,7 @@ public final class FeatureBootstrap {
 
         SettingsGui settingsGui = new SettingsGui(guiSessions, soundService, settingsService);
         StatsKitGui statsKitGui = new StatsKitGui(guiSessions, soundService, kitService, statsService);
+        ProfileGui profileGui = new ProfileGui(guiSessions, soundService, kitService, statsService);
         PlayersGui playersGui = new PlayersGui(guiSessions, soundService, stateManager, statsService, duelRequestGui);
         SpectateListGui spectateListGui = new SpectateListGui(guiSessions, soundService, matchRegistry, spectatorService);
         FfaListGui ffaListGui = new FfaListGui(guiSessions, soundService, ffaService);
@@ -241,6 +243,7 @@ public final class FeatureBootstrap {
         guiListener.register(duelRequestGui);
         guiListener.register(settingsGui);
         guiListener.register(statsKitGui);
+        guiListener.register(profileGui);
         guiListener.register(playersGui);
         guiListener.register(spectateListGui);
         guiListener.register(ffaListGui);
@@ -292,6 +295,7 @@ public final class FeatureBootstrap {
                 matchService, lobbyService, runtimeFlags, kitService, arenaStore, arenaService, ffaService);
 
         bind("duel", rankedDuel);
+        bind("ranked", rankedDuel);
         bind("unranked", unrankedDuel);
         bind("accept", acceptDeny);
         bind("deny", acceptDeny);
@@ -331,7 +335,7 @@ public final class FeatureBootstrap {
                 case OBJECTION -> "objection";
             };
             bind(cmd, new PlayerCommands(type, plugin, asyncExecutor, statsService, kitService, statsKitGui,
-                    settingsGui, playersGui, spectateListGui, spectatorService, ffaListGui, editKitGui,
+                    profileGui, settingsGui, playersGui, spectateListGui, spectatorService, ffaListGui, editKitGui,
                     arrowEffectGui, chatBanService));
         }
         bind("originalkit", (org.bukkit.command.CommandExecutor) (sender, command, label, args) -> {

@@ -3,6 +3,7 @@ package com.rumilance.practice.session;
 import com.rumilance.practice.state.ArenaTerrain;
 import com.rumilance.practice.state.MatchMode;
 import com.rumilance.practice.state.MatchState;
+import com.rumilance.practice.state.TeamColor;
 
 import java.time.Instant;
 import java.util.List;
@@ -23,6 +24,10 @@ public final class MatchSession {
     private final List<UUID> participants;
     private final ArenaTerrain terrain;
     private final int bestOf;
+    /** Team color per participant: index 0 is always RED, index 1 is always BLUE. */
+    private final Map<UUID, TeamColor> teamColors = new ConcurrentHashMap<>();
+    /** Per-participant win count of the current rematch chain (0-0 on a fresh match). */
+    private final Map<UUID, Integer> seriesWins = new ConcurrentHashMap<>();
     private volatile UUID arenaInstanceId;
     private final Map<UUID, Integer> kills = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> roundWins = new ConcurrentHashMap<>();
@@ -49,6 +54,12 @@ public final class MatchSession {
         this.state = MatchState.CREATED;
         for (UUID participant : this.participants) {
             roundWins.put(participant, 0);
+        }
+        if (!this.participants.isEmpty()) {
+            teamColors.put(this.participants.get(0), TeamColor.RED);
+        }
+        if (this.participants.size() > 1) {
+            teamColors.put(this.participants.get(1), TeamColor.BLUE);
         }
     }
 
@@ -95,6 +106,38 @@ public final class MatchSession {
             }
         }
         return null;
+    }
+
+    /**
+     * @return the player's team color. Fallback keeps the deterministic
+     *         first=RED / second=BLUE mapping for players without an explicit entry.
+     */
+    public TeamColor teamColor(UUID playerId) {
+        TeamColor color = teamColors.get(playerId);
+        return color != null ? color
+                : (participants.indexOf(playerId) == 0 ? TeamColor.RED : TeamColor.BLUE);
+    }
+
+    /**
+     * Carries a rematch chain's accumulated wins into a new match session. Only invoked when
+     * a rematch is confirmed; a fresh queue/duel-request match starts with an empty series.
+     */
+    public void applySeries(Map<UUID, Integer> carry) {
+        if (carry != null) {
+            seriesWins.putAll(carry);
+        }
+    }
+
+    public void addSeriesWin(UUID playerId) {
+        seriesWins.merge(playerId, 1, Integer::sum);
+    }
+
+    public int seriesWinsOf(UUID playerId) {
+        return seriesWins.getOrDefault(playerId, 0);
+    }
+
+    public Map<UUID, Integer> seriesWinsSnapshot() {
+        return Map.copyOf(seriesWins);
     }
 
     public MatchState state() {

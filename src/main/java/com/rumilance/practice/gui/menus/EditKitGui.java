@@ -81,8 +81,7 @@ public final class EditKitGui extends AbstractGui {
     @Override
     protected Component title(Player player, GuiSession session) {
         String kit = session.selectedKit();
-        return Component.text(kit == null ? "Edit Kit" : "Edit: " + kit, NamedTextColor.BLUE)
-                .decorate(TextDecoration.BOLD);
+        return Component.text(kit == null ? "Edit Kit" : "Edit: " + kit, NamedTextColor.WHITE);
     }
 
     @Override

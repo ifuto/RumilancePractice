@@ -55,7 +55,7 @@ public final class StatsKitGui extends AbstractGui {
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return Component.text("Ranked Stats", NamedTextColor.GOLD).decorate(TextDecoration.BOLD);
+        return Component.text("Ranked Stats", NamedTextColor.WHITE);
     }
 
     @Override

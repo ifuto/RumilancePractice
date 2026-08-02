@@ -47,7 +47,7 @@ public final class PlayersGui extends AbstractGui {
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return Component.text("Players", NamedTextColor.AQUA).decorate(TextDecoration.BOLD);
+        return Component.text("Players", NamedTextColor.WHITE);
     }
 
     @Override

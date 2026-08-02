@@ -48,7 +48,7 @@ public final class KitSelectGui extends AbstractGui {
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return Component.text("Select Kit", NamedTextColor.AQUA).decorate(TextDecoration.BOLD);
+        return Component.text("Select Kit", NamedTextColor.WHITE);
     }
 
     @Override

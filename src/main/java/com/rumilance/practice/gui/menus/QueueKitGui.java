@@ -60,8 +60,7 @@ public final class QueueKitGui extends AbstractGui {
     @Override
     protected Component title(Player player, GuiSession session) {
         return Component.text(ranked ? "Ranked Queue" : "Unranked Queue")
-                .color(ranked ? NamedTextColor.LIGHT_PURPLE : NamedTextColor.AQUA)
-                .decorate(TextDecoration.BOLD);
+                .color(NamedTextColor.WHITE);
     }
 
     @Override

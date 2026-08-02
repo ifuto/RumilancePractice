@@ -78,6 +78,9 @@ scoreboard:
   # Central task period; the spec requires 10-20 ticks (not a per-player timer).
   update-interval-ticks: 20
   tab-header-footer: true
+  # Server branding shown at the top of the sidebar and in the TAB header/footer.
+  server-name: "Rumilance"
+  server-ip: "play.example.com"
 
 performance:
   # Soft cap on particles spawned per player per visual effect (region selection, arrow trails).

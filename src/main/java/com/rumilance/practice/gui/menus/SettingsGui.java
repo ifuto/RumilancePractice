@@ -31,7 +31,7 @@ public final class SettingsGui extends AbstractGui {
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return Component.text("Settings", NamedTextColor.GOLD).decorate(TextDecoration.BOLD);
+        return Component.text("Settings", NamedTextColor.WHITE);
     }
 
     @Override

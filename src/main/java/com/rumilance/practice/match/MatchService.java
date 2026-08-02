@@ -23,6 +23,7 @@ import com.rumilance.practice.state.ArenaType;
 import com.rumilance.practice.state.MatchMode;
 import com.rumilance.practice.state.MatchState;
 import com.rumilance.practice.state.PlayerState;
+import com.rumilance.practice.state.TeamColor;
 import com.rumilance.practice.util.AsyncExecutor;
 import com.rumilance.practice.util.ItemKeys;
 import com.rumilance.practice.util.LocationUtil;
@@ -157,6 +158,15 @@ public final class MatchService {
 
     public void startDuel(UUID playerA, UUID playerB, String kitId, MatchMode mode,
                           ArenaTerrain terrain, int bestOf) {
+        startDuel(playerA, playerB, kitId, mode, terrain, bestOf, Map.of());
+    }
+
+    /**
+     * Starts a duel. {@code carrySeriesWins} carries a rematch chain's accumulated wins into
+     * the new session (empty for fresh queue/duel-request matches, so the score starts 0-0).
+     */
+    public void startDuel(UUID playerA, UUID playerB, String kitId, MatchMode mode,
+                          ArenaTerrain terrain, int bestOf, Map<UUID, Integer> carrySeriesWins) {
         if (registry.isPlayerInMatch(playerA) || registry.isPlayerInMatch(playerB)) {
             return;
         }
@@ -167,6 +177,7 @@ public final class MatchService {
 
         MatchSession session = new MatchSession(
                 UUID.randomUUID(), mode, kitId, List.of(playerA, playerB), null, terrain, bestOf);
+        session.applySeries(carrySeriesWins);
         if (!registry.register(session)) {
             return;
         }
@@ -255,6 +266,23 @@ public final class MatchService {
         }
     }
 
+    /**
+     * Tells each participant their assigned team color (RED/BLUE, never shared).
+     */
+    private void announceTeams(MatchSession session) {
+        if (messageService == null) {
+            return;
+        }
+        for (UUID id : session.participants()) {
+            Player player = Bukkit.getPlayer(id);
+            if (player == null) {
+                continue;
+            }
+            String key = session.teamColor(id) == TeamColor.RED ? "match.team-red" : "match.team-blue";
+            messageService.send(player, key);
+        }
+    }
+
     private void applyKit(Player player, KitDefinition kit) {
         layoutCache.loadSyncIfAbsent(player.getUniqueId(), kit.name());
         ItemStack[] layout = layoutCache.get(player.getUniqueId(), kit.name()).orElse(null);
@@ -266,6 +294,7 @@ public final class MatchService {
         for (UUID id : session.participants()) {
             tryTransition(id, PlayerState.COUNTDOWN);
         }
+        announceTeams(session);
         final int[] remaining = {countdownSeconds};
         BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             if (session.state() != MatchState.COUNTDOWN) {
@@ -468,6 +497,9 @@ public final class MatchService {
         }
         cancelTask(session.id());
         session.end(winnerId, draw);
+        if (!draw && winnerId != null) {
+            session.addSeriesWin(winnerId);
+        }
         for (UUID id : session.participants()) {
             try {
                 stateManager.transition(id, PlayerState.ENDING);
@@ -547,8 +579,9 @@ public final class MatchService {
                 MatchMode mode = session.mode();
                 ArenaTerrain terrain = session.terrain();
                 int bestOf = session.bestOf();
+                Map<UUID, Integer> carrySeries = session.seriesWinsSnapshot();
                 cleanupSession(session, false);
-                startDuel(a, b, kit, mode, terrain, bestOf);
+                startDuel(a, b, kit, mode, terrain, bestOf, carrySeries);
             }
         });
     }
@@ -621,7 +654,7 @@ public final class MatchService {
     private void giveRematchItems(Player player) {
         ItemStack rematch = new ItemStack(Material.LIME_DYE);
         ItemMeta rematchMeta = rematch.getItemMeta();
-        rematchMeta.displayName(Component.text("Rematch", NamedTextColor.GREEN).decorate(TextDecoration.BOLD)
+        rematchMeta.displayName(Component.text("Rematch", NamedTextColor.GREEN)
                 .decoration(TextDecoration.ITALIC, false));
         rematchMeta.getPersistentDataContainer().set(ItemKeys.rematch(), PersistentDataType.BYTE, (byte) 1);
         rematch.setItemMeta(rematchMeta);
@@ -629,7 +662,7 @@ public final class MatchService {
 
         ItemStack lobby = new ItemStack(Material.RED_DYE);
         ItemMeta lobbyMeta = lobby.getItemMeta();
-        lobbyMeta.displayName(Component.text("Return to Lobby", NamedTextColor.RED).decorate(TextDecoration.BOLD)
+        lobbyMeta.displayName(Component.text("Return to Lobby", NamedTextColor.RED)
                 .decoration(TextDecoration.ITALIC, false));
         lobbyMeta.getPersistentDataContainer().set(ItemKeys.returnLobby(), PersistentDataType.BYTE, (byte) 1);
         lobby.setItemMeta(lobbyMeta);

@@ -46,7 +46,7 @@ public final class SpectateListGui extends AbstractGui {
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return Component.text("Spectate Matches", NamedTextColor.LIGHT_PURPLE).decorate(TextDecoration.BOLD);
+        return Component.text("Spectate Matches", NamedTextColor.WHITE);
     }
 
     @Override

@@ -63,8 +63,7 @@ public final class KitAdminGui extends AbstractGui {
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return messageService.render(FORCED_LOCALE, "admin-gui.title")
-                .decorate(TextDecoration.BOLD);
+        return messageService.render(FORCED_LOCALE, "admin-gui.title");
     }
 
     @Override
@@ -165,7 +164,6 @@ public final class KitAdminGui extends AbstractGui {
         ItemStack stack = new ItemStack(Material.NAME_TAG);
         ItemMeta meta = stack.getItemMeta();
         meta.displayName(Component.text(kit.name(), NamedTextColor.LIGHT_PURPLE)
-                .decorate(TextDecoration.BOLD)
                 .decoration(TextDecoration.ITALIC, false));
         meta.lore(List.of(Component.text(t(locale, "click-hint"), NamedTextColor.GRAY)
                 .decoration(TextDecoration.ITALIC, false)));

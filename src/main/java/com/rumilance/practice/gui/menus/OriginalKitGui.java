@@ -38,7 +38,7 @@ public final class OriginalKitGui extends AbstractGui {
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return Component.text("Original Kit", NamedTextColor.BLUE).decorate(TextDecoration.BOLD);
+        return Component.text("Original Kit", NamedTextColor.WHITE);
     }
 
     @Override

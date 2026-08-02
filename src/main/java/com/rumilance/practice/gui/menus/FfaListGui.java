@@ -32,7 +32,7 @@ public final class FfaListGui extends AbstractGui {
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return Component.text("FFA Arenas", NamedTextColor.GREEN).decorate(TextDecoration.BOLD);
+        return Component.text("FFA Arenas", NamedTextColor.WHITE);
     }
 
     @Override

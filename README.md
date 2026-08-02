@@ -15,7 +15,7 @@ cd RumilancePractice
 ./gradlew.bat build
 ```
 
-成果物: `build/libs/RumilancePractice-1.0.2.jar`
+成果物: `build/libs/RumilancePractice-1.1.0.jar`
 
 ## 導入
 
@@ -38,7 +38,7 @@ cd RumilancePractice
 
 | コマンド | 内容 |
 |---|---|
-| `/duel` `/d` | ランク戦キュー GUI |
+| `/duel` `/d` `/ranked` `/rd` | ランク戦キュー GUI |
 | `/unranked` `/ud` | アンランクド戦キュー GUI |
 | `/duel <player>` | ランク戦申請 |
 | `/unranked <player>` | アンランクド申請 |

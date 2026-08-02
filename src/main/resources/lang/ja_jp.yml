@@ -132,6 +132,8 @@ match:
   opponent-left-countdown: "<gray>対戦相手がカウントダウン中に退出したため、試合はキャンセルされました。"
   leave-banned: "<red>カウントダウン中の連続退出が多いため、3日間チャットBANが適用されました。"
   leave-ban-reason: "開始前カウントダウン中の連続退出"
+  team-red: "<gray>あなたは <red>RED</red> チームです。"
+  team-blue: "<gray>あなたは <blue>BLUE</blue> チームです。"
 
 spectator:
   now-spectating: "<gray><yellow><player></yellow> の観戦を開始しました。"
@@ -178,7 +180,7 @@ arrow:
   list-header: "<gray>--- 矢の軌跡エフェクト ---"
 
 admin-gui:
-  title: "<light_purple>キット管理"
+  title: "<white>キット管理"
   enabled: "有効"
   adventure: "アドベンチャー"
   ranked: "ランク対象"

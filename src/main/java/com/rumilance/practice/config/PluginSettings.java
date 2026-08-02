@@ -38,6 +38,8 @@ public record PluginSettings(
         boolean scoreboardEnabled,
         int scoreboardUpdateIntervalTicks,
         boolean tabHeaderFooterEnabled,
+        String scoreboardServerName,
+        String scoreboardServerIp,
         int particleLimitPerPlayer,
         boolean maintenanceMode
 ) {
@@ -75,6 +77,8 @@ public record PluginSettings(
                 config.getBoolean("scoreboard.enabled", true),
                 config.getInt("scoreboard.update-interval-ticks", 20),
                 config.getBoolean("scoreboard.tab-header-footer", true),
+                config.getString("scoreboard.server-name", "Rumilance"),
+                config.getString("scoreboard.server-ip", "play.example.com"),
                 config.getInt("performance.particle-limit-per-player", 40),
                 config.getBoolean("plugin.maintenance", false)
         );

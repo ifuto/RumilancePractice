@@ -15,6 +15,11 @@ commands:
     usage: /duel [player|cancel|accept|deny]
     aliases: [d]
     permission: rumilance.user
+  ranked:
+    description: Ranked queue GUI or send a ranked duel request (same as /duel).
+    usage: /ranked [player|cancel|accept|deny]
+    aliases: [rd]
+    permission: rumilance.user
   unranked:
     description: Unranked queue GUI or send an unranked duel request.
     usage: /unranked [player]
@@ -54,8 +59,8 @@ commands:
     usage: /stats [player]
     permission: rumilance.user
   kdr:
-    description: View ranked K/D for a kit.
-    usage: /kdr <kit> [player]
+    description: View ranked K/D (overall or for a kit).
+    usage: /kdr [player] [kit]
     permission: rumilance.user
   profile:
     description: View ranked profile summary.

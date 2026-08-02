@@ -4,6 +4,7 @@ import com.rumilance.practice.gui.menus.ArrowEffectGui;
 import com.rumilance.practice.gui.menus.EditKitGui;
 import com.rumilance.practice.gui.menus.FfaListGui;
 import com.rumilance.practice.gui.menus.PlayersGui;
+import com.rumilance.practice.gui.menus.ProfileGui;
 import com.rumilance.practice.gui.menus.SettingsGui;
 import com.rumilance.practice.gui.menus.SpectateListGui;
 import com.rumilance.practice.gui.menus.StatsKitGui;
@@ -17,6 +18,7 @@ import com.rumilance.practice.util.AsyncExecutor;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -42,6 +44,7 @@ public final class PlayerCommands implements CommandExecutor, TabCompleter {
     private final StatsService statsService;
     private final KitService kitService;
     private final StatsKitGui statsKitGui;
+    private final ProfileGui profileGui;
     private final SettingsGui settingsGui;
     private final PlayersGui playersGui;
     private final SpectateListGui spectateListGui;
@@ -58,6 +61,7 @@ public final class PlayerCommands implements CommandExecutor, TabCompleter {
             StatsService statsService,
             KitService kitService,
             StatsKitGui statsKitGui,
+            ProfileGui profileGui,
             SettingsGui settingsGui,
             PlayersGui playersGui,
             SpectateListGui spectateListGui,
@@ -73,6 +77,7 @@ public final class PlayerCommands implements CommandExecutor, TabCompleter {
         this.statsService = statsService;
         this.kitService = kitService;
         this.statsKitGui = statsKitGui;
+        this.profileGui = profileGui;
         this.settingsGui = settingsGui;
         this.playersGui = playersGui;
         this.spectateListGui = spectateListGui;
@@ -111,19 +116,15 @@ public final class PlayerCommands implements CommandExecutor, TabCompleter {
             case PROFILE -> {
                 Player target = args.length > 0 ? Bukkit.getPlayerExact(args[0]) : player;
                 if (target == null) {
-                    player.sendMessage(Component.text("Player not found.", NamedTextColor.RED));
+                    OfflinePlayer offline = Bukkit.getOfflinePlayerIfCached(args[0]);
+                    if (offline == null) {
+                        player.sendMessage(Component.text("Player not found.", NamedTextColor.RED));
+                        return true;
+                    }
+                    profileGui.openFor(player, offline.getUniqueId());
                     return true;
                 }
-                Player finalTarget = target;
-                asyncExecutor.execute(() -> {
-                    try {
-                        Component msg = statsService.profileMessage(finalTarget.getUniqueId(), finalTarget.getName());
-                        plugin.getServer().getScheduler().runTask(plugin, () -> player.sendMessage(msg));
-                    } catch (Exception e) {
-                        plugin.getServer().getScheduler().runTask(plugin,
-                                () -> player.sendMessage(Component.text("Failed to load profile.", NamedTextColor.RED)));
-                    }
-                });
+                profileGui.openFor(player, target.getUniqueId());
             }
             case RANKING -> handleRanking(player, args);
             case PLAYERS -> playersGui.open(player);
@@ -174,24 +175,34 @@ public final class PlayerCommands implements CommandExecutor, TabCompleter {
                 }
             });
             case KDR -> {
-                if (args.length < 1) {
-                    player.sendMessage(Component.text("Usage: /kdr <kit> [player]", NamedTextColor.YELLOW));
-                    return true;
-                }
-                String kit = args[0];
-                Player target = args.length > 1 ? Bukkit.getPlayerExact(args[1]) : player;
+                Player target = args.length >= 1 ? Bukkit.getPlayerExact(args[0]) : player;
                 if (target == null) {
                     player.sendMessage(Component.text("Player not found.", NamedTextColor.RED));
                     return true;
                 }
+                String kit = args.length > 1 ? args[1] : null;
                 Player finalTarget = target;
+                String finalKit = kit;
                 asyncExecutor.execute(() -> {
                     try {
-                        RankedKitStats stats = statsService.kitStats(finalTarget.getUniqueId(), kit)
-                                .orElse(RankedKitStats.starting(finalTarget.getUniqueId(), kit));
+                        String label;
+                        double kd;
+                        if (finalKit == null) {
+                            var kits = statsService.allKits(finalTarget.getUniqueId());
+                            int wins = kits.stream().mapToInt(RankedKitStats::wins).sum();
+                            int losses = kits.stream().mapToInt(RankedKitStats::losses).sum();
+                            kd = (double) wins / Math.max(1, losses);
+                            label = "overall";
+                        } else {
+                            RankedKitStats stats = statsService.kitStats(finalTarget.getUniqueId(), finalKit)
+                                    .orElse(RankedKitStats.starting(finalTarget.getUniqueId(), finalKit));
+                            kd = statsService.kd(stats);
+                            label = finalKit;
+                        }
+                        double finalKd = kd;
                         plugin.getServer().getScheduler().runTask(plugin, () ->
-                                player.sendMessage(Component.text(finalTarget.getName() + " " + kit + " K/D: "
-                                        + String.format("%.2f", statsService.kd(stats))
+                                player.sendMessage(Component.text(finalTarget.getName() + " " + label + " K/D: "
+                                        + String.format("%.2f", finalKd)
                                         + " (ranked only)", NamedTextColor.GREEN)));
                     } catch (Exception e) {
                         plugin.getServer().getScheduler().runTask(plugin,
@@ -280,6 +291,9 @@ public final class PlayerCommands implements CommandExecutor, TabCompleter {
             return List.of("elo", "kill", "matches", "winstreak");
         }
         if (type == Type.KDR && args.length == 1) {
+            return Bukkit.getOnlinePlayers().stream().map(Player::getName).toList();
+        }
+        if (type == Type.KDR && args.length == 2) {
             return kitService.enabled().stream().map(k -> k.name()).toList();
         }
         if (args.length == 1 && (type == Type.PING || type == Type.STATS || type == Type.PROFILE || type == Type.SPEC)) {

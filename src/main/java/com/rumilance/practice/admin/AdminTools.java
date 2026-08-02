@@ -30,14 +30,14 @@ public final class AdminTools {
         ItemStack selector = new ItemStack(Material.BLAZE_ROD);
         ItemMeta selectorMeta = selector.getItemMeta();
         selectorMeta.displayName(Component.text("Region Selector", NamedTextColor.GOLD)
-                .decorate(TextDecoration.BOLD).decoration(TextDecoration.ITALIC, false));
+                .decoration(TextDecoration.ITALIC, false));
         selectorMeta.getPersistentDataContainer().set(ItemKeys.adminTool(), PersistentDataType.STRING, "region");
         selector.setItemMeta(selectorMeta);
 
         ItemStack menu = new ItemStack(Material.NETHER_STAR);
         ItemMeta menuMeta = menu.getItemMeta();
         menuMeta.displayName(Component.text("Practice Setup Menu", NamedTextColor.LIGHT_PURPLE)
-                .decorate(TextDecoration.BOLD).decoration(TextDecoration.ITALIC, false));
+                .decoration(TextDecoration.ITALIC, false));
         menuMeta.getPersistentDataContainer().set(ItemKeys.adminTool(), PersistentDataType.STRING, "menu");
         menu.setItemMeta(menuMeta);
 

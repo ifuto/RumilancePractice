@@ -114,10 +114,10 @@ public final class FunctionalItemListener implements Listener {
     }
 
     public static Component rankedName() {
-        return Component.text("⚔ Ranked Queue ⚔", NamedTextColor.RED).decorate(TextDecoration.BOLD);
+        return Component.text("⚔ Ranked Queue ⚔", NamedTextColor.RED);
     }
 
     public static Component unrankedName() {
-        return Component.text("⚔ Unranked Queue ⚔", NamedTextColor.BLUE).decorate(TextDecoration.BOLD);
+        return Component.text("⚔ Unranked Queue ⚔", NamedTextColor.BLUE);
     }
 }

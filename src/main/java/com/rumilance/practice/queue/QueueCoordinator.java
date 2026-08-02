@@ -193,7 +193,7 @@ public final class QueueCoordinator {
     private void giveLeaveItem(Player player) {
         ItemStack item = new ItemStack(Material.RED_DYE);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(Component.text("Leave Queue", NamedTextColor.RED).decorate(TextDecoration.BOLD)
+        meta.displayName(Component.text("Leave Queue", NamedTextColor.RED)
                 .decoration(TextDecoration.ITALIC, false));
         meta.getPersistentDataContainer().set(ItemKeys.leaveQueue(), PersistentDataType.BYTE, (byte) 1);
         item.setItemMeta(meta);

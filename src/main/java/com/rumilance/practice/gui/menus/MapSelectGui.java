@@ -10,7 +10,6 @@ import com.rumilance.practice.state.ArenaTerrain;
 import com.rumilance.practice.util.GuiSlots;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
@@ -40,7 +39,7 @@ public final class MapSelectGui extends AbstractGui {
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return Component.text("Select Map", NamedTextColor.GREEN).decorate(TextDecoration.BOLD);
+        return Component.text("Select Map", NamedTextColor.WHITE);
     }
 
     @Override
