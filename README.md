@@ -40,8 +40,8 @@ cd RumilancePractice
 |---|---|
 | `/duel` `/d` `/ranked` `/rd` | ランク戦キュー GUI |
 | `/unranked` `/ud` | アンランクド戦キュー GUI |
-| `/duel <player>` | ランク戦申請 |
-| `/unranked <player>` | アンランクド申請 |
+| `/duel <player> [kit]` | ランク戦申請（GUIなしで即送信） |
+| `/unranked <player>` | アンランクド申請（GUIなしで即送信） |
 | `/accept` `/deny` | 申請の承認 / 拒否 |
 | `/queue leave` | キュー離脱 |
 | `/lobby` `/spawn` | ロビーへ帰還 |

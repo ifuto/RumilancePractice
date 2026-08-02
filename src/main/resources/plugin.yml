@@ -12,12 +12,12 @@ softdepend:
 commands:
   duel:
     description: Ranked queue GUI or send a ranked duel request.
-    usage: /duel [player|cancel|accept|deny]
+    usage: /duel [player [kit]|cancel|accept|deny]
     aliases: [d]
     permission: rumilance.user
   ranked:
     description: Ranked queue GUI or send a ranked duel request (same as /duel).
-    usage: /ranked [player|cancel|accept|deny]
+    usage: /ranked [player [kit]|cancel|accept|deny]
     aliases: [rd]
     permission: rumilance.user
   unranked:

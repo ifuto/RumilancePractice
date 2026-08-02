@@ -102,15 +102,17 @@ public final class ScoreboardService {
 
         PlayerState state = stateManager.getState(player.getUniqueId());
         int line = 15;
-        // Minimal layout: server branding + player counts, then match context only.
+        // Minimal layout: server name at top, counts, then match context, and the server
+        // IP pinned to the very bottom (lowest score = bottom row).
         objective.getScore("§f" + settings.scoreboardServerName()).setScore(line--);
-        objective.getScore("§7" + settings.scoreboardServerIp()).setScore(line--);
         objective.getScore("§7Online: §f" + Bukkit.getOnlinePlayers().size()).setScore(line--);
         objective.getScore("§7Queue: §f" + queueService.totalWaiting()).setScore(line--);
         objective.getScore("§r").setScore(line--);
 
+        boolean hasContext = false;
         Optional<MatchSession> match = matchRegistry.byPlayer(player.getUniqueId());
         if (match.isPresent()) {
+            hasContext = true;
             MatchSession session = match.get();
             // Team banner: "- YOU -" / "- OPPONENT -" with each name in its team color.
             // Colors are stable for the whole rematch chain (participant order never changes).
@@ -144,9 +146,15 @@ public final class ScoreboardService {
                 objective.getScore("§7Time: §f" + secs + "s").setScore(line--);
             }
         } else if (state == PlayerState.QUEUED_RANKED || state == PlayerState.QUEUED_UNRANKED) {
-            queueService.get(player.getUniqueId()).ifPresent(entry ->
-                    objective.getScore("§fQueued: §7" + entry.kitId()).setScore(10));
+            queueService.get(player.getUniqueId()).ifPresent(entry -> {
+                hasContext = true;
+                objective.getScore("§fQueued: §7" + entry.kitId()).setScore(line--);
+            });
         }
+        if (hasContext) {
+            objective.getScore("§r ").setScore(2);
+        }
+        objective.getScore("§7" + settings.scoreboardServerIp()).setScore(1);
 
         player.setScoreboard(board);
     }

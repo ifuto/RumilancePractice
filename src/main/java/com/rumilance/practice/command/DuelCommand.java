@@ -2,7 +2,6 @@ package com.rumilance.practice.command;
 
 import com.rumilance.practice.config.RuntimeFlags;
 import com.rumilance.practice.duel.DuelRequestService;
-import com.rumilance.practice.gui.menus.DuelRequestGui;
 import com.rumilance.practice.gui.menus.QueueKitGui;
 import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.lobby.LobbyService;
@@ -49,7 +48,6 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
     private final RuntimeFlags runtimeFlags;
     private final boolean rankedDefault;
     private final MessageService messageService;
-    private DuelRequestGui duelRequestGui;
 
     public DuelCommand(
             QueueKitGui rankedGui,
@@ -77,10 +75,6 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
         this.runtimeFlags = runtimeFlags;
         this.rankedDefault = rankedDefault;
         this.messageService = messageService;
-    }
-
-    public void setDuelRequestGui(DuelRequestGui duelRequestGui) {
-        this.duelRequestGui = duelRequestGui;
     }
 
     @Override
@@ -140,11 +134,13 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
                             MessageService.tags("target", args[0]));
                     yield true;
                 }
-                if (duelRequestGui != null) {
-                    duelRequestGui.openFor(player, target, ranked);
-                } else {
-                    sendRequest(player, target, ranked, args.length > 1 ? args[1] : firstKit(), ArenaTerrain.ANY, 1);
+                // /duel <player> [kit] sends the request immediately (no GUI).
+                String kit = args.length > 1 ? args[1].toLowerCase(Locale.ROOT) : firstKit();
+                if (kitService.get(kit).filter(k -> k.enabled()).isEmpty()) {
+                    messageService.send(player, "kit.not-found", MessageService.tags("kit", args[1]));
+                    yield true;
                 }
+                sendRequest(player, target, ranked, kit, ArenaTerrain.ANY, 1);
                 yield true;
             }
         };
@@ -264,6 +260,8 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
             for (Player online : Bukkit.getOnlinePlayers()) {
                 out.add(online.getName());
             }
+        } else if (args.length == 2) {
+            kitService.enabled().stream().map(k -> k.name()).forEach(out::add);
         }
         return out.stream().filter(s -> s.toLowerCase(Locale.ROOT).startsWith(args[args.length - 1].toLowerCase(Locale.ROOT))).toList();
     }

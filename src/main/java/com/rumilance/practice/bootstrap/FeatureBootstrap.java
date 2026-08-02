@@ -283,9 +283,6 @@ public final class FeatureBootstrap {
                 kitService, stateManager, soundService, lobbyService, queueCoordinator, runtimeFlags, true, messageService);
         DuelCommand unrankedDuel = new DuelCommand(rankedGui, unrankedGui, duelRequestService, matchService,
                 kitService, stateManager, soundService, lobbyService, queueCoordinator, runtimeFlags, false, messageService);
-        rankedDuel.setDuelRequestGui(duelRequestGui);
-        unrankedDuel.setDuelRequestGui(duelRequestGui);
-
         AcceptDenyCommand acceptDeny = new AcceptDenyCommand(rankedDuel);
         ArenaKitAdminCommand arenaKitAdmin = new ArenaKitAdminCommand(configService, arenaStore, arenaService,
                 kitService, queueService, faweBridge, new File(plugin.getDataFolder(), "schematics"), soundService, kitAdminGui);
