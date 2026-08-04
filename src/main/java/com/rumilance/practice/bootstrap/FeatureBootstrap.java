@@ -299,7 +299,7 @@ public final class FeatureBootstrap {
         functionalItemListener.setOpenEkit(ekitSelectGui::open);
         functionalItemListener.setOpenSpectate(spectateListGui::open);
 
-        scoreboardService = new ScoreboardService(settings, stateManager,
+        scoreboardService = new ScoreboardService(plugin, settings, stateManager,
                 queueService, matchRegistry, rankedStatsRepository, settingsService);
         if (settings.scoreboardEnabled()) {
             scoreboardService.start();

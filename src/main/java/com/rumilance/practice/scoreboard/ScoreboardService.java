@@ -15,6 +15,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scoreboard.Criteria;
 import org.bukkit.scoreboard.DisplaySlot;
@@ -48,6 +49,7 @@ public final class ScoreboardService {
         }
     }
 
+    private final Plugin plugin;
     private final PluginSettings settings;
     private final PlayerStateManager stateManager;
     private final QueueService queueService;
@@ -59,6 +61,7 @@ public final class ScoreboardService {
     private BukkitTask task;
 
     public ScoreboardService(
+            Plugin plugin,
             PluginSettings settings,
             PlayerStateManager stateManager,
             QueueService queueService,
@@ -66,6 +69,7 @@ public final class ScoreboardService {
             RankedStatsRepository rankedStatsRepository,
             SettingsService settingsService
     ) {
+        this.plugin = plugin;
         this.settings = settings;
         this.stateManager = stateManager;
         this.queueService = queueService;
