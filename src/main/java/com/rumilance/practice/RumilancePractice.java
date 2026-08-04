@@ -31,7 +31,6 @@ import com.rumilance.practice.util.ItemKeys;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
-import java.sql.SQLException;
 import java.util.logging.Level;
 
 /**
@@ -46,6 +45,19 @@ public final class RumilancePractice extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        try {
+            enableInternal();
+        } catch (Throwable t) {
+            // Any failure while enabling must be visible in the log with a full stack
+            // trace - otherwise the plugin silently ends up disabled and every command
+            // reports "plugin is disabled".
+            getLogger().log(Level.SEVERE,
+                    "Fatal error while enabling RumilancePractice - disabling plugin.", t);
+            getServer().getPluginManager().disablePlugin(this);
+        }
+    }
+
+    private void enableInternal() {
         this.serviceRegistry = new ServiceRegistry();
         ItemKeys.init(this);
 
@@ -125,7 +137,10 @@ public final class RumilancePractice extends JavaPlugin {
             serviceRegistry.register(FfaStatsRepository.class, new FfaStatsRepository(databaseService));
             serviceRegistry.register(ObjectionRepository.class, new ObjectionRepository(databaseService));
             return true;
-        } catch (SQLException e) {
+        } catch (Exception e) {
+            // Catch everything (not just SQLException): Hikari pool initialization and
+            // data-folder creation can throw RuntimeException, and any of those must
+            // disable the plugin with a clear, self-logged reason.
             getLogger().log(Level.SEVERE, "Failed to initialize the database. Disabling RumilancePractice.", e);
             getServer().getPluginManager().disablePlugin(this);
             return false;
