@@ -93,8 +93,17 @@ public final class GuiSession {
         this.targetPlayer = targetPlayer;
     }
 
+    /**
+     * Stores an attribute. A {@code null} value removes the key instead of storing it -
+     * the backing map ({@link ConcurrentHashMap}) does not accept null values, and several
+     * call sites use {@code put(key, null)} to mean "clear this selection".
+     */
     public void put(String key, Object value) {
-        attributes.put(key, value);
+        if (value == null) {
+            attributes.remove(key);
+        } else {
+            attributes.put(key, value);
+        }
     }
 
     @SuppressWarnings("unchecked")
