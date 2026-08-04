@@ -76,7 +76,11 @@ public final class ConfirmGui extends AbstractGui {
             case "yes" -> {
                 Consumer<Player> yes = session.get("yes", Consumer.class);
                 com.rumilance.practice.originalkit.OriginalKitService svc = originalKitService();
-                if (svc != null) {
+                // Only mark navigating if the inventory is already stashed (e.g. the
+                // delete-all confirm inside the editor). For the paper->confirm flow the
+                // stash happens AFTER this dialog closes, so no flag is needed - and leaving
+                // a stale flag would break ESC-restore on the next flow GUI.
+                if (svc != null && svc.isStashed(player.getUniqueId())) {
                     svc.markNavigating(player.getUniqueId());
                 }
                 player.closeInventory();
@@ -87,7 +91,7 @@ public final class ConfirmGui extends AbstractGui {
             case "no" -> {
                 Consumer<Player> no = session.get("no", Consumer.class);
                 com.rumilance.practice.originalkit.OriginalKitService svc = originalKitService();
-                if (svc != null) {
+                if (svc != null && svc.isStashed(player.getUniqueId())) {
                     svc.markNavigating(player.getUniqueId());
                 }
                 player.closeInventory();
