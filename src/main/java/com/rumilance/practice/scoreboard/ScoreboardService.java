@@ -6,8 +6,8 @@ import com.rumilance.practice.match.MatchRegistry;
 import com.rumilance.practice.queue.QueueService;
 import com.rumilance.practice.session.MatchSession;
 import com.rumilance.practice.session.PlayerStateManager;
-import com.rumilance.practice.session.SessionManager;
 import com.rumilance.practice.settings.SettingsService;
+import com.rumilance.practice.state.MatchMode;
 import com.rumilance.practice.state.PlayerState;
 import com.rumilance.practice.state.TeamColor;
 import com.rumilance.practice.stats.StatsService;
@@ -15,7 +15,6 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
-import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scoreboard.Criteria;
 import org.bukkit.scoreboard.DisplaySlot;
@@ -23,37 +22,51 @@ import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * Central scoreboard updater (10-20 tick interval), not per-player timers.
+ *
+ * <p>v1.2.1: dense, bright layout. Server branding on top, per-player ranked stats
+ * (Elo / W-L / K-D / streak / matches / kits) cached for 3s, full match context
+ * (teams + Elos, series score, kit, mode, kills, time) while fighting, queue info
+ * while queued, and the server IP pinned to the very bottom.</p>
  */
 public final class ScoreboardService {
 
-    private final Plugin plugin;
+    private static final long STATS_CACHE_MS = 3000L;
+
+    private record CachedStats(int bestElo, int wins, int losses, int bestStreak, int matches, int kits) {
+        static final CachedStats EMPTY = new CachedStats(1000, 0, 0, 0, 0, 0);
+
+        double kd() {
+            return (double) wins / Math.max(1, losses);
+        }
+    }
+
     private final PluginSettings settings;
-    private final SessionManager sessionManager;
     private final PlayerStateManager stateManager;
     private final QueueService queueService;
     private final MatchRegistry matchRegistry;
     private final RankedStatsRepository rankedStatsRepository;
     private final SettingsService settingsService;
+    private final ConcurrentMap<UUID, CachedStats> statsCache = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, Long> statsCacheAt = new ConcurrentHashMap<>();
     private BukkitTask task;
 
     public ScoreboardService(
-            Plugin plugin,
             PluginSettings settings,
-            SessionManager sessionManager,
             PlayerStateManager stateManager,
             QueueService queueService,
             MatchRegistry matchRegistry,
             RankedStatsRepository rankedStatsRepository,
             SettingsService settingsService
     ) {
-        this.plugin = plugin;
         this.settings = settings;
-        this.sessionManager = sessionManager;
         this.stateManager = stateManager;
         this.queueService = queueService;
         this.matchRegistry = matchRegistry;
@@ -73,6 +86,8 @@ public final class ScoreboardService {
         for (Player player : Bukkit.getOnlinePlayers()) {
             player.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
         }
+        statsCache.clear();
+        statsCacheAt.clear();
     }
 
     private void tick() {
@@ -86,13 +101,67 @@ public final class ScoreboardService {
             update(player);
             if (settings.tabHeaderFooterEnabled()) {
                 player.sendPlayerListHeaderAndFooter(
-                        Component.text(settings.scoreboardServerName(), NamedTextColor.WHITE),
-                        Component.text(settings.scoreboardServerIp() + "  |  Online: "
-                                + Bukkit.getOnlinePlayers().size(), NamedTextColor.GRAY)
+                        Component.text("§6✦ §f" + settings.scoreboardServerName() + " §6✦"),
+                        Component.text("§b" + settings.scoreboardServerIp() + "§f  |  §eOnline: §a"
+                                + Bukkit.getOnlinePlayers().size())
                 );
             }
         }
     }
+
+    // ------------------------------------------------------------------ stats
+
+    private CachedStats cachedStats(UUID uuid) {
+        long now = System.currentTimeMillis();
+        Long updated = statsCacheAt.get(uuid);
+        if (updated != null && now - updated < STATS_CACHE_MS) {
+            CachedStats cached = statsCache.get(uuid);
+            if (cached != null) {
+                return cached;
+            }
+        }
+        CachedStats computed = loadStats(uuid);
+        statsCache.put(uuid, computed);
+        statsCacheAt.put(uuid, now);
+        return computed;
+    }
+
+    private CachedStats loadStats(UUID uuid) {
+        try {
+            List<com.rumilance.practice.model.RankedKitStats> kits =
+                    rankedStatsRepository.findAllForPlayer(uuid);
+            int bestElo = 0;
+            int wins = 0;
+            int losses = 0;
+            int bestStreak = 0;
+            for (com.rumilance.practice.model.RankedKitStats stats : kits) {
+                bestElo = Math.max(bestElo, stats.elo());
+                wins += stats.wins();
+                losses += stats.losses();
+                bestStreak = Math.max(bestStreak, stats.winStreak());
+            }
+            return new CachedStats(bestElo, wins, losses, bestStreak, wins + losses, kits.size());
+        } catch (Exception e) {
+            return CachedStats.EMPTY;
+        }
+    }
+
+    private static String modeLabel(MatchMode mode) {
+        return switch (mode) {
+            case RANKED -> "ランク";
+            case UNRANKED -> "アンランク";
+            case FFA -> "FFA";
+        };
+    }
+
+    private static String fmtTime(long secs) {
+        if (secs < 60) {
+            return secs + "s";
+        }
+        return (secs / 60) + "m" + (secs % 60) + "s";
+    }
+
+    // ------------------------------------------------------------------ render
 
     private void update(Player player) {
         Scoreboard board = Bukkit.getScoreboardManager().getNewScoreboard();
@@ -102,61 +171,91 @@ public final class ScoreboardService {
 
         PlayerState state = stateManager.getState(player.getUniqueId());
         int line = 15;
-        // Minimal layout: server name at top, counts, then match context, and the server
-        // IP pinned to the very bottom (lowest score = bottom row).
-        objective.getScore("§f" + settings.scoreboardServerName()).setScore(line--);
-        objective.getScore("§7Online: §f" + Bukkit.getOnlinePlayers().size()).setScore(line--);
-        objective.getScore("§7Queue: §f" + queueService.totalWaiting()).setScore(line--);
+
+        // --- header (always) ---
+        objective.getScore("§6✦ §f" + settings.scoreboardServerName() + " §6✦").setScore(line--);
+        objective.getScore("§eOnline: §a" + Bukkit.getOnlinePlayers().size()
+                + "  §eQueue: §b" + queueService.totalWaiting()
+                + "  §eMatch: §d" + matchRegistry.activeCount()).setScore(line--);
         objective.getScore("§r").setScore(line--);
 
-        boolean hasContext = false;
         Optional<MatchSession> match = matchRegistry.byPlayer(player.getUniqueId());
         if (match.isPresent()) {
-            hasContext = true;
-            MatchSession session = match.get();
-            // Team banner: "- YOU -" / "- OPPONENT -" with each name in its team color.
-            // Colors are stable for the whole rematch chain (participant order never changes).
-            UUID me = player.getUniqueId();
-            if (session.isParticipant(me) && session.participants().size() >= 2) {
-                UUID opponent = session.opponentOf(me);
-                TeamColor myColor = session.teamColor(me);
-                String myCode = myColor == TeamColor.RED ? "§c" : "§9";
-                String oppCode = myColor == TeamColor.RED ? "§9" : "§c";
-                objective.getScore("§7- YOU -").setScore(line--);
-                objective.getScore(myCode + player.getName()).setScore(line--);
-                if (opponent != null) {
-                    objective.getScore("§7- OPPONENT -").setScore(line--);
-                    objective.getScore(oppCode + StatsService.nameOf(opponent)).setScore(line--);
-                }
-            }
-            objective.getScore("§fKit: §7" + session.kitName()).setScore(line--);
-            objective.getScore("§fMode: §7" + session.mode()).setScore(line--);
-            // Rematch-chain score: own wins (own color) - opponent wins (opponent color).
-            // Fresh matches show 0-0; only rematch-confirmed matches carry the score over.
-            if (session.isParticipant(me)) {
-                TeamColor myColor = session.teamColor(me);
-                String myCode = myColor == TeamColor.RED ? "§c" : "§9";
-                String oppCode = myColor == TeamColor.RED ? "§9" : "§c";
-                int myWins = session.seriesWinsOf(me);
-                int oppWins = session.opponentOf(me) == null ? 0 : session.seriesWinsOf(session.opponentOf(me));
-                objective.getScore(myCode + myWins + " §7- " + oppCode + oppWins).setScore(line--);
-            }
-            if (session.startedAt() != null) {
-                long secs = Instant.now().getEpochSecond() - session.startedAt().getEpochSecond();
-                objective.getScore("§7Time: §f" + secs + "s").setScore(line--);
-            }
+            line = renderMatch(player, objective, match.get(), line);
         } else if (state == PlayerState.QUEUED_RANKED || state == PlayerState.QUEUED_UNRANKED) {
-            var entry = queueService.get(player.getUniqueId());
-            if (entry.isPresent()) {
-                hasContext = true;
-                objective.getScore("§fQueued: §7" + entry.get().kitId()).setScore(line--);
-            }
+            line = renderQueued(player, objective, line);
+        } else {
+            line = renderStats(player, objective, line);
         }
-        if (hasContext) {
-            objective.getScore("§r ").setScore(2);
-        }
-        objective.getScore("§7" + settings.scoreboardServerIp()).setScore(1);
+
+        objective.getScore("§r").setScore(2);
+        objective.getScore("§b" + settings.scoreboardServerIp()).setScore(1);
 
         player.setScoreboard(board);
+    }
+
+    private int renderStats(Player player, Objective objective, int line) {
+        CachedStats stats = cachedStats(player.getUniqueId());
+        objective.getScore("§6┃ §fあなたの統計 §6┃").setScore(line--);
+        objective.getScore("§bElo: §f" + stats.bestElo()
+                + "  §7Kits: §e" + stats.kits()).setScore(line--);
+        objective.getScore("§aWins: §f" + stats.wins()
+                + "  §cLosses: §f" + stats.losses()).setScore(line--);
+        objective.getScore("§eK/D: §f" + String.format("%.2f", stats.kd())
+                + "  §dStreak: §f" + stats.bestStreak()).setScore(line--);
+        objective.getScore("§bMatches: §f" + stats.matches()).setScore(line--);
+        return line;
+    }
+
+    private int renderQueued(Player player, Objective objective, int line) {
+        var entry = queueService.get(player.getUniqueId());
+        if (entry.isPresent()) {
+            long waited = Math.max(0, Instant.now().getEpochSecond()
+                    - entry.get().joinedAt().getEpochSecond());
+            int waiting = queueService.waitingCount(entry.get().mode(), entry.get().kitId());
+            objective.getScore("§eQueued: §b" + entry.get().kitId()
+                    + " §7(§a" + modeLabel(entry.get().mode()) + "§7)").setScore(line--);
+            objective.getScore("§fWait: §e" + fmtTime(waited)
+                    + "  §7Queue: §a" + waiting).setScore(line--);
+        }
+        objective.getScore("§r").setScore(line--);
+        return renderStats(player, objective, line);
+    }
+
+    private int renderMatch(Player player, Objective objective, MatchSession session, int line) {
+        UUID me = player.getUniqueId();
+        TeamColor myColor = session.teamColor(me);
+        String myCode = myColor == TeamColor.RED ? "§c" : "§9";
+        String oppCode = myColor == TeamColor.RED ? "§9" : "§c";
+
+        // --- team banner + elos ---
+        objective.getScore(myCode + "▸ YOU").setScore(line--);
+        CachedStats myStats = cachedStats(me);
+        objective.getScore(myCode + player.getName()
+                + "  §eElo: §a" + myStats.bestElo()).setScore(line--);
+        UUID opponent = session.opponentOf(me);
+        if (opponent != null) {
+            objective.getScore(oppCode + "▸ OPPONENT").setScore(line--);
+            CachedStats oppStats = cachedStats(opponent);
+            objective.getScore(oppCode + StatsService.nameOf(opponent)
+                    + "  §eElo: §a" + oppStats.bestElo()).setScore(line--);
+        }
+        objective.getScore("§r").setScore(line--);
+
+        // --- series score (own color left, opponent color right) ---
+        int myWins = session.seriesWinsOf(me);
+        int oppWins = opponent == null ? 0 : session.seriesWinsOf(opponent);
+        objective.getScore("§eScore: " + myCode + myWins + " §7- " + oppCode + oppWins).setScore(line--);
+
+        // --- kit / mode / kills / kd / time ---
+        objective.getScore("§fKit: §b" + session.kitName()
+                + "  §fMode: §a" + modeLabel(session.mode())).setScore(line--);
+        objective.getScore("§6Kills: §f" + session.killsOf(me)
+                + "  §eK/D: §f" + String.format("%.2f", myStats.kd())).setScore(line--);
+        if (session.startedAt() != null) {
+            long secs = Instant.now().getEpochSecond() - session.startedAt().getEpochSecond();
+            objective.getScore("§7Time: §f" + fmtTime(secs)).setScore(line--);
+        }
+        return line;
     }
 }

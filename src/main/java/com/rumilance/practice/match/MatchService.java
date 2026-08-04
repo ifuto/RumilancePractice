@@ -359,6 +359,10 @@ public final class MatchService {
         if (session.state() != MatchState.ACTIVE || session.isResultApplied()) {
             return;
         }
+        // Count a kill for the attacker (skip self-inflicted / environmental deaths).
+        if (attackerId != null && !attackerId.equals(victimId)) {
+            session.addKill(attackerId);
+        }
         Player victim = Bukkit.getPlayer(victimId);
         if (victim != null) {
             soundService.play(victim, "death");
