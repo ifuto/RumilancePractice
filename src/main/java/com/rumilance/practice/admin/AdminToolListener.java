@@ -50,7 +50,13 @@ public final class AdminToolListener implements Listener {
                 var p1 = AdminTools.pos1(event.getPlayer());
                 var p2 = AdminTools.pos2(event.getPlayer());
                 if (p1 != null && p2 != null) {
-                    lobbyService.setRegion(Cuboid.of(p1, p2));
+                    try {
+                        lobbyService.setRegion(Cuboid.of(p1, p2));
+                    } catch (IllegalArgumentException e) {
+                        // pos1 and pos2 in different worlds (or an unloaded world)
+                        event.getPlayer().sendMessage(Component.text(
+                                "pos1 と pos2 は同じワールドである必要があります。", NamedTextColor.RED));
+                    }
                 }
                 event.getPlayer().sendActionBar(Component.text("pos2 set", NamedTextColor.GREEN));
             }
