@@ -95,9 +95,12 @@ tasks.shadowJar {
     // Relocate shaded libraries to avoid classpath collisions with other plugins
     // that may bundle different versions of the same libraries.
     relocate("com.zaxxer.hikari", "com.rumilance.practice.libs.hikari")
-    relocate("org.sqlite", "com.rumilance.practice.libs.sqlite")
     relocate("org.mariadb.jdbc", "com.rumilance.practice.libs.mariadb")
     relocate("org.slf4j", "com.rumilance.practice.libs.slf4j")
+    // NOTE: org.sqlite (sqlite-jdbc) must NOT be relocated. Its JNI native library
+    // (libsqlitejdbc.so) binds to the exact package "org.sqlite.core.NativeDB", so
+    // relocating the classes breaks the native method lookup with UnsatisfiedLinkError.
+    // We rely on sqlite-jdbc's own package; no other plugin ships sqlite-jdbc by default.
 
     minimize {
         exclude(dependency("org.xerial:sqlite-jdbc:.*"))
