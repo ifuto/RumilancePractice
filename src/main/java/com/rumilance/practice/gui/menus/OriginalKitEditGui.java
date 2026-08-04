@@ -150,25 +150,27 @@ public final class OriginalKitEditGui extends AbstractGui implements BottomInven
         inv.clear();
         List<String> catItems = ekitItems.items(ctx.category);
         int start = ctx.page * ITEMS_PER_PAGE;
+        // カテゴリアイテムはメインインベントリ（スロット 9-35、27枠）
         for (int i = 0; i < ITEMS_PER_PAGE; i++) {
             int idx = start + i;
             if (idx < catItems.size()) {
-                inv.setItem(i, ekitItems.displayItem(ctx.category, catItems.get(idx)).clone());
+                inv.setItem(9 + i, ekitItems.displayItem(ctx.category, catItems.get(idx)).clone());
             }
         }
+        // ホットバー（スロット 0-8）: 1番=前ページ / 2-4・6-8番=削除 / 5番=続行 / 9番=次ページ
         if (ctx.page > 0) {
-            inv.setItem(27, pageButton("前のページへ", "prev"));
+            inv.setItem(0, pageButton("前のページへ", "prev"));
         }
-        inv.setItem(28, deleteGlass());
-        inv.setItem(29, deleteGlass());
-        inv.setItem(30, deleteGlass());
-        inv.setItem(31, GuiDecorator.button(Material.LIME_STAINED_GLASS_PANE,
+        inv.setItem(1, deleteGlass());
+        inv.setItem(2, deleteGlass());
+        inv.setItem(3, deleteGlass());
+        inv.setItem(4, GuiDecorator.button(Material.LIME_STAINED_GLASS_PANE,
                 Component.text("続行", NamedTextColor.GREEN), "continue"));
-        inv.setItem(32, deleteGlass());
-        inv.setItem(33, deleteGlass());
-        inv.setItem(34, deleteGlass());
+        inv.setItem(5, deleteGlass());
+        inv.setItem(6, deleteGlass());
+        inv.setItem(7, deleteGlass());
         if (start + ITEMS_PER_PAGE < catItems.size()) {
-            inv.setItem(35, pageButton("次のページへ", "next"));
+            inv.setItem(8, pageButton("次のページへ", "next"));
         }
     }
 
@@ -248,12 +250,13 @@ public final class OriginalKitEditGui extends AbstractGui implements BottomInven
         }
         int slot = event.getSlot();
         ItemStack cursor = event.getCursor();
-        if (slot <= 26) {
+        if (slot >= 9 && slot <= 35) {
+            // メインインベントリ = カテゴリアイテム
             if (cursor != null && !cursor.getType().isAir()) {
                 return;
             }
             List<String> catItems = ekitItems.items(ctx.category);
-            int idx = ctx.page * ITEMS_PER_PAGE + slot;
+            int idx = ctx.page * ITEMS_PER_PAGE + (slot - 9);
             if (idx >= catItems.size()) {
                 return;
             }
@@ -280,24 +283,25 @@ public final class OriginalKitEditGui extends AbstractGui implements BottomInven
             renderTop(event.getView().getTopInventory(), ctx);
             return;
         }
-        if (slot == 27) {
-            ctx.page = Math.max(0, ctx.page - 1);
-            renderPlayerInventory(player, ctx);
-            return;
-        }
-        if (slot == 35) {
-            List<String> catItems = ekitItems.items(ctx.category);
-            if ((ctx.page + 1) * ITEMS_PER_PAGE < catItems.size()) {
-                ctx.page++;
+        if (slot <= 8) {
+            if (slot == 0) {
+                ctx.page = Math.max(0, ctx.page - 1);
                 renderPlayerInventory(player, ctx);
+                return;
             }
-            return;
-        }
-        if (slot == 31) {
-            saveAndClose(player, ctx);
-            return;
-        }
-        if (slot >= 28 && slot <= 34) {
+            if (slot == 8) {
+                List<String> catItems = ekitItems.items(ctx.category);
+                if ((ctx.page + 1) * ITEMS_PER_PAGE < catItems.size()) {
+                    ctx.page++;
+                    renderPlayerInventory(player, ctx);
+                }
+                return;
+            }
+            if (slot == 4) {
+                saveAndClose(player, ctx);
+                return;
+            }
+            // 削除ガラス（ホットバー 1-3, 5-7）
             if (cursor != null && !cursor.getType().isAir()) {
                 event.getView().setCursor(null);
                 sounds.play(player, "delete");

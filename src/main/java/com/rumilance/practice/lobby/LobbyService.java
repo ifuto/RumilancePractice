@@ -120,7 +120,9 @@ public final class LobbyService {
         player.setFallDistance(0f);
         player.setAllowFlight(false);
         player.setFlying(false);
-        for (PotionEffect effect : player.getActivePotionEffects()) {
+        // Copy to a list first: removing effects while iterating the live collection can
+        // throw ConcurrentModificationException depending on the server implementation.
+        for (PotionEffect effect : new java.util.ArrayList<>(player.getActivePotionEffects())) {
             player.removePotionEffect(effect.getType());
         }
         applyLobbyInventory(player);

@@ -202,8 +202,16 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                 if (args.length < 3) {
                     yield true;
                 }
+                final int seconds;
+                try {
+                    seconds = Integer.parseInt(args[2]);
+                } catch (NumberFormatException e) {
+                    player.sendMessage(Component.text("数値を入力してください: /kit timeout <name> <sec>",
+                            NamedTextColor.RED));
+                    yield true;
+                }
                 kitService.get(args[1]).ifPresent(k -> {
-                    kitService.save(k.toBuilder().timeoutSeconds(Integer.parseInt(args[2])).build());
+                    kitService.save(k.toBuilder().timeoutSeconds(Math.max(0, seconds)).build());
                     player.sendMessage(Component.text("Timeout set.", NamedTextColor.GREEN));
                 });
                 yield true;

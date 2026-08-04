@@ -177,29 +177,37 @@ public final class EkitAdminGui extends AbstractGui implements BottomInventoryCl
         if (cursor != null && !cursor.getType().isAir()) {
             return;
         }
-        deposit(player, cat, current);
+        if (!deposit(player, cat, current)) {
+            return;
+        }
+        // The click event is already cancelled by GuiListener, so mutating the event's
+        // currentItem does NOT touch the real inventory. Modify the actual bottom
+        // inventory directly instead.
+        Inventory bottom = event.getView().getBottomInventory();
         if (current.getAmount() > 1) {
             current.setAmount(current.getAmount() - 1);
+            bottom.setItem(event.getSlot(), current);
         } else {
-            event.setCurrentItem(null);
+            bottom.setItem(event.getSlot(), null);
         }
         sounds.play(player, "gui-click");
         render(player, session, event.getView().getTopInventory());
     }
 
-    private void deposit(Player player, String cat, ItemStack item) {
+    private boolean deposit(Player player, String cat, ItemStack item) {
         if (cat == null || item == null) {
-            return;
+            return false;
         }
         if (ekitItems.isPotionCategory(cat)) {
             String effect = PotionRules.effectOf(item);
             if (effect == null) {
                 player.sendMessage(Component.text("このアイテムはポーションではありません。", NamedTextColor.RED));
-                return;
+                return false;
             }
             ekitItems.add(cat, effect);
         } else {
             ekitItems.add(cat, item.getType().name());
         }
+        return true;
     }
 }

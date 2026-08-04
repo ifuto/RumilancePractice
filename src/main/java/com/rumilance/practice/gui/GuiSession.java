@@ -106,6 +106,11 @@ public final class GuiSession {
         }
     }
 
+    /** @return true if the attribute map currently contains {@code key}. */
+    public boolean attributesContain(String key) {
+        return attributes.containsKey(key);
+    }
+
     @SuppressWarnings("unchecked")
     public <T> T get(String key, Class<T> type) {
         Object value = attributes.get(key);

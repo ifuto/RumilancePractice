@@ -82,16 +82,20 @@ public final class PracticeSideListener implements Listener {
             }
         });
         // hide other chat setting
-        event.viewers().removeIf(audience -> {
-            if (!(audience instanceof Player viewer) || viewer.getUniqueId().equals(player.getUniqueId())) {
-                return false;
-            }
-            var settings = settingsService.get(viewer);
-            if (!settings.hideOtherChat()) {
-                return false;
-            }
-            return !settings.chatWhitelist().contains(player.getName().toLowerCase(Locale.ROOT));
-        });
+        try {
+            event.viewers().removeIf(audience -> {
+                if (!(audience instanceof Player viewer) || viewer.getUniqueId().equals(player.getUniqueId())) {
+                    return false;
+                }
+                var settings = settingsService.get(viewer);
+                if (!settings.hideOtherChat()) {
+                    return false;
+                }
+                return !settings.chatWhitelist().contains(player.getName().toLowerCase(Locale.ROOT));
+            });
+        } catch (Exception e) {
+            // Never let an async chat event be killed by a settings/storage hiccup.
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
