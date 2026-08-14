@@ -88,7 +88,7 @@ public final class GuiListener implements Listener {
             if (guiAction == null || "decorate".equals(guiAction)) {
                 return;
             }
-            handler.handleClick(player, session, top, event.getSlot(), guiAction);
+            handler.handleClick(player, session, top, event.getSlot(), guiAction, event.getClick());
         } else if (handler instanceof BottomInventoryClickHandler bottom) {
             bottom.handleBottomClick(player, session, event);
         }

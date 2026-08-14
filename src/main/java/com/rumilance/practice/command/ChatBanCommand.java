@@ -7,14 +7,25 @@ import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
-public final class ChatBanCommand implements CommandExecutor {
+/**
+ * Administrator commands for issuing and removing chat bans. Supports human-friendly durations
+ * ({@code 30m}, {@code 6h}, {@code 7d}) and tab-completes online player names plus the duration
+ * shortcuts.
+ */
+public final class ChatBanCommand implements CommandExecutor, TabCompleter {
+
+    private static final List<String> DURATIONS = List.of("5m", "30m", "1h", "6h", "12h", "1d", "3d", "7d", "30d");
 
     private final ChatBanService chatBanService;
 
@@ -25,7 +36,7 @@ public final class ChatBanCommand implements CommandExecutor {
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command,
                              @NotNull String label, @NotNull String[] args) {
-        if (!sender.hasPermission("rumilance.admin") && !sender.isOp()) {
+        if (!sender.hasPermission("rumilance.admin")) {
             sender.sendMessage(Component.text("No permission.", NamedTextColor.RED));
             return true;
         }
@@ -40,15 +51,16 @@ public final class ChatBanCommand implements CommandExecutor {
             try {
                 id = target != null ? target.getUniqueId() : UUID.fromString(args[0]);
             } catch (Exception e) {
-                sender.sendMessage(Component.text("Invalid target.", NamedTextColor.RED));
+                sender.sendMessage(Component.text("Invalid target (use a player name or UUID).", NamedTextColor.RED));
                 return true;
             }
             chatBanService.unban(id);
-            sender.sendMessage(Component.text("Unban requested.", NamedTextColor.GREEN));
+            sender.sendMessage(Component.text("ChatBan removed.", NamedTextColor.GREEN));
             return true;
         }
         if (args.length < 3) {
             sender.sendMessage(Component.text("/chatban <player> <duration> <reason>", NamedTextColor.YELLOW));
+            sender.sendMessage(Component.text("Durations: e.g. 30m, 6h, 7d (default 7d if invalid)", NamedTextColor.GRAY));
             return true;
         }
         Player target = Bukkit.getPlayerExact(args[0]);
@@ -57,24 +69,68 @@ public final class ChatBanCommand implements CommandExecutor {
             return true;
         }
         Duration duration = parseDuration(args[1]);
-        String reason = String.join(" ", java.util.Arrays.copyOfRange(args, 2, args.length));
+        if (duration == null || duration.isZero() || duration.isNegative()) {
+            sender.sendMessage(Component.text("Invalid duration. Use e.g. 30m, 6h, 7d.", NamedTextColor.RED));
+            return true;
+        }
+        String reason = String.join(" ", Arrays.copyOfRange(args, 2, args.length));
         UUID staff = sender instanceof Player p ? p.getUniqueId() : null;
         chatBanService.issue(target.getUniqueId(), staff, "CHATBAN", reason, duration);
-        sender.sendMessage(Component.text("ChatBan issued.", NamedTextColor.GREEN));
+        sender.sendMessage(Component.text("ChatBan issued to " + target.getName()
+                + " for " + args[1] + ".", NamedTextColor.GREEN));
         return true;
     }
 
+    @Override
+    public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command,
+                                      @NotNull String alias, @NotNull String[] args) {
+        if (!sender.hasPermission("rumilance.admin")) {
+            return List.of();
+        }
+        if (command.getName().equalsIgnoreCase("chatunban")) {
+            if (args.length == 1) {
+                List<String> names = new ArrayList<>();
+                Bukkit.getOnlinePlayers().forEach(p -> names.add(p.getName()));
+                return TabCompletions.filter(TabCompletions.current(args), names);
+            }
+            return List.of();
+        }
+        if (args.length == 1) {
+            List<String> names = new ArrayList<>();
+            Bukkit.getOnlinePlayers().forEach(p -> names.add(p.getName()));
+            return TabCompletions.filter(TabCompletions.current(args), names);
+        }
+        if (args.length == 2) {
+            return TabCompletions.filter(TabCompletions.current(args), DURATIONS);
+        }
+        if (args.length == 3) {
+            return TabCompletions.filter(TabCompletions.current(args),
+                    List.of("Spam", "Advertising", "Toxicity", "Insults", "Other"));
+        }
+        return List.of();
+    }
+
     private static Duration parseDuration(String raw) {
-        raw = raw.toLowerCase(Locale.ROOT);
-        if (raw.endsWith("d")) {
-            return Duration.ofDays(Long.parseLong(raw.substring(0, raw.length() - 1)));
+        if (raw == null || raw.isBlank()) {
+            return null;
         }
-        if (raw.endsWith("h")) {
-            return Duration.ofHours(Long.parseLong(raw.substring(0, raw.length() - 1)));
+        String lower = raw.toLowerCase(Locale.ROOT);
+        try {
+            if (lower.endsWith("d")) {
+                return Duration.ofDays(Long.parseLong(lower.substring(0, lower.length() - 1)));
+            }
+            if (lower.endsWith("h")) {
+                return Duration.ofHours(Long.parseLong(lower.substring(0, lower.length() - 1)));
+            }
+            if (lower.endsWith("m")) {
+                return Duration.ofMinutes(Long.parseLong(lower.substring(0, lower.length() - 1)));
+            }
+            if (lower.endsWith("s")) {
+                return Duration.ofSeconds(Long.parseLong(lower.substring(0, lower.length() - 1)));
+            }
+        } catch (NumberFormatException e) {
+            return null;
         }
-        if (raw.endsWith("m")) {
-            return Duration.ofMinutes(Long.parseLong(raw.substring(0, raw.length() - 1)));
-        }
-        return Duration.ofDays(7);
+        return null;
     }
 }

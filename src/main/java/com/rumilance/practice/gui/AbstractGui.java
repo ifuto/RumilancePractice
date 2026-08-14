@@ -61,6 +61,26 @@ public abstract class AbstractGui {
 
     public abstract void handleClick(Player player, GuiSession session, Inventory inventory, int slot, String action);
 
+    /**
+     * Extended click handler that also receives the Bukkit {@link org.bukkit.event.inventory.ClickType}.
+     * The default delegates to {@link #handleClick}; menus that need to distinguish left from
+     * right clicks (e.g. queue list with a right-click preview) can override this.
+     */
+    public void handleClick(Player player, GuiSession session, Inventory inventory, int slot,
+                            String action, org.bukkit.event.inventory.ClickType clickType) {
+        handleClick(player, session, inventory, slot, action);
+    }
+
+    /**
+     * Re-renders this menu in place (clears, then fills) without issuing a new open packet,
+     * so toggling a setting or turning a page feels instant instead of re-opening the
+     * inventory. Safe to call from {@link #handleClick} on the main thread.
+     */
+    protected void refresh(Player player, GuiSession session, Inventory inventory) {
+        inventory.clear();
+        render(player, session, inventory);
+    }
+
     public boolean matches(UUID sessionId, GuiType type) {
         return this.type == type;
     }

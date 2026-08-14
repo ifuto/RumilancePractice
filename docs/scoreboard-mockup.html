@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>RumilancePractice — Scoreboard Mockup</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#14171c; --ink:#ffffff; --muted:#8b8f96;
+    --aqua:#55ffff; --gold:#ffaa00; --green:#55ff55; --red:#ff5555;
+    --yellow:#ffff55; --purple:#ff55ff; --gray:#aaaaaa; --dark:#2a2e36;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(135deg,#0b0d10,#141820);color:var(--ink);
+       font-family:'Segoe UI',system-ui,sans-serif;padding:32px;min-height:100vh}
+  h1{font-size:22px;margin:0 0 6px}
+  p.lead{color:var(--muted);margin:0 0 28px;font-size:13px;max-width:760px;line-height:1.6}
+  .grid{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start}
+  .card{background:var(--panel);border:1px solid #20252c;border-radius:10px;padding:18px 20px;width:300px}
+  .card h2{margin:0 0 4px;font-size:14px;letter-spacing:.04em;text-transform:uppercase;color:var(--aqua)}
+  .card .sub{color:var(--muted);font-size:11px;margin:0 0 14px}
+  /* fake sidebar scoreboard */
+  .sb{background:#000;border:2px solid #000;border-radius:4px;padding:6px 8px;font-family:'Consolas',monospace;font-size:13px;line-height:1.55}
+  .sb .title{color:var(--ink);font-weight:700;text-align:center;padding:4px 0;border-bottom:1px solid #1d1d1d;margin-bottom:4px}
+  .row{display:flex;justify-content:space-between;gap:12px;white-space:nowrap}
+  .sep{height:1px;background:#1d1d1d;margin:4px 0}
+  .c-aqua{color:var(--aqua)} .c-gold{color:var(--gold)} .c-green{color:var(--green)}
+  .c-red{color:var(--red)} .c-yellow{color:var(--yellow)} .c-purple{color:var(--purple)}
+  .c-gray{color:var(--gray)} .c-white{color:var(--ink)}
+  .footer{margin-top:6px;padding-top:6px;border-top:1px solid #1d1d1d;text-align:center;color:var(--aqua);font-size:12px}
+  /* notes */
+  .notes{margin-top:32px;max-width:820px;background:var(--panel);border:1px solid #20252c;border-radius:10px;padding:18px 22px}
+  .notes h3{margin:0 0 10px;color:var(--aqua);font-size:14px}
+  .notes ul{margin:0;padding-left:20px;color:var(--muted);font-size:13px;line-height:1.8}
+  .notes code{background:#0b0d10;padding:1px 6px;border-radius:4px;color:var(--aqua)}
+</style>
+</head>
+<body>
+
+<h1>RumilancePractice スコアボード 現在の表示</h1>
+<p class="lead">
+  <code>ScoreboardService</code>（中央10〜20tick更新、統計は3秒キャッシュ）がプレイヤーの状態に応じて3パターンのサイドバーを出し分けます。
+  タイトルとフッター（サーバーIP）は全状態で共通。各ブロックの見た目は実際のチャットカラーに合わせています（Minecraftフォント厳密再現ではなく、内容優先）。
+</p>
+
+<div class="grid">
+
+  <!-- ============== ロビー / 通常 ============== -->
+  <div class="card">
+    <h2>① ロビー／通常</h2>
+    <p class="sub">状態: LOBBY / OPENING_GUI / SPECTATING など</p>
+    <div class="sb">
+      <div class="title"><span class="c-gold">✦</span> Rumilance <span class="c-gold">✦</span></div>
+      <div class="row"><span><span class="c-yellow">Online:</span> <span class="c-green">128</span></span><span><span class="c-yellow">Queue:</span> <span class="c-aqua">7</span></span></div>
+      <div class="row"><span><span class="c-yellow">Match:</span> <span class="c-purple">23</span></span><span></span></div>
+      <div class="sep"></div>
+      <div class="row"><span class="c-gold">┃</span> <span class="c-white">あなたの統計</span> <span class="c-gold">┃</span><span></span></div>
+      <div class="row"><span><span class="c-aqua">Elo:</span> <span class="c-white">1420</span></span><span><span class="c-gray">Kits:</span> <span class="c-yellow">4</span></span></div>
+      <div class="row"><span><span class="c-green">Wins:</span> <span class="c-white">86</span></span><span><span class="c-red">Losses:</span> <span class="c-white">54</span></span></div>
+      <div class="row"><span><span class="c-yellow">K/D:</span> <span class="c-white">1.59</span></span><span><span class="c-purple">Streak:</span> <span class="c-white">6</span></span></div>
+      <div class="row"><span><span class="c-aqua">Matches:</span> <span class="c-white">140</span></span><span></span></div>
+      <div class="footer">play.rumilance.net</div>
+    </div>
+  </div>
+
+  <!-- ============== キュー待機中 ============== -->
+  <div class="card">
+    <h2>② キュー待機中</h2>
+    <p class="sub">状態: QUEUED_RANKED / QUEUED_UNRANKED</p>
+    <div class="sb">
+      <div class="title"><span class="c-gold">✦</span> Rumilance <span class="c-gold">✦</span></div>
+      <div class="row"><span><span class="c-yellow">Online:</span> <span class="c-green">128</span></span><span><span class="c-yellow">Queue:</span> <span class="c-aqua">7</span></span></div>
+      <div class="row"><span><span class="c-yellow">Match:</span> <span class="c-purple">23</span></span><span></span></div>
+      <div class="sep"></div>
+      <div class="row"><span><span class="c-yellow">Queued:</span> <span class="c-aqua">nodebuff</span> <span class="c-gray">(<span class="c-green">ランク</span><span class="c-gray">)</span></span><span></span></div>
+      <div class="row"><span><span class="c-white">Wait:</span> <span class="c-yellow">12s</span></span><span><span class="c-gray">Queue:</span> <span class="c-green">3</span></span></div>
+      <div class="sep"></div>
+      <div class="row"><span class="c-gold">┃</span> <span class="c-white">あなたの統計</span> <span class="c-gold">┃</span><span></span></div>
+      <div class="row"><span><span class="c-aqua">Elo:</span> <span class="c-white">1420</span></span><span><span class="c-gray">Kits:</span> <span class="c-yellow">4</span></span></div>
+      <div class="row"><span><span class="c-green">Wins:</span> <span class="c-white">86</span></span><span><span class="c-red">Losses:</span> <span class="c-white">54</span></span></div>
+      <div class="row"><span><span class="c-yellow">K/D:</span> <span class="c-white">1.59</span></span><span><span class="c-purple">Streak:</span> <span class="c-white">6</span></span></div>
+      <div class="row"><span><span class="c-aqua">Matches:</span> <span class="c-white">140</span></span><span></span></div>
+      <div class="footer">play.rumilance.net</div>
+    </div>
+  </div>
+
+  <!-- ============== 試合中 ============== -->
+  <div class="card">
+    <h2>③ 試合中（ACTIVE）</h2>
+    <p class="sub">状態: COUNTDOWN / ACTIVE / ENDING</p>
+    <div class="sb">
+      <div class="title"><span class="c-gold">✦</span> Rumilance <span class="c-gold">✦</span></div>
+      <div class="row"><span><span class="c-yellow">Online:</span> <span class="c-green">128</span></span><span><span class="c-yellow">Queue:</span> <span class="c-aqua">7</span></span></div>
+      <div class="row"><span><span class="c-yellow">Match:</span> <span class="c-purple">23</span></span><span></span></div>
+      <div class="sep"></div>
+      <div class="row"><span class="c-red">▸ YOU</span><span></span></div>
+      <div class="row"><span class="c-red">AquaPlayer</span><span><span class="c-yellow">Elo:</span> <span class="c-green">1420</span></span></div>
+      <div class="row"><span class="c-blue" style="color:#5555ff">▸ OPPONENT</span><span></span></div>
+      <div class="row"><span class="c-blue" style="color:#5555ff">CyanFighter</span><span><span class="c-yellow">Elo:</span> <span class="c-green">1380</span></span></div>
+      <div class="sep"></div>
+      <div class="row"><span><span class="c-yellow">Score:</span> <span class="c-red">2</span> <span class="c-gray">-</span> <span style="color:#5555ff">1</span></span><span></span></div>
+      <div class="row"><span><span class="c-white">Kit:</span> <span class="c-aqua">nodebuff</span></span><span><span class="c-white">Mode:</span> <span class="c-green">ランク</span></span></div>
+      <div class="row"><span><span class="c-gold">Kills:</span> <span class="c-white">5</span></span><span><span class="c-yellow">K/D:</span> <span class="c-white">1.59</span></span></div>
+      <div class="row"><span><span class="c-gray">Time:</span> <span class="c-white">1m23s</span></span><span></span></div>
+      <div class="footer">play.rumilance.net</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="notes">
+  <h3>実装メモ</h3>
+  <ul>
+    <li>タイトル: <code>settings.scoreboardServerName()</code>（金の✦を前後に付与）。Objectiveディスプレイ名は白。</li>
+    <li>1行目は常に <code>Online / Queue / Match</code> のサマリー。<code>Queue</code> は <code>queueService.totalWaiting()</code>、<code>Match</code> は <code>matchRegistry.activeCount()</code>。</li>
+    <li>統計ブロック: <code>Elo</code>（全キット中の bestElo）、<code>Wins/Losses</code>、<code>K/D</code>、<code>Streak</code>（bestStreak）、<code>Matches</code>、<code>Kits</code>。3秒キャッシュ。</li>
+    <li>キュー中: 統計の上に <code>Queued: &lt;kitId&gt; (ランク/アンランク)</code> と <code>Wait: Xs Queue: N</code> を2行追加。</li>
+    <li>試合中: あなた（<code>§c</code>赤／<code>§9</code>青のどちらか自分のチームカラー）と相手を <code>▸ YOU / ▸ OPPONENT</code> バナー付きで表示。</li>
+    <li>シリーズスコア: <code>Score: myWins - oppWins</code>。再戦ボタンによる連続試合のみ加算。</li>
+    <li>キット・モード・キル数・K/D・経過時間を表示。</li>
+    <li>最下行は常に <code>settings.scoreboardServerIp()</code> をアクア色で表示（<code>§b</code>）。</li>
+    <li>非対応: スコアボード上でのキルタイトルやマッチリポートへの導線は今のところ無し（リポートはチャットと <code>/matchreport</code> のみ）。</li>
+  </ul>
+</div>
+
+</body>
+</html>

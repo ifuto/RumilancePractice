@@ -23,6 +23,8 @@ public final class ItemKeys {
     public static final String REMATCH = "rematch";
     public static final String RETURN_LOBBY = "return_lobby";
     public static final String TARGET_UUID = "target_uuid";
+    public static final String GOLDEN_HEAD = "golden_head";
+    public static final String MATCH_REPORT = "match_report";
 
     private static volatile Plugin plugin;
 
@@ -75,6 +77,14 @@ public final class ItemKeys {
 
     public static NamespacedKey targetUuid() {
         return key(TARGET_UUID);
+    }
+
+    public static NamespacedKey goldenHead() {
+        return key(GOLDEN_HEAD);
+    }
+
+    public static NamespacedKey matchReport() {
+        return key(MATCH_REPORT);
     }
 
     public static NamespacedKey key(String name) {

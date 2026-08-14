@@ -29,7 +29,7 @@ public final class SetFuncCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         if (args.length < 1) {
-            player.sendMessage(Component.text("Usage: /setfunc <ranked|unranked|ffa|ekit|settings|spectate|leavequeue>",
+            player.sendMessage(Component.text("Usage: /setfunc <ranked|unranked|ffa|ekit|settings|spectate|titles|party|menu|leavequeue>",
                     NamedTextColor.YELLOW));
             return true;
         }
@@ -45,6 +45,9 @@ public final class SetFuncCommand implements CommandExecutor, TabCompleter {
             case "ekit" -> Component.text("🪓 Edit Kit 🪓", NamedTextColor.BLUE);
             case "settings" -> Component.text("⚙️ Settings ⚙️", NamedTextColor.YELLOW);
             case "spectate" -> Component.text("👀 Spectate 👀", NamedTextColor.LIGHT_PURPLE);
+            case "titles" -> Component.text("✦ Kill Titles ✦", NamedTextColor.AQUA);
+            case "party" -> Component.text(" Party", NamedTextColor.AQUA);
+            case "menu" -> Component.text("✦ Game Menu ✦", NamedTextColor.AQUA);
             case "leavequeue" -> Component.text("Leave Queue", NamedTextColor.RED);
             default -> null;
         };
@@ -63,7 +66,8 @@ public final class SetFuncCommand implements CommandExecutor, TabCompleter {
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command,
                                                 @NotNull String alias, @NotNull String[] args) {
         if (args.length == 1) {
-            return List.of("ranked", "unranked", "ffa", "ekit", "settings", "spectate", "leavequeue");
+            return List.of("ranked", "unranked", "ffa", "ekit", "settings", "spectate",
+                    "titles", "party", "menu", "leavequeue");
         }
         return List.of();
     }

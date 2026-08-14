@@ -1,5 +1,6 @@
 package com.rumilance.practice.queue;
 
+import com.rumilance.practice.config.PluginSettings;
 import com.rumilance.practice.config.RuntimeFlags;
 import com.rumilance.practice.database.repository.RankedStatsRepository;
 import com.rumilance.practice.kit.KitService;
@@ -48,6 +49,7 @@ public final class QueueCoordinator {
     private final RankedStatsRepository rankedStatsRepository;
     private final AsyncExecutor asyncExecutor;
     private final RuntimeFlags runtimeFlags;
+    private final PluginSettings settings;
     private final boolean blockSameIp;
     private final boolean avoidRecent;
     private BukkitTask matchTask;
@@ -64,6 +66,7 @@ public final class QueueCoordinator {
             RankedStatsRepository rankedStatsRepository,
             AsyncExecutor asyncExecutor,
             RuntimeFlags runtimeFlags,
+            PluginSettings settings,
             boolean blockSameIp,
             boolean avoidRecent,
             MessageService messageService
@@ -78,6 +81,7 @@ public final class QueueCoordinator {
         this.rankedStatsRepository = rankedStatsRepository;
         this.asyncExecutor = asyncExecutor;
         this.runtimeFlags = runtimeFlags;
+        this.settings = settings;
         this.blockSameIp = blockSameIp;
         this.avoidRecent = avoidRecent;
         this.messageService = messageService;
@@ -105,6 +109,15 @@ public final class QueueCoordinator {
         if (runtimeFlags.maintenance() && !player.hasPermission("rumilance.admin")) {
             messageService.send(player, "queue.maintenance");
             return;
+        }
+        if (mode == MatchMode.RANKED) {
+            int maxPing = settings.queueMaxRankedPingMs();
+            if (maxPing > 0 && player.getPing() > maxPing) {
+                messageService.send(player, "queue.high-ping",
+                        MessageService.tags("ping", String.valueOf(player.getPing()),
+                                "max", String.valueOf(maxPing)));
+                return;
+            }
         }
         if (!kitService.isQueueEnabled(kitId) || kitService.get(kitId).filter(k -> k.enabled()).isEmpty()) {
             messageService.send(player, "queue.kit-disabled");

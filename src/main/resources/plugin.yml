@@ -74,6 +74,15 @@ commands:
     description: Open FFA list GUI or manage FFA arenas.
     usage: /ffa [create|selection|spawn|kit|enable|disable|delete|reset|leave]
     permission: rumilance.user
+  party:
+    description: Manage parties (invite, accept, leave, kick, warp, chat).
+    usage: /party <invite|accept|leave|kick|disband|warp|list|chat>
+    aliases: [p]
+    permission: rumilance.user
+  title:
+    description: Open the kill/win title selector.
+    usage: /title
+    permission: rumilance.user
   ekit:
     description: Edit official kit layout.
     usage: /ekit
@@ -153,6 +162,14 @@ commands:
     description: Manage original-kit item categories.
     usage: /ekitadmin
     permission: rumilance.admin
+  giveitem:
+    description: Operator-only utility to receive special items (golden head, etc.).
+    usage: /giveitem <ghead>
+    permission: rumilance.admin
+  matchreport:
+    description: View the combat report card for your most recent match.
+    usage: /matchreport [toggle]
+    permission: rumilance.user
 
 permissions:
   rumilance.user:

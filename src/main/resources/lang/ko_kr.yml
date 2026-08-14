@@ -80,6 +80,7 @@ queue:
   kit-disabled: "<red>해당 키트 대기열이 비활성화되어 있습니다."
   cannot-join: "<red>지금은 대기열에 참여할 수 없습니다."
   already-queued: "<red>이미 대기열에 있습니다."
+  high-ping: "<red>핑(<ping>ms)이 너무 높아 랭크에 참여할 수 없습니다 (최대 <max>ms)."
   joined: "<green><yellow><kit></yellow> <mode> 대기열에 참여했습니다."
   left: "<gray>대기열에서 나갔습니다."
 

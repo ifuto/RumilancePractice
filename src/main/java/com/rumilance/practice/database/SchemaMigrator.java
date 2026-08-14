@@ -246,6 +246,16 @@ public final class SchemaMigrator {
                         + " WHERE item_data IS NOT NULL AND item_data <> ''"
         )));
 
+        migrations.add(new Migration(14, "add selected_title column to player_settings", List.of(
+                "ALTER TABLE " + databaseService.table("player_settings")
+                        + " ADD COLUMN selected_title VARCHAR(64) NOT NULL DEFAULT 'none'"
+        )));
+
+        migrations.add(new Migration(15, "add show_match_report column to player_settings", List.of(
+                "ALTER TABLE " + databaseService.table("player_settings")
+                        + " ADD COLUMN show_match_report INTEGER NOT NULL DEFAULT 0"
+        )));
+
         return migrations;
     }
 }

@@ -39,6 +39,9 @@ queue:
   initial-elo-range: 75
   elo-range-growth-per-interval: 25
   growth-interval-seconds: 15
+  # When greater than 0, players whose ping (ms) is above this value cannot join the ranked
+  # queue (they receive a warning). 0 disables the check.
+  max-ranked-ping-ms: 0
 
 ranking:
   # Starting ELO rating for a kit the player has never played.

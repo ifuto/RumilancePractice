@@ -1,32 +1,35 @@
 package com.rumilance.practice.gui.menus;
 
 import com.rumilance.practice.gui.AbstractGui;
-import com.rumilance.practice.gui.GuiDecorator;
 import com.rumilance.practice.gui.GuiSession;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.GuiType;
+import com.rumilance.practice.gui.ItemBuilder;
+import com.rumilance.practice.gui.MenuScaffold;
+import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.model.KitDefinition;
 import com.rumilance.practice.model.RankedKitStats;
 import com.rumilance.practice.sound.SoundService;
 import com.rumilance.practice.stats.StatsService;
 import com.rumilance.practice.util.GuiSlots;
-import com.rumilance.practice.util.ItemKeys;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
-import net.kyori.adventure.text.minimessage.MiniMessage;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.persistence.PersistentDataType;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Per-kit ranked stats browser. The header shows whose stats are being viewed (with a head),
+ * the content grid lists every enabled kit with W/L, win-rate, K/D, streak and Elo, and the
+ * bottom bar holds a close button. Stats are loaded via {@link StatsService} with failures
+ * degraded to a "Stats unavailable" lore rather than aborting the whole menu.
+ */
 public final class StatsKitGui extends AbstractGui {
 
     private final KitService kitService;
@@ -55,59 +58,95 @@ public final class StatsKitGui extends AbstractGui {
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return Component.text("Ranked Stats", NamedTextColor.WHITE);
+        UUID target = session.targetPlayer() == null ? player.getUniqueId() : session.targetPlayer();
+        return Component.text("✦ " + StatsService.nameOf(target) + " — Stats", UiTheme.HEADER)
+                .decoration(TextDecoration.ITALIC, false);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
         UUID target = session.targetPlayer() == null ? player.getUniqueId() : session.targetPlayer();
-        int index = 0;
-        for (KitDefinition kit : kitService.enabled()) {
-            if (index >= 28) {
-                break;
-            }
-            int row = 1 + index / 7;
-            int col = 1 + index % 7;
-            Material mat = Material.matchMaterial(kit.icon());
-            ItemStack icon = new ItemStack(mat == null ? Material.DIAMOND_SWORD : mat);
-            ItemMeta meta = icon.getItemMeta();
-            meta.displayName(MiniMessage.miniMessage().deserialize(kit.displayName())
-                    .decoration(TextDecoration.ITALIC, false));
-            List<Component> lore = new ArrayList<>();
-            try {
-                RankedKitStats stats = statsService.kitStats(target, kit.name())
-                        .orElse(RankedKitStats.starting(target, kit.name()));
-                lore.add(line("Wins", String.valueOf(stats.wins()), NamedTextColor.GREEN));
-                lore.add(line("Losses", String.valueOf(stats.losses()), NamedTextColor.RED));
-                lore.add(line("Matches", String.valueOf(stats.gamesPlayed()), NamedTextColor.GRAY));
-                lore.add(line("WinRate", statsService.winRateLabel(stats), NamedTextColor.AQUA));
-                lore.add(line("K/D", String.format("%.2f", statsService.kd(stats)), NamedTextColor.YELLOW));
-                lore.add(line("Streak", String.valueOf(stats.winStreak()), NamedTextColor.LIGHT_PURPLE));
-                lore.add(line("Elo", String.valueOf(stats.elo()), NamedTextColor.GOLD));
-            } catch (Exception e) {
-                lore.add(Component.text("Stats unavailable", NamedTextColor.RED)
-                        .decoration(TextDecoration.ITALIC, false));
-            }
-            meta.lore(lore);
-            meta.getPersistentDataContainer().set(ItemKeys.guiAction(), PersistentDataType.STRING, "kit:" + kit.name());
-            icon.setItemMeta(meta);
-            inventory.setItem(GuiSlots.slot(row, col), icon);
-            index++;
+        MenuScaffold.chrome(inventory);
+
+        Player online = Bukkit.getPlayer(target);
+        inventory.setItem(GuiSlots.slot(0, 4),
+                ItemBuilder.of(Material.PLAYER_HEAD)
+                        .name(Component.text(StatsService.nameOf(target), UiTheme.VALUE))
+                        .skullOwner(online != null ? online : Bukkit.getOfflinePlayer(target))
+                        .lore(
+                                UiTheme.status(online != null ? "ONLINE" : "OFFLINE",
+                                        online != null ? UiTheme.SUCCESS : UiTheme.MUTED),
+                                online != null ? UiTheme.labelValue("Ping", online.getPing() + "ms")
+                                        : UiTheme.line("Last seen: earlier")
+                        )
+                        .action("decorate")
+                        .build());
+
+        List<KitDefinition> kits = kitService.enabled();
+        int perPage = MenuScaffold.gridPageSize();
+        int page = session.page();
+        int offset = page * perPage;
+
+        int placed = 0;
+        for (int i = offset; i < kits.size() && placed < perPage; i++, placed++) {
+            inventory.setItem(MenuScaffold.gridSlot(placed), kitIcon(kits.get(i), target));
         }
-        inventory.setItem(GuiSlots.slot(5, 4), GuiDecorator.button(Material.BARRIER,
-                Component.text("Close", NamedTextColor.RED), "close"));
+
+        MenuScaffold.pagingButtons(inventory, page, kits.size());
+        MenuScaffold.closeButton(inventory);
     }
 
-    private static Component line(String key, String value, NamedTextColor color) {
-        return Component.text(key + ": " + value, color).decoration(TextDecoration.ITALIC, false);
+    private ItemStack kitIcon(KitDefinition kit, UUID target) {
+        Material material = ItemBuilder.materialOr(kit.icon(), Material.DIAMOND_SWORD);
+        ItemBuilder builder = ItemBuilder.of(material).nameMini(kit.displayName());
+        try {
+            RankedKitStats stats = statsService.kitStats(target, kit.name())
+                    .orElse(RankedKitStats.starting(target, kit.name()));
+            builder.lore(
+                    UiTheme.divider(),
+                    UiTheme.labelValue("Wins", String.valueOf(stats.wins())),
+                    UiTheme.labelValue("Losses", String.valueOf(stats.losses())),
+                    UiTheme.labelValue("Matches", String.valueOf(stats.gamesPlayed())),
+                    UiTheme.labelValue("Win rate", statsService.winRateLabel(stats)),
+                    UiTheme.labelValue("K/D", String.format("%.2f", statsService.kd(stats))),
+                    UiTheme.labelValue("Streak", String.valueOf(stats.winStreak())),
+                    UiTheme.labelValue("Elo", String.valueOf(stats.elo())),
+                    UiTheme.blank(),
+                    UiTheme.labelValue("Best Elo", String.valueOf(stats.bestElo()))
+            );
+        } catch (Exception e) {
+            builder.lore(UiTheme.status("Stats unavailable", UiTheme.DANGER));
+        }
+        return builder.action("decorate").glint(statsPlayed(kit, target) > 0).build();
+    }
+
+    private int statsPlayed(KitDefinition kit, UUID target) {
+        try {
+            return statsService.kitStats(target, kit.name())
+                    .map(RankedKitStats::gamesPlayed)
+                    .orElse(0);
+        } catch (Exception e) {
+            return 0;
+        }
     }
 
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot, String action) {
         if ("close".equals(action)) {
+            sounds.play(player, "gui-back");
             player.closeInventory();
-        } else if (action.startsWith("kit:")) {
-            sounds.play(player, "kit-select");
+            return;
+        }
+        if ("page:prev".equals(action)) {
+            session.setPage(session.page() - 1);
+            sounds.play(player, "gui-click");
+            refresh(player, session, inventory);
+            return;
+        }
+        if ("page:next".equals(action)) {
+            session.setPage(session.page() + 1);
+            sounds.play(player, "gui-click");
+            refresh(player, session, inventory);
         }
     }
 }

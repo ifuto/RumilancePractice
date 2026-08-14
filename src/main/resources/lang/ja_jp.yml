@@ -110,6 +110,7 @@ queue:
   kit-disabled: "<red>そのキットのキューは現在無効です。"
   cannot-join: "<red>今はキューに参加できません。"
   already-queued: "<red>すでにキューに入っています。"
+  high-ping: "<red>あなたのPing（<ping>ms）が高すぎるためランク戦に参加できません（上限 <max>ms）。"
   joined: "<green><yellow><kit></yellow> の<mode>キューに参加しました。"
   left: "<gray>キューから抜けました。"
 

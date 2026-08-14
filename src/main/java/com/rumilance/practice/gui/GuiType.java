@@ -27,5 +27,9 @@ public enum GuiType {
     CONFIRM,
     ENCHANT,
     POTION,
-    EKIT_ADMIN
+    EKIT_ADMIN,
+    GAME_MENU,
+    TITLE_SELECT,
+    KIT_PREVIEW,
+    MATCH_REPORT
 }

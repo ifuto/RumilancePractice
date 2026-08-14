@@ -25,6 +25,7 @@ queue:
   kit-disabled: "<red>That kit queue is currently disabled."
   cannot-join: "<red>You cannot join a queue right now."
   already-queued: "<red>You are already in a queue."
+  high-ping: "<red>Your ping (<ping>ms) is too high for ranked (max <max>ms)."
   joined: "<green>Joined the <mode> queue for <yellow><kit></yellow>."
   left: "<grey>Left the queue."
 

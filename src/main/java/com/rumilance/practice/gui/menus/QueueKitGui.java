@@ -1,10 +1,12 @@
 package com.rumilance.practice.gui.menus;
 
 import com.rumilance.practice.gui.AbstractGui;
-import com.rumilance.practice.gui.GuiDecorator;
 import com.rumilance.practice.gui.GuiSession;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.GuiType;
+import com.rumilance.practice.gui.ItemBuilder;
+import com.rumilance.practice.gui.MenuScaffold;
+import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.model.KitDefinition;
 import com.rumilance.practice.queue.QueueCoordinator;
@@ -14,21 +16,18 @@ import com.rumilance.practice.state.MatchMode;
 import com.rumilance.practice.util.GuiSlots;
 import com.rumilance.practice.util.ItemKeys;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.persistence.PersistentDataType;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Ranked / Unranked kit queue selector GUI(6).
+ * Ranked / Unranked kit queue selector. The 28-slot content grid (rows 1-4, cols 1-7) lists
+ * every enabled kit with its live queue count and a ranked/unranked accent; the bottom bar
+ * holds the close button. Disabled kits render as a barrier with an explanation.
  */
 public final class QueueKitGui extends AbstractGui {
 
@@ -36,6 +35,7 @@ public final class QueueKitGui extends AbstractGui {
     private final QueueService queueService;
     private final QueueCoordinator queueCoordinator;
     private final boolean ranked;
+    private KitPreviewGui previewGui;
 
     public QueueKitGui(
             GuiSessionRegistry registry,
@@ -52,6 +52,20 @@ public final class QueueKitGui extends AbstractGui {
         this.ranked = ranked;
     }
 
+    public void setPreviewGui(KitPreviewGui previewGui) {
+        this.previewGui = previewGui;
+    }
+
+    public void openPreview(Player player, String kitId) {
+        if (previewGui == null) {
+            return;
+        }
+        GuiSession session = registry.open(player.getUniqueId(), previewGui.type(), previewGui.rows);
+        session.setSelectedKit(kitId);
+        PracticeGuiOpen.open(previewGui, player, session);
+        sounds.play(player, "gui-open");
+    }
+
     @Override
     protected void configureSession(GuiSession session, Player player) {
         session.setRanked(ranked);
@@ -59,48 +73,102 @@ public final class QueueKitGui extends AbstractGui {
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return Component.text(ranked ? "Ranked Queue" : "Unranked Queue")
-                .color(NamedTextColor.WHITE);
+        return Component.text(ranked ? "⚔ Ranked Queue" : "♟ Unranked Queue",
+                ranked ? UiTheme.PRIMARY : UiTheme.SECONDARY)
+                .decoration(TextDecoration.ITALIC, false);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
+        MenuScaffold.chrome(inventory);
+        MenuScaffold.header(inventory, 0, title(player, session));
+
         List<KitDefinition> kits = kitService.enabled();
         int index = 0;
-        for (int row = 1; row <= 4 && index < kits.size(); row++) {
-            for (int col = 1; col <= 7 && index < kits.size(); col++) {
-                KitDefinition kit = kits.get(index++);
-                int slot = GuiSlots.slot(row, col);
-                boolean queueOn = kitService.isQueueEnabled(kit.name());
-                ItemStack icon = new ItemStack(queueOn
-                        ? materialOr(kit.icon(), Material.DIAMOND_SWORD)
-                        : Material.BARRIER);
-                ItemMeta meta = icon.getItemMeta();
-                meta.displayName(MiniMessage.miniMessage().deserialize(kit.displayName())
-                        .decoration(TextDecoration.ITALIC, false));
-                List<Component> lore = new ArrayList<>();
-                lore.add(Component.text("Waiting: " + queueService.waitingCount(
-                        ranked ? MatchMode.RANKED : MatchMode.UNRANKED, kit.name()), NamedTextColor.GRAY)
-                        .decoration(TextDecoration.ITALIC, false));
-                if (!queueOn) {
-                    lore.add(Component.text("Disabled", NamedTextColor.RED)
-                            .decoration(TextDecoration.ITALIC, false));
-                }
-                meta.lore(lore);
-                meta.getPersistentDataContainer().set(ItemKeys.guiAction(), PersistentDataType.STRING, "kit:" + kit.name());
-                meta.getPersistentDataContainer().set(ItemKeys.kitName(), PersistentDataType.STRING, kit.name());
-                icon.setItemMeta(meta);
-                inventory.setItem(slot, icon);
+        for (KitDefinition kit : kits) {
+            if (index >= MenuScaffold.gridPageSize()) {
+                break;
             }
+            inventory.setItem(MenuScaffold.gridSlot(index++), kitIcon(kit));
         }
-        inventory.setItem(GuiSlots.slot(5, 4), GuiDecorator.button(
-                Material.BARRIER,
-                Component.text("Close", NamedTextColor.RED),
-                "close"));
+
+        // Info tile showing total queue depth.
+        int totalWaiting = kits.stream()
+                .filter(k -> kitService.isQueueEnabled(k.name()))
+                .mapToInt(k -> queueService.waitingCount(mode(), k.name()))
+                .sum();
+        inventory.setItem(GuiSlots.slot(5, 1),
+                ItemBuilder.of(Material.CLOCK)
+                        .name(Component.text("In Queue", UiTheme.MUTED))
+                        .lore(UiTheme.labelValue("Players", String.valueOf(totalWaiting)))
+                        .action("decorate")
+                        .build());
+
+        inventory.setItem(GuiSlots.slot(5, 7),
+                ItemBuilder.of(Material.PLAYER_HEAD)
+                        .name(Component.text("You", UiTheme.VALUE))
+                        .skullOwner(player)
+                        .lore(
+                                UiTheme.labelValue("Mode", ranked ? "Ranked" : "Unranked"),
+                                UiTheme.hint("Pick a kit to queue")
+                        )
+                        .action("decorate")
+                        .build());
+
+        inventory.setItem(GuiSlots.slot(5, 4),
+                ItemBuilder.action(Material.BARRIER,
+                        Component.text("Close", UiTheme.DANGER), "close"));
+    }
+
+    private ItemStack kitIcon(KitDefinition kit) {
+        boolean queueOn = kitService.isQueueEnabled(kit.name());
+        int waiting = queueService.waitingCount(mode(), kit.name());
+
+        if (!queueOn) {
+            return ItemBuilder.of(Material.BARRIER)
+                    .nameMini(kit.displayName())
+                    .lore(
+                            UiTheme.divider(),
+                            UiTheme.status("DISABLED", UiTheme.DANGER),
+                            UiTheme.line("Queue is currently closed.")
+                    )
+                    .action("decorate")
+                    .build();
+        }
+
+        Material icon = ItemBuilder.materialOr(kit.icon(), Material.DIAMOND_SWORD);
+        ItemBuilder builder = ItemBuilder.of(icon)
+                .nameMini(kit.displayName())
+                .lore(
+                        UiTheme.divider(),
+                        UiTheme.labelValue("Mode", ranked ? "Ranked" : "Unranked"),
+                        UiTheme.labelValue("Waiting", String.valueOf(waiting))
+                );
+        if (ranked) {
+            builder.lore(
+                    UiTheme.labelValue("Terrain", kit.arenaTerrain().name()),
+                    UiTheme.labelValue("Ranked", "Yes")
+            );
+        }
+        builder.lore(
+                UiTheme.blank(),
+                UiTheme.hint("Left-click to join queue"),
+                UiTheme.hint("Right-click to preview kit")
+        );
+        return builder
+                .glint(waiting > 0)
+                .action("kit:" + kit.name())
+                .tag(ItemKeys.kitName(), kit.name())
+                .build();
+    }
+
+    private MatchMode mode() {
+        return ranked ? MatchMode.RANKED : MatchMode.UNRANKED;
     }
 
     @Override
-    public void handleClick(Player player, GuiSession session, Inventory inventory, int slot, String action) {
+    public void handleClick(Player player, GuiSession session, Inventory inventory, int slot,
+                            String action, org.bukkit.event.inventory.ClickType clickType) {
         if ("close".equals(action)) {
             sounds.play(player, "gui-back");
             player.closeInventory();
@@ -112,14 +180,16 @@ public final class QueueKitGui extends AbstractGui {
                 sounds.play(player, "error");
                 return;
             }
+            // Right-click opens a read-only kit preview; left-click (and any other click) joins the queue.
+            if (clickType == org.bukkit.event.inventory.ClickType.RIGHT) {
+                sounds.play(player, "gui-click");
+                player.closeInventory();
+                openPreview(player, kitId);
+                return;
+            }
             sounds.play(player, "kit-select");
             player.closeInventory();
-            queueCoordinator.join(player, kitId, ranked ? MatchMode.RANKED : MatchMode.UNRANKED);
+            queueCoordinator.join(player, kitId, mode());
         }
-    }
-
-    private static Material materialOr(String name, Material fallback) {
-        Material material = Material.matchMaterial(name);
-        return material == null ? fallback : material;
     }
 }

@@ -1,64 +1,101 @@
 package com.rumilance.practice.gui.menus;
 
 import com.rumilance.practice.gui.AbstractGui;
-import com.rumilance.practice.gui.GuiDecorator;
 import com.rumilance.practice.gui.GuiSession;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.GuiType;
+import com.rumilance.practice.gui.ItemBuilder;
+import com.rumilance.practice.gui.MenuScaffold;
+import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.model.PlayerSettings;
 import com.rumilance.practice.settings.SettingsService;
 import com.rumilance.practice.sound.SoundService;
 import com.rumilance.practice.util.GuiSlots;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 
-import java.util.List;
-
+/**
+ * Personal settings menu. Toggles are laid out in a centred 3x3 panel with consistent
+ * ON/OFF materials and a two-line lore (current state + click hint), while the chat
+ * whitelist manager and close button live on the bottom bar.
+ */
 public final class SettingsGui extends AbstractGui {
 
     private final SettingsService settingsService;
 
     public SettingsGui(GuiSessionRegistry registry, SoundService sounds, SettingsService settingsService) {
-        super(registry, sounds, GuiType.SETTINGS, 4, true);
+        super(registry, sounds, GuiType.SETTINGS, 6, true);
         this.settingsService = settingsService;
     }
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return Component.text("Settings", NamedTextColor.WHITE);
+        return Component.text("⚙ Settings", UiTheme.PRIMARY).decoration(TextDecoration.ITALIC, false);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
         PlayerSettings s = settingsService.get(player);
-        inventory.setItem(GuiSlots.slot(1, 1), toggle(Material.BARRIER, "Deny Duel Requests", !s.acceptDuelRequests()));
-        inventory.setItem(GuiSlots.slot(1, 2), toggle(Material.COMPASS, "Auto Requeue", s.autoRequeue()));
-        inventory.setItem(GuiSlots.slot(1, 3), toggle(Material.ENDER_EYE, "Allow Spectators", s.spectateVisible()));
-        inventory.setItem(GuiSlots.slot(1, 4), toggle(Material.PAPER, "Hide Other Chat", s.hideOtherChat()));
-        inventory.setItem(GuiSlots.slot(1, 5), toggle(Material.NOTE_BLOCK, "Duel Sounds", s.soundsEnabled()));
-        inventory.setItem(GuiSlots.slot(1, 6), toggle(Material.PAINTING, "Scoreboard", s.scoreboardEnabled()));
-        inventory.setItem(GuiSlots.slot(2, 1), GuiDecorator.button(Material.OAK_SIGN,
-                Component.text("Chat Whitelist: " + s.chatWhitelist().size(), NamedTextColor.AQUA), "whitelist"));
-        inventory.setItem(GuiSlots.slot(3, 4), GuiDecorator.button(Material.BARRIER,
-                Component.text("Close", NamedTextColor.RED), "close"));
+        MenuScaffold.chrome(inventory);
+        MenuScaffold.header(inventory, 0, title(player, session));
+
+        // Central 3x3 panel (rows 2-3): 6 toggles arranged in two rows.
+        inventory.setItem(GuiSlots.slot(2, 2), toggle(Material.BARRIER, "Deny Duel Requests",
+                !s.acceptDuelRequests(), "deny_duels",
+                "Block incoming duel requests from other players."));
+        inventory.setItem(GuiSlots.slot(2, 3), toggle(Material.COMPASS, "Auto Requeue",
+                s.autoRequeue(), "auto_requeue",
+                "Automatically rejoin the queue after a match ends."));
+        inventory.setItem(GuiSlots.slot(2, 4), toggle(Material.ENDER_EYE, "Allow Spectators",
+                s.spectateVisible(), "spectators",
+                "Let other players spectate your matches."));
+        inventory.setItem(GuiSlots.slot(2, 5), toggle(Material.PAPER, "Hide Other Chat",
+                s.hideOtherChat(), "hide_chat",
+                "Hide public chat messages during matches."));
+        inventory.setItem(GuiSlots.slot(3, 3), toggle(Material.NOTE_BLOCK, "Duel Sounds",
+                s.soundsEnabled(), "sounds",
+                "Play menu and match sound effects."));
+        inventory.setItem(GuiSlots.slot(3, 4), toggle(Material.WRITABLE_BOOK, "Match Report Book",
+                s.showMatchReport(), "match_report",
+                "Give a clickable report book after every match."));
+        inventory.setItem(GuiSlots.slot(3, 5), toggle(Material.PAINTING, "Scoreboard",
+                s.scoreboardEnabled(), "scoreboard",
+                "Show the sidebar scoreboard."));
+
+        // Whitelist manager (bottom-left of content area).
+        inventory.setItem(GuiSlots.slot(4, 4),
+                ItemBuilder.of(Material.OAK_SIGN)
+                        .name(Component.text("Chat Whitelist", UiTheme.SECONDARY))
+                        .lore(
+                                UiTheme.divider(),
+                                UiTheme.labelValue("Players", String.valueOf(s.chatWhitelist().size())),
+                                UiTheme.blank(),
+                                UiTheme.hint("Click to manage")
+                        )
+                        .action("whitelist")
+                        .build());
+
+        MenuScaffold.closeButton(inventory);
     }
 
-    private ItemStack toggle(Material material, String name, boolean enabled) {
-        ItemStack stack = GuiDecorator.button(material,
-                Component.text(name, enabled ? NamedTextColor.GREEN : NamedTextColor.GRAY),
-                "toggle:" + name);
-        ItemMeta meta = stack.getItemMeta();
-        meta.lore(List.of(Component.text(enabled ? "ON" : "OFF",
-                        enabled ? NamedTextColor.GREEN : NamedTextColor.RED)
-                .decoration(TextDecoration.ITALIC, false)));
-        stack.setItemMeta(meta);
-        return stack;
+    private ItemStack toggle(Material material, String name, boolean enabled, String key, String description) {
+        return ItemBuilder.of(material)
+                .name(Component.text(name, enabled ? UiTheme.SUCCESS : UiTheme.MUTED))
+                .lore(
+                        UiTheme.divider(),
+                        UiTheme.line(description),
+                        UiTheme.blank(),
+                        UiTheme.status(enabled ? "ENABLED" : "DISABLED",
+                                enabled ? UiTheme.SUCCESS : UiTheme.DANGER),
+                        UiTheme.hint("Click to toggle")
+                )
+                .glint(enabled)
+                .action("toggle:" + key)
+                .build();
     }
 
     @Override
@@ -67,27 +104,30 @@ public final class SettingsGui extends AbstractGui {
             player.closeInventory();
             return;
         }
+        if ("whitelist".equals(action)) {
+            player.closeInventory();
+            player.sendMessage(Component.text(
+                    "Type a player name in chat to add to the whitelist, or 'clear' to reset.",
+                    UiTheme.WARNING));
+            session.put("await_whitelist", Boolean.TRUE);
+            sounds.play(player, "gui-click");
+            return;
+        }
         PlayerSettings s = settingsService.get(player);
         PlayerSettings next = switch (action) {
-            case "toggle:Deny Duel Requests" -> s.withAcceptDuelRequests(!s.acceptDuelRequests());
-            case "toggle:Auto Requeue" -> s.withAutoRequeue(!s.autoRequeue());
-            case "toggle:Allow Spectators" -> s.withSpectateVisible(!s.spectateVisible());
-            case "toggle:Hide Other Chat" -> s.withHideOtherChat(!s.hideOtherChat());
-            case "toggle:Duel Sounds" -> s.withSoundsEnabled(!s.soundsEnabled());
-            case "toggle:Scoreboard" -> s.withScoreboardEnabled(!s.scoreboardEnabled());
-            case "whitelist" -> {
-                player.closeInventory();
-                player.sendMessage(Component.text("Type a player name in chat to add to whitelist, or 'clear' to reset.",
-                        NamedTextColor.YELLOW));
-                session.put("await_whitelist", Boolean.TRUE);
-                yield s;
-            }
+            case "toggle:deny_duels" -> s.withAcceptDuelRequests(!s.acceptDuelRequests());
+            case "toggle:auto_requeue" -> s.withAutoRequeue(!s.autoRequeue());
+            case "toggle:spectators" -> s.withSpectateVisible(!s.spectateVisible());
+            case "toggle:hide_chat" -> s.withHideOtherChat(!s.hideOtherChat());
+            case "toggle:sounds" -> s.withSoundsEnabled(!s.soundsEnabled());
+            case "toggle:match_report" -> s.withShowMatchReport(!s.showMatchReport());
+            case "toggle:scoreboard" -> s.withScoreboardEnabled(!s.scoreboardEnabled());
             default -> s;
         };
         if (next != s) {
             settingsService.update(next);
             sounds.play(player, "gui-click");
-            render(player, session, inventory);
+            refresh(player, session, inventory);
         }
     }
 }

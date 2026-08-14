@@ -2,74 +2,115 @@ package com.rumilance.practice.gui.menus;
 
 import com.rumilance.practice.ffa.FfaService;
 import com.rumilance.practice.gui.AbstractGui;
-import com.rumilance.practice.gui.GuiDecorator;
 import com.rumilance.practice.gui.GuiSession;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.GuiType;
+import com.rumilance.practice.gui.ItemBuilder;
+import com.rumilance.practice.gui.MenuScaffold;
+import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.sound.SoundService;
-import com.rumilance.practice.util.GuiSlots;
-import com.rumilance.practice.util.ItemKeys;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.persistence.PersistentDataType;
 
-import java.util.List;
-
+/**
+ * FFA arena picker. Each enabled arena is a sword icon with its kit and a join hint; disabled
+ * arenas show a barrier. The list uses the standard 28-slot content grid and is paged when
+ * more than 28 arenas are configured.
+ */
 public final class FfaListGui extends AbstractGui {
 
     private final FfaService ffaService;
 
     public FfaListGui(GuiSessionRegistry registry, SoundService sounds, FfaService ffaService) {
-        super(registry, sounds, GuiType.FFA_LIST, 4, false);
+        super(registry, sounds, GuiType.FFA_LIST, 6, false);
         this.ffaService = ffaService;
     }
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return Component.text("FFA Arenas", NamedTextColor.WHITE);
+        return Component.text("⚔ FFA Arenas", UiTheme.DANGER).decoration(TextDecoration.ITALIC, false);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        int index = 0;
-        for (FfaService.FfaArena arena : ffaService.list()) {
-            if (index >= 14) {
-                break;
-            }
-            ItemStack icon = new ItemStack(arena.enabled() ? Material.IRON_SWORD : Material.BARRIER);
-            ItemMeta meta = icon.getItemMeta();
-            meta.displayName(Component.text(arena.id(), NamedTextColor.YELLOW)
-                    .decoration(TextDecoration.ITALIC, false));
-            meta.lore(List.of(
-                    Component.text("Kit: " + arena.kitId(), NamedTextColor.GRAY)
-                            .decoration(TextDecoration.ITALIC, false),
-                    Component.text(arena.enabled() ? "Click to join" : "Disabled",
-                                    arena.enabled() ? NamedTextColor.GREEN : NamedTextColor.RED)
-                            .decoration(TextDecoration.ITALIC, false)
-            ));
-            meta.getPersistentDataContainer().set(ItemKeys.guiAction(), PersistentDataType.STRING,
-                    "ffa:" + arena.id());
-            icon.setItemMeta(meta);
-            inventory.setItem(GuiSlots.slot(1 + index / 7, 1 + index % 7), icon);
-            index++;
+        MenuScaffold.chrome(inventory);
+        MenuScaffold.header(inventory, 0, title(player, session));
+
+        var arenas = ffaService.list();
+        int pageSize = MenuScaffold.gridPageSize();
+        int page = session.page();
+        int offset = page * pageSize;
+
+        int placed = 0;
+        for (int i = offset; i < arenas.size() && placed < pageSize; i++, placed++) {
+            inventory.setItem(MenuScaffold.gridSlot(placed), arenaIcon(arenas.get(i)));
         }
-        inventory.setItem(GuiSlots.slot(3, 4), GuiDecorator.button(Material.BARRIER,
-                Component.text("Close", NamedTextColor.RED), "close"));
+
+        if (arenas.isEmpty()) {
+            inventory.setItem(MenuScaffold.gridSlot(13),
+                    ItemBuilder.of(Material.BARRIER)
+                            .name(Component.text("No FFA arenas configured", UiTheme.MUTED))
+                            .lore(UiTheme.line("Ask an admin to set one up."))
+                            .action("decorate")
+                            .build());
+        }
+
+        MenuScaffold.pagingButtons(inventory, page, arenas.size());
+        MenuScaffold.closeButton(inventory);
+    }
+
+    private ItemStack arenaIcon(FfaService.FfaArena arena) {
+        if (!arena.enabled()) {
+            return ItemBuilder.of(Material.BARRIER)
+                    .name(Component.text(arena.id(), UiTheme.MUTED))
+                    .lore(
+                            UiTheme.divider(),
+                            UiTheme.status("DISABLED", UiTheme.DANGER),
+                            UiTheme.labelValue("Kit", arena.kitId()),
+                            UiTheme.blank()
+                    )
+                    .action("decorate")
+                    .build();
+        }
+        return ItemBuilder.of(Material.IRON_SWORD)
+                .name(Component.text(arena.id(), UiTheme.SECONDARY))
+                .lore(
+                        UiTheme.divider(),
+                        UiTheme.labelValue("Kit", arena.kitId()),
+                        UiTheme.status("ONLINE", UiTheme.SUCCESS),
+                        UiTheme.blank(),
+                        UiTheme.hint("Click to join FFA")
+                )
+                .glint(true)
+                .action("ffa:" + arena.id())
+                .build();
     }
 
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot, String action) {
         if ("close".equals(action)) {
+            sounds.play(player, "gui-back");
             player.closeInventory();
             return;
         }
+        if ("page:prev".equals(action)) {
+            session.setPage(session.page() - 1);
+            sounds.play(player, "gui-click");
+            refresh(player, session, inventory);
+            return;
+        }
+        if ("page:next".equals(action)) {
+            session.setPage(session.page() + 1);
+            sounds.play(player, "gui-click");
+            refresh(player, session, inventory);
+            return;
+        }
         if (action.startsWith("ffa:")) {
+            sounds.play(player, "select");
             player.closeInventory();
             ffaService.join(player, action.substring(4));
         }

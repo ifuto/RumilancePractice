@@ -6,6 +6,8 @@ import com.rumilance.practice.gui.GuiDecorator;
 import com.rumilance.practice.gui.GuiSession;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.GuiType;
+import com.rumilance.practice.gui.ItemBuilder;
+import com.rumilance.practice.gui.MenuScaffold;
 import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.locale.MessageService;
 import com.rumilance.practice.model.RankedKitStats;
@@ -14,7 +16,6 @@ import com.rumilance.practice.sound.SoundService;
 import com.rumilance.practice.state.ArenaTerrain;
 import com.rumilance.practice.stats.StatsService;
 import com.rumilance.practice.util.GuiSlots;
-import com.rumilance.practice.util.ItemKeys;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -24,11 +25,7 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.SkullMeta;
-import org.bukkit.persistence.PersistentDataType;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 
 public final class DuelRequestGui extends AbstractGui {
@@ -87,48 +84,54 @@ public final class DuelRequestGui extends AbstractGui {
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
+        MenuScaffold.chrome(inventory);
         String locale = messageService.resolveLocale(player);
         UUID targetId = session.targetPlayer();
         Player target = targetId == null ? null : Bukkit.getPlayer(targetId);
-        ItemStack head = new ItemStack(Material.PLAYER_HEAD);
-        SkullMeta skull = (SkullMeta) head.getItemMeta();
+
+        // Opponent head on the top bar with ping, W/L and K/D beneath it.
+        ItemBuilder headBuilder = ItemBuilder.of(Material.PLAYER_HEAD)
+                .name(target != null
+                        ? Component.text(target.getName(), NamedTextColor.YELLOW)
+                        : Component.text("?", NamedTextColor.GRAY))
+                .skullOwner(target)
+                .action("head");
         if (target != null) {
-            skull.setOwningPlayer(target);
-            skull.displayName(Component.text(target.getName(), NamedTextColor.YELLOW)
-                    .decoration(TextDecoration.ITALIC, false));
-            List<Component> lore = new ArrayList<>();
-            lore.add(messageService.render(locale, "duel-gui.ping",
-                    MessageService.tags("n", String.valueOf(target.getPing())))
-                    .decoration(TextDecoration.ITALIC, false));
+            headBuilder.lore(
+                    messageService.render(locale, "duel-gui.ping",
+                            MessageService.tags("n", String.valueOf(target.getPing())))
+                            .decoration(TextDecoration.ITALIC, false));
             try {
                 RankedKitStats stats = statsService.kitStats(targetId,
                                 session.selectedKit() == null ? "nodebuff" : session.selectedKit())
                         .orElse(RankedKitStats.starting(targetId, "nodebuff"));
-                lore.add(messageService.render(locale, "duel-gui.record",
-                                MessageService.tags("wins", String.valueOf(stats.wins()),
-                                        "losses", String.valueOf(stats.losses())))
-                        .decoration(TextDecoration.ITALIC, false));
-                lore.add(messageService.render(locale, "duel-gui.kd",
-                                MessageService.tags("kd", String.format("%.2f", statsService.kd(stats)),
-                                        "wr", statsService.winRateLabel(stats)))
-                        .decoration(TextDecoration.ITALIC, false));
+                headBuilder.lore(
+                        messageService.render(locale, "duel-gui.record",
+                                        MessageService.tags("wins", String.valueOf(stats.wins()),
+                                                "losses", String.valueOf(stats.losses())))
+                                .decoration(TextDecoration.ITALIC, false),
+                        messageService.render(locale, "duel-gui.kd",
+                                        MessageService.tags("kd", String.format("%.2f", statsService.kd(stats)),
+                                                "wr", statsService.winRateLabel(stats)))
+                                .decoration(TextDecoration.ITALIC, false));
             } catch (Exception ignored) {
-                // ignore
+                // Stats are best-effort; the head still renders without them.
             }
-            skull.lore(lore);
         }
-        skull.getPersistentDataContainer().set(ItemKeys.guiAction(), PersistentDataType.STRING, "head");
-        head.setItemMeta(skull);
-        inventory.setItem(GuiSlots.slot(0, 4), head);
+        inventory.setItem(GuiSlots.slot(0, 4), headBuilder.build());
+
+        // Configuration tiles.
         inventory.setItem(GuiSlots.slot(2, 3), GuiDecorator.button(Material.DIAMOND_SWORD,
                 messageService.render(locale, "duel-gui.kit-select",
                         MessageService.tags("kit", session.selectedKit() == null ? "nodebuff" : session.selectedKit())), "kit"));
         inventory.setItem(GuiSlots.slot(2, 5), GuiDecorator.button(Material.GRASS_BLOCK,
                 messageService.render(locale, "duel-gui.map-select",
                         MessageService.tags("map", session.selectedMap() == null ? "ANY" : session.selectedMap())), "map"));
-        inventory.setItem(GuiSlots.slot(3, 4), GuiDecorator.button(
+        ItemStack modeButton = GuiDecorator.button(
                 session.ranked() ? Material.PURPLE_DYE : Material.BLUE_DYE,
-                messageService.render(locale, session.ranked() ? "duel-gui.mode-ranked" : "duel-gui.mode-unranked"), "mode"));
+                messageService.render(locale, session.ranked() ? "duel-gui.mode-ranked" : "duel-gui.mode-unranked"), "mode");
+        modeButton.editMeta(meta -> meta.setEnchantmentGlintOverride(session.ranked()));
+        inventory.setItem(GuiSlots.slot(3, 4), modeButton);
         inventory.setItem(GuiSlots.slot(4, 2), GuiDecorator.button(Material.BARRIER,
                 messageService.render(locale, "duel-gui.cancel"), "cancel"));
         inventory.setItem(GuiSlots.slot(4, 4), GuiDecorator.button(Material.CLOCK,

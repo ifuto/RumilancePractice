@@ -79,11 +79,16 @@ public final class MatchService {
      * this streak resets on server restart.)
      */
     private final Map<UUID, Integer> countdownLeaveStreak = new ConcurrentHashMap<>();
+    private final MatchCombatTracker combatTracker = new MatchCombatTracker();
+    /** Each player's most recent match id, retained for a short time so /matchreport works. */
+    private final Map<UUID, UUID> recentMatch = new ConcurrentHashMap<>();
     private com.rumilance.practice.spectator.SpectatorService spectatorService;
     private com.rumilance.practice.punishment.ChatBanService chatBanService;
     private SettingsService settingsService;
     private QueueCoordinator queueCoordinator;
     private MessageService messageService;
+    private com.rumilance.practice.cosmetic.TitleService titleService;
+    private java.util.function.Consumer<Player> matchReportOpener;
 
     public MatchService(
             Plugin plugin,
@@ -141,8 +146,25 @@ public final class MatchService {
         this.messageService = messageService;
     }
 
+    public void setTitleService(com.rumilance.practice.cosmetic.TitleService titleService) {
+        this.titleService = titleService;
+    }
+
+    public void setMatchReportOpener(java.util.function.Consumer<Player> matchReportOpener) {
+        this.matchReportOpener = matchReportOpener;
+    }
+
     public MatchRegistry registry() {
         return registry;
+    }
+
+    public MatchCombatTracker combatTracker() {
+        return combatTracker;
+    }
+
+    /** @return the id of the player's most recent match (if still cached), used by /matchreport. */
+    public Optional<UUID> lastMatchId(UUID playerId) {
+        return Optional.ofNullable(recentMatch.get(playerId));
     }
 
     public void setShuttingDown(boolean value) {
@@ -362,6 +384,13 @@ public final class MatchService {
         // Count a kill for the attacker (skip self-inflicted / environmental deaths).
         if (attackerId != null && !attackerId.equals(victimId)) {
             session.addKill(attackerId);
+            combatTracker.forParticipant(session.id(), attackerId).hits.incrementAndGet();
+            if (titleService != null) {
+                Player killer = Bukkit.getPlayer(attackerId);
+                if (killer != null) {
+                    titleService.showKillTitle(killer);
+                }
+            }
         }
         Player victim = Bukkit.getPlayer(victimId);
         if (victim != null) {
@@ -373,6 +402,11 @@ public final class MatchService {
             winner = session.opponentOf(victimId);
         }
         endMatch(session, winner, draw);
+    }
+
+    /** @return the combat stats for a finished match, or empty if the match has been cleaned up. */
+    public Optional<MatchCombatTracker.CombatStats> combatStats(UUID matchId, UUID playerId) {
+        return combatTracker.matchStats(matchId).map(map -> map.get(playerId));
     }
 
     public void handleDisconnect(UUID playerId) {
@@ -511,11 +545,20 @@ public final class MatchService {
             // loser/draw hears the heavy anvil thud. (Previously both played to both players.)
             if (win) {
                 soundService.play(player, "match-end-levelup");
+                if (titleService != null) {
+                    titleService.showWinTitle(player);
+                }
             } else {
                 soundService.play(player, "match-end-anvil");
             }
             giveRematchItems(player);
+            recentMatch.put(id, session.id());
+            sendEndSummary(player, session, id, win);
         }
+        // Drop the recent-match pointers after 60s so /matchreport cannot open a cleaned-up match.
+        UUID matchIdForCleanup = session.id();
+        Bukkit.getScheduler().runTaskLater(plugin,
+                () -> session.participants().forEach(recentMatch::remove), 60L * 20L);
 
         MatchResultProcessor processor = switch (session.mode()) {
             case RANKED -> rankedResultProcessor;
@@ -571,6 +614,24 @@ public final class MatchService {
         });
     }
 
+    /** Opens the match report for the player's most recent (still cached) match, if any. */
+    public void openMatchReport(Player player) {
+        if (matchReportOpener == null) {
+            return;
+        }
+        UUID matchId = recentMatch.get(player.getUniqueId());
+        if (matchId == null) {
+            player.sendMessage(Component.text("No recent match report available.", NamedTextColor.RED));
+            return;
+        }
+        if (registry.get(matchId).isEmpty()) {
+            recentMatch.remove(player.getUniqueId());
+            player.sendMessage(Component.text("That match report is no longer available.", NamedTextColor.RED));
+            return;
+        }
+        matchReportOpener.accept(player);
+    }
+
     public void returnToLobby(Player player) {
         registry.byPlayer(player.getUniqueId()).ifPresent(session -> {
             session.setRematchRequested(player.getUniqueId(), false);
@@ -590,6 +651,13 @@ public final class MatchService {
             stateManager.resetToLobby(id);
         }
         cleanupSession(session, true);
+        // Keep combat stats around a little longer so players who open the report book after the
+        // 5s rematch window still see their numbers. The report GUI itself degrades gracefully if
+        // the stats have been cleared.
+        UUID matchId = session.id();
+        // cleanupSession already cleared the tracker when releaseArena=true; schedule a safety net
+        // in case cleanup was called with releaseArena=false (rematch path) so stats do not leak.
+        Bukkit.getScheduler().runTaskLater(plugin, () -> combatTracker.clear(matchId), 60L * 20L);
         if (queueCoordinator != null && settingsService != null && mode != MatchMode.FFA) {
             for (UUID id : session.participants()) {
                 Player player = Bukkit.getPlayer(id);
@@ -634,6 +702,7 @@ public final class MatchService {
         if (releaseArena && arenaId != null) {
             arenaService.release(arenaId);
         }
+        combatTracker.clear(session.id());
     }
 
     private void giveRematchItems(Player player) {
@@ -645,6 +714,18 @@ public final class MatchService {
         rematch.setItemMeta(rematchMeta);
         player.getInventory().setItem(3, rematch);
 
+        // Only hand the report book to players who opted in via /setting; everyone else can open
+        // the same GUI with /matchreport if they want the numbers.
+        if (settingsService != null && settingsService.get(player).showMatchReport()) {
+            ItemStack report = new ItemStack(Material.WRITABLE_BOOK);
+            ItemMeta reportMeta = report.getItemMeta();
+            reportMeta.displayName(Component.text("Match Report", NamedTextColor.AQUA)
+                    .decoration(TextDecoration.ITALIC, false));
+            reportMeta.getPersistentDataContainer().set(ItemKeys.matchReport(), PersistentDataType.BYTE, (byte) 1);
+            report.setItemMeta(reportMeta);
+            player.getInventory().setItem(4, report);
+        }
+
         ItemStack lobby = new ItemStack(Material.RED_DYE);
         ItemMeta lobbyMeta = lobby.getItemMeta();
         lobbyMeta.displayName(Component.text("Return to Lobby", NamedTextColor.RED)
@@ -652,6 +733,29 @@ public final class MatchService {
         lobbyMeta.getPersistentDataContainer().set(ItemKeys.returnLobby(), PersistentDataType.BYTE, (byte) 1);
         lobby.setItemMeta(lobbyMeta);
         player.getInventory().setItem(5, lobby);
+    }
+
+    /**
+     * Sends a one-line combat summary after a match (DMG dealt / taken / hits), so players who
+     * don't want the GUI still get the headline numbers without any extra clicks.
+     */
+    private void sendEndSummary(Player player, MatchSession session, UUID playerId, boolean won) {
+        MatchCombatTracker.CombatStats stats = combatTracker
+                .matchStats(session.id()).map(m -> m.get(playerId)).orElse(null);
+        Component outcome = won
+                ? Component.text("WIN", NamedTextColor.GREEN)
+                : (session.isDraw() ? Component.text("DRAW", NamedTextColor.YELLOW)
+                        : Component.text("LOSS", NamedTextColor.RED));
+        Component body = stats == null
+                ? Component.text(" (no combat stats)", NamedTextColor.GRAY)
+                : Component.text("  DMG " + stats.damageDealt() + " / " + stats.damageTaken()
+                        + "  •  Hits " + stats.hits() + "  •  Best Combo " + stats.bestCombo(),
+                        NamedTextColor.AQUA);
+        player.sendMessage(Component.text("Match: ", NamedTextColor.GRAY)
+                .append(outcome)
+                .append(body)
+                .append(Component.text("  —  /matchreport", NamedTextColor.DARK_GRAY))
+                .decoration(TextDecoration.ITALIC, false));
     }
 
     /**

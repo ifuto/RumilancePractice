@@ -20,7 +20,9 @@ public record PlayerSettings(
         boolean autoRequeue,
         boolean hideOtherChat,
         Set<String> chatWhitelist,
-        String locale
+        String locale,
+        String selectedTitle,
+        boolean showMatchReport
 ) {
 
     public PlayerSettings {
@@ -29,10 +31,21 @@ public record PlayerSettings(
         chatWhitelist = chatWhitelist == null
                 ? Set.of()
                 : Collections.unmodifiableSet(new LinkedHashSet<>(chatWhitelist));
+        selectedTitle = selectedTitle == null ? "none" : selectedTitle;
+    }
+
+    public PlayerSettings(
+            UUID uuid, boolean soundsEnabled, boolean scoreboardEnabled, String arrowEffect,
+            boolean spectateVisible, boolean acceptDuelRequests, boolean autoRequeue,
+            boolean hideOtherChat, Set<String> chatWhitelist, String locale, String selectedTitle
+    ) {
+        this(uuid, soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
+                acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale, selectedTitle, false);
     }
 
     public static PlayerSettings defaultsFor(UUID uuid, String defaultLocale) {
-        return new PlayerSettings(uuid, true, true, "none", true, true, false, false, Set.of(), defaultLocale);
+        return new PlayerSettings(uuid, true, true, "none", true, true, false, false,
+                Set.of(), defaultLocale, "none", false);
     }
 
     public PlayerSettings withLocale(String newLocale) {
@@ -90,5 +103,17 @@ public record PlayerSettings(
         Set<String> updated = new LinkedHashSet<>(chatWhitelist);
         updated.remove(name.toLowerCase(java.util.Locale.ROOT));
         return withChatWhitelist(updated);
+    }
+
+    public PlayerSettings withSelectedTitle(String titleId) {
+        return new PlayerSettings(uuid, soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
+                acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
+                titleId == null ? "none" : titleId, showMatchReport);
+    }
+
+    public PlayerSettings withShowMatchReport(boolean show) {
+        return new PlayerSettings(uuid, soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
+                acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
+                selectedTitle, show);
     }
 }

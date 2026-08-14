@@ -22,6 +22,8 @@ import com.rumilance.practice.command.SetFuncCommand;
 import com.rumilance.practice.config.ConfigService;
 import com.rumilance.practice.config.PluginSettings;
 import com.rumilance.practice.config.RuntimeFlags;
+import com.rumilance.practice.cosmetic.KillTitle;
+import com.rumilance.practice.cosmetic.TitleService;
 import com.rumilance.practice.database.repository.AuditLogRepository;
 import com.rumilance.practice.database.repository.DailyRankedStatsRepository;
 import com.rumilance.practice.database.repository.FfaStatsRepository;
@@ -36,6 +38,15 @@ import com.rumilance.practice.database.repository.SettingsRepository;
 import com.rumilance.practice.originalkit.OriginalKitService;
 import com.rumilance.practice.duel.DuelRequestService;
 import com.rumilance.practice.elo.EloCalculator;
+import com.rumilance.practice.gui.menus.GameMenuGui;
+import com.rumilance.practice.gui.menus.KitPreviewGui;
+import com.rumilance.practice.gui.menus.SpectateListGui;
+import com.rumilance.practice.gui.menus.TitleGui;
+import com.rumilance.practice.lobby.LobbyCompassListener;
+import com.rumilance.practice.match.GoldenHeadListener;
+import com.rumilance.practice.party.PartyCommand;
+import com.rumilance.practice.party.PartyListener;
+import com.rumilance.practice.party.PartyService;
 import com.rumilance.practice.ffa.FfaListener;
 import com.rumilance.practice.ffa.FfaService;
 import com.rumilance.practice.gui.GuiListener;
@@ -61,7 +72,6 @@ import com.rumilance.practice.gui.menus.PlayersGui;
 import com.rumilance.practice.gui.menus.QueueKitGui;
 import com.rumilance.practice.gui.menus.ProfileGui;
 import com.rumilance.practice.gui.menus.SettingsGui;
-import com.rumilance.practice.gui.menus.SpectateListGui;
 import com.rumilance.practice.gui.menus.StatsKitGui;
 import com.rumilance.practice.item.FunctionalItemListener;
 import com.rumilance.practice.kit.KitLayoutCache;
@@ -211,7 +221,8 @@ public final class FeatureBootstrap {
 
         queueCoordinator = new QueueCoordinator(
                 plugin, queueService, matchService, kitService, lobbyService, stateManager,
-                soundService, rankedStatsRepository, asyncExecutor, runtimeFlags, false, true, messageService
+                soundService, rankedStatsRepository, asyncExecutor, runtimeFlags, settings,
+                false, true, messageService
         );
         services.register(QueueCoordinator.class, queueCoordinator);
         queueCoordinator.start();
@@ -232,6 +243,18 @@ public final class FeatureBootstrap {
         PlayersGui playersGui = new PlayersGui(guiSessions, soundService, stateManager, statsService, duelRequestGui);
         SpectateListGui spectateListGui = new SpectateListGui(guiSessions, soundService, matchRegistry, spectatorService);
         FfaListGui ffaListGui = new FfaListGui(guiSessions, soundService, ffaService);
+        KitPreviewGui kitPreviewGui = new KitPreviewGui(guiSessions, soundService, kitService);
+        rankedGui.setPreviewGui(kitPreviewGui);
+        unrankedGui.setPreviewGui(kitPreviewGui);
+        TitleService titleService = new TitleService(settingsService, statsService);
+        services.register(TitleService.class, titleService);
+        matchService.setTitleService(titleService);
+        TitleGui titleGui = new TitleGui(guiSessions, soundService, titleService);
+        com.rumilance.practice.gui.menus.MatchReportGui matchReportGui =
+                new com.rumilance.practice.gui.menus.MatchReportGui(guiSessions, soundService, matchService);
+        matchService.setMatchReportOpener(matchReportGui::openLastReport);
+        PartyService partyService = new PartyService();
+        services.register(PartyService.class, partyService);
         EditKitGui editKitGui = new EditKitGui(guiSessions, soundService, kitService, kitLayoutRepository,
                 layoutCache, asyncExecutor, stateManager);
         ArrowEffectGui arrowEffectGui = new ArrowEffectGui(guiSessions, soundService, arrowEffectService, settingsService);
@@ -266,6 +289,9 @@ public final class FeatureBootstrap {
         EkitAdminGui ekitAdminGui = new EkitAdminGui(guiSessions, soundService, ekitItems);
         KitAdminGui kitAdminGui = new KitAdminGui(guiSessions, soundService, kitService, messageService);
 
+        GameMenuGui gameMenuGui = new GameMenuGui(guiSessions, soundService,
+                rankedGui, unrankedGui, ffaListGui, ekitSelectGui, spectateListGui, settingsGui, titleGui);
+
         GuiListener guiListener = new GuiListener(guiSessions, stateManager, originalKitService);
         guiListener.register(rankedGui);
         guiListener.register(unrankedGui);
@@ -291,6 +317,10 @@ public final class FeatureBootstrap {
         guiListener.register(arrowEffectGui);
         guiListener.register(originalKitGui);
         guiListener.register(kitAdminGui);
+        guiListener.register(kitPreviewGui);
+        guiListener.register(titleGui);
+        guiListener.register(matchReportGui);
+        guiListener.register(gameMenuGui);
 
         FunctionalItemListener functionalItemListener = new FunctionalItemListener(
                 soundService, queueCoordinator, rankedGui, unrankedGui);
@@ -298,6 +328,9 @@ public final class FeatureBootstrap {
         functionalItemListener.setOpenFfa(ffaListGui::open);
         functionalItemListener.setOpenEkit(ekitSelectGui::open);
         functionalItemListener.setOpenSpectate(spectateListGui::open);
+        functionalItemListener.setOpenMenu(gameMenuGui::open);
+        functionalItemListener.setOpenTitles(titleGui::open);
+        functionalItemListener.setOpenParty(partyService::create);
 
         scoreboardService = new ScoreboardService(plugin, settings, stateManager,
                 queueService, matchRegistry, rankedStatsRepository, settingsService);
@@ -313,9 +346,12 @@ public final class FeatureBootstrap {
         pm.registerEvents(new MatchListener(matchService, kitService), plugin);
         pm.registerEvents(new ArenaBoundsListener(matchService, arenaService), plugin);
         pm.registerEvents(new FfaListener(ffaService, kitService, stateManager), plugin);
+        pm.registerEvents(new GoldenHeadListener(plugin, matchRegistry), plugin);
         pm.registerEvents(guiListener, plugin);
         pm.registerEvents(functionalItemListener, plugin);
+        pm.registerEvents(new LobbyCompassListener(stateManager, soundService, gameMenuGui::open), plugin);
         pm.registerEvents(new AdminToolListener(lobbyService, soundService), plugin);
+        pm.registerEvents(new PartyListener(partyService), plugin);
         pm.registerEvents(new PracticeSideListener(chatBanService, settingsService, guiSessions,
                 arrowEffectService, spectatorService, ffaService, originalKitService), plugin);
 
@@ -323,7 +359,7 @@ public final class FeatureBootstrap {
                 kitService, stateManager, soundService, lobbyService, queueCoordinator, runtimeFlags, true, messageService);
         DuelCommand unrankedDuel = new DuelCommand(rankedGui, unrankedGui, duelRequestService, matchService,
                 kitService, stateManager, soundService, lobbyService, queueCoordinator, runtimeFlags, false, messageService);
-        AcceptDenyCommand acceptDeny = new AcceptDenyCommand(rankedDuel);
+        AcceptDenyCommand acceptDeny = new AcceptDenyCommand(rankedDuel, duelRequestService);
         ArenaKitAdminCommand arenaKitAdmin = new ArenaKitAdminCommand(configService, arenaStore, arenaService,
                 kitService, queueService, faweBridge, new File(plugin.getDataFolder(), "schematics"), soundService, kitAdminGui);
         ChatBanCommand chatBanCommand = new ChatBanCommand(chatBanService);
@@ -349,8 +385,17 @@ public final class FeatureBootstrap {
         bind("chatban", chatBanCommand);
         bind("chatunban", chatBanCommand);
         bind("ekitadmin", new com.rumilance.practice.command.EkitAdminCommand(ekitAdminGui));
+        bind("giveitem", new com.rumilance.practice.command.GiveItemCommand());
+        bind("matchreport", new com.rumilance.practice.command.MatchReportCommand(matchService, settingsService));
         bind("ffa", ffaCommand);
         bind("leave", new LeaveCommand(matchService, messageService));
+        bind("party", new PartyCommand(partyService));
+        bind("title", (org.bukkit.command.CommandExecutor) (sender, command, label, args) -> {
+            if (sender instanceof org.bukkit.entity.Player player) {
+                titleGui.open(player);
+            }
+            return true;
+        });
 
         for (PlayerCommands.Type type : PlayerCommands.Type.values()) {
             if (type == PlayerCommands.Type.FFA) {

@@ -38,6 +38,12 @@ public final class FunctionalItemListener implements Listener {
     };
     private Consumer<Player> openSpectate = p -> {
     };
+    private Consumer<Player> openMenu = p -> {
+    };
+    private Consumer<Player> openTitles = p -> {
+    };
+    private Consumer<Player> openParty = p -> {
+    };
 
     public FunctionalItemListener(
             SoundService soundService,
@@ -65,6 +71,18 @@ public final class FunctionalItemListener implements Listener {
 
     public void setOpenSpectate(Consumer<Player> openSpectate) {
         this.openSpectate = openSpectate;
+    }
+
+    public void setOpenMenu(Consumer<Player> openMenu) {
+        this.openMenu = openMenu;
+    }
+
+    public void setOpenTitles(Consumer<Player> openTitles) {
+        this.openTitles = openTitles;
+    }
+
+    public void setOpenParty(Consumer<Player> openParty) {
+        this.openParty = openParty;
     }
 
     public static ItemStack create(String functionType, Material material, Component name) {
@@ -108,6 +126,9 @@ public final class FunctionalItemListener implements Listener {
             case "ekit" -> openEkit.accept(player);
             case "settings" -> openSettings.accept(player);
             case "spectate" -> openSpectate.accept(player);
+            case "menu" -> openMenu == null ? soundService.play(player, "error") : openMenu.accept(player);
+            case "titles" -> openTitles.accept(player);
+            case "party" -> openParty.accept(player);
             case "leavequeue" -> queueCoordinator.leave(player);
             default -> soundService.play(player, "error");
         }

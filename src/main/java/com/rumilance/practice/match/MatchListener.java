@@ -73,7 +73,16 @@ public final class MatchListener implements Listener {
             applyCombatRules(byEntity, victim, kit);
         }
 
+        // Record non-lethal combat stats for the report card. Lethal hits are recorded by
+        // MatchService.handleLethal once the outcome is known, so they still appear in the totals.
         double finalHealth = victim.getHealth() - event.getFinalDamage();
+        if (finalHealth > 0 && attacker != null && attacker.playerId() != null
+                && session.isParticipant(attacker.playerId())
+                && event instanceof EntityDamageByEntityEvent byEntity
+                && byEntity.getDamager() instanceof org.bukkit.entity.Player attackerPlayer) {
+            recordCombatHit(session, attackerPlayer, victim, byEntity, event.getFinalDamage());
+        }
+
         boolean hasTotem = kit != null && kit.totem() && hasTotem(victim);
         if (finalHealth > 0 || hasTotem) {
             return;
@@ -83,6 +92,22 @@ public final class MatchListener implements Listener {
         event.setDamage(0);
         UUID attackerId = attacker == null ? null : attacker.playerId();
         matchService.handleLethal(session, victim.getUniqueId(), attackerId);
+    }
+
+    private void recordCombatHit(MatchSession session, Player attacker, Player victim,
+                                 EntityDamageByEntityEvent byEntity, double finalDamage) {
+        MatchCombatTracker tracker = matchService.combatTracker();
+        if (byEntity.getDamager() instanceof Projectile projectile
+                && projectile.getShooter() instanceof Player) {
+            tracker.recordProjectileHit(session.id(), attacker.getUniqueId(), victim.getUniqueId(), finalDamage);
+            return;
+        }
+        boolean crit = attacker.getFallDistance() > 0
+                && !attacker.isOnGround()
+                && !attacker.isInsideVehicle()
+                && !attacker.hasPotionEffect(org.bukkit.potion.PotionEffectType.BLINDNESS)
+                && attacker.getAttackCooldown() > 0.9f;
+        tracker.recordHit(session.id(), attacker.getUniqueId(), victim.getUniqueId(), finalDamage, crit);
     }
 
     private void applyCombatRules(EntityDamageByEntityEvent event, Player victim, KitDefinition kit) {
@@ -240,6 +265,9 @@ public final class MatchListener implements Listener {
         } else if (pdc.has(ItemKeys.returnLobby(), PersistentDataType.BYTE)) {
             event.setCancelled(true);
             matchService.returnToLobby(event.getPlayer());
+        } else if (pdc.has(ItemKeys.matchReport(), PersistentDataType.BYTE)) {
+            event.setCancelled(true);
+            matchService.openMatchReport(event.getPlayer());
         }
     }
 

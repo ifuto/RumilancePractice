@@ -6,6 +6,7 @@ import com.rumilance.practice.model.PlayerSettings;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
@@ -27,7 +28,8 @@ public final class SettingsRepository {
 
     public Optional<PlayerSettings> findByUuid(UUID uuid) throws SQLException {
         String sql = "SELECT uuid, sounds_enabled, scoreboard_enabled, arrow_effect, spectate_visible, "
-                + "accept_duel_requests, auto_requeue, hide_other_chat, chat_whitelist, locale FROM "
+                + "accept_duel_requests, auto_requeue, hide_other_chat, chat_whitelist, locale, "
+                + "selected_title, show_match_report FROM "
                 + databaseService.table("player_settings") + " WHERE uuid = ?";
         try (Connection connection = databaseService.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -48,11 +50,12 @@ public final class SettingsRepository {
     public void upsert(PlayerSettings settings) throws SQLException {
         String sql = "INSERT INTO " + databaseService.table("player_settings")
                 + " (uuid, sounds_enabled, scoreboard_enabled, arrow_effect, spectate_visible, "
-                + "accept_duel_requests, auto_requeue, hide_other_chat, chat_whitelist, locale) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                + "accept_duel_requests, auto_requeue, hide_other_chat, chat_whitelist, locale, "
+                + "selected_title, show_match_report) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
                 + databaseService.upsertClause("uuid", "sounds_enabled", "scoreboard_enabled", "arrow_effect",
                 "spectate_visible", "accept_duel_requests", "auto_requeue", "hide_other_chat",
-                "chat_whitelist", "locale");
+                "chat_whitelist", "locale", "selected_title", "show_match_report");
         try (Connection connection = databaseService.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, settings.uuid().toString());
@@ -65,6 +68,8 @@ public final class SettingsRepository {
             statement.setInt(8, settings.hideOtherChat() ? 1 : 0);
             statement.setString(9, String.join(",", settings.chatWhitelist()));
             statement.setString(10, settings.locale());
+            statement.setString(11, settings.selectedTitle());
+            statement.setInt(12, settings.showMatchReport() ? 1 : 0);
             statement.executeUpdate();
         }
     }
@@ -87,7 +92,35 @@ public final class SettingsRepository {
                 resultSet.getInt("auto_requeue") != 0,
                 resultSet.getInt("hide_other_chat") != 0,
                 whitelist,
-                resultSet.getString("locale")
+                resultSet.getString("locale"),
+                columnOrDefault(resultSet, "selected_title", "none"),
+                columnOrDefault(resultSet, "show_match_report", 0) != 0
         );
+    }
+
+    /**
+     * Reads a string column that may not exist yet (added by a later migration), returning a
+     * default when the column is absent.
+     */
+    private static String columnOrDefault(ResultSet rs, String column, String def) throws SQLException {
+        ResultSetMetaData meta = rs.getMetaData();
+        for (int i = 1; i <= meta.getColumnCount(); i++) {
+            if (column.equalsIgnoreCase(meta.getColumnName(i))) {
+                String value = rs.getString(i);
+                return value == null ? def : value;
+            }
+        }
+        return def;
+    }
+
+    /** Same as {@link #columnOrDefault(ResultSet, String, String)} but for integer columns. */
+    private static int columnOrDefault(ResultSet rs, String column, int def) throws SQLException {
+        ResultSetMetaData meta = rs.getMetaData();
+        for (int i = 1; i <= meta.getColumnCount(); i++) {
+            if (column.equalsIgnoreCase(meta.getColumnName(i))) {
+                return rs.getInt(i);
+            }
+        }
+        return def;
     }
 }

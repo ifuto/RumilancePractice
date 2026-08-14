@@ -252,17 +252,39 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
     @Override
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command,
                                                 @NotNull String alias, @NotNull String[] args) {
-        List<String> out = new ArrayList<>();
+        if (!(sender instanceof Player player)) {
+            return List.of();
+        }
+        String current = TabCompletions.current(args);
         if (args.length == 1) {
+            List<String> out = new ArrayList<>();
             out.add("cancel");
             out.add("accept");
             out.add("deny");
+            // Prioritise players who have sent (or received) a pending request, then the rest of the server.
+            duelRequestService.incoming(player.getUniqueId()).forEach(req -> {
+                Player p = Bukkit.getPlayer(req.sender());
+                if (p != null) {
+                    out.add(p.getName());
+                }
+            });
             for (Player online : Bukkit.getOnlinePlayers()) {
-                out.add(online.getName());
+                if (!online.getUniqueId().equals(player.getUniqueId())) {
+                    out.add(online.getName());
+                }
             }
-        } else if (args.length == 2) {
-            kitService.enabled().stream().map(k -> k.name()).forEach(out::add);
+            return TabCompletions.limit(TabCompletions.filter(current, out), 50);
         }
-        return out.stream().filter(s -> s.toLowerCase(Locale.ROOT).startsWith(args[args.length - 1].toLowerCase(Locale.ROOT))).toList();
+        if (args.length == 2) {
+            // Only complete kit names when the first arg is a real player name, not a subcommand.
+            String first = args[0].toLowerCase(Locale.ROOT);
+            if (!first.equals("cancel") && !first.equals("accept") && !first.equals("deny")
+                    && Bukkit.getPlayerExact(args[0]) != null) {
+                return TabCompletions.filter(current,
+                        kitService.enabled().stream().map(k -> k.name()).toList());
+            }
+            return List.of();
+        }
+        return List.of();
     }
 }
