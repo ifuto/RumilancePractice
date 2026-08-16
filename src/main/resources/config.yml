@@ -76,6 +76,15 @@ hooks:
 
 # Central Scoreboard/TAB service (see com.rumilance.practice.scoreboard). Disable if another
 # plugin (e.g. TAB) should own the sidebar/tab list instead.
+gui:
+  # How kit ids are displayed in menus when no custom display-name is set.
+  # Underscores always become spaces; casing is one of: TITLE ("No Debuff"),
+  # UPPER ("NO DEBUFF"), LOWER ("no debuff"), KEEP (original casing).
+  kit-name-case: TITLE
+  # Minimum seconds between /setting (and similar) toggle clicks per player,
+  # to stop rapid ON/OFF spam from hammering the settings store.
+  toggle-cooldown-seconds: 2
+
 scoreboard:
   enabled: true
   # Central task period; the spec requires 10-20 ticks (not a per-player timer).

@@ -114,6 +114,10 @@ public final class KitAdminGui extends AbstractGui {
         lore.add(stateLine(t(locale, "ranked"), kit.ranked(), locale));
         lore.add(Component.text(t(locale, "terrain") + ": " + kit.arenaTerrain().name(), NamedTextColor.AQUA)
                 .decoration(TextDecoration.ITALIC, false));
+        lore.add(Component.text("Shift+左クリック: 上へ移動", NamedTextColor.GRAY)
+                .decoration(TextDecoration.ITALIC, false));
+        lore.add(Component.text("Shift+右クリック: 下へ移動", NamedTextColor.GRAY)
+                .decoration(TextDecoration.ITALIC, false));
         meta.lore(lore);
         meta.getPersistentDataContainer().set(ItemKeys.guiAction(), PersistentDataType.STRING, "select:" + kit.name());
         stack.setItemMeta(meta);
@@ -248,5 +252,24 @@ public final class KitAdminGui extends AbstractGui {
             }
         }
         return ArenaTerrain.ANY;
+    }
+
+    /**
+     * ClickType-aware overload: in the kit list, Shift+left moves the kit up in the display
+     * order and Shift+right moves it down (persisted to kits.yml as {@code kit-order}).
+     * All other clicks fall through to the simple handler.
+     */
+    @Override
+    public void handleClick(Player player, GuiSession session, Inventory inventory, int slot,
+                            String action, org.bukkit.event.inventory.ClickType click) {
+        if (action != null && action.startsWith("select:") && click.isShiftClick()) {
+            String kitName = action.substring("select:".length());
+            boolean moved = kitService.move(kitName,
+                    click == org.bukkit.event.inventory.ClickType.SHIFT_LEFT);
+            sounds.play(player, moved ? "gui-click" : "error");
+            render(player, session, inventory);
+            return;
+        }
+        handleClick(player, session, inventory, slot, action);
     }
 }

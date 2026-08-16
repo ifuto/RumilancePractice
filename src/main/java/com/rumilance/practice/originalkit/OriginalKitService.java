@@ -276,9 +276,14 @@ public final class OriginalKitService {
     public static ItemStack[] layoutFromOfficial(KitDefinition kit) {
         ItemStack[] layout = new ItemStack[41];
         for (KitItemEntry entry : kit.items()) {
-            Material material = Material.matchMaterial(entry.material());
-            if (material != null && entry.slot() >= 0 && entry.slot() < 36) {
-                layout[entry.slot()] = new ItemStack(material, Math.max(1, entry.amount()));
+            ItemStack stack = resolveEntry(entry);
+            if (stack == null) {
+                continue;
+            }
+            if (entry.slot() >= 0 && entry.slot() < 36) {
+                layout[entry.slot()] = stack;
+            } else if (entry.slot() == 40) {
+                layout[40] = stack;
             }
         }
         layout[36] = materialOrNull(kit.armor().get("helmet"));
@@ -286,6 +291,19 @@ public final class OriginalKitService {
         layout[38] = materialOrNull(kit.armor().get("leggings"));
         layout[39] = materialOrNull(kit.armor().get("boots"));
         return layout;
+    }
+
+    /** Rebuilds a kit item with full NBT when available, material+amount otherwise. */
+    private static ItemStack resolveEntry(KitItemEntry entry) {
+        if (entry.hasSerializedItem()) {
+            ItemStack decoded = com.rumilance.practice.util.ItemSerializer
+                    .singleFromBase64(entry.itemDataBase64());
+            if (decoded != null) {
+                return decoded;
+            }
+        }
+        Material material = Material.matchMaterial(entry.material());
+        return material == null || material.isAir() ? null : new ItemStack(material, Math.max(1, entry.amount()));
     }
 
     /** @return true if the item is a helmet/chestplate/leggings/boots. */
@@ -353,6 +371,15 @@ public final class OriginalKitService {
 
     private static ItemStack materialOrNull(String name) {
         if (name == null) {
+            return null;
+        }
+        // Armor stored as "data:<base64>" carries full NBT (enchantments, trims, ...).
+        if (name.startsWith("data:")) {
+            ItemStack decoded = com.rumilance.practice.util.ItemSerializer
+                    .singleFromBase64(name.substring("data:".length()));
+            if (decoded != null) {
+                return decoded;
+            }
             return null;
         }
         Material material = Material.matchMaterial(name);

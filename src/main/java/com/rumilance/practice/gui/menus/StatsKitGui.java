@@ -98,7 +98,7 @@ public final class StatsKitGui extends AbstractGui {
 
     private ItemStack kitIcon(KitDefinition kit, UUID target) {
         Material material = ItemBuilder.materialOr(kit.icon(), Material.DIAMOND_SWORD);
-        ItemBuilder builder = ItemBuilder.of(material).nameMini(kit.displayName());
+        ItemBuilder builder = ItemBuilder.of(material).nameMini(kit.prettyDisplayName());
         try {
             RankedKitStats stats = statsService.kitStats(target, kit.name())
                     .orElse(RankedKitStats.starting(target, kit.name()));

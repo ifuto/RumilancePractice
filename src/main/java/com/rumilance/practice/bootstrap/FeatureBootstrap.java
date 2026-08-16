@@ -124,6 +124,10 @@ public final class FeatureBootstrap {
     public void enable() {
         ConfigService configService = services.get(ConfigService.class);
         PluginSettings settings = services.get(PluginSettings.class);
+        // Global kit-name display style (underscores -> spaces + configured casing).
+        com.rumilance.practice.util.KitNames.configure(
+                com.rumilance.practice.util.KitNames.CaseStyle.parse(
+                        configService.config().getString("gui.kit-name-case", "TITLE")));
         SessionManager sessionManager = services.get(SessionManager.class);
         PlayerStateManager stateManager = services.get(PlayerStateManager.class);
         AsyncExecutor asyncExecutor = services.get(AsyncExecutor.class);
@@ -238,6 +242,7 @@ public final class FeatureBootstrap {
         mapSelectGui.setDuelRequestGui(duelRequestGui);
 
         SettingsGui settingsGui = new SettingsGui(guiSessions, soundService, settingsService);
+        settingsGui.setToggleCooldownSeconds(configService.config().getInt("gui.toggle-cooldown-seconds", 2));
         StatsKitGui statsKitGui = new StatsKitGui(guiSessions, soundService, kitService, statsService);
         ProfileGui profileGui = new ProfileGui(guiSessions, soundService, kitService, statsService);
         PlayersGui playersGui = new PlayersGui(guiSessions, soundService, stateManager, statsService, duelRequestGui);
@@ -331,6 +336,8 @@ public final class FeatureBootstrap {
         guiListener.register(teamHubGui);
         guiListener.register(teamKitSelectGui);
         guiListener.register(gameMenuGui);
+        // Esc / Close inside Game Menu sub-menus returns players to the Game Menu.
+        guiListener.setMenuReturn(gameMenuGui::open);
 
         FunctionalItemListener functionalItemListener = new FunctionalItemListener(
                 soundService, queueCoordinator, rankedGui, unrankedGui);
@@ -376,6 +383,9 @@ public final class FeatureBootstrap {
         pm.registerEvents(new AdminToolListener(lobbyService, soundService), plugin);
         pm.registerEvents(new com.rumilance.practice.team.TeamListener(teamService), plugin);
         com.rumilance.practice.chat.PendingInput.init(plugin);
+        // One-shot sweep: delete leftover floating-text entities (holograms) from all worlds,
+        // including ones spawned by other plugins that crashed without cleaning up.
+        com.rumilance.practice.lobby.FloatingTextCleanup.scheduleSweep(plugin);
         pm.registerEvents(new PracticeSideListener(chatBanService, settingsService, guiSessions,
                 arrowEffectService, spectatorService, ffaService, originalKitService), plugin);
 

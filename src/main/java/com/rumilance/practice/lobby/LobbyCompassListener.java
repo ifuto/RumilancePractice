@@ -104,7 +104,11 @@ public final class LobbyCompassListener implements Listener {
         return false;
     }
 
-    @EventHandler
+    /**
+     * LOWEST priority + DENY results so WorldEdit/FAWE never treats the menu compass as its
+     * navigation wand (which caused "No free spot ahead of you found" spam on every click).
+     */
+    @EventHandler(priority = org.bukkit.event.EventPriority.LOWEST)
     public void onInteract(PlayerInteractEvent event) {
         if (event.getHand() != EquipmentSlot.HAND) {
             return;
@@ -122,6 +126,10 @@ public final class LobbyCompassListener implements Listener {
             return;
         }
         event.setCancelled(true);
+        // DENY both results: WorldEdit's interact listener checks these and skips its
+        // navigation-wand (/thru, /jumpto) handling entirely.
+        event.setUseItemInHand(org.bukkit.event.Event.Result.DENY);
+        event.setUseInteractedBlock(org.bukkit.event.Event.Result.DENY);
         Player player = event.getPlayer();
         if (stateManager.getState(player.getUniqueId()) != PlayerState.LOBBY) {
             return;

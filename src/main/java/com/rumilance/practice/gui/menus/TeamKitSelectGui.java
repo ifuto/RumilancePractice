@@ -69,7 +69,7 @@ public final class TeamKitSelectGui extends AbstractGui {
             }
             inventory.setItem(MenuScaffold.gridSlot(index++),
                     ItemBuilder.of(ItemBuilder.materialOr(kit.icon(), Material.DIAMOND_SWORD))
-                            .nameMini(kit.displayName())
+                            .nameMini(kit.prettyDisplayName())
                             .lore(UiTheme.divider(),
                                     UiTheme.labelValue("Terrain", kit.arenaTerrain().name()),
                                     UiTheme.blank(),

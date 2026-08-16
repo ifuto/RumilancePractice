@@ -43,7 +43,9 @@ public final class KitPreviewGui extends AbstractGui {
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        String kit = session.selectedKit() == null ? "Kit" : session.selectedKit();
+        String kit = session.selectedKit() == null
+                ? "Kit"
+                : com.rumilance.practice.util.KitNames.pretty(session.selectedKit());
         return Component.text("✦ Preview: " + kit, UiTheme.PRIMARY).decoration(TextDecoration.ITALIC, false);
     }
 
@@ -74,11 +76,10 @@ public final class KitPreviewGui extends AbstractGui {
             if (entry.slot() < 9 || entry.slot() > 35) {
                 continue;
             }
-            Material material = Material.matchMaterial(entry.material());
-            if (material == null || material.isAir()) {
-                continue;
+            ItemStack stack = previewStack(entry);
+            if (stack != null) {
+                inventory.setItem(entry.slot(), stack);
             }
-            inventory.setItem(entry.slot(), new ItemStack(material, Math.max(1, entry.amount())));
         }
 
         // Hot-bar preview on row 4 columns 0..8 (slots 36..44).
@@ -86,18 +87,16 @@ public final class KitPreviewGui extends AbstractGui {
             if (entry.slot() < 0 || entry.slot() > 8) {
                 continue;
             }
-            Material material = Material.matchMaterial(entry.material());
-            if (material == null || material.isAir()) {
-                continue;
+            ItemStack stack = previewStack(entry);
+            if (stack != null) {
+                inventory.setItem(GuiSlots.slot(4, entry.slot()), stack);
             }
-            inventory.setItem(GuiSlots.slot(4, entry.slot()),
-                    new ItemStack(material, Math.max(1, entry.amount())));
         }
 
         // Info panel on row 5 (close already placed by chrome; add a description book next to it).
         inventory.setItem(GuiSlots.slot(5, 2),
                 ItemBuilder.of(Material.WRITTEN_BOOK)
-                        .name(Component.text(kit.name(), UiTheme.SECONDARY))
+                        .name(Component.text(com.rumilance.practice.util.KitNames.pretty(kit.name()), UiTheme.SECONDARY))
                         .lore(
                                 UiTheme.divider(),
                                 UiTheme.labelValue("Health", String.valueOf((int) kit.maxHealth())),
@@ -128,11 +127,36 @@ public final class KitPreviewGui extends AbstractGui {
         if (materialName == null || materialName.isBlank()) {
             return;
         }
+        // Full-NBT armor pieces are stored as "data:<base64>".
+        if (materialName.startsWith("data:")) {
+            ItemStack decoded = com.rumilance.practice.util.ItemSerializer
+                    .singleFromBase64(materialName.substring("data:".length()));
+            if (decoded != null) {
+                inventory.setItem(slot, decoded);
+                return;
+            }
+        }
         Material material = Material.matchMaterial(materialName);
         if (material == null || material.isAir()) {
             return;
         }
         inventory.setItem(slot, new ItemStack(material));
+    }
+
+    /** Preview stack with full NBT when available (enchant glint, potion colours, ...). */
+    private static ItemStack previewStack(KitItemEntry entry) {
+        if (entry.hasSerializedItem()) {
+            ItemStack decoded = com.rumilance.practice.util.ItemSerializer
+                    .singleFromBase64(entry.itemDataBase64());
+            if (decoded != null) {
+                return decoded;
+            }
+        }
+        Material material = Material.matchMaterial(entry.material());
+        if (material == null || material.isAir()) {
+            return null;
+        }
+        return new ItemStack(material, Math.max(1, entry.amount()));
     }
 
     @Override

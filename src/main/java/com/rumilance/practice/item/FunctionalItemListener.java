@@ -116,7 +116,14 @@ public final class FunctionalItemListener implements Listener {
         if (function == null) {
             return;
         }
+        // The "menu" compass is handled exclusively by LobbyCompassListener (LOWEST priority,
+        // WorldEdit-safe). Handling it here too caused the Game Menu to open twice per click.
+        if ("menu".equalsIgnoreCase(function)) {
+            return;
+        }
         event.setCancelled(true);
+        event.setUseItemInHand(org.bukkit.event.Event.Result.DENY);
+        event.setUseInteractedBlock(org.bukkit.event.Event.Result.DENY);
         Player player = event.getPlayer();
         soundService.play(player, "gui-open", 1.4f);
         switch (function.toLowerCase(Locale.ROOT)) {
@@ -126,13 +133,6 @@ public final class FunctionalItemListener implements Listener {
             case "ekit" -> openEkit.accept(player);
             case "settings" -> openSettings.accept(player);
             case "spectate" -> openSpectate.accept(player);
-            case "menu" -> {
-                if (openMenu == null) {
-                    soundService.play(player, "error");
-                } else {
-                    openMenu.accept(player);
-                }
-            }
             case "titles" -> openTitles.accept(player);
             case "party" -> openParty.accept(player);
             case "leavequeue" -> queueCoordinator.leave(player);

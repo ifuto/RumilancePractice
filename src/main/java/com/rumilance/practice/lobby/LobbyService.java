@@ -129,6 +129,9 @@ public final class LobbyService {
         Location destination = spawn();
         if (destination != null && destination.getWorld() != null) {
             player.teleportAsync(LocationUtil.safeTeleportLocation(destination, player));
+            // Make every compass needle (including the Game Menu compass) point at the
+            // lobby spawn instead of the world spawn.
+            player.setCompassTarget(destination);
         }
     }
 

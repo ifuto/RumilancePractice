@@ -155,7 +155,7 @@ public final class ProfileGui extends AbstractGui {
                 ? "計測中 " + stats.gamesPlayed() + "/21"
                 : String.format("%.1f%%", stats.winRate() * 100);
         var builder = ItemBuilder.of(material)
-                .nameMini(kit.displayName())
+                .nameMini(kit.prettyDisplayName())
                 .lore(
                         UiTheme.divider(),
                         UiTheme.labelValue("W/L", stats.wins() + "/" + stats.losses()),

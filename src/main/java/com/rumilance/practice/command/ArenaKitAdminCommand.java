@@ -137,6 +137,19 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                 player.sendMessage(Component.text("/kit delete <name> | timeout <name> <sec>", NamedTextColor.GRAY));
                 player.sendMessage(Component.text("/kit adventure <name> <on|off> - force Adventure mode", NamedTextColor.GRAY));
                 player.sendMessage(Component.text("/kit <flag> <name> <on|off> - regen/food/place/break/pearl/totem/shield", NamedTextColor.GRAY));
+                player.sendMessage(Component.text("/kit order <name> <up|down> - GUI表示順を移動 (GUIでShift+クリックでも可)", NamedTextColor.GRAY));
+                yield true;
+            }
+            case "order" -> {
+                if (args.length < 3) {
+                    player.sendMessage(Component.text("/kit order <name> <up|down>", NamedTextColor.YELLOW));
+                    yield true;
+                }
+                boolean up = args[2].equalsIgnoreCase("up");
+                boolean moved = kitService.move(args[1], up);
+                player.sendMessage(moved
+                        ? Component.text("Kit '" + args[1] + "' moved " + (up ? "up" : "down") + ".", NamedTextColor.GREEN)
+                        : Component.text("Could not move kit (unknown name or already at the edge).", NamedTextColor.RED));
                 yield true;
             }
             case "adventure" -> {
@@ -429,20 +442,23 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
         if (args.length == 1) {
             return filter(List.of(
                     "gui", "help", "create", "overwrite", "list", "info", "enable", "disable",
-                    "delete", "timeout", "adventure", "autoregen", "autofood", "blockplace",
+                    "delete", "timeout", "order", "adventure", "autoregen", "autofood", "blockplace",
                     "blockbreak", "canbreak", "pearl", "totem", "swordshieldbreak"), args[0]);
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
         // Subcommands that take a kit name next.
-        if (args.length == 2 && List.of("info", "enable", "disable", "delete", "timeout", "adventure",
+        if (args.length == 2 && List.of("info", "enable", "disable", "delete", "timeout", "order", "adventure",
                 "autoregen", "autofood", "blockplace", "blockbreak", "canbreak", "pearl", "totem",
                 "swordshieldbreak").contains(sub)) {
             return filter(kitService.all().stream().map(KitDefinition::name).toList(), args[1]);
         }
-        // Third arg: on/off for toggles, numeric hint for timeout.
+        // Third arg: on/off for toggles, numeric hint for timeout, up/down for order.
         if (args.length == 3) {
             if (sub.equals("timeout")) {
                 return filter(List.of("30", "60", "120", "300"), args[2]);
+            }
+            if (sub.equals("order")) {
+                return filter(List.of("up", "down"), args[2]);
             }
             if (List.of("adventure", "autoregen", "autofood", "blockplace", "blockbreak", "canbreak",
                     "pearl", "totem", "swordshieldbreak").contains(sub)) {

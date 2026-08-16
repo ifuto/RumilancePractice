@@ -26,10 +26,18 @@ import org.bukkit.inventory.ItemStack;
 public final class SettingsGui extends AbstractGui {
 
     private final SettingsService settingsService;
+    /** Per-player timestamp of the last accepted toggle (anti spam-click). */
+    private final java.util.Map<java.util.UUID, Long> lastToggle = new java.util.concurrent.ConcurrentHashMap<>();
+    /** Minimum millis between toggle clicks; configured via gui.toggle-cooldown-seconds. */
+    private volatile long toggleCooldownMillis = 2000L;
 
     public SettingsGui(GuiSessionRegistry registry, SoundService sounds, SettingsService settingsService) {
         super(registry, sounds, GuiType.SETTINGS, 6, true);
         this.settingsService = settingsService;
+    }
+
+    public void setToggleCooldownSeconds(int seconds) {
+        this.toggleCooldownMillis = Math.max(0, seconds) * 1000L;
     }
 
     @Override
@@ -112,6 +120,20 @@ public final class SettingsGui extends AbstractGui {
             session.put("await_whitelist", Boolean.TRUE);
             sounds.play(player, "gui-click");
             return;
+        }
+        // Rate-limit toggles: rapid ON/OFF spam would hammer the settings store (DB flushes)
+        // and scoreboard rebuilds for no benefit.
+        if (action.startsWith("toggle:")) {
+            long now = System.currentTimeMillis();
+            Long last = lastToggle.get(player.getUniqueId());
+            if (last != null && now - last < toggleCooldownMillis) {
+                long waitSecs = Math.max(1, (toggleCooldownMillis - (now - last) + 999) / 1000);
+                sounds.play(player, "error");
+                player.sendActionBar(Component.text("設定変更のクールダウン中… (" + waitSecs + "s)",
+                        UiTheme.WARNING));
+                return;
+            }
+            lastToggle.put(player.getUniqueId(), now);
         }
         PlayerSettings s = settingsService.get(player);
         PlayerSettings next = switch (action) {

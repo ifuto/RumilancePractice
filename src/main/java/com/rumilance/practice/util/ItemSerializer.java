@@ -78,4 +78,22 @@ public final class ItemSerializer {
     public static ItemStack deserializeSingle(byte[] data) {
         return data == null || data.length == 0 ? null : ItemStack.deserializeBytes(data);
     }
+
+    /** Base64 form of a single item (full NBT: enchantments, potion effects, names, ...). */
+    public static String singleToBase64(ItemStack item) {
+        byte[] bytes = serializeSingle(item);
+        return bytes.length == 0 ? null : Base64.getEncoder().encodeToString(bytes);
+    }
+
+    /** @return the item encoded by {@link #singleToBase64}, or null when absent/corrupt. */
+    public static ItemStack singleFromBase64(String encoded) {
+        if (encoded == null || encoded.isBlank()) {
+            return null;
+        }
+        try {
+            return deserializeSingle(Base64.getDecoder().decode(encoded));
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
 }

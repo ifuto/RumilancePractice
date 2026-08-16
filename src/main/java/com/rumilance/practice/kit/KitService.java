@@ -29,6 +29,8 @@ public final class KitService {
     private final ConfigService configService;
     private final Map<String, KitDefinition> kits = new ConcurrentHashMap<>();
     private final Map<String, Boolean> queueEnabled = new ConcurrentHashMap<>();
+    /** Admin-defined display order (lower index first); kits not listed sort alphabetically after. */
+    private final List<String> sortOrder = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     public KitService(ConfigService configService) {
         this.configService = Objects.requireNonNull(configService);
@@ -73,10 +75,14 @@ public final class KitService {
                 Object slotObj = map.get("slot");
                 Object materialObj = map.get("material");
                 Object amountObj = map.get("amount");
+                Object dataObj = map.get("data");
                 int slot = slotObj instanceof Number number ? number.intValue() : 0;
                 String material = materialObj == null ? "STONE" : String.valueOf(materialObj);
                 int amount = amountObj instanceof Number number ? number.intValue() : 1;
-                items.add(new KitItemEntry(slot, material, amount));
+                // "data" carries the full serialized ItemStack (enchantments, potion effects,
+                // custom names, ...) so kits created from a live inventory keep their NBT.
+                String data = dataObj == null ? null : String.valueOf(dataObj);
+                items.add(new KitItemEntry(slot, material, amount, null, data));
             }
             builder.items(items);
 
@@ -94,6 +100,11 @@ public final class KitService {
             kits.put(id.toLowerCase(Locale.ROOT), builder.build());
             queueEnabled.putIfAbsent(id.toLowerCase(Locale.ROOT), true);
         }
+        sortOrder.clear();
+        sortOrder.addAll(yaml.getStringList("kit-order").stream()
+                .map(s -> s.toLowerCase(Locale.ROOT))
+                .filter(kits::containsKey)
+                .toList());
     }
 
     public Optional<KitDefinition> get(String id) {
@@ -104,11 +115,55 @@ public final class KitService {
     }
 
     public List<KitDefinition> all() {
-        return List.copyOf(kits.values());
+        return sorted(kits.values());
     }
 
     public List<KitDefinition> enabled() {
-        return kits.values().stream().filter(KitDefinition::enabled).toList();
+        return sorted(kits.values().stream().filter(KitDefinition::enabled).toList());
+    }
+
+    /** Applies the admin-defined kit order; unlisted kits follow alphabetically. */
+    private List<KitDefinition> sorted(java.util.Collection<KitDefinition> input) {
+        List<KitDefinition> out = new ArrayList<>(input);
+        out.sort((a, b) -> {
+            int ia = sortOrder.indexOf(a.name().toLowerCase(Locale.ROOT));
+            int ib = sortOrder.indexOf(b.name().toLowerCase(Locale.ROOT));
+            if (ia < 0 && ib < 0) {
+                return a.name().compareToIgnoreCase(b.name());
+            }
+            if (ia < 0) {
+                return 1;
+            }
+            if (ib < 0) {
+                return -1;
+            }
+            return Integer.compare(ia, ib);
+        });
+        return out;
+    }
+
+    /** Moves a kit one step earlier/later in the display order and persists it. */
+    public boolean move(String kitId, boolean up) {
+        String key = kitId.toLowerCase(Locale.ROOT);
+        if (!kits.containsKey(key)) {
+            return false;
+        }
+        // Materialise the full current order so unlisted kits become movable too.
+        List<String> order = new ArrayList<>();
+        for (KitDefinition kit : all()) {
+            order.add(kit.name().toLowerCase(Locale.ROOT));
+        }
+        int index = order.indexOf(key);
+        int target = up ? index - 1 : index + 1;
+        if (index < 0 || target < 0 || target >= order.size()) {
+            return false;
+        }
+        java.util.Collections.swap(order, index, target);
+        sortOrder.clear();
+        sortOrder.addAll(order);
+        configService.kits().set("kit-order", order);
+        configService.save(ConfigService.KITS);
+        return true;
     }
 
     public void save(KitDefinition kit) {
@@ -168,16 +223,19 @@ public final class KitService {
             }
         } else {
             for (KitItemEntry entry : kit.items()) {
-                Material material = Material.matchMaterial(entry.material());
-                if (material == null || material.isAir()) {
+                if (entry.slot() == OFFHAND_SLOT) {
+                    inventory.setItemInOffHand(resolveItem(entry));
                     continue;
                 }
-                inventory.setItem(entry.slot(), new ItemStack(material, Math.max(1, entry.amount())));
+                ItemStack stack = resolveItem(entry);
+                if (stack != null) {
+                    inventory.setItem(entry.slot(), stack);
+                }
             }
-            inventory.setHelmet(materialOrNull(kit.armor().get("helmet")));
-            inventory.setChestplate(materialOrNull(kit.armor().get("chestplate")));
-            inventory.setLeggings(materialOrNull(kit.armor().get("leggings")));
-            inventory.setBoots(materialOrNull(kit.armor().get("boots")));
+            inventory.setHelmet(armorStack(kit.armor().get("helmet")));
+            inventory.setChestplate(armorStack(kit.armor().get("chestplate")));
+            inventory.setLeggings(armorStack(kit.armor().get("leggings")));
+            inventory.setBoots(armorStack(kit.armor().get("boots")));
         }
         player.setHealth(Math.min(player.getMaxHealth(), kit.maxHealth()));
         player.setFoodLevel(20);
@@ -202,7 +260,14 @@ public final class KitService {
             if (stack == null || stack.getType().isAir()) {
                 continue;
             }
-            items.add(new KitItemEntry(i, stack.getType().name(), stack.getAmount()));
+            // Full NBT snapshot: enchantments, potion effects, custom names, attributes...
+            items.add(new KitItemEntry(i, stack.getType().name(), stack.getAmount(), null,
+                    com.rumilance.practice.util.ItemSerializer.singleToBase64(stack)));
+        }
+        ItemStack offhand = player.getInventory().getItemInOffHand();
+        if (offhand != null && !offhand.getType().isAir()) {
+            items.add(new KitItemEntry(OFFHAND_SLOT, offhand.getType().name(), offhand.getAmount(), null,
+                    com.rumilance.practice.util.ItemSerializer.singleToBase64(offhand)));
         }
         Map<String, String> armor = new LinkedHashMap<>();
         putArmor(armor, "helmet", player.getInventory().getHelmet());
@@ -249,6 +314,9 @@ public final class KitService {
             map.put("slot", entry.slot());
             map.put("material", entry.material());
             map.put("amount", entry.amount());
+            if (entry.hasSerializedItem()) {
+                map.put("data", entry.itemDataBase64());
+            }
             itemMaps.add(map);
         }
         yaml.set(path + ".items", itemMaps);
@@ -258,18 +326,56 @@ public final class KitService {
         configService.save(ConfigService.KITS);
     }
 
+    /** Virtual slot index used for the off-hand item inside {@link KitItemEntry}. */
+    public static final int OFFHAND_SLOT = 40;
+    /** Prefix marking an armor value that stores a full serialized item, not just a material. */
+    private static final String ARMOR_DATA_PREFIX = "data:";
+
     private static void putArmor(Map<String, String> armor, String key, ItemStack stack) {
-        if (stack != null && !stack.getType().isAir()) {
-            armor.put(key, stack.getType().name());
+        if (stack == null || stack.getType().isAir()) {
+            return;
         }
+        // Keep enchantments/trims by serializing the whole stack; plain pieces stay readable.
+        if (stack.hasItemMeta()) {
+            String encoded = com.rumilance.practice.util.ItemSerializer.singleToBase64(stack);
+            if (encoded != null) {
+                armor.put(key, ARMOR_DATA_PREFIX + encoded);
+                return;
+            }
+        }
+        armor.put(key, stack.getType().name());
     }
 
-    private static ItemStack materialOrNull(String name) {
-        if (name == null) {
+    /** Resolves a stored armor value: either a {@code data:<base64>} full item or a material name. */
+    private static ItemStack armorStack(String value) {
+        if (value == null || value.isBlank()) {
             return null;
         }
-        Material material = Material.matchMaterial(name);
+        if (value.startsWith(ARMOR_DATA_PREFIX)) {
+            ItemStack decoded = com.rumilance.practice.util.ItemSerializer
+                    .singleFromBase64(value.substring(ARMOR_DATA_PREFIX.length()));
+            if (decoded != null) {
+                return decoded;
+            }
+        }
+        Material material = Material.matchMaterial(value);
         return material == null || material.isAir() ? null : new ItemStack(material);
+    }
+
+    /** Rebuilds a kit item: prefers the full NBT snapshot, falls back to material+amount. */
+    private static ItemStack resolveItem(KitItemEntry entry) {
+        if (entry.hasSerializedItem()) {
+            ItemStack decoded = com.rumilance.practice.util.ItemSerializer
+                    .singleFromBase64(entry.itemDataBase64());
+            if (decoded != null) {
+                return decoded;
+            }
+        }
+        Material material = Material.matchMaterial(entry.material());
+        if (material == null || material.isAir()) {
+            return null;
+        }
+        return new ItemStack(material, Math.max(1, entry.amount()));
     }
 
     private static ArenaTerrain parseTerrain(String raw) {

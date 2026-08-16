@@ -168,9 +168,14 @@ public final class EditKitGui extends AbstractGui {
         }
         ItemStack[] layout = new ItemStack[41];
         for (KitItemEntry entry : kit.items()) {
-            Material mat = Material.matchMaterial(entry.material());
-            if (mat != null && entry.slot() >= 0 && entry.slot() < 36) {
-                layout[entry.slot()] = new ItemStack(mat, entry.amount());
+            ItemStack stack = kitEntryStack(entry);
+            if (stack == null) {
+                continue;
+            }
+            if (entry.slot() >= 0 && entry.slot() < 36) {
+                layout[entry.slot()] = stack;
+            } else if (entry.slot() == 40) {
+                layout[40] = stack;
             }
         }
         layout[36] = material(kit.armor().get("helmet"));
@@ -180,8 +185,28 @@ public final class EditKitGui extends AbstractGui {
         return layout;
     }
 
+    /** Full-NBT kit entry when available; plain material+amount otherwise. */
+    private static ItemStack kitEntryStack(KitItemEntry entry) {
+        if (entry.hasSerializedItem()) {
+            ItemStack decoded = ItemSerializer.singleFromBase64(entry.itemDataBase64());
+            if (decoded != null) {
+                return decoded;
+            }
+        }
+        Material mat = Material.matchMaterial(entry.material());
+        return mat == null || mat.isAir() ? null : new ItemStack(mat, Math.max(1, entry.amount()));
+    }
+
     private static ItemStack material(String name) {
         if (name == null) {
+            return null;
+        }
+        // "data:<base64>" armor values carry full NBT.
+        if (name.startsWith("data:")) {
+            ItemStack decoded = ItemSerializer.singleFromBase64(name.substring("data:".length()));
+            if (decoded != null) {
+                return decoded;
+            }
             return null;
         }
         Material mat = Material.matchMaterial(name);

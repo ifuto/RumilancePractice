@@ -271,15 +271,29 @@ public final class TeamHubGui extends AbstractGui {
             }
             case "choose_kit" -> {
                 if (!owner) {
+                    sounds.play(player, "error");
+                    player.sendMessage(Component.text("チームオーナーのみ開始できます。", UiTheme.DANGER)
+                            .decoration(TextDecoration.ITALIC, false));
                     return;
                 }
                 if (!team.isSplitReady()) {
                     sounds.play(player, "error");
+                    player.sendMessage(Component.text(
+                            "全員を赤/青に割り当ててください(Auto Split か 各メンバーをクリック)。",
+                            UiTheme.WARNING).decoration(TextDecoration.ITALIC, false));
+                    refresh(player, session, inventory);
                     return;
                 }
                 sounds.play(player, "gui-click");
-                player.closeInventory();
-                kitSelect.open(player);
+                // Open on the next tick: switching inventories from inside an
+                // InventoryClickEvent handler is unreliable on some clients.
+                org.bukkit.Bukkit.getScheduler().runTask(
+                        org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
+                        () -> {
+                            if (player.isOnline()) {
+                                kitSelect.open(player);
+                            }
+                        });
             }
             case "page:prev" -> {
                 session.setPage(session.page() - 1);

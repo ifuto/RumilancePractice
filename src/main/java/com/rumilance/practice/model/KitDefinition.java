@@ -65,6 +65,18 @@ public record KitDefinition(
         return builder(name).displayName(displayName).icon(icon).build();
     }
 
+    /**
+     * Display name for GUIs: when no custom display name is configured (it still equals the raw
+     * id), underscores become spaces and the configured case style is applied — e.g.
+     * {@code "no_debuff"} renders as {@code "No Debuff"}. Custom display names are untouched.
+     */
+    public String prettyDisplayName() {
+        if (!displayName.equals(name)) {
+            return displayName;
+        }
+        return com.rumilance.practice.util.KitNames.pretty(name);
+    }
+
     public static Builder builder(String name) {
         return new Builder(name);
     }

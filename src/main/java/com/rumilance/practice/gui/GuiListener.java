@@ -25,10 +25,23 @@ import java.util.Map;
  */
 public final class GuiListener implements Listener {
 
+    /**
+     * GUIs that are children of the Game Menu: pressing Esc or the Close button inside them
+     * returns the player to the Game Menu instead of dropping them back to the hotbar.
+     * The GAME_MENU itself is deliberately absent so Esc can always fully exit.
+     */
+    private static final java.util.Set<GuiType> MENU_RETURN_TYPES = java.util.EnumSet.of(
+            GuiType.RANKED_QUEUE, GuiType.UNRANKED_QUEUE, GuiType.FFA_LIST, GuiType.SETTINGS,
+            GuiType.SPECTATE_LIST, GuiType.TITLE_SELECT, GuiType.KIT_PREVIEW,
+            GuiType.TEAMS_BROWSER, GuiType.TEAM_HUB, GuiType.TEAM_KIT_SELECT,
+            GuiType.STATS_KIT, GuiType.PROFILE);
+
     private final GuiSessionRegistry registry;
     private final PlayerStateManager stateManager;
     private final OriginalKitService originalKitService;
     private final Map<GuiType, AbstractGui> handlers = new EnumMap<>(GuiType.class);
+    /** Opens the Game Menu; wired from bootstrap (null = feature disabled). */
+    private java.util.function.Consumer<Player> menuReturn;
 
     public GuiListener(GuiSessionRegistry registry, PlayerStateManager stateManager,
                        OriginalKitService originalKitService) {
@@ -39,6 +52,26 @@ public final class GuiListener implements Listener {
 
     public void register(AbstractGui gui) {
         handlers.put(gui.type(), gui);
+    }
+
+    public void setMenuReturn(java.util.function.Consumer<Player> menuReturn) {
+        this.menuReturn = menuReturn;
+    }
+
+    /** True when the player may be bounced back to the Game Menu (lobby-ish states only). */
+    private boolean canReturnToMenu(Player player) {
+        PlayerState state = stateManager.getState(player.getUniqueId());
+        return state == PlayerState.LOBBY || state == PlayerState.OPENING_GUI;
+    }
+
+    private void openMenuLater(Player player) {
+        org.bukkit.plugin.Plugin plugin =
+                org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(GuiListener.class);
+        org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+            if (player.isOnline() && menuReturn != null && canReturnToMenu(player)) {
+                menuReturn.accept(player);
+            }
+        });
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -93,6 +126,13 @@ public final class GuiListener implements Listener {
             if (guiAction == null || "decorate".equals(guiAction)) {
                 return;
             }
+            // Central "Close" interception: sub-menus of the Game Menu navigate back to the
+            // menu instead of dumping the player to their hotbar (Esc does the same below).
+            if ("close".equals(guiAction) && menuReturn != null
+                    && MENU_RETURN_TYPES.contains(holder.type()) && canReturnToMenu(player)) {
+                openMenuLater(player);
+                return;
+            }
             handler.handleClick(player, session, top, event.getSlot(), guiAction, event.getClick());
         } else if (handler instanceof BottomInventoryClickHandler bottom) {
             bottom.handleBottomClick(player, session, event);
@@ -119,6 +159,14 @@ public final class GuiListener implements Listener {
                 registry.close(player.getUniqueId());
             }
         });
+        // Esc from a Game Menu sub-menu returns to the Game Menu (reason PLAYER only, so
+        // programmatic OPEN_NEW/PLUGIN closes never loop).
+        if (event.getReason() == InventoryCloseEvent.Reason.PLAYER
+                && menuReturn != null
+                && MENU_RETURN_TYPES.contains(holder.type())
+                && canReturnToMenu(player)) {
+            openMenuLater(player);
+        }
         if ((holder.type() == GuiType.EDIT_KIT || holder.type() == GuiType.EKIT_EDIT)
                 && stateManager.getState(player.getUniqueId()) == PlayerState.EDITING_KIT) {
             stateManager.resetToLobby(player.getUniqueId());

@@ -126,7 +126,7 @@ public final class QueueKitGui extends AbstractGui {
 
         if (!queueOn) {
             return ItemBuilder.of(Material.BARRIER)
-                    .nameMini(kit.displayName())
+                    .nameMini(kit.prettyDisplayName())
                     .lore(
                             UiTheme.divider(),
                             UiTheme.status("DISABLED", UiTheme.DANGER),
@@ -138,7 +138,7 @@ public final class QueueKitGui extends AbstractGui {
 
         Material icon = ItemBuilder.materialOr(kit.icon(), Material.DIAMOND_SWORD);
         ItemBuilder builder = ItemBuilder.of(icon)
-                .nameMini(kit.displayName())
+                .nameMini(kit.prettyDisplayName())
                 .lore(
                         UiTheme.divider(),
                         UiTheme.labelValue("Mode", ranked ? "Ranked" : "Unranked"),
