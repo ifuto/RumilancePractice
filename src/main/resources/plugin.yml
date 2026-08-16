@@ -74,10 +74,10 @@ commands:
     description: Open FFA list GUI or manage FFA arenas.
     usage: /ffa [create|selection|spawn|kit|enable|disable|delete|reset|leave]
     permission: rumilance.user
-  party:
-    description: Manage parties (invite, accept, leave, kick, warp, chat).
-    usage: /party <invite|accept|leave|kick|disband|warp|list|chat>
-    aliases: [p]
+  team:
+    description: Owner-invite style teams with public/private visibility and red-blue team battles.
+    usage: /team <gui|create|invite|join|decline|leave|kick|public|list|info|side|autosplit|clearsides|start|disband>
+    aliases: [party, p]
     permission: rumilance.user
   title:
     description: Open the kill/win title selector.

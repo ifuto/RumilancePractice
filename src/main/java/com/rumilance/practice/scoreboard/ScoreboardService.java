@@ -155,6 +155,7 @@ public final class ScoreboardService {
             case RANKED -> "ランク";
             case UNRANKED -> "アンランク";
             case FFA -> "FFA";
+            case TEAM -> "チーム";
         };
     }
 
@@ -231,27 +232,28 @@ public final class ScoreboardService {
         TeamColor myColor = session.teamColor(me);
         String myCode = myColor == TeamColor.RED ? "§c" : "§9";
         String oppCode = myColor == TeamColor.RED ? "§9" : "§c";
-
-        // --- team banner + elos ---
-        objective.getScore(myCode + "▸ YOU").setScore(line--);
         CachedStats myStats = cachedStats(me);
+
+        if (session.isTeamMatch()) {
+            return renderTeamMatch(player, objective, session, line, me, myColor, myCode, oppCode, myStats);
+        }
+
+        // --- 1v1: own banner (with Elo) + opponent banner (Elo hidden) ---
+        objective.getScore(myCode + "▸ YOU").setScore(line--);
         objective.getScore(myCode + player.getName()
                 + "  §eElo: §a" + myStats.bestElo()).setScore(line--);
         UUID opponent = session.opponentOf(me);
         if (opponent != null) {
             objective.getScore(oppCode + "▸ OPPONENT").setScore(line--);
-            CachedStats oppStats = cachedStats(opponent);
-            objective.getScore(oppCode + StatsService.nameOf(opponent)
-                    + "  §eElo: §a" + oppStats.bestElo()).setScore(line--);
+            // Opponent Elo is intentionally not shown (private by design).
+            objective.getScore(oppCode + StatsService.nameOf(opponent)).setScore(line--);
         }
         objective.getScore("§r").setScore(line--);
 
-        // --- series score (own color left, opponent color right) ---
         int myWins = session.seriesWinsOf(me);
         int oppWins = opponent == null ? 0 : session.seriesWinsOf(opponent);
         objective.getScore("§eScore: " + myCode + myWins + " §7- " + oppCode + oppWins).setScore(line--);
 
-        // --- kit / mode / kills / kd / time ---
         objective.getScore("§fKit: §b" + session.kitName()
                 + "  §fMode: §a" + modeLabel(session.mode())).setScore(line--);
         objective.getScore("§6Kills: §f" + session.killsOf(me)
@@ -261,5 +263,44 @@ public final class ScoreboardService {
             objective.getScore("§7Time: §f" + fmtTime(secs)).setScore(line--);
         }
         return line;
+    }
+
+    private int renderTeamMatch(Player player, Objective objective, MatchSession session, int line,
+                                UUID me, TeamColor myColor, String myCode, String oppCode,
+                                CachedStats myStats) {
+        // Team battles can hold up to 15v15 players, far beyond the sidebar's ~15 line budget,
+        // so show alive/total counts per side instead of a member list. Elo stays private:
+        // no other player's Elo is ever rendered.
+        TeamColor enemy = myColor.opposite();
+        List<UUID> mySide = session.team(myColor);
+        List<UUID> enemySide = session.team(enemy);
+
+        objective.getScore(myCode + "▸ YOUR TEAM  §f" + countAlive(mySide) + "§7/" + mySide.size())
+                .setScore(line--);
+        objective.getScore("§7▶ " + myCode + player.getName()).setScore(line--);
+        objective.getScore(oppCode + "▸ ENEMY TEAM  §f" + countAlive(enemySide) + "§7/" + enemySide.size())
+                .setScore(line--);
+        objective.getScore("§r").setScore(line--);
+
+        objective.getScore("§fKit: §b" + session.kitName()
+                + "  §fMode: §a" + modeLabel(session.mode())).setScore(line--);
+        objective.getScore("§6Kills: §f" + session.killsOf(me)).setScore(line--);
+        if (session.startedAt() != null) {
+            long secs = Instant.now().getEpochSecond() - session.startedAt().getEpochSecond();
+            objective.getScore("§7Time: §f" + fmtTime(secs)).setScore(line--);
+        }
+        return line;
+    }
+
+    /** @return how many of the given players are online and not spectating (i.e. still fighting). */
+    private static int countAlive(List<UUID> members) {
+        int alive = 0;
+        for (UUID member : members) {
+            Player p = org.bukkit.Bukkit.getPlayer(member);
+            if (p != null && p.getGameMode() != org.bukkit.GameMode.SPECTATOR) {
+                alive++;
+            }
+        }
+        return alive;
     }
 }

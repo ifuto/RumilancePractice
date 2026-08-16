@@ -85,26 +85,28 @@ public final class ProfileGui extends AbstractGui {
                 : String.format("%.1f%%", 100.0 * wins / Math.max(1, matches));
         String kd = String.format("%.2f", (double) wins / Math.max(1, losses));
 
+        // Elo is private: only the player viewing their own profile sees Elo numbers.
+        boolean self = target.equals(player.getUniqueId());
+
         MenuScaffold.chrome(inventory);
 
         // Header: player head on the accent bar, with ping/online status.
         Player online = Bukkit.getPlayer(target);
-        inventory.setItem(GuiSlots.slot(0, 4),
-                ItemBuilder.of(Material.PLAYER_HEAD)
-                        .name(Component.text(StatsService.nameOf(target), UiTheme.VALUE))
-                        .skullOwner(online != null ? online : Bukkit.getOfflinePlayer(target))
-                        .lore(
-                                UiTheme.status(online != null ? "ONLINE" : "OFFLINE",
-                                        online != null ? UiTheme.SUCCESS : UiTheme.MUTED),
-                                online != null
-                                        ? UiTheme.labelValue("Ping", online.getPing() + "ms")
-                                        : UiTheme.line("Last seen: earlier")
-                        )
-                        .glint(online != null)
-                        .action("decorate")
-                        .build());
+        var head = ItemBuilder.of(Material.PLAYER_HEAD)
+                .name(Component.text(StatsService.nameOf(target), UiTheme.VALUE))
+                .skullOwner(online != null ? online : Bukkit.getOfflinePlayer(target))
+                .lore(
+                        UiTheme.status(online != null ? "ONLINE" : "OFFLINE",
+                                online != null ? UiTheme.SUCCESS : UiTheme.MUTED),
+                        online != null
+                                ? UiTheme.labelValue("Ping", online.getPing() + "ms")
+                                : UiTheme.line("Last seen: earlier")
+                )
+                .glint(online != null)
+                .action("decorate");
+        inventory.setItem(GuiSlots.slot(0, 4), head.build());
 
-        // Summary tiles (rows 1-2).
+        // Summary tiles (rows 1-2). Elo is only shown on the owner's own profile.
         inventory.setItem(GuiSlots.slot(1, 1), summary(Material.BOOK, "総試合数", String.valueOf(matches)));
         inventory.setItem(GuiSlots.slot(1, 3), summary(Material.DIAMOND_SWORD, "勝利", String.valueOf(wins)));
         inventory.setItem(GuiSlots.slot(1, 5), summary(Material.SHIELD, "敗北", String.valueOf(losses)));
@@ -112,7 +114,11 @@ public final class ProfileGui extends AbstractGui {
         inventory.setItem(GuiSlots.slot(2, 1), summary(Material.NETHERITE_SWORD, "K/D", kd));
         inventory.setItem(GuiSlots.slot(2, 3), summary(Material.EMERALD, "最高連勝", String.valueOf(bestStreak)));
         inventory.setItem(GuiSlots.slot(2, 5), summary(Material.NETHER_STAR, "得意キット", bestKit));
-        inventory.setItem(GuiSlots.slot(2, 7), summary(Material.DIAMOND, "Best Elo", String.valueOf(bestElo)));
+        if (self) {
+            inventory.setItem(GuiSlots.slot(2, 7), summary(Material.DIAMOND, "Best Elo", String.valueOf(bestElo)));
+        } else {
+            inventory.setItem(GuiSlots.slot(2, 7), summary(Material.DIAMOND, "Best Elo", "非公開"));
+        }
 
         // Per-kit breakdown (rows 3-4 = 14 slots).
         int index = 0;
@@ -120,7 +126,7 @@ public final class ProfileGui extends AbstractGui {
             if (index >= 14) {
                 break;
             }
-            inventory.setItem(GuiSlots.slot(3 + index / 7, 1 + index % 7), kitIcon(kit, target, kits));
+            inventory.setItem(GuiSlots.slot(3 + index / 7, 1 + index % 7), kitIcon(kit, target, kits, self));
             index++;
         }
 
@@ -139,7 +145,7 @@ public final class ProfileGui extends AbstractGui {
                 .build();
     }
 
-    private ItemStack kitIcon(KitDefinition kit, UUID target, List<RankedKitStats> kits) {
+    private ItemStack kitIcon(KitDefinition kit, UUID target, List<RankedKitStats> kits, boolean self) {
         Material material = ItemBuilder.materialOr(kit.icon(), Material.DIAMOND_SWORD);
         RankedKitStats stats = kits.stream()
                 .filter(s -> s.kit().equalsIgnoreCase(kit.name()))
@@ -148,17 +154,24 @@ public final class ProfileGui extends AbstractGui {
         String winRate = stats.gamesPlayed() < 21
                 ? "計測中 " + stats.gamesPlayed() + "/21"
                 : String.format("%.1f%%", stats.winRate() * 100);
-        return ItemBuilder.of(material)
+        var builder = ItemBuilder.of(material)
                 .nameMini(kit.displayName())
                 .lore(
                         UiTheme.divider(),
-                        UiTheme.labelValue("Elo", String.valueOf(stats.elo())),
                         UiTheme.labelValue("W/L", stats.wins() + "/" + stats.losses()),
                         UiTheme.labelValue("勝率", winRate),
                         UiTheme.labelValue("K/D", String.format("%.2f", statsService.kd(stats))),
-                        UiTheme.labelValue("連勝", String.valueOf(stats.winStreak())),
-                        UiTheme.labelValue("Best", String.valueOf(stats.bestElo()))
-                )
+                        UiTheme.labelValue("連勝", String.valueOf(stats.winStreak()))
+                );
+        if (self) {
+            builder.lore(
+                    UiTheme.labelValue("Elo", String.valueOf(stats.elo())),
+                    UiTheme.labelValue("Best", String.valueOf(stats.bestElo()))
+            );
+        } else {
+            builder.lore(UiTheme.line("Elo: 非公開"));
+        }
+        return builder
                 .glint(stats.gamesPlayed() > 0)
                 .action("decorate")
                 .build();

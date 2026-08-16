@@ -30,6 +30,8 @@ public final class GameMenuGui extends AbstractGui {
     private final SpectateListGui spectateListGui;
     private final SettingsGui settingsGui;
     private final TitleGui titleGui;
+    /** Opens the team hub/browser — wired via setter because the team GUIs are built later. */
+    private java.util.function.Consumer<Player> openTeams = p -> { };
 
     public GameMenuGui(
             GuiSessionRegistry registry,
@@ -50,6 +52,10 @@ public final class GameMenuGui extends AbstractGui {
         this.spectateListGui = spectateListGui;
         this.settingsGui = settingsGui;
         this.titleGui = titleGui;
+    }
+
+    public void setOpenTeams(java.util.function.Consumer<Player> openTeams) {
+        this.openTeams = openTeams == null ? p -> { } : openTeams;
     }
 
     @Override
@@ -99,12 +105,19 @@ public final class GameMenuGui extends AbstractGui {
                         UiTheme.blank(), UiTheme.hint("Click to configure"))
                 .action("settings").build());
 
-        // Bottom cluster: titles and close on the accent bar.
+        // Bottom cluster: teams + titles on row 4.
         inventory.setItem(GuiSlots.slot(4, 3), ItemBuilder.of(Material.NAME_TAG)
                 .name(Component.text("Kill Titles", UiTheme.SECONDARY))
                 .lore(UiTheme.divider(), UiTheme.line("Equip kill/win title effects."),
                         UiTheme.blank(), UiTheme.hint("Click to browse"))
                 .action("titles").build());
+
+        inventory.setItem(GuiSlots.slot(4, 5), ItemBuilder.of(Material.WHITE_BANNER)
+                .name(Component.text("Team Battles", UiTheme.PRIMARY))
+                .lore(UiTheme.divider(), UiTheme.line("Create or join a team and fight"),
+                        UiTheme.line("RED vs BLUE — up to 15 per side."),
+                        UiTheme.blank(), UiTheme.hint("Click to open teams"))
+                .action("teams").build());
 
         MenuScaffold.closeButton(inventory);
     }
@@ -150,6 +163,11 @@ public final class GameMenuGui extends AbstractGui {
                 sounds.play(player, "gui-click");
                 player.closeInventory();
                 titleGui.open(player);
+            }
+            case "teams" -> {
+                sounds.play(player, "gui-click");
+                player.closeInventory();
+                openTeams.accept(player);
             }
             default -> {
             }

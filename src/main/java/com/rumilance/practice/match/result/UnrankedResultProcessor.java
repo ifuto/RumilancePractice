@@ -8,7 +8,8 @@ import com.rumilance.practice.state.MatchMode;
 import java.util.UUID;
 
 /**
- * Unranked results must never touch Elo or public ranked statistics.
+ * Unranked (and team-battle) results must never touch Elo or public ranked statistics.
+ * Team battles are audit-logged the same way — they are casual by design.
  */
 public final class UnrankedResultProcessor implements MatchResultProcessor {
 
@@ -20,8 +21,9 @@ public final class UnrankedResultProcessor implements MatchResultProcessor {
 
     @Override
     public void process(MatchSession session, UUID winnerId, boolean draw) throws Exception {
-        if (session.mode() != MatchMode.UNRANKED) {
-            throw new IllegalArgumentException("UnrankedResultProcessor only accepts UNRANKED matches");
+        if (session.mode() != MatchMode.UNRANKED && session.mode() != MatchMode.TEAM) {
+            throw new IllegalArgumentException(
+                    "UnrankedResultProcessor only accepts UNRANKED or TEAM matches");
         }
         if (!session.tryMarkResultApplied()) {
             return;
@@ -29,7 +31,7 @@ public final class UnrankedResultProcessor implements MatchResultProcessor {
         auditLogRepository.insert(new AuditLogEntry(
                 UUID.randomUUID(),
                 null,
-                "UNRANKED_MATCH_END",
+                session.mode() == MatchMode.TEAM ? "TEAM_MATCH_END" : "UNRANKED_MATCH_END",
                 "match=" + session.id() + ", kit=" + session.kitName()
                         + ", winner=" + winnerId + ", draw=" + draw,
                 java.time.Instant.now()

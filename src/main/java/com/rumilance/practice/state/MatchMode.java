@@ -6,7 +6,9 @@ package com.rumilance.practice.state;
 public enum MatchMode {
     RANKED,
     UNRANKED,
-    FFA;
+    FFA,
+    /** RED-vs-BLUE team battle (up to 15 per side, uneven ratios allowed). No Elo changes. */
+    TEAM;
 
     public boolean isRanked() {
         return this == RANKED;
@@ -14,5 +16,9 @@ public enum MatchMode {
 
     public boolean isDuel() {
         return this == RANKED || this == UNRANKED;
+    }
+
+    public boolean isTeam() {
+        return this == TEAM;
     }
 }

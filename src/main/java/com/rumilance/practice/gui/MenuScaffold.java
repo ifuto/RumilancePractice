@@ -6,6 +6,8 @@ import org.bukkit.Material;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
+import java.util.List;
+
 /**
  * Layout helpers that draw the standard RumilancePractice menu chrome (background fill,
  * top/bottom bars, framed content panels, and standard navigation buttons) into an

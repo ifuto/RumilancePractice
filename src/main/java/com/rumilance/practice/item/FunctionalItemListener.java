@@ -126,7 +126,13 @@ public final class FunctionalItemListener implements Listener {
             case "ekit" -> openEkit.accept(player);
             case "settings" -> openSettings.accept(player);
             case "spectate" -> openSpectate.accept(player);
-            case "menu" -> openMenu == null ? soundService.play(player, "error") : openMenu.accept(player);
+            case "menu" -> {
+                if (openMenu == null) {
+                    soundService.play(player, "error");
+                } else {
+                    openMenu.accept(player);
+                }
+            }
             case "titles" -> openTitles.accept(player);
             case "party" -> openParty.accept(player);
             case "leavequeue" -> queueCoordinator.leave(player);

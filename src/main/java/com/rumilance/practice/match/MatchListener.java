@@ -67,6 +67,13 @@ public final class MatchListener implements Listener {
             event.setCancelled(true);
             return;
         }
+        // Friendly fire is always off in team matches so teammates can't grief each other.
+        if (attacker != null && attacker.playerId() != null
+                && session.isTeamMatch()
+                && session.areTeammates(attacker.playerId(), victim.getUniqueId())) {
+            event.setCancelled(true);
+            return;
+        }
 
         KitDefinition kit = kitService.get(session.kitName()).orElse(null);
         if (kit != null && event instanceof EntityDamageByEntityEvent byEntity) {

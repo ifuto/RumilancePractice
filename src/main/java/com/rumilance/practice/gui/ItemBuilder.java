@@ -13,7 +13,6 @@ import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.persistence.PersistentDataType;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -25,7 +24,7 @@ import java.util.List;
 public final class ItemBuilder {
 
     private final ItemStack stack;
-    private final ItemMeta meta;
+    private ItemMeta meta;
     private final List<Component> lore = new ArrayList<>();
     private boolean hideAttributes = true;
 
@@ -157,6 +156,21 @@ public final class ItemBuilder {
         return this;
     }
 
+    /** Allows setting pre-built meta (e.g. a skull with owning player) directly. */
+    public ItemBuilder applyMeta(org.bukkit.inventory.meta.ItemMeta prebuilt) {
+        if (prebuilt != null) {
+            stack.setItemMeta(prebuilt);
+            this.meta = prebuilt;
+        }
+        return this;
+    }
+
+    /** Builds the item meta without creating the final stack, useful for skull editing. */
+    public org.bukkit.inventory.meta.ItemMeta buildMeta() {
+        stack.setItemMeta(meta);
+        return meta;
+    }
+
     /** Convenience: adds the glint shimmer when {@code active} is true. */
     public ItemBuilder glintIf(boolean active) {
         return glint(active);
@@ -200,7 +214,7 @@ public final class ItemBuilder {
                 .name(name)
                 .skullOwner(owner);
         if (extraLore != null) {
-            builder.lore(Arrays.asList(extraLore));
+            builder.lore(extraLore);
         }
         return builder.build();
     }

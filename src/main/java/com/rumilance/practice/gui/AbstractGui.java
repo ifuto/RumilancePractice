@@ -59,7 +59,14 @@ public abstract class AbstractGui {
         render(player, session, inventory);
     }
 
-    public abstract void handleClick(Player player, GuiSession session, Inventory inventory, int slot, String action);
+    /**
+     * Simple click handler (no {@link org.bukkit.event.inventory.ClickType}). Menus can override
+     * either this or the extended overload below; the default is a no-op so a menu that only
+     * cares about click types doesn't have to implement both.
+     */
+    public void handleClick(Player player, GuiSession session, Inventory inventory, int slot, String action) {
+        // default: no-op — most menus override this, ClickType-aware menus override the overload.
+    }
 
     /**
      * Extended click handler that also receives the Bukkit {@link org.bukkit.event.inventory.ClickType}.

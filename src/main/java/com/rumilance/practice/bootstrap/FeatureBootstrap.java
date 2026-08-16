@@ -44,9 +44,9 @@ import com.rumilance.practice.gui.menus.SpectateListGui;
 import com.rumilance.practice.gui.menus.TitleGui;
 import com.rumilance.practice.lobby.LobbyCompassListener;
 import com.rumilance.practice.match.GoldenHeadListener;
-import com.rumilance.practice.party.PartyCommand;
-import com.rumilance.practice.party.PartyListener;
-import com.rumilance.practice.party.PartyService;
+import com.rumilance.practice.team.TeamCommand;
+import com.rumilance.practice.team.TeamListener;
+import com.rumilance.practice.team.TeamService;
 import com.rumilance.practice.ffa.FfaListener;
 import com.rumilance.practice.ffa.FfaService;
 import com.rumilance.practice.gui.GuiListener;
@@ -253,8 +253,15 @@ public final class FeatureBootstrap {
         com.rumilance.practice.gui.menus.MatchReportGui matchReportGui =
                 new com.rumilance.practice.gui.menus.MatchReportGui(guiSessions, soundService, matchService);
         matchService.setMatchReportOpener(matchReportGui::openLastReport);
-        PartyService partyService = new PartyService();
-        services.register(PartyService.class, partyService);
+        TeamService teamService = new TeamService(plugin, matchService);
+        services.register(TeamService.class, teamService);
+        com.rumilance.practice.gui.menus.TeamsBrowserGui teamsBrowserGui =
+                new com.rumilance.practice.gui.menus.TeamsBrowserGui(guiSessions, soundService, teamService, null);
+        com.rumilance.practice.gui.menus.TeamKitSelectGui teamKitSelectGui =
+                new com.rumilance.practice.gui.menus.TeamKitSelectGui(guiSessions, soundService, teamService, kitService);
+        com.rumilance.practice.gui.menus.TeamHubGui teamHubGui =
+                new com.rumilance.practice.gui.menus.TeamHubGui(guiSessions, soundService, teamService, teamsBrowserGui, teamKitSelectGui);
+        teamsBrowserGui.setHub(teamHubGui);
         EditKitGui editKitGui = new EditKitGui(guiSessions, soundService, kitService, kitLayoutRepository,
                 layoutCache, asyncExecutor, stateManager);
         ArrowEffectGui arrowEffectGui = new ArrowEffectGui(guiSessions, soundService, arrowEffectService, settingsService);
@@ -320,6 +327,9 @@ public final class FeatureBootstrap {
         guiListener.register(kitPreviewGui);
         guiListener.register(titleGui);
         guiListener.register(matchReportGui);
+        guiListener.register(teamsBrowserGui);
+        guiListener.register(teamHubGui);
+        guiListener.register(teamKitSelectGui);
         guiListener.register(gameMenuGui);
 
         FunctionalItemListener functionalItemListener = new FunctionalItemListener(
@@ -330,7 +340,20 @@ public final class FeatureBootstrap {
         functionalItemListener.setOpenSpectate(spectateListGui::open);
         functionalItemListener.setOpenMenu(gameMenuGui::open);
         functionalItemListener.setOpenTitles(titleGui::open);
-        functionalItemListener.setOpenParty(partyService::create);
+        functionalItemListener.setOpenParty(player -> {
+            if (teamService.teamOf(player.getUniqueId()).isPresent()) {
+                teamHubGui.open(player);
+            } else {
+                teamsBrowserGui.open(player);
+            }
+        });
+        gameMenuGui.setOpenTeams(player -> {
+            if (teamService.teamOf(player.getUniqueId()).isPresent()) {
+                teamHubGui.open(player);
+            } else {
+                teamsBrowserGui.open(player);
+            }
+        });
 
         scoreboardService = new ScoreboardService(plugin, settings, stateManager,
                 queueService, matchRegistry, rankedStatsRepository, settingsService);
@@ -351,7 +374,8 @@ public final class FeatureBootstrap {
         pm.registerEvents(functionalItemListener, plugin);
         pm.registerEvents(new LobbyCompassListener(stateManager, soundService, gameMenuGui::open), plugin);
         pm.registerEvents(new AdminToolListener(lobbyService, soundService), plugin);
-        pm.registerEvents(new PartyListener(partyService), plugin);
+        pm.registerEvents(new com.rumilance.practice.team.TeamListener(teamService), plugin);
+        com.rumilance.practice.chat.PendingInput.init(plugin);
         pm.registerEvents(new PracticeSideListener(chatBanService, settingsService, guiSessions,
                 arrowEffectService, spectatorService, ffaService, originalKitService), plugin);
 
@@ -389,7 +413,8 @@ public final class FeatureBootstrap {
         bind("matchreport", new com.rumilance.practice.command.MatchReportCommand(matchService, settingsService));
         bind("ffa", ffaCommand);
         bind("leave", new LeaveCommand(matchService, messageService));
-        bind("party", new PartyCommand(partyService));
+        // "/party" and "/p" are plugin.yml aliases of "/team" — only bind the real command.
+        bind("team", new TeamCommand(teamService, kitService, teamHubGui, teamsBrowserGui));
         bind("title", (org.bukkit.command.CommandExecutor) (sender, command, label, args) -> {
             if (sender instanceof org.bukkit.entity.Player player) {
                 titleGui.open(player);
