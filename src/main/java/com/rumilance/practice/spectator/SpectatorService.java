@@ -35,6 +35,17 @@ public final class SpectatorService {
     private final PluginSettings settings;
     private final Map<UUID, UUID> spectatorToMatch = new ConcurrentHashMap<>();
     private final Map<UUID, Set<UUID>> matchSpectators = new ConcurrentHashMap<>();
+    /** Optional per-player border/view-distance control (null = feature off). */
+    private volatile com.rumilance.practice.sight.ViewControlService viewControl;
+
+    public void setViewControl(com.rumilance.practice.sight.ViewControlService viewControl) {
+        this.viewControl = viewControl;
+    }
+
+    /** @return the match this player is currently spectating, if any. */
+    public java.util.Optional<UUID> spectatedMatch(UUID spectator) {
+        return java.util.Optional.ofNullable(spectatorToMatch.get(spectator));
+    }
 
     public SpectatorService(
             Plugin plugin,
@@ -81,6 +92,11 @@ public final class SpectatorService {
         spectator.setGameMode(GameMode.SPECTATOR);
         spectator.setAllowFlight(settings.spectatorAllowFlight());
         spectator.teleport(LocationUtil.safeTeleportLocation(target.getLocation(), spectator));
+        // Confine the spectator's view to this arena (per-player border + view distance);
+        // SpectatorBoundsListener is the hard server-side backstop against flying out.
+        if (viewControl != null) {
+            viewControl.applyForMatch(spectator, match);
+        }
         if (settings.spectatorHideFromPlayers()) {
             for (Player online : Bukkit.getOnlinePlayers()) {
                 if (!online.equals(spectator)) {

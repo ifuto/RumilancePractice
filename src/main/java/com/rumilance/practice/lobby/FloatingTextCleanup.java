@@ -23,10 +23,12 @@ public final class FloatingTextCleanup {
     /** Schedules the sweep for one tick after enable; logs how many entities were removed. */
     public static void scheduleSweep(Plugin plugin) {
         Bukkit.getScheduler().runTask(plugin, () -> {
+            org.bukkit.NamespacedKey wallTextKey = new org.bukkit.NamespacedKey(
+                    plugin, com.rumilance.practice.decor.WallTextService.MARKER);
             int removed = 0;
             for (World world : Bukkit.getWorlds()) {
                 for (Entity entity : world.getEntities()) {
-                    if (isFloatingText(entity)) {
+                    if (isFloatingText(entity, wallTextKey)) {
                         entity.remove();
                         removed++;
                     }
@@ -38,9 +40,11 @@ public final class FloatingTextCleanup {
         });
     }
 
-    private static boolean isFloatingText(Entity entity) {
-        if (entity instanceof TextDisplay) {
-            return true;
+    private static boolean isFloatingText(Entity entity, org.bukkit.NamespacedKey wallTextKey) {
+        if (entity instanceof TextDisplay display) {
+            // Plugin-managed wall texts are respawned intentionally — never sweep them.
+            return !display.getPersistentDataContainer()
+                    .has(wallTextKey, org.bukkit.persistence.PersistentDataType.STRING);
         }
         if (entity instanceof ArmorStand stand) {
             // Hologram signature: invisible + a custom name shown + no gravity. Anything with

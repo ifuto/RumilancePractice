@@ -65,6 +65,15 @@ lobby:
   world: world
   return-to-lobby-on-death: false
 
+# Per-player sight control: real vanilla-style world borders fitted to the current play area
+# (arena in matches/FFA), plus a per-player send-view-distance cap so non-admin players never
+# receive chunks beyond their area (lobby included). Admins (rumilance.admin) are exempt from
+# the view-distance cap; borders apply to everyone because they are gameplay.
+sight:
+  enabled: true
+  # View distance (chunks) for non-admin players while in the lobby.
+  lobby-view-chunks: 6
+
 fawe:
   # Whether to attempt to use FastAsyncWorldEdit/WorldEdit for arena snapshot/restore.
   enabled: true
@@ -91,7 +100,7 @@ scoreboard:
   update-interval-ticks: 20
   tab-header-footer: true
   # Server branding shown at the top of the sidebar and in the TAB header/footer.
-  server-name: "Rumilance"
+  server-name: "N."
   server-ip: "play.example.com"
 
 performance:

@@ -170,6 +170,10 @@ commands:
     description: View the combat report card for your most recent match.
     usage: /matchreport [toggle]
     permission: rumilance.user
+  walltext:
+    description: Place wall-mounted text labels (TextDisplay) on the block face in sight.
+    usage: /walltext <set|scale|remove|list|reload> ...
+    permission: rumilance.admin
 
 permissions:
   rumilance.user:

@@ -105,8 +105,8 @@ public final class ScoreboardService {
             update(player);
             if (settings.tabHeaderFooterEnabled()) {
                 player.sendPlayerListHeaderAndFooter(
-                        Component.text("§6✦ §f" + settings.scoreboardServerName() + " §6✦"),
-                        Component.text("§b" + settings.scoreboardServerIp() + "§f  |  §eOnline: §a"
+                        Component.text("§b✦ §f" + settings.scoreboardServerName() + " §b✦"),
+                        Component.text("§b" + settings.scoreboardServerIp() + "§f  |  §7Online: §f"
                                 + Bukkit.getOnlinePlayers().size())
                 );
             }
@@ -177,11 +177,9 @@ public final class ScoreboardService {
         PlayerState state = stateManager.getState(player.getUniqueId());
         int line = 15;
 
-        // --- header (always) ---
-        objective.getScore("§6✦ §f" + settings.scoreboardServerName() + " §6✦").setScore(line--);
-        objective.getScore("§eOnline: §a" + Bukkit.getOnlinePlayers().size()
-                + "  §eQueue: §b" + queueService.totalWaiting()
-                + "  §eMatch: §d" + matchRegistry.activeCount()).setScore(line--);
+        // --- header (always; one piece of information per line) ---
+        objective.getScore("§b✦ §f" + settings.scoreboardServerName() + " §b✦").setScore(line--);
+        objective.getScore("§7Online: §f" + Bukkit.getOnlinePlayers().size()).setScore(line--);
         objective.getScore("§r").setScore(line--);
 
         Optional<MatchSession> match = matchRegistry.byPlayer(player.getUniqueId());
@@ -201,14 +199,14 @@ public final class ScoreboardService {
 
     private int renderStats(Player player, Objective objective, int line) {
         CachedStats stats = cachedStats(player.getUniqueId());
-        objective.getScore("§6┃ §fあなたの統計 §6┃").setScore(line--);
-        objective.getScore("§bElo: §f" + stats.bestElo()
-                + "  §7Kits: §e" + stats.kits()).setScore(line--);
-        objective.getScore("§aWins: §f" + stats.wins()
-                + "  §cLosses: §f" + stats.losses()).setScore(line--);
-        objective.getScore("§eK/D: §f" + String.format("%.2f", stats.kd())
-                + "  §dStreak: §f" + stats.bestStreak()).setScore(line--);
-        objective.getScore("§bMatches: §f" + stats.matches()).setScore(line--);
+        // One piece of information per line for readability.
+        objective.getScore("§b┃ §fあなたの統計 §b┃").setScore(line--);
+        objective.getScore("§bElo: §f" + stats.bestElo()).setScore(line--);
+        objective.getScore("§aWins: §f" + stats.wins()).setScore(line--);
+        objective.getScore("§cLosses: §f" + stats.losses()).setScore(line--);
+        objective.getScore("§eK/D: §f" + String.format("%.2f", stats.kd())).setScore(line--);
+        objective.getScore("§dStreak: §f" + stats.bestStreak()).setScore(line--);
+        objective.getScore("§7Matches: §f" + stats.matches()).setScore(line--);
         return line;
     }
 
@@ -218,10 +216,12 @@ public final class ScoreboardService {
             long waited = Math.max(0, Instant.now().getEpochSecond()
                     - entry.get().joinedAt().getEpochSecond());
             int waiting = queueService.waitingCount(entry.get().mode(), entry.get().kitId());
-            objective.getScore("§eQueued: §b" + entry.get().kitId()
-                    + " §7(§a" + modeLabel(entry.get().mode()) + "§7)").setScore(line--);
-            objective.getScore("§fWait: §e" + fmtTime(waited)
-                    + "  §7Queue: §a" + waiting).setScore(line--);
+            // One piece of information per line.
+            objective.getScore("§b┃ §fキュー中 §b┃").setScore(line--);
+            objective.getScore("§7Kit: §b" + entry.get().kitId()).setScore(line--);
+            objective.getScore("§7Mode: §a" + modeLabel(entry.get().mode())).setScore(line--);
+            objective.getScore("§7Wait: §e" + fmtTime(waited)).setScore(line--);
+            objective.getScore("§7Queue: §f" + waiting).setScore(line--);
         }
         objective.getScore("§r").setScore(line--);
         return renderStats(player, objective, line);
@@ -238,26 +238,21 @@ public final class ScoreboardService {
             return renderTeamMatch(player, objective, session, line, me, myColor, myCode, oppCode, myStats);
         }
 
-        // --- 1v1: own banner (with Elo) + opponent banner (Elo hidden) ---
-        objective.getScore(myCode + "▸ YOU").setScore(line--);
-        objective.getScore(myCode + player.getName()
-                + "  §eElo: §a" + myStats.bestElo()).setScore(line--);
+        // --- 1v1 (one piece of information per line; opponent Elo stays private) ---
         UUID opponent = session.opponentOf(me);
+        objective.getScore(myCode + "You: §f" + player.getName()).setScore(line--);
+        objective.getScore("§7Elo: §f" + myStats.bestElo()).setScore(line--);
         if (opponent != null) {
-            objective.getScore(oppCode + "▸ OPPONENT").setScore(line--);
-            // Opponent Elo is intentionally not shown (private by design).
-            objective.getScore(oppCode + StatsService.nameOf(opponent)).setScore(line--);
+            objective.getScore(oppCode + "Foe: §f" + StatsService.nameOf(opponent)).setScore(line--);
         }
         objective.getScore("§r").setScore(line--);
 
         int myWins = session.seriesWinsOf(me);
         int oppWins = opponent == null ? 0 : session.seriesWinsOf(opponent);
-        objective.getScore("§eScore: " + myCode + myWins + " §7- " + oppCode + oppWins).setScore(line--);
-
-        objective.getScore("§fKit: §b" + session.kitName()
-                + "  §fMode: §a" + modeLabel(session.mode())).setScore(line--);
-        objective.getScore("§6Kills: §f" + session.killsOf(me)
-                + "  §eK/D: §f" + String.format("%.2f", myStats.kd())).setScore(line--);
+        objective.getScore("§7Score: " + myCode + myWins + " §7- " + oppCode + oppWins).setScore(line--);
+        objective.getScore("§7Kit: §b" + com.rumilance.practice.util.KitNames.pretty(session.kitName())).setScore(line--);
+        objective.getScore("§7Mode: §a" + modeLabel(session.mode())).setScore(line--);
+        objective.getScore("§7Kills: §f" + session.killsOf(me)).setScore(line--);
         if (session.startedAt() != null) {
             long secs = Instant.now().getEpochSecond() - session.startedAt().getEpochSecond();
             objective.getScore("§7Time: §f" + fmtTime(secs)).setScore(line--);
@@ -275,16 +270,16 @@ public final class ScoreboardService {
         List<UUID> mySide = session.team(myColor);
         List<UUID> enemySide = session.team(enemy);
 
-        objective.getScore(myCode + "▸ YOUR TEAM  §f" + countAlive(mySide) + "§7/" + mySide.size())
+        // One piece of information per line.
+        objective.getScore(myCode + "Your Team: §f" + countAlive(mySide) + "§7/" + mySide.size())
                 .setScore(line--);
-        objective.getScore("§7▶ " + myCode + player.getName()).setScore(line--);
-        objective.getScore(oppCode + "▸ ENEMY TEAM  §f" + countAlive(enemySide) + "§7/" + enemySide.size())
+        objective.getScore(oppCode + "Enemy Team: §f" + countAlive(enemySide) + "§7/" + enemySide.size())
                 .setScore(line--);
         objective.getScore("§r").setScore(line--);
 
-        objective.getScore("§fKit: §b" + session.kitName()
-                + "  §fMode: §a" + modeLabel(session.mode())).setScore(line--);
-        objective.getScore("§6Kills: §f" + session.killsOf(me)).setScore(line--);
+        objective.getScore("§7Kit: §b" + com.rumilance.practice.util.KitNames.pretty(session.kitName())).setScore(line--);
+        objective.getScore("§7Mode: §a" + modeLabel(session.mode())).setScore(line--);
+        objective.getScore("§7Kills: §f" + session.killsOf(me)).setScore(line--);
         if (session.startedAt() != null) {
             long secs = Instant.now().getEpochSecond() - session.startedAt().getEpochSecond();
             objective.getScore("§7Time: §f" + fmtTime(secs)).setScore(line--);

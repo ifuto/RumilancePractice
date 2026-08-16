@@ -153,6 +153,20 @@ public final class MatchService {
         this.titleService = titleService;
     }
 
+    /** Per-player border/view-distance control; optional (null = feature off). */
+    private com.rumilance.practice.sight.ViewControlService viewControl;
+
+    public void setViewControl(com.rumilance.practice.sight.ViewControlService viewControl) {
+        this.viewControl = viewControl;
+    }
+
+    /** Applies the arena border + view cap to one player of {@code session} (safe if off). */
+    private void applySight(Player player, MatchSession session) {
+        if (viewControl != null && player != null) {
+            viewControl.applyForMatch(player, session);
+        }
+    }
+
     public void setMatchReportOpener(java.util.function.Consumer<Player> matchReportOpener) {
         this.matchReportOpener = matchReportOpener;
     }
@@ -323,6 +337,7 @@ public final class MatchService {
                 Player player = Bukkit.getPlayer(id);
                 if (player != null) {
                     applyKit(player, kit);
+                    applySight(player, session);
                 }
             }
             startCountdown(session);
@@ -360,6 +375,8 @@ public final class MatchService {
                         }
                         applyKit(p1, kit);
                         applyKit(p2, kit);
+                        applySight(p1, session);
+                        applySight(p2, session);
                         startCountdown(session);
                     }));
         }, 10L);

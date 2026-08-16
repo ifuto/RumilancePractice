@@ -68,6 +68,12 @@ public final class FfaService {
     private final RuntimeFlags runtimeFlags;
     private final MessageService messageService;
     private final SoundService soundService;
+    /** Optional per-player border/view-distance control (null = feature off). */
+    private volatile com.rumilance.practice.sight.ViewControlService viewControl;
+
+    public void setViewControl(com.rumilance.practice.sight.ViewControlService viewControl) {
+        this.viewControl = viewControl;
+    }
     private final Map<String, FfaArena> arenas = new ConcurrentHashMap<>();
     private final Map<UUID, String> playerArena = new ConcurrentHashMap<>();
     private final Map<UUID, FfaStats> sessionStats = new ConcurrentHashMap<>();
@@ -173,6 +179,10 @@ public final class FfaService {
             player.teleport(LocationUtil.safeTeleportLocation(arena.spawn(), player));
         }
         applyKit(player, kit);
+        // Fit the per-player border + view distance to this FFA arena.
+        if (viewControl != null) {
+            viewControl.applyRegion(player, arena.region());
+        }
         messageService.send(player, "ffa.joined", MessageService.tags("arena", arena.id()));
         return true;
     }

@@ -215,6 +215,24 @@ public final class FeatureBootstrap {
                 stateManager, ffaStatsRepository, asyncExecutor, runtimeFlags, messageService, soundService);
         services.register(FfaService.class, ffaService);
 
+        // Per-player borders + view-distance caps fitted to the current play area.
+        com.rumilance.practice.sight.ViewControlService viewControl =
+                new com.rumilance.practice.sight.ViewControlService(
+                        arenaService,
+                        configService.config().getBoolean("sight.enabled", true),
+                        configService.config().getInt("sight.lobby-view-chunks", 6));
+        services.register(com.rumilance.practice.sight.ViewControlService.class, viewControl);
+        matchService.setViewControl(viewControl);
+        spectatorService.setViewControl(viewControl);
+        ffaService.setViewControl(viewControl);
+        lobbyService.setSightHook(viewControl::applyLobby);
+
+        // Wall-mounted text labels (e.g. aqua "N Arena" on an arena border wall).
+        com.rumilance.practice.decor.WallTextService wallTextService =
+                new com.rumilance.practice.decor.WallTextService(plugin);
+        services.register(com.rumilance.practice.decor.WallTextService.class, wallTextService);
+        org.bukkit.Bukkit.getScheduler().runTask(plugin, wallTextService::load);
+
         StatsService statsService = new StatsService(rankedStatsRepository, matchHistoryRepository,
                 dailyRankedStatsRepository, configService);
         services.register(StatsService.class, statsService);
@@ -375,6 +393,8 @@ public final class FeatureBootstrap {
         pm.registerEvents(new LobbyListener(lobbyService, stateManager), plugin);
         pm.registerEvents(new MatchListener(matchService, kitService), plugin);
         pm.registerEvents(new ArenaBoundsListener(matchService, arenaService), plugin);
+        pm.registerEvents(new com.rumilance.practice.spectator.SpectatorBoundsListener(
+                spectatorService, matchRegistry, arenaService), plugin);
         pm.registerEvents(new FfaListener(ffaService, kitService, stateManager), plugin);
         pm.registerEvents(new GoldenHeadListener(plugin, matchRegistry), plugin);
         pm.registerEvents(guiListener, plugin);
@@ -421,6 +441,7 @@ public final class FeatureBootstrap {
         bind("ekitadmin", new com.rumilance.practice.command.EkitAdminCommand(ekitAdminGui));
         bind("giveitem", new com.rumilance.practice.command.GiveItemCommand());
         bind("matchreport", new com.rumilance.practice.command.MatchReportCommand(matchService, settingsService));
+        bind("walltext", new com.rumilance.practice.decor.WallTextCommand(wallTextService));
         bind("ffa", ffaCommand);
         bind("leave", new LeaveCommand(matchService, messageService));
         // "/party" and "/p" are plugin.yml aliases of "/team" — only bind the real command.

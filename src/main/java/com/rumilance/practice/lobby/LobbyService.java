@@ -26,6 +26,8 @@ public final class LobbyService {
     private volatile Cuboid region;
     private volatile double fallReturnY = 0.0d;
     private volatile ItemStack[] lobbyInventory = new ItemStack[41];
+    /** Optional sight hook applied on every lobby send (per-player border + view distance). */
+    private volatile java.util.function.Consumer<Player> sightHook;
 
     public LobbyService(ConfigService configService) {
         this.configService = Objects.requireNonNull(configService);
@@ -133,6 +135,15 @@ public final class LobbyService {
             // lobby spawn instead of the world spawn.
             player.setCompassTarget(destination);
         }
+        java.util.function.Consumer<Player> hook = sightHook;
+        if (hook != null) {
+            hook.accept(player);
+        }
+    }
+
+    /** Wires the per-player border / view-distance hook (called from bootstrap). */
+    public void setSightHook(java.util.function.Consumer<Player> sightHook) {
+        this.sightHook = sightHook;
     }
 
     public void applyLobbyInventory(Player player) {
