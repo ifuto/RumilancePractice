@@ -3,7 +3,6 @@ package com.rumilance.practice.spectator;
 import com.rumilance.practice.arena.ArenaService;
 import com.rumilance.practice.match.MatchRegistry;
 import com.rumilance.practice.model.ArenaInstance;
-import com.rumilance.practice.model.ArenaTemplate;
 import com.rumilance.practice.session.MatchSession;
 import com.rumilance.practice.util.Cuboid;
 import org.bukkit.Location;
@@ -73,9 +72,9 @@ public final class SpectatorBoundsListener implements Listener {
         if (instance == null) {
             return null;
         }
-        ArenaTemplate template = instance.template();
-        return Cuboid.of(template.world(),
-                template.minX(), template.minY(), template.minZ(),
-                template.maxX(), template.maxY(), template.maxZ());
+        // Instance bounds (origin-shifted for disposable copies).
+        return Cuboid.of(instance.template().world(),
+                instance.minX(), instance.minY(), instance.minZ(),
+                instance.maxX(), instance.maxY(), instance.maxZ());
     }
 }

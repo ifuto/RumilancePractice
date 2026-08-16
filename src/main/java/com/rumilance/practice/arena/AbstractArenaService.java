@@ -95,11 +95,13 @@ public abstract class AbstractArenaService implements ArenaService {
 
     @Override
     public Location spawnA(ArenaInstance instance) {
-        return LocationUtil.safeTeleportLocation(LocationUtil.deserialize(instance.template().serializedSpawnA()));
+        return LocationUtil.safeTeleportLocation(
+                instance.offset(LocationUtil.deserialize(instance.template().serializedSpawnA())));
     }
 
     @Override
     public Location spawnB(ArenaInstance instance) {
-        return LocationUtil.safeTeleportLocation(LocationUtil.deserialize(instance.template().serializedSpawnB()));
+        return LocationUtil.safeTeleportLocation(
+                instance.offset(LocationUtil.deserialize(instance.template().serializedSpawnB())));
     }
 }

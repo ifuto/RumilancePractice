@@ -2,7 +2,6 @@ package com.rumilance.practice.sight;
 
 import com.rumilance.practice.arena.ArenaService;
 import com.rumilance.practice.model.ArenaInstance;
-import com.rumilance.practice.model.ArenaTemplate;
 import com.rumilance.practice.session.MatchSession;
 import com.rumilance.practice.util.Cuboid;
 import org.bukkit.Bukkit;
@@ -73,10 +72,10 @@ public final class ViewControlService {
         if (instance == null) {
             return;
         }
-        ArenaTemplate template = instance.template();
-        applyRegion(player, Cuboid.of(template.world(),
-                template.minX(), template.minY(), template.minZ(),
-                template.maxX(), template.maxY(), template.maxZ()));
+        // Instance bounds (origin-shifted for disposable copies).
+        applyRegion(player, Cuboid.of(instance.template().world(),
+                instance.minX(), instance.minY(), instance.minZ(),
+                instance.maxX(), instance.maxY(), instance.maxZ()));
     }
 
     /** Removes the per-player border and restores the server-default view distance. */

@@ -29,9 +29,18 @@ public interface FaweBridge {
 
     /**
      * Pastes a previously saved schematic back into the world, anchored at {@code pasteAnchor}'s
-     * block position, asynchronously. Used to reset an arena to its pristine state after a match.
+     * block position, asynchronously. Used both to reset an in-place arena after a match and to
+     * stamp a fresh disposable copy of a template at an arbitrary location.
      *
      * @return a future completing with {@code true} on success, {@code false} on failure.
      */
     CompletableFuture<Boolean> regenerate(Path schematicFile, Location pasteAnchor);
+
+    /**
+     * Fills the given region with air, asynchronously. Used to delete a disposable arena copy
+     * once its match has finished.
+     *
+     * @return a future completing with {@code true} on success, {@code false} on failure.
+     */
+    CompletableFuture<Boolean> clearRegion(World world, int minX, int minY, int minZ, int maxX, int maxY, int maxZ);
 }

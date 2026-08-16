@@ -36,4 +36,11 @@ public final class NoOpFaweBridge implements FaweBridge {
                 .warning("Cannot regenerate from '" + schematicFile + "': FastAsyncWorldEdit/WorldEdit is not available.");
         return CompletableFuture.completedFuture(false);
     }
+
+    @Override
+    public CompletableFuture<Boolean> clearRegion(World world, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
+        Logger.getLogger(NoOpFaweBridge.class.getName())
+                .warning("Cannot clear region: FastAsyncWorldEdit/WorldEdit is not available.");
+        return CompletableFuture.completedFuture(false);
+    }
 }

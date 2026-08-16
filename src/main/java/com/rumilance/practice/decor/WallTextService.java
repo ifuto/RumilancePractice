@@ -210,6 +210,18 @@ public final class WallTextService {
         spawn(placement);
     }
 
+    /** Removes one automatic label by id (e.g. when its disposable arena copy is deleted). */
+    public void removeAutoLabel(String id) {
+        String cleanId = id.toLowerCase(Locale.ROOT);
+        UUID entityId = spawned.remove(cleanId);
+        if (entityId != null) {
+            Entity entity = Bukkit.getEntity(entityId);
+            if (entity != null) {
+                entity.remove();
+            }
+        }
+    }
+
     /** Removes every automatic (non-persisted) label; used before re-placing on reload. */
     public void clearAutoLabels() {
         for (Map.Entry<String, UUID> entry : Map.copyOf(spawned).entrySet()) {

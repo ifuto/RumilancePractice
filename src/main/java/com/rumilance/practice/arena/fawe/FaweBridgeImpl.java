@@ -147,4 +147,24 @@ public final class FaweBridgeImpl implements FaweBridge {
             }
         });
     }
+
+    @Override
+    public CompletableFuture<Boolean> clearRegion(org.bukkit.World bukkitWorld, int minX, int minY, int minZ,
+                                                  int maxX, int maxY, int maxZ) {
+        return asyncExecutor.supplyAsync(() -> {
+            try {
+                World weWorld = BukkitAdapter.adapt(bukkitWorld);
+                CuboidRegion region = new CuboidRegion(weWorld,
+                        BlockVector3.at(minX, minY, minZ), BlockVector3.at(maxX, maxY, maxZ));
+                try (EditSession editSession = WorldEdit.getInstance().newEditSessionBuilder().world(weWorld).build()) {
+                    editSession.setBlocks((com.sk89q.worldedit.regions.Region) region,
+                            com.sk89q.worldedit.world.block.BlockTypes.AIR.getDefaultState());
+                }
+                return true;
+            } catch (Exception e) {
+                LOGGER.log(Level.WARNING, "Failed to clear region for disposable arena copy", e);
+                return false;
+            }
+        });
+    }
 }

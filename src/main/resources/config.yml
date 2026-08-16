@@ -73,6 +73,21 @@ lobby:
 sight:
   enabled: true
 
+# Disposable arena copies (requires FAWE/WorldEdit): every match pastes a fresh copy of the
+# arena template at a random, chunk-aligned spot that never overlaps another live copy or any
+# template's own build, and deletes the copy when the match ends. Allows unlimited concurrent
+# matches per template. Set disposable-copies to false to revert to the old in-place mode
+# (one match per template, regenerated between matches).
+arena:
+  disposable-copies: true
+  # Copies are placed within +/- this many blocks of the placement centre (min 256).
+  placement-range: 4096
+  # Minimum empty margin, in blocks, kept between a copy and anything else (min 16).
+  placement-spacing: 64
+  # Centre of the placement band (defaults to world origin).
+  placement-center-x: 0
+  placement-center-z: 0
+
 fawe:
   # Whether to attempt to use FastAsyncWorldEdit/WorldEdit for arena snapshot/restore.
   enabled: true

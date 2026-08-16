@@ -2,7 +2,6 @@ package com.rumilance.practice.match;
 
 import com.rumilance.practice.arena.ArenaService;
 import com.rumilance.practice.model.ArenaInstance;
-import com.rumilance.practice.model.ArenaTemplate;
 import com.rumilance.practice.session.MatchSession;
 import com.rumilance.practice.state.MatchState;
 import com.rumilance.practice.util.Cuboid;
@@ -47,10 +46,10 @@ public final class ArenaBoundsListener implements Listener {
         if (instance == null) {
             return;
         }
-        ArenaTemplate template = instance.template();
-        Cuboid region = Cuboid.of(template.world(),
-                template.minX(), template.minY(), template.minZ(),
-                template.maxX(), template.maxY(), template.maxZ());
+        // Use the instance's own bounds: for disposable copies these are origin-shifted.
+        Cuboid region = Cuboid.of(instance.template().world(),
+                instance.minX(), instance.minY(), instance.minZ(),
+                instance.maxX(), instance.maxY(), instance.maxZ());
         if (!region.contains(event.getTo())) {
             Location spawn = session.participants().get(0).equals(player.getUniqueId())
                     ? arenaService.spawnA(instance)

@@ -169,8 +169,20 @@ public final class FeatureBootstrap {
         arenaStore.reload();
         services.register(ArenaTemplateStore.class, arenaStore);
 
+        // Arena strategy: with FAWE, matches run on disposable copies pasted at random
+        // non-overlapping locations and deleted after the match (arena.disposable-copies=false
+        // reverts to in-place regeneration). Without FAWE, plain teleport-only arenas.
+        boolean disposableCopies = configService.config().getBoolean("arena.disposable-copies", true);
         ArenaService arenaService = faweBridge.isAvailable()
-                ? new FaweArenaService(faweBridge, new File(plugin.getDataFolder(), "schematics"), settings.regenerateArena())
+                ? (disposableCopies
+                        ? new com.rumilance.practice.arena.DisposableArenaService(
+                                plugin, faweBridge, new File(plugin.getDataFolder(), "schematics"),
+                                configService.config().getInt("arena.placement-range", 4096),
+                                configService.config().getInt("arena.placement-spacing", 64),
+                                configService.config().getInt("arena.placement-center-x", 0),
+                                configService.config().getInt("arena.placement-center-z", 0))
+                        : new FaweArenaService(faweBridge, new File(plugin.getDataFolder(), "schematics"),
+                                settings.regenerateArena()))
                 : new SimpleArenaService();
         arenaService.setTemplates(arenaStore.templates());
         services.register(ArenaService.class, arenaService);
@@ -233,14 +245,17 @@ public final class FeatureBootstrap {
         services.register(com.rumilance.practice.decor.WallTextService.class, wallTextService);
         org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
             wallTextService.load();
-            // Automatic big aqua name labels on one border wall of every arena.
             wallTextService.clearAutoLabels();
-            for (var template : arenaStore.templates()) {
-                wallTextService.placeAutoLabel(
-                        "auto_arena_" + template.name(), template.world(),
-                        template.minX(), template.minY(), template.minZ(),
-                        template.maxX(), template.maxY(), template.maxZ(),
-                        com.rumilance.practice.util.KitNames.pretty(template.name()) + " Arena");
+            // Static labels: FFA arenas always; template builds only in in-place mode
+            // (in disposable mode matches never happen at the template's own location).
+            if (!(arenaService instanceof com.rumilance.practice.arena.DisposableArenaService)) {
+                for (var template : arenaStore.templates()) {
+                    wallTextService.placeAutoLabel(
+                            "auto_arena_" + template.name(), template.world(),
+                            template.minX(), template.minY(), template.minZ(),
+                            template.maxX(), template.maxY(), template.maxZ(),
+                            com.rumilance.practice.util.KitNames.pretty(template.name()) + " Arena");
+                }
             }
             for (var ffaArena : ffaService.list()) {
                 var region = ffaArena.region();
@@ -251,6 +266,16 @@ public final class FeatureBootstrap {
                         com.rumilance.practice.util.KitNames.pretty(ffaArena.id()) + " FFA");
             }
         });
+        // Disposable copies get their label when pasted and lose it when cleared.
+        if (arenaService instanceof com.rumilance.practice.arena.DisposableArenaService disposableService) {
+            disposableService.setCopyHooks(
+                    inst -> wallTextService.placeAutoLabel(
+                            "auto_copy_" + inst.id(), inst.template().world(),
+                            inst.minX(), inst.minY(), inst.minZ(),
+                            inst.maxX(), inst.maxY(), inst.maxZ(),
+                            com.rumilance.practice.util.KitNames.pretty(inst.template().name()) + " Arena"),
+                    inst -> wallTextService.removeAutoLabel("auto_copy_" + inst.id()));
+        }
 
         StatsService statsService = new StatsService(rankedStatsRepository, matchHistoryRepository,
                 dailyRankedStatsRepository, configService);
@@ -512,6 +537,16 @@ public final class FeatureBootstrap {
         }
         if (matchService != null) {
             matchService.shutdown();
+        }
+        // Delete any still-pasted disposable arena copies so nothing leaks into the world.
+        com.rumilance.practice.arena.ArenaService disposable =
+                services.find(com.rumilance.practice.arena.ArenaService.class).orElse(null);
+        if (disposable instanceof com.rumilance.practice.arena.DisposableArenaService copies) {
+            try {
+                copies.clearAllCopies().get(20, java.util.concurrent.TimeUnit.SECONDS);
+            } catch (Exception e) {
+                plugin.getLogger().warning("Could not clear all disposable arena copies on shutdown: " + e.getMessage());
+            }
         }
         if (scoreboardService != null) {
             scoreboardService.stop();
