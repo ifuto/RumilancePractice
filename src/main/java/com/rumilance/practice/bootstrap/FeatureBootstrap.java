@@ -177,7 +177,7 @@ public final class FeatureBootstrap {
                 ? (disposableCopies
                         ? new com.rumilance.practice.arena.DisposableArenaService(
                                 plugin, faweBridge, new File(plugin.getDataFolder(), "schematics"),
-                                configService.config().getInt("arena.placement-range", 4096),
+                                configService.config().getInt("arena.placement-range", 100000),
                                 configService.config().getInt("arena.placement-spacing", 64),
                                 configService.config().getInt("arena.placement-center-x", 0),
                                 configService.config().getInt("arena.placement-center-z", 0))

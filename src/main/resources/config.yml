@@ -81,7 +81,10 @@ sight:
 arena:
   disposable-copies: true
   # Copies are placed within +/- this many blocks of the placement centre (min 256).
-  placement-range: 4096
+  # Distance is free - copies can go arbitrarily far out: every chunk of a copy is
+  # async-pregenerated and pinned with chunk tickets BEFORE players are teleported,
+  # so arrival never triggers fresh chunk generation around the players.
+  placement-range: 100000
   # Minimum empty margin, in blocks, kept between a copy and anything else (min 16).
   placement-spacing: 64
   # Centre of the placement band (defaults to world origin).

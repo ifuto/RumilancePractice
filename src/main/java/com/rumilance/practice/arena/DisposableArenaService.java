@@ -114,19 +114,68 @@ public final class DisposableArenaService extends AbstractArenaService {
 
         Path schematic = resolveSchematicPath(template.schematicPath());
         Location anchor = new Location(world, instance.minX(), instance.minY(), instance.minZ());
-        return faweBridge.regenerate(schematic, anchor).handle((success, throwable) -> {
-            if (throwable != null || !Boolean.TRUE.equals(success)) {
-                LOGGER.log(Level.WARNING, "Failed to paste disposable arena copy of '"
-                        + template.name() + "'", throwable);
-                liveCopies.remove(instance.id());
-                return Optional.<ArenaInstance>empty();
+        return faweBridge.regenerate(schematic, anchor)
+                .thenCompose(success -> {
+                    if (!Boolean.TRUE.equals(success)) {
+                        return CompletableFuture.completedFuture(Boolean.FALSE);
+                    }
+                    // Pre-generate & pin every chunk of the copy BEFORE players are sent,
+                    // so arriving there never triggers fresh chunk loading around them.
+                    return preloadChunks(world, instance).thenApply(v -> Boolean.TRUE);
+                })
+                .handle((success, throwable) -> {
+                    if (throwable != null || !Boolean.TRUE.equals(success)) {
+                        LOGGER.log(Level.WARNING, "Failed to paste disposable arena copy of '"
+                                + template.name() + "'", throwable);
+                        liveCopies.remove(instance.id());
+                        return Optional.<ArenaInstance>empty();
+                    }
+                    java.util.function.Consumer<ArenaInstance> hook = onCopyPasted;
+                    if (hook != null && plugin.isEnabled()) {
+                        Bukkit.getScheduler().runTask(plugin, () -> hook.accept(instance));
+                    }
+                    return Optional.of(instance);
+                });
+    }
+
+    /**
+     * Asynchronously generates/loads every chunk covering the copy (plus one chunk of margin)
+     * and pins them with plugin chunk tickets so they stay loaded for the whole match even
+     * with no player nearby yet. Uses Paper's async {@code getChunkAtAsync}; chunks are
+     * unpinned in {@link #release(UUID)}.
+     */
+    private CompletableFuture<Void> preloadChunks(World world, ArenaInstance instance) {
+        int minCX = (instance.minX() >> 4) - 1;
+        int maxCX = (instance.maxX() >> 4) + 1;
+        int minCZ = (instance.minZ() >> 4) - 1;
+        int maxCZ = (instance.maxZ() >> 4) + 1;
+        java.util.List<CompletableFuture<?>> futures = new java.util.ArrayList<>();
+        for (int cx = minCX; cx <= maxCX; cx++) {
+            for (int cz = minCZ; cz <= maxCZ; cz++) {
+                final int fcx = cx;
+                final int fcz = cz;
+                futures.add(world.getChunkAtAsync(cx, cz, true).thenAccept(chunk ->
+                        Bukkit.getScheduler().runTask(plugin, () -> {
+                            if (plugin.isEnabled() && liveCopies.containsKey(instance.id())) {
+                                world.addPluginChunkTicket(fcx, fcz, plugin);
+                            }
+                        })));
             }
-            java.util.function.Consumer<ArenaInstance> hook = onCopyPasted;
-            if (hook != null && plugin.isEnabled()) {
-                Bukkit.getScheduler().runTask(plugin, () -> hook.accept(instance));
+        }
+        return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
+    }
+
+    /** Releases the chunk tickets pinned by {@link #preloadChunks}. Main thread only. */
+    private void unpinChunks(World world, ArenaInstance instance) {
+        int minCX = (instance.minX() >> 4) - 1;
+        int maxCX = (instance.maxX() >> 4) + 1;
+        int minCZ = (instance.minZ() >> 4) - 1;
+        int maxCZ = (instance.maxZ() >> 4) + 1;
+        for (int cx = minCX; cx <= maxCX; cx++) {
+            for (int cz = minCZ; cz <= maxCZ; cz++) {
+                world.removePluginChunkTicket(cx, cz, plugin);
             }
-            return Optional.of(instance);
-        });
+        }
     }
 
     @Override
@@ -152,6 +201,10 @@ public final class DisposableArenaService extends AbstractArenaService {
                     if (throwable != null || !Boolean.TRUE.equals(success)) {
                         LOGGER.warning("Failed to clear disposable arena copy " + instanceId
                                 + " (template=" + instance.template().name() + ").");
+                    }
+                    // Unpin the chunk tickets so the area can unload normally again.
+                    if (plugin.isEnabled()) {
+                        Bukkit.getScheduler().runTask(plugin, () -> unpinChunks(world, instance));
                     }
                     return null;
                 });
