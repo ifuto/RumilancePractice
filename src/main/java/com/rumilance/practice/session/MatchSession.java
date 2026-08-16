@@ -73,7 +73,8 @@ public final class MatchSession {
         this.state = MatchState.CREATED;
         for (UUID participant : this.participants) {
             roundWins.put(participant, 0);
-            seriesWins.put(participant, 0);
+            // seriesWins intentionally starts empty: a fresh match snapshot must be empty
+            // (rematch chains seed it via applySeries; seriesWinsOf defaults to 0).
         }
         teamColors.put(this.participants.get(0), TeamColor.RED);
         teamColors.put(this.participants.get(1), TeamColor.BLUE);
@@ -111,7 +112,8 @@ public final class MatchSession {
         this.state = MatchState.CREATED;
         for (UUID participant : this.participants) {
             roundWins.put(participant, 0);
-            seriesWins.put(participant, 0);
+            // seriesWins intentionally starts empty: a fresh match snapshot must be empty
+            // (rematch chains seed it via applySeries; seriesWinsOf defaults to 0).
         }
         for (UUID p : red) {
             teamColors.put(p, TeamColor.RED);
