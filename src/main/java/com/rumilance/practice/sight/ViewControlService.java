@@ -27,26 +27,30 @@ import org.bukkit.entity.Player;
 public final class ViewControlService {
 
     private final ArenaService arenaService;
-    private final int lobbyViewChunks;
     private final boolean enabled;
 
-    public ViewControlService(ArenaService arenaService, boolean enabled, int lobbyViewChunks) {
+    public ViewControlService(ArenaService arenaService, boolean enabled) {
         this.arenaService = arenaService;
         this.enabled = enabled;
-        this.lobbyViewChunks = clampChunks(lobbyViewChunks);
     }
 
-    /** Lobby mode: no border (world default) + lobby-sized view distance for non-admins. */
-    public void applyLobby(Player player) {
+    /**
+     * Lobby mode: non-admin players get a border + view distance fitted to the lobby region
+     * itself (the cuboid configured via {@code /slobby}), so nothing beyond the lobby is ever
+     * visible. Admins get no border and the server-default view distance. When no lobby
+     * region is configured, everything resets to defaults.
+     */
+    public void applyLobby(Player player, Cuboid lobbyRegion) {
         if (!enabled) {
             return;
         }
-        player.setWorldBorder(null);
-        if (isExempt(player)) {
+        if (isExempt(player) || lobbyRegion == null) {
+            player.setWorldBorder(null);
             resetViewDistance(player);
-        } else {
-            setViewChunks(player, lobbyViewChunks);
+            return;
         }
+        applyBorder(player, lobbyRegion);
+        setViewChunks(player, chunksFor(lobbyRegion));
     }
 
     /** Fits a per-player border + view distance to an arbitrary cuboid region (FFA etc.). */

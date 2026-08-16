@@ -219,13 +219,13 @@ public final class FeatureBootstrap {
         com.rumilance.practice.sight.ViewControlService viewControl =
                 new com.rumilance.practice.sight.ViewControlService(
                         arenaService,
-                        configService.config().getBoolean("sight.enabled", true),
-                        configService.config().getInt("sight.lobby-view-chunks", 6));
+                        configService.config().getBoolean("sight.enabled", true));
         services.register(com.rumilance.practice.sight.ViewControlService.class, viewControl);
         matchService.setViewControl(viewControl);
         spectatorService.setViewControl(viewControl);
         ffaService.setViewControl(viewControl);
-        lobbyService.setSightHook(viewControl::applyLobby);
+        // Lobby sight is fitted to the /slobby region itself (no fixed chunk radius).
+        lobbyService.setSightHook(player -> viewControl.applyLobby(player, lobbyService.region()));
 
         // Wall-mounted text labels (e.g. aqua "N Arena" on an arena border wall).
         com.rumilance.practice.decor.WallTextService wallTextService =

@@ -141,7 +141,10 @@ public final class LobbyService {
         }
     }
 
-    /** Wires the per-player border / view-distance hook (called from bootstrap). */
+    /**
+     * Wires the per-player border / view-distance hook (called from bootstrap). The hook
+     * receives the player; the lobby region itself is exposed via {@link #region()}.
+     */
     public void setSightHook(java.util.function.Consumer<Player> sightHook) {
         this.sightHook = sightHook;
     }
