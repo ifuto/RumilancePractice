@@ -57,21 +57,26 @@ public final class GuiListener implements Listener {
             return;
         }
 
+        Inventory clicked = event.getClickedInventory();
+        if (clicked == null) {
+            return;
+        }
         ClickType click = event.getClick();
         InventoryAction action = event.getAction();
-        if (click == ClickType.NUMBER_KEY
+        // The event is already cancelled above, so no item can actually move. Shift-clicks on
+        // the TOP (GUI) inventory are legitimate button gestures (e.g. team disband confirm,
+        // shift-click kick) and must reach the handler. Everything else that smells like an
+        // item-management gesture is ignored.
+        boolean topShiftClick = clicked == top && click.isShiftClick();
+        if (!topShiftClick
+                && (click == ClickType.NUMBER_KEY
                 || click == ClickType.DOUBLE_CLICK
                 || click == ClickType.DROP
                 || click == ClickType.CONTROL_DROP
                 || click.isShiftClick()
                 || action == InventoryAction.MOVE_TO_OTHER_INVENTORY
                 || action == InventoryAction.HOTBAR_SWAP
-                || action == InventoryAction.COLLECT_TO_CURSOR) {
-            return;
-        }
-
-        Inventory clicked = event.getClickedInventory();
-        if (clicked == null) {
+                || action == InventoryAction.COLLECT_TO_CURSOR)) {
             return;
         }
         GuiSession session = registry.get(player.getUniqueId()).orElse(null);
