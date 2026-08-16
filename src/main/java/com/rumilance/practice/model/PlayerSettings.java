@@ -50,47 +50,56 @@ public record PlayerSettings(
 
     public PlayerSettings withLocale(String newLocale) {
         return new PlayerSettings(uuid, soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
-                acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, newLocale);
+                acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, newLocale,
+                selectedTitle, showMatchReport);
     }
 
     public PlayerSettings withArrowEffect(String newArrowEffect) {
         return new PlayerSettings(uuid, soundsEnabled, scoreboardEnabled, newArrowEffect, spectateVisible,
-                acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale);
+                acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
+                selectedTitle, showMatchReport);
     }
 
     public PlayerSettings withSoundsEnabled(boolean enabled) {
         return new PlayerSettings(uuid, enabled, scoreboardEnabled, arrowEffect, spectateVisible,
-                acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale);
+                acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
+                selectedTitle, showMatchReport);
     }
 
     public PlayerSettings withScoreboardEnabled(boolean enabled) {
         return new PlayerSettings(uuid, soundsEnabled, enabled, arrowEffect, spectateVisible,
-                acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale);
+                acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
+                selectedTitle, showMatchReport);
     }
 
     public PlayerSettings withSpectateVisible(boolean visible) {
         return new PlayerSettings(uuid, soundsEnabled, scoreboardEnabled, arrowEffect, visible,
-                acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale);
+                acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
+                selectedTitle, showMatchReport);
     }
 
     public PlayerSettings withAcceptDuelRequests(boolean accept) {
         return new PlayerSettings(uuid, soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
-                accept, autoRequeue, hideOtherChat, chatWhitelist, locale);
+                accept, autoRequeue, hideOtherChat, chatWhitelist, locale,
+                selectedTitle, showMatchReport);
     }
 
     public PlayerSettings withAutoRequeue(boolean enabled) {
         return new PlayerSettings(uuid, soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
-                acceptDuelRequests, enabled, hideOtherChat, chatWhitelist, locale);
+                acceptDuelRequests, enabled, hideOtherChat, chatWhitelist, locale,
+                selectedTitle, showMatchReport);
     }
 
     public PlayerSettings withHideOtherChat(boolean enabled) {
         return new PlayerSettings(uuid, soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
-                acceptDuelRequests, autoRequeue, enabled, chatWhitelist, locale);
+                acceptDuelRequests, autoRequeue, enabled, chatWhitelist, locale,
+                selectedTitle, showMatchReport);
     }
 
     public PlayerSettings withChatWhitelist(Set<String> newWhitelist) {
         return new PlayerSettings(uuid, soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
-                acceptDuelRequests, autoRequeue, hideOtherChat, newWhitelist, locale);
+                acceptDuelRequests, autoRequeue, hideOtherChat, newWhitelist, locale,
+                selectedTitle, showMatchReport);
     }
 
     public PlayerSettings withChatWhitelistAdded(String name) {
