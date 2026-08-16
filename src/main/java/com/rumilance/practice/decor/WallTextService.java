@@ -169,6 +169,60 @@ public final class WallTextService {
         return Map.copyOf(placements);
     }
 
+    // ------------------------------------------------------------------ automatic arena labels
+
+    /**
+     * Spawns (or refreshes) an automatic arena name label centred on one wall of the given
+     * region: big aqua text ({@code <aqua>N Arena</aqua>} style) floating just inside the
+     * north face at roughly two thirds of the region height. Auto labels are transient — they
+     * are NOT persisted to walltext.yml; call this again after reloads (bootstrap does).
+     *
+     * @param id        stable id, e.g. {@code "auto_arena_<name>"} (existing label replaced)
+     * @param worldName world the region lives in
+     * @param minX/minY/minZ/maxX/maxY/maxZ region bounds (inclusive)
+     * @param text      plain display text; rendered in the aqua house style
+     */
+    public void placeAutoLabel(String id, String worldName,
+                               int minX, int minY, int minZ, int maxX, int maxY, int maxZ,
+                               String text) {
+        World world = Bukkit.getWorld(worldName);
+        if (world == null) {
+            return;
+        }
+        String cleanId = id.toLowerCase(Locale.ROOT);
+        // Replace any previous spawn of this auto label (no persistence involved).
+        UUID old = spawned.remove(cleanId);
+        if (old != null) {
+            Entity entity = Bukkit.getEntity(old);
+            if (entity != null) {
+                entity.remove();
+            }
+        }
+        // Centre of the north wall (minZ face), facing south into the arena, at ~2/3 height.
+        double x = (minX + maxX + 1) / 2.0;
+        double y = minY + Math.max(3.0, (maxY - minY) * 0.66);
+        double z = minZ + 0.6;
+        // Scale with arena width so the label reads well from the middle of the arena.
+        float scale = (float) Math.max(3.0, Math.min(12.0, (maxX - minX + 1) / 8.0));
+        Placement placement = new Placement(cleanId,
+                new Location(world, x, y, z), BlockFace.SOUTH,
+                "<aqua>" + text + "</aqua>", scale);
+        spawn(placement);
+    }
+
+    /** Removes every automatic (non-persisted) label; used before re-placing on reload. */
+    public void clearAutoLabels() {
+        for (Map.Entry<String, UUID> entry : Map.copyOf(spawned).entrySet()) {
+            if (entry.getKey().startsWith("auto_")) {
+                Entity entity = Bukkit.getEntity(entry.getValue());
+                if (entity != null) {
+                    entity.remove();
+                }
+                spawned.remove(entry.getKey());
+            }
+        }
+    }
+
     // ------------------------------------------------------------------ internals
 
     private void spawn(Placement placement) {

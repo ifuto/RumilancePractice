@@ -231,7 +231,26 @@ public final class FeatureBootstrap {
         com.rumilance.practice.decor.WallTextService wallTextService =
                 new com.rumilance.practice.decor.WallTextService(plugin);
         services.register(com.rumilance.practice.decor.WallTextService.class, wallTextService);
-        org.bukkit.Bukkit.getScheduler().runTask(plugin, wallTextService::load);
+        org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+            wallTextService.load();
+            // Automatic big aqua name labels on one border wall of every arena.
+            wallTextService.clearAutoLabels();
+            for (var template : arenaStore.templates()) {
+                wallTextService.placeAutoLabel(
+                        "auto_arena_" + template.name(), template.world(),
+                        template.minX(), template.minY(), template.minZ(),
+                        template.maxX(), template.maxY(), template.maxZ(),
+                        com.rumilance.practice.util.KitNames.pretty(template.name()) + " Arena");
+            }
+            for (var ffaArena : ffaService.list()) {
+                var region = ffaArena.region();
+                wallTextService.placeAutoLabel(
+                        "auto_ffa_" + ffaArena.id(), region.worldName(),
+                        region.minX(), region.minY(), region.minZ(),
+                        region.maxX(), region.maxY(), region.maxZ(),
+                        com.rumilance.practice.util.KitNames.pretty(ffaArena.id()) + " FFA");
+            }
+        });
 
         StatsService statsService = new StatsService(rankedStatsRepository, matchHistoryRepository,
                 dailyRankedStatsRepository, configService);
