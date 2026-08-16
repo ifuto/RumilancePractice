@@ -96,7 +96,15 @@ tasks.shadowJar {
     // that may bundle different versions of the same libraries.
     relocate("com.zaxxer.hikari", "com.rumilance.practice.libs.hikari")
     relocate("org.mariadb.jdbc", "com.rumilance.practice.libs.mariadb")
-    relocate("org.slf4j", "com.rumilance.practice.libs.slf4j")
+    // NOTE: org.slf4j must NOT be bundled/relocated. Paper provides SLF4J at runtime
+    // (JavaPlugin#getSLF4JLogger) with a real Log4j provider; bundling our own copy
+    // leaves it provider-less, causing the startup stderr noise
+    // "SLF4J(W): No SLF4J providers were found / defaulting to NOP" plus a
+    // "Nag author(s) ... System.out/err.print" warning. Excluding it below routes
+    // HikariCP/sqlite-jdbc logging through the server's SLF4J instead.
+    dependencies {
+        exclude(dependency("org.slf4j:.*:.*"))
+    }
     // NOTE: org.sqlite (sqlite-jdbc) must NOT be relocated. Its JNI native library
     // (libsqlitejdbc.so) binds to the exact package "org.sqlite.core.NativeDB", so
     // relocating the classes breaks the native method lookup with UnsatisfiedLinkError.
