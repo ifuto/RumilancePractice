@@ -60,7 +60,7 @@ public final class QueueKitGui extends AbstractGui {
         if (previewGui == null) {
             return;
         }
-        GuiSession session = registry.open(player.getUniqueId(), previewGui.type(), previewGui.rows);
+        GuiSession session = registry.open(player.getUniqueId(), previewGui.type(), previewGui.rows());
         session.setSelectedKit(kitId);
         PracticeGuiOpen.open(previewGui, player, session);
         sounds.play(player, "gui-open");

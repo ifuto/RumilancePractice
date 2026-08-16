@@ -43,6 +43,6 @@ public final class GoldenHeadItems {
     }
 
     public static boolean isGoldenHead(ItemStack item) {
-        return GoldenHeadListener.isGoldenHead(item);
+        return com.rumilance.practice.match.GoldenHeadListener.isGoldenHead(item);
     }
 }

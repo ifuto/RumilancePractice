@@ -58,8 +58,11 @@ public final class TitleService {
             totalWins = 0;
             bestElo = 1000;
         }
+        // Effectively-final copies for the lambda below.
+        final int wins = totalWins;
+        final int elo = bestElo;
         return titles.stream()
-                .filter(t -> totalWins >= t.requiredWins() && bestElo >= t.requiredElo())
+                .filter(t -> wins >= t.requiredWins() && elo >= t.requiredElo())
                 .max(Comparator.comparingInt(t -> t.requiredWins() + t.requiredElo()))
                 .orElse(KillTitle.NONE);
     }

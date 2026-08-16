@@ -69,7 +69,7 @@ public final class ItemBuilder {
 
     /** A clickable button with a plain (non-MiniMessage) display name and action key. */
     public static ItemStack action(Material material, Component name, String action) {
-        return new ItemBuilder(material).name(name).action(action).build();
+        return new ItemBuilder(material, 1).name(name).action(action).build();
     }
 
     /** Sets the display name from a literal component (italic already removed). */
@@ -210,7 +210,7 @@ public final class ItemBuilder {
 
     /** Builds a simple head for the given player with a name and optional lore. */
     public static ItemStack head(OfflinePlayer owner, Component name, Component... extraLore) {
-        ItemBuilder builder = new ItemBuilder(Material.PLAYER_HEAD)
+        ItemBuilder builder = new ItemBuilder(Material.PLAYER_HEAD, 1)
                 .name(name)
                 .skullOwner(owner);
         if (extraLore != null) {

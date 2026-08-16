@@ -32,6 +32,11 @@ public abstract class AbstractGui {
         return type;
     }
 
+    /** @return the number of inventory rows this menu uses. */
+    public int rows() {
+        return rows;
+    }
+
     public final void open(Player player) {
         GuiSession session = registry.open(player.getUniqueId(), type, rows);
         configureSession(session, player);
