@@ -326,6 +326,8 @@ public final class MatchService {
             dest.setPitch(base.getPitch());
             player.teleport(LocationUtil.safeTeleportLocation(dest, player));
         }
+        // Teleport happened above; give clients a full second to settle/render the arena
+        // (possibly a far-away disposable copy) before kits and the countdown begin.
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             for (UUID id : session.participants()) {
                 if (Bukkit.getPlayer(id) == null) {
@@ -341,7 +343,7 @@ public final class MatchService {
                 }
             }
             startCountdown(session);
-        }, 10L);
+        }, 20L);
     }
 
     private void teleportAndPrepare(MatchSession session, KitDefinition kit, ArenaInstance instance) {
@@ -377,7 +379,16 @@ public final class MatchService {
                         applyKit(p2, kit);
                         applySight(p1, session);
                         applySight(p2, session);
-                        startCountdown(session);
+                        // Teleport FIRST, then a 1s settle beat so both clients finish
+                        // rendering the (possibly far-away) arena before the countdown starts.
+                        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                            if (Bukkit.getPlayer(p1.getUniqueId()) == null
+                                    || Bukkit.getPlayer(p2.getUniqueId()) == null) {
+                                failMatch(session, "Player offline during prepare");
+                                return;
+                            }
+                            startCountdown(session);
+                        }, 20L);
                     }));
         }, 10L);
     }
