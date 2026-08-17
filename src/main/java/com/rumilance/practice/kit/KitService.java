@@ -181,6 +181,47 @@ public final class KitService {
         return true;
     }
 
+    /** Result of {@link #rename(String, String)}. */
+    public enum RenameResult {
+        OK, NOT_FOUND, TARGET_EXISTS
+    }
+
+    /**
+     * Renames a kit: the storage key becomes {@code newName} lowercased, the display name
+     * takes {@code newName}'s exact casing (KEEP style shows it verbatim), and the kit keeps
+     * its position in the admin display order. The old kits.yml section is removed.
+     */
+    public RenameResult rename(String oldName, String newName) {
+        String oldKey = oldName.toLowerCase(Locale.ROOT);
+        String newKey = newName.toLowerCase(Locale.ROOT);
+        KitDefinition existing = kits.get(oldKey);
+        if (existing == null) {
+            return RenameResult.NOT_FOUND;
+        }
+        if (!oldKey.equals(newKey) && kits.containsKey(newKey)) {
+            return RenameResult.TARGET_EXISTS;
+        }
+        KitDefinition renamed = existing.toBuilder()
+                .name(newKey)
+                .displayName(newName)
+                .build();
+        kits.remove(oldKey);
+        kits.put(newKey, renamed);
+        // Preserve queue toggle and display order position under the new key.
+        Boolean queueFlag = queueEnabled.remove(oldKey);
+        if (queueFlag != null) {
+            queueEnabled.put(newKey, queueFlag);
+        }
+        int orderIndex = sortOrder.indexOf(oldKey);
+        if (orderIndex >= 0) {
+            sortOrder.set(orderIndex, newKey);
+            configService.kits().set("kit-order", new ArrayList<>(sortOrder));
+        }
+        configService.kits().set("kits." + oldKey, null);
+        persist(renamed);
+        return RenameResult.OK;
+    }
+
     public void setQueueEnabled(String kitId, boolean enabled) {
         queueEnabled.put(kitId.toLowerCase(Locale.ROOT), enabled);
     }

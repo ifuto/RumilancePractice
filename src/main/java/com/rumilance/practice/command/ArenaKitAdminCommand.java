@@ -138,6 +138,21 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                 player.sendMessage(Component.text("/kit adventure <name> <on|off> - force Adventure mode", NamedTextColor.GRAY));
                 player.sendMessage(Component.text("/kit <flag> <name> <on|off> - regen/food/place/break/pearl/totem/shield", NamedTextColor.GRAY));
                 player.sendMessage(Component.text("/kit order <name> <up|down> - GUI表示順を移動 (GUIでShift+クリックでも可)", NamedTextColor.GRAY));
+                player.sendMessage(Component.text("/kit rename <nowname> <newname> - 改名 (入力した大文字小文字がそのまま表示名に)", NamedTextColor.GRAY));
+                yield true;
+            }
+            case "rename" -> {
+                if (args.length < 3) {
+                    player.sendMessage(Component.text("/kit rename <nowname> <newname>", NamedTextColor.YELLOW));
+                    yield true;
+                }
+                // args[2] keeps the typed casing: it becomes the display name verbatim.
+                KitService.RenameResult r = kitService.rename(args[1], args[2]);
+                player.sendMessage(switch (r) {
+                    case OK -> Component.text("Kit renamed: " + args[1] + " -> " + args[2], NamedTextColor.GREEN);
+                    case NOT_FOUND -> Component.text("Unknown kit: " + args[1], NamedTextColor.RED);
+                    case TARGET_EXISTS -> Component.text("A kit named '" + args[2] + "' already exists.", NamedTextColor.RED);
+                });
                 yield true;
             }
             case "order" -> {
@@ -444,12 +459,12 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
         if (args.length == 1) {
             return filter(List.of(
                     "gui", "help", "create", "overwrite", "list", "info", "enable", "disable",
-                    "delete", "timeout", "order", "adventure", "autoregen", "autofood", "blockplace",
+                    "delete", "timeout", "order", "rename", "adventure", "autoregen", "autofood", "blockplace",
                     "blockbreak", "canbreak", "pearl", "totem", "swordshieldbreak"), args[0]);
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
         // Subcommands that take a kit name next.
-        if (args.length == 2 && List.of("info", "enable", "disable", "delete", "timeout", "order", "adventure",
+        if (args.length == 2 && List.of("info", "enable", "disable", "delete", "timeout", "order", "rename", "adventure",
                 "autoregen", "autofood", "blockplace", "blockbreak", "canbreak", "pearl", "totem",
                 "swordshieldbreak").contains(sub)) {
             return filter(kitService.all().stream().map(KitDefinition::name).toList(), args[1]);

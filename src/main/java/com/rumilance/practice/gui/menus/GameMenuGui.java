@@ -129,48 +129,28 @@ public final class GameMenuGui extends AbstractGui {
                 sounds.play(player, "gui-back");
                 player.closeInventory();
             }
-            case "ranked" -> {
-                sounds.play(player, "gui-click");
-                player.closeInventory();
-                rankedGui.open(player);
-            }
-            case "unranked" -> {
-                sounds.play(player, "gui-click");
-                player.closeInventory();
-                unrankedGui.open(player);
-            }
-            case "ffa" -> {
-                sounds.play(player, "gui-click");
-                player.closeInventory();
-                ffaListGui.open(player);
-            }
-            case "ekit" -> {
-                sounds.play(player, "gui-click");
-                player.closeInventory();
-                ekitSelectGui.open(player);
-            }
-            case "spectate" -> {
-                sounds.play(player, "gui-click");
-                player.closeInventory();
-                spectateListGui.open(player);
-            }
-            case "settings" -> {
-                sounds.play(player, "gui-click");
-                player.closeInventory();
-                settingsGui.open(player);
-            }
-            case "titles" -> {
-                sounds.play(player, "gui-click");
-                player.closeInventory();
-                titleGui.open(player);
-            }
-            case "teams" -> {
-                sounds.play(player, "gui-click");
-                player.closeInventory();
-                openTeams.accept(player);
-            }
+            case "ranked" -> openChild(player, rankedGui::open);
+            case "unranked" -> openChild(player, unrankedGui::open);
+            case "ffa" -> openChild(player, ffaListGui::open);
+            case "ekit" -> openChild(player, ekitSelectGui::open);
+            case "spectate" -> openChild(player, spectateListGui::open);
+            case "settings" -> openChild(player, settingsGui::open);
+            case "titles" -> openChild(player, titleGui::open);
+            case "teams" -> openChild(player, openTeams);
             default -> {
             }
         }
+    }
+
+    /**
+     * Opens a child screen and marks its fresh session as "from the Game Menu" so Esc/Close
+     * inside it returns here. Screens opened any other way (e.g. /setfunc hotbar items or
+     * commands) don't get the flag and simply close.
+     */
+    private void openChild(Player player, java.util.function.Consumer<Player> opener) {
+        sounds.play(player, "gui-click");
+        player.closeInventory();
+        opener.accept(player);
+        registry.get(player.getUniqueId()).ifPresent(child -> child.setFromGameMenu(true));
     }
 }

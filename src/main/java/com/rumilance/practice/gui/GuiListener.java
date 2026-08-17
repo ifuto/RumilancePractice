@@ -25,17 +25,6 @@ import java.util.Map;
  */
 public final class GuiListener implements Listener {
 
-    /**
-     * GUIs that are children of the Game Menu: pressing Esc or the Close button inside them
-     * returns the player to the Game Menu instead of dropping them back to the hotbar.
-     * The GAME_MENU itself is deliberately absent so Esc can always fully exit.
-     */
-    private static final java.util.Set<GuiType> MENU_RETURN_TYPES = java.util.EnumSet.of(
-            GuiType.RANKED_QUEUE, GuiType.UNRANKED_QUEUE, GuiType.FFA_LIST, GuiType.SETTINGS,
-            GuiType.SPECTATE_LIST, GuiType.TITLE_SELECT, GuiType.KIT_PREVIEW,
-            GuiType.TEAMS_BROWSER, GuiType.TEAM_HUB, GuiType.TEAM_KIT_SELECT,
-            GuiType.STATS_KIT, GuiType.PROFILE);
-
     private final GuiSessionRegistry registry;
     private final PlayerStateManager stateManager;
     private final OriginalKitService originalKitService;
@@ -126,10 +115,11 @@ public final class GuiListener implements Listener {
             if (guiAction == null || "decorate".equals(guiAction)) {
                 return;
             }
-            // Central "Close" interception: sub-menus of the Game Menu navigate back to the
-            // menu instead of dumping the player to their hotbar (Esc does the same below).
+            // Central "Close" interception: ONLY screens opened from the Game Menu navigate
+            // back to it (session.fromGameMenu). Screens opened via /setfunc items, commands
+            // or other flows simply close (Esc behaves the same below).
             if ("close".equals(guiAction) && menuReturn != null
-                    && MENU_RETURN_TYPES.contains(holder.type()) && canReturnToMenu(player)) {
+                    && session.fromGameMenu() && canReturnToMenu(player)) {
                 openMenuLater(player);
                 return;
             }
@@ -154,16 +144,20 @@ public final class GuiListener implements Listener {
         if (!(event.getInventory().getHolder() instanceof PracticeGuiHolder holder)) {
             return;
         }
+        boolean openedFromGameMenu = registry.get(player.getUniqueId())
+                .filter(session -> session.sessionId().equals(holder.sessionId()))
+                .map(GuiSession::fromGameMenu)
+                .orElse(false);
         registry.get(player.getUniqueId()).ifPresent(session -> {
             if (session.sessionId().equals(holder.sessionId())) {
                 registry.close(player.getUniqueId());
             }
         });
-        // Esc from a Game Menu sub-menu returns to the Game Menu (reason PLAYER only, so
-        // programmatic OPEN_NEW/PLUGIN closes never loop).
-        if (event.getReason() == InventoryCloseEvent.Reason.PLAYER
+        // Esc returns to the Game Menu ONLY for screens opened from it (reason PLAYER only,
+        // so programmatic OPEN_NEW/PLUGIN closes never loop). /setfunc-opened screens just close.
+        if (openedFromGameMenu
+                && event.getReason() == InventoryCloseEvent.Reason.PLAYER
                 && menuReturn != null
-                && MENU_RETURN_TYPES.contains(holder.type())
                 && canReturnToMenu(player)) {
             openMenuLater(player);
         }

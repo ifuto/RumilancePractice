@@ -21,6 +21,8 @@ public final class GuiSession {
     private volatile int bestOf = 1;
     private volatile boolean ranked = true;
     private volatile UUID targetPlayer;
+    /** True when this GUI was opened from the Game Menu (Esc/Close then returns to it). */
+    private volatile boolean fromGameMenu;
 
     public GuiSession(UUID sessionId, UUID playerId, GuiType type, int rows) {
         this.sessionId = Objects.requireNonNull(sessionId, "sessionId");
@@ -91,6 +93,14 @@ public final class GuiSession {
 
     public void setTargetPlayer(UUID targetPlayer) {
         this.targetPlayer = targetPlayer;
+    }
+
+    public boolean fromGameMenu() {
+        return fromGameMenu;
+    }
+
+    public void setFromGameMenu(boolean fromGameMenu) {
+        this.fromGameMenu = fromGameMenu;
     }
 
     /**
