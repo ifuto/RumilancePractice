@@ -106,7 +106,8 @@ public final class KitAdminGui extends AbstractGui {
         }
         ItemStack stack = new ItemStack(material);
         ItemMeta meta = stack.getItemMeta();
-        meta.displayName(Component.text(kit.name(), kit.enabled() ? NamedTextColor.GREEN : NamedTextColor.RED)
+        meta.displayName(Component.text(kit.prettyDisplayName(),
+                        kit.enabled() ? NamedTextColor.GREEN : NamedTextColor.RED)
                 .decoration(TextDecoration.ITALIC, false));
         List<Component> lore = new ArrayList<>();
         lore.add(stateLine(t(locale, "enabled"), kit.enabled(), locale));
@@ -167,7 +168,7 @@ public final class KitAdminGui extends AbstractGui {
     private ItemStack header(KitDefinition kit, String locale) {
         ItemStack stack = new ItemStack(Material.NAME_TAG);
         ItemMeta meta = stack.getItemMeta();
-        meta.displayName(Component.text(kit.name(), NamedTextColor.LIGHT_PURPLE)
+        meta.displayName(Component.text(kit.prettyDisplayName(), NamedTextColor.LIGHT_PURPLE)
                 .decoration(TextDecoration.ITALIC, false));
         meta.lore(List.of(Component.text(t(locale, "click-hint"), NamedTextColor.GRAY)
                 .decoration(TextDecoration.ITALIC, false)));

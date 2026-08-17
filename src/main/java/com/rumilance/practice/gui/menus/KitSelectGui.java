@@ -61,7 +61,7 @@ public final class KitSelectGui extends AbstractGui {
             Material mat = Material.matchMaterial(kit.icon());
             ItemStack icon = new ItemStack(mat == null ? Material.DIAMOND_SWORD : mat);
             ItemMeta meta = icon.getItemMeta();
-            meta.displayName(MiniMessage.miniMessage().deserialize(kit.displayName())
+            meta.displayName(MiniMessage.miniMessage().deserialize(kit.prettyDisplayName())
                     .decoration(TextDecoration.ITALIC, false));
             meta.getPersistentDataContainer().set(ItemKeys.guiAction(), PersistentDataType.STRING, "pick:" + kit.name());
             icon.setItemMeta(meta);

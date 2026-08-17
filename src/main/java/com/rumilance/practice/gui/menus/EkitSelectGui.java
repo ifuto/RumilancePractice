@@ -82,7 +82,7 @@ public final class EkitSelectGui extends AbstractGui {
         Material material = Material.matchMaterial(kit.icon());
         ItemStack stack = new ItemStack(material == null ? Material.DIAMOND_SWORD : material);
         ItemMeta meta = stack.getItemMeta();
-        meta.displayName(MiniMessage.miniMessage().deserialize(kit.displayName())
+        meta.displayName(MiniMessage.miniMessage().deserialize(kit.prettyDisplayName())
                 .decoration(TextDecoration.ITALIC, false));
         meta.lore(List.of(Component.text("クリックして選択", NamedTextColor.GRAY)
                 .decoration(TextDecoration.ITALIC, false)));

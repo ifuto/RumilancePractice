@@ -99,7 +99,8 @@ public final class EditKitGui extends AbstractGui {
     @Override
     protected Component title(Player player, GuiSession session) {
         String kit = session.selectedKit();
-        return Component.text(kit == null ? "Edit Kit" : "Edit: " + kit, NamedTextColor.WHITE);
+        return Component.text(kit == null ? "Edit Kit"
+                : "Edit: " + com.rumilance.practice.util.KitNames.pretty(kit), NamedTextColor.WHITE);
     }
 
     @Override
@@ -113,7 +114,7 @@ public final class EditKitGui extends AbstractGui {
                 Material mat = Material.matchMaterial(kit.icon());
                 ItemStack icon = new ItemStack(mat == null ? Material.DIAMOND_SWORD : mat);
                 ItemMeta meta = icon.getItemMeta();
-                meta.displayName(Component.text(kit.name(), NamedTextColor.AQUA)
+                meta.displayName(Component.text(kit.prettyDisplayName(), NamedTextColor.AQUA)
                         .decoration(TextDecoration.ITALIC, false));
                 meta.getPersistentDataContainer().set(ItemKeys.guiAction(), PersistentDataType.STRING,
                         "editkit:" + kit.name());
@@ -136,14 +137,12 @@ public final class EditKitGui extends AbstractGui {
         inventory.setItem(GuiSlots.slot(0, 3), tagged(layout.length > 38 ? layout[38] : null, "slot:38"));
         inventory.setItem(GuiSlots.slot(0, 4), tagged(layout.length > 39 ? layout[39] : null, "slot:39"));
         inventory.setItem(GuiSlots.slot(0, 6), tagged(layout.length > 40 ? layout[40] : null, "slot:40"));
-        // main inv slots 9-35 -> rows 1-3 cols 1-7 simplified mapping to center
+        // Main inventory slots 9-35 -> menu rows 1-3, ALL 9 columns (27 slots exactly).
+        // (Previously columns 0 and 8 were skipped, hiding the edge slots of each row.)
         for (int inv = 9; inv < 36; inv++) {
             int local = inv - 9;
             int row = 1 + local / 9;
             int col = local % 9;
-            if (col == 0 || col == 8 || row > 3) {
-                continue;
-            }
             inventory.setItem(GuiSlots.slot(row, col), tagged(layout[inv], "slot:" + inv));
         }
         // hotbar row 4
@@ -283,20 +282,23 @@ public final class EditKitGui extends AbstractGui {
         if (kit == null || layout == null) {
             return;
         }
-        ItemStack[] baseline = loadLayout(UUID.randomUUID(), kit); // fresh from kit definition only
-        // rebuild baseline from kit definition only
-        baseline = new ItemStack[41];
+        // Baseline straight from the kit definition (full NBT items included).
+        ItemStack[] baseline = new ItemStack[41];
         for (KitItemEntry entry : kit.items()) {
-            Material mat = Material.matchMaterial(entry.material());
-            if (mat != null && entry.slot() >= 0 && entry.slot() < 36) {
-                baseline[entry.slot()] = new ItemStack(mat, entry.amount());
+            ItemStack stack = kitEntryStack(entry);
+            if (stack == null) {
+                continue;
+            }
+            if (entry.slot() >= 0 && entry.slot() < 36) {
+                baseline[entry.slot()] = stack;
+            } else if (entry.slot() == 40) {
+                baseline[40] = stack;
             }
         }
         baseline[36] = material(kit.armor().get("helmet"));
         baseline[37] = material(kit.armor().get("chestplate"));
         baseline[38] = material(kit.armor().get("leggings"));
         baseline[39] = material(kit.armor().get("boots"));
-        // offhand starts empty unless kit items include slot 40
 
         if (!sameContents(baseline, layout)) {
             sounds.play(player, "error");

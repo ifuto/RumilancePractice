@@ -73,6 +73,13 @@ lobby:
 sight:
   enabled: true
 
+cleanup:
+  # Floating-text (hologram) sweep window after startup, in seconds. Entities load
+  # asynchronously after their chunks (MC 1.17+), so the sweep listens to EntitiesLoadEvent
+  # for this long and removes stray TextDisplays / hologram armor stands as chunks load in.
+  # 0 = only sweep already-loaded entities; negative = keep sweeping forever.
+  floating-text-window-seconds: 300
+
 # Disposable arena copies (requires FAWE/WorldEdit): every match pastes a fresh copy of the
 # arena template at a random, chunk-aligned spot that never overlaps another live copy or any
 # template's own build, and deletes the copy when the match ends. Allows unlimited concurrent

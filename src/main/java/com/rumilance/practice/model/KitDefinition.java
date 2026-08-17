@@ -66,15 +66,19 @@ public record KitDefinition(
     }
 
     /**
-     * Display name for GUIs: when no custom display name is configured (it still equals the raw
-     * id), underscores become spaces and the configured case style is applied — e.g.
-     * {@code "no_debuff"} renders as {@code "No Debuff"}. Custom display names are untouched.
+     * Display name for GUIs. When the configured display name is "just the id" (same text up
+     * to case, with underscores/spaces interchangeable), underscores become spaces and the
+     * configured case style applies — e.g. {@code "no_debuff"} renders as {@code "No Debuff"}.
+     * Genuinely custom display names (MiniMessage markup or different wording) are untouched.
      */
     public String prettyDisplayName() {
-        if (!displayName.equals(name)) {
+        boolean looksLikeId = !displayName.contains("<")
+                && displayName.replace(' ', '_').equalsIgnoreCase(name);
+        if (!looksLikeId) {
             return displayName;
         }
-        return com.rumilance.practice.util.KitNames.pretty(name);
+        // Pass the display name (not the lowercased id) so KEEP style retains original casing.
+        return com.rumilance.practice.util.KitNames.pretty(displayName);
     }
 
     public static Builder builder(String name) {

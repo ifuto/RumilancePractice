@@ -66,7 +66,7 @@ public final class EkitCopyGui extends AbstractGui {
             Material material = Material.matchMaterial(kit.icon());
             ItemStack icon = new ItemStack(material == null ? Material.DIAMOND_SWORD : material);
             ItemMeta meta = icon.getItemMeta();
-            meta.displayName(MiniMessage.miniMessage().deserialize(kit.displayName())
+            meta.displayName(MiniMessage.miniMessage().deserialize(kit.prettyDisplayName())
                     .decoration(TextDecoration.ITALIC, false));
             meta.lore(java.util.List.of(Component.text("クリックでコピー", NamedTextColor.GRAY)
                     .decoration(TextDecoration.ITALIC, false)));

@@ -172,8 +172,10 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                     player.sendMessage(Component.text("/kit create <name>", NamedTextColor.YELLOW));
                     yield true;
                 }
-                KitDefinition kit = kitService.createFromPlayer(player, args[1].toLowerCase(Locale.ROOT));
-                player.sendMessage(Component.text("Kit saved: " + kit.name(), NamedTextColor.GREEN));
+                // Pass the RAW name: KitService lowercases the storage key itself but keeps
+                // the typed casing as the display name (for gui.kit-name-case: KEEP).
+                KitDefinition kit = kitService.createFromPlayer(player, args[1]);
+                player.sendMessage(Component.text("Kit saved: " + kit.displayName(), NamedTextColor.GREEN));
                 yield true;
             }
             case "list" -> {

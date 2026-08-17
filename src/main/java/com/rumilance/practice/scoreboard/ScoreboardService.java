@@ -218,7 +218,8 @@ public final class ScoreboardService {
             int waiting = queueService.waitingCount(entry.get().mode(), entry.get().kitId());
             // One piece of information per line.
             objective.getScore("§b┃ §fキュー中 §b┃").setScore(line--);
-            objective.getScore("§7Kit: §b" + entry.get().kitId()).setScore(line--);
+            objective.getScore("§7Kit: §b"
+                    + com.rumilance.practice.util.KitNames.pretty(entry.get().kitId())).setScore(line--);
             objective.getScore("§7Mode: §a" + modeLabel(entry.get().mode())).setScore(line--);
             objective.getScore("§7Wait: §e" + fmtTime(waited)).setScore(line--);
             objective.getScore("§7Queue: §f" + waiting).setScore(line--);

@@ -252,7 +252,13 @@ public final class KitService {
         return stack.clone();
     }
 
+    /**
+     * Creates a kit from the player's live inventory. The storage key is the lowercased id,
+     * but the ORIGINAL casing of {@code id} is preserved as the display name so the
+     * {@code gui.kit-name-case: KEEP} style can render it exactly as typed.
+     */
     public KitDefinition createFromPlayer(Player player, String id) {
+        String key = id.toLowerCase(Locale.ROOT);
         List<KitItemEntry> items = new ArrayList<>();
         ItemStack[] contents = player.getInventory().getStorageContents();
         for (int i = 0; i < contents.length; i++) {
@@ -277,7 +283,8 @@ public final class KitService {
 
         ItemStack hand = player.getInventory().getItemInMainHand();
         String icon = hand.getType().isAir() ? "DIAMOND_SWORD" : hand.getType().name();
-        KitDefinition kit = KitDefinition.builder(id)
+        // Storage key is lowercase; display name keeps the admin's original casing.
+        KitDefinition kit = KitDefinition.builder(key)
                 .displayName(id)
                 .icon(icon)
                 .items(items)

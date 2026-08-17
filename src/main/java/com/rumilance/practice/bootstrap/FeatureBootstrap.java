@@ -449,7 +449,10 @@ public final class FeatureBootstrap {
         com.rumilance.practice.chat.PendingInput.init(plugin);
         // One-shot sweep: delete leftover floating-text entities (holograms) from all worlds,
         // including ones spawned by other plugins that crashed without cleaning up.
-        com.rumilance.practice.lobby.FloatingTextCleanup.scheduleSweep(plugin);
+        // Floating-text (hologram) cleanup: entities load async AFTER chunks since 1.17, so a
+        // one-shot scan at enable sees nothing - sweep via EntitiesLoadEvent for a window instead.
+        com.rumilance.practice.lobby.FloatingTextCleanup.start(plugin,
+                configService.config().getLong("cleanup.floating-text-window-seconds", 300L));
         pm.registerEvents(new PracticeSideListener(chatBanService, settingsService, guiSessions,
                 arrowEffectService, spectatorService, ffaService, originalKitService), plugin);
 
