@@ -182,6 +182,11 @@ public final class MatchListener implements Listener {
             return;
         }
         if (session.state() == MatchState.ACTIVE) {
+            // Glass (arena walls/borders) is NEVER breakable in a match, regardless of kit flags.
+            if (isGlass(event.getBlock().getType())) {
+                event.setCancelled(true);
+                return;
+            }
             KitDefinition kit = kitService.get(session.kitName()).orElse(null);
             if (kit == null) {
                 event.setCancelled(true);
@@ -191,6 +196,12 @@ public final class MatchListener implements Listener {
                 event.setCancelled(true);
             }
         }
+    }
+
+    /** @return true for every glass variant (blocks, panes, stained, tinted). */
+    private static boolean isGlass(org.bukkit.Material material) {
+        String name = material.name();
+        return name.endsWith("GLASS") || name.endsWith("GLASS_PANE");
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)

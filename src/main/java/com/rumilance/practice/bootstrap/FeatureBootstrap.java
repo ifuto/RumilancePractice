@@ -444,7 +444,7 @@ public final class FeatureBootstrap {
         pm.registerEvents(guiListener, plugin);
         pm.registerEvents(functionalItemListener, plugin);
         pm.registerEvents(new LobbyCompassListener(stateManager, soundService, gameMenuGui::open), plugin);
-        pm.registerEvents(new AdminToolListener(lobbyService, soundService), plugin);
+        pm.registerEvents(new AdminToolListener(soundService), plugin);
         pm.registerEvents(new com.rumilance.practice.team.TeamListener(teamService), plugin);
         com.rumilance.practice.chat.PendingInput.init(plugin);
         // One-shot sweep: delete leftover floating-text entities (holograms) from all worlds,

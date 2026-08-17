@@ -125,6 +125,12 @@ public final class FfaListener implements Listener {
         if (!ffaService.isInFfa(event.getPlayer().getUniqueId())) {
             return;
         }
+        // Glass (arena walls/borders) is NEVER breakable in FFA, regardless of kit flags.
+        String typeName = event.getBlock().getType().name();
+        if (typeName.endsWith("GLASS") || typeName.endsWith("GLASS_PANE")) {
+            event.setCancelled(true);
+            return;
+        }
         KitDefinition kit = kitOf(event.getPlayer().getUniqueId());
         if (kit == null) {
             event.setCancelled(true);

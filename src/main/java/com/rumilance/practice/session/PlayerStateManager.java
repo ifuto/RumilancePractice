@@ -17,8 +17,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>Allowed transitions:</p>
  * <pre>
  * IDLE              -&gt; LOBBY
- * LOBBY             -&gt; OPENING_GUI, QUEUED_RANKED, QUEUED_UNRANKED, REQUESTING_DUEL, SPECTATING, FFA, EDITING_KIT
- * OPENING_GUI       -&gt; LOBBY, QUEUED_RANKED, QUEUED_UNRANKED, REQUESTING_DUEL, SPECTATING, FFA, EDITING_KIT
+ * LOBBY             -&gt; OPENING_GUI, QUEUED_RANKED, QUEUED_UNRANKED, REQUESTING_DUEL, SPECTATING, FFA, EDITING_KIT, PREPARING_MATCH
+ * OPENING_GUI       -&gt; LOBBY, QUEUED_RANKED, QUEUED_UNRANKED, REQUESTING_DUEL, SPECTATING, FFA, EDITING_KIT, PREPARING_MATCH
  * QUEUED_RANKED     -&gt; LOBBY, PREPARING_MATCH
  * QUEUED_UNRANKED   -&gt; LOBBY, PREPARING_MATCH
  * REQUESTING_DUEL   -&gt; LOBBY, PREPARING_MATCH
@@ -104,11 +104,17 @@ public final class PlayerStateManager {
         map.put(PlayerState.IDLE, Set.of(PlayerState.LOBBY));
         map.put(PlayerState.LOBBY, Set.of(
                 PlayerState.OPENING_GUI, PlayerState.QUEUED_RANKED, PlayerState.QUEUED_UNRANKED,
-                PlayerState.REQUESTING_DUEL, PlayerState.SPECTATING, PlayerState.FFA, PlayerState.EDITING_KIT
+                PlayerState.REQUESTING_DUEL, PlayerState.SPECTATING, PlayerState.FFA, PlayerState.EDITING_KIT,
+                // Direct match entry: duel-request acceptors and team-battle members enter a
+                // match straight from LOBBY (no queue). Without this edge every tryTransition
+                // silently failed, players stayed in LOBBY state for the whole fight and the
+                // lobby damage protection made them unhittable.
+                PlayerState.PREPARING_MATCH
         ));
         map.put(PlayerState.OPENING_GUI, Set.of(
                 PlayerState.LOBBY, PlayerState.QUEUED_RANKED, PlayerState.QUEUED_UNRANKED,
-                PlayerState.REQUESTING_DUEL, PlayerState.SPECTATING, PlayerState.FFA, PlayerState.EDITING_KIT
+                PlayerState.REQUESTING_DUEL, PlayerState.SPECTATING, PlayerState.FFA, PlayerState.EDITING_KIT,
+                PlayerState.PREPARING_MATCH
         ));
         map.put(PlayerState.QUEUED_RANKED, Set.of(PlayerState.LOBBY, PlayerState.PREPARING_MATCH));
         map.put(PlayerState.QUEUED_UNRANKED, Set.of(PlayerState.LOBBY, PlayerState.PREPARING_MATCH));

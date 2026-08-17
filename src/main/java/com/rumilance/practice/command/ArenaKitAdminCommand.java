@@ -302,6 +302,17 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                 player.sendMessage(Component.text("Draft created: " + id, NamedTextColor.GREEN));
                 yield true;
             }
+            case "pos1" -> {
+                // Feet-position selection: /arena pos1 marks the block you are standing on.
+                AdminTools.setPos1(player, player.getLocation().getBlock().getLocation());
+                player.sendMessage(Component.text("Selection pos1 = ここ(足元)に設定しました。", NamedTextColor.GREEN));
+                yield true;
+            }
+            case "pos2" -> {
+                AdminTools.setPos2(player, player.getLocation().getBlock().getLocation());
+                player.sendMessage(Component.text("Selection pos2 = ここ(足元)に設定しました。次: /arena selection apply <draft>", NamedTextColor.GREEN));
+                yield true;
+            }
             case "selection", "selectionapply" -> {
                 if (args.length < 2 && !sub.equals("selection")) {
                     yield true;
@@ -488,7 +499,7 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
     private List<String> completeArena(String[] args) {
         if (args.length == 1) {
             return filter(List.of(
-                    "draft", "selection", "p1", "p2", "type", "save", "enable", "disable",
+                    "draft", "pos1", "pos2", "selection", "p1", "p2", "type", "save", "enable", "disable",
                     "list", "info", "delete"), args[0]);
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
