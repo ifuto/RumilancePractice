@@ -10,7 +10,6 @@ import com.rumilance.practice.match.MatchService;
 import com.rumilance.practice.queue.QueueCoordinator;
 import com.rumilance.practice.session.PlayerStateManager;
 import com.rumilance.practice.sound.SoundService;
-import com.rumilance.practice.state.ArenaTerrain;
 import com.rumilance.practice.state.MatchMode;
 import com.rumilance.practice.state.PlayerState;
 import net.kyori.adventure.text.Component;
@@ -140,7 +139,7 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
                     messageService.send(player, "kit.not-found", MessageService.tags("kit", args[1]));
                     yield true;
                 }
-                sendRequest(player, target, ranked, kit, ArenaTerrain.ANY, 1);
+                sendRequest(player, target, ranked, kit, 1);
                 yield true;
             }
         };
@@ -174,7 +173,7 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
         }
         matchService.startDuel(request.sender(), request.target(), request.kitName(),
                 request.ranked() ? MatchMode.RANKED : MatchMode.UNRANKED,
-                request.terrain(), request.bestOf());
+                request.bestOf());
     }
 
     public void handleDeny(Player player, String fromName) {
@@ -207,7 +206,7 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
     }
 
     private void sendRequest(Player sender, Player target, boolean ranked, String kit,
-                             ArenaTerrain terrain, int bestOf) {
+                             int bestOf) {
         if (sender.getUniqueId().equals(target.getUniqueId())) {
             messageService.send(sender, "duel.cannot-duel-self");
             return;
@@ -218,7 +217,7 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
                     MessageService.tags("target", target.getName()));
             return;
         }
-        duelRequestService.create(sender.getUniqueId(), target.getUniqueId(), kit, ranked, terrain, bestOf)
+        duelRequestService.create(sender.getUniqueId(), target.getUniqueId(), kit, ranked, bestOf)
                 .ifPresentOrElse(req -> {
                     soundService.play(sender, "duel-request-sent");
                     soundService.play(target, "duel-request-received");

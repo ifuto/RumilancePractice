@@ -1,7 +1,6 @@
 package com.rumilance.practice.duel;
 
 import com.rumilance.practice.model.DuelRequest;
-import com.rumilance.practice.state.ArenaTerrain;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -24,7 +23,6 @@ public final class DuelRequestService {
             UUID target,
             String kitName,
             boolean ranked,
-            ArenaTerrain terrain,
             int bestOf,
             Instant createdAt,
             Instant expiresAt
@@ -45,7 +43,7 @@ public final class DuelRequestService {
     }
 
     public synchronized Optional<RichDuelRequest> create(
-            UUID sender, UUID target, String kit, boolean ranked, ArenaTerrain terrain, int bestOf
+            UUID sender, UUID target, String kit, boolean ranked, int bestOf
     ) {
         if (sender.equals(target)) {
             return Optional.empty();
@@ -58,7 +56,6 @@ public final class DuelRequestService {
         Instant created = Instant.now();
         RichDuelRequest request = new RichDuelRequest(
                 UUID.randomUUID(), sender, target, kit, ranked,
-                terrain == null ? ArenaTerrain.ANY : terrain,
                 Math.max(1, bestOf),
                 created,
                 created.plusSeconds(ttlSeconds)

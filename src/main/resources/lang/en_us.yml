@@ -39,7 +39,6 @@ duel-gui:
   title-ranked: "<light_purple>Ranked Duel"
   title-unranked: "<aqua>Unranked Duel"
   kit-select: "<aqua>Kit (<kit>)"
-  map-select: "<green>Map (<map>)"
   mode-ranked: "<white>Mode: Ranked"
   mode-unranked: "<white>Mode: Unranked"
   cancel: "<red>Cancel"

@@ -18,7 +18,6 @@ import com.rumilance.practice.session.MatchSession;
 import com.rumilance.practice.session.PlayerStateManager;
 import com.rumilance.practice.settings.SettingsService;
 import com.rumilance.practice.sound.SoundService;
-import com.rumilance.practice.state.ArenaTerrain;
 import com.rumilance.practice.state.ArenaType;
 import com.rumilance.practice.state.TeamColor;
 import com.rumilance.practice.state.MatchMode;
@@ -194,9 +193,8 @@ public final class MatchService {
         }
     }
 
-    public void startDuel(UUID playerA, UUID playerB, String kitId, MatchMode mode,
-                          ArenaTerrain terrain, int bestOf) {
-        startDuel(playerA, playerB, kitId, mode, terrain, bestOf, Map.of());
+    public void startDuel(UUID playerA, UUID playerB, String kitId, MatchMode mode, int bestOf) {
+        startDuel(playerA, playerB, kitId, mode, bestOf, Map.of());
     }
 
     /**
@@ -204,7 +202,7 @@ public final class MatchService {
      * the new session (empty for fresh queue/duel-request matches, so the score starts 0-0).
      */
     public void startDuel(UUID playerA, UUID playerB, String kitId, MatchMode mode,
-                          ArenaTerrain terrain, int bestOf, Map<UUID, Integer> carrySeriesWins) {
+                          int bestOf, Map<UUID, Integer> carrySeriesWins) {
         if (registry.isPlayerInMatch(playerA) || registry.isPlayerInMatch(playerB)) {
             return;
         }
@@ -214,7 +212,7 @@ public final class MatchService {
         }
 
         MatchSession session = new MatchSession(
-                UUID.randomUUID(), mode, kitId, List.of(playerA, playerB), null, terrain, bestOf);
+                UUID.randomUUID(), mode, kitId, List.of(playerA, playerB), null, bestOf);
         session.applySeries(carrySeriesWins);
         if (!registry.register(session)) {
             return;
@@ -227,7 +225,7 @@ public final class MatchService {
         session.setState(MatchState.RESERVING_ARENA);
         announceMatchFound(session);
 
-        reserveArenaFor(kit, terrain, session.id())
+        reserveArenaFor(kit, session.id())
                 .whenComplete((opt, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
                     if (error != null || opt == null || opt.isEmpty()) {
                         failMatch(session, "No arena available");
@@ -247,14 +245,14 @@ public final class MatchService {
 
     /**
      * Reserves the arena for {@code kit}: kits pinned to one arena ({@code /kit arena})
-     * always use that template; otherwise falls back to the legacy terrain-based pick.
+     * always use that exact template; unpinned kits get any free duel arena.
      */
     private java.util.concurrent.CompletableFuture<Optional<ArenaInstance>> reserveArenaFor(
-            KitDefinition kit, ArenaTerrain terrain, UUID matchId) {
+            KitDefinition kit, UUID matchId) {
         if (kit.hasFixedArena()) {
             return arenaService.reserveNamed(kit.arenaName(), matchId);
         }
-        return arenaService.reserve(ArenaType.DUEL, terrain == null ? kit.arenaTerrain() : terrain, matchId);
+        return arenaService.reserve(ArenaType.DUEL, matchId);
     }
 
     /**
@@ -264,7 +262,7 @@ public final class MatchService {
      * the no-queue entry point used by the team hub GUI / {@code /team start}.
      */
     public void startTeamMatch(List<UUID> redTeam, List<UUID> blueTeam, String kitId,
-                               MatchMode mode, ArenaTerrain terrain, int bestOf) {
+                               MatchMode mode, int bestOf) {
         if (redTeam == null || blueTeam == null
                 || redTeam.isEmpty() || blueTeam.isEmpty()
                 || redTeam.size() > MatchSession.MAX_SIDE_SIZE
@@ -288,7 +286,7 @@ public final class MatchService {
         }
 
         MatchSession session = new MatchSession(
-                UUID.randomUUID(), mode, kitId, redTeam, blueTeam, null, terrain, bestOf);
+                UUID.randomUUID(), mode, kitId, redTeam, blueTeam, null, bestOf);
         if (!registry.register(session)) {
             return;
         }
@@ -299,7 +297,7 @@ public final class MatchService {
         session.setState(MatchState.RESERVING_ARENA);
         announceMatchFound(session);
 
-        reserveArenaFor(kit, terrain, session.id())
+        reserveArenaFor(kit, session.id())
                 .whenComplete((opt, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
                     if (error != null || opt == null || opt.isEmpty()) {
                         failMatch(session, "No arena available");
@@ -816,7 +814,6 @@ public final class MatchService {
                 UUID b = session.participants().get(1);
                 String kit = session.kitName();
                 MatchMode mode = session.mode();
-                ArenaTerrain terrain = session.terrain();
                 int bestOf = session.bestOf();
                 Map<UUID, Integer> carrySeries = session.seriesWinsSnapshot();
                 cleanupSession(session, false);
@@ -824,9 +821,9 @@ public final class MatchService {
                     // Rematch a team battle with the same rosters and sides.
                     startTeamMatch(new ArrayList<>(session.team(TeamColor.RED)),
                             new ArrayList<>(session.team(TeamColor.BLUE)),
-                            kit, mode, terrain, bestOf);
+                            kit, mode, bestOf);
                 } else {
-                    startDuel(a, b, kit, mode, terrain, bestOf, carrySeries);
+                    startDuel(a, b, kit, mode, bestOf, carrySeries);
                 }
             }
         });

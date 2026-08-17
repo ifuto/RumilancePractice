@@ -1,6 +1,5 @@
 package com.rumilance.practice.session;
 
-import com.rumilance.practice.state.ArenaTerrain;
 import com.rumilance.practice.state.MatchMode;
 
 import java.util.Collection;
@@ -36,13 +35,13 @@ public final class SessionManager {
     }
 
     public MatchSession createMatch(MatchMode mode, String kitName, List<UUID> participants, UUID arenaInstanceId) {
-        return createMatch(mode, kitName, participants, arenaInstanceId, ArenaTerrain.ANY, 1);
+        return createMatch(mode, kitName, participants, arenaInstanceId, 1);
     }
 
     public MatchSession createMatch(MatchMode mode, String kitName, List<UUID> participants,
-                                    UUID arenaInstanceId, ArenaTerrain terrain, int bestOf) {
+                                    UUID arenaInstanceId, int bestOf) {
         MatchSession session = new MatchSession(
-                UUID.randomUUID(), mode, kitName, participants, arenaInstanceId, terrain, bestOf);
+                UUID.randomUUID(), mode, kitName, participants, arenaInstanceId, bestOf);
         matchSessions.put(session.id(), session);
         for (UUID participant : participants) {
             getSession(participant).ifPresent(playerSession -> playerSession.setCurrentMatchId(session.id()));

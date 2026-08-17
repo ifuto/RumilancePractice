@@ -185,7 +185,6 @@ public final class QueueCoordinator {
                     pair.b().playerId(),
                     pair.a().kitId(),
                     pair.a().mode(),
-                    kitService.get(pair.a().kitId()).map(k -> k.arenaTerrain()).orElse(null),
                     1
             );
         }

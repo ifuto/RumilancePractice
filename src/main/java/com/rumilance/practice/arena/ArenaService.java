@@ -2,7 +2,6 @@ package com.rumilance.practice.arena;
 
 import com.rumilance.practice.model.ArenaInstance;
 import com.rumilance.practice.model.ArenaTemplate;
-import com.rumilance.practice.state.ArenaTerrain;
 import com.rumilance.practice.state.ArenaType;
 import org.bukkit.Location;
 
@@ -14,8 +13,7 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Abstraction over arena reservation/regeneration used by the match engine. Exactly one
  * {@link ArenaInstance} currently backs each enabled {@link ArenaTemplate}; concurrency is
- * achieved by defining multiple templates of the same {@link ArenaType}/{@link ArenaTerrain}
- * (see {@code arenas.yml}). Two implementations are provided:
+ * achieved by defining multiple templates of the same {@link ArenaType} (see {@code arenas.yml}). Two implementations are provided:
  * <ul>
  *     <li>{@link SimpleArenaService} - no FAWE/WorldEdit dependency; simply teleports players to
  *     the template's configured spawn points and performs no world regeneration. Suitable for
@@ -37,25 +35,24 @@ public interface ArenaService {
     List<ArenaTemplate> templates(ArenaType type);
 
     /**
-     * Atomically reserves a free, enabled arena instance matching {@code type} and compatible
-     * with {@code terrain} (via {@link ArenaTerrain#matches(ArenaTerrain)}), pastes/prepares it if
-     * necessary, and marks it {@code IN_USE}. Never returns an instance already held by another
+     * Atomically reserves a free, enabled arena instance matching {@code type}, pastes/prepares
+     * it if necessary, and marks it {@code IN_USE}. Never returns an instance already held by another
      * match - see {@code com.rumilance.practice.match.MatchRegistry} for the equivalent
      * player-side double-registration guard.
      *
      * @return a future completing with the reserved instance, or empty if none is available.
      */
-    CompletableFuture<Optional<ArenaInstance>> reserve(ArenaType type, ArenaTerrain terrain, UUID matchId);
+    CompletableFuture<Optional<ArenaInstance>> reserve(ArenaType type, UUID matchId);
 
     /**
      * Reserves an instance of ONE specific template by name (kits pinned to a single arena).
-     * Falls back to {@link #reserve(ArenaType, ArenaTerrain, UUID)} semantics when the named
+     * Falls back to {@link #reserve(ArenaType, UUID)} semantics when the named
      * template does not exist or is disabled — implementations may also return empty instead.
      *
      * @return a future completing with the reserved instance, or empty if unavailable.
      */
     default CompletableFuture<Optional<ArenaInstance>> reserveNamed(String templateName, UUID matchId) {
-        return reserve(ArenaType.DUEL, ArenaTerrain.ANY, matchId);
+        return reserve(ArenaType.DUEL, matchId);
     }
 
     /**

@@ -36,7 +36,6 @@ duel-gui:
   title-ranked: "<light_purple>랭크 듀얼"
   title-unranked: "<aqua>비랭크 듀얼"
   kit-select: "<aqua>키트 (<kit>)"
-  map-select: "<green>맵 (<map>)"
   mode-ranked: "<white>모드: 랭크전"
   mode-unranked: "<white>모드: 비랭크전"
   cancel: "<red>취소"

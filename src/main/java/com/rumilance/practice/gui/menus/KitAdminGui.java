@@ -26,7 +26,7 @@ import java.util.List;
 
 /**
  * Admin kit management GUI ({@code /kit} with no args). Lists every kit; clicking one opens a
- * toggle panel for its settings (enable / adventure / ranked / arena-terrain / regen / food /
+ * toggle panel for its settings (enable / adventure / ranked / pinned-arena / regen / food /
  * block-place / block-break / pearl / totem / shield-break). Changes are saved immediately.
  *
  * <p>All labels are localised via {@link MessageService} under the {@code admin-gui.*} keys

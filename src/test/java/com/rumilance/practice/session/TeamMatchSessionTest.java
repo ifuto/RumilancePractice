@@ -1,6 +1,5 @@
 package com.rumilance.practice.session;
 
-import com.rumilance.practice.state.ArenaTerrain;
 import com.rumilance.practice.state.MatchMode;
 import com.rumilance.practice.state.TeamColor;
 import org.junit.jupiter.api.Test;
@@ -30,7 +29,7 @@ class TeamMatchSessionTest {
 
     private static MatchSession team(List<UUID> red, List<UUID> blue) {
         return new MatchSession(UUID.randomUUID(), MatchMode.TEAM, "nodebuff",
-                red, blue, null, ArenaTerrain.ANY, 1);
+                red, blue, null, 1);
     }
 
     @Test
@@ -87,7 +86,7 @@ class TeamMatchSessionTest {
         UUID a = UUID.randomUUID();
         UUID b = UUID.randomUUID();
         MatchSession session = new MatchSession(UUID.randomUUID(), MatchMode.RANKED, "nodebuff",
-                List.of(a, b), null, ArenaTerrain.ANY, 1);
+                List.of(a, b), null, 1);
         assertFalse(session.isTeamMatch());
         assertEquals(TeamColor.RED, session.teamColor(a));
         assertEquals(TeamColor.BLUE, session.teamColor(b));

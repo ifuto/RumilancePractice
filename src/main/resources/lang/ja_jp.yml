@@ -38,7 +38,6 @@ duel-gui:
   title-ranked: "<light_purple>ランク戦デュエル"
   title-unranked: "<aqua>アンランク戦デュエル"
   kit-select: "<aqua>キット (<kit>)"
-  map-select: "<green>マップ (<map>)"
   mode-ranked: "<white>モード: ランク戦"
   mode-unranked: "<white>モード: アンランク戦"
   cancel: "<red>キャンセル"

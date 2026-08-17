@@ -3,7 +3,6 @@ package com.rumilance.practice.arena;
 import com.rumilance.practice.model.ArenaInstance;
 import com.rumilance.practice.model.ArenaTemplate;
 import com.rumilance.practice.state.ArenaInstanceState;
-import com.rumilance.practice.state.ArenaTerrain;
 import com.rumilance.practice.state.ArenaType;
 import com.rumilance.practice.util.LocationUtil;
 import org.bukkit.Location;
@@ -59,17 +58,17 @@ public abstract class AbstractArenaService implements ArenaService {
     }
 
     /**
-     * Finds a free, enabled template matching {@code type}/{@code terrain} and atomically marks
+     * Finds a free, enabled template matching {@code type} and atomically marks
      * its backing instance {@code IN_USE} for {@code matchId} before releasing the lock, so two
      * concurrent callers can never be handed the same instance. Returns empty if none is
      * currently free. This method has no Bukkit-world-mutating side effects, so it is safe (and
      * intended) to unit test directly.
      */
-    protected final Optional<ArenaInstance> reserveInstance(ArenaType type, ArenaTerrain terrain, UUID matchId) {
+    protected final Optional<ArenaInstance> reserveInstance(ArenaType type, UUID matchId) {
         reservationLock.lock();
         try {
             for (ArenaTemplate template : templates) {
-                if (!template.enabled() || template.type() != type || !template.terrain().matches(terrain)) {
+                if (!template.enabled() || template.type() != type) {
                     continue;
                 }
                 ArenaInstance instance = instancesByTemplate.computeIfAbsent(

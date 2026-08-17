@@ -3,7 +3,6 @@ package com.rumilance.practice.kit;
 import com.rumilance.practice.config.ConfigService;
 import com.rumilance.practice.model.KitDefinition;
 import com.rumilance.practice.model.KitItemEntry;
-import com.rumilance.practice.state.ArenaTerrain;
 import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -58,7 +57,6 @@ public final class KitService {
                     .naturalHealthRegen(section.getBoolean("natural-health-regen", true))
                     .knockbackMultiplier(section.getDouble("knockback-multiplier", 1.0d))
                     .enabled(section.getBoolean("enabled", true))
-                    .arenaTerrain(parseTerrain(section.getString("arena-terrain", "ANY")))
                     .autoFood(section.getBoolean("auto-food", false))
                     .swordShieldBreak(section.getBoolean("sword-shield-break", false))
                     .blockPlace(section.getBoolean("block-place", false))
@@ -347,7 +345,6 @@ public final class KitService {
         yaml.set(path + ".natural-health-regen", kit.naturalHealthRegen());
         yaml.set(path + ".knockback-multiplier", kit.knockbackMultiplier());
         yaml.set(path + ".enabled", kit.enabled());
-        yaml.set(path + ".arena-terrain", kit.arenaTerrain().name());
         yaml.set(path + ".auto-food", kit.autoFood());
         yaml.set(path + ".sword-shield-break", kit.swordShieldBreak());
         yaml.set(path + ".block-place", kit.blockPlace());
@@ -428,16 +425,4 @@ public final class KitService {
         return new ItemStack(material, Math.max(1, entry.amount()));
     }
 
-    private static ArenaTerrain parseTerrain(String raw) {
-        if (raw == null) {
-            return ArenaTerrain.ANY;
-        }
-        return switch (raw.toLowerCase(Locale.ROOT)) {
-            case "false", "flat" -> ArenaTerrain.FLAT;
-            case "true", "bumpy" -> ArenaTerrain.BUMPY;
-            case "crystal" -> ArenaTerrain.CRYSTAL;
-            case "neth", "netherite" -> ArenaTerrain.NETHERITE;
-            default -> ArenaTerrain.ANY;
-        };
-    }
 }

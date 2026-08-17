@@ -13,7 +13,6 @@ import com.rumilance.practice.locale.MessageService;
 import com.rumilance.practice.model.RankedKitStats;
 import com.rumilance.practice.settings.SettingsService;
 import com.rumilance.practice.sound.SoundService;
-import com.rumilance.practice.state.ArenaTerrain;
 import com.rumilance.practice.stats.StatsService;
 import com.rumilance.practice.util.GuiSlots;
 import net.kyori.adventure.text.Component;
@@ -34,7 +33,6 @@ public final class DuelRequestGui extends AbstractGui {
     private final DuelRequestService duelRequestService;
     private final SettingsService settingsService;
     private final StatsService statsService;
-    private final MapSelectGui mapSelectGui;
     private final KitSelectGui kitSelectGui;
     private final MessageService messageService;
 
@@ -45,7 +43,6 @@ public final class DuelRequestGui extends AbstractGui {
             DuelRequestService duelRequestService,
             SettingsService settingsService,
             StatsService statsService,
-            MapSelectGui mapSelectGui,
             KitSelectGui kitSelectGui,
             MessageService messageService
     ) {
@@ -54,7 +51,6 @@ public final class DuelRequestGui extends AbstractGui {
         this.duelRequestService = duelRequestService;
         this.settingsService = settingsService;
         this.statsService = statsService;
-        this.mapSelectGui = mapSelectGui;
         this.kitSelectGui = kitSelectGui;
         this.messageService = messageService;
     }
@@ -65,9 +61,6 @@ public final class DuelRequestGui extends AbstractGui {
         session.setRanked(ranked);
         if (session.bestOf() < 1) {
             session.setBestOf(1);
-        }
-        if (session.selectedMap() == null) {
-            session.setSelectedMap(ArenaTerrain.ANY.name());
         }
         if (session.selectedKit() == null) {
             kitService.enabled().stream().findFirst().ifPresent(k -> session.setSelectedKit(k.name()));
@@ -124,9 +117,6 @@ public final class DuelRequestGui extends AbstractGui {
         inventory.setItem(GuiSlots.slot(2, 3), GuiDecorator.button(Material.DIAMOND_SWORD,
                 messageService.render(locale, "duel-gui.kit-select",
                         MessageService.tags("kit", session.selectedKit() == null ? "nodebuff" : session.selectedKit())), "kit"));
-        inventory.setItem(GuiSlots.slot(2, 5), GuiDecorator.button(Material.GRASS_BLOCK,
-                messageService.render(locale, "duel-gui.map-select",
-                        MessageService.tags("map", session.selectedMap() == null ? "ANY" : session.selectedMap())), "map"));
         ItemStack modeButton = GuiDecorator.button(
                 session.ranked() ? Material.PURPLE_DYE : Material.BLUE_DYE,
                 messageService.render(locale, session.ranked() ? "duel-gui.mode-ranked" : "duel-gui.mode-unranked"), "mode");
@@ -152,10 +142,6 @@ public final class DuelRequestGui extends AbstractGui {
             case "kit" -> {
                 player.closeInventory();
                 kitSelectGui.openFor(player, session);
-            }
-            case "map" -> {
-                player.closeInventory();
-                mapSelectGui.openFor(player, session);
             }
             case "mode" -> {
                 session.setRanked(!session.ranked());
@@ -189,13 +175,7 @@ public final class DuelRequestGui extends AbstractGui {
             return;
         }
         String kit = session.selectedKit() == null ? "nodebuff" : session.selectedKit();
-        ArenaTerrain terrain = ArenaTerrain.ANY;
-        try {
-            terrain = ArenaTerrain.valueOf(session.selectedMap() == null ? "ANY" : session.selectedMap());
-        } catch (Exception ignored) {
-            // keep ANY
-        }
-        if (duelRequestService.create(player.getUniqueId(), targetId, kit, session.ranked(), terrain, session.bestOf()).isEmpty()) {
+        if (duelRequestService.create(player.getUniqueId(), targetId, kit, session.ranked(), session.bestOf()).isEmpty()) {
             sounds.play(player, "error");
             messageService.send(player, "duel.could-not-send");
             return;

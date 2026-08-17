@@ -2,7 +2,6 @@ package com.rumilance.practice.arena;
 
 import com.rumilance.practice.config.ConfigService;
 import com.rumilance.practice.model.ArenaTemplate;
-import com.rumilance.practice.state.ArenaTerrain;
 import com.rumilance.practice.state.ArenaType;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -42,7 +41,7 @@ public final class ArenaTemplateStore {
             ArenaTemplate t = templates.get(i);
             if (t.name().equalsIgnoreCase(name)) {
                 templates.set(i, new ArenaTemplate(
-                        t.id(), t.name(), t.type(), t.terrain(), t.world(),
+                        t.id(), t.name(), t.type(), t.world(),
                         t.minX(), t.minY(), t.minZ(), t.maxX(), t.maxY(), t.maxZ(),
                         t.serializedSpawnA(), t.serializedSpawnB(), t.schematicPath(), enabled));
                 persistAll();
@@ -64,7 +63,6 @@ public final class ArenaTemplateStore {
             String path = "arenas." + t.name();
             yaml.set(path + ".id", t.id().toString());
             yaml.set(path + ".type", t.type().name());
-            yaml.set(path + ".terrain", t.terrain().name());
             yaml.set(path + ".world", t.world());
             yaml.set(path + ".enabled", t.enabled());
             yaml.set(path + ".schematic", t.schematicPath());
@@ -113,7 +111,6 @@ public final class ArenaTemplateStore {
     private static ArenaTemplate fromSection(String name, ConfigurationSection entry) {
         UUID id = entry.contains("id") ? UUID.fromString(entry.getString("id")) : UUID.nameUUIDFromBytes(name.getBytes());
         ArenaType type = ArenaType.valueOf(entry.getString("type", "DUEL").toUpperCase(Locale.ROOT));
-        ArenaTerrain terrain = ArenaTerrain.valueOf(entry.getString("terrain", "ANY").toUpperCase(Locale.ROOT));
         String world = entry.getString("world", "world");
         int minX = entry.getInt("min.x", 0);
         int minY = entry.getInt("min.y", 0);
@@ -125,7 +122,7 @@ public final class ArenaTemplateStore {
         String spawnB = buildSpawn(entry.getConfigurationSection("spawn-b"), world);
         String schematic = entry.getString("schematic", "");
         boolean enabled = entry.getBoolean("enabled", true);
-        return new ArenaTemplate(id, name, type, terrain, world, minX, minY, minZ, maxX, maxY, maxZ,
+        return new ArenaTemplate(id, name, type, world, minX, minY, minZ, maxX, maxY, maxZ,
                 spawnA, spawnB, schematic, enabled);
     }
 

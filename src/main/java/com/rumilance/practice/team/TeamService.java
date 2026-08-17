@@ -1,7 +1,6 @@
 package com.rumilance.practice.team;
 
 import com.rumilance.practice.match.MatchService;
-import com.rumilance.practice.state.ArenaTerrain;
 import com.rumilance.practice.state.MatchMode;
 import com.rumilance.practice.state.TeamColor;
 import net.kyori.adventure.text.Component;
@@ -265,7 +264,7 @@ public final class TeamService {
 
         // Delegate to MatchService which handles arena reservation, teleport, countdown.
         Bukkit.getScheduler().runTask(plugin, () ->
-                matchService.startTeamMatch(red, blue, kitId, MatchMode.TEAM, ArenaTerrain.ANY, 1));
+                matchService.startTeamMatch(red, blue, kitId, MatchMode.TEAM, 1));
         broadcast(team, Component.text("Team battle starting!", NamedTextColor.GOLD));
         return Result.OK;
     }

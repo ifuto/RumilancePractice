@@ -3,7 +3,6 @@ package com.rumilance.practice.arena;
 import com.rumilance.practice.arena.fawe.FaweBridge;
 import com.rumilance.practice.model.ArenaInstance;
 import com.rumilance.practice.model.ArenaTemplate;
-import com.rumilance.practice.state.ArenaTerrain;
 import com.rumilance.practice.state.ArenaType;
 import com.rumilance.practice.util.LocationUtil;
 import org.bukkit.Bukkit;
@@ -40,8 +39,8 @@ public final class FaweArenaService extends AbstractArenaService {
     }
 
     @Override
-    public CompletableFuture<Optional<ArenaInstance>> reserve(ArenaType type, ArenaTerrain terrain, UUID matchId) {
-        return CompletableFuture.completedFuture(reserveInstance(type, terrain, matchId));
+    public CompletableFuture<Optional<ArenaInstance>> reserve(ArenaType type, UUID matchId) {
+        return CompletableFuture.completedFuture(reserveInstance(type, matchId));
     }
 
     @Override

@@ -11,7 +11,6 @@ import com.rumilance.practice.model.ArenaTemplate;
 import com.rumilance.practice.model.KitDefinition;
 import com.rumilance.practice.queue.QueueService;
 import com.rumilance.practice.sound.SoundService;
-import com.rumilance.practice.state.ArenaTerrain;
 import com.rumilance.practice.state.ArenaType;
 import com.rumilance.practice.util.Cuboid;
 import com.rumilance.practice.util.LocationUtil;
@@ -321,7 +320,7 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                     yield true;
                 }
                 String id = args[1].toLowerCase(Locale.ROOT);
-                drafts.put(id, new ArenaTemplate(UUID.randomUUID(), id, ArenaType.DUEL, ArenaTerrain.ANY,
+                drafts.put(id, new ArenaTemplate(UUID.randomUUID(), id, ArenaType.DUEL,
                         player.getWorld().getName(), 0, 0, 0, 0, 0, 0,
                         LocationUtil.serialize(player.getLocation()),
                         LocationUtil.serialize(player.getLocation()), "", false));
@@ -359,12 +358,12 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                 Cuboid cuboid = Cuboid.of(p1, p2);
                 ArenaTemplate draft = drafts.getOrDefault(arena.toLowerCase(Locale.ROOT),
                         new ArenaTemplate(UUID.randomUUID(), arena.toLowerCase(Locale.ROOT), ArenaType.DUEL,
-                                ArenaTerrain.ANY, cuboid.worldName(), cuboid.minX(), cuboid.minY(), cuboid.minZ(),
+                                cuboid.worldName(), cuboid.minX(), cuboid.minY(), cuboid.minZ(),
                                 cuboid.maxX(), cuboid.maxY(), cuboid.maxZ(),
                                 LocationUtil.serialize(player.getLocation()),
                                 LocationUtil.serialize(player.getLocation()), "", false));
                 drafts.put(arena.toLowerCase(Locale.ROOT), new ArenaTemplate(
-                        draft.id(), draft.name(), draft.type(), draft.terrain(), cuboid.worldName(),
+                        draft.id(), draft.name(), draft.type(), cuboid.worldName(),
                         cuboid.minX(), cuboid.minY(), cuboid.minZ(), cuboid.maxX(), cuboid.maxY(), cuboid.maxZ(),
                         draft.serializedSpawnA(), draft.serializedSpawnB(), draft.schematicPath(), draft.enabled()));
                 player.sendMessage(Component.text("Selection applied.", NamedTextColor.GREEN));
@@ -381,28 +380,12 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                 }
                 String serialized = LocationUtil.serialize(player.getLocation());
                 drafts.put(draft.name(), new ArenaTemplate(
-                        draft.id(), draft.name(), draft.type(), draft.terrain(), draft.world(),
+                        draft.id(), draft.name(), draft.type(), draft.world(),
                         draft.minX(), draft.minY(), draft.minZ(), draft.maxX(), draft.maxY(), draft.maxZ(),
                         sub.equals("p1") ? serialized : draft.serializedSpawnA(),
                         sub.equals("p2") ? serialized : draft.serializedSpawnB(),
                         draft.schematicPath(), draft.enabled()));
                 player.sendMessage(Component.text(sub + " set.", NamedTextColor.GREEN));
-                yield true;
-            }
-            case "type" -> {
-                if (args.length < 3) {
-                    yield true;
-                }
-                ArenaTerrain terrain = ArenaTerrain.valueOf(args[1].toUpperCase(Locale.ROOT));
-                ArenaTemplate draft = drafts.get(args[2].toLowerCase(Locale.ROOT));
-                if (draft == null) {
-                    yield true;
-                }
-                drafts.put(draft.name(), new ArenaTemplate(
-                        draft.id(), draft.name(), draft.type(), terrain, draft.world(),
-                        draft.minX(), draft.minY(), draft.minZ(), draft.maxX(), draft.maxY(), draft.maxZ(),
-                        draft.serializedSpawnA(), draft.serializedSpawnB(), draft.schematicPath(), draft.enabled()));
-                player.sendMessage(Component.text("Type set.", NamedTextColor.GREEN));
                 yield true;
             }
             case "save" -> {
@@ -421,7 +404,7 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                             draft.maxX(), draft.maxY(), draft.maxZ(), out);
                 }
                 ArenaTemplate saved = new ArenaTemplate(
-                        draft.id(), draft.name(), draft.type(), draft.terrain(), draft.world(),
+                        draft.id(), draft.name(), draft.type(), draft.world(),
                         draft.minX(), draft.minY(), draft.minZ(), draft.maxX(), draft.maxY(), draft.maxZ(),
                         draft.serializedSpawnA(), draft.serializedSpawnB(), schematic, false);
                 arenaStore.upsert(saved);
@@ -440,7 +423,7 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
             }
             case "list" -> {
                 arenaStore.templates().forEach(t -> player.sendMessage(Component.text(
-                        t.name() + " " + t.terrain() + " enabled=" + t.enabled(), NamedTextColor.AQUA)));
+                        t.name() + " enabled=" + t.enabled(), NamedTextColor.AQUA)));
                 yield true;
             }
             case "info" -> {
@@ -531,7 +514,7 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
     private List<String> completeArena(String[] args) {
         if (args.length == 1) {
             return filter(List.of(
-                    "draft", "pos1", "pos2", "selection", "p1", "p2", "type", "save", "enable", "disable",
+                    "draft", "pos1", "pos2", "selection", "p1", "p2", "save", "enable", "disable",
                     "list", "info", "delete"), args[0]);
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
@@ -543,14 +526,12 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                 case "p1", "p2", "save" -> filter(draftNames, args[1]);
                 // Template management operates on SAVED templates only.
                 case "enable", "disable", "info", "delete" -> filter(arenaNames, args[1]);
-                case "type" -> filter(List.of("ANY", "FLAT", "BUMPY", "CRYSTAL", "NETHERITE"), args[1]);
                 case "selection" -> filter(List.of("apply"), args[1]);
                 default -> List.of();
             };
         }
-        if (args.length == 3 && (sub.equals("type")
-                || (sub.equals("selection") && args[1].equalsIgnoreCase("apply")))) {
-            // /arena type <terrain> <draft>  |  /arena selection apply <draft> — drafts only.
+        if (args.length == 3 && sub.equals("selection") && args[1].equalsIgnoreCase("apply")) {
+            // /arena selection apply <draft> — drafts only.
             return filter(draftNames, args[2]);
         }
         return List.of();

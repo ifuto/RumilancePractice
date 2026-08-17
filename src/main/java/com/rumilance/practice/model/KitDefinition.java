@@ -1,6 +1,5 @@
 package com.rumilance.practice.model;
 
-import com.rumilance.practice.state.ArenaTerrain;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,7 +29,6 @@ public record KitDefinition(
         List<KitItemEntry> items,
         Map<String, String> armor,
         boolean enabled,
-        ArenaTerrain arenaTerrain,
         boolean autoFood,
         boolean swordShieldBreak,
         boolean blockPlace,
@@ -49,15 +47,13 @@ public record KitDefinition(
      * {@code RegainReason} is {@code SATIATED} (regen from a full hunger bar) for players fighting
      * with this kit, while leaving other regen sources (golden apples, potions, ...) untouched.
      *
-     * <p>{@link #arenaName()} pins the kit to ONE specific arena template (empty = any arena).
-     * When set, matches with this kit always reserve that template; the legacy
-     * {@link #arenaTerrain()} preference is ignored.</p>
+     * <p>{@link #arenaName()} pins the kit to ONE specific arena template
+     * (empty = any free arena).</p>
      */
     public KitDefinition {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(displayName, "displayName");
         Objects.requireNonNull(icon, "icon");
-        Objects.requireNonNull(arenaTerrain, "arenaTerrain");
         maxHealth = maxHealth <= 0 ? 20.0d : maxHealth;
         knockbackMultiplier = knockbackMultiplier <= 0 ? 1.0d : knockbackMultiplier;
         items = List.copyOf(items);
@@ -125,7 +121,6 @@ public record KitDefinition(
         private List<KitItemEntry> items = new ArrayList<>();
         private Map<String, String> armor = new java.util.LinkedHashMap<>();
         private boolean enabled = true;
-        private ArenaTerrain arenaTerrain = ArenaTerrain.ANY;
         private boolean autoFood = false;
         private boolean swordShieldBreak = false;
         private boolean blockPlace = false;
@@ -154,7 +149,6 @@ public record KitDefinition(
             this.items = new ArrayList<>(source.items);
             this.armor = new java.util.LinkedHashMap<>(source.armor);
             this.enabled = source.enabled;
-            this.arenaTerrain = source.arenaTerrain;
             this.autoFood = source.autoFood;
             this.swordShieldBreak = source.swordShieldBreak;
             this.blockPlace = source.blockPlace;
@@ -222,11 +216,6 @@ public record KitDefinition(
             return this;
         }
 
-        public Builder arenaTerrain(ArenaTerrain value) {
-            this.arenaTerrain = Objects.requireNonNull(value, "arenaTerrain");
-            return this;
-        }
-
         public Builder autoFood(boolean value) {
             this.autoFood = value;
             return this;
@@ -285,7 +274,7 @@ public record KitDefinition(
         public KitDefinition build() {
             return new KitDefinition(
                     name, displayName, icon, ranked, ffaEnabled, maxHealth, naturalHealthRegen,
-                    knockbackMultiplier, items, armor, enabled, arenaTerrain, autoFood,
+                    knockbackMultiplier, items, armor, enabled, autoFood,
                     swordShieldBreak, blockPlace, blockBreak, canBreak, pearl, totem, forceAdventure,
                     timeoutSeconds, arenaName
             );

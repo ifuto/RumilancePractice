@@ -4,7 +4,7 @@
 #
 # Per-kit options (all optional):
 #   adventure: true           -> forces Adventure mode for this kit (default Survival).
-#   arena-terrain: ANY|FLAT|BUMPY|CRYSTAL|NETHERITE  -> which arenas the kit may use.
+#   arena: <arena-name>  -> pin this kit to one specific arena (empty = any free arena).
 #   enabled / ranked / ffa-enabled / natural-health-regen / timeout-seconds / ...
 kits:
   nodebuff:

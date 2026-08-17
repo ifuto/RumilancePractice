@@ -1,7 +1,6 @@
 package com.rumilance.practice.match;
 
 import com.rumilance.practice.session.MatchSession;
-import com.rumilance.practice.state.ArenaTerrain;
 import com.rumilance.practice.state.MatchMode;
 import org.junit.jupiter.api.Test;
 
@@ -20,9 +19,9 @@ class MatchRegistryTest {
         UUID b = UUID.randomUUID();
         UUID c = UUID.randomUUID();
         MatchSession first = new MatchSession(UUID.randomUUID(), MatchMode.RANKED, "nodebuff",
-                List.of(a, b), UUID.randomUUID(), ArenaTerrain.FLAT, 1);
+                List.of(a, b), UUID.randomUUID(), 1);
         MatchSession second = new MatchSession(UUID.randomUUID(), MatchMode.UNRANKED, "nodebuff",
-                List.of(a, c), UUID.randomUUID(), ArenaTerrain.FLAT, 1);
+                List.of(a, c), UUID.randomUUID(), 1);
 
         assertTrue(registry.register(first));
         assertFalse(registry.register(second));

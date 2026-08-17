@@ -1,6 +1,5 @@
 package com.rumilance.practice.session;
 
-import com.rumilance.practice.state.ArenaTerrain;
 import com.rumilance.practice.state.MatchMode;
 import org.junit.jupiter.api.Test;
 
@@ -17,7 +16,7 @@ class MatchSessionIdempotencyTest {
         MatchSession session = new MatchSession(
                 UUID.randomUUID(), MatchMode.RANKED, "nodebuff",
                 List.of(UUID.randomUUID(), UUID.randomUUID()),
-                UUID.randomUUID(), ArenaTerrain.ANY, 1
+                UUID.randomUUID(), 1
         );
         assertTrue(session.tryMarkResultApplied());
         assertFalse(session.tryMarkResultApplied());
@@ -29,7 +28,7 @@ class MatchSessionIdempotencyTest {
         MatchSession session = new MatchSession(
                 UUID.randomUUID(), MatchMode.UNRANKED, "nodebuff",
                 List.of(UUID.randomUUID(), UUID.randomUUID()),
-                UUID.randomUUID(), ArenaTerrain.ANY, 1
+                UUID.randomUUID(), 1
         );
         session.setShuttingDown(true);
         assertTrue(session.isShuttingDown());

@@ -67,7 +67,6 @@ import com.rumilance.practice.gui.menus.EditKitGui;
 import com.rumilance.practice.gui.menus.FfaListGui;
 import com.rumilance.practice.gui.menus.KitAdminGui;
 import com.rumilance.practice.gui.menus.KitSelectGui;
-import com.rumilance.practice.gui.menus.MapSelectGui;
 import com.rumilance.practice.gui.menus.PlayersGui;
 import com.rumilance.practice.gui.menus.QueueKitGui;
 import com.rumilance.practice.gui.menus.ProfileGui;
@@ -297,11 +296,9 @@ public final class FeatureBootstrap {
         QueueKitGui rankedGui = new QueueKitGui(guiSessions, soundService, kitService, queueService, queueCoordinator, true);
         QueueKitGui unrankedGui = new QueueKitGui(guiSessions, soundService, kitService, queueService, queueCoordinator, false);
         KitSelectGui kitSelectGui = new KitSelectGui(guiSessions, soundService, kitService);
-        MapSelectGui mapSelectGui = new MapSelectGui(guiSessions, soundService);
         DuelRequestGui duelRequestGui = new DuelRequestGui(guiSessions, soundService, kitService, duelRequestService,
-                settingsService, statsService, mapSelectGui, kitSelectGui, messageService);
+                settingsService, statsService, kitSelectGui, messageService);
         kitSelectGui.setDuelRequestGui(duelRequestGui);
-        mapSelectGui.setDuelRequestGui(duelRequestGui);
 
         SettingsGui settingsGui = new SettingsGui(guiSessions, soundService, settingsService);
         settingsGui.setToggleCooldownSeconds(configService.config().getInt("gui.toggle-cooldown-seconds", 2));
@@ -372,7 +369,6 @@ public final class FeatureBootstrap {
         guiListener.register(rankedGui);
         guiListener.register(unrankedGui);
         guiListener.register(kitSelectGui);
-        guiListener.register(mapSelectGui);
         guiListener.register(duelRequestGui);
         guiListener.register(settingsGui);
         guiListener.register(statsKitGui);

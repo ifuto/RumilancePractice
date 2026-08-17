@@ -1,6 +1,5 @@
 package com.rumilance.practice.session;
 
-import com.rumilance.practice.state.ArenaTerrain;
 import com.rumilance.practice.state.MatchMode;
 import com.rumilance.practice.state.MatchState;
 import com.rumilance.practice.state.TeamColor;
@@ -32,7 +31,6 @@ public final class MatchSession {
     private final MatchMode mode;
     private final String kitName;
     private final List<UUID> participants;
-    private final ArenaTerrain terrain;
     private final int bestOf;
     private final boolean teamMatch;
     /** Team color per participant (explicit, supports uneven splits). */
@@ -57,7 +55,7 @@ public final class MatchSession {
 
     /** 1v1 constructor: exactly two participants, index 0 = RED, index 1 = BLUE. */
     public MatchSession(UUID id, MatchMode mode, String kitName, List<UUID> participants,
-                        UUID arenaInstanceId, ArenaTerrain terrain, int bestOf) {
+                        UUID arenaInstanceId, int bestOf) {
         this.id = Objects.requireNonNull(id, "id");
         this.mode = Objects.requireNonNull(mode, "mode");
         this.kitName = Objects.requireNonNull(kitName, "kitName");
@@ -68,7 +66,6 @@ public final class MatchSession {
         this.participants = List.copyOf(ordered);
         this.teamMatch = false;
         this.arenaInstanceId = arenaInstanceId;
-        this.terrain = terrain == null ? ArenaTerrain.ANY : terrain;
         this.bestOf = Math.max(1, bestOf);
         this.state = MatchState.CREATED;
         for (UUID participant : this.participants) {
@@ -86,7 +83,7 @@ public final class MatchSession {
      */
     public MatchSession(UUID id, MatchMode mode, String kitName,
                         List<UUID> redTeam, List<UUID> blueTeam,
-                        UUID arenaInstanceId, ArenaTerrain terrain, int bestOf) {
+                        UUID arenaInstanceId, int bestOf) {
         this.id = Objects.requireNonNull(id, "id");
         this.mode = Objects.requireNonNull(mode, "mode");
         this.kitName = Objects.requireNonNull(kitName, "kitName");
@@ -107,7 +104,6 @@ public final class MatchSession {
         this.participants = List.copyOf(ordered);
         this.teamMatch = true;
         this.arenaInstanceId = arenaInstanceId;
-        this.terrain = terrain == null ? ArenaTerrain.ANY : terrain;
         this.bestOf = Math.max(1, bestOf);
         this.state = MatchState.CREATED;
         for (UUID participant : this.participants) {
@@ -182,10 +178,6 @@ public final class MatchSession {
 
     public void setArenaInstanceId(UUID arenaInstanceId) {
         this.arenaInstanceId = arenaInstanceId;
-    }
-
-    public ArenaTerrain terrain() {
-        return terrain;
     }
 
     public int bestOf() {

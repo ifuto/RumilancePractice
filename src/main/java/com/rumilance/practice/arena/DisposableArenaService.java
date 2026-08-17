@@ -3,7 +3,6 @@ package com.rumilance.practice.arena;
 import com.rumilance.practice.arena.fawe.FaweBridge;
 import com.rumilance.practice.model.ArenaInstance;
 import com.rumilance.practice.model.ArenaTemplate;
-import com.rumilance.practice.state.ArenaTerrain;
 import com.rumilance.practice.state.ArenaType;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -85,15 +84,15 @@ public final class DisposableArenaService extends AbstractArenaService {
     }
 
     @Override
-    public CompletableFuture<Optional<ArenaInstance>> reserve(ArenaType type, ArenaTerrain terrain, UUID matchId) {
+    public CompletableFuture<Optional<ArenaInstance>> reserve(ArenaType type, UUID matchId) {
         // Pick a template (round-robin over enabled candidates via random start).
         List<ArenaTemplate> candidates = templates().stream()
-                .filter(t -> t.enabled() && t.type() == type && t.terrain().matches(terrain))
+                .filter(t -> t.enabled() && t.type() == type)
                 .filter(t -> t.schematicPath() != null && !t.schematicPath().isBlank())
                 .toList();
         if (candidates.isEmpty()) {
             // No schematic-backed template: fall back to the classic in-place reservation.
-            return CompletableFuture.completedFuture(reserveInstance(type, terrain, matchId));
+            return CompletableFuture.completedFuture(reserveInstance(type, matchId));
         }
         ArenaTemplate template = candidates.get(ThreadLocalRandom.current().nextInt(candidates.size()));
         return pasteCopy(template, matchId);

@@ -25,7 +25,7 @@ class MatchSessionTest {
 
     private MatchSession duel() {
         return new MatchSession(UUID.randomUUID(), MatchMode.RANKED, "nodebuff",
-                List.of(a, b), null, null, 1);
+                List.of(a, b), null, 1);
     }
 
     @Test

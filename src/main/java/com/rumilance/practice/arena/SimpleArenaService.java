@@ -1,7 +1,6 @@
 package com.rumilance.practice.arena;
 
 import com.rumilance.practice.model.ArenaInstance;
-import com.rumilance.practice.state.ArenaTerrain;
 import com.rumilance.practice.state.ArenaType;
 
 import java.util.Optional;
@@ -17,8 +16,8 @@ import java.util.concurrent.CompletableFuture;
 public final class SimpleArenaService extends AbstractArenaService {
 
     @Override
-    public CompletableFuture<Optional<ArenaInstance>> reserve(ArenaType type, ArenaTerrain terrain, UUID matchId) {
-        return CompletableFuture.completedFuture(reserveInstance(type, terrain, matchId));
+    public CompletableFuture<Optional<ArenaInstance>> reserve(ArenaType type, UUID matchId) {
+        return CompletableFuture.completedFuture(reserveInstance(type, matchId));
     }
 
     @Override
