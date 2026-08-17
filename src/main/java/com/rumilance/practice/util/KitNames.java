@@ -3,10 +3,10 @@ package com.rumilance.practice.util;
 import java.util.Locale;
 
 /**
- * Formats internal kit ids for display: underscores become spaces and an optional case style
- * is applied ({@code gui.kit-name-case} in config.yml). E.g. {@code "no_debuff"} renders as
- * {@code "No Debuff"} (TITLE), {@code "NO DEBUFF"} (UPPER), {@code "no debuff"} (LOWER) or
- * {@code "no debuff"} with original casing (KEEP).
+ * Formats kit display names: underscores become spaces and an optional case style is applied
+ * ({@code gui.kit-name-case} in config.yml, default {@code KEEP}). With KEEP, the casing typed
+ * in {@code /kit create NoDebuff_Pro} is shown verbatim as {@code "NoDebuff Pro"}; TITLE would
+ * render {@code "Nodebuff Pro"}, UPPER {@code "NODEBUFF PRO"}, LOWER {@code "nodebuff pro"}.
  */
 public final class KitNames {
 
@@ -23,24 +23,24 @@ public final class KitNames {
 
         public static CaseStyle parse(String raw) {
             if (raw == null) {
-                return TITLE;
+                return KEEP;
             }
             try {
                 return valueOf(raw.trim().toUpperCase(Locale.ROOT));
             } catch (IllegalArgumentException e) {
-                return TITLE;
+                return KEEP;
             }
         }
     }
 
-    private static volatile CaseStyle style = CaseStyle.TITLE;
+    private static volatile CaseStyle style = CaseStyle.KEEP;
 
     private KitNames() {
     }
 
     /** Sets the global case style (called once at bootstrap from config.yml). */
     public static void configure(CaseStyle newStyle) {
-        style = newStyle == null ? CaseStyle.TITLE : newStyle;
+        style = newStyle == null ? CaseStyle.KEEP : newStyle;
     }
 
     /** @return the display form of a kit id: underscores to spaces + configured casing. */

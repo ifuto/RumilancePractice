@@ -127,7 +127,7 @@ public final class FeatureBootstrap {
         // Global kit-name display style (underscores -> spaces + configured casing).
         com.rumilance.practice.util.KitNames.configure(
                 com.rumilance.practice.util.KitNames.CaseStyle.parse(
-                        configService.config().getString("gui.kit-name-case", "TITLE")));
+                        configService.config().getString("gui.kit-name-case", "KEEP")));
         SessionManager sessionManager = services.get(SessionManager.class);
         PlayerStateManager stateManager = services.get(PlayerStateManager.class);
         AsyncExecutor asyncExecutor = services.get(AsyncExecutor.class);

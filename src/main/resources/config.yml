@@ -111,9 +111,12 @@ hooks:
 # plugin (e.g. TAB) should own the sidebar/tab list instead.
 gui:
   # How kit ids are displayed in menus when no custom display-name is set.
-  # Underscores always become spaces; casing is one of: TITLE ("No Debuff"),
-  # UPPER ("NO DEBUFF"), LOWER ("no debuff"), KEEP (original casing).
-  kit-name-case: TITLE
+  # Underscores always become spaces; casing is one of:
+  #   KEEP  - exactly as typed in /kit create (default: "NoDebuff" stays "NoDebuff")
+  #   TITLE - capitalise each word ("No Debuff")
+  #   UPPER - all caps ("NO DEBUFF")
+  #   LOWER - all lowercase ("no debuff")
+  kit-name-case: KEEP
   # Minimum seconds between /setting (and similar) toggle clicks per player,
   # to stop rapid ON/OFF spam from hammering the settings store.
   toggle-cooldown-seconds: 2
