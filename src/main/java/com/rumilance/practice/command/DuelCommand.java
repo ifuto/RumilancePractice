@@ -257,11 +257,11 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
         }
         String current = TabCompletions.current(args);
         if (args.length == 1) {
-            List<String> out = new ArrayList<>();
+            // LinkedHashSet: pending requesters first, then other players — no duplicates.
+            java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<>();
             out.add("cancel");
             out.add("accept");
             out.add("deny");
-            // Prioritise players who have sent (or received) a pending request, then the rest of the server.
             duelRequestService.incoming(player.getUniqueId()).forEach(req -> {
                 Player p = Bukkit.getPlayer(req.sender());
                 if (p != null) {

@@ -163,25 +163,33 @@ public final class FfaCommand implements CommandExecutor, TabCompleter {
     @Override
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command,
                                                 @NotNull String alias, @NotNull String[] args) {
+        String current = TabCompletions.current(args);
         if (args.length == 1) {
             List<String> base = new ArrayList<>(List.of("leave"));
             if (sender.hasPermission("rumilance.admin")) {
                 base.addAll(List.of("create", "selection", "spawn", "kit", "enable", "disable", "delete", "reset"));
             }
-            return base;
+            return TabCompletions.filter(current, base);
+        }
+        // Admin-only subcommands: never suggest anything to non-admins past arg 1.
+        if (!sender.hasPermission("rumilance.admin")) {
+            return List.of();
         }
         if (args.length == 2 && List.of("enable", "disable", "delete", "reset", "spawn", "kit")
                 .contains(args[0].toLowerCase(Locale.ROOT))) {
-            return ffaService.list().stream().map(FfaService.FfaArena::id).toList();
+            return TabCompletions.filter(current,
+                    ffaService.list().stream().map(FfaService.FfaArena::id).toList());
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("kit")) {
-            return kitService.enabled().stream().map(k -> k.name()).toList();
+            return TabCompletions.filter(current,
+                    kitService.enabled().stream().map(k -> k.name()).toList());
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("selection")) {
-            return ffaService.list().stream().map(FfaService.FfaArena::id).toList();
+            return TabCompletions.filter(current,
+                    ffaService.list().stream().map(FfaService.FfaArena::id).toList());
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("selection")) {
-            return List.of("apply");
+            return TabCompletions.filter(current, "apply");
         }
         return List.of();
     }

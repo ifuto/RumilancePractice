@@ -197,14 +197,15 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
     @Override
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command,
                                                 @NotNull String alias, @NotNull String[] args) {
+        String current = TabCompletions.current(args);
         if (command.getName().equalsIgnoreCase("slobby") && args.length == 1) {
-            return List.of("pos1", "pos2", "spawn", "info", "validate");
+            return TabCompletions.filter(current, "pos1", "pos2", "spawn", "info", "validate");
         }
         if (args.length == 1) {
-            return List.of("tool", "reload", "status", "matches", "cleanup", "maintenance");
+            return TabCompletions.filter(current, "tool", "reload", "status", "matches", "cleanup", "maintenance");
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("maintenance")) {
-            return List.of("on", "off");
+            return TabCompletions.filter(current, "on", "off");
         }
         return List.of();
     }

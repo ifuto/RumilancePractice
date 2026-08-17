@@ -66,7 +66,8 @@ public final class SetFuncCommand implements CommandExecutor, TabCompleter {
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command,
                                                 @NotNull String alias, @NotNull String[] args) {
         if (args.length == 1) {
-            return List.of("ranked", "unranked", "ffa", "ekit", "settings", "spectate",
+            return TabCompletions.filter(TabCompletions.current(args),
+                    "ranked", "unranked", "ffa", "ekit", "settings", "spectate",
                     "titles", "party", "menu", "leavequeue");
         }
         return List.of();

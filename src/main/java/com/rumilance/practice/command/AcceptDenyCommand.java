@@ -56,17 +56,12 @@ public final class AcceptDenyCommand implements CommandExecutor, TabCompleter {
                 names.add(name);
             }
         }
-        if (command.getName().equalsIgnoreCase("deny")) {
+        // "all" is only meaningful for /deny and only when something is actually pending.
+        if (command.getName().equalsIgnoreCase("deny") && !names.isEmpty()) {
             names.add("all");
         }
-        if (names.isEmpty()) {
-            // No pending requests: fall back to every other online player so typing still hints names.
-            for (Player online : Bukkit.getOnlinePlayers()) {
-                if (!online.getUniqueId().equals(player.getUniqueId())) {
-                    names.add(online.getName());
-                }
-            }
-        }
+        // Only ACTUAL pending requesters are valid targets — no fallback to random online
+        // players (suggesting names that /accept would just reject is worse than silence).
         return TabCompletions.filter(TabCompletions.current(args), names);
     }
 

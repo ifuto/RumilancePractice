@@ -35,10 +35,6 @@ public final class TeamCommand implements CommandExecutor, TabCompleter {
         this.teamsBrowserGui = teamsBrowserGui;
     }
 
-    private static final List<String> SUB = List.of(
-            "gui", "create", "invite", "join", "decline", "leave", "kick", "public",
-            "list", "info", "side", "autosplit", "clearsides", "start", "disband");
-
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command,
                              @NotNull String label, @NotNull String[] args) {
@@ -179,7 +175,19 @@ public final class TeamCommand implements CommandExecutor, TabCompleter {
                                       @NotNull String alias, @NotNull String[] args) {
         if (!(sender instanceof Player player)) return List.of();
         if (args.length == 1) {
-            return filter(args[0], SUB);
+            // Context-sensitive: only offer subcommands that can actually succeed right now.
+            var teamOpt = teamService.teamOf(player.getUniqueId());
+            List<String> subs = new ArrayList<>(List.of("gui", "list"));
+            if (teamOpt.isEmpty()) {
+                subs.addAll(List.of("create", "join", "decline"));
+            } else {
+                subs.addAll(List.of("info", "leave"));
+                if (teamOpt.get().isOwner(player.getUniqueId())) {
+                    subs.addAll(List.of("invite", "kick", "public", "side",
+                            "autosplit", "clearsides", "start", "disband"));
+                }
+            }
+            return filter(args[0], subs);
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
         if (args.length == 2 && sub.equals("join")) {
@@ -187,11 +195,27 @@ public final class TeamCommand implements CommandExecutor, TabCompleter {
             teamService.publicTeams().forEach(t -> names.add(t.name()));
             return filter(args[1], names);
         }
-        if (args.length == 2 && (sub.equals("invite") || sub.equals("kick"))) {
+        if (args.length == 2 && sub.equals("invite")) {
+            // Only players who could actually accept: online, not the sender, not already in a team.
             List<String> names = new ArrayList<>();
             for (Player online : Bukkit.getOnlinePlayers()) {
-                if (!online.getUniqueId().equals(player.getUniqueId())) names.add(online.getName());
+                if (!online.getUniqueId().equals(player.getUniqueId())
+                        && teamService.teamOf(online.getUniqueId()).isEmpty()) {
+                    names.add(online.getName());
+                }
             }
+            return filter(args[1], names);
+        }
+        if (args.length == 2 && sub.equals("kick")) {
+            // Only your own team's members (excluding yourself, the owner).
+            List<String> names = new ArrayList<>();
+            teamService.teamOf(player.getUniqueId()).ifPresent(t ->
+                    t.members().forEach(u -> {
+                        if (!u.equals(player.getUniqueId())) {
+                            Player p = Bukkit.getPlayer(u);
+                            if (p != null) names.add(p.getName());
+                        }
+                    }));
             return filter(args[1], names);
         }
         if (args.length == 2 && sub.equals("create")) {

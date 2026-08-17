@@ -291,17 +291,21 @@ public final class PlayerCommands implements CommandExecutor, TabCompleter {
     @Override
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command,
                                                 @NotNull String alias, @NotNull String[] args) {
+        String current = TabCompletions.current(args);
         if (type == Type.RANKING && args.length == 1) {
-            return List.of("elo", "kill", "matches", "winstreak");
+            return TabCompletions.filter(current, "elo", "kill", "matches", "winstreak");
         }
         if (type == Type.KDR && args.length == 1) {
-            return Bukkit.getOnlinePlayers().stream().map(Player::getName).toList();
+            return TabCompletions.filter(current,
+                    Bukkit.getOnlinePlayers().stream().map(Player::getName).toList());
         }
         if (type == Type.KDR && args.length == 2) {
-            return kitService.enabled().stream().map(k -> k.name()).toList();
+            return TabCompletions.filter(current,
+                    kitService.enabled().stream().map(k -> k.name()).toList());
         }
         if (args.length == 1 && (type == Type.PING || type == Type.STATS || type == Type.PROFILE || type == Type.SPEC)) {
-            return Bukkit.getOnlinePlayers().stream().map(Player::getName).toList();
+            return TabCompletions.filter(current,
+                    Bukkit.getOnlinePlayers().stream().map(Player::getName).toList());
         }
         return List.of();
     }

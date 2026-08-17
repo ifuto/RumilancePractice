@@ -507,16 +507,19 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
         List<String> draftNames = new ArrayList<>(drafts.keySet());
         if (args.length == 2) {
             return switch (sub) {
-                case "p1", "p2", "save", "enable", "disable", "info", "delete" ->
-                        filter(arenaNames, args[1]);
+                // Draft-stage subcommands operate on DRAFTS only.
+                case "p1", "p2", "save" -> filter(draftNames, args[1]);
+                // Template management operates on SAVED templates only.
+                case "enable", "disable", "info", "delete" -> filter(arenaNames, args[1]);
                 case "type" -> filter(List.of("ANY", "FLAT", "BUMPY", "CRYSTAL", "NETHERITE"), args[1]);
                 case "selection" -> filter(List.of("apply"), args[1]);
                 default -> List.of();
             };
         }
-        if (args.length == 3) {
-            // /arena type <terrain> <draft>  |  /arena selection apply <draft>
-            return filter(draftNames.isEmpty() ? arenaNames : draftNames, args[2]);
+        if (args.length == 3 && (sub.equals("type")
+                || (sub.equals("selection") && args[1].equalsIgnoreCase("apply")))) {
+            // /arena type <terrain> <draft>  |  /arena selection apply <draft> — drafts only.
+            return filter(draftNames, args[2]);
         }
         return List.of();
     }
