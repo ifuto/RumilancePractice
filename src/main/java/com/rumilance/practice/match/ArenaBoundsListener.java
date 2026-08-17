@@ -51,7 +51,10 @@ public final class ArenaBoundsListener implements Listener {
                 instance.minX(), instance.minY(), instance.minZ(),
                 instance.maxX(), instance.maxY(), instance.maxZ());
         if (!region.contains(event.getTo())) {
-            Location spawn = session.participants().get(0).equals(player.getUniqueId())
+            // RED returns to spawn A, BLUE to spawn B (correct for 1v1 AND team matches;
+            // previously only participant #0 got spawn A, so most team members were sent
+            // to the enemy spawn when pushed back).
+            Location spawn = session.teamColor(player.getUniqueId()) == com.rumilance.practice.state.TeamColor.RED
                     ? arenaService.spawnA(instance)
                     : arenaService.spawnB(instance);
             event.setTo(LocationUtil.safeTeleportLocation(spawn, player));

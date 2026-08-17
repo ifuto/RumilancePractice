@@ -139,30 +139,41 @@ public final class DisposableArenaService extends AbstractArenaService {
     }
 
     /**
-     * Asynchronously generates/loads every chunk covering the copy (plus one chunk of margin)
-     * and pins them with plugin chunk tickets so they stay loaded for the whole match even
-     * with no player nearby yet. Uses Paper's async {@code getChunkAtAsync}; chunks are
-     * unpinned in {@link #release(UUID)}.
+     * Generates/loads every chunk covering the copy (plus one chunk of margin) and pins them
+     * with plugin chunk tickets so they stay loaded for the whole match even with no player
+     * nearby yet. {@code getChunkAtAsync} and {@code addPluginChunkTicket} are invoked FROM THE
+     * MAIN THREAD (Paper expects sync callers; the loading itself still happens off-thread) —
+     * this method may be called from any thread and hops to main first.
      */
     private CompletableFuture<Void> preloadChunks(World world, ArenaInstance instance) {
-        int minCX = (instance.minX() >> 4) - 1;
-        int maxCX = (instance.maxX() >> 4) + 1;
-        int minCZ = (instance.minZ() >> 4) - 1;
-        int maxCZ = (instance.maxZ() >> 4) + 1;
-        java.util.List<CompletableFuture<?>> futures = new java.util.ArrayList<>();
-        for (int cx = minCX; cx <= maxCX; cx++) {
-            for (int cz = minCZ; cz <= maxCZ; cz++) {
-                final int fcx = cx;
-                final int fcz = cz;
-                futures.add(world.getChunkAtAsync(cx, cz, true).thenAccept(chunk ->
-                        Bukkit.getScheduler().runTask(plugin, () -> {
-                            if (plugin.isEnabled() && liveCopies.containsKey(instance.id())) {
-                                world.addPluginChunkTicket(fcx, fcz, plugin);
-                            }
-                        })));
-            }
+        CompletableFuture<Void> done = new CompletableFuture<>();
+        if (!plugin.isEnabled()) {
+            done.complete(null);
+            return done;
         }
-        return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            int minCX = (instance.minX() >> 4) - 1;
+            int maxCX = (instance.maxX() >> 4) + 1;
+            int minCZ = (instance.minZ() >> 4) - 1;
+            int maxCZ = (instance.maxZ() >> 4) + 1;
+            java.util.List<CompletableFuture<?>> futures = new java.util.ArrayList<>();
+            for (int cx = minCX; cx <= maxCX; cx++) {
+                for (int cz = minCZ; cz <= maxCZ; cz++) {
+                    // Ticket first (sync, loads lazily); async load actually materialises it.
+                    world.addPluginChunkTicket(cx, cz, plugin);
+                    futures.add(world.getChunkAtAsync(cx, cz, true));
+                }
+            }
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                    .whenComplete((v, err) -> {
+                        if (err != null) {
+                            done.completeExceptionally(err);
+                        } else {
+                            done.complete(null);
+                        }
+                    });
+        });
+        return done;
     }
 
     /** Releases the chunk tickets pinned by {@link #preloadChunks}. Main thread only. */

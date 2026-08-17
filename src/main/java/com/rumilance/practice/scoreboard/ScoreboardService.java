@@ -216,7 +216,8 @@ public final class ScoreboardService {
             long waited = Math.max(0, Instant.now().getEpochSecond()
                     - entry.get().joinedAt().getEpochSecond());
             int waiting = queueService.waitingCount(entry.get().mode(), entry.get().kitId());
-            // One piece of information per line.
+            // One piece of information per line. No stats section while queued: the sidebar
+            // holds ~15 lines total and header(3)+queue(5)+stats(8)+footer(2) would overflow.
             objective.getScore("§b┃ §fキュー中 §b┃").setScore(line--);
             objective.getScore("§7Kit: §b"
                     + com.rumilance.practice.util.KitNames.pretty(entry.get().kitId())).setScore(line--);
@@ -224,8 +225,7 @@ public final class ScoreboardService {
             objective.getScore("§7Wait: §e" + fmtTime(waited)).setScore(line--);
             objective.getScore("§7Queue: §f" + waiting).setScore(line--);
         }
-        objective.getScore("§r").setScore(line--);
-        return renderStats(player, objective, line);
+        return line;
     }
 
     private int renderMatch(Player player, Objective objective, MatchSession session, int line) {

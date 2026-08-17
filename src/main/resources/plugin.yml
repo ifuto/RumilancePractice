@@ -136,7 +136,7 @@ commands:
     permission: rumilance.admin
   setfunc:
     description: Mark held item as a functional lobby item.
-    usage: /setfunc <ranked|unranked|ffa|ekit|settings|spectate|leavequeue>
+    usage: /setfunc <ranked|unranked|ffa|ekit|settings|spectate|titles|party|menu|leavequeue>
     permission: rumilance.admin
   arena:
     description: Manage arena templates and paste pool.
