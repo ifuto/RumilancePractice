@@ -71,7 +71,8 @@ public final class TeamKitSelectGui extends AbstractGui {
                     ItemBuilder.of(ItemBuilder.materialOr(kit.icon(), Material.DIAMOND_SWORD))
                             .nameMini(kit.prettyDisplayName())
                             .lore(UiTheme.divider(),
-                                    UiTheme.labelValue("Terrain", kit.arenaTerrain().name()),
+                                    UiTheme.labelValue("Arena", kit.hasFixedArena()
+                                            ? com.rumilance.practice.util.KitNames.pretty(kit.arenaName()) : "Random"),
                                     UiTheme.blank(),
                                     UiTheme.hint("Click to start the team battle"))
                             .action("kit:" + kit.name())

@@ -227,7 +227,7 @@ public final class MatchService {
         session.setState(MatchState.RESERVING_ARENA);
         announceMatchFound(session);
 
-        arenaService.reserve(ArenaType.DUEL, terrain == null ? kit.arenaTerrain() : terrain, session.id())
+        reserveArenaFor(kit, terrain, session.id())
                 .whenComplete((opt, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
                     if (error != null || opt == null || opt.isEmpty()) {
                         failMatch(session, "No arena available");
@@ -243,6 +243,18 @@ public final class MatchService {
                     session.setState(MatchState.WAITING_FOR_PLAYERS);
                     teleportAndPrepare(session, kit, instance);
                 }));
+    }
+
+    /**
+     * Reserves the arena for {@code kit}: kits pinned to one arena ({@code /kit arena})
+     * always use that template; otherwise falls back to the legacy terrain-based pick.
+     */
+    private java.util.concurrent.CompletableFuture<Optional<ArenaInstance>> reserveArenaFor(
+            KitDefinition kit, ArenaTerrain terrain, UUID matchId) {
+        if (kit.hasFixedArena()) {
+            return arenaService.reserveNamed(kit.arenaName(), matchId);
+        }
+        return arenaService.reserve(ArenaType.DUEL, terrain == null ? kit.arenaTerrain() : terrain, matchId);
     }
 
     /**
@@ -287,7 +299,7 @@ public final class MatchService {
         session.setState(MatchState.RESERVING_ARENA);
         announceMatchFound(session);
 
-        arenaService.reserve(ArenaType.DUEL, terrain == null ? kit.arenaTerrain() : terrain, session.id())
+        reserveArenaFor(kit, terrain, session.id())
                 .whenComplete((opt, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
                     if (error != null || opt == null || opt.isEmpty()) {
                         failMatch(session, "No arena available");

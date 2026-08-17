@@ -144,7 +144,7 @@ commands:
     permission: rumilance.admin
   kit:
     description: Manage official kits (no args opens the Kit Management GUI).
-    usage: /kit [gui|help|create <name>|rename <now> <new>|order <name> <up|down>|list|info <name>|enable|disable|delete <name>|timeout <name> <sec>|adventure <name> <on|off>|flag <name> <on|off>]
+    usage: /kit [gui|help|create <name>|rename <now> <new>|arena <kit> <arena|any>|order <name> <up|down>|list|info <name>|enable|disable|delete <name>|timeout <name> <sec>|adventure <name> <on|off>|flag <name> <on|off>]
     permission: rumilance.admin
   toggle:
     description: Enable/disable queues or maps.

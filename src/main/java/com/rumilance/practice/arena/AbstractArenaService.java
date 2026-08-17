@@ -85,6 +85,34 @@ public abstract class AbstractArenaService implements ArenaService {
         }
     }
 
+    /** In-place reservation of ONE specific enabled template by name (case-insensitive). */
+    protected final Optional<ArenaInstance> reserveInstanceNamed(String templateName, UUID matchId) {
+        reservationLock.lock();
+        try {
+            for (ArenaTemplate template : templates) {
+                if (!template.enabled() || !template.name().equalsIgnoreCase(templateName)) {
+                    continue;
+                }
+                ArenaInstance instance = instancesByTemplate.computeIfAbsent(
+                        template.id(), id -> new ArenaInstance(UUID.randomUUID(), template));
+                if (instance.isAvailable()) {
+                    instance.assignMatch(matchId);
+                    return Optional.of(instance);
+                }
+            }
+            return Optional.empty();
+        } finally {
+            reservationLock.unlock();
+        }
+    }
+
+    @Override
+    public java.util.concurrent.CompletableFuture<Optional<ArenaInstance>> reserveNamed(
+            String templateName, UUID matchId) {
+        return java.util.concurrent.CompletableFuture.completedFuture(
+                reserveInstanceNamed(templateName, matchId));
+    }
+
     protected final void markRegenerating(ArenaInstance instance) {
         instance.setState(ArenaInstanceState.REGENERATING);
     }

@@ -96,6 +96,27 @@ public final class DisposableArenaService extends AbstractArenaService {
             return CompletableFuture.completedFuture(reserveInstance(type, terrain, matchId));
         }
         ArenaTemplate template = candidates.get(ThreadLocalRandom.current().nextInt(candidates.size()));
+        return pasteCopy(template, matchId);
+    }
+
+    @Override
+    public CompletableFuture<Optional<ArenaInstance>> reserveNamed(String templateName, UUID matchId) {
+        ArenaTemplate template = templates().stream()
+                .filter(t -> t.enabled() && t.name().equalsIgnoreCase(templateName))
+                .findFirst()
+                .orElse(null);
+        if (template == null) {
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
+        if (template.schematicPath() == null || template.schematicPath().isBlank()) {
+            // No schematic: reserve the template's own build in place.
+            return CompletableFuture.completedFuture(reserveInstanceNamed(templateName, matchId));
+        }
+        return pasteCopy(template, matchId);
+    }
+
+    /** Pastes a fresh disposable copy of {@code template} at a free random origin. */
+    private CompletableFuture<Optional<ArenaInstance>> pasteCopy(ArenaTemplate template, UUID matchId) {
         World world = Bukkit.getWorld(template.world());
         if (world == null) {
             return CompletableFuture.completedFuture(Optional.empty());

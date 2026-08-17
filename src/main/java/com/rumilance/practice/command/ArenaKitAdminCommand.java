@@ -139,6 +139,32 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                 player.sendMessage(Component.text("/kit <flag> <name> <on|off> - regen/food/place/break/pearl/totem/shield", NamedTextColor.GRAY));
                 player.sendMessage(Component.text("/kit order <name> <up|down> - GUI表示順を移動 (GUIでShift+クリックでも可)", NamedTextColor.GRAY));
                 player.sendMessage(Component.text("/kit rename <nowname> <newname> - 改名 (入力した大文字小文字がそのまま表示名に)", NamedTextColor.GRAY));
+                player.sendMessage(Component.text("/kit arena <kit> <arena|any> - キットの使用アリーナを1つに固定", NamedTextColor.GRAY));
+                yield true;
+            }
+            case "arena" -> {
+                if (args.length < 3) {
+                    player.sendMessage(Component.text("/kit arena <kit> <arena|any>  - キットに使用アリーナを1つ固定 (any=解除)", NamedTextColor.YELLOW));
+                    yield true;
+                }
+                var kitOpt = kitService.get(args[1]);
+                if (kitOpt.isEmpty()) {
+                    player.sendMessage(Component.text("Unknown kit: " + args[1], NamedTextColor.RED));
+                    yield true;
+                }
+                if (args[2].equalsIgnoreCase("any") || args[2].equalsIgnoreCase("none")) {
+                    kitService.save(kitOpt.get().toBuilder().arenaName("").build());
+                    player.sendMessage(Component.text("Kit '" + args[1] + "' の固定アリーナを解除しました。", NamedTextColor.GREEN));
+                    yield true;
+                }
+                boolean exists = arenaStore.templates().stream()
+                        .anyMatch(t -> t.name().equalsIgnoreCase(args[2]));
+                if (!exists) {
+                    player.sendMessage(Component.text("Unknown arena: " + args[2], NamedTextColor.RED));
+                    yield true;
+                }
+                kitService.save(kitOpt.get().toBuilder().arenaName(args[2].toLowerCase(Locale.ROOT)).build());
+                player.sendMessage(Component.text("Kit '" + args[1] + "' は常にアリーナ '" + args[2] + "' を使用します。", NamedTextColor.GREEN));
                 yield true;
             }
             case "rename" -> {
@@ -470,15 +496,21 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
         if (args.length == 1) {
             return filter(List.of(
                     "gui", "help", "create", "overwrite", "list", "info", "enable", "disable",
-                    "delete", "timeout", "order", "rename", "adventure", "autoregen", "autofood", "blockplace",
-                    "blockbreak", "canbreak", "pearl", "totem", "swordshieldbreak"), args[0]);
+                    "delete", "timeout", "order", "rename", "arena", "adventure", "autoregen", "autofood",
+                    "blockplace", "blockbreak", "canbreak", "pearl", "totem", "swordshieldbreak"), args[0]);
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
         // Subcommands that take a kit name next.
-        if (args.length == 2 && List.of("info", "enable", "disable", "delete", "timeout", "order", "rename", "adventure",
-                "autoregen", "autofood", "blockplace", "blockbreak", "canbreak", "pearl", "totem",
+        if (args.length == 2 && List.of("info", "enable", "disable", "delete", "timeout", "order", "rename", "arena",
+                "adventure", "autoregen", "autofood", "blockplace", "blockbreak", "canbreak", "pearl", "totem",
                 "swordshieldbreak").contains(sub)) {
             return filter(kitService.all().stream().map(KitDefinition::name).toList(), args[1]);
+        }
+        if (args.length == 3 && sub.equals("arena")) {
+            List<String> options = new ArrayList<>(
+                    arenaStore.templates().stream().map(ArenaTemplate::name).toList());
+            options.add("any");
+            return filter(options, args[2]);
         }
         // Third arg: on/off for toggles, numeric hint for timeout, up/down for order.
         if (args.length == 3) {

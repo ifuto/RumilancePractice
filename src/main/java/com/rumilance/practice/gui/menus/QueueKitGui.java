@@ -146,7 +146,8 @@ public final class QueueKitGui extends AbstractGui {
                 );
         if (ranked) {
             builder.lore(
-                    UiTheme.labelValue("Terrain", kit.arenaTerrain().name()),
+                    UiTheme.labelValue("Arena", kit.hasFixedArena()
+                            ? com.rumilance.practice.util.KitNames.pretty(kit.arenaName()) : "Random"),
                     UiTheme.labelValue("Ranked", "Yes")
             );
         }

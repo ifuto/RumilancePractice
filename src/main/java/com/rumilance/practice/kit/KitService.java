@@ -67,6 +67,7 @@ public final class KitService {
                     .totem(section.getBoolean("totem", true))
                     .forceAdventure(section.getBoolean("adventure", false))
                     .timeoutSeconds(section.getInt("timeout-seconds", 0))
+                    .arenaName(section.getString("arena", ""))
                     .canBreak(section.getStringList("can-break"));
 
             List<KitItemEntry> items = new ArrayList<>();
@@ -355,6 +356,7 @@ public final class KitService {
         yaml.set(path + ".totem", kit.totem());
         yaml.set(path + ".adventure", kit.forceAdventure());
         yaml.set(path + ".timeout-seconds", kit.timeoutSeconds());
+        yaml.set(path + ".arena", kit.arenaName());
         yaml.set(path + ".can-break", kit.canBreak());
         List<Map<String, Object>> itemMaps = new ArrayList<>();
         for (KitItemEntry entry : kit.items()) {

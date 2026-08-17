@@ -101,7 +101,8 @@ public final class KitPreviewGui extends AbstractGui {
                                 UiTheme.divider(),
                                 UiTheme.labelValue("Health", String.valueOf((int) kit.maxHealth())),
                                 UiTheme.labelValue("Natural regen", kit.naturalHealthRegen() ? "Yes" : "No"),
-                                UiTheme.labelValue("Terrain", kit.arenaTerrain().name()),
+                                UiTheme.labelValue("Arena", kit.hasFixedArena()
+                                        ? com.rumilance.practice.util.KitNames.pretty(kit.arenaName()) : "Random"),
                                 kit.timeoutSeconds() > 0
                                         ? UiTheme.labelValue("Timeout", kit.timeoutSeconds() + "s")
                                         : UiTheme.line("No timeout")

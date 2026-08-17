@@ -39,7 +39,8 @@ public record KitDefinition(
         boolean pearl,
         boolean totem,
         boolean forceAdventure,
-        int timeoutSeconds
+        int timeoutSeconds,
+        String arenaName
 ) {
 
     /**
@@ -47,6 +48,10 @@ public record KitDefinition(
      * {@code com.rumilance.practice.kit.KitListener} cancels {@code EntityRegainHealthEvent}s whose
      * {@code RegainReason} is {@code SATIATED} (regen from a full hunger bar) for players fighting
      * with this kit, while leaving other regen sources (golden apples, potions, ...) untouched.
+     *
+     * <p>{@link #arenaName()} pins the kit to ONE specific arena template (empty = any arena).
+     * When set, matches with this kit always reserve that template; the legacy
+     * {@link #arenaTerrain()} preference is ignored.</p>
      */
     public KitDefinition {
         Objects.requireNonNull(name, "name");
@@ -59,6 +64,12 @@ public record KitDefinition(
         armor = Map.copyOf(armor);
         canBreak = List.copyOf(canBreak);
         timeoutSeconds = Math.max(0, timeoutSeconds);
+        arenaName = arenaName == null ? "" : arenaName;
+    }
+
+    /** @return true when this kit is pinned to one specific arena template. */
+    public boolean hasFixedArena() {
+        return arenaName != null && !arenaName.isBlank();
     }
 
     public static KitDefinition simple(String name, String displayName, String icon) {
@@ -124,6 +135,7 @@ public record KitDefinition(
         private boolean totem = true;
         private boolean forceAdventure = false;
         private int timeoutSeconds = 0;
+        private String arenaName = "";
 
         private Builder(String name) {
             this.name = Objects.requireNonNull(name, "name");
@@ -152,6 +164,7 @@ public record KitDefinition(
             this.totem = source.totem;
             this.forceAdventure = source.forceAdventure;
             this.timeoutSeconds = source.timeoutSeconds;
+            this.arenaName = source.arenaName;
         }
 
         public Builder name(String value) {
@@ -264,11 +277,17 @@ public record KitDefinition(
             return this;
         }
 
+        public Builder arenaName(String value) {
+            this.arenaName = value == null ? "" : value;
+            return this;
+        }
+
         public KitDefinition build() {
             return new KitDefinition(
                     name, displayName, icon, ranked, ffaEnabled, maxHealth, naturalHealthRegen,
                     knockbackMultiplier, items, armor, enabled, arenaTerrain, autoFood,
-                    swordShieldBreak, blockPlace, blockBreak, canBreak, pearl, totem, forceAdventure, timeoutSeconds
+                    swordShieldBreak, blockPlace, blockBreak, canBreak, pearl, totem, forceAdventure,
+                    timeoutSeconds, arenaName
             );
         }
     }

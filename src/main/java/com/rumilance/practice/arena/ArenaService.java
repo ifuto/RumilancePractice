@@ -48,6 +48,17 @@ public interface ArenaService {
     CompletableFuture<Optional<ArenaInstance>> reserve(ArenaType type, ArenaTerrain terrain, UUID matchId);
 
     /**
+     * Reserves an instance of ONE specific template by name (kits pinned to a single arena).
+     * Falls back to {@link #reserve(ArenaType, ArenaTerrain, UUID)} semantics when the named
+     * template does not exist or is disabled — implementations may also return empty instead.
+     *
+     * @return a future completing with the reserved instance, or empty if unavailable.
+     */
+    default CompletableFuture<Optional<ArenaInstance>> reserveNamed(String templateName, UUID matchId) {
+        return reserve(ArenaType.DUEL, ArenaTerrain.ANY, matchId);
+    }
+
+    /**
      * Regenerates (if configured/available) and releases {@code instanceId} back to the
      * {@code AVAILABLE} pool. Safe to call for an instance that is already available or unknown.
      */

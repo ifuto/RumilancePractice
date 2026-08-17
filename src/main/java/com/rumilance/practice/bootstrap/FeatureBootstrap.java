@@ -362,6 +362,8 @@ public final class FeatureBootstrap {
         ekitSelectGui.setOriginalKitGui(originalKitGui);
         EkitAdminGui ekitAdminGui = new EkitAdminGui(guiSessions, soundService, ekitItems);
         KitAdminGui kitAdminGui = new KitAdminGui(guiSessions, soundService, kitService, messageService);
+        kitAdminGui.setArenaNames(() -> arenaStore.templates().stream()
+                .map(com.rumilance.practice.model.ArenaTemplate::name).toList());
 
         GameMenuGui gameMenuGui = new GameMenuGui(guiSessions, soundService,
                 rankedGui, unrankedGui, ffaListGui, ekitSelectGui, spectateListGui, settingsGui, titleGui);

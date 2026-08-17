@@ -9,7 +9,6 @@ import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.locale.MessageService;
 import com.rumilance.practice.model.KitDefinition;
 import com.rumilance.practice.sound.SoundService;
-import com.rumilance.practice.state.ArenaTerrain;
 import com.rumilance.practice.util.GuiSlots;
 import com.rumilance.practice.util.ItemKeys;
 import net.kyori.adventure.text.Component;
@@ -35,7 +34,6 @@ import java.util.List;
  */
 public final class KitAdminGui extends AbstractGui {
 
-    private static final ArenaTerrain[] TERRAIN_CYCLE = ArenaTerrain.values();
     /**
      * The admin GUI is always shown in Japanese, regardless of the admin's client locale
      * (this server is Japanese-operated; admin tooling is intentionally ja-only).
@@ -44,11 +42,17 @@ public final class KitAdminGui extends AbstractGui {
 
     private final KitService kitService;
     private final MessageService messageService;
+    /** Supplies the saved arena template names for the arena-pin cycle button (wired at boot). */
+    private java.util.function.Supplier<List<String>> arenaNames = List::of;
 
     public KitAdminGui(GuiSessionRegistry registry, SoundService sounds, KitService kitService, MessageService messageService) {
         super(registry, sounds, GuiType.KIT_ADMIN, 6, false);
         this.kitService = kitService;
         this.messageService = messageService;
+    }
+
+    public void setArenaNames(java.util.function.Supplier<List<String>> arenaNames) {
+        this.arenaNames = arenaNames == null ? List::of : arenaNames;
     }
 
     /** Localised raw label string from {@code admin-gui.<key>}. */
@@ -113,7 +117,7 @@ public final class KitAdminGui extends AbstractGui {
         lore.add(stateLine(t(locale, "enabled"), kit.enabled(), locale));
         lore.add(stateLine(t(locale, "adventure"), kit.forceAdventure(), locale));
         lore.add(stateLine(t(locale, "ranked"), kit.ranked(), locale));
-        lore.add(Component.text(t(locale, "terrain") + ": " + kit.arenaTerrain().name(), NamedTextColor.AQUA)
+        lore.add(Component.text("アリーナ: " + (kit.hasFixedArena() ? kit.arenaName() : "ランダム"), NamedTextColor.AQUA)
                 .decoration(TextDecoration.ITALIC, false));
         lore.add(Component.text("Shift+左クリック: 上へ移動", NamedTextColor.GRAY)
                 .decoration(TextDecoration.ITALIC, false));
@@ -139,8 +143,8 @@ public final class KitAdminGui extends AbstractGui {
         inventory.setItem(GuiSlots.slot(1, 5), toggle(t(locale, "ranked"), kit.ranked(), "toggle:ranked",
                 kit.ranked() ? Material.LIME_DYE : Material.GRAY_DYE, locale));
         inventory.setItem(GuiSlots.slot(1, 7), GuiDecorator.button(Material.GRASS_BLOCK,
-                Component.text(t(locale, "terrain") + ": " + kit.arenaTerrain().name(), NamedTextColor.AQUA)
-                        .decoration(TextDecoration.ITALIC, false), "cycle:terrain"));
+                Component.text("アリーナ: " + (kit.hasFixedArena() ? kit.arenaName() : "ランダム"), NamedTextColor.AQUA)
+                        .decoration(TextDecoration.ITALIC, false), "cycle:arena"));
 
         inventory.setItem(GuiSlots.slot(2, 1), toggle(t(locale, "health-regen"), kit.naturalHealthRegen(), "toggle:autoregen",
                 Material.GOLDEN_APPLE, locale));
@@ -241,18 +245,26 @@ public final class KitAdminGui extends AbstractGui {
             case "toggle:pearl" -> b.pearl(!kit.pearl()).build();
             case "toggle:totem" -> b.totem(!kit.totem()).build();
             case "toggle:swordshieldbreak" -> b.swordShieldBreak(!kit.swordShieldBreak()).build();
-            case "cycle:terrain" -> b.arenaTerrain(nextTerrain(kit.arenaTerrain())).build();
+            case "cycle:arena" -> b.arenaName(nextArena(kit.arenaName())).build();
             default -> null;
         };
     }
 
-    private ArenaTerrain nextTerrain(ArenaTerrain current) {
-        for (int i = 0; i < TERRAIN_CYCLE.length; i++) {
-            if (TERRAIN_CYCLE[i] == current) {
-                return TERRAIN_CYCLE[(i + 1) % TERRAIN_CYCLE.length];
+    /** Cycles: random ("") -> arena1 -> arena2 -> ... -> random. */
+    private String nextArena(String current) {
+        List<String> names = arenaNames.get();
+        if (names.isEmpty()) {
+            return "";
+        }
+        if (current == null || current.isBlank()) {
+            return names.get(0);
+        }
+        for (int i = 0; i < names.size(); i++) {
+            if (names.get(i).equalsIgnoreCase(current)) {
+                return i + 1 < names.size() ? names.get(i + 1) : "";
             }
         }
-        return ArenaTerrain.ANY;
+        return "";
     }
 
     /**
