@@ -71,6 +71,14 @@ sounds:
     key: block.note_block.hat
     volume: 1.0
     pitch: 1.0
+  ffa-reset-warn:
+    key: block.note_block.hat
+    volume: 0.4
+    pitch: 1.4
+  ffa-open:
+    key: entity.player.levelup
+    volume: 1.0
+    pitch: 1.0
   error:
     key: block.note_block.bass
     volume: 1.0

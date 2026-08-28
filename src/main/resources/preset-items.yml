@@ -1,0 +1,57 @@
+# 公式キットのプリセット編集で選べる候補。
+# 推奨: 管理メニュー（ネザースター）または /kit GUI →「プリセット候補を編集」から操作。
+#       自由配置・複数ページ・NBT 保持。プレイヤーは /ekit（メニューのキット）から利用。
+categories:
+  防具:
+    - LEATHER_HELMET
+    - LEATHER_CHESTPLATE
+    - LEATHER_LEGGINGS
+    - LEATHER_BOOTS
+    - CHAINMAIL_HELMET
+    - CHAINMAIL_CHESTPLATE
+    - CHAINMAIL_LEGGINGS
+    - CHAINMAIL_BOOTS
+    - IRON_HELMET
+    - IRON_CHESTPLATE
+    - IRON_LEGGINGS
+    - IRON_BOOTS
+    - DIAMOND_HELMET
+    - DIAMOND_CHESTPLATE
+    - DIAMOND_LEGGINGS
+    - DIAMOND_BOOTS
+    - NETHERITE_HELMET
+    - NETHERITE_CHESTPLATE
+    - NETHERITE_LEGGINGS
+    - NETHERITE_BOOTS
+  装備:
+    - WOODEN_SWORD
+    - STONE_SWORD
+    - IRON_SWORD
+    - DIAMOND_SWORD
+    - NETHERITE_SWORD
+    - MACE
+    - BOW
+    - CROSSBOW
+    - TRIDENT
+    - SHIELD
+    - FISHING_ROD
+    - FLINT_AND_STEEL
+    - WATER_BUCKET
+    - LAVA_BUCKET
+    - TOTEM_OF_UNDYING
+  ポーション:
+    - speed
+    - strength
+    - instant_health
+    - regeneration
+    - fire_resistance
+  消耗品:
+    - GOLDEN_APPLE
+    - ENCHANTED_GOLDEN_APPLE
+    - ENDER_PEARL
+    - ARROW
+    - SNOWBALL
+    - EGG
+    - EXPERIENCE_BOTTLE
+    - FIREWORK_ROCKET
+    - COOKED_BEEF

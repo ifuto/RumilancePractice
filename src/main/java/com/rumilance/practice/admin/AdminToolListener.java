@@ -14,9 +14,14 @@ import org.bukkit.persistence.PersistentDataType;
 public final class AdminToolListener implements Listener {
 
     private final SoundService soundService;
+    private java.util.function.Consumer<org.bukkit.entity.Player> openAdminMenu;
 
     public AdminToolListener(SoundService soundService) {
         this.soundService = soundService;
+    }
+
+    public void setOpenAdminMenu(java.util.function.Consumer<org.bukkit.entity.Player> openAdminMenu) {
+        this.openAdminMenu = openAdminMenu;
     }
 
     @EventHandler
@@ -33,8 +38,12 @@ public final class AdminToolListener implements Listener {
         if ("menu".equals(tool) && (event.getAction() == Action.RIGHT_CLICK_AIR
                 || event.getAction() == Action.RIGHT_CLICK_BLOCK)) {
             soundService.play(event.getPlayer(), "gui-open");
-            event.getPlayer().sendMessage(Component.text(
-                    "Setup: /slobby, /arena, /kit, /setfunc, /practiceadmin status", NamedTextColor.LIGHT_PURPLE));
+            if (openAdminMenu != null) {
+                openAdminMenu.accept(event.getPlayer());
+            } else {
+                event.getPlayer().sendMessage(Component.text(
+                        "Setup: /slobby, /arena, /kit, /setfunc, /practiceadmin status", NamedTextColor.LIGHT_PURPLE));
+            }
             return;
         }
         // Selection tool ONLY records pos1/pos2. It must NEVER write the lobby region as a

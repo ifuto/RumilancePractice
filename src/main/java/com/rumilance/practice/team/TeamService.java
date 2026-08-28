@@ -37,6 +37,9 @@ public final class TeamService {
 
     private final Plugin plugin;
     private final MatchService matchService;
+    private final com.rumilance.practice.locale.MessageService messageService;
+    private volatile PartyHotbar partyHotbar;
+    private volatile java.util.function.BooleanSupplier hasPartyMaps = () -> false;
 
     private final Map<UUID, Team> byId = new ConcurrentHashMap<>();
     private final Map<UUID, Team> byMember = new ConcurrentHashMap<>();
@@ -55,9 +58,76 @@ public final class TeamService {
         UNBALANCED, OWNER_CANNOT_LEAVE, INVALID_SIDE, KIT_NOT_FOUND, NO_ARENA
     }
 
+    /** Localized / player-facing explanation for a non-{@link Result#OK} result. */
+    public String errorMessage(Player player, Result result) {
+        if (result == null || result == Result.OK) {
+            return "";
+        }
+        return switch (result) {
+            case ALREADY_IN_TEAM -> "Already in a team.";
+            case NOT_OWNER -> "Only the team owner can do that.";
+            case NOT_IN_TEAM -> "You are not in a team.";
+            case TEAM_FULL -> "That team is full.";
+            case TARGET_OFFLINE -> "That player is offline.";
+            case TARGET_IN_TEAM -> "That player is already in a team.";
+            case NO_INVITE -> "No pending invite.";
+            case INVITE_EXPIRED -> "That invite expired.";
+            case INVALID_NAME -> "Invalid team name.";
+            case TOO_SMALL -> "Not enough players.";
+            case UNBALANCED -> "Teams are unbalanced.";
+            case OWNER_CANNOT_LEAVE -> "The owner cannot leave; disband instead.";
+            case INVALID_SIDE -> "Invalid side.";
+            case KIT_NOT_FOUND -> "Kit not found.";
+            case NO_ARENA -> "No arena available.";
+            case OK -> "";
+        };
+    }
+
     public TeamService(Plugin plugin, MatchService matchService) {
+        this(plugin, matchService, null);
+    }
+
+    public TeamService(Plugin plugin, MatchService matchService,
+                       com.rumilance.practice.locale.MessageService messageService) {
         this.plugin = plugin;
         this.matchService = matchService;
+        this.messageService = messageService;
+    }
+
+    public void setPartyHotbar(PartyHotbar partyHotbar) {
+        this.partyHotbar = partyHotbar;
+    }
+
+    public void setHasPartyMaps(java.util.function.BooleanSupplier hasPartyMaps) {
+        this.hasPartyMaps = hasPartyMaps == null ? () -> false : hasPartyMaps;
+    }
+
+    private void applyHotbar(Player player, Team team) {
+        PartyHotbar bar = partyHotbar;
+        if (bar == null || player == null || team == null) {
+            return;
+        }
+        bar.give(player, team.isOwner(player.getUniqueId()), hasPartyMaps.getAsBoolean(),
+                team.friendlyFire());
+    }
+
+    private void restoreLobby(Player player) {
+        PartyHotbar bar = partyHotbar;
+        if (bar != null && player != null) {
+            bar.restoreLobby(player);
+        }
+    }
+
+    private void refreshAllHotbars(Team team) {
+        if (team == null || partyHotbar == null) {
+            return;
+        }
+        for (UUID id : team.members()) {
+            Player p = Bukkit.getPlayer(id);
+            if (p != null) {
+                applyHotbar(p, team);
+            }
+        }
     }
 
     // ---- create / disband ----
@@ -72,6 +142,7 @@ public final class TeamService {
         Team team = new Team(UUID.randomUUID(), owner.getUniqueId(), name, isPublic);
         byId.put(team.id(), team);
         byMember.put(owner.getUniqueId(), team);
+        applyHotbar(owner, team);
         owner.sendMessage(Component.text("Team '" + team.name() + "' created ("
                 + (isPublic ? "public" : "private") + ").", NamedTextColor.AQUA)
                 .decoration(TextDecoration.ITALIC, false));
@@ -90,6 +161,10 @@ public final class TeamService {
         for (UUID member : team.members()) {
             byMember.remove(member);
             invites.entrySet().removeIf(e -> e.getValue().teamId().equals(team.id()));
+            Player m = Bukkit.getPlayer(member);
+            if (m != null) {
+                restoreLobby(m);
+            }
         }
         byId.remove(team.id());
         return Result.OK;
@@ -139,6 +214,7 @@ public final class TeamService {
         team.add(player.getUniqueId());
         byMember.put(player.getUniqueId(), team);
         invites.remove(player.getUniqueId());
+        applyHotbar(player, team);
         broadcast(team, Component.text(player.getName() + " joined the team.", NamedTextColor.AQUA));
         return Result.OK;
     }
@@ -172,6 +248,7 @@ public final class TeamService {
         team.remove(player.getUniqueId());
         byMember.remove(player.getUniqueId());
         recentLeaver.put(player.getUniqueId(), Instant.now());
+        restoreLobby(player);
         broadcast(team, Component.text(player.getName() + " left the team.", NamedTextColor.YELLOW));
         return Result.OK;
     }
@@ -186,6 +263,7 @@ public final class TeamService {
         if (team.isOwner(target.getUniqueId())) return Result.OWNER_CANNOT_LEAVE;
         team.remove(target.getUniqueId());
         byMember.remove(target.getUniqueId());
+        restoreLobby(target);
         target.sendMessage(Component.text("You were kicked from '" + team.name() + "'.", NamedTextColor.RED));
         broadcast(team, Component.text(target.getName() + " was kicked from the team.", NamedTextColor.RED));
         return Result.OK;
@@ -197,6 +275,18 @@ public final class TeamService {
         if (!team.isOwner(owner.getUniqueId())) return Result.NOT_OWNER;
         team.setPublic(!team.isPublic());
         broadcast(team, Component.text("Team is now " + (team.isPublic() ? "public" : "private") + ".", NamedTextColor.AQUA));
+        refreshAllHotbars(team);
+        return Result.OK;
+    }
+
+    public Result setSelectedArena(Player owner, String arenaName) {
+        Team team = byMember.get(owner.getUniqueId());
+        if (team == null) return Result.NOT_IN_TEAM;
+        if (!team.isOwner(owner.getUniqueId())) return Result.NOT_OWNER;
+        team.setSelectedArena(arenaName);
+        broadcast(team, Component.text(
+                arenaName == null ? "Party map: Random" : "Party map: " + arenaName,
+                NamedTextColor.AQUA));
         return Result.OK;
     }
 
@@ -248,6 +338,22 @@ public final class TeamService {
         return Result.OK;
     }
 
+    public Result toggleFriendlyFire(Player owner) {
+        Team team = byMember.get(owner.getUniqueId());
+        if (team == null) {
+            return Result.NOT_IN_TEAM;
+        }
+        if (!team.isOwner(owner.getUniqueId())) {
+            return Result.NOT_OWNER;
+        }
+        team.setFriendlyFire(!team.friendlyFire());
+        broadcast(team, Component.text(
+                team.friendlyFire() ? "Friendly fire: ON" : "Friendly fire: OFF",
+                team.friendlyFire() ? NamedTextColor.RED : NamedTextColor.GREEN));
+        refreshAllHotbars(team);
+        return Result.OK;
+    }
+
     // ---- start team battle (no queue) ----
 
     public Result start(Player owner, String kitId) {
@@ -262,9 +368,10 @@ public final class TeamService {
         if (red.isEmpty() || blue.isEmpty()) return Result.UNBALANCED;
         if (red.size() > MAX_SIDE_SIZE || blue.size() > MAX_SIDE_SIZE) return Result.UNBALANCED;
 
-        // Delegate to MatchService which handles arena reservation, teleport, countdown.
+        String arenaName = team.selectedArena();
+        boolean ff = team.friendlyFire();
         Bukkit.getScheduler().runTask(plugin, () ->
-                matchService.startTeamMatch(red, blue, kitId, MatchMode.TEAM, 1));
+                matchService.startTeamMatch(red, blue, kitId, MatchMode.TEAM, 1, arenaName, ff));
         broadcast(team, Component.text("Team battle starting!", NamedTextColor.GOLD));
         return Result.OK;
     }
@@ -318,11 +425,17 @@ public final class TeamService {
             invites.remove(player);
             return;
         }
+        if (team.isOwner(player) && isInActiveTeamMatch(player)) {
+            team.remove(player);
+            byMember.remove(player);
+            return;
+        }
         if (team.isOwner(player)) {
             for (UUID member : team.members()) {
                 byMember.remove(member);
                 Player p = Bukkit.getPlayer(member);
                 if (p != null) {
+                    restoreLobby(p);
                     p.sendMessage(Component.text("Team disbanded (owner left).", NamedTextColor.RED));
                 }
             }
@@ -338,5 +451,16 @@ public final class TeamService {
             }
         }
         invites.remove(player);
+    }
+
+    private boolean isInActiveTeamMatch(UUID player) {
+        return matchService.registry().byPlayer(player)
+                .filter(com.rumilance.practice.session.MatchSession::isTeamMatch)
+                .filter(s -> {
+                    com.rumilance.practice.state.MatchState st = s.state();
+                    return st != com.rumilance.practice.state.MatchState.CLOSED
+                            && st != com.rumilance.practice.state.MatchState.FAILED;
+                })
+                .isPresent();
     }
 }

@@ -37,9 +37,24 @@ public final class SpectatorService {
     private final Map<UUID, Set<UUID>> matchSpectators = new ConcurrentHashMap<>();
     /** Optional per-player border/view-distance control (null = feature off). */
     private volatile com.rumilance.practice.sight.ViewControlService viewControl;
+    private volatile com.rumilance.practice.ffa.FfaService ffaService;
+    private volatile com.rumilance.practice.match.TeamColoredArmorService teamColoredArmorService;
 
     public void setViewControl(com.rumilance.practice.sight.ViewControlService viewControl) {
         this.viewControl = viewControl;
+    }
+
+    public void setFfaService(com.rumilance.practice.ffa.FfaService ffaService) {
+        this.ffaService = ffaService;
+    }
+
+    public com.rumilance.practice.ffa.FfaService ffaService() {
+        return ffaService;
+    }
+
+    public void setTeamColoredArmorService(
+            com.rumilance.practice.match.TeamColoredArmorService teamColoredArmorService) {
+        this.teamColoredArmorService = teamColoredArmorService;
     }
 
     /** @return the match this player is currently spectating, if any. */
@@ -147,5 +162,16 @@ public final class SpectatorService {
 
     public Optional<UUID> matchOf(UUID spectator) {
         return Optional.ofNullable(spectatorToMatch.get(spectator));
+    }
+
+    /** FFA-arena spectate is not wired yet; reserved for scoreboard layouts. */
+    public Optional<String> ffaArenaOf(UUID spectator) {
+        return Optional.empty();
+    }
+
+    /** Snapshot of spectators currently watching {@code matchId}. */
+    public Set<UUID> spectatorsWatching(UUID matchId) {
+        Set<UUID> set = matchSpectators.get(matchId);
+        return set == null ? Set.of() : Set.copyOf(set);
     }
 }

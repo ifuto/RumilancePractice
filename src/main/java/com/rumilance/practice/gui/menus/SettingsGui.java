@@ -7,6 +7,7 @@ import com.rumilance.practice.gui.GuiType;
 import com.rumilance.practice.gui.ItemBuilder;
 import com.rumilance.practice.gui.MenuScaffold;
 import com.rumilance.practice.gui.UiTheme;
+import com.rumilance.practice.item.FunctionalItemListener;
 import com.rumilance.practice.model.PlayerSettings;
 import com.rumilance.practice.settings.SettingsService;
 import com.rumilance.practice.sound.SoundService;
@@ -30,6 +31,7 @@ public final class SettingsGui extends AbstractGui {
     private final java.util.Map<java.util.UUID, Long> lastToggle = new java.util.concurrent.ConcurrentHashMap<>();
     /** Minimum millis between toggle clicks; configured via gui.toggle-cooldown-seconds. */
     private volatile long toggleCooldownMillis = 2000L;
+    private com.rumilance.practice.match.TeamColoredArmorService teamColoredArmorService;
 
     public SettingsGui(GuiSessionRegistry registry, SoundService sounds, SettingsService settingsService) {
         super(registry, sounds, GuiType.SETTINGS, 6, true);
@@ -40,9 +42,15 @@ public final class SettingsGui extends AbstractGui {
         this.toggleCooldownMillis = Math.max(0, seconds) * 1000L;
     }
 
+    public void setTeamColoredArmorService(
+            com.rumilance.practice.match.TeamColoredArmorService teamColoredArmorService) {
+        this.teamColoredArmorService = teamColoredArmorService;
+    }
+
     @Override
     protected Component title(Player player, GuiSession session) {
-        return Component.text("⚙ Settings", UiTheme.PRIMARY).decoration(TextDecoration.ITALIC, false);
+        return FunctionalItemListener.stripVariationSelectors(
+                Component.text("Settings", UiTheme.PRIMARY)).decoration(TextDecoration.ITALIC, false);
     }
 
     @Override
@@ -73,9 +81,15 @@ public final class SettingsGui extends AbstractGui {
         inventory.setItem(GuiSlots.slot(3, 5), toggle(Material.PAINTING, "Scoreboard",
                 s.scoreboardEnabled(), "scoreboard",
                 "Show the sidebar scoreboard."));
+        inventory.setItem(GuiSlots.slot(4, 3), toggle(Material.GLOWSTONE_DUST, "Team Glow (LOS)",
+                s.teamGlow(), "team_glow",
+                "Outline teammates only with line-of-sight (not through walls)."));
+        inventory.setItem(GuiSlots.slot(4, 5), toggle(Material.LEATHER_CHESTPLATE, "Team Leather Look",
+                s.teamColoredArmor(), "team_armor",
+                "Show packet-only leather armor in team colors (default ON)."));
 
-        // Whitelist manager (bottom-left of content area).
-        inventory.setItem(GuiSlots.slot(4, 4),
+        // Whitelist manager (bottom-centre of last row).
+        inventory.setItem(GuiSlots.slot(MenuScaffold.lastRow(inventory), 4),
                 ItemBuilder.of(Material.OAK_SIGN)
                         .name(Component.text("Chat Whitelist", UiTheme.SECONDARY))
                         .lore(
@@ -144,11 +158,17 @@ public final class SettingsGui extends AbstractGui {
             case "toggle:sounds" -> s.withSoundsEnabled(!s.soundsEnabled());
             case "toggle:match_report" -> s.withShowMatchReport(!s.showMatchReport());
             case "toggle:scoreboard" -> s.withScoreboardEnabled(!s.scoreboardEnabled());
+            case "toggle:team_glow" -> s.withTeamGlow(!s.teamGlow());
+            case "toggle:team_armor" -> s.withTeamColoredArmor(!s.teamColoredArmor());
             default -> s;
         };
         if (next != s) {
             settingsService.update(next);
             sounds.play(player, "gui-click");
+            if (("toggle:team_armor".equals(action) || "toggle:team_glow".equals(action))
+                    && teamColoredArmorService != null) {
+                teamColoredArmorService.scheduleRefreshViewer(player);
+            }
             refresh(player, session, inventory);
         }
     }

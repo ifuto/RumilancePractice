@@ -9,11 +9,11 @@ import org.bukkit.inventory.ItemStack;
 import java.util.List;
 
 /**
- * Layout helpers that draw the standard RumilancePractice menu chrome (background fill,
- * top/bottom bars, framed content panels, and standard navigation buttons) into an
- * {@link Inventory}. Every public method returns the inventory it was given so calls can be
- * chained. The content "grid" for a standard 6-row menu is rows 1-4, columns 1-7 (28 slots),
- * matching the existing kit/player selectors, while rows 0 and 5 stay reserved for chrome.
+ * Layout helpers that draw the standard RumilancePractice menu chrome (dark fill,
+ * thin top accent, navigation buttons) into an {@link Inventory}. Every public method
+ * returns the inventory it was given so calls can be chained. The content "grid" for a
+ * standard 6-row menu is rows 1-4, columns 1-7 (28 slots), matching the existing
+ * kit/player selectors, while row 0 stays reserved for the accent strip and row 5 for nav.
  */
 public final class MenuScaffold {
 
@@ -32,8 +32,19 @@ public final class MenuScaffold {
         return inventory;
     }
 
-    /** Draws a horizontal accent bar across an entire row. */
+    private static int rowCount(Inventory inventory) {
+        return inventory.getSize() / GuiSlots.ROW_SIZE;
+    }
+
+    private static boolean rowInBounds(Inventory inventory, int row) {
+        return row >= 0 && row < rowCount(inventory);
+    }
+
+    /** Draws a horizontal accent bar across an entire row (no-op when row is out of range). */
     public static Inventory bar(Inventory inventory, int row) {
+        if (!rowInBounds(inventory, row)) {
+            return inventory;
+        }
         ItemStack accent = ItemBuilder.accent();
         for (int col = 0; col < GuiSlots.ROW_SIZE; col++) {
             inventory.setItem(GuiSlots.slot(row, col), accent);
@@ -41,7 +52,10 @@ public final class MenuScaffold {
         return inventory;
     }
 
-    /** Frames a rectangular region with gray panel tiles, leaving the interior empty. */
+    /**
+     * Frames a rectangular region. Prefer {@link #chrome} for menus — gray glass frames
+     * were dropped from the house style; this remains for rare admin panels.
+     */
     public static Inventory frame(Inventory inventory, int fromRow, int fromCol, int toRow, int toCol) {
         ItemStack panel = ItemBuilder.panel();
         for (int row = fromRow; row <= toRow; row++) {
@@ -56,16 +70,36 @@ public final class MenuScaffold {
     }
 
     /**
-     * Draws the standard 6-row chrome: black background, accent bars on the top and bottom
-     * rows, and a gray frame around the content area (rows 1-4, cols 1-7). Call this before
-     * placing content so content items overwrite the frame's interior (the interior is left
-     * empty, not filled).
+     * Standard chrome: dark fill, cyan accent top + subtle bottom bar on the last row.
+     * Adapts to 5-row kit editors and 6-row menus without indexing past inventory size.
      */
     public static Inventory chrome(Inventory inventory) {
         fillBackground(inventory);
         bar(inventory, 0);
-        bar(inventory, 5);
-        frame(inventory, 1, 0, 4, 8);
+        int rows = rowCount(inventory);
+        if (rows >= 6) {
+            softBar(inventory, 5);
+        } else if (rows >= 2) {
+            softBar(inventory, rows - 1);
+        }
+        return inventory;
+    }
+
+    /** Top accent only — for 5-row kit editor where the last row is player slots. */
+    public static Inventory editorChrome(Inventory inventory) {
+        fillBackground(inventory);
+        bar(inventory, 0);
+        return inventory;
+    }
+
+    private static Inventory softBar(Inventory inventory, int row) {
+        if (!rowInBounds(inventory, row)) {
+            return inventory;
+        }
+        ItemStack soft = ItemBuilder.of(UiTheme.ACCENT_SOFT).action("decorate").build();
+        for (int col = 0; col < GuiSlots.ROW_SIZE; col++) {
+            inventory.setItem(GuiSlots.slot(row, col), soft);
+        }
         return inventory;
     }
 
@@ -82,8 +116,11 @@ public final class MenuScaffold {
     }
 
     public static Inventory closeButton(Inventory inventory, Component label) {
-        inventory.setItem(GuiSlots.slot(5, 4),
-                ItemBuilder.action(UiTheme.CLOSE, label, "close"));
+        int lastRow = rowCount(inventory) - 1;
+        if (lastRow >= 0) {
+            inventory.setItem(GuiSlots.slot(lastRow, 4),
+                    ItemBuilder.action(UiTheme.CLOSE, label, "close"));
+        }
         return inventory;
     }
 
@@ -93,15 +130,21 @@ public final class MenuScaffold {
     }
 
     public static Inventory backButton(Inventory inventory, Component label) {
-        inventory.setItem(GuiSlots.slot(5, 1),
-                ItemBuilder.action(UiTheme.BACK, label, "back"));
+        int lastRow = rowCount(inventory) - 1;
+        if (lastRow >= 0) {
+            inventory.setItem(GuiSlots.slot(lastRow, 1),
+                    ItemBuilder.action(UiTheme.BACK, label, "back"));
+        }
         return inventory;
     }
 
     /** Places a confirm/select button at the bottom-right. */
     public static Inventory confirmButton(Inventory inventory, Component label) {
-        inventory.setItem(GuiSlots.slot(5, 7),
-                ItemBuilder.action(UiTheme.CONFIRM, label, "confirm"));
+        int lastRow = rowCount(inventory) - 1;
+        if (lastRow >= 0) {
+            inventory.setItem(GuiSlots.slot(lastRow, 7),
+                    ItemBuilder.action(UiTheme.CONFIRM, label, "confirm"));
+        }
         return inventory;
     }
 
@@ -136,6 +179,11 @@ public final class MenuScaffold {
         return GuiSlots.slot(row, col);
     }
 
+    /** @return last valid row index for {@code inventory}. */
+    public static int lastRow(Inventory inventory) {
+        return Math.max(0, rowCount(inventory) - 1);
+    }
+
     /** Number of items one page of the standard content grid can hold. */
     public static int gridPageSize() {
         return 28;
@@ -143,9 +191,13 @@ public final class MenuScaffold {
 
     /** Places previous/next page buttons when the list spans more than one page. */
     public static void pagingButtons(Inventory inventory, int page, int totalItems) {
+        int lastRow = rowCount(inventory) - 1;
+        if (lastRow < 0) {
+            return;
+        }
         int pageSize = gridPageSize();
         if (page > 0) {
-            inventory.setItem(GuiSlots.slot(5, 2),
+            inventory.setItem(GuiSlots.slot(lastRow, 2),
                     ItemBuilder.of(UiTheme.PREV_PAGE)
                             .name(Component.text("◀ Previous", UiTheme.PRIMARY))
                             .lore(UiTheme.line("Page " + page))
@@ -153,7 +205,7 @@ public final class MenuScaffold {
                             .build());
         }
         if ((long) (page + 1) * pageSize < totalItems) {
-            inventory.setItem(GuiSlots.slot(5, 6),
+            inventory.setItem(GuiSlots.slot(lastRow, 6),
                     ItemBuilder.of(UiTheme.NEXT_PAGE)
                             .name(Component.text("Next ▶", UiTheme.PRIMARY))
                             .lore(UiTheme.line("Page " + (page + 2)))

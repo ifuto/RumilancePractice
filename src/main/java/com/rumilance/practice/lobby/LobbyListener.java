@@ -1,5 +1,6 @@
 package com.rumilance.practice.lobby;
 
+import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.session.PlayerStateManager;
 import com.rumilance.practice.state.PlayerState;
 import com.rumilance.practice.util.Cuboid;
@@ -24,16 +25,23 @@ public final class LobbyListener implements Listener {
 
     private final LobbyService lobbyService;
     private final PlayerStateManager stateManager;
+    private final GuiSessionRegistry guiSessions;
 
-    public LobbyListener(LobbyService lobbyService, PlayerStateManager stateManager) {
+    public LobbyListener(LobbyService lobbyService, PlayerStateManager stateManager,
+                         GuiSessionRegistry guiSessions) {
         this.lobbyService = lobbyService;
         this.stateManager = stateManager;
+        this.guiSessions = guiSessions;
     }
 
     private boolean shouldProtect(Player player) {
+        if (guiSessions.get(player.getUniqueId()).isPresent()) {
+            return true;
+        }
         PlayerState state = stateManager.getState(player.getUniqueId());
         return switch (state) {
-            case LOBBY, OPENING_GUI, QUEUED_RANKED, QUEUED_UNRANKED, REQUESTING_DUEL, IDLE -> true;
+            case LOBBY, OPENING_GUI, QUEUED_RANKED, QUEUED_UNRANKED, REQUESTING_DUEL, IDLE,
+                 EDITING_KIT -> true;
             default -> false;
         };
     }
@@ -43,12 +51,9 @@ public final class LobbyListener implements Listener {
         if (!(event.getEntity() instanceof Player player) || !shouldProtect(player)) {
             return;
         }
-        if (event.getCause() == EntityDamageEvent.DamageCause.FALL
-                || event.getCause() == EntityDamageEvent.DamageCause.ENTITY_ATTACK
-                || event.getCause() == EntityDamageEvent.DamageCause.ENTITY_SWEEP_ATTACK
-                || event.getCause() == EntityDamageEvent.DamageCause.PROJECTILE) {
-            event.setCancelled(true);
-        }
+        // Full invulnerability in lobby / queue / kit-edit / GUI — including Match Found punch-through.
+        event.setCancelled(true);
+        event.setDamage(0);
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)

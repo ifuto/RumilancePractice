@@ -7,7 +7,6 @@ plugins {
 }
 
 group = "com.rumilance.practice"
-version = "1.2.0"
 
 description = "RumilancePractice - competitive practice/duel plugin for Paper servers"
 
@@ -55,6 +54,11 @@ dependencies {
         // Avoid pulling transitive Bukkit/Paper implementations that would conflict with Paper's own.
         isTransitive = true
     }
+
+    // ProtocolLib soft-dependency - powers the active sign-probe mod detector (MC-265322).
+    // Compile against the stable API; the server must run a build that supports the target MC
+    // version (1.21.11 support ships in ProtocolLib dev builds).
+    compileOnly("net.dmulloy2:ProtocolLib:5.4.0")
 
     // Relational database access - shaded into the plugin jar and relocated to avoid classpath clashes.
     implementation("com.zaxxer:HikariCP:$hikariVersion")
@@ -113,6 +117,16 @@ tasks.shadowJar {
     minimize {
         exclude(dependency("org.xerial:sqlite-jdbc:.*"))
         exclude(dependency("org.mariadb.jdbc:mariadb-java-client:.*"))
+    }
+
+    doLast {
+        val icon = project.file("src/main/resources/branding/server-icon.png")
+        if (icon.exists()) {
+            icon.copyTo(project.file("build/libs/server-icon.png"), overwrite = true)
+            icon.copyTo(project.file("server-icon.png"), overwrite = true)
+        } else {
+            logger.warn("[Branding] branding/server-icon.png missing — ops icon not copied.")
+        }
     }
 }
 

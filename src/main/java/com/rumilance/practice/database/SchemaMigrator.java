@@ -15,7 +15,19 @@ import java.util.logging.Logger;
  */
 public final class SchemaMigrator {
 
-    private record Migration(int version, String description, List<String> statements) {
+    @FunctionalInterface
+    private interface MigrationAction {
+        void apply(Connection connection) throws SQLException;
+    }
+
+    private record Migration(int version, String description, List<String> statements, MigrationAction action) {
+        Migration(int version, String description, List<String> statements) {
+            this(version, description, statements, null);
+        }
+
+        Migration(int version, String description, MigrationAction action) {
+            this(version, description, List.of(), action);
+        }
     }
 
     private final DatabaseService databaseService;
@@ -45,9 +57,13 @@ public final class SchemaMigrator {
                         continue;
                     }
                     logger.info(() -> "Applying database migration v" + migration.version() + ": " + migration.description());
-                    try (Statement statement = connection.createStatement()) {
-                        for (String sql : migration.statements()) {
-                            statement.executeUpdate(sql);
+                    if (migration.action() != null) {
+                        migration.action().apply(connection);
+                    } else {
+                        try (Statement statement = connection.createStatement()) {
+                            for (String sql : migration.statements()) {
+                                statement.executeUpdate(sql);
+                            }
                         }
                     }
                     recordVersion(connection, migration.version());
@@ -255,6 +271,117 @@ public final class SchemaMigrator {
                 "ALTER TABLE " + databaseService.table("player_settings")
                         + " ADD COLUMN show_match_report INTEGER NOT NULL DEFAULT 0"
         )));
+
+        migrations.add(new Migration(16, "add team glow / leather armor settings", List.of(
+                "ALTER TABLE " + databaseService.table("player_settings")
+                        + " ADD COLUMN team_glow INTEGER NOT NULL DEFAULT 1",
+                "ALTER TABLE " + databaseService.table("player_settings")
+                        + " ADD COLUMN team_colored_armor INTEGER NOT NULL DEFAULT 1"
+        )));
+
+        // Floodgate Bedrock names are ".XboxName" and can exceed Java's historic 16-char limit.
+        // MariaDB enforces VARCHAR length; SQLite ignores declared length (noop UPDATE).
+        if (databaseService.type() == DatabaseType.MARIADB) {
+            migrations.add(new Migration(17, "widen players.username for Bedrock/Floodgate", List.of(
+                    "ALTER TABLE " + databaseService.table("players")
+                            + " MODIFY COLUMN username VARCHAR(32) NOT NULL"
+            )));
+        } else {
+            migrations.add(new Migration(17, "widen players.username for Bedrock/Floodgate (sqlite noop)", List.of(
+                    "UPDATE " + databaseService.table("players") + " SET username = username WHERE 0 = 1"
+            )));
+        }
+
+        migrations.add(new Migration(18, "create practice_layouts table", List.of(
+                "CREATE TABLE IF NOT EXISTS " + databaseService.table("practice_layouts") + " ("
+                        + "uuid CHAR(36) NOT NULL, "
+                        + "practice_id VARCHAR(64) NOT NULL, "
+                        + "layout_key VARCHAR(32) NOT NULL, "
+                        + "contents TEXT NOT NULL, "
+                        + "last_used TIMESTAMP NOT NULL, "
+                        + "PRIMARY KEY (uuid, practice_id, layout_key)"
+                        + ")"
+        )));
+
+        migrations.add(new Migration(19, "create unified win_streaks table", List.of(
+                "CREATE TABLE IF NOT EXISTS " + databaseService.table("win_streaks") + " ("
+                        + "uuid CHAR(36) PRIMARY KEY, "
+                        + "username VARCHAR(32) NOT NULL, "
+                        + "current_streak INTEGER NOT NULL DEFAULT 0, "
+                        + "best_streak INTEGER NOT NULL DEFAULT 0, "
+                        + "month_key CHAR(7) NOT NULL, "
+                        + "month_best INTEGER NOT NULL DEFAULT 0"
+                        + ")"
+        )));
+
+        migrations.add(new Migration(20, "create player_reports table", List.of(
+                "CREATE TABLE IF NOT EXISTS " + databaseService.table("player_reports") + " ("
+                        + "id CHAR(36) PRIMARY KEY, "
+                        + "reporter_uuid CHAR(36) NOT NULL, "
+                        + "reporter_name VARCHAR(32) NOT NULL, "
+                        + "target_uuid CHAR(36) NOT NULL, "
+                        + "target_name VARCHAR(32) NOT NULL, "
+                        + "match_id CHAR(36) NOT NULL, "
+                        + "reason VARCHAR(64) NOT NULL, "
+                        + "kit VARCHAR(64), "
+                        + "mode VARCHAR(32), "
+                        + "status VARCHAR(32) NOT NULL DEFAULT 'PENDING', "
+                        + "evidence_path VARCHAR(256), "
+                        + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+                        + ")"
+        )));
+
+        migrations.add(new Migration(21, "add block_tell to punishments", List.of(
+                "ALTER TABLE " + databaseService.table("punishments")
+                        + " ADD COLUMN block_tell INTEGER NOT NULL DEFAULT 0"
+        )));
+
+        migrations.add(new Migration(22, "create spam_detections table", List.of(
+                "CREATE TABLE IF NOT EXISTS " + databaseService.table("spam_detections") + " ("
+                        + "player_uuid CHAR(36) PRIMARY KEY, "
+                        + "detection_count INTEGER NOT NULL DEFAULT 0, "
+                        + "auto_ban_count INTEGER NOT NULL DEFAULT 0, "
+                        + "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+                        + ")"
+        )));
+
+        migrations.add(new Migration(23, "create kit-scoped win_streaks table", List.of(
+                "CREATE TABLE IF NOT EXISTS " + databaseService.table("kit_win_streaks") + " ("
+                        + "uuid CHAR(36) NOT NULL, "
+                        + "kit VARCHAR(64) NOT NULL, "
+                        + "username VARCHAR(32) NOT NULL, "
+                        + "current_streak INTEGER NOT NULL DEFAULT 0, "
+                        + "best_streak INTEGER NOT NULL DEFAULT 0, "
+                        + "month_key CHAR(7) NOT NULL, "
+                        + "month_best INTEGER NOT NULL DEFAULT 0, "
+                        + "PRIMARY KEY (uuid, kit)"
+                        + ")"
+        )));
+
+        migrations.add(new Migration(24, "create player_ranks table", List.of(
+                "CREATE TABLE IF NOT EXISTS " + databaseService.table("player_ranks") + " ("
+                        + "uuid CHAR(36) PRIMARY KEY, "
+                        + "rank_id VARCHAR(32) NOT NULL"
+                        + ")"
+        )));
+
+        migrations.add(new Migration(25, "create player kit preset preferences", List.of(
+                "CREATE TABLE IF NOT EXISTS " + databaseService.table("player_kit_presets") + " ("
+                        + "uuid CHAR(36) NOT NULL, "
+                        + "kit VARCHAR(64) NOT NULL, "
+                        + "preset VARCHAR(64) NOT NULL, "
+                        + "PRIMARY KEY (uuid, kit)"
+                        + ")"
+        )));
+
+        // Repair: migration 16 may have been skipped/failed while schema_version still advanced.
+        migrations.add(new Migration(26, "ensure team_glow / team_colored_armor columns", connection -> {
+            String table = databaseService.table("player_settings");
+            databaseService.ensureColumn(connection, table, "team_glow",
+                    "INTEGER NOT NULL DEFAULT 1");
+            databaseService.ensureColumn(connection, table, "team_colored_armor",
+                    "INTEGER NOT NULL DEFAULT 1");
+        }));
 
         return migrations;
     }

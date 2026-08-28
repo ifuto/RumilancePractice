@@ -31,17 +31,25 @@ public final class TeamKitSelectGui extends AbstractGui {
 
     private final TeamService teamService;
     private final KitService kitService;
+    private final com.rumilance.practice.locale.MessageService messageService;
 
     public TeamKitSelectGui(GuiSessionRegistry registry, SoundService sounds,
                             TeamService teamService, KitService kitService) {
+        this(registry, sounds, teamService, kitService, null);
+    }
+
+    public TeamKitSelectGui(GuiSessionRegistry registry, SoundService sounds,
+                            TeamService teamService, KitService kitService,
+                            com.rumilance.practice.locale.MessageService messageService) {
         super(registry, sounds, GuiType.TEAM_KIT_SELECT, 6, true);
         this.teamService = teamService;
         this.kitService = kitService;
+        this.messageService = messageService;
     }
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return Component.text("✦ Team Battle — Pick a Kit", UiTheme.PRIMARY)
+        return Component.text("Party Battle — Pick a Kit", UiTheme.PRIMARY)
                 .decoration(TextDecoration.ITALIC, false);
     }
 

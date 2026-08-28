@@ -106,6 +106,36 @@ public final class DatabaseService implements AutoCloseable {
      * {@code conflictColumns} must name a column covered by a {@code PRIMARY KEY} or
      * {@code UNIQUE} constraint (required by SQLite's syntax; ignored by MariaDB's).
      */
+    /**
+     * Adds a column if missing. Ignores SQLite / MariaDB "duplicate column" errors so a
+     * repair migration can re-run safely when {@code schema_version} advanced without DDL.
+     */
+    public void ensureColumn(Connection connection, String tableName, String columnName, String columnSql)
+            throws SQLException {
+        Objects.requireNonNull(connection, "connection");
+        Objects.requireNonNull(tableName, "tableName");
+        Objects.requireNonNull(columnName, "columnName");
+        Objects.requireNonNull(columnSql, "columnSql");
+        try (var statement = connection.createStatement()) {
+            statement.executeUpdate("ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + columnSql);
+        } catch (SQLException e) {
+            if (!isDuplicateColumnError(e)) {
+                throw e;
+            }
+        }
+    }
+
+    private static boolean isDuplicateColumnError(SQLException e) {
+        String message = e.getMessage();
+        if (message == null) {
+            return false;
+        }
+        String lower = message.toLowerCase(java.util.Locale.ROOT);
+        return lower.contains("duplicate column")
+                || lower.contains("duplicate column name")
+                || lower.contains("already exists");
+    }
+
     public String upsertClause(String conflictColumns, String... updatedColumns) {
         StringBuilder builder = new StringBuilder();
         if (type == DatabaseType.MARIADB) {

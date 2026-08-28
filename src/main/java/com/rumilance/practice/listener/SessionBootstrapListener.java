@@ -1,9 +1,13 @@
 package com.rumilance.practice.listener;
 
 import com.rumilance.practice.database.repository.PlayerRepository;
+import com.rumilance.practice.join.JoinQuitMessages;
+import com.rumilance.practice.join.WelcomeTitle;
 import com.rumilance.practice.kit.KitLayoutCache;
 import com.rumilance.practice.lobby.LobbyService;
+import com.rumilance.practice.locale.MessageService;
 import com.rumilance.practice.model.PlayerData;
+import com.rumilance.practice.rank.RankService;
 import com.rumilance.practice.session.PlayerSession;
 import com.rumilance.practice.session.PlayerStateManager;
 import com.rumilance.practice.session.SessionManager;
@@ -15,6 +19,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.plugin.Plugin;
 
 import java.time.Instant;
 import java.util.Locale;
@@ -33,6 +38,9 @@ public final class SessionBootstrapListener implements Listener {
     private final KitLayoutCache layoutCache;
     private final SettingsService settingsService;
     private final AsyncExecutor asyncExecutor;
+    private final Plugin plugin;
+    private final MessageService messageService;
+    private final RankService rankService;
 
     public SessionBootstrapListener(
             SessionManager sessionManager,
@@ -44,6 +52,39 @@ public final class SessionBootstrapListener implements Listener {
             SettingsService settingsService,
             AsyncExecutor asyncExecutor
     ) {
+        this(sessionManager, playerStateManager, lobbyService, defaultLocale, playerRepository,
+                layoutCache, settingsService, asyncExecutor, null, null, null);
+    }
+
+    public SessionBootstrapListener(
+            SessionManager sessionManager,
+            PlayerStateManager playerStateManager,
+            LobbyService lobbyService,
+            String defaultLocale,
+            PlayerRepository playerRepository,
+            KitLayoutCache layoutCache,
+            SettingsService settingsService,
+            AsyncExecutor asyncExecutor,
+            Plugin plugin,
+            MessageService messageService
+    ) {
+        this(sessionManager, playerStateManager, lobbyService, defaultLocale, playerRepository,
+                layoutCache, settingsService, asyncExecutor, plugin, messageService, null);
+    }
+
+    public SessionBootstrapListener(
+            SessionManager sessionManager,
+            PlayerStateManager playerStateManager,
+            LobbyService lobbyService,
+            String defaultLocale,
+            PlayerRepository playerRepository,
+            KitLayoutCache layoutCache,
+            SettingsService settingsService,
+            AsyncExecutor asyncExecutor,
+            Plugin plugin,
+            MessageService messageService,
+            RankService rankService
+    ) {
         this.sessionManager = Objects.requireNonNull(sessionManager, "sessionManager");
         this.playerStateManager = Objects.requireNonNull(playerStateManager, "playerStateManager");
         this.lobbyService = Objects.requireNonNull(lobbyService, "lobbyService");
@@ -52,10 +93,14 @@ public final class SessionBootstrapListener implements Listener {
         this.layoutCache = layoutCache;
         this.settingsService = settingsService;
         this.asyncExecutor = asyncExecutor;
+        this.plugin = plugin;
+        this.messageService = messageService;
+        this.rankService = rankService;
     }
 
     @EventHandler(priority = EventPriority.LOWEST)
     public void onJoin(PlayerJoinEvent event) {
+        JoinQuitMessages.apply(event);
         Player player = event.getPlayer();
         String locale = player.locale() != null ? player.locale().toString().toLowerCase(Locale.ROOT) : defaultLocale;
         PlayerSession session = sessionManager.createSession(player.getUniqueId(), locale);
@@ -63,8 +108,31 @@ public final class SessionBootstrapListener implements Listener {
         session.setSoundsEnabled(settings.soundsEnabled());
         session.setScoreboardEnabled(settings.scoreboardEnabled());
         playerStateManager.initialize(player.getUniqueId());
-        lobbyService.sendToLobby(player);
+        if (rankService != null) {
+            rankService.load(player.getUniqueId());
+        }
         layoutCache.preload(player.getUniqueId());
+        // Teleporting during PlayerJoinEvent freezes look + movement on the client.
+        Runnable lobbyAndWelcome = () -> {
+            if (!player.isOnline()) {
+                return;
+            }
+            lobbyService.sendToLobby(player);
+            if (plugin != null && messageService != null) {
+                try {
+                    WelcomeTitle.play(plugin, player,
+                            messageService.render(messageService.resolveLocale(player), "welcome.subtitle"));
+                    messageService.sendRaw(player, "welcome.record-tip");
+                } catch (Exception e) {
+                    WelcomeTitle.play(plugin, player);
+                }
+            }
+        };
+        if (plugin != null) {
+            plugin.getServer().getScheduler().runTask(plugin, lobbyAndWelcome);
+        } else {
+            lobbyService.sendToLobby(player);
+        }
         asyncExecutor.execute(() -> {
             try {
                 Instant now = Instant.now();
@@ -79,8 +147,12 @@ public final class SessionBootstrapListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent event) {
+        JoinQuitMessages.apply(event);
         Player player = event.getPlayer();
         settingsService.unload(player.getUniqueId());
+        if (rankService != null) {
+            rankService.unload(player.getUniqueId());
+        }
         layoutCache.unload(player.getUniqueId());
         asyncExecutor.execute(() -> {
             try {

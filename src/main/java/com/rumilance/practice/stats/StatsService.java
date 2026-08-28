@@ -101,7 +101,7 @@ public final class StatsService {
         String bar = barChar.repeat(Math.max(0, filled)) + "-".repeat(Math.max(0, barLen - filled));
         double kd = losses == 0 ? wins : (double) wins / losses;
 
-        return Component.text("───────────────────────\n", NamedTextColor.DARK_GRAY)
+        return Component.text("· · ·\n", NamedTextColor.DARK_GRAY)
                 .append(Component.text("MCID : " + name + "\n", NamedTextColor.WHITE))
                 .append(Component.text("───ランク戦戦闘記録───\n", NamedTextColor.GOLD))
                 .append(Component.text("総試合数 : " + matches + "\n", NamedTextColor.GRAY))
@@ -113,7 +113,7 @@ public final class StatsService {
                 .append(Component.text(String.format("K/Dレート : %.1f\n", kd), NamedTextColor.AQUA))
                 .append(Component.text("最高連勝 : " + bestStreak + "\n", NamedTextColor.LIGHT_PURPLE))
                 .append(Component.text("得意Kit : " + bestKit + "\n", NamedTextColor.GOLD))
-                .append(Component.text("───────────────────────", NamedTextColor.DARK_GRAY));
+                .append(Component.text("· · ·", NamedTextColor.DARK_GRAY));
     }
 
     public static String nameOf(UUID uuid) {

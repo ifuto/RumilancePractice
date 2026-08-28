@@ -4,15 +4,11 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Per-match combat statistics for the post-fight report card. Tracks damage, hits, critical
- * hits, projectiles and the current/best combo for every participant of a match. The tracker
- * is keyed by match id so multiple concurrent matches never mix up their numbers, and is
- * cleared when the match is cleaned up.
- *
- * <p>All counters are mutated only from the main thread (damage events fire there), but the
- * maps are concurrent so the report GUI can read them safely from any thread.</p>
+ * hits, projectiles and the current/best combo for every participant of a match.
  */
 public final class MatchCombatTracker {
 
@@ -51,39 +47,50 @@ public final class MatchCombatTracker {
         if (crit) {
             attackerStats.crits.incrementAndGet();
         }
-        bumpCombo(attackerStats);
+        bumpMeleeCombo(attackerStats, victim);
 
         CombatStats victimStats = forParticipant(matchId, victim);
         victimStats.damageTaken.addAndGet((int) Math.round(finalDamage));
+        victimStats.breakCombo();
         victimStats.lastHitAt = System.currentTimeMillis();
     }
 
-    /** Records a projectile (bow/other) hit. Counts both as a hit and as a projectile hit. */
+    /**
+     * Records a projectile (bow/other) hit. Counts as a hit and projectile hit but does
+     * <strong>not</strong> extend the melee combo chain.
+     */
     public void recordProjectileHit(UUID matchId, UUID attacker, UUID victim, double finalDamage) {
         CombatStats attackerStats = forParticipant(matchId, attacker);
         attackerStats.damageDealt.addAndGet((int) Math.round(finalDamage));
         attackerStats.hits.incrementAndGet();
         attackerStats.projectileHits.incrementAndGet();
-        bumpCombo(attackerStats);
+        // Projectile hits do not extend or break the melee combo window timing for the attacker;
+        // they also do not increment currentCombo.
+        attackerStats.lastHitAt = System.currentTimeMillis();
 
         CombatStats victimStats = forParticipant(matchId, victim);
         victimStats.damageTaken.addAndGet((int) Math.round(finalDamage));
+        victimStats.breakCombo();
         victimStats.lastHitAt = System.currentTimeMillis();
     }
 
-    private void bumpCombo(CombatStats stats) {
+    private void bumpMeleeCombo(CombatStats stats, UUID victim) {
         long now = System.currentTimeMillis();
-        if (now - stats.lastHitAt <= COMBO_WINDOW_MS) {
+        UUID previousTarget = stats.comboTarget.get();
+        boolean sameTarget = previousTarget != null && previousTarget.equals(victim);
+        boolean inWindow = now - stats.lastHitAt <= COMBO_WINDOW_MS;
+        if (sameTarget && inWindow) {
             int current = stats.currentCombo.incrementAndGet();
             stats.bestCombo.accumulateAndGet(current, Math::max);
         } else {
             stats.currentCombo.set(1);
             stats.bestCombo.accumulateAndGet(1, Math::max);
         }
+        stats.comboTarget.set(victim);
         stats.lastHitAt = now;
     }
 
-    /** Mutable per-player counters held inside the tracker; read via {@link #snapshot()}. */
+    /** Mutable per-player counters held inside the tracker; read via accessors. */
     public static final class CombatStats {
         final AtomicInteger damageDealt = new AtomicInteger();
         final AtomicInteger damageTaken = new AtomicInteger();
@@ -92,7 +99,13 @@ public final class MatchCombatTracker {
         final AtomicInteger projectileHits = new AtomicInteger();
         final AtomicInteger currentCombo = new AtomicInteger();
         final AtomicInteger bestCombo = new AtomicInteger();
+        final AtomicReference<UUID> comboTarget = new AtomicReference<>();
         volatile long lastHitAt;
+
+        void breakCombo() {
+            currentCombo.set(0);
+            comboTarget.set(null);
+        }
 
         public int damageDealt() {
             return damageDealt.get();
@@ -112,6 +125,10 @@ public final class MatchCombatTracker {
 
         public int projectileHits() {
             return projectileHits.get();
+        }
+
+        public int currentCombo() {
+            return currentCombo.get();
         }
 
         public int bestCombo() {

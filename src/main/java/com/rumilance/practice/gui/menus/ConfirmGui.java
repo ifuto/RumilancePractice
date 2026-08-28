@@ -1,14 +1,16 @@
 package com.rumilance.practice.gui.menus;
 
 import com.rumilance.practice.gui.AbstractGui;
-import com.rumilance.practice.gui.GuiDecorator;
 import com.rumilance.practice.gui.GuiSession;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.GuiType;
+import com.rumilance.practice.gui.ItemBuilder;
+import com.rumilance.practice.gui.MenuScaffold;
+import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.sound.SoundService;
 import com.rumilance.practice.util.GuiSlots;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
@@ -49,25 +51,29 @@ public final class ConfirmGui extends AbstractGui {
     @Override
     protected Component title(Player player, GuiSession session) {
         Component stored = session.get("title", Component.class);
-        return stored != null ? stored : Component.text("確認", NamedTextColor.WHITE);
+        return stored != null ? stored : Component.text("確認", UiTheme.PRIMARY)
+                .decoration(TextDecoration.ITALIC, false);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
+        MenuScaffold.chrome(inventory);
         Component message = session.get("title", Component.class);
         List<Component> lore = session.get("lore", List.class);
         ItemStack info = new ItemStack(Material.PAPER);
         ItemMeta meta = info.getItemMeta();
-        meta.displayName(message == null ? Component.text("確認", NamedTextColor.WHITE) : message);
+        meta.displayName(message == null
+                ? Component.text("確認", UiTheme.PRIMARY).decoration(TextDecoration.ITALIC, false)
+                : message);
         if (lore != null && !lore.isEmpty()) {
             meta.lore(lore);
         }
         info.setItemMeta(meta);
         inventory.setItem(GuiSlots.slot(1, 4), info);
-        inventory.setItem(GuiSlots.slot(1, 2), GuiDecorator.button(Material.LIME_DYE,
-                Component.text("はい", NamedTextColor.GREEN), "yes"));
-        inventory.setItem(GuiSlots.slot(1, 6), GuiDecorator.button(Material.RED_DYE,
-                Component.text("いいえ", NamedTextColor.RED), "no"));
+        inventory.setItem(GuiSlots.slot(1, 2), ItemBuilder.action(UiTheme.CONFIRM,
+                Component.text("はい", UiTheme.SUCCESS), "yes"));
+        inventory.setItem(GuiSlots.slot(1, 6), ItemBuilder.action(UiTheme.CLOSE,
+                Component.text("いいえ", UiTheme.DANGER), "no"));
     }
 
     @Override

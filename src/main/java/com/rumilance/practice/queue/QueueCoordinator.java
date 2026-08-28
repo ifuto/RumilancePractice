@@ -7,6 +7,7 @@ import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.lobby.LobbyService;
 import com.rumilance.practice.match.MatchService;
 import com.rumilance.practice.model.RankedKitStats;
+import com.rumilance.practice.platform.PlayerPlatform;
 import com.rumilance.practice.session.PlayerStateManager;
 import com.rumilance.practice.locale.MessageService;
 import com.rumilance.practice.sound.SoundService;
@@ -54,6 +55,8 @@ public final class QueueCoordinator {
     private final boolean avoidRecent;
     private BukkitTask matchTask;
     private BukkitTask actionBarTask;
+    private com.rumilance.practice.ffa.FfaService ffaService;
+    private com.rumilance.practice.team.TeamService teamService;
 
     public QueueCoordinator(
             Plugin plugin,
@@ -87,6 +90,10 @@ public final class QueueCoordinator {
         this.messageService = messageService;
     }
 
+    public void setFfaService(com.rumilance.practice.ffa.FfaService ffaService) {
+        this.ffaService = ffaService;
+    }
+
     public void start() {
         matchTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tickMatchmaking, 40L, 40L);
         actionBarTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tickActionBars, 20L, 20L);
@@ -102,7 +109,15 @@ public final class QueueCoordinator {
         queueService.clearAll();
     }
 
+    public void setTeamService(com.rumilance.practice.team.TeamService teamService) {
+        this.teamService = teamService;
+    }
+
     public void join(Player player, String kitId, MatchMode mode) {
+        if (teamService != null && teamService.teamOf(player.getUniqueId()).isPresent()) {
+            messageService.send(player, "party.solo-only");
+            return;
+        }
         if (mode == MatchMode.FFA) {
             return;
         }
@@ -121,6 +136,10 @@ public final class QueueCoordinator {
         }
         if (!kitService.isQueueEnabled(kitId) || kitService.get(kitId).filter(k -> k.enabled()).isEmpty()) {
             messageService.send(player, "queue.kit-disabled");
+            return;
+        }
+        if (ffaService != null && ffaService.isInFfa(player.getUniqueId())) {
+            messageService.send(player, "queue.cannot-join");
             return;
         }
         PlayerState state = stateManager.getState(player.getUniqueId());
@@ -145,7 +164,8 @@ public final class QueueCoordinator {
         }
 
         String ip = player.getAddress() == null ? null : player.getAddress().getAddress().getHostAddress();
-        if (!queueService.join(player.getUniqueId(), kitId, mode, elo.get(), ip)) {
+        PlayerPlatform platform = PlayerPlatform.of(player);
+        if (!queueService.join(player.getUniqueId(), kitId, mode, elo.get(), ip, platform)) {
             messageService.send(player, "queue.already-queued");
             return;
         }
@@ -195,8 +215,9 @@ public final class QueueCoordinator {
         for (Player player : Bukkit.getOnlinePlayers()) {
             queueService.get(player.getUniqueId()).ifPresent(entry -> {
                 long waited = now.getEpochSecond() - entry.joinedAt().getEpochSecond();
-                int waiting = queueService.waitingCount(entry.mode(), entry.kitId());
-                player.sendActionBar(Component.text("Queue " + entry.kitId() + " | "
+                int waiting = queueService.waitingCount(entry.mode(), entry.kitId(), entry.platform());
+                String platformLabel = entry.platform() == PlayerPlatform.BEDROCK ? "BE" : "Java";
+                player.sendActionBar(Component.text("Queue " + entry.kitId() + " (" + platformLabel + ") | "
                         + waited + "s | " + waiting + " waiting", NamedTextColor.AQUA));
             });
         }

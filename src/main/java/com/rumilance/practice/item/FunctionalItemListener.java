@@ -40,9 +40,23 @@ public final class FunctionalItemListener implements Listener {
     };
     private Consumer<Player> openMenu = p -> {
     };
+    private Consumer<Player> openBattle = p -> {
+    };
     private Consumer<Player> openTitles = p -> {
     };
     private Consumer<Player> openParty = p -> {
+    };
+    private Consumer<Player> openPartyInvite = p -> {
+    };
+    private Consumer<Player> openPartyStart = p -> {
+    };
+    private Consumer<Player> openPartyMap = p -> {
+    };
+    private Consumer<Player> partyLeave = p -> {
+    };
+    private Consumer<Player> partyTogglePublic = p -> {
+    };
+    private Consumer<Player> partyToggleFf = p -> {
     };
 
     public FunctionalItemListener(
@@ -77,6 +91,10 @@ public final class FunctionalItemListener implements Listener {
         this.openMenu = openMenu;
     }
 
+    public void setOpenBattle(Consumer<Player> openBattle) {
+        this.openBattle = openBattle == null ? p -> { } : openBattle;
+    }
+
     public void setOpenTitles(Consumer<Player> openTitles) {
         this.openTitles = openTitles;
     }
@@ -85,13 +103,55 @@ public final class FunctionalItemListener implements Listener {
         this.openParty = openParty;
     }
 
+    public void setOpenPartyInvite(Consumer<Player> openPartyInvite) {
+        this.openPartyInvite = openPartyInvite == null ? p -> { } : openPartyInvite;
+    }
+
+    public void setOpenPartyStart(Consumer<Player> openPartyStart) {
+        this.openPartyStart = openPartyStart == null ? p -> { } : openPartyStart;
+    }
+
+    public void setOpenPartyMap(Consumer<Player> openPartyMap) {
+        this.openPartyMap = openPartyMap == null ? p -> { } : openPartyMap;
+    }
+
+    public void setPartyLeave(Consumer<Player> partyLeave) {
+        this.partyLeave = partyLeave == null ? p -> { } : partyLeave;
+    }
+
+    public void setPartyTogglePublic(Consumer<Player> partyTogglePublic) {
+        this.partyTogglePublic = partyTogglePublic == null ? p -> { } : partyTogglePublic;
+    }
+
+    public void setPartyToggleFf(Consumer<Player> partyToggleFf) {
+        this.partyToggleFf = partyToggleFf == null ? p -> { } : partyToggleFf;
+    }
+
     public static ItemStack create(String functionType, Material material, Component name) {
         ItemStack stack = new ItemStack(material);
         ItemMeta meta = stack.getItemMeta();
-        meta.displayName(name.decoration(TextDecoration.ITALIC, false));
+        Component safeName = stripVariationSelectors(name);
+        meta.displayName(safeName.decoration(TextDecoration.ITALIC, false));
         meta.getPersistentDataContainer().set(ItemKeys.functionType(), PersistentDataType.STRING, functionType);
         stack.setItemMeta(meta);
         return stack;
+    }
+
+    /** Strips VS16/VS18 variation selectors that render as tofu on some clients. */
+    public static Component stripVariationSelectors(Component component) {
+        if (component == null) {
+            return Component.empty();
+        }
+        return component.replaceText(builder -> builder
+                .match("[\uFE0E\uFE0F]")
+                .replacement(""));
+    }
+
+    public static String stripVariationSelectors(String text) {
+        if (text == null) {
+            return "";
+        }
+        return text.replace("\uFE0E", "").replace("\uFE0F", "");
     }
 
     @EventHandler
@@ -135,6 +195,14 @@ public final class FunctionalItemListener implements Listener {
             case "spectate" -> openSpectate.accept(player);
             case "titles" -> openTitles.accept(player);
             case "party" -> openParty.accept(player);
+            case "party_hub" -> openParty.accept(player);
+            case "party_invite" -> openPartyInvite.accept(player);
+            case "party_start" -> openPartyStart.accept(player);
+            case "party_map" -> openPartyMap.accept(player);
+            case "party_ff" -> partyToggleFf.accept(player);
+            case "party_leave" -> partyLeave.accept(player);
+            case "party_public" -> partyTogglePublic.accept(player);
+            case "battle" -> openBattle.accept(player);
             case "leavequeue" -> queueCoordinator.leave(player);
             default -> soundService.play(player, "error");
         }

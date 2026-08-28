@@ -7,85 +7,71 @@ import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 
 /**
- * Central design tokens for every RumilancePractice menu: the filler/background materials,
- * accent colours, and a few ready-made divider/spacer components. Keeping these in one place
- * means a single tweak re-skins every GUI instead of editing colours scattered across 20+
- * menu classes.
- *
- * <p>The visual language is intentionally "dark + one accent": black glass panes fade the
- * inventory chrome into the background, while a single aqua/gold accent draws the eye to the
- * active/selected element. Bold is avoided everywhere (per the plugin's house style).</p>
+ * N Arena menu design tokens — dark slate panels with cyan accents (brand {@code #55FFFF}).
  */
 public final class UiTheme {
 
-    // ---- Materials ------------------------------------------------------
-
-    /** Empty, unclickable background tile filling every unused slot. */
     public static final Material BACKGROUND = Material.BLACK_STAINED_GLASS_PANE;
-    /** Slightly lighter tile used to frame a content panel inside the menu. */
     public static final Material PANEL = Material.GRAY_STAINED_GLASS_PANE;
-    /** Accent tile used for section headers / active highlights. */
     public static final Material ACCENT = Material.CYAN_STAINED_GLASS_PANE;
+    public static final Material ACCENT_SOFT = Material.LIGHT_BLUE_STAINED_GLASS_PANE;
 
     public static final Material CLOSE = Material.BARRIER;
     public static final Material BACK = Material.ARROW;
-    public static final Material NEXT_PAGE = Material.ARROW;
-    public static final Material PREV_PAGE = Material.ARROW;
+    public static final Material NEXT_PAGE = Material.SPECTRAL_ARROW;
+    public static final Material PREV_PAGE = Material.SPECTRAL_ARROW;
     public static final Material CONFIRM = Material.LIME_DYE;
     public static final Material INFO = Material.NETHER_STAR;
 
     public static final Material TOGGLE_ON = Material.LIME_DYE;
-    public static final Material TOGGLE_OFF = Material.GRAY_DYE;
+    public static final Material TOGGLE_OFF = Material.RED_DYE;
 
-    // ---- Colours --------------------------------------------------------
-
-    public static final TextColor PRIMARY = TextColor.color(0x55FFFF);   // aqua
-    public static final TextColor SECONDARY = TextColor.color(0xFFAA00); // gold
-    public static final TextColor SUCCESS = NamedTextColor.GREEN;
-    public static final TextColor DANGER = NamedTextColor.RED;
-    public static final TextColor WARNING = NamedTextColor.YELLOW;
-    public static final TextColor MUTED = NamedTextColor.GRAY;
+    /** Brand cyan — matches Lunar Server Mappings primaryColor. */
+    public static final TextColor PRIMARY = TextColor.color(0x55FFFF);
+    public static final TextColor SECONDARY = TextColor.color(0x7DD3FC);
+    public static final TextColor SUCCESS = TextColor.color(0x4ADE80);
+    public static final TextColor DANGER = TextColor.color(0xF87171);
+    public static final TextColor WARNING = TextColor.color(0xFBBF24);
+    public static final TextColor MUTED = TextColor.color(0x94A3B8);
     public static final TextColor VALUE = NamedTextColor.WHITE;
-    public static final TextColor HEADER = TextColor.color(0xFFD700); // gold, for headings
+    public static final TextColor HEADER = TextColor.color(0x22D3EE);
 
     private UiTheme() {
     }
 
-    /** A horizontal rule used between lore sections ("─────────────"). */
     public static Component divider() {
-        return Component.text(" ".repeat(18), NamedTextColor.DARK_GRAY)
-                .decoration(TextDecoration.STRIKETHROUGH, true)
+        return Component.text(" ─────────── ", TextColor.color(0x334155))
                 .decoration(TextDecoration.ITALIC, false);
     }
 
-    /** A blank lore line (kept explicit so call sites read clearly). */
     public static Component blank() {
         return Component.empty();
     }
 
-    /** A muted label followed by a white value, e.g. {@code "Elo: 1234"}. */
     public static Component labelValue(String label, String value) {
-        return Component.text(label + ": ", MUTED)
+        return Component.text(label + " ", MUTED)
                 .append(Component.text(value, VALUE))
                 .decoration(TextDecoration.ITALIC, false);
     }
 
-    /** A single muted lore line with no value. */
     public static Component line(String text) {
         return Component.text(text, MUTED).decoration(TextDecoration.ITALIC, false);
     }
 
-    /** An accent-coloured hint line, e.g. "▶ Click to join". */
     public static Component hint(String text) {
-        return Component.text("▶ ", PRIMARY)
-                .append(Component.text(text, NamedTextColor.GRAY))
+        return Component.text("▸ ", PRIMARY)
+                .append(Component.text(text, MUTED))
                 .decoration(TextDecoration.ITALIC, false);
     }
 
-    /** A coloured status word, e.g. green "● ONLINE". */
     public static Component status(String text, TextColor color) {
         return Component.text("● ", color)
                 .append(Component.text(text, color))
                 .decoration(TextDecoration.ITALIC, false);
+    }
+
+    /** Branded menu title prefix. */
+    public static Component menuTitle(String text) {
+        return Component.text(text, PRIMARY).decoration(TextDecoration.ITALIC, false);
     }
 }

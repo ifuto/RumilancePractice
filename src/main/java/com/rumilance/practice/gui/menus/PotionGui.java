@@ -1,16 +1,17 @@
 package com.rumilance.practice.gui.menus;
 
 import com.rumilance.practice.gui.AbstractGui;
-import com.rumilance.practice.gui.GuiDecorator;
 import com.rumilance.practice.gui.GuiSession;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.GuiType;
+import com.rumilance.practice.gui.ItemBuilder;
+import com.rumilance.practice.gui.MenuScaffold;
+import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.originalkit.OriginalKitService;
 import com.rumilance.practice.sound.SoundService;
 import com.rumilance.practice.util.ItemKeys;
 import com.rumilance.practice.util.PotionRules;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
@@ -50,11 +51,12 @@ public final class PotionGui extends AbstractGui {
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return Component.text("ポーション選択", NamedTextColor.WHITE);
+        return Component.text("ポーション選択", UiTheme.PRIMARY).decoration(TextDecoration.ITALIC, false);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
+        MenuScaffold.chrome(inventory);
         String effect = session.get("effect", String.class);
         PotionRules.Option opt = PotionRules.option(effect);
         List<ItemStack> choices = new ArrayList<>();
@@ -68,9 +70,9 @@ public final class PotionGui extends AbstractGui {
                                     PotionRules.variantLabel(variant) + " " + opt.display()
                                             + (opt.maxLevel() > 1 ? " レベル" + roman(level) : "")
                                             + (extended ? " 延長" : ""),
-                                    NamedTextColor.WHITE)
+                                    UiTheme.VALUE)
                             .decoration(TextDecoration.ITALIC, false));
-                    meta.lore(List.of(Component.text("クリックでキットに追加", NamedTextColor.GRAY)
+                    meta.lore(List.of(Component.text("クリックでキットに追加", UiTheme.MUTED)
                             .decoration(TextDecoration.ITALIC, false)));
                     meta.getPersistentDataContainer().set(ItemKeys.guiAction(), PersistentDataType.STRING,
                             "pick:" + variant + ":" + level + ":" + extended);
@@ -82,8 +84,8 @@ public final class PotionGui extends AbstractGui {
         for (int i = 0; i < choices.size() && i < 45; i++) {
             inventory.setItem(i, choices.get(i));
         }
-        inventory.setItem(45, GuiDecorator.button(org.bukkit.Material.RED_DYE,
-                Component.text("戻る", NamedTextColor.RED), "back"));
+        inventory.setItem(45, ItemBuilder.action(UiTheme.BACK,
+                Component.text("戻る", UiTheme.WARNING), "back"));
     }
 
     private static String roman(int level) {
@@ -115,7 +117,7 @@ public final class PotionGui extends AbstractGui {
                     }
                     boolean placed = OriginalKitService.addToLayout(ctx, potion);
                     if (!placed) {
-                        player.sendMessage(Component.text("キットのインベントリが満杯です。", NamedTextColor.RED));
+                        player.sendMessage(Component.text("キットのインベントリが満杯です。", UiTheme.DANGER));
                         return;
                     }
                     sounds.play(player, "select");

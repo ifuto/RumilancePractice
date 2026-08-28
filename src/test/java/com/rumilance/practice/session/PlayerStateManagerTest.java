@@ -139,4 +139,28 @@ class PlayerStateManagerTest {
         assertEquals(PlayerState.LOBBY, manager.resetToLobby(playerId));
         assertEquals(PlayerState.LOBBY, manager.getState(playerId));
     }
+
+    @Test
+    void practiceWaitActiveRoundTripFromLobby() {
+        manager.initialize(playerId);
+        assertEquals(PlayerState.PRACTICE_WAIT, manager.transition(playerId, PlayerState.PRACTICE_WAIT));
+        assertEquals(PlayerState.PRACTICE_ACTIVE, manager.transition(playerId, PlayerState.PRACTICE_ACTIVE));
+        assertEquals(PlayerState.PRACTICE_WAIT, manager.transition(playerId, PlayerState.PRACTICE_WAIT));
+        assertEquals(PlayerState.LOBBY, manager.transition(playerId, PlayerState.LOBBY));
+    }
+
+    @Test
+    void practiceActiveDirectFromLobbyForMace() {
+        manager.initialize(playerId);
+        assertTrue(PlayerStateManager.canTransition(PlayerState.LOBBY, PlayerState.PRACTICE_ACTIVE));
+        assertEquals(PlayerState.PRACTICE_ACTIVE, manager.transition(playerId, PlayerState.PRACTICE_ACTIVE));
+        assertEquals(PlayerState.LOBBY, manager.transition(playerId, PlayerState.LOBBY));
+    }
+
+    @Test
+    void openingGuiCanEnterPractice() {
+        manager.initialize(playerId);
+        manager.transition(playerId, PlayerState.OPENING_GUI);
+        assertEquals(PlayerState.PRACTICE_WAIT, manager.transition(playerId, PlayerState.PRACTICE_WAIT));
+    }
 }

@@ -1,6 +1,8 @@
 package com.rumilance.practice.queue;
 
 import com.rumilance.practice.config.PluginSettings;
+import com.rumilance.practice.guard.PracticeGuards;
+import com.rumilance.practice.platform.PlayerPlatform;
 import com.rumilance.practice.state.MatchMode;
 
 import java.time.Instant;
@@ -18,7 +20,15 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class QueueService {
 
-    public record QueueEntry(UUID playerId, String kitId, MatchMode mode, int elo, Instant joinedAt, String ip) {
+    public record QueueEntry(
+            UUID playerId,
+            String kitId,
+            MatchMode mode,
+            int elo,
+            Instant joinedAt,
+            String ip,
+            PlayerPlatform platform
+    ) {
     }
 
     public record MatchPair(QueueEntry a, QueueEntry b) {
@@ -33,20 +43,26 @@ public final class QueueService {
         this.settings = Objects.requireNonNull(settings);
     }
 
-    public static String queueKey(MatchMode mode, String kitId) {
-        return mode.name() + "_" + kitId.toLowerCase();
+    public static String queueKey(MatchMode mode, String kitId, PlayerPlatform platform) {
+        return mode.name() + "_" + kitId.toLowerCase() + "_"
+                + (platform == null ? PlayerPlatform.JAVA.queueToken() : platform.queueToken());
     }
 
-    public synchronized boolean join(UUID playerId, String kitId, MatchMode mode, int elo, String ip) {
-        if (mode == MatchMode.FFA) {
+    public synchronized boolean join(
+            UUID playerId,
+            String kitId,
+            MatchMode mode,
+            int elo,
+            String ip,
+            PlayerPlatform platform
+    ) {
+        if (!PracticeGuards.canEnterQueue(mode, byPlayer.containsKey(playerId))) {
             return false;
         }
-        if (byPlayer.containsKey(playerId)) {
-            return false;
-        }
-        QueueEntry entry = new QueueEntry(playerId, kitId.toLowerCase(), mode, elo, Instant.now(), ip);
+        PlayerPlatform resolved = platform == null ? PlayerPlatform.JAVA : platform;
+        QueueEntry entry = new QueueEntry(playerId, kitId.toLowerCase(), mode, elo, Instant.now(), ip, resolved);
         byPlayer.put(playerId, entry);
-        byQueue.computeIfAbsent(queueKey(mode, kitId), k -> new ArrayList<>()).add(entry);
+        byQueue.computeIfAbsent(queueKey(mode, kitId, resolved), k -> new ArrayList<>()).add(entry);
         return true;
     }
 
@@ -55,7 +71,7 @@ public final class QueueService {
         if (removed == null) {
             return Optional.empty();
         }
-        List<QueueEntry> list = byQueue.get(queueKey(removed.mode(), removed.kitId()));
+        List<QueueEntry> list = byQueue.get(queueKey(removed.mode(), removed.kitId(), removed.platform()));
         if (list != null) {
             list.removeIf(e -> e.playerId().equals(playerId));
         }
@@ -70,8 +86,8 @@ public final class QueueService {
         return byPlayer.containsKey(playerId);
     }
 
-    public int waitingCount(MatchMode mode, String kitId) {
-        List<QueueEntry> list = byQueue.get(queueKey(mode, kitId));
+    public int waitingCount(MatchMode mode, String kitId, PlayerPlatform platform) {
+        List<QueueEntry> list = byQueue.get(queueKey(mode, kitId, platform));
         return list == null ? 0 : list.size();
     }
 
@@ -99,7 +115,10 @@ public final class QueueService {
                     QueueEntry a = list.get(i);
                     for (int j = i + 1; j < list.size(); j++) {
                         QueueEntry b = list.get(j);
-                        if (!canMatch(a, b, blockSameIp, avoidRecent, now)) {
+                        // When only two players are waiting for this kit+mode, ignore Elo and
+                        // recent-opponent blocks so they are never stuck alone forever.
+                        boolean lonelyPair = list.size() == 2;
+                        if (!canMatch(a, b, blockSameIp, avoidRecent && !lonelyPair, now, lonelyPair)) {
                             continue;
                         }
                         pairs.add(new MatchPair(a, b));
@@ -120,30 +139,24 @@ public final class QueueService {
         return pairs;
     }
 
-    private boolean canMatch(QueueEntry a, QueueEntry b, boolean blockSameIp, boolean avoidRecent, Instant now) {
-        if (a.playerId().equals(b.playerId())) {
-            return false;
-        }
-        if (blockSameIp && a.ip() != null && a.ip().equals(b.ip())) {
-            return false;
-        }
-        if (avoidRecent) {
-            UUID recentA = recentOpponents.get(a.playerId());
-            UUID recentB = recentOpponents.get(b.playerId());
-            if (b.playerId().equals(recentA) || a.playerId().equals(recentB)) {
-                return false;
-            }
-        }
-        if (a.mode() == MatchMode.UNRANKED) {
-            return true;
-        }
+    private boolean canMatch(QueueEntry a, QueueEntry b, boolean blockSameIp, boolean avoidRecent,
+                             Instant now, boolean ignoreElo) {
         long waitedSeconds = Math.max(
                 now.getEpochSecond() - a.joinedAt().getEpochSecond(),
                 now.getEpochSecond() - b.joinedAt().getEpochSecond()
         );
         int intervals = (int) (waitedSeconds / Math.max(1, settings.queueGrowthIntervalSeconds()));
         int range = settings.queueInitialEloRange() + intervals * settings.queueEloRangeGrowthPerInterval();
-        return Math.abs(a.elo() - b.elo()) <= range;
+        return PracticeGuards.canPairInQueue(
+                a,
+                b,
+                blockSameIp,
+                avoidRecent,
+                ignoreElo,
+                range,
+                recentOpponents.get(a.playerId()),
+                recentOpponents.get(b.playerId())
+        );
     }
 
     public synchronized void removeStale(UUID playerId) {

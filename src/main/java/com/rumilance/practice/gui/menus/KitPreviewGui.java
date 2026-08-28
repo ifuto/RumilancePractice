@@ -46,7 +46,7 @@ public final class KitPreviewGui extends AbstractGui {
         String kit = session.selectedKit() == null
                 ? "Kit"
                 : com.rumilance.practice.util.KitNames.pretty(session.selectedKit());
-        return Component.text("✦ Preview: " + kit, UiTheme.PRIMARY).decoration(TextDecoration.ITALIC, false);
+        return Component.text("Preview: " + kit, UiTheme.PRIMARY).decoration(TextDecoration.ITALIC, false);
     }
 
     @Override

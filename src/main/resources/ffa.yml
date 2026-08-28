@@ -1,9 +1,16 @@
 # Free-for-all arena and matchmaking configuration.
+# spawn: omit (or /ffa deletespawn) = random grass. /ffa spawn = fixed location.
 arenas: []
 
 settings:
   min-players-to-start: 1
   max-players-per-arena: 24
+  # Invulnerability after join/respawn (also used as no-damage ticks).
   respawn-delay-seconds: 3
+  # Legacy global default (unused when per-arena values are set). Prefer:
+  # /ffa resettime <arena> 30min | /ffa resettime <arena> off
+  # Persisted on arenas.<id>.reset-interval-seconds (0 = off).
+  reset-interval-seconds: 0
   kill-streak-announcements: true
+  # false = cancel fall/lava/drown/etc. PvP damage is unchanged.
   environment-damage-enabled: false

@@ -40,6 +40,25 @@ public final class PlayerRepository {
         }
     }
 
+    /** Case-insensitive username lookup (exact match after trim). */
+    public Optional<PlayerData> findByUsername(String username) throws SQLException {
+        if (username == null || username.isBlank()) {
+            return Optional.empty();
+        }
+        String sql = "SELECT uuid, username, first_join, last_seen, locale FROM "
+                + databaseService.table("players") + " WHERE LOWER(username) = LOWER(?) LIMIT 1";
+        try (Connection connection = databaseService.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, sanitizeUsername(username.trim()));
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) {
+                    return Optional.empty();
+                }
+                return Optional.of(map(resultSet));
+            }
+        }
+    }
+
     public void upsert(PlayerData data) throws SQLException {
         String sql = "INSERT INTO " + databaseService.table("players")
                 + " (uuid, username, first_join, last_seen, locale) VALUES (?, ?, ?, ?, ?) "
@@ -47,12 +66,23 @@ public final class PlayerRepository {
         try (Connection connection = databaseService.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, data.uuid().toString());
-            statement.setString(2, data.username());
+            statement.setString(2, sanitizeUsername(data.username()));
             statement.setTimestamp(3, Timestamp.from(data.firstJoin()));
             statement.setTimestamp(4, Timestamp.from(data.lastSeen()));
             statement.setString(5, data.locale());
             statement.executeUpdate();
         }
+    }
+
+    /**
+     * Floodgate Bedrock names can exceed 16 characters (leading {@code .} + Xbox gamertag).
+     * Cap at 32 to match migration 17 / MariaDB column width.
+     */
+    public static String sanitizeUsername(String username) {
+        if (username == null) {
+            return "";
+        }
+        return username.length() <= 32 ? username : username.substring(0, 32);
     }
 
     public void updateLastSeen(UUID uuid, Instant lastSeen) throws SQLException {

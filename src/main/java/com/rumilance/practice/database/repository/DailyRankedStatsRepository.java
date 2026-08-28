@@ -59,6 +59,23 @@ public final class DailyRankedStatsRepository {
         return top("matches", limit);
     }
 
+    public int deleteForPlayer(UUID playerId) throws SQLException {
+        String sql = "DELETE FROM " + databaseService.table("daily_ranked_stats") + " WHERE player_uuid = ?";
+        try (Connection connection = databaseService.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, playerId.toString());
+            return statement.executeUpdate();
+        }
+    }
+
+    public int deleteAll() throws SQLException {
+        try (Connection connection = databaseService.getConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "DELETE FROM " + databaseService.table("daily_ranked_stats"))) {
+            return statement.executeUpdate();
+        }
+    }
+
     private List<DailyEntry> top(String column, int limit) throws SQLException {
         String date = LocalDate.now().toString();
         String sql = "SELECT player_uuid, kills, matches FROM " + databaseService.table("daily_ranked_stats")

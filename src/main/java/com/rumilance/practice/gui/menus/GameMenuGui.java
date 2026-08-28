@@ -7,6 +7,7 @@ import com.rumilance.practice.gui.GuiType;
 import com.rumilance.practice.gui.ItemBuilder;
 import com.rumilance.practice.gui.MenuScaffold;
 import com.rumilance.practice.gui.UiTheme;
+import com.rumilance.practice.locale.MessageService;
 import com.rumilance.practice.sound.SoundService;
 import com.rumilance.practice.util.GuiSlots;
 import net.kyori.adventure.text.Component;
@@ -16,42 +17,37 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 
 /**
- * Fast-access "Game Menu" opened by right-clicking the lobby compass. Lays out the six most
- * common lobby actions (ranked, unranked, FFA, kit editor, spectate, settings) in a single
- * 3x3 cluster so players can jump anywhere in one click. Each button has a clear label,
- * a short description and a click hint; the close button sits on the bottom bar.
+ * Lobby compass hub. Combat entries live under {@link BattleMenuGui}; this screen keeps
+ * kit editor, spectate, settings, titles, and teams.
  */
 public final class GameMenuGui extends AbstractGui {
 
-    private final QueueKitGui rankedGui;
-    private final QueueKitGui unrankedGui;
-    private final FfaListGui ffaListGui;
+    private final BattleMenuGui battleMenuGui;
     private final EkitSelectGui ekitSelectGui;
     private final SpectateListGui spectateListGui;
     private final SettingsGui settingsGui;
     private final TitleGui titleGui;
+    private final MessageService messageService;
     /** Opens the team hub/browser — wired via setter because the team GUIs are built later. */
     private java.util.function.Consumer<Player> openTeams = p -> { };
 
     public GameMenuGui(
             GuiSessionRegistry registry,
             SoundService sounds,
-            QueueKitGui rankedGui,
-            QueueKitGui unrankedGui,
-            FfaListGui ffaListGui,
+            BattleMenuGui battleMenuGui,
             EkitSelectGui ekitSelectGui,
             SpectateListGui spectateListGui,
             SettingsGui settingsGui,
-            TitleGui titleGui
+            TitleGui titleGui,
+            MessageService messageService
     ) {
         super(registry, sounds, GuiType.GAME_MENU, 6, true);
-        this.rankedGui = rankedGui;
-        this.unrankedGui = unrankedGui;
-        this.ffaListGui = ffaListGui;
+        this.battleMenuGui = battleMenuGui;
         this.ekitSelectGui = ekitSelectGui;
         this.spectateListGui = spectateListGui;
         this.settingsGui = settingsGui;
         this.titleGui = titleGui;
+        this.messageService = messageService;
     }
 
     public void setOpenTeams(java.util.function.Consumer<Player> openTeams) {
@@ -60,7 +56,16 @@ public final class GameMenuGui extends AbstractGui {
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return Component.text("✦ Game Menu", UiTheme.PRIMARY).decoration(TextDecoration.ITALIC, false);
+        if (messageService != null) {
+            try {
+                return messageService.render(messageService.resolveLocale(player), "menu.game-title")
+                        .color(UiTheme.PRIMARY)
+                        .decoration(TextDecoration.ITALIC, false);
+            } catch (Exception ignored) {
+                // fall through
+            }
+        }
+        return Component.text("Game Menu", UiTheme.PRIMARY).decoration(TextDecoration.ITALIC, false);
     }
 
     @Override
@@ -68,55 +73,49 @@ public final class GameMenuGui extends AbstractGui {
         MenuScaffold.chrome(inventory);
         MenuScaffold.header(inventory, 0, title(player, session));
 
-        // Central 3x3 cluster on rows 2-3.
-        inventory.setItem(GuiSlots.slot(2, 2), ItemBuilder.of(Material.IRON_SWORD)
-                .name(Component.text("Ranked Duels", UiTheme.SUCCESS))
-                .lore(UiTheme.divider(), UiTheme.line("Climb the Elo ladder."),
-                        UiTheme.blank(), UiTheme.hint("Click to queue ranked"))
-                .action("ranked").build());
+        Component battleName = Component.text("Battle", UiTheme.SUCCESS);
+        if (messageService != null) {
+            try {
+                battleName = messageService.render(messageService.resolveLocale(player), "menu.battle")
+                        .color(UiTheme.SUCCESS);
+            } catch (Exception ignored) {
+            }
+        }
+        inventory.setItem(GuiSlots.slot(2, 3), ItemBuilder.of(Material.DIAMOND_SWORD)
+                .name(battleName)
+                .lore(UiTheme.line("Ranked, unranked, duel, FFA, bot."),
+                        UiTheme.hint("Open Battle Menu"))
+                .action("battle").build());
 
-        inventory.setItem(GuiSlots.slot(2, 4), ItemBuilder.of(Material.DIAMOND_SWORD)
-                .name(Component.text("Unranked Duels", UiTheme.SECONDARY))
-                .lore(UiTheme.divider(), UiTheme.line("Casual matches, no Elo change."),
-                        UiTheme.blank(), UiTheme.hint("Click to queue unranked"))
-                .action("unranked").build());
-
-        inventory.setItem(GuiSlots.slot(2, 6), ItemBuilder.of(Material.GOLDEN_AXE)
-                .name(Component.text("FFA Arenas", UiTheme.DANGER))
-                .lore(UiTheme.divider(), UiTheme.line("Free-for-all combat zones."),
-                        UiTheme.blank(), UiTheme.hint("Click to browse FFA"))
-                .action("ffa").build());
-
-        inventory.setItem(GuiSlots.slot(3, 2), ItemBuilder.of(Material.CRAFTING_TABLE)
+        inventory.setItem(GuiSlots.slot(2, 5), ItemBuilder.of(Material.CRAFTING_TABLE)
                 .name(Component.text("Kit Editor", UiTheme.PRIMARY))
-                .lore(UiTheme.divider(), UiTheme.line("Edit official & original kits."),
-                        UiTheme.blank(), UiTheme.hint("Click to open /ekit"))
+                .lore(UiTheme.line("Edit official & original kits."),
+                        UiTheme.hint("Open /ekit"))
                 .action("ekit").build());
 
-        inventory.setItem(GuiSlots.slot(3, 4), ItemBuilder.of(Material.ENDER_EYE)
+        inventory.setItem(GuiSlots.slot(3, 3), ItemBuilder.of(Material.ENDER_EYE)
                 .name(Component.text("Spectate", UiTheme.WARNING))
-                .lore(UiTheme.divider(), UiTheme.line("Watch live matches."),
-                        UiTheme.blank(), UiTheme.hint("Click to browse"))
+                .lore(UiTheme.line("Watch live matches."),
+                        UiTheme.hint("Browse"))
                 .action("spectate").build());
 
-        inventory.setItem(GuiSlots.slot(3, 6), ItemBuilder.of(Material.COMPARATOR)
+        inventory.setItem(GuiSlots.slot(3, 5), ItemBuilder.of(Material.COMPARATOR)
                 .name(Component.text("Settings", UiTheme.MUTED))
-                .lore(UiTheme.divider(), UiTheme.line("Sounds, scoreboard, privacy."),
-                        UiTheme.blank(), UiTheme.hint("Click to configure"))
+                .lore(UiTheme.line("Sounds, scoreboard, privacy."),
+                        UiTheme.hint("Configure"))
                 .action("settings").build());
 
-        // Bottom cluster: teams + titles on row 4.
         inventory.setItem(GuiSlots.slot(4, 3), ItemBuilder.of(Material.NAME_TAG)
                 .name(Component.text("Kill Titles", UiTheme.SECONDARY))
-                .lore(UiTheme.divider(), UiTheme.line("Equip kill/win title effects."),
-                        UiTheme.blank(), UiTheme.hint("Click to browse"))
+                .lore(UiTheme.line("Equip kill/win title effects."),
+                        UiTheme.hint("Browse"))
                 .action("titles").build());
 
         inventory.setItem(GuiSlots.slot(4, 5), ItemBuilder.of(Material.WHITE_BANNER)
-                .name(Component.text("Team Battles", UiTheme.PRIMARY))
-                .lore(UiTheme.divider(), UiTheme.line("Create or join a team and fight"),
+                .name(Component.text("Party", UiTheme.PRIMARY))
+                .lore(UiTheme.line("Create or join a party and fight"),
                         UiTheme.line("RED vs BLUE — up to 15 per side."),
-                        UiTheme.blank(), UiTheme.hint("Click to open teams"))
+                        UiTheme.hint("Open parties"))
                 .action("teams").build());
 
         MenuScaffold.closeButton(inventory);
@@ -129,9 +128,7 @@ public final class GameMenuGui extends AbstractGui {
                 sounds.play(player, "gui-back");
                 player.closeInventory();
             }
-            case "ranked" -> openChild(player, rankedGui::open);
-            case "unranked" -> openChild(player, unrankedGui::open);
-            case "ffa" -> openChild(player, ffaListGui::open);
+            case "battle" -> openChild(player, battleMenuGui::open);
             case "ekit" -> openChild(player, ekitSelectGui::open);
             case "spectate" -> openChild(player, spectateListGui::open);
             case "settings" -> openChild(player, settingsGui::open);

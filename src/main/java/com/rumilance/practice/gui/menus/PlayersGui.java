@@ -7,6 +7,7 @@ import com.rumilance.practice.gui.GuiType;
 import com.rumilance.practice.gui.ItemBuilder;
 import com.rumilance.practice.gui.MenuScaffold;
 import com.rumilance.practice.gui.UiTheme;
+import com.rumilance.practice.locale.MessageService;
 import com.rumilance.practice.session.PlayerStateManager;
 import com.rumilance.practice.sound.SoundService;
 import com.rumilance.practice.state.PlayerState;
@@ -35,6 +36,7 @@ public final class PlayersGui extends AbstractGui {
     private final PlayerStateManager stateManager;
     private final StatsService statsService;
     private final DuelRequestGui duelRequestGui;
+    private final MessageService messageService;
 
     public PlayersGui(
             GuiSessionRegistry registry,
@@ -43,10 +45,22 @@ public final class PlayersGui extends AbstractGui {
             StatsService statsService,
             DuelRequestGui duelRequestGui
     ) {
+        this(registry, sounds, stateManager, statsService, duelRequestGui, null);
+    }
+
+    public PlayersGui(
+            GuiSessionRegistry registry,
+            SoundService sounds,
+            PlayerStateManager stateManager,
+            StatsService statsService,
+            DuelRequestGui duelRequestGui,
+            MessageService messageService
+    ) {
         super(registry, sounds, GuiType.PLAYERS, 6, true);
         this.stateManager = stateManager;
         this.statsService = statsService;
         this.duelRequestGui = duelRequestGui;
+        this.messageService = messageService;
     }
 
     @Override
@@ -136,6 +150,8 @@ public final class PlayersGui extends AbstractGui {
             case REQUESTING_DUEL -> "Requesting Duel";
             case ENDING -> "Match Ending";
             case IDLE -> "Idle";
+            case PRACTICE_WAIT -> "Practice (Wait)";
+            case PRACTICE_ACTIVE -> "Practice";
         };
     }
 

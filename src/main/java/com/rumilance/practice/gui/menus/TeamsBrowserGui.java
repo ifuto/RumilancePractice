@@ -28,6 +28,7 @@ public final class TeamsBrowserGui extends AbstractGui {
 
     private final TeamService teamService;
     private TeamHubGui teamHubGui;
+    private final com.rumilance.practice.locale.MessageService messageService;
 
     public void setHub(TeamHubGui teamHubGui) {
         this.teamHubGui = teamHubGui;
@@ -35,14 +36,21 @@ public final class TeamsBrowserGui extends AbstractGui {
 
     public TeamsBrowserGui(GuiSessionRegistry registry, SoundService sounds,
                            TeamService teamService, TeamHubGui teamHubGui) {
+        this(registry, sounds, teamService, teamHubGui, null);
+    }
+
+    public TeamsBrowserGui(GuiSessionRegistry registry, SoundService sounds,
+                           TeamService teamService, TeamHubGui teamHubGui,
+                           com.rumilance.practice.locale.MessageService messageService) {
         super(registry, sounds, GuiType.TEAMS_BROWSER, 6, true);
         this.teamService = teamService;
         this.teamHubGui = teamHubGui;
+        this.messageService = messageService;
     }
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return Component.text("✦ Teams", UiTheme.PRIMARY).decoration(TextDecoration.ITALIC, false);
+        return Component.text("Party List", UiTheme.PRIMARY).decoration(TextDecoration.ITALIC, false);
     }
 
     @Override

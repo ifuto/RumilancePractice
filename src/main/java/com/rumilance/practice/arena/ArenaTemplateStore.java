@@ -9,10 +9,15 @@ import org.bukkit.configuration.file.FileConfiguration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 public final class ArenaTemplateStore {
+
+    public enum RenameResult {
+        OK, NOT_FOUND, TARGET_EXISTS
+    }
 
     private final ConfigService configService;
     private final List<ArenaTemplate> templates = new CopyOnWriteArrayList<>();
@@ -30,29 +35,84 @@ public final class ArenaTemplateStore {
         return List.copyOf(templates);
     }
 
+    public Optional<ArenaTemplate> findExact(String name) {
+        if (name == null) {
+            return Optional.empty();
+        }
+        return templates.stream().filter(t -> t.name().equals(name)).findFirst();
+    }
+
+    public List<ArenaTemplate> partyArenas() {
+        return templates.stream().filter(t -> t.party() && t.enabled()).toList();
+    }
+
     public void upsert(ArenaTemplate template) {
-        templates.removeIf(t -> t.name().equalsIgnoreCase(template.name()));
+        templates.removeIf(t -> t.name().equals(template.name()));
         templates.add(template);
         persistAll();
     }
 
     public void setEnabled(String name, boolean enabled) {
-        for (int i = 0; i < templates.size(); i++) {
-            ArenaTemplate t = templates.get(i);
-            if (t.name().equalsIgnoreCase(name)) {
-                templates.set(i, new ArenaTemplate(
-                        t.id(), t.name(), t.type(), t.world(),
-                        t.minX(), t.minY(), t.minZ(), t.maxX(), t.maxY(), t.maxZ(),
-                        t.serializedSpawnA(), t.serializedSpawnB(), t.schematicPath(), enabled));
+        findExact(name).ifPresent(t -> {
+            int i = templates.indexOf(t);
+            if (i >= 0) {
+                templates.set(i, t.withEnabled(enabled));
                 persistAll();
-                return;
             }
+        });
+    }
+
+    public void setParty(String name, boolean party) {
+        findExact(name).ifPresent(t -> {
+            int i = templates.indexOf(t);
+            if (i >= 0) {
+                templates.set(i, t.withParty(party));
+                persistAll();
+            }
+        });
+    }
+
+    public void setIconMaterial(String name, String material) {
+        findExact(name).ifPresent(t -> {
+            int i = templates.indexOf(t);
+            if (i >= 0) {
+                templates.set(i, t.withIconMaterial(material));
+                persistAll();
+            }
+        });
+    }
+
+    public void setType(String name, ArenaType type) {
+        findExact(name).ifPresent(t -> {
+            int i = templates.indexOf(t);
+            if (i >= 0) {
+                templates.set(i, t.withType(type));
+                persistAll();
+            }
+        });
+    }
+
+    public RenameResult rename(String oldName, String newName) {
+        if (oldName == null || newName == null || newName.isBlank()) {
+            return RenameResult.NOT_FOUND;
         }
+        ArenaTemplate existing = findExact(oldName).orElse(null);
+        if (existing == null) {
+            return RenameResult.NOT_FOUND;
+        }
+        if (!oldName.equals(newName) && findExact(newName).isPresent()) {
+            return RenameResult.TARGET_EXISTS;
+        }
+        templates.remove(existing);
+        templates.add(existing.withName(newName));
+        configService.arenas().set("arenas." + oldName, null);
+        persistAll();
+        return RenameResult.OK;
     }
 
     public void delete(String name) {
-        templates.removeIf(t -> t.name().equalsIgnoreCase(name));
-        configService.arenas().set("arenas." + name.toLowerCase(Locale.ROOT), null);
+        templates.removeIf(t -> t.name().equals(name));
+        configService.arenas().set("arenas." + name, null);
         persistAll();
     }
 
@@ -65,6 +125,10 @@ public final class ArenaTemplateStore {
             yaml.set(path + ".type", t.type().name());
             yaml.set(path + ".world", t.world());
             yaml.set(path + ".enabled", t.enabled());
+            yaml.set(path + ".party", t.party());
+            if (t.iconMaterial() != null) {
+                yaml.set(path + ".icon", t.iconMaterial());
+            }
             yaml.set(path + ".schematic", t.schematicPath());
             yaml.set(path + ".min.x", t.minX());
             yaml.set(path + ".min.y", t.minY());
@@ -122,8 +186,10 @@ public final class ArenaTemplateStore {
         String spawnB = buildSpawn(entry.getConfigurationSection("spawn-b"), world);
         String schematic = entry.getString("schematic", "");
         boolean enabled = entry.getBoolean("enabled", true);
+        boolean party = entry.getBoolean("party", false);
+        String icon = entry.getString("icon", null);
         return new ArenaTemplate(id, name, type, world, minX, minY, minZ, maxX, maxY, maxZ,
-                spawnA, spawnB, schematic, enabled);
+                spawnA, spawnB, schematic, enabled, party, icon);
     }
 
     private static String buildSpawn(ConfigurationSection spawn, String world) {

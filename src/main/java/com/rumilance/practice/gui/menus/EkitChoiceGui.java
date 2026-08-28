@@ -1,15 +1,17 @@
 package com.rumilance.practice.gui.menus;
 
 import com.rumilance.practice.gui.AbstractGui;
-import com.rumilance.practice.gui.GuiDecorator;
 import com.rumilance.practice.gui.GuiSession;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.GuiType;
+import com.rumilance.practice.gui.ItemBuilder;
+import com.rumilance.practice.gui.MenuScaffold;
+import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.originalkit.OriginalKitService;
 import com.rumilance.practice.sound.SoundService;
 import com.rumilance.practice.util.GuiSlots;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
@@ -41,17 +43,19 @@ public final class EkitChoiceGui extends AbstractGui {
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return Component.text("オリジナルキット作成", NamedTextColor.WHITE);
+        return Component.text("オリジナルキット作成", UiTheme.PRIMARY)
+                .decoration(TextDecoration.ITALIC, false);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        inventory.setItem(GuiSlots.slot(1, 2), GuiDecorator.button(Material.PAPER,
-                Component.text("新しくキットを作成する", NamedTextColor.GREEN), "create"));
-        inventory.setItem(GuiSlots.slot(1, 6), GuiDecorator.button(Material.DIAMOND,
-                Component.text("公式キットをコピーする", NamedTextColor.AQUA), "copy"));
-        inventory.setItem(GuiSlots.slot(2, 4), GuiDecorator.button(Material.BARRIER,
-                Component.text("閉じる", NamedTextColor.GRAY), "close"));
+        MenuScaffold.chrome(inventory);
+        inventory.setItem(GuiSlots.slot(1, 2), ItemBuilder.action(Material.PAPER,
+                Component.text("新しくキットを作成する", UiTheme.SUCCESS), "create"));
+        inventory.setItem(GuiSlots.slot(1, 6), ItemBuilder.action(Material.DIAMOND,
+                Component.text("公式キットをコピーする", UiTheme.PRIMARY), "copy"));
+        inventory.setItem(GuiSlots.slot(2, 4), ItemBuilder.action(UiTheme.CLOSE,
+                Component.text("閉じる", UiTheme.DANGER), "close"));
     }
 
     @Override

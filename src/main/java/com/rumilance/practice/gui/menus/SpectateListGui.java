@@ -36,6 +36,7 @@ public final class SpectateListGui extends AbstractGui {
 
     private final MatchRegistry matchRegistry;
     private final SpectatorService spectatorService;
+    private final com.rumilance.practice.ffa.FfaService ffaService;
 
     public SpectateListGui(
             GuiSessionRegistry registry,
@@ -43,9 +44,20 @@ public final class SpectateListGui extends AbstractGui {
             MatchRegistry matchRegistry,
             SpectatorService spectatorService
     ) {
+        this(registry, sounds, matchRegistry, spectatorService, null);
+    }
+
+    public SpectateListGui(
+            GuiSessionRegistry registry,
+            SoundService sounds,
+            MatchRegistry matchRegistry,
+            SpectatorService spectatorService,
+            com.rumilance.practice.ffa.FfaService ffaService
+    ) {
         super(registry, sounds, GuiType.SPECTATE_LIST, 6, true);
         this.matchRegistry = matchRegistry;
         this.spectatorService = spectatorService;
+        this.ffaService = ffaService;
     }
 
     @Override

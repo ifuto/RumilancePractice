@@ -1,10 +1,12 @@
 package com.rumilance.practice.gui.menus;
 
 import com.rumilance.practice.gui.AbstractGui;
-import com.rumilance.practice.gui.GuiDecorator;
 import com.rumilance.practice.gui.GuiSession;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.GuiType;
+import com.rumilance.practice.gui.ItemBuilder;
+import com.rumilance.practice.gui.MenuScaffold;
+import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.model.KitDefinition;
 import com.rumilance.practice.originalkit.OriginalKitService;
@@ -12,7 +14,6 @@ import com.rumilance.practice.sound.SoundService;
 import com.rumilance.practice.util.GuiSlots;
 import com.rumilance.practice.util.ItemKeys;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Material;
@@ -53,11 +54,12 @@ public final class EkitCopyGui extends AbstractGui {
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return Component.text("公式キットをコピー", NamedTextColor.WHITE);
+        return Component.text("公式キットをコピー", UiTheme.PRIMARY).decoration(TextDecoration.ITALIC, false);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
+        MenuScaffold.chrome(inventory);
         int i = 0;
         for (KitDefinition kit : kitService.enabled()) {
             if (i >= 35) {
@@ -68,17 +70,17 @@ public final class EkitCopyGui extends AbstractGui {
             ItemMeta meta = icon.getItemMeta();
             meta.displayName(MiniMessage.miniMessage().deserialize(kit.prettyDisplayName())
                     .decoration(TextDecoration.ITALIC, false));
-            meta.lore(java.util.List.of(Component.text("クリックでコピー", NamedTextColor.GRAY)
+            meta.lore(java.util.List.of(Component.text("クリックでコピー", UiTheme.MUTED)
                     .decoration(TextDecoration.ITALIC, false)));
             meta.getPersistentDataContainer().set(ItemKeys.guiAction(), PersistentDataType.STRING, "kit:" + kit.name());
             icon.setItemMeta(meta);
             inventory.setItem(GuiSlots.slot(1 + i / 9, i % 9), icon);
             i++;
         }
-        inventory.setItem(GuiSlots.slot(5, 0), GuiDecorator.button(Material.RED_DYE,
-                Component.text("戻る", NamedTextColor.RED), "back"));
-        inventory.setItem(GuiSlots.slot(5, 8), GuiDecorator.button(Material.BARRIER,
-                Component.text("閉じる", NamedTextColor.GRAY), "close"));
+        inventory.setItem(GuiSlots.slot(5, 0), ItemBuilder.action(UiTheme.BACK,
+                Component.text("戻る", UiTheme.WARNING), "back"));
+        inventory.setItem(GuiSlots.slot(5, 8), ItemBuilder.action(UiTheme.CLOSE,
+                Component.text("閉じる", UiTheme.DANGER), "close"));
     }
 
     @Override

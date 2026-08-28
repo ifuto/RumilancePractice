@@ -52,6 +52,16 @@ public final class MatchSession {
     private volatile boolean rematchRequestedA;
     private volatile boolean rematchRequestedB;
     private volatile boolean shuttingDown;
+    /** Short public id from {@code DuelLogStore} for scoreboard /tab ({@code {duel_id}}). */
+    private volatile String publicDuelId;
+    /** Preferred arena template for rematch / named duel reserve (nullable = random). */
+    private volatile String preferredArenaName;
+    /** Team-only: whether teammates can damage each other. */
+    private volatile boolean friendlyFire;
+    /** Guards against double rematch starts while cleanup is in flight. */
+    private final AtomicBoolean rematchStarting = new AtomicBoolean(false);
+    /** End-of-life inventory bytes per participant (captured on death or at match end). */
+    private final Map<UUID, byte[]> endInventories = new ConcurrentHashMap<>();
 
     /** 1v1 constructor: exactly two participants, index 0 = RED, index 1 = BLUE. */
     public MatchSession(UUID id, MatchMode mode, String kitName, List<UUID> participants,
@@ -129,6 +139,23 @@ public final class MatchSession {
 
     public String kitName() {
         return kitName;
+    }
+
+    /** Kit id for a participant (matches share one kit). */
+    public String kitFor(UUID playerId) {
+        return kitName;
+    }
+
+    /**
+     * Whether teammates can damage each other. Defaults to {@code false} for duels;
+     * team matches copy the party setting via {@link #setFriendlyFire(boolean)}.
+     */
+    public boolean friendlyFire() {
+        return friendlyFire;
+    }
+
+    public void setFriendlyFire(boolean friendlyFire) {
+        this.friendlyFire = friendlyFire;
     }
 
     public List<UUID> participants() {
@@ -346,5 +373,51 @@ public final class MatchSession {
 
     public boolean isShuttingDown() {
         return shuttingDown;
+    }
+
+    public String publicDuelId() {
+        return publicDuelId;
+    }
+
+    public void setPublicDuelId(String publicDuelId) {
+        this.publicDuelId = publicDuelId;
+    }
+
+    public String preferredArenaName() {
+        return preferredArenaName;
+    }
+
+    public void setPreferredArenaName(String preferredArenaName) {
+        this.preferredArenaName = preferredArenaName;
+    }
+
+    public boolean tryBeginRematch() {
+        return rematchStarting.compareAndSet(false, true);
+    }
+
+    public boolean rematchStarting() {
+        return rematchStarting.get();
+    }
+
+    /** Clears both sides' rematch votes (1v1 or team). */
+    public void clearRematchRequests() {
+        rematchRequestedA = false;
+        rematchRequestedB = false;
+    }
+
+    /** Remember a fighter's inventory once (first write wins — typically at death). */
+    public void rememberEndInventory(UUID playerId, byte[] serialized) {
+        if (playerId == null || serialized == null) {
+            return;
+        }
+        endInventories.putIfAbsent(playerId, serialized);
+    }
+
+    public byte[] endInventoryOf(UUID playerId) {
+        return playerId == null ? null : endInventories.get(playerId);
+    }
+
+    public Map<UUID, byte[]> endInventoriesSnapshot() {
+        return Map.copyOf(endInventories);
     }
 }

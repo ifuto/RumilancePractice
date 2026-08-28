@@ -1,0 +1,227 @@
+# =============================================================================
+# scoreboard.yml — sidebar / TAB の全文面をここで編集します。
+#
+# ・色: MiniMessage（例 <aqua><bold>）または &a / &l（レガシー）
+# ・プレースホルダは {name} 形式（下の一覧）
+# ・各 layout.lines は上から順に表示（最大 max-lines）
+# ・空文字 "" はスペーサー行
+# ・omit-line-if-blank: 行テンプレにそのトークンがあり、値が空なら行ごと非表示
+# ・特殊行（複数行に展開）:
+#     @ffa_streak_top     FFA 連勝ランキング
+#     @month_streak_top   今月の連勝ランキング（キュー画面）
+#     @best_streak_top    通算ベスト連勝
+#     @spec_red           観戦: 赤チーム（cap あり）
+#     @spec_blue          観戦: 青チーム
+#
+# 再読み込み: /practiceadmin reload
+# =============================================================================
+
+enabled: true
+# 中央タイマー周期（5〜40 tick、推奨 10〜20）
+update-interval-ticks: 20
+# サイドバー本文の上限行数（header/footer ルール込みでクリップ）
+max-lines: 15
+# 統計キャッシュ（ミリ秒）
+stats-cache-ms: 3000
+# TAB ヘッダー/フッターをこのプラグインが書くか
+tab-header-footer: true
+
+# ---------------------------------------------------------------------------
+# ブランド（全レイアウト共通。layout の title で上書き可）
+# ---------------------------------------------------------------------------
+branding:
+  server-name: "N Arena"
+  server-ip: "town-warm.gl.playit.gg"
+  header-rule: "<aqua><strikethrough>────────────────────────────"
+  footer-rule: "<aqua><strikethrough>────────────────────────────"
+  # 最下行。空なら出さない（show-footer-line: false でも非表示）
+  footer-line: "<aqua>{server_ip}"
+
+# ---------------------------------------------------------------------------
+# モード名ラベル（{mode} に入る文字列）
+# ---------------------------------------------------------------------------
+mode-labels:
+  ranked: "ランク"
+  unranked: "アンランク"
+  ffa: "FFA"
+  team: "チーム"
+
+# 経過時間フォーマット（{time} / {wait}）
+time:
+  under-minute: "{s}s"
+  with-minutes: "{m}m{s}s"
+
+# チーム色トークン（{my_color} {opp_color} に入る MiniMessage）
+colors:
+  red: "<red>"
+  blue: "<blue>"
+
+# 観戦者名の区切り（TAB {spectators}）
+spectators-join: "<gray>, <white>"
+
+# ---------------------------------------------------------------------------
+# 複数行リスト（@xxx 特殊行）
+# ---------------------------------------------------------------------------
+lists:
+  ffa_streak_top:
+    max: 5
+    empty: "<dark_aqua>—"
+    entry: "<aqua>{rank}. <white>{name} <aqua>{streak}"
+  month_streak_top:
+    max: 8
+    empty: "<dark_aqua>—"
+    entry: "<aqua>{rank}. <white>{name} <aqua>{streak}"
+  best_streak_top:
+    max: 3
+    empty: "<dark_aqua>—"
+    entry: "<aqua>{rank}. <white>{name} <aqua>{streak}"
+  spec_red:
+    max: 2
+    empty: ""
+    more: "<red>+{extra} more"
+    entry: "<red>{name} <white>{hearts} <yellow>T:{totems}"
+  spec_blue:
+    max: 2
+    empty: ""
+    more: "<blue>+{extra} more"
+    entry: "<blue>{name} <white>{hearts} <yellow>T:{totems}"
+
+# ---------------------------------------------------------------------------
+# TAB リスト
+# ---------------------------------------------------------------------------
+tab:
+  lobby:
+    header:
+      - "<aqua><bold>{server_name}"
+      - "<aqua>────────────────────────────────"
+    footer:
+      - "<aqua>{server_ip}"
+      - "<aqua>────────────────────────────────"
+      - "<white>Online <aqua>{online}"
+  match:
+    header:
+      - "<white>{player} <gray>vs <white>{opponent}"
+      - "<gray>ID: <aqua>{duel_id}"
+    omit-header-line-if-blank:
+      - "{duel_id}"
+    footer:
+      - "<gray>Spec: <white>{spectators}"
+    footer-when-no-spectators: "<dark_gray>"
+
+# ---------------------------------------------------------------------------
+# サイドバー・レイアウト
+# ---------------------------------------------------------------------------
+layouts:
+  lobby:
+    title: "<aqua><bold>{server_name}"
+    show-header-rule: true
+    show-footer-rule: true
+    show-footer-line: true
+    lines:
+      - "<aqua>Lobby"
+      - "<white>Wins <aqua>{wins}  <white>Losses <aqua>{losses}"
+      - "<white>K/D <aqua>{kd}"
+      - "<white>Rating <aqua>{rating} <white>({best_tier})"
+      - "<white>連勝 <aqua>{best_streak}"
+      - "<white>Matches <aqua>{matches}  <white>Kits <aqua>{kits}"
+      - "<white>Online <aqua>{online}"
+      - "<white>Ping <aqua>{ping}ms"
+
+  queue:
+    title: "<aqua><bold>{server_name}"
+    show-header-rule: true
+    show-footer-rule: true
+    show-footer-line: true
+    lines:
+      - "<white>Queue <aqua>{kit}"
+      - "<white>Wait <aqua>{wait}"
+      - "<white>Mode <aqua>{mode}"
+      - "<white>Ping <aqua>{ping}ms"
+      - "<dark_aqua>今月連勝"
+      - "@month_streak_top"
+
+  match:
+    title: "<aqua><bold>{server_name}"
+    show-header-rule: true
+    show-footer-rule: true
+    show-footer-line: true
+    omit-line-if-blank:
+      - "{opponent}"
+      - "{time}"
+    lines:
+      - "<aqua>Match"
+      - "{my_color}{player}"
+      - "{opp_color}{opponent}"
+      - "{my_color}{my_series} <white>— {opp_color}{opp_series}"
+      - "<white>Kit <aqua>{kit}"
+      - "<white>Mode <aqua>{mode}"
+      - "<white>Time <aqua>{time}"
+      - "<white>Ping <aqua>{ping}ms"
+
+  team_match:
+    title: "<aqua><bold>{server_name}"
+    show-header-rule: true
+    show-footer-rule: true
+    show-footer-line: true
+    omit-line-if-blank:
+      - "{time}"
+    lines:
+      - "<aqua>Team Match"
+      - "{my_color}Ally <white>{ally_alive}<aqua>/{ally_size}"
+      - "{opp_color}Enemy <white>{enemy_alive}<aqua>/{enemy_size}"
+      - "<white>Kit <aqua>{kit}"
+      - "<white>Kills <aqua>{my_kills}"
+      - "<white>Time <aqua>{time}"
+      - "<white>Ping <aqua>{ping}ms"
+
+  spectate:
+    title: "<aqua><bold>{server_name}"
+    show-header-rule: true
+    show-footer-rule: true
+    show-footer-line: true
+    lines:
+      - "<aqua>Spectating"
+      - "<red>{red_series} <white>— <blue>{blue_series}"
+      - "<white>Kit <aqua>{kit}"
+      - "<white>Mode <aqua>{mode}"
+      - "@spec_red"
+      - "@spec_blue"
+
+  ffa:
+    title: "<aqua><bold>{server_name}"
+    show-header-rule: true
+    show-footer-rule: true
+    show-footer-line: true
+    lines:
+      - "<aqua>{arena} <white>FFA"
+      - "<white>Kills <aqua>{ffa_kills}  <white>Deaths <aqua>{ffa_deaths}"
+      - "<white>Streak <aqua>{ffa_streak}"
+      - "<white>Ping <aqua>{ping}ms"
+      - "<dark_aqua>FFA 連勝"
+      - "@ffa_streak_top"
+
+  ffa_spectate:
+    title: "<aqua><bold>{server_name}"
+    show-header-rule: true
+    show-footer-rule: true
+    show-footer-line: true
+    lines:
+      - "<aqua>{arena} <white>観戦"
+      - "<white>Kills <aqua>{ffa_kills}  <white>Deaths <aqua>{ffa_deaths}"
+      - "<white>Streak <aqua>{ffa_streak}"
+      - "<white>Ping <aqua>{ping}ms"
+      - "<dark_aqua>FFA 連勝"
+      - "@ffa_streak_top"
+
+# =============================================================================
+# プレースホルダ一覧
+#
+# 共通: {server_name} {server_ip} {online} {player} {ping}
+# ロビー: {wins} {losses} {kd} {rating} {best_rating} {best_elo} {best_tier} {best_streak} {matches} {kits}
+# キュー: {kit} {wait} {mode}
+# 1v1: {opponent} {my_color} {opp_color} {my_series} {opp_series} {time} {duel_id}
+# TAB: {spectators}
+# チーム: {ally_alive} {ally_size} {enemy_alive} {enemy_size} {my_kills}
+# 観戦: {red_series} {blue_series} / リスト: {rank} {name} {streak} {hearts} {totems} {extra}
+# FFA: {arena} {ffa_kills} {ffa_deaths} {ffa_streak}
+# =============================================================================

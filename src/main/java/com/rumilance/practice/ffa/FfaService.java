@@ -8,12 +8,14 @@ import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.locale.MessageService;
 import com.rumilance.practice.lobby.LobbyService;
 import com.rumilance.practice.model.KitDefinition;
+import com.rumilance.practice.queue.QueueService;
 import com.rumilance.practice.session.PlayerStateManager;
 import com.rumilance.practice.sound.SoundService;
 import com.rumilance.practice.state.PlayerState;
 import com.rumilance.practice.util.AsyncExecutor;
 import com.rumilance.practice.util.Cuboid;
 import com.rumilance.practice.util.LocationUtil;
+import com.rumilance.practice.util.SafeTeleport;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.title.Title;
@@ -21,14 +23,22 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.block.data.BlockData;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.EnderCrystal;
+import org.bukkit.entity.FallingBlock;
+import org.bukkit.entity.Item;
+import org.bukkit.entity.TNTPrimed;
+import org.bukkit.entity.minecart.ExplosiveMinecart;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -47,15 +57,61 @@ public final class FfaService {
             String world,
             Cuboid region,
             Location spawn,
-            boolean enabled
+            boolean enabled,
+            int resetIntervalSeconds,
+            String iconMaterial
     ) {
+        public FfaArena {
+            resetIntervalSeconds = Math.max(0, resetIntervalSeconds);
+            if (iconMaterial == null || iconMaterial.isBlank()) {
+                iconMaterial = "IRON_SWORD";
+            }
+        }
+
+        public FfaArena withResetInterval(int seconds) {
+            return new FfaArena(id, kitId, world, region, spawn, enabled, Math.max(0, seconds), iconMaterial);
+        }
+
+        public FfaArena withEnabled(boolean value) {
+            return new FfaArena(id, kitId, world, region, spawn, value, resetIntervalSeconds, iconMaterial);
+        }
+
+        public FfaArena withKit(String kit) {
+            return new FfaArena(id, kit, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial);
+        }
+
+        public FfaArena withRegion(Cuboid newRegion) {
+            return new FfaArena(id, kitId, newRegion.worldName(), newRegion, spawn, enabled,
+                    resetIntervalSeconds, iconMaterial);
+        }
+
+        public FfaArena withSpawn(Location newSpawn) {
+            return new FfaArena(id, kitId, world, region, newSpawn.clone(), enabled,
+                    resetIntervalSeconds, iconMaterial);
+        }
+
+        public FfaArena withId(String newId) {
+            return new FfaArena(newId, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial);
+        }
+
+        public FfaArena withIconMaterial(String material) {
+            return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, material);
+        }
     }
 
     public record FfaStats(int kills, int deaths) {
     }
 
+    public record StreakRank(UUID playerId, int streak) {
+    }
+
     private record BlockChange(Location location, String previousData) {
     }
+
+    private record CombatTag(UUID attackerId, long untilMillis) {
+    }
+
+    private static final long COMBAT_MS = 30_000L;
 
     private final Plugin plugin;
     private final ConfigService configService;
@@ -74,11 +130,34 @@ public final class FfaService {
     public void setViewControl(com.rumilance.practice.sight.ViewControlService viewControl) {
         this.viewControl = viewControl;
     }
+
+    private FfaSpawnIndex spawnIndex;
+    private QueueService queueService;
+
+    public void setSpawnIndex(FfaSpawnIndex spawnIndex) {
+        this.spawnIndex = spawnIndex;
+    }
+
+    public FfaSpawnIndex spawnIndex() {
+        return spawnIndex;
+    }
+
+    public void setQueueService(QueueService queueService) {
+        this.queueService = queueService;
+    }
     private final Map<String, FfaArena> arenas = new ConcurrentHashMap<>();
     private final Map<UUID, String> playerArena = new ConcurrentHashMap<>();
     private final Map<UUID, FfaStats> sessionStats = new ConcurrentHashMap<>();
+    private final Map<UUID, Integer> killStreaks = new ConcurrentHashMap<>();
+    private final Map<UUID, CombatTag> combatUntil = new ConcurrentHashMap<>();
     private final Map<String, Boolean> resetting = new ConcurrentHashMap<>();
     private final Map<String, List<BlockChange>> blockDiffs = new ConcurrentHashMap<>();
+    /** Per-arena countdown deadline (millis); absent or 0 = timer inactive. */
+    private final Map<String, Long> nextResetAtMillis = new ConcurrentHashMap<>();
+    /** Last observed remaining seconds, used to fire warn thresholds once each. */
+    private final Map<String, Integer> lastResetRemaining = new ConcurrentHashMap<>();
+    private static final int[] RESET_WARN_AT = {300, 240, 180, 120, 60, 30, 5, 4, 3, 2, 1};
+    private BukkitTask combatTask;
 
     public FfaService(
             Plugin plugin,
@@ -105,15 +184,32 @@ public final class FfaService {
         this.messageService = messageService;
         this.soundService = soundService;
         reload();
+        combatTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            tickCombat();
+            tickResets();
+        }, 20L, 20L);
+    }
+
+    public void shutdown() {
+        if (combatTask != null) {
+            combatTask.cancel();
+            combatTask = null;
+        }
+        combatUntil.clear();
+        nextResetAtMillis.clear();
+        lastResetRemaining.clear();
     }
 
     public void reload() {
         arenas.clear();
+        nextResetAtMillis.clear();
+        lastResetRemaining.clear();
         FileConfiguration yaml = configService.ffa();
         ConfigurationSection section = yaml.getConfigurationSection("arenas");
         if (section == null) {
             return;
         }
+        int globalDefault = yaml.getInt("settings.reset-interval-seconds", 0);
         for (String id : section.getKeys(false)) {
             ConfigurationSection entry = section.getConfigurationSection(id);
             if (entry == null) {
@@ -129,14 +225,21 @@ public final class FfaService {
                     entry.getDouble("spawn.z", 0.5),
                     (float) entry.getDouble("spawn.yaw", 0),
                     (float) entry.getDouble("spawn.pitch", 0));
-            arenas.put(id.toLowerCase(), new FfaArena(
-                    id.toLowerCase(),
+            int interval = entry.contains("reset-interval-seconds")
+                    ? entry.getInt("reset-interval-seconds", 0)
+                    : globalDefault;
+            FfaArena arena = new FfaArena(
+                    id,
                     entry.getString("kit", "nodebuff"),
                     world,
                     region,
                     spawn,
-                    entry.getBoolean("enabled", true)
-            ));
+                    entry.getBoolean("enabled", true),
+                    interval,
+                    entry.getString("icon", "IRON_SWORD")
+            );
+            arenas.put(id, arena);
+            armResetTimer(arena, false);
         }
     }
 
@@ -144,8 +247,58 @@ public final class FfaService {
         return List.copyOf(arenas.values());
     }
 
+    /** Live arena definitions (same contents as {@link #list()}). */
+    public java.util.Collection<FfaArena> arenasView() {
+        return java.util.Collections.unmodifiableCollection(arenas.values());
+    }
+
+    /** Players currently inside any FFA arena. */
+    public java.util.Set<UUID> occupantIds() {
+        return java.util.Set.copyOf(playerArena.keySet());
+    }
+
+    /** Preferred respawn/teleport destination for an FFA occupant. */
+    public Location spawnDestination(Player player) {
+        String arenaId = playerArena.get(player.getUniqueId());
+        if (arenaId == null) {
+            return null;
+        }
+        FfaArena arena = arenas.get(arenaId);
+        if (arena == null || arena.spawn() == null) {
+            return null;
+        }
+        return LocationUtil.safeTeleportLocation(arena.spawn(), player);
+    }
+
+    /** Re-applies per-player border / view distance for the player's current FFA arena. */
+    public void applySight(Player player) {
+        if (viewControl == null) {
+            return;
+        }
+        String arenaId = playerArena.get(player.getUniqueId());
+        if (arenaId == null) {
+            return;
+        }
+        FfaArena arena = arenas.get(arenaId);
+        if (arena != null && arena.region() != null) {
+            viewControl.applyRegion(player, arena.region());
+        }
+    }
+
     public Optional<FfaArena> get(String id) {
-        return Optional.ofNullable(arenas.get(id.toLowerCase()));
+        return Optional.ofNullable(findArena(id));
+    }
+
+    private FfaArena findArena(String id) {
+        if (id == null) {
+            return null;
+        }
+        FfaArena exact = arenas.get(id);
+        if (exact != null) {
+            return exact;
+        }
+        // Legacy lowercased keys from pre-1.7.0 stores.
+        return arenas.get(id.toLowerCase());
     }
 
     public boolean join(Player player, String arenaId) {
@@ -153,7 +306,7 @@ public final class FfaService {
             messageService.send(player, "ffa.maintenance");
             return false;
         }
-        FfaArena arena = arenas.get(arenaId.toLowerCase());
+        FfaArena arena = findArena(arenaId);
         if (arena == null || !arena.enabled() || Boolean.TRUE.equals(resetting.get(arena.id()))) {
             messageService.send(player, "ffa.unavailable");
             return false;
@@ -175,10 +328,14 @@ public final class FfaService {
         }
         playerArena.put(player.getUniqueId(), arena.id());
         sessionStats.put(player.getUniqueId(), new FfaStats(0, 0));
+        killStreaks.put(player.getUniqueId(), 0);
+        combatUntil.remove(player.getUniqueId());
+        player.setCanPickupItems(true);
         if (arena.spawn().getWorld() != null) {
-            player.teleport(LocationUtil.safeTeleportLocation(arena.spawn(), player));
+            SafeTeleport.teleport(player, LocationUtil.safeTeleportLocation(arena.spawn(), player));
         }
         applyKit(player, kit);
+        player.setCanPickupItems(true);
         // Fit the per-player border + view distance to this FFA arena.
         if (viewControl != null) {
             viewControl.applyRegion(player, arena.region());
@@ -188,9 +345,12 @@ public final class FfaService {
     }
 
     public void leave(Player player) {
-        playerArena.remove(player.getUniqueId());
-        sessionStats.remove(player.getUniqueId());
-        stateManager.resetToLobby(player.getUniqueId());
+        UUID id = player.getUniqueId();
+        playerArena.remove(id);
+        sessionStats.remove(id);
+        killStreaks.remove(id);
+        combatUntil.remove(id);
+        stateManager.resetToLobby(id);
         lobbyService.sendToLobby(player);
     }
 
@@ -202,8 +362,129 @@ public final class FfaService {
         return playerArena.containsKey(player);
     }
 
+    /** True when {@code location} lies inside any enabled FFA arena region. */
+    public boolean isInFfaRegion(Location location) {
+        if (location == null) {
+            return false;
+        }
+        for (FfaArena arena : arenas.values()) {
+            if (arena.enabled() && arena.region() != null && arena.region().contains(location)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public FfaStats stats(UUID player) {
         return sessionStats.getOrDefault(player, new FfaStats(0, 0));
+    }
+
+    public int killStreak(UUID player) {
+        return killStreaks.getOrDefault(player, 0);
+    }
+
+    public List<StreakRank> topKillStreaks(int limit) {
+        return topKillStreaks(null, limit);
+    }
+
+    /** When {@code arenaId} is set, only streaks of players currently in that FFA. */
+    public List<StreakRank> topKillStreaks(String arenaId, int limit) {
+        int cap = Math.max(0, limit);
+        return killStreaks.entrySet().stream()
+                .filter(entry -> {
+                    String in = playerArena.get(entry.getKey());
+                    if (in == null || entry.getValue() <= 0) {
+                        return false;
+                    }
+                    return arenaId == null || arenaId.equalsIgnoreCase(in);
+                })
+                .sorted(Comparator.<Map.Entry<UUID, Integer>>comparingInt(Map.Entry::getValue).reversed())
+                .limit(cap)
+                .map(entry -> new StreakRank(entry.getKey(), entry.getValue()))
+                .toList();
+    }
+
+    public void tagCombat(UUID victimId, UUID attackerId) {
+        if (victimId == null || attackerId == null || victimId.equals(attackerId)) {
+            return;
+        }
+        if (!playerArena.containsKey(victimId) || !playerArena.containsKey(attackerId)) {
+            return;
+        }
+        long until = System.currentTimeMillis() + COMBAT_MS;
+        combatUntil.put(victimId, new CombatTag(attackerId, until));
+        combatUntil.put(attackerId, new CombatTag(victimId, until));
+    }
+
+    public boolean inCombat(UUID playerId) {
+        CombatTag tag = combatUntil.get(playerId);
+        return tag != null && tag.untilMillis() > System.currentTimeMillis();
+    }
+
+    /**
+     * Quit while combat-tagged: count as a death for the quitter and a kill for the last attacker.
+     *
+     * @return true when combat credit was applied
+     */
+    public boolean creditCombatLogout(Player player) {
+        UUID victimId = player.getUniqueId();
+        String arenaId = playerArena.get(victimId);
+        CombatTag tag = combatUntil.remove(victimId);
+        if (arenaId == null || tag == null || tag.untilMillis() <= System.currentTimeMillis()) {
+            combatUntil.remove(victimId);
+            return false;
+        }
+        addDeath(victimId);
+        killStreaks.put(victimId, 0);
+        asyncExecutor.execute(() -> {
+            try {
+                ffaStatsRepository.addDeath(victimId, arenaId);
+            } catch (Exception e) {
+                plugin.getLogger().log(Level.WARNING, "Failed persisting FFA combat-logout death", e);
+            }
+        });
+        UUID killerId = tag.attackerId();
+        if (killerId != null && !killerId.equals(victimId) && playerArena.containsKey(killerId)) {
+            addKill(killerId);
+            int streak = killStreaks.merge(killerId, 1, Integer::sum);
+            Player killer = Bukkit.getPlayer(killerId);
+            if (killer != null) {
+                FfaStats s = stats(killerId);
+                killer.sendActionBar(Component.text("Kills: " + s.kills() + " Deaths: " + s.deaths(),
+                        NamedTextColor.GOLD));
+                if (streak > 0 && streak % 5 == 0) {
+                    killer.sendMessage(Component.text(streak + " kill streak!", NamedTextColor.GOLD));
+                }
+            }
+            asyncExecutor.execute(() -> {
+                try {
+                    ffaStatsRepository.addKill(killerId, arenaId);
+                } catch (Exception e) {
+                    plugin.getLogger().log(Level.WARNING, "Failed persisting FFA combat-logout kill", e);
+                }
+            });
+        }
+        return true;
+    }
+
+    private void tickCombat() {
+        if (combatUntil.isEmpty()) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        for (Map.Entry<UUID, CombatTag> entry : combatUntil.entrySet()) {
+            CombatTag tag = entry.getValue();
+            if (tag.untilMillis() <= now) {
+                combatUntil.remove(entry.getKey(), tag);
+                continue;
+            }
+            Player online = Bukkit.getPlayer(entry.getKey());
+            if (online == null || !online.isOnline()) {
+                continue;
+            }
+            int seconds = (int) Math.max(1L, (tag.untilMillis() - now + 999L) / 1000L);
+            online.sendActionBar(Component.text("Combat : " + seconds + "s", NamedTextColor.RED));
+        }
     }
 
     public void handleLethal(Player victim, UUID killerId) {
@@ -212,6 +493,8 @@ public final class FfaService {
             return;
         }
         soundService.play(victim, "death");
+        combatUntil.remove(victim.getUniqueId());
+        killStreaks.put(victim.getUniqueId(), 0);
         addDeath(victim.getUniqueId());
         asyncExecutor.execute(() -> {
             try {
@@ -222,11 +505,16 @@ public final class FfaService {
         });
         if (killerId != null && !killerId.equals(victim.getUniqueId()) && playerArena.containsKey(killerId)) {
             addKill(killerId);
+            int streak = killStreaks.merge(killerId, 1, Integer::sum);
             Player killer = Bukkit.getPlayer(killerId);
             if (killer != null) {
                 FfaStats s = stats(killerId);
+                restoreKit(killer);
                 killer.sendActionBar(Component.text("Kills: " + s.kills() + " Deaths: " + s.deaths(),
                         NamedTextColor.GOLD));
+                if (streak > 0 && streak % 5 == 0) {
+                    killer.sendMessage(Component.text(streak + " kill streak!", NamedTextColor.GOLD));
+                }
             }
             asyncExecutor.execute(() -> {
                 try {
@@ -265,12 +553,14 @@ public final class FfaService {
         KitDefinition kit = kitService.get(arena.kitId()).orElse(null);
         player.setHealth(player.getMaxHealth());
         player.setFireTicks(0);
+        player.setCanPickupItems(true);
         if (arena.spawn().getWorld() != null) {
-            player.teleport(LocationUtil.safeTeleportLocation(arena.spawn(), player));
+            SafeTeleport.teleport(player, LocationUtil.safeTeleportLocation(arena.spawn(), player));
         }
         if (kit != null) {
             applyKit(player, kit);
         }
+        player.setCanPickupItems(true);
     }
 
     public void recordBlockChange(UUID playerId, Location location, String previousData) {
@@ -278,81 +568,269 @@ public final class FfaService {
         if (arenaId == null) {
             return;
         }
-        // Keep compressed diffs only (location + previous BlockData string).
+        recordBlockChangeForArena(arenaId, location, previousData);
+    }
+
+    /** Records a change by location (explosions) for whichever enabled FFA arena contains it. */
+    public void recordBlockChangeAt(Location location, String previousData) {
+        if (location == null || previousData == null) {
+            return;
+        }
+        for (FfaArena arena : arenas.values()) {
+            if (!arena.enabled() || arena.region() == null || !arena.region().contains(location)) {
+                continue;
+            }
+            recordBlockChangeForArena(arena.id(), location, previousData);
+            return;
+        }
+    }
+
+    private void recordBlockChangeForArena(String arenaId, Location location, String previousData) {
         List<BlockChange> list = blockDiffs.computeIfAbsent(arenaId, id -> new ArrayList<>());
         synchronized (list) {
+            for (BlockChange existing : list) {
+                if (sameBlock(existing.location(), location)) {
+                    return;
+                }
+            }
             if (list.size() < 50_000) {
                 list.add(new BlockChange(location.clone(), previousData));
             }
         }
     }
 
+    private static boolean sameBlock(Location a, Location b) {
+        if (a == null || b == null || a.getWorld() == null || b.getWorld() == null) {
+            return false;
+        }
+        return a.getWorld().equals(b.getWorld())
+                && a.getBlockX() == b.getBlockX()
+                && a.getBlockY() == b.getBlockY()
+                && a.getBlockZ() == b.getBlockZ();
+    }
+
     public void create(String id, Cuboid region, Location spawn, String kitId) {
-        FfaArena arena = new FfaArena(id.toLowerCase(), kitId, region.worldName(), region, spawn.clone(), false);
+        FfaArena arena = new FfaArena(id, kitId, region.worldName(), region, spawn.clone(), false, 0, "IRON_SWORD");
         arenas.put(arena.id(), arena);
         persist(arena);
+        armResetTimer(arena, false);
+    }
+
+    public enum RenameResult {
+        OK, NOT_FOUND, TARGET_EXISTS
+    }
+
+    public RenameResult rename(String oldId, String newId) {
+        if (oldId == null || newId == null || newId.isBlank()) {
+            return RenameResult.NOT_FOUND;
+        }
+        FfaArena existing = findArena(oldId);
+        if (existing == null) {
+            return RenameResult.NOT_FOUND;
+        }
+        if (!existing.id().equals(newId) && arenas.containsKey(newId)) {
+            return RenameResult.TARGET_EXISTS;
+        }
+        arenas.remove(existing.id());
+        List<BlockChange> diffs = blockDiffs.remove(existing.id());
+        Long nextAt = nextResetAtMillis.remove(existing.id());
+        Integer lastRem = lastResetRemaining.remove(existing.id());
+        FfaArena renamed = existing.withId(newId);
+        arenas.put(newId, renamed);
+        if (diffs != null) {
+            blockDiffs.put(newId, diffs);
+        }
+        if (nextAt != null) {
+            nextResetAtMillis.put(newId, nextAt);
+        }
+        if (lastRem != null) {
+            lastResetRemaining.put(newId, lastRem);
+        }
+        for (Map.Entry<UUID, String> e : playerArena.entrySet()) {
+            if (existing.id().equals(e.getValue())) {
+                e.setValue(newId);
+            }
+        }
+        configService.ffa().set("arenas." + existing.id(), null);
+        persist(renamed);
+        return RenameResult.OK;
     }
 
     public boolean updateRegion(String id, Cuboid region) {
-        FfaArena existing = arenas.get(id.toLowerCase());
+        FfaArena existing = findArena(id);
         if (existing == null) {
             return false;
         }
-        FfaArena updated = new FfaArena(existing.id(), existing.kitId(), region.worldName(), region,
-                existing.spawn(), existing.enabled());
+        FfaArena updated = existing.withRegion(region);
         arenas.put(updated.id(), updated);
         persist(updated);
         return true;
     }
 
     public boolean updateSpawn(String id, Location spawn) {
-        FfaArena existing = arenas.get(id.toLowerCase());
+        FfaArena existing = findArena(id);
         if (existing == null) {
             return false;
         }
-        FfaArena updated = new FfaArena(existing.id(), existing.kitId(), existing.world(),
-                existing.region(), spawn.clone(), existing.enabled());
+        FfaArena updated = existing.withSpawn(spawn);
         arenas.put(updated.id(), updated);
         persist(updated);
         return true;
     }
 
     public boolean updateKit(String id, String kitId) {
-        FfaArena existing = arenas.get(id.toLowerCase());
+        FfaArena existing = findArena(id);
         if (existing == null) {
             return false;
         }
-        FfaArena updated = new FfaArena(existing.id(), kitId.toLowerCase(), existing.world(),
-                existing.region(), existing.spawn(), existing.enabled());
+        FfaArena updated = existing.withKit(kitId);
+        arenas.put(updated.id(), updated);
+        persist(updated);
+        return true;
+    }
+
+    public boolean updateIcon(String id, String material) {
+        FfaArena existing = findArena(id);
+        if (existing == null || material == null || material.isBlank()) {
+            return false;
+        }
+        FfaArena updated = existing.withIconMaterial(material.toUpperCase(java.util.Locale.ROOT));
         arenas.put(updated.id(), updated);
         persist(updated);
         return true;
     }
 
     public void setEnabled(String id, boolean enabled) {
-        FfaArena existing = arenas.get(id.toLowerCase());
+        FfaArena existing = findArena(id);
         if (existing == null) {
             return;
         }
-        FfaArena updated = new FfaArena(existing.id(), existing.kitId(), existing.world(),
-                existing.region(), existing.spawn(), enabled);
+        FfaArena updated = existing.withEnabled(enabled);
         arenas.put(updated.id(), updated);
         persist(updated);
     }
 
     public void delete(String id) {
-        arenas.remove(id.toLowerCase());
-        blockDiffs.remove(id.toLowerCase());
-        configService.ffa().set("arenas." + id.toLowerCase(), null);
+        FfaArena existing = findArena(id);
+        if (existing == null) {
+            return;
+        }
+        arenas.remove(existing.id());
+        blockDiffs.remove(existing.id());
+        nextResetAtMillis.remove(existing.id());
+        lastResetRemaining.remove(existing.id());
+        configService.ffa().set("arenas." + existing.id(), null);
         configService.save(ConfigService.FFA);
     }
 
+    /** Current per-arena reset interval (0 = off). */
+    public int resetIntervalSeconds(String arenaId) {
+        FfaArena arena = findArena(arenaId);
+        return arena == null ? 0 : arena.resetIntervalSeconds();
+    }
+
+    /** Sets and persists the periodic reset interval for one arena. */
+    public boolean setResetIntervalSeconds(String arenaId, int seconds) {
+        FfaArena existing = findArena(arenaId);
+        if (existing == null) {
+            return false;
+        }
+        FfaArena updated = existing.withResetInterval(seconds);
+        arenas.put(updated.id(), updated);
+        persist(updated);
+        armResetTimer(updated, true);
+        return true;
+    }
+
+    private void armResetTimer(FfaArena arena, boolean restartNow) {
+        if (arena == null) {
+            return;
+        }
+        lastResetRemaining.put(arena.id(), Integer.MAX_VALUE);
+        if (arena.resetIntervalSeconds() <= 0) {
+            nextResetAtMillis.remove(arena.id());
+            return;
+        }
+        if (restartNow || !nextResetAtMillis.containsKey(arena.id())) {
+            nextResetAtMillis.put(arena.id(),
+                    System.currentTimeMillis() + arena.resetIntervalSeconds() * 1000L);
+        }
+    }
+
+    private void tickResets() {
+        long now = System.currentTimeMillis();
+        for (FfaArena arena : arenas.values()) {
+            if (arena.resetIntervalSeconds() <= 0) {
+                continue;
+            }
+            Long deadline = nextResetAtMillis.get(arena.id());
+            if (deadline == null || deadline <= 0L) {
+                armResetTimer(arena, true);
+                continue;
+            }
+            int remaining = (int) Math.max(0L, (deadline - now + 999L) / 1000L);
+            if (remaining <= 0) {
+                performScheduledReset(arena);
+                continue;
+            }
+            int prev = lastResetRemaining.getOrDefault(arena.id(), Integer.MAX_VALUE);
+            lastResetRemaining.put(arena.id(), remaining);
+            for (int at : RESET_WARN_AT) {
+                if (prev > at && remaining <= at) {
+                    announceResetWarning(arena, at);
+                }
+            }
+        }
+    }
+
+    private void performScheduledReset(FfaArena arena) {
+        lastResetRemaining.put(arena.id(), Integer.MAX_VALUE);
+        nextResetAtMillis.put(arena.id(),
+                System.currentTimeMillis() + arena.resetIntervalSeconds() * 1000L);
+        reset(arena.id(), true);
+    }
+
+    private void announceResetWarning(FfaArena arena, int remainingSeconds) {
+        String timeLabel = remainingSeconds >= 60 && remainingSeconds % 60 == 0
+                ? FfaResetTimes.format(remainingSeconds)
+                : remainingSeconds + (remainingSeconds == 1 ? " second" : " seconds");
+        Component message = Component.text("⚠ ", NamedTextColor.YELLOW)
+                .append(Component.text(arena.id() + " FFA will reset in ", NamedTextColor.WHITE))
+                .append(Component.text(timeLabel + ".", NamedTextColor.YELLOW));
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            player.sendMessage(message);
+            if (stateManager.getState(player.getUniqueId()) == PlayerState.EDITING_KIT) {
+                continue;
+            }
+            soundService.play(player, "ffa-reset-warn");
+        }
+    }
+
+    private void announceResetOpen(FfaArena arena) {
+        Component message = Component.text(arena.id() + " FFA is now open !", NamedTextColor.GREEN);
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            player.sendMessage(message);
+            if (stateManager.getState(player.getUniqueId()) == PlayerState.EDITING_KIT) {
+                continue;
+            }
+            soundService.play(player, "ffa-open");
+        }
+    }
+
     public void reset(String id) {
-        FfaArena arena = arenas.get(id.toLowerCase());
+        reset(id, false);
+    }
+
+    /**
+     * @param announceOpen when true (periodic timer), broadcast open + LEVEL_UP after terrain restore
+     */
+    public void reset(String id, boolean announceOpen) {
+        FfaArena arena = findArena(id);
         if (arena == null) {
             return;
         }
         resetting.put(arena.id(), true);
+        cleanupEntities(arena);
         List<UUID> occupants = new ArrayList<>();
         for (Map.Entry<UUID, String> entry : playerArena.entrySet()) {
             if (entry.getValue().equals(arena.id())) {
@@ -370,9 +848,17 @@ public final class FfaService {
             }
         }
         List<BlockChange> diffs = blockDiffs.remove(arena.id());
+        Runnable finish = () -> {
+            resetting.put(arena.id(), false);
+            if (announceOpen) {
+                announceResetOpen(arena);
+            }
+        };
         if (diffs != null && !diffs.isEmpty()) {
             Bukkit.getScheduler().runTask(plugin, () -> {
-                for (BlockChange change : diffs) {
+                // Undo in reverse so stacked place/break/explosion diffs restore correctly.
+                for (int i = diffs.size() - 1; i >= 0; i--) {
+                    BlockChange change = diffs.get(i);
                     World world = change.location().getWorld();
                     if (world == null) {
                         continue;
@@ -384,17 +870,54 @@ public final class FfaService {
                         // skip corrupt entries
                     }
                 }
-                resetting.put(arena.id(), false);
+                finish.run();
             });
         } else {
-            Bukkit.getScheduler().runTaskLater(plugin, () -> resetting.put(arena.id(), false), 40L);
+            Bukkit.getScheduler().runTaskLater(plugin, finish, 40L);
         }
+    }
+
+    private void cleanupEntities(FfaArena arena) {
+        if (arena == null || arena.region() == null) {
+            return;
+        }
+        World world = Bukkit.getWorld(arena.world());
+        if (world == null) {
+            return;
+        }
+        Cuboid region = arena.region();
+        for (Entity entity : world.getEntities()) {
+            if (!(entity instanceof Player) && region.contains(entity.getLocation())
+                    && (entity instanceof EnderCrystal
+                    || entity instanceof TNTPrimed
+                    || entity instanceof ExplosiveMinecart
+                    || entity instanceof FallingBlock
+                    || entity instanceof Item)) {
+                entity.remove();
+            }
+        }
+    }
+
+    private void restoreKit(Player player) {
+        String arenaId = playerArena.get(player.getUniqueId());
+        if (arenaId == null) {
+            return;
+        }
+        FfaArena arena = arenas.get(arenaId);
+        if (arena == null) {
+            return;
+        }
+        kitService.get(arena.kitId()).ifPresent(kit -> applyKit(player, kit));
     }
 
     private void applyKit(Player player, KitDefinition kit) {
         layoutCache.loadSyncIfAbsent(player.getUniqueId(), kit.name());
         ItemStack[] layout = layoutCache.get(player.getUniqueId(), kit.name()).orElse(null);
         kitService.apply(player, kit, layout);
+        if (kit.totem()) {
+            com.rumilance.practice.guard.PracticeGuards.enforceTotemCap(player, 14);
+        }
+        player.setCanPickupItems(true);
     }
 
     private void persist(FfaArena arena) {
@@ -403,6 +926,7 @@ public final class FfaService {
         yaml.set(path + ".kit", arena.kitId());
         yaml.set(path + ".world", arena.world());
         yaml.set(path + ".enabled", arena.enabled());
+        yaml.set(path + ".reset-interval-seconds", arena.resetIntervalSeconds());
         yaml.set(path + ".pos1.x", arena.region().minX());
         yaml.set(path + ".pos1.y", arena.region().minY());
         yaml.set(path + ".pos1.z", arena.region().minZ());
@@ -414,6 +938,7 @@ public final class FfaService {
         yaml.set(path + ".spawn.z", arena.spawn().getZ());
         yaml.set(path + ".spawn.yaw", arena.spawn().getYaw());
         yaml.set(path + ".spawn.pitch", arena.spawn().getPitch());
+        yaml.set(path + ".icon", arena.iconMaterial());
         configService.save(ConfigService.FFA);
     }
 }

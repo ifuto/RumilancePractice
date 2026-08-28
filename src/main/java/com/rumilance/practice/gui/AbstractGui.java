@@ -1,5 +1,7 @@
 package com.rumilance.practice.gui;
 
+import com.rumilance.practice.session.PlayerStateManager;
+import com.rumilance.practice.state.PlayerState;
 import com.rumilance.practice.sound.SoundService;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
@@ -19,6 +21,7 @@ public abstract class AbstractGui {
     protected final GuiType type;
     protected final int rows;
     protected final boolean rankedBorder;
+    private PlayerStateManager stateManager;
 
     protected AbstractGui(GuiSessionRegistry registry, SoundService sounds, GuiType type, int rows, boolean rankedBorder) {
         this.registry = Objects.requireNonNull(registry);
@@ -32,12 +35,23 @@ public abstract class AbstractGui {
         return type;
     }
 
+    public void setStateManager(PlayerStateManager stateManager) {
+        this.stateManager = stateManager;
+    }
+
     /** @return the number of inventory rows this menu uses. */
     public int rows() {
         return rows;
     }
 
     public final void open(Player player) {
+        if (stateManager != null && stateManager.getState(player.getUniqueId()) == PlayerState.LOBBY) {
+            try {
+                stateManager.transition(player.getUniqueId(), PlayerState.OPENING_GUI);
+            } catch (Exception ignored) {
+                // keep opening
+            }
+        }
         GuiSession session = registry.open(player.getUniqueId(), type, rows);
         configureSession(session, player);
         PracticeGuiHolder holder = new PracticeGuiHolder(session.sessionId(), type, rows);

@@ -48,7 +48,7 @@ public final class LobbyCompassListener implements Listener {
     public static ItemStack compassItem() {
         ItemStack stack = new ItemStack(Material.COMPASS);
         ItemMeta meta = stack.getItemMeta();
-        meta.displayName(Component.text("✦ Game Menu", net.kyori.adventure.text.format.NamedTextColor.AQUA)
+        meta.displayName(Component.text("Game Menu", net.kyori.adventure.text.format.NamedTextColor.AQUA)
                 .decoration(TextDecoration.ITALIC, false));
         meta.lore(java.util.List.of(
                 Component.text("Right-click to open the practice menu.",

@@ -1,6 +1,5 @@
 package com.rumilance.practice.gui.menus;
 
-import com.rumilance.practice.chat.PendingInput;
 import com.rumilance.practice.gui.AbstractGui;
 import com.rumilance.practice.gui.GuiSession;
 import com.rumilance.practice.gui.GuiSessionRegistry;
@@ -46,18 +45,46 @@ public final class TeamHubGui extends AbstractGui {
     private final TeamService teamService;
     private final TeamsBrowserGui browser;
     private final TeamKitSelectGui kitSelect;
+    private final com.rumilance.practice.locale.MessageService messageService;
+    private PartyInviteGui partyInviteGui;
+    private PartyMapSelectGui partyMapSelectGui;
+    private ArenaTemplateStoreSupplier arenaStoreSupplier;
+
+    @FunctionalInterface
+    public interface ArenaTemplateStoreSupplier {
+        java.util.List<com.rumilance.practice.model.ArenaTemplate> partyArenas();
+    }
 
     public TeamHubGui(GuiSessionRegistry registry, SoundService sounds,
                       TeamService teamService, TeamsBrowserGui browser, TeamKitSelectGui kitSelect) {
+        this(registry, sounds, teamService, browser, kitSelect, null);
+    }
+
+    public TeamHubGui(GuiSessionRegistry registry, SoundService sounds,
+                      TeamService teamService, TeamsBrowserGui browser, TeamKitSelectGui kitSelect,
+                      com.rumilance.practice.locale.MessageService messageService) {
         super(registry, sounds, GuiType.TEAM_HUB, 6, true);
         this.teamService = teamService;
         this.browser = browser;
         this.kitSelect = kitSelect;
+        this.messageService = messageService;
+    }
+
+    public void setPartyInviteGui(PartyInviteGui partyInviteGui) {
+        this.partyInviteGui = partyInviteGui;
+    }
+
+    public void setPartyMapSelectGui(PartyMapSelectGui partyMapSelectGui) {
+        this.partyMapSelectGui = partyMapSelectGui;
+    }
+
+    public void setArenaStoreSupplier(ArenaTemplateStoreSupplier arenaStoreSupplier) {
+        this.arenaStoreSupplier = arenaStoreSupplier;
     }
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return Component.text("✦ Team", UiTheme.PRIMARY).decoration(TextDecoration.ITALIC, false);
+        return UiTheme.menuTitle("Party Control");
     }
 
     @Override
@@ -80,12 +107,13 @@ public final class TeamHubGui extends AbstractGui {
         inventory.setItem(GuiSlots.slot(0, 4), headerItem(team));
         if (owner) {
             inventory.setItem(GuiSlots.slot(0, 1),
-                    ItemBuilder.of(Material.WRITABLE_BOOK)
+                    ItemBuilder.of(Material.PLAYER_HEAD)
                             .name(Component.text("Invite Player", UiTheme.SUCCESS))
                             .lore(UiTheme.divider(),
+                                    UiTheme.line("Opens a head list of online players."),
                                     UiTheme.line("Invites expire after 60s."),
                                     UiTheme.blank(),
-                                    UiTheme.hint("Click, then type a name in chat"))
+                                    UiTheme.hint("Click to open invite GUI"))
                             .action("invite").build());
             inventory.setItem(GuiSlots.slot(0, 2),
                     ItemBuilder.of(team.isPublic() ? UiTheme.TOGGLE_ON : UiTheme.TOGGLE_OFF)
@@ -98,6 +126,29 @@ public final class TeamHubGui extends AbstractGui {
                                     UiTheme.blank(),
                                     UiTheme.hint("Click to toggle visibility"))
                             .action("toggle_public").build());
+            if (arenaStoreSupplier != null && !arenaStoreSupplier.partyArenas().isEmpty()) {
+                inventory.setItem(GuiSlots.slot(0, 3),
+                        ItemBuilder.of(Material.MAP)
+                                .name(Component.text("Select Map", UiTheme.PRIMARY))
+                                .lore(UiTheme.divider(),
+                                        UiTheme.labelValue("Map", team.selectedArena() == null
+                                                ? "Random"
+                                                : com.rumilance.practice.util.NameDisplay.pretty(team.selectedArena())),
+                                        UiTheme.blank(),
+                                        UiTheme.hint("Click to pick a party map"))
+                                .action("select_map").build());
+            }
+            inventory.setItem(GuiSlots.slot(0, 6),
+                    ItemBuilder.of(team.friendlyFire() ? Material.TNT : Material.SHIELD)
+                            .name(Component.text("Friendly Fire",
+                                    team.friendlyFire() ? UiTheme.DANGER : UiTheme.SUCCESS))
+                            .lore(UiTheme.divider(),
+                                    UiTheme.line(team.friendlyFire()
+                                            ? "ON — 味方へのダメージ有効"
+                                            : "OFF — 味方へのダメージ無効"),
+                                    UiTheme.blank(),
+                                    UiTheme.hint("クリックで切替"))
+                            .action("toggle_ff").build());
             inventory.setItem(GuiSlots.slot(0, 7),
                     ItemBuilder.of(Material.TNT)
                             .name(Component.text("Disband Team", UiTheme.DANGER))
@@ -255,6 +306,13 @@ public final class TeamHubGui extends AbstractGui {
                     refresh(player, session, inventory);
                 }
             }
+            case "toggle_ff" -> {
+                if (owner) {
+                    TeamService.Result r = teamService.toggleFriendlyFire(player);
+                    sounds.play(player, r == TeamService.Result.OK ? "select" : "error");
+                    refresh(player, session, inventory);
+                }
+            }
             case "autosplit" -> {
                 if (owner) {
                     TeamService.Result r = teamService.autoAssign(player);
@@ -310,23 +368,31 @@ public final class TeamHubGui extends AbstractGui {
                     return;
                 }
                 sounds.play(player, "gui-click");
-                player.closeInventory();
-                player.sendMessage(Component.text("Type the player name to invite (or 'cancel'):",
-                        UiTheme.PRIMARY).decoration(TextDecoration.ITALIC, false));
-                TeamHubGui self = this;
-                PendingInput.await(player, text -> {
-                    if (text.equalsIgnoreCase("cancel") || text.isBlank()) {
-                        player.sendMessage(Component.text("Invite cancelled.", UiTheme.MUTED)
-                                .decoration(TextDecoration.ITALIC, false));
-                    } else {
-                        TeamService.Result r = teamService.invite(player, text);
-                        if (r != TeamService.Result.OK) {
-                            player.sendMessage(Component.text(inviteError(r), UiTheme.DANGER)
-                                    .decoration(TextDecoration.ITALIC, false));
-                        }
-                    }
-                    self.open(player);
-                });
+                if (partyInviteGui != null) {
+                    org.bukkit.Bukkit.getScheduler().runTask(
+                            org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
+                            () -> {
+                                if (player.isOnline()) {
+                                    partyInviteGui.openFor(player);
+                                }
+                            });
+                } else {
+                    player.closeInventory();
+                    player.sendMessage(Component.text("Invite GUI unavailable.", UiTheme.DANGER));
+                }
+            }
+            case "select_map" -> {
+                if (!owner || partyMapSelectGui == null) {
+                    return;
+                }
+                sounds.play(player, "gui-click");
+                org.bukkit.Bukkit.getScheduler().runTask(
+                        org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
+                        () -> {
+                            if (player.isOnline()) {
+                                partyMapSelectGui.open(player);
+                            }
+                        });
             }
             default -> {
                 if (action.startsWith("member:") && owner) {
@@ -355,15 +421,5 @@ public final class TeamHubGui extends AbstractGui {
                 }
             }
         }
-    }
-
-    private static String inviteError(TeamService.Result r) {
-        return switch (r) {
-            case TARGET_OFFLINE -> "Player not found or offline.";
-            case TARGET_IN_TEAM -> "That player is already in a team.";
-            case TEAM_FULL -> "Your team is full (30 max).";
-            case NOT_OWNER -> "Only the owner can invite.";
-            default -> "Could not invite: " + r.name();
-        };
     }
 }

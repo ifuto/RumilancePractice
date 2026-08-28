@@ -23,6 +23,8 @@ public final class GuiSession {
     private volatile UUID targetPlayer;
     /** True when this GUI was opened from the Game Menu (Esc/Close then returns to it). */
     private volatile boolean fromGameMenu;
+    /** True when opened from the Battle menu (Esc/Close returns there). */
+    private volatile boolean fromBattleMenu;
 
     public GuiSession(UUID sessionId, UUID playerId, GuiType type, int rows) {
         this.sessionId = Objects.requireNonNull(sessionId, "sessionId");
@@ -101,6 +103,14 @@ public final class GuiSession {
 
     public void setFromGameMenu(boolean fromGameMenu) {
         this.fromGameMenu = fromGameMenu;
+    }
+
+    public boolean fromBattleMenu() {
+        return fromBattleMenu;
+    }
+
+    public void setFromBattleMenu(boolean fromBattleMenu) {
+        this.fromBattleMenu = fromBattleMenu;
     }
 
     /**

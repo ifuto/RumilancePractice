@@ -43,7 +43,7 @@ public final class ArrowEffectGui extends AbstractGui {
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return Component.text("✦ Arrow Effects", UiTheme.PRIMARY).decoration(TextDecoration.ITALIC, false);
+        return Component.text("Arrow Effects", UiTheme.PRIMARY).decoration(TextDecoration.ITALIC, false);
     }
 
     @Override

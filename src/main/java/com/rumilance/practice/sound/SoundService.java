@@ -32,6 +32,12 @@ public final class SoundService {
         reload();
     }
 
+    /** Recovery wiring overload; stateManager reserved for future state-gated sounds. */
+    public SoundService(ConfigService configService, SettingsService settingsService,
+                        com.rumilance.practice.session.PlayerStateManager stateManager) {
+        this(configService, settingsService);
+    }
+
     public void reload() {
         cache.clear();
         ConfigurationSection root = configService.sounds().getConfigurationSection("sounds");

@@ -74,6 +74,12 @@ public final class ArenaInstance {
         return originZ + (template.maxZ() - template.minZ());
     }
 
+    /** Axis-aligned playable region for this instance (origin-shifted when relocated). */
+    public com.rumilance.practice.util.Cuboid bounds() {
+        return com.rumilance.practice.util.Cuboid.of(
+                template.world(), minX(), minY(), minZ(), maxX(), maxY(), maxZ());
+    }
+
     /** @return a copy of {@code base} shifted from template space into this instance's space. */
     public org.bukkit.Location offset(org.bukkit.Location base) {
         return base.clone().add(

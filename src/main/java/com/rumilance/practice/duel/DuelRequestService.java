@@ -1,11 +1,7 @@
 package com.rumilance.practice.duel;
 
-import com.rumilance.practice.model.DuelRequest;
-
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -25,10 +21,19 @@ public final class DuelRequestService {
             boolean ranked,
             int bestOf,
             Instant createdAt,
-            Instant expiresAt
+            Instant expiresAt,
+            String arenaName
     ) {
         public boolean isExpired(Instant now) {
             return now.isAfter(expiresAt);
+        }
+
+        /** Preferred map template, or empty when random / unset. */
+        public Optional<String> preferredArena() {
+            if (arenaName == null || arenaName.isBlank() || "random".equalsIgnoreCase(arenaName)) {
+                return Optional.empty();
+            }
+            return Optional.of(arenaName);
         }
     }
 
@@ -45,6 +50,12 @@ public final class DuelRequestService {
     public synchronized Optional<RichDuelRequest> create(
             UUID sender, UUID target, String kit, boolean ranked, int bestOf
     ) {
+        return create(sender, target, kit, ranked, bestOf, null);
+    }
+
+    public synchronized Optional<RichDuelRequest> create(
+            UUID sender, UUID target, String kit, boolean ranked, int bestOf, String arenaName
+    ) {
         if (sender.equals(target)) {
             return Optional.empty();
         }
@@ -54,11 +65,15 @@ public final class DuelRequestService {
             return Optional.empty();
         }
         Instant created = Instant.now();
+        String map = arenaName == null || arenaName.isBlank() || "random".equalsIgnoreCase(arenaName)
+                ? null
+                : arenaName;
         RichDuelRequest request = new RichDuelRequest(
                 UUID.randomUUID(), sender, target, kit, ranked,
                 Math.max(1, bestOf),
                 created,
-                created.plusSeconds(ttlSeconds)
+                created.plusSeconds(ttlSeconds),
+                map
         );
         byId.put(request.id(), request);
         lastSendMillis.put(sender, now);

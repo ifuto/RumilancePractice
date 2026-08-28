@@ -66,7 +66,7 @@ public final class FfaListGui extends AbstractGui {
     private ItemStack arenaIcon(FfaService.FfaArena arena) {
         if (!arena.enabled()) {
             return ItemBuilder.of(Material.BARRIER)
-                    .name(Component.text(arena.id(), UiTheme.MUTED))
+                    .name(Component.text(com.rumilance.practice.util.NameDisplay.pretty(arena.id()), UiTheme.MUTED))
                     .lore(
                             UiTheme.divider(),
                             UiTheme.status("DISABLED", UiTheme.DANGER),
@@ -76,8 +76,8 @@ public final class FfaListGui extends AbstractGui {
                     .action("decorate")
                     .build();
         }
-        return ItemBuilder.of(Material.IRON_SWORD)
-                .name(Component.text(arena.id(), UiTheme.SECONDARY))
+        return ItemBuilder.of(resolveIcon(arena))
+                .name(Component.text(com.rumilance.practice.util.NameDisplay.pretty(arena.id()), UiTheme.SECONDARY))
                 .lore(
                         UiTheme.divider(),
                         UiTheme.labelValue("Kit", arena.kitId()),
@@ -88,6 +88,11 @@ public final class FfaListGui extends AbstractGui {
                 .glint(true)
                 .action("ffa:" + arena.id())
                 .build();
+    }
+
+    private static Material resolveIcon(FfaService.FfaArena arena) {
+        Material mat = Material.matchMaterial(arena.iconMaterial());
+        return mat == null ? Material.IRON_SWORD : mat;
     }
 
     @Override

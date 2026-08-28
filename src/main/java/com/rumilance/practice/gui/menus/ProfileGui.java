@@ -34,12 +34,20 @@ public final class ProfileGui extends AbstractGui {
 
     private final KitService kitService;
     private final StatsService statsService;
+    private final com.rumilance.practice.ban.BanService banService;
 
     public ProfileGui(GuiSessionRegistry registry, SoundService sounds,
                       KitService kitService, StatsService statsService) {
+        this(registry, sounds, kitService, statsService, null);
+    }
+
+    public ProfileGui(GuiSessionRegistry registry, SoundService sounds,
+                      KitService kitService, StatsService statsService,
+                      com.rumilance.practice.ban.BanService banService) {
         super(registry, sounds, GuiType.PROFILE, 6, true);
         this.kitService = kitService;
         this.statsService = statsService;
+        this.banService = banService;
     }
 
     public void openFor(Player viewer, UUID target) {
@@ -59,7 +67,7 @@ public final class ProfileGui extends AbstractGui {
     @Override
     protected Component title(Player player, GuiSession session) {
         UUID target = session.targetPlayer() == null ? player.getUniqueId() : session.targetPlayer();
-        return Component.text("✦ " + StatsService.nameOf(target), UiTheme.HEADER)
+        return Component.text(StatsService.nameOf(target), UiTheme.HEADER)
                 .decoration(TextDecoration.ITALIC, false);
     }
 

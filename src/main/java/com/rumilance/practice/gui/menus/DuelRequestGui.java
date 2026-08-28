@@ -35,6 +35,8 @@ public final class DuelRequestGui extends AbstractGui {
     private final StatsService statsService;
     private final KitSelectGui kitSelectGui;
     private final MessageService messageService;
+    private DuelMapSelectGui mapSelectGui;
+    private com.rumilance.practice.team.TeamService teamService;
 
     public DuelRequestGui(
             GuiSessionRegistry registry,
@@ -53,6 +55,18 @@ public final class DuelRequestGui extends AbstractGui {
         this.statsService = statsService;
         this.kitSelectGui = kitSelectGui;
         this.messageService = messageService;
+    }
+
+    public void setMapSelectGui(DuelMapSelectGui mapSelectGui) {
+        this.mapSelectGui = mapSelectGui;
+    }
+
+    public void setTeamService(com.rumilance.practice.team.TeamService teamService) {
+        this.teamService = teamService;
+    }
+
+    public DuelMapSelectGui mapSelectGui() {
+        return mapSelectGui;
     }
 
     public void openFor(Player sender, Player target, boolean ranked) {
@@ -117,6 +131,13 @@ public final class DuelRequestGui extends AbstractGui {
         inventory.setItem(GuiSlots.slot(2, 3), GuiDecorator.button(Material.DIAMOND_SWORD,
                 messageService.render(locale, "duel-gui.kit-select",
                         MessageService.tags("kit", session.selectedKit() == null ? "nodebuff" : session.selectedKit())), "kit"));
+        String mapLabel = session.selectedMap() == null || session.selectedMap().isBlank()
+                || "random".equalsIgnoreCase(session.selectedMap())
+                ? "Random"
+                : com.rumilance.practice.util.KitNames.pretty(session.selectedMap());
+        inventory.setItem(GuiSlots.slot(2, 5), GuiDecorator.button(Material.GRASS_BLOCK,
+                messageService.render(locale, "duel-gui.map-select",
+                        MessageService.tags("map", mapLabel)), "map"));
         ItemStack modeButton = GuiDecorator.button(
                 session.ranked() ? Material.PURPLE_DYE : Material.BLUE_DYE,
                 messageService.render(locale, session.ranked() ? "duel-gui.mode-ranked" : "duel-gui.mode-unranked"), "mode");
@@ -143,6 +164,14 @@ public final class DuelRequestGui extends AbstractGui {
                 player.closeInventory();
                 kitSelectGui.openFor(player, session);
             }
+            case "map" -> {
+                if (mapSelectGui != null) {
+                    player.closeInventory();
+                    mapSelectGui.openFor(player, session);
+                } else {
+                    sounds.play(player, "error");
+                }
+            }
             case "mode" -> {
                 session.setRanked(!session.ranked());
                 sounds.play(player, "gui-click");
@@ -163,6 +192,11 @@ public final class DuelRequestGui extends AbstractGui {
         if (Boolean.TRUE.equals(session.get("pending", Boolean.class))) {
             return;
         }
+        if (teamService != null && teamService.teamOf(player.getUniqueId()).isPresent()) {
+            sounds.play(player, "error");
+            messageService.send(player, "party.solo-only");
+            return;
+        }
         UUID targetId = session.targetPlayer();
         Player target = targetId == null ? null : Bukkit.getPlayer(targetId);
         if (target == null) {
@@ -175,7 +209,9 @@ public final class DuelRequestGui extends AbstractGui {
             return;
         }
         String kit = session.selectedKit() == null ? "nodebuff" : session.selectedKit();
-        if (duelRequestService.create(player.getUniqueId(), targetId, kit, session.ranked(), session.bestOf()).isEmpty()) {
+        String map = session.selectedMap();
+        if (duelRequestService.create(player.getUniqueId(), targetId, kit, session.ranked(),
+                session.bestOf(), map).isEmpty()) {
             sounds.play(player, "error");
             messageService.send(player, "duel.could-not-send");
             return;

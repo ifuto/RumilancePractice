@@ -5,6 +5,9 @@ import com.rumilance.practice.gui.GuiDecorator;
 import com.rumilance.practice.gui.GuiSession;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.GuiType;
+import com.rumilance.practice.gui.ItemBuilder;
+import com.rumilance.practice.gui.MenuScaffold;
+import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.locale.MessageService;
 import com.rumilance.practice.model.KitDefinition;
@@ -12,7 +15,6 @@ import com.rumilance.practice.sound.SoundService;
 import com.rumilance.practice.util.GuiSlots;
 import com.rumilance.practice.util.ItemKeys;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -44,6 +46,9 @@ public final class KitAdminGui extends AbstractGui {
     private final MessageService messageService;
     /** Supplies the saved arena template names for the arena-pin cycle button (wired at boot). */
     private java.util.function.Supplier<List<String>> arenaNames = List::of;
+    private java.util.function.Consumer<Player> openPresetAdmin = p -> { };
+    private java.util.function.BiConsumer<Player, String> openStartEffects = (p, kit) -> { };
+    private java.util.function.BiConsumer<Player, String> openArenaSelect = (p, kit) -> { };
 
     public KitAdminGui(GuiSessionRegistry registry, SoundService sounds, KitService kitService, MessageService messageService) {
         super(registry, sounds, GuiType.KIT_ADMIN, 6, false);
@@ -53,6 +58,27 @@ public final class KitAdminGui extends AbstractGui {
 
     public void setArenaNames(java.util.function.Supplier<List<String>> arenaNames) {
         this.arenaNames = arenaNames == null ? List::of : arenaNames;
+    }
+
+    public void setOpenPresetAdmin(java.util.function.Consumer<Player> openPresetAdmin) {
+        this.openPresetAdmin = openPresetAdmin == null ? p -> { } : openPresetAdmin;
+    }
+
+    public void setOpenStartEffects(java.util.function.BiConsumer<Player, String> openStartEffects) {
+        this.openStartEffects = openStartEffects == null ? (p, kit) -> { } : openStartEffects;
+    }
+
+    public void setOpenArenaSelect(java.util.function.BiConsumer<Player, String> openArenaSelect) {
+        this.openArenaSelect = openArenaSelect == null ? (p, kit) -> { } : openArenaSelect;
+    }
+
+    /** Reopens the config panel for a kit (used when returning from Start Effects GUI). */
+    public void openConfig(Player player, String kitId) {
+        GuiSession session = registry.open(player.getUniqueId(), type(), rows);
+        session.put("view", "config");
+        session.setSelectedKit(kitId);
+        PracticeGuiOpen.open(this, player, session);
+        sounds.play(player, "gui-open");
     }
 
     /** Localised raw label string from {@code admin-gui.<key>}. */
@@ -72,7 +98,7 @@ public final class KitAdminGui extends AbstractGui {
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        inventory.clear();
+        MenuScaffold.chrome(inventory);
         String locale = FORCED_LOCALE;
         String view = session.get("view", String.class);
         if (view == null) {
@@ -111,17 +137,19 @@ public final class KitAdminGui extends AbstractGui {
         ItemStack stack = new ItemStack(material);
         ItemMeta meta = stack.getItemMeta();
         meta.displayName(Component.text(kit.prettyDisplayName(),
-                        kit.enabled() ? NamedTextColor.GREEN : NamedTextColor.RED)
+                        kit.enabled() ? UiTheme.SUCCESS : UiTheme.DANGER)
                 .decoration(TextDecoration.ITALIC, false));
         List<Component> lore = new ArrayList<>();
         lore.add(stateLine(t(locale, "enabled"), kit.enabled(), locale));
         lore.add(stateLine(t(locale, "adventure"), kit.forceAdventure(), locale));
         lore.add(stateLine(t(locale, "ranked"), kit.ranked(), locale));
-        lore.add(Component.text("アリーナ: " + (kit.hasFixedArena() ? kit.arenaName() : "ランダム"), NamedTextColor.AQUA)
+        lore.add(Component.text("デュエル: " + arenaSummary(kit.arenas()), UiTheme.PRIMARY)
                 .decoration(TextDecoration.ITALIC, false));
-        lore.add(Component.text("Shift+左クリック: 上へ移動", NamedTextColor.GRAY)
+        lore.add(Component.text("パーティ: " + arenaSummary(kit.partyArenas()), UiTheme.PRIMARY)
                 .decoration(TextDecoration.ITALIC, false));
-        lore.add(Component.text("Shift+右クリック: 下へ移動", NamedTextColor.GRAY)
+        lore.add(Component.text("Shift+左クリック: 上へ移動", UiTheme.MUTED)
+                .decoration(TextDecoration.ITALIC, false));
+        lore.add(Component.text("Shift+右クリック: 下へ移動", UiTheme.MUTED)
                 .decoration(TextDecoration.ITALIC, false));
         meta.lore(lore);
         meta.getPersistentDataContainer().set(ItemKeys.guiAction(), PersistentDataType.STRING, "select:" + kit.name());
@@ -142,9 +170,11 @@ public final class KitAdminGui extends AbstractGui {
                 kit.forceAdventure() ? Material.LIME_DYE : Material.GRAY_DYE, locale));
         inventory.setItem(GuiSlots.slot(1, 5), toggle(t(locale, "ranked"), kit.ranked(), "toggle:ranked",
                 kit.ranked() ? Material.LIME_DYE : Material.GRAY_DYE, locale));
-        inventory.setItem(GuiSlots.slot(1, 7), GuiDecorator.button(Material.GRASS_BLOCK,
-                Component.text("アリーナ: " + (kit.hasFixedArena() ? kit.arenaName() : "ランダム"), NamedTextColor.AQUA)
-                        .decoration(TextDecoration.ITALIC, false), "cycle:arena"));
+        inventory.setItem(GuiSlots.slot(1, 7), ItemBuilder.action(Material.GRASS_BLOCK,
+                Component.text("アリーナ選択", UiTheme.PRIMARY)
+                        .decoration(TextDecoration.ITALIC, false), "open:arenas"));
+        inventory.setItem(GuiSlots.slot(2, 7), toggle("プリセット編集", kit.presetEnabled(), "toggle:preset",
+                Material.CHEST, locale));
 
         inventory.setItem(GuiSlots.slot(2, 1), toggle(t(locale, "health-regen"), kit.naturalHealthRegen(), "toggle:autoregen",
                 Material.GOLDEN_APPLE, locale));
@@ -162,19 +192,28 @@ public final class KitAdminGui extends AbstractGui {
         inventory.setItem(GuiSlots.slot(3, 5), toggle(t(locale, "shield-break"), kit.swordShieldBreak(), "toggle:swordshieldbreak",
                 Material.SHIELD, locale));
         inventory.setItem(GuiSlots.slot(3, 7), GuiDecorator.button(Material.CLOCK,
-                Component.text(t(locale, "timeout") + ": " + kit.timeoutSeconds() + "s", NamedTextColor.YELLOW)
+                Component.text(t(locale, "timeout") + ": " + kit.timeoutSeconds() + "s", UiTheme.WARNING)
                         .decoration(TextDecoration.ITALIC, false), "noop"));
 
-        inventory.setItem(GuiSlots.slot(5, 4), GuiDecorator.button(Material.ARROW,
-                Component.text(t(locale, "back"), NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false), "back"));
+        inventory.setItem(GuiSlots.slot(4, 4), GuiDecorator.button(Material.SPLASH_POTION,
+                Component.text(t(locale, "start-effects")
+                                + (kit.startEffects().isEmpty() ? "" : " (" + kit.startEffects().size() + ")"),
+                        UiTheme.SECONDARY)
+                        .decoration(TextDecoration.ITALIC, false), "open:start-effects"));
+
+        inventory.setItem(GuiSlots.slot(4, 2), ItemBuilder.action(Material.NETHER_STAR,
+                Component.text("プリセット候補を編集", UiTheme.SECONDARY), "open:preset"));
+
+        inventory.setItem(GuiSlots.slot(5, 4), ItemBuilder.action(UiTheme.BACK,
+                Component.text(t(locale, "back"), UiTheme.PRIMARY).decoration(TextDecoration.ITALIC, false), "back"));
     }
 
     private ItemStack header(KitDefinition kit, String locale) {
         ItemStack stack = new ItemStack(Material.NAME_TAG);
         ItemMeta meta = stack.getItemMeta();
-        meta.displayName(Component.text(kit.prettyDisplayName(), NamedTextColor.LIGHT_PURPLE)
+        meta.displayName(Component.text(kit.prettyDisplayName(), UiTheme.SECONDARY)
                 .decoration(TextDecoration.ITALIC, false));
-        meta.lore(List.of(Component.text(t(locale, "click-hint"), NamedTextColor.GRAY)
+        meta.lore(List.of(Component.text(t(locale, "click-hint"), UiTheme.MUTED)
                 .decoration(TextDecoration.ITALIC, false)));
         stack.setItemMeta(meta);
         return stack;
@@ -182,17 +221,17 @@ public final class KitAdminGui extends AbstractGui {
 
     private ItemStack toggle(String label, boolean state, String action, Material material, String locale) {
         return GuiDecorator.button(material,
-                Component.text(label + ": ", NamedTextColor.GRAY)
+                Component.text(label + ": ", UiTheme.MUTED)
                         .append(Component.text(state ? t(locale, "on") : t(locale, "off"),
-                                state ? NamedTextColor.GREEN : NamedTextColor.RED))
+                                state ? UiTheme.SUCCESS : UiTheme.DANGER))
                         .decoration(TextDecoration.ITALIC, false),
                 action);
     }
 
     private Component stateLine(String label, boolean state, String locale) {
-        return Component.text(label + ": ", NamedTextColor.GRAY)
+        return Component.text(label + ": ", UiTheme.MUTED)
                 .append(Component.text(state ? t(locale, "on") : t(locale, "off"),
-                        state ? NamedTextColor.GREEN : NamedTextColor.RED))
+                        state ? UiTheme.SUCCESS : UiTheme.DANGER))
                 .decoration(TextDecoration.ITALIC, false);
     }
 
@@ -217,6 +256,25 @@ public final class KitAdminGui extends AbstractGui {
             return;
         }
         if (action.equals("noop")) {
+            return;
+        }
+        if (action.equals("open:start-effects")) {
+            if (session.selectedKit() != null) {
+                sounds.play(player, "gui-click");
+                openStartEffects.accept(player, session.selectedKit());
+            }
+            return;
+        }
+        if (action.equals("open:arenas")) {
+            if (session.selectedKit() != null) {
+                sounds.play(player, "gui-click");
+                openArenaSelect.accept(player, session.selectedKit());
+            }
+            return;
+        }
+        if (action.equals("open:preset")) {
+            sounds.play(player, "gui-click");
+            openPresetAdmin.accept(player);
             return;
         }
         KitDefinition current = session.selectedKit() == null ? null
@@ -245,12 +303,23 @@ public final class KitAdminGui extends AbstractGui {
             case "toggle:pearl" -> b.pearl(!kit.pearl()).build();
             case "toggle:totem" -> b.totem(!kit.totem()).build();
             case "toggle:swordshieldbreak" -> b.swordShieldBreak(!kit.swordShieldBreak()).build();
-            case "cycle:arena" -> b.arenaName(nextArena(kit.arenaName())).build();
+            case "toggle:preset" -> b.presetEnabled(!kit.presetEnabled()).build();
             default -> null;
         };
     }
 
-    /** Cycles: random ("") -> arena1 -> arena2 -> ... -> random. */
+    private static String arenaSummary(List<String> arenas) {
+        if (arenas == null || arenas.isEmpty()) {
+            return "ランダム";
+        }
+        if (arenas.size() == 1) {
+            return arenas.getFirst();
+        }
+        return arenas.size() + " maps";
+    }
+
+    /** @deprecated replaced by {@link KitArenaSelectGui} */
+    @SuppressWarnings("unused")
     private String nextArena(String current) {
         List<String> names = arenaNames.get();
         if (names.isEmpty()) {

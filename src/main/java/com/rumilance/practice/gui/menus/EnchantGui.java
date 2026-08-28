@@ -1,16 +1,17 @@
 package com.rumilance.practice.gui.menus;
 
 import com.rumilance.practice.gui.AbstractGui;
-import com.rumilance.practice.gui.GuiDecorator;
 import com.rumilance.practice.gui.GuiSession;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.GuiType;
+import com.rumilance.practice.gui.ItemBuilder;
+import com.rumilance.practice.gui.MenuScaffold;
+import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.originalkit.OriginalKitService;
 import com.rumilance.practice.sound.SoundService;
 import com.rumilance.practice.util.EnchantmentRules;
 import com.rumilance.practice.util.ItemKeys;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -59,7 +60,7 @@ public final class EnchantGui extends AbstractGui {
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return Component.text("エンチャント", NamedTextColor.WHITE);
+        return Component.text("エンチャント", UiTheme.PRIMARY).decoration(TextDecoration.ITALIC, false);
     }
 
     @SuppressWarnings("unchecked")
@@ -76,7 +77,7 @@ public final class EnchantGui extends AbstractGui {
         }
         Map<String, Integer> applied = applied(session);
         String view = session.get("view", String.class);
-        inventory.clear();
+        MenuScaffold.chrome(inventory);
         if ("levels".equals(view)) {
             String pick = session.get("pick", String.class);
             Enchantment ench = pick == null ? null : Registry.ENCHANTMENT.get(NamespacedKey.minecraft(pick));
@@ -85,9 +86,9 @@ public final class EnchantGui extends AbstractGui {
             for (int level = 1; level <= max && i < 45; level++) {
                 ItemStack book = new ItemStack(Material.ENCHANTED_BOOK);
                 ItemMeta meta = book.getItemMeta();
-                meta.displayName(Component.text("レベル " + level, NamedTextColor.GOLD)
+                meta.displayName(Component.text("レベル " + level, UiTheme.WARNING)
                         .decoration(TextDecoration.ITALIC, false));
-                meta.lore(List.of(Component.text(EnchantmentRules.label(ench), NamedTextColor.GRAY)
+                meta.lore(List.of(Component.text(EnchantmentRules.label(ench), UiTheme.MUTED)
                         .decoration(TextDecoration.ITALIC, false)));
                 meta.getPersistentDataContainer().set(ItemKeys.guiAction(), PersistentDataType.STRING, "level:" + level);
                 book.setItemMeta(meta);
@@ -100,22 +101,22 @@ public final class EnchantGui extends AbstractGui {
                 Integer appliedLevel = applied.get(ench.getKey().getKey());
                 ItemStack book = new ItemStack(Material.ENCHANTED_BOOK);
                 ItemMeta meta = book.getItemMeta();
-                meta.displayName(Component.text(EnchantmentRules.label(ench), NamedTextColor.AQUA)
+                meta.displayName(Component.text(EnchantmentRules.label(ench), UiTheme.PRIMARY)
                         .decoration(TextDecoration.ITALIC, false));
                 meta.lore(List.of(
                         appliedLevel == null
-                                ? Component.text("クリックでレベル選択", NamedTextColor.GRAY)
-                                : Component.text("適用済み: レベル " + appliedLevel + " - クリックで外す", NamedTextColor.GREEN)));
+                                ? Component.text("クリックでレベル選択", UiTheme.MUTED)
+                                : Component.text("適用済み: レベル " + appliedLevel + " - クリックで外す", UiTheme.SUCCESS)));
                 meta.getPersistentDataContainer().set(ItemKeys.guiAction(), PersistentDataType.STRING,
                         "ench:" + ench.getKey().getKey());
                 book.setItemMeta(meta);
                 inventory.setItem(i, book);
             }
         }
-        inventory.setItem(45, GuiDecorator.button(Material.RED_DYE,
-                Component.text("戻る", NamedTextColor.RED), "back"));
-        inventory.setItem(49, GuiDecorator.button(Material.LIME_DYE,
-                Component.text("続行", NamedTextColor.GREEN), "continue"));
+        inventory.setItem(45, ItemBuilder.action(UiTheme.BACK,
+                Component.text("戻る", UiTheme.WARNING), "back"));
+        inventory.setItem(49, ItemBuilder.action(UiTheme.CONFIRM,
+                Component.text("続行", UiTheme.SUCCESS), "continue"));
     }
 
     @Override
@@ -132,7 +133,7 @@ public final class EnchantGui extends AbstractGui {
                 }
                 boolean placed = OriginalKitService.addToLayout(ctx, finalItem);
                 if (!placed) {
-                    player.sendMessage(Component.text("キットのインベントリが満杯です。", NamedTextColor.RED));
+                    player.sendMessage(Component.text("キットのインベントリが満杯です。", UiTheme.DANGER));
                     return;
                 }
                 sounds.play(player, "select");

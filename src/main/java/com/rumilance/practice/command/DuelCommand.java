@@ -2,6 +2,7 @@ package com.rumilance.practice.command;
 
 import com.rumilance.practice.config.RuntimeFlags;
 import com.rumilance.practice.duel.DuelRequestService;
+import com.rumilance.practice.guard.PracticeGuards;
 import com.rumilance.practice.gui.menus.QueueKitGui;
 import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.lobby.LobbyService;
@@ -28,6 +29,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -37,6 +39,7 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
 
     private final QueueKitGui rankedGui;
     private final QueueKitGui unrankedGui;
+    private final com.rumilance.practice.gui.menus.DuelRequestGui duelRequestGui;
     private final DuelRequestService duelRequestService;
     private final MatchService matchService;
     private final KitService kitService;
@@ -47,6 +50,32 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
     private final RuntimeFlags runtimeFlags;
     private final boolean rankedDefault;
     private final MessageService messageService;
+    private com.rumilance.practice.ffa.FfaService ffaService;
+    private com.rumilance.practice.spectator.SpectatorService spectatorService;
+    private com.rumilance.practice.gui.GuiSessionRegistry guiSessions;
+    private com.rumilance.practice.team.TeamService teamService;
+
+    public void setTeamService(com.rumilance.practice.team.TeamService teamService) {
+        this.teamService = teamService;
+    }
+
+    private boolean inParty(UUID playerId) {
+        return teamService != null && teamService.teamOf(playerId).isPresent();
+    }
+
+    private void rejectIfInParty(Player player) {
+        if (inParty(player.getUniqueId())) {
+            messageService.send(player, "party.solo-only");
+        }
+    }
+
+    private boolean partyBlocksSolo(Player player) {
+        if (PracticeGuards.canUseSoloMatchmaking(!inParty(player.getUniqueId()))) {
+            return false;
+        }
+        rejectIfInParty(player);
+        return true;
+    }
 
     public DuelCommand(
             QueueKitGui rankedGui,
@@ -62,8 +91,29 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
             boolean rankedDefault,
             MessageService messageService
     ) {
+        this(rankedGui, unrankedGui, null, duelRequestService, matchService, kitService,
+                stateManager, soundService, lobbyService, queueCoordinator, runtimeFlags,
+                rankedDefault, messageService);
+    }
+
+    public DuelCommand(
+            QueueKitGui rankedGui,
+            QueueKitGui unrankedGui,
+            com.rumilance.practice.gui.menus.DuelRequestGui duelRequestGui,
+            DuelRequestService duelRequestService,
+            MatchService matchService,
+            KitService kitService,
+            PlayerStateManager stateManager,
+            SoundService soundService,
+            LobbyService lobbyService,
+            QueueCoordinator queueCoordinator,
+            RuntimeFlags runtimeFlags,
+            boolean rankedDefault,
+            MessageService messageService
+    ) {
         this.rankedGui = rankedGui;
         this.unrankedGui = unrankedGui;
+        this.duelRequestGui = duelRequestGui;
         this.duelRequestService = duelRequestService;
         this.matchService = matchService;
         this.kitService = kitService;
@@ -74,6 +124,18 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
         this.runtimeFlags = runtimeFlags;
         this.rankedDefault = rankedDefault;
         this.messageService = messageService;
+    }
+
+    public void setFfaService(com.rumilance.practice.ffa.FfaService ffaService) {
+        this.ffaService = ffaService;
+    }
+
+    public void setSpectatorService(com.rumilance.practice.spectator.SpectatorService spectatorService) {
+        this.spectatorService = spectatorService;
+    }
+
+    public void setGuiSessions(com.rumilance.practice.gui.GuiSessionRegistry guiSessions) {
+        this.guiSessions = guiSessions;
     }
 
     @Override
@@ -146,8 +208,10 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
     }
 
     public void handleAccept(Player player, String fromName) {
-        PlayerState state = stateManager.getState(player.getUniqueId());
-        if (state == PlayerState.FIGHTING || state == PlayerState.COUNTDOWN || state == PlayerState.PREPARING_MATCH) {
+        if (partyBlocksSolo(player)) {
+            return;
+        }
+        if (isBusyForDuel(player.getUniqueId())) {
             messageService.send(player, "duel.already-in-match");
             return;
         }
@@ -166,14 +230,56 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
             messageService.send(player, "duel.no-pending-request");
             return;
         }
+        Player sender = Bukkit.getPlayer(request.sender());
+        Player target = Bukkit.getPlayer(request.target());
+        if (sender == null || target == null) {
+            duelRequestService.cancel(request.id());
+            messageService.send(player, "duel.request-expired",
+                    MessageService.tags("target", senderName(request.sender())));
+            return;
+        }
+        if (isBusyForDuel(sender.getUniqueId()) || isBusyForDuel(target.getUniqueId())) {
+            messageService.send(player, "duel.already-in-match");
+            messageService.send(sender.getUniqueId().equals(player.getUniqueId()) ? target : sender,
+                    "duel.already-in-match");
+            return;
+        }
         if (!duelRequestService.accept(request.id())) {
             messageService.send(player, "duel.request-expired",
                     MessageService.tags("target", senderName(request.sender())));
             return;
         }
+        preparePlayersForDuel(sender);
+        preparePlayersForDuel(target);
+        duelRequestService.invalidateForPlayer(sender.getUniqueId());
+        duelRequestService.invalidateForPlayer(target.getUniqueId());
         matchService.startDuel(request.sender(), request.target(), request.kitName(),
                 request.ranked() ? MatchMode.RANKED : MatchMode.UNRANKED,
-                request.bestOf());
+                request.bestOf(), Map.of(), request.preferredArena().orElse(null));
+    }
+
+    private boolean isBusyForDuel(UUID playerId) {
+        return !PracticeGuards.canSendOrAcceptDuel(stateManager.getState(playerId));
+    }
+
+    private void preparePlayersForDuel(Player player) {
+        if (player == null) {
+            return;
+        }
+        try {
+            queueCoordinator.leave(player);
+        } catch (Exception ignored) {
+        }
+        if (ffaService != null && stateManager.getState(player.getUniqueId()) == PlayerState.FFA) {
+            ffaService.leave(player);
+        }
+        if (spectatorService != null && stateManager.getState(player.getUniqueId()) == PlayerState.SPECTATING) {
+            spectatorService.leave(player);
+        }
+        if (guiSessions != null) {
+            guiSessions.close(player.getUniqueId());
+        }
+        player.closeInventory();
     }
 
     public void handleDeny(Player player, String fromName) {
@@ -211,8 +317,15 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
             messageService.send(sender, "duel.cannot-duel-self");
             return;
         }
+        if (partyBlocksSolo(sender)) {
+            return;
+        }
+        if (!PracticeGuards.canSendOrAcceptDuel(stateManager.getState(sender.getUniqueId()))) {
+            messageService.send(sender, "duel.already-in-match");
+            return;
+        }
         PlayerState targetState = stateManager.getState(target.getUniqueId());
-        if (targetState == PlayerState.FIGHTING || targetState == PlayerState.COUNTDOWN) {
+        if (!PracticeGuards.canSendOrAcceptDuel(targetState)) {
             messageService.send(sender, "duel.target-already-in-match",
                     MessageService.tags("target", target.getName()));
             return;

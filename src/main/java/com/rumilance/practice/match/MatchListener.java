@@ -1,5 +1,7 @@
 package com.rumilance.practice.match;
 
+import com.rumilance.practice.combat.PracticeDeath;
+import com.rumilance.practice.guard.PracticeGuards;
 import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.model.KitDefinition;
 import com.rumilance.practice.session.MatchSession;
@@ -19,8 +21,10 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
+import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -38,10 +42,20 @@ public final class MatchListener implements Listener {
 
     private final MatchService matchService;
     private final KitService kitService;
+    private final com.rumilance.practice.combat.CombatNetTracker combatNet;
+    private final com.rumilance.practice.tnt.PracticeTntSettings practiceTnt;
 
     public MatchListener(MatchService matchService, KitService kitService) {
+        this(matchService, kitService, null, null);
+    }
+
+    public MatchListener(MatchService matchService, KitService kitService,
+                         com.rumilance.practice.combat.CombatNetTracker combatNet,
+                         com.rumilance.practice.tnt.PracticeTntSettings practiceTnt) {
         this.matchService = matchService;
         this.kitService = kitService;
+        this.combatNet = combatNet;
+        this.practiceTnt = practiceTnt;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -53,11 +67,11 @@ public final class MatchListener implements Listener {
         if (session == null) {
             return;
         }
-        if (session.state() == MatchState.COUNTDOWN || session.state() == MatchState.ENDING) {
-            event.setCancelled(true);
-            return;
-        }
         if (session.state() != MatchState.ACTIVE) {
+            // PREPARING / WAITING / COUNTDOWN / ENDING: no damage (Match Found lobby punch-through,
+            // countdown freeze, post-fight). Only ACTIVE participants trade hits.
+            event.setCancelled(true);
+            event.setDamage(0);
             return;
         }
 
@@ -67,10 +81,11 @@ public final class MatchListener implements Listener {
             event.setCancelled(true);
             return;
         }
-        // Friendly fire is always off in team matches so teammates can't grief each other.
-        if (attacker != null && attacker.playerId() != null
-                && session.isTeamMatch()
-                && session.areTeammates(attacker.playerId(), victim.getUniqueId())) {
+        if (PracticeGuards.shouldBlockTeammateDamage(
+                session.isTeamMatch(),
+                attacker != null && attacker.playerId() != null
+                        && session.areTeammates(attacker.playerId(), victim.getUniqueId()),
+                session.friendlyFire())) {
             event.setCancelled(true);
             return;
         }
@@ -82,16 +97,23 @@ public final class MatchListener implements Listener {
 
         // Record non-lethal combat stats for the report card. Lethal hits are recorded by
         // MatchService.handleLethal once the outcome is known, so they still appear in the totals.
-        double finalHealth = victim.getHealth() - event.getFinalDamage();
-        if (finalHealth > 0 && attacker != null && attacker.playerId() != null
+        double remaining = PracticeDeath.remainingAfter(victim, event);
+        if (remaining > 0 && attacker != null && attacker.playerId() != null
                 && session.isParticipant(attacker.playerId())
                 && event instanceof EntityDamageByEntityEvent byEntity
                 && byEntity.getDamager() instanceof org.bukkit.entity.Player attackerPlayer) {
             recordCombatHit(session, attackerPlayer, victim, byEntity, event.getFinalDamage());
         }
 
-        boolean hasTotem = kit != null && kit.totem() && hasTotem(victim);
-        if (finalHealth > 0 || hasTotem) {
+        // After a vanilla/manual totem pop, HP frames can look lethal and falsely fake-death
+        // (which re-applies kits at full health).
+        if (PracticeDeath.isInResurrectGrace(victim)) {
+            return;
+        }
+        if (PracticeDeath.shouldDeferTotemToVanilla(victim, kit, event)) {
+            return;
+        }
+        if (remaining > 0) {
             return;
         }
 
@@ -212,6 +234,29 @@ public final class MatchListener implements Listener {
         }
     }
 
+    /** Countdown: walk + rearrange kit only — no bows / crossbows / eggs / pearls as projectiles. */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onShootBow(EntityShootBowEvent event) {
+        if (!(event.getEntity() instanceof Player player)) {
+            return;
+        }
+        MatchSession session = matchService.registry().byPlayer(player.getUniqueId()).orElse(null);
+        if (session != null && session.state() == MatchState.COUNTDOWN) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onProjectileLaunch(ProjectileLaunchEvent event) {
+        if (!(event.getEntity().getShooter() instanceof Player player)) {
+            return;
+        }
+        MatchSession session = matchService.registry().byPlayer(player.getUniqueId()).orElse(null);
+        if (session != null && session.state() == MatchState.COUNTDOWN) {
+            event.setCancelled(true);
+        }
+    }
+
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onFood(FoodLevelChangeEvent event) {
         if (!(event.getEntity() instanceof Player player)) {
@@ -254,7 +299,11 @@ public final class MatchListener implements Listener {
             return;
         }
         MatchSession session = matchService.registry().byPlayer(event.getPlayer().getUniqueId()).orElse(null);
-        if (session == null || session.state() != MatchState.ACTIVE) {
+        if (session == null) {
+            return;
+        }
+        if (session.state() != MatchState.ACTIVE) {
+            event.setCancelled(true);
             return;
         }
         KitDefinition kit = kitService.get(session.kitName()).orElse(null);
@@ -287,11 +336,6 @@ public final class MatchListener implements Listener {
             event.setCancelled(true);
             matchService.openMatchReport(event.getPlayer());
         }
-    }
-
-    private boolean hasTotem(Player player) {
-        return player.getInventory().getItemInOffHand().getType().name().contains("TOTEM")
-                || player.getInventory().getItemInMainHand().getType().name().contains("TOTEM");
     }
 
     private UUIDLikeAttacker resolveAttacker(EntityDamageEvent event) {

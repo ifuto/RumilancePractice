@@ -4,6 +4,7 @@ import com.rumilance.practice.arena.ArenaService;
 import com.rumilance.practice.match.MatchRegistry;
 import com.rumilance.practice.model.ArenaInstance;
 import com.rumilance.practice.session.MatchSession;
+import com.rumilance.practice.util.BoundsNudge;
 import com.rumilance.practice.util.Cuboid;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
@@ -16,22 +17,28 @@ import org.bukkit.event.player.PlayerTeleportEvent;
 import java.util.UUID;
 
 /**
- * Hard server-side backstop that keeps spectators inside the arena they are watching. The
- * per-player world border already walls them in client-side, but spectator-mode flight and
- * teleports (spectate-target hopping) can pierce a client border, so out-of-bounds moves are
- * clamped back to the arena centre here.
+ * Hard server-side backstop that keeps spectators inside the arena they are watching.
+ * Out-of-bounds flight is nudged ~1 block inward — never snapped to arena centre.
  */
 public final class SpectatorBoundsListener implements Listener {
 
     private final SpectatorService spectatorService;
     private final MatchRegistry matchRegistry;
     private final ArenaService arenaService;
+    private final com.rumilance.practice.ffa.FfaService ffaService;
 
     public SpectatorBoundsListener(SpectatorService spectatorService, MatchRegistry matchRegistry,
                                    ArenaService arenaService) {
+        this(spectatorService, matchRegistry, arenaService, null);
+    }
+
+    public SpectatorBoundsListener(SpectatorService spectatorService, MatchRegistry matchRegistry,
+                                   ArenaService arenaService,
+                                   com.rumilance.practice.ffa.FfaService ffaService) {
         this.spectatorService = spectatorService;
         this.matchRegistry = matchRegistry;
         this.arenaService = arenaService;
+        this.ffaService = ffaService;
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -41,9 +48,10 @@ public final class SpectatorBoundsListener implements Listener {
         }
         Cuboid region = regionFor(event.getPlayer());
         if (region != null && !region.contains(event.getTo())) {
-            Location center = region.center();
-            center.setWorld(event.getTo().getWorld());
-            event.setTo(center);
+            Location nudged = BoundsNudge.nudgeInward(region, event.getTo());
+            nudged.setYaw(event.getTo().getYaw());
+            nudged.setPitch(event.getTo().getPitch());
+            event.setTo(nudged);
         }
     }
 
@@ -72,7 +80,6 @@ public final class SpectatorBoundsListener implements Listener {
         if (instance == null) {
             return null;
         }
-        // Instance bounds (origin-shifted for disposable copies).
         return Cuboid.of(instance.template().world(),
                 instance.minX(), instance.minY(), instance.minZ(),
                 instance.maxX(), instance.maxY(), instance.maxZ());

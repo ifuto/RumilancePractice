@@ -1,5 +1,6 @@
 package com.rumilance.practice.ffa;
 
+import com.rumilance.practice.combat.PracticeDeath;
 import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.model.KitDefinition;
 import com.rumilance.practice.session.PlayerStateManager;
@@ -15,6 +16,7 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
@@ -36,11 +38,21 @@ public final class FfaListener implements Listener {
     private final FfaService ffaService;
     private final KitService kitService;
     private final PlayerStateManager stateManager;
+    private final com.rumilance.practice.combat.CombatNetTracker combatNet;
+    private final com.rumilance.practice.tnt.PracticeTntSettings practiceTnt;
 
     public FfaListener(FfaService ffaService, KitService kitService, PlayerStateManager stateManager) {
+        this(ffaService, kitService, stateManager, null, null);
+    }
+
+    public FfaListener(FfaService ffaService, KitService kitService, PlayerStateManager stateManager,
+                       com.rumilance.practice.combat.CombatNetTracker combatNet,
+                       com.rumilance.practice.tnt.PracticeTntSettings practiceTnt) {
         this.ffaService = ffaService;
         this.kitService = kitService;
         this.stateManager = stateManager;
+        this.combatNet = combatNet;
+        this.practiceTnt = practiceTnt;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -54,10 +66,19 @@ public final class FfaListener implements Listener {
         KitDefinition kit = kitOf(victim.getUniqueId());
         if (event instanceof EntityDamageByEntityEvent byEntity) {
             applyKitCombatRules(byEntity, victim, kit);
+            UUID attackerId = resolveKiller(byEntity);
+            if (attackerId != null) {
+                ffaService.tagCombat(victim.getUniqueId(), attackerId);
+            }
         }
-        double finalHealth = victim.getHealth() - event.getFinalDamage();
-        boolean hasTotem = kit != null && kit.totem() && hasTotem(victim);
-        if (finalHealth > 0 || hasTotem) {
+        if (PracticeDeath.isInResurrectGrace(victim)) {
+            return;
+        }
+        if (PracticeDeath.shouldDeferTotemToVanilla(victim, kit, event)) {
+            return;
+        }
+        double remaining = PracticeDeath.remainingAfter(victim, event);
+        if (remaining > 0) {
             return;
         }
         event.setCancelled(true);
@@ -100,8 +121,8 @@ public final class FfaListener implements Listener {
             return;
         }
         ffaService.arenaOf(player.getUniqueId()).flatMap(ffaService::get).ifPresent(arena -> {
-            if (!arena.region().contains(event.getTo())) {
-                event.setTo(LocationUtil.safeTeleportLocation(arena.spawn(), player));
+            if (!arena.region().containsHorizontal(event.getTo())) {
+                com.rumilance.practice.util.PlayAreaWall.constrain(event, arena.region(), player);
             }
         });
     }
@@ -116,8 +137,6 @@ public final class FfaListener implements Listener {
             event.setCancelled(true);
             return;
         }
-        ffaService.recordBlockChange(event.getPlayer().getUniqueId(), event.getBlock().getLocation(),
-                event.getBlockReplacedState().getBlockData().getAsString());
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -140,8 +159,6 @@ public final class FfaListener implements Listener {
             event.setCancelled(true);
             return;
         }
-        ffaService.recordBlockChange(event.getPlayer().getUniqueId(), event.getBlock().getLocation(),
-                event.getBlock().getBlockData().getAsString());
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -186,10 +203,24 @@ public final class FfaListener implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onPickup(EntityPickupItemEvent event) {
+        if (!(event.getEntity() instanceof Player player)) {
+            return;
+        }
+        if (ffaService.isInFfa(player.getUniqueId())
+                || stateManager.getState(player.getUniqueId()) == PlayerState.FFA) {
+            // Lobby / other guards must not block kit drops in FFA.
+            event.setCancelled(false);
+            player.setCanPickupItems(true);
+        }
+    }
+
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         if (ffaService.isInFfa(event.getPlayer().getUniqueId())
                 || stateManager.getState(event.getPlayer().getUniqueId()) == PlayerState.FFA) {
+            ffaService.creditCombatLogout(event.getPlayer());
             ffaService.leave(event.getPlayer());
         }
     }
@@ -232,11 +263,6 @@ public final class FfaListener implements Listener {
 
     private static boolean isSword(Material material) {
         return material.name().endsWith("_SWORD");
-    }
-
-    private static boolean hasTotem(Player player) {
-        return player.getInventory().getItemInOffHand().getType().name().contains("TOTEM")
-                || player.getInventory().getItemInMainHand().getType().name().contains("TOTEM");
     }
 
     private static UUID resolveKiller(EntityDamageEvent event) {

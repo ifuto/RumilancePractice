@@ -136,6 +136,16 @@ public final class RumilancePractice extends JavaPlugin {
             serviceRegistry.register(DailyRankedStatsRepository.class, new DailyRankedStatsRepository(databaseService));
             serviceRegistry.register(FfaStatsRepository.class, new FfaStatsRepository(databaseService));
             serviceRegistry.register(ObjectionRepository.class, new ObjectionRepository(databaseService));
+            serviceRegistry.register(com.rumilance.practice.database.repository.PracticeLayoutRepository.class,
+                    new com.rumilance.practice.database.repository.PracticeLayoutRepository(databaseService));
+            serviceRegistry.register(com.rumilance.practice.database.repository.WinStreakRepository.class,
+                    new com.rumilance.practice.database.repository.WinStreakRepository(databaseService));
+            serviceRegistry.register(com.rumilance.practice.database.repository.PlayerReportRepository.class,
+                    new com.rumilance.practice.database.repository.PlayerReportRepository(databaseService));
+            serviceRegistry.register(com.rumilance.practice.database.repository.SpamDetectionRepository.class,
+                    new com.rumilance.practice.database.repository.SpamDetectionRepository(databaseService));
+            serviceRegistry.register(com.rumilance.practice.rank.RankRepository.class,
+                    new com.rumilance.practice.rank.RankRepository(databaseService));
             return true;
         } catch (Exception e) {
             // Catch everything (not just SQLException): Hikari pool initialization and

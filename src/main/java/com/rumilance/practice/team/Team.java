@@ -26,6 +26,10 @@ public final class Team {
     /** Player -> chosen side (only set while a split is active). */
     private final java.util.Map<UUID, TeamColor> sideAssignment = new java.util.HashMap<>();
     private volatile Instant createdAt;
+    /** Optional party fight arena name (exact case); null = random / kit default. */
+    private volatile String selectedArena;
+    /** When true, teammates can damage each other in party battles. */
+    private volatile boolean friendlyFire;
 
     public Team(UUID id, UUID owner, String name, boolean isPublic) {
         this.id = Objects.requireNonNull(id, "id");
@@ -150,5 +154,21 @@ public final class Team {
 
     public Instant createdAt() {
         return createdAt;
+    }
+
+    public String selectedArena() {
+        return selectedArena;
+    }
+
+    public void setSelectedArena(String arenaName) {
+        this.selectedArena = arenaName == null || arenaName.isBlank() ? null : arenaName;
+    }
+
+    public boolean friendlyFire() {
+        return friendlyFire;
+    }
+
+    public void setFriendlyFire(boolean friendlyFire) {
+        this.friendlyFire = friendlyFire;
     }
 }

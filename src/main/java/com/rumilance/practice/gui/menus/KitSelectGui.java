@@ -1,25 +1,25 @@
 package com.rumilance.practice.gui.menus;
 
 import com.rumilance.practice.gui.AbstractGui;
-import com.rumilance.practice.gui.GuiDecorator;
 import com.rumilance.practice.gui.GuiSession;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.GuiType;
+import com.rumilance.practice.gui.ItemBuilder;
+import com.rumilance.practice.gui.MenuScaffold;
+import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.model.KitDefinition;
 import com.rumilance.practice.sound.SoundService;
-import com.rumilance.practice.util.GuiSlots;
-import com.rumilance.practice.util.ItemKeys;
+import com.rumilance.practice.util.KitNames;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.persistence.PersistentDataType;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public final class KitSelectGui extends AbstractGui {
 
@@ -42,58 +42,61 @@ public final class KitSelectGui extends AbstractGui {
         session.setSelectedKit(parent.selectedKit());
         session.setSelectedMap(parent.selectedMap());
         session.setBestOf(parent.bestOf());
+        session.setFromBattleMenu(parent.fromBattleMenu());
         PracticeGuiOpen.open(this, player, session);
         sounds.play(player, "gui-open");
     }
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return Component.text("Select Kit", NamedTextColor.WHITE);
+        return Component.text("Select Kit", UiTheme.PRIMARY).decoration(TextDecoration.ITALIC, false);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        int index = 0;
-        for (KitDefinition kit : kitService.enabled()) {
-            if (index >= 28) {
+        MenuScaffold.chrome(inventory);
+        MenuScaffold.header(inventory, 0, title(player, session));
+
+        List<KitDefinition> kits = new ArrayList<>();
+        kitService.enabled().forEach(kits::add);
+        String current = session.selectedKit();
+        int placed = 0;
+        for (KitDefinition kit : kits) {
+            if (placed >= MenuScaffold.gridPageSize()) {
                 break;
             }
             Material mat = Material.matchMaterial(kit.icon());
-            ItemStack icon = new ItemStack(mat == null ? Material.DIAMOND_SWORD : mat);
-            ItemMeta meta = icon.getItemMeta();
-            meta.displayName(MiniMessage.miniMessage().deserialize(kit.prettyDisplayName())
-                    .decoration(TextDecoration.ITALIC, false));
-            meta.getPersistentDataContainer().set(ItemKeys.guiAction(), PersistentDataType.STRING, "pick:" + kit.name());
-            icon.setItemMeta(meta);
-            inventory.setItem(GuiSlots.slot(1 + index / 7, 1 + index % 7), icon);
-            index++;
+            boolean selected = kit.name().equalsIgnoreCase(current);
+            inventory.setItem(MenuScaffold.gridSlot(placed++),
+                    ItemBuilder.of(mat == null ? Material.DIAMOND_SWORD : mat)
+                            .name(Component.text(KitNames.pretty(kit.name()),
+                                    selected ? UiTheme.SUCCESS : UiTheme.VALUE))
+                            .lore(
+                                    UiTheme.divider(),
+                                    UiTheme.line(kit.prettyDisplayName()),
+                                    UiTheme.blank(),
+                                    selected
+                                            ? UiTheme.status("SELECTED", UiTheme.SUCCESS)
+                                            : UiTheme.hint("Click to select")
+                            )
+                            .glint(selected)
+                            .action("pick:" + kit.name())
+                            .build());
         }
-        String selectedName = session.selectedKit() == null ? "まだ選択されていません" : session.selectedKit();
-        inventory.setItem(GuiSlots.slot(2, 4), GuiDecorator.button(Material.BOOK,
-                Component.text(selectedName, NamedTextColor.AQUA), "selected"));
-        inventory.setItem(GuiSlots.slot(5, 1), GuiDecorator.button(Material.BARRIER,
-                Component.text("戻る", NamedTextColor.RED), "back"));
-        inventory.setItem(GuiSlots.slot(5, 7), GuiDecorator.button(Material.EMERALD,
-                Component.text("選択", NamedTextColor.GREEN), "confirm"));
+
+        MenuScaffold.backButton(inventory, Component.text("Back", UiTheme.WARNING));
+        MenuScaffold.closeButton(inventory, Component.text("Close", UiTheme.DANGER));
     }
 
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot, String action) {
-        if (action.startsWith("pick:")) {
-            session.put("temp_kit", action.substring(5));
-            sounds.play(player, "kit-select");
-            return;
-        }
-        if ("back".equals(action)) {
+        if ("back".equals(action) || "close".equals(action)) {
             sounds.play(player, "gui-back");
             returnToDuel(player, session);
             return;
         }
-        if ("confirm".equals(action)) {
-            String temp = session.get("temp_kit", String.class);
-            if (temp != null) {
-                session.setSelectedKit(temp);
-            }
+        if (action != null && action.startsWith("pick:")) {
+            session.setSelectedKit(action.substring(5));
             sounds.play(player, "select");
             returnToDuel(player, session);
         }
@@ -109,12 +112,14 @@ public final class KitSelectGui extends AbstractGui {
         String map = session.selectedMap();
         int bestOf = session.bestOf();
         boolean ranked = session.ranked();
+        boolean fromBattle = session.fromBattleMenu();
         player.closeInventory();
         duelRequestGui.openFor(player, target, ranked);
         registry.get(player.getUniqueId()).ifPresent(s -> {
             s.setSelectedKit(kit);
             s.setSelectedMap(map);
             s.setBestOf(bestOf);
+            s.setFromBattleMenu(fromBattle);
         });
     }
 }

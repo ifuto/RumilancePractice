@@ -8,21 +8,18 @@ import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 
 /**
- * Tiny factory for the plugin's clickable chat buttons — the aqua-themed
- * {@code [Label]} components used across duel requests, team invites and
- * post-match actions. Keeping them here guarantees every button looks and
- * behaves the same (hover tooltip + run-command click) instead of each call
- * site hand-rolling its own style.
+ * Clickable chat actions for duel requests, party invites, and post-match links.
+ * Soft modern chips — no plugin-name tags, light brackets only for click affordance.
  */
 public final class ChatButtons {
 
-    /** House accent (aqua/water). */
-    public static final TextColor ACCENT = TextColor.color(0x55FFFF);
+    /** House accent (soft cyan). */
+    public static final TextColor ACCENT = TextColor.color(0x5EEAD4);
 
     private ChatButtons() {
     }
 
-    /** An aqua-accented {@code [Label]} that runs {@code command} when clicked. */
+    /** An aqua-accented label that runs {@code command} when clicked. */
     public static Component button(String label, String command, String hover) {
         return button(label, command, hover, ACCENT);
     }
@@ -43,7 +40,9 @@ public final class ChatButtons {
     }
 
     public static Component button(String label, String command, String hover, TextColor color) {
-        Component base = Component.text("[" + label + "]", color)
+        Component base = Component.text("[", TextColor.color(0x4B5563))
+                .append(Component.text(label, color))
+                .append(Component.text("]", TextColor.color(0x4B5563)))
                 .decoration(TextDecoration.ITALIC, false)
                 .clickEvent(ClickEvent.runCommand(command));
         if (hover != null && !hover.isBlank()) {

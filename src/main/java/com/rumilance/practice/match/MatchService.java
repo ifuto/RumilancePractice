@@ -25,7 +25,16 @@ import com.rumilance.practice.state.MatchState;
 import com.rumilance.practice.state.PlayerState;
 import com.rumilance.practice.util.AsyncExecutor;
 import com.rumilance.practice.util.ItemKeys;
+import com.rumilance.practice.util.ItemSerializer;
 import com.rumilance.practice.util.LocationUtil;
+import com.rumilance.practice.util.PlayerVitals;
+import com.rumilance.practice.util.SafeTeleport;
+import com.rumilance.practice.scoreboard.TabVisibilityService;
+import com.rumilance.practice.team.Team;
+import com.rumilance.practice.team.TeamService;
+import com.rumilance.practice.util.SplashPotionDurations;
+import com.rumilance.practice.stats.StatsService;
+import com.rumilance.practice.model.KitStartEffect;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
@@ -34,11 +43,16 @@ import net.kyori.adventure.title.Title;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.Registry;
+import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.time.Duration;
@@ -152,6 +166,22 @@ public final class MatchService {
         this.titleService = titleService;
     }
 
+    private volatile TeamColoredArmorService teamColoredArmorService;
+    private volatile TeamService teamService;
+    private volatile TabVisibilityService tabVisibilityService;
+
+    public void setTeamColoredArmorService(TeamColoredArmorService teamColoredArmorService) {
+        this.teamColoredArmorService = teamColoredArmorService;
+    }
+
+    public void setTeamService(TeamService teamService) {
+        this.teamService = teamService;
+    }
+
+    public void setTabVisibilityService(com.rumilance.practice.scoreboard.TabVisibilityService tabVisibilityService) {
+        this.tabVisibilityService = tabVisibilityService;
+    }
+
     /** Per-player border/view-distance control; optional (null = feature off). */
     private com.rumilance.practice.sight.ViewControlService viewControl;
 
@@ -168,6 +198,70 @@ public final class MatchService {
 
     public void setMatchReportOpener(java.util.function.Consumer<Player> matchReportOpener) {
         this.matchReportOpener = matchReportOpener;
+    }
+
+    private com.rumilance.practice.duel.DuelLogStore duelLogStore;
+    private MatchActionRecorder actionRecorder;
+    private com.rumilance.practice.match.inventory.MatchInventoryStore inventoryStore;
+    private com.rumilance.practice.ffa.FfaService ffaService;
+    private com.rumilance.practice.combat.CombatNetTracker combatNet;
+
+    public void setDuelLogStore(com.rumilance.practice.duel.DuelLogStore duelLogStore) {
+        this.duelLogStore = duelLogStore;
+    }
+
+    public com.rumilance.practice.duel.DuelLogStore duelLogStore() {
+        return duelLogStore;
+    }
+
+    private void assignDuelId(MatchSession session) {
+        if (duelLogStore == null || session == null) {
+            return;
+        }
+        String player1;
+        String player2;
+        if (session.isTeamMatch()) {
+            List<UUID> red = session.team(TeamColor.RED);
+            List<UUID> blue = session.team(TeamColor.BLUE);
+            player1 = StatsService.nameOf(red.get(0));
+            player2 = StatsService.nameOf(blue.get(0));
+        } else {
+            player1 = StatsService.nameOf(session.participants().get(0));
+            player2 = StatsService.nameOf(session.participants().get(1));
+        }
+        session.setPublicDuelId(duelLogStore.append(player1, player2));
+    }
+
+    public void setActionRecorder(MatchActionRecorder actionRecorder) {
+        this.actionRecorder = actionRecorder;
+    }
+
+    public MatchActionRecorder actionRecorder() {
+        return actionRecorder;
+    }
+
+    public void setInventoryStore(com.rumilance.practice.match.inventory.MatchInventoryStore inventoryStore) {
+        this.inventoryStore = inventoryStore;
+    }
+
+    public com.rumilance.practice.match.inventory.MatchInventoryStore inventoryStore() {
+        return inventoryStore;
+    }
+
+    public void setFfaService(com.rumilance.practice.ffa.FfaService ffaService) {
+        this.ffaService = ffaService;
+    }
+
+    public com.rumilance.practice.ffa.FfaService ffaService() {
+        return ffaService;
+    }
+
+    public void setCombatNet(com.rumilance.practice.combat.CombatNetTracker combatNet) {
+        this.combatNet = combatNet;
+    }
+
+    public com.rumilance.practice.combat.CombatNetTracker combatNet() {
+        return combatNet;
     }
 
     public MatchRegistry registry() {
@@ -194,7 +288,7 @@ public final class MatchService {
     }
 
     public void startDuel(UUID playerA, UUID playerB, String kitId, MatchMode mode, int bestOf) {
-        startDuel(playerA, playerB, kitId, mode, bestOf, Map.of());
+        startDuel(playerA, playerB, kitId, mode, bestOf, Map.of(), null);
     }
 
     /**
@@ -203,7 +297,22 @@ public final class MatchService {
      */
     public void startDuel(UUID playerA, UUID playerB, String kitId, MatchMode mode,
                           int bestOf, Map<UUID, Integer> carrySeriesWins) {
+        startDuel(playerA, playerB, kitId, mode, bestOf, carrySeriesWins, null);
+    }
+
+    /**
+     * Starts a duel, optionally reserving a named arena template when {@code preferredArena}
+     * is set (from map select / rematch).
+     */
+    public void startDuel(UUID playerA, UUID playerB, String kitId, MatchMode mode,
+                          int bestOf, Map<UUID, Integer> carrySeriesWins, String preferredArena) {
         if (registry.isPlayerInMatch(playerA) || registry.isPlayerInMatch(playerB)) {
+            messageAlreadyInMatch(playerA, playerB);
+            return;
+        }
+        Player onlineA = Bukkit.getPlayer(playerA);
+        Player onlineB = Bukkit.getPlayer(playerB);
+        if (onlineA == null || onlineB == null) {
             return;
         }
         KitDefinition kit = kitService.get(kitId).orElse(null);
@@ -214,19 +323,37 @@ public final class MatchService {
         MatchSession session = new MatchSession(
                 UUID.randomUUID(), mode, kitId, List.of(playerA, playerB), null, bestOf);
         session.applySeries(carrySeriesWins);
+        if (preferredArena != null && !preferredArena.isBlank()
+                && !"random".equalsIgnoreCase(preferredArena)) {
+            session.setPreferredArenaName(preferredArena);
+        }
         if (!registry.register(session)) {
+            messageAlreadyInMatch(playerA, playerB);
             return;
         }
+        assignDuelId(session);
 
         duelRequestService.invalidateForPlayer(playerA);
         duelRequestService.invalidateForPlayer(playerB);
-        tryTransition(playerA, PlayerState.PREPARING_MATCH);
-        tryTransition(playerB, PlayerState.PREPARING_MATCH);
+        onlineA.closeInventory();
+        onlineB.closeInventory();
+        boolean okA = tryTransition(playerA, PlayerState.PREPARING_MATCH);
+        boolean okB = tryTransition(playerB, PlayerState.PREPARING_MATCH);
+        if (!okA || !okB) {
+            failMatch(session, "Could not prepare players");
+            return;
+        }
         session.setState(MatchState.RESERVING_ARENA);
         announceMatchFound(session);
 
-        reserveArenaFor(kit, session.id())
-                .whenComplete((opt, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
+        String named = session.preferredArenaName();
+        CompletableFuture<Optional<ArenaInstance>> reservation;
+        if (named != null && !named.isBlank()) {
+            reservation = arenaService.reserveNamed(named, session.id());
+        } else {
+            reservation = reserveArenaFor(kit, session.id());
+        }
+        reservation.whenComplete((opt, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
                     if (error != null || opt == null || opt.isEmpty()) {
                         failMatch(session, "No arena available");
                         return;
@@ -243,6 +370,20 @@ public final class MatchService {
                 }));
     }
 
+    private void messageAlreadyInMatch(UUID playerA, UUID playerB) {
+        for (UUID id : List.of(playerA, playerB)) {
+            Player player = Bukkit.getPlayer(id);
+            if (player == null) {
+                continue;
+            }
+            if (messageService != null) {
+                messageService.send(player, "duel.already-in-match");
+            } else {
+                player.sendMessage(Component.text("Already in a match.", NamedTextColor.RED));
+            }
+        }
+    }
+
     /**
      * Reserves the arena for {@code kit}: kits pinned to one arena ({@code /kit arena})
      * always use that exact template; unpinned kits get any free duel arena.
@@ -250,7 +391,23 @@ public final class MatchService {
     private java.util.concurrent.CompletableFuture<Optional<ArenaInstance>> reserveArenaFor(
             KitDefinition kit, UUID matchId) {
         if (kit.hasFixedArena()) {
-            return arenaService.reserveNamed(kit.arenaName(), matchId);
+            List<String> pool = kit.arenas();
+            String chosen = pool.size() == 1
+                    ? pool.getFirst()
+                    : pool.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(pool.size()));
+            return arenaService.reserveNamed(chosen, matchId);
+        }
+        return arenaService.reserve(ArenaType.DUEL, matchId);
+    }
+
+    private java.util.concurrent.CompletableFuture<Optional<ArenaInstance>> reservePartyArenaFor(
+            KitDefinition kit, UUID matchId) {
+        if (kit.hasPartyArenaPool()) {
+            List<String> pool = kit.partyArenas();
+            String chosen = pool.size() == 1
+                    ? pool.getFirst()
+                    : pool.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(pool.size()));
+            return arenaService.reserveNamed(chosen, matchId);
         }
         return arenaService.reserve(ArenaType.DUEL, matchId);
     }
@@ -263,6 +420,27 @@ public final class MatchService {
      */
     public void startTeamMatch(List<UUID> redTeam, List<UUID> blueTeam, String kitId,
                                MatchMode mode, int bestOf) {
+        startTeamMatch(redTeam, blueTeam, kitId, mode, bestOf, null);
+    }
+
+    /**
+     * Starts a RED-vs-BLUE team battle. When {@code partyArenaName} is set, that exact arena
+     * template is reserved; otherwise falls back to the kit's pinned arena / any duel arena.
+     */
+    public void startTeamMatch(List<UUID> redTeam, List<UUID> blueTeam, String kitId,
+                               MatchMode mode, int bestOf, String partyArenaName) {
+        startTeamMatch(redTeam, blueTeam, kitId, mode, bestOf, partyArenaName, false);
+    }
+
+    public void startTeamMatch(List<UUID> redTeam, List<UUID> blueTeam, String kitId,
+                               MatchMode mode, int bestOf, String partyArenaName,
+                               boolean friendlyFire) {
+        startTeamMatch(redTeam, blueTeam, kitId, mode, bestOf, partyArenaName, friendlyFire, Map.of());
+    }
+
+    public void startTeamMatch(List<UUID> redTeam, List<UUID> blueTeam, String kitId,
+                               MatchMode mode, int bestOf, String partyArenaName,
+                               boolean friendlyFire, Map<UUID, Integer> carrySeriesWins) {
         if (redTeam == null || blueTeam == null
                 || redTeam.isEmpty() || blueTeam.isEmpty()
                 || redTeam.size() > MatchSession.MAX_SIDE_SIZE
@@ -287,18 +465,41 @@ public final class MatchService {
 
         MatchSession session = new MatchSession(
                 UUID.randomUUID(), mode, kitId, redTeam, blueTeam, null, bestOf);
+        session.setFriendlyFire(friendlyFire);
+        session.applySeries(carrySeriesWins);
+        if (partyArenaName != null && !partyArenaName.isBlank()
+                && !"random".equalsIgnoreCase(partyArenaName)) {
+            session.setPreferredArenaName(partyArenaName);
+        }
         if (!registry.register(session)) {
             return;
         }
+        assignDuelId(session);
+        boolean allPrepared = true;
         for (UUID id : all) {
             duelRequestService.invalidateForPlayer(id);
-            tryTransition(id, PlayerState.PREPARING_MATCH);
+            Player online = Bukkit.getPlayer(id);
+            if (online != null) {
+                online.closeInventory();
+            }
+            if (!tryTransition(id, PlayerState.PREPARING_MATCH)) {
+                allPrepared = false;
+            }
+        }
+        if (!allPrepared) {
+            failMatch(session, "Could not prepare players");
+            return;
         }
         session.setState(MatchState.RESERVING_ARENA);
         announceMatchFound(session);
 
-        reserveArenaFor(kit, session.id())
-                .whenComplete((opt, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
+        java.util.concurrent.CompletableFuture<Optional<ArenaInstance>> reservation;
+        if (partyArenaName != null && !partyArenaName.isBlank()) {
+            reservation = arenaService.reserveNamed(partyArenaName, session.id());
+        } else {
+            reservation = reservePartyArenaFor(kit, session.id());
+        }
+        reservation.whenComplete((opt, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
                     if (error != null || opt == null || opt.isEmpty()) {
                         failMatch(session, "No arena available");
                         return;
@@ -316,16 +517,20 @@ public final class MatchService {
     }
 
     private void teleportAndPrepareTeam(MatchSession session, KitDefinition kit, ArenaInstance instance) {
+        teleportAndPrepareTeam(session, kit, instance, false);
+    }
+
+    private void teleportAndPrepareTeam(MatchSession session, KitDefinition kit, ArenaInstance instance,
+                                         boolean arenaRetried) {
         Location spawnA = LocationUtil.safeTeleportLocation(arenaService.spawnA(instance));
         Location spawnB = LocationUtil.safeTeleportLocation(arenaService.spawnB(instance));
+        List<java.util.concurrent.CompletableFuture<Boolean>> teleports = new ArrayList<>();
         for (UUID id : session.participants()) {
             Player player = Bukkit.getPlayer(id);
             if (player == null) {
                 failMatch(session, "Player offline during prepare");
                 return;
             }
-            // RED spawns at A, BLUE at B. Spread teammates on a line centred on the spawn
-            // point (1.2 blocks apart) so even a 15-player side doesn't stack in one block.
             TeamColor color = session.teamColor(id);
             Location base = color == TeamColor.RED ? spawnA : spawnB;
             List<UUID> side = session.team(color);
@@ -334,11 +539,15 @@ public final class MatchService {
             Location dest = base.clone().add(offset, 0, 0);
             dest.setYaw(base.getYaw());
             dest.setPitch(base.getPitch());
-            player.teleport(LocationUtil.safeTeleportLocation(dest, player));
+            teleports.add(SafeTeleport.teleport(player, LocationUtil.safeTeleportLocation(dest, player)));
         }
-        // Teleport happened above; give clients a full second to settle/render the arena
-        // (possibly a far-away disposable copy) before kits and the countdown begin.
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+        java.util.concurrent.CompletableFuture.allOf(
+                teleports.toArray(new java.util.concurrent.CompletableFuture[0])
+        ).whenComplete((ignored, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
+            if (error != null || !allTeleportsSucceeded(teleports)) {
+                retryPrepareAfterBadArena(session, kit, instance, arenaRetried);
+                return;
+            }
             for (UUID id : session.participants()) {
                 if (Bukkit.getPlayer(id) == null) {
                     failMatch(session, "Player offline during prepare");
@@ -348,15 +557,29 @@ public final class MatchService {
             for (UUID id : session.participants()) {
                 Player player = Bukkit.getPlayer(id);
                 if (player != null) {
+                    PlayerVitals.clearCombatState(player);
                     applyKit(player, kit);
                     applySight(player, session);
                 }
             }
-            startCountdown(session);
-        }, 20L);
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                for (UUID id : session.participants()) {
+                    if (Bukkit.getPlayer(id) == null) {
+                        failMatch(session, "Player offline during prepare");
+                        return;
+                    }
+                }
+                startCountdown(session);
+            }, 20L);
+        }));
     }
 
     private void teleportAndPrepare(MatchSession session, KitDefinition kit, ArenaInstance instance) {
+        teleportAndPrepare(session, kit, instance, false);
+    }
+
+    private void teleportAndPrepare(MatchSession session, KitDefinition kit, ArenaInstance instance,
+                                   boolean arenaRetried) {
         Player p1 = Bukkit.getPlayer(session.participants().get(0));
         Player p2 = Bukkit.getPlayer(session.participants().get(1));
         if (p1 == null || p2 == null) {
@@ -372,19 +595,20 @@ public final class MatchService {
                 return;
             }
             // Wait for both teleports before countdown so clients never render a border-outside frame.
-            var futureA = p1.teleportAsync(spawnA);
-            var futureB = p2.teleportAsync(spawnB);
+            var futureA = SafeTeleport.teleport(p1, spawnA);
+            var futureB = SafeTeleport.teleport(p2, spawnB);
             futureA.thenCombine(futureB, (a, b) -> a && b).whenComplete((ok, error) ->
                     Bukkit.getScheduler().runTask(plugin, () -> {
                         if (error != null || !Boolean.TRUE.equals(ok)) {
-                            // Fallback sync teleport if async failed.
-                            p1.teleport(spawnA);
-                            p2.teleport(spawnB);
+                            retryPrepareAfterBadArena(session, kit, instance, arenaRetried);
+                            return;
                         }
                         if (Bukkit.getPlayer(p1.getUniqueId()) == null || Bukkit.getPlayer(p2.getUniqueId()) == null) {
                             failMatch(session, "Player offline during prepare");
                             return;
                         }
+                        PlayerVitals.clearCombatState(p1);
+                        PlayerVitals.clearCombatState(p2);
                         applyKit(p1, kit);
                         applyKit(p2, kit);
                         applySight(p1, session);
@@ -403,6 +627,67 @@ public final class MatchService {
         }, 10L);
     }
 
+    private static boolean allTeleportsSucceeded(java.util.List<java.util.concurrent.CompletableFuture<Boolean>> futures) {
+        if (futures == null || futures.isEmpty()) {
+            return false;
+        }
+        for (java.util.concurrent.CompletableFuture<Boolean> future : futures) {
+            try {
+                if (!Boolean.TRUE.equals(future.join())) {
+                    return false;
+                }
+            } catch (Exception e) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * When collision-free footing fails (common on freshly pasted arenas), release and reserve
+     * a new instance once before failing the match.
+     */
+    private void retryPrepareAfterBadArena(MatchSession session, KitDefinition kit,
+                                           ArenaInstance failed, boolean arenaRetried) {
+        if (arenaRetried) {
+            failMatch(session, "Could not teleport to arena");
+            return;
+        }
+        plugin.getLogger().warning("Teleport footing failed for match " + session.id()
+                + " — releasing arena and retrying once.");
+        UUID arenaId = session.arenaInstanceId();
+        if (arenaId != null) {
+            arenaService.release(arenaId);
+        }
+        session.setArenaInstanceId(null);
+        String named = session.preferredArenaName();
+        java.util.concurrent.CompletableFuture<java.util.Optional<ArenaInstance>> reservation;
+        if (named != null && !named.isBlank()) {
+            reservation = arenaService.reserveNamed(named, session.id());
+        } else {
+            reservation = reserveArenaFor(kit, session.id());
+        }
+        reservation.whenComplete((opt, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
+            if (error != null || opt == null || opt.isEmpty()) {
+                failMatch(session, "No arena available after retry");
+                return;
+            }
+            ArenaInstance instance = opt.get();
+            if (!registry.tryReserveArena(instance.id(), session.id())) {
+                arenaService.release(instance.id());
+                failMatch(session, "Arena already reserved");
+                return;
+            }
+            registry.bindArena(session.id(), instance.id());
+            session.setState(MatchState.WAITING_FOR_PLAYERS);
+            if (session.isTeamMatch()) {
+                teleportAndPrepareTeam(session, kit, instance, true);
+            } else {
+                teleportAndPrepare(session, kit, instance, true);
+            }
+        }));
+    }
+
     /**
      * Shows the MATCH FOUND title and plays the match-found jingle to both participants the
      * instant a match is created (before the arena is reserved and players are teleported).
@@ -418,7 +703,7 @@ public final class MatchService {
                             .color(NamedTextColor.GOLD)
                             .decorate(TextDecoration.BOLD));
             Component sub = title(player, "match.found-subtitle",
-                    Component.text("----------------------------", NamedTextColor.DARK_GRAY));
+                    Component.text("· · ·", NamedTextColor.DARK_GRAY));
             player.showTitle(Title.title(
                     main, sub,
                     Title.Times.times(Duration.ZERO, Duration.ofMillis(700), Duration.ofMillis(300))));
@@ -434,8 +719,9 @@ public final class MatchService {
 
     private void startCountdown(MatchSession session) {
         session.setState(MatchState.COUNTDOWN);
-        for (UUID id : session.participants()) {
-            tryTransition(id, PlayerState.COUNTDOWN);
+        if (!transitionAll(session, PlayerState.COUNTDOWN)) {
+            failMatch(session, "Could not start countdown");
+            return;
         }
         final int[] remaining = {countdownSeconds};
         BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
@@ -463,11 +749,17 @@ public final class MatchService {
 
     private void beginFight(MatchSession session) {
         session.markActive();
+        if (!transitionAll(session, PlayerState.FIGHTING)) {
+            failMatch(session, "Could not start fight");
+            return;
+        }
+        KitDefinition kit = kitService.get(session.kitName()).orElse(null);
         for (UUID id : session.participants()) {
             countdownLeaveStreak.remove(id);
-            tryTransition(id, PlayerState.FIGHTING);
             Player player = Bukkit.getPlayer(id);
             if (player != null) {
+                // Clear stuck arrows / fire / absorption / cooldowns before fight-start effects.
+                PlayerVitals.clearCombatState(player);
                 ArenaInstance instance = session.arenaInstanceId() == null
                         ? null
                         : arenaService.get(session.arenaInstanceId()).orElse(null);
@@ -483,7 +775,12 @@ public final class MatchService {
                         double offset = (withinTeam - (side.size() - 1) / 2.0) * 1.2;
                         spawn = spawn.clone().add(offset, 0, 0);
                     }
-                    player.teleport(LocationUtil.safeTeleportLocation(spawn, player));
+                    SafeTeleport.teleport(player, LocationUtil.safeTeleportLocation(spawn, player));
+                }
+                applySight(player, session);
+                if (kit != null) {
+                    applyStartEffects(player, kit);
+                    runStartCommands(player, kit);
                 }
                 soundService.play(player, "match-start");
                 player.showTitle(Title.title(
@@ -496,7 +793,53 @@ public final class MatchService {
                 ));
             }
         }
+        if (session.isTeamMatch() && teamColoredArmorService != null) {
+            teamColoredArmorService.scheduleRefreshMatch(session);
+        }
         scheduleMatchTimeout(session);
+    }
+
+    /**
+     * Applies kit-configured start potion effects with splash-potion durations and break sound.
+     */
+    private void applyStartEffects(Player player, KitDefinition kit) {
+        if (player == null || kit == null || kit.startEffects().isEmpty()) {
+            return;
+        }
+        boolean any = false;
+        for (KitStartEffect start : kit.startEffects()) {
+            String key = SplashPotionDurations.normalizeKey(start.potionEffectKey());
+            if (key.isEmpty()) {
+                continue;
+            }
+            PotionEffectType type = Registry.POTION_EFFECT_TYPE.get(NamespacedKey.minecraft(key));
+            if (type == null) {
+                continue;
+            }
+            int duration = SplashPotionDurations.ticks(type, start.amplifier());
+            player.addPotionEffect(new PotionEffect(type, duration, start.amplifier(), false, true, true));
+            any = true;
+        }
+        if (any) {
+            player.getWorld().playSound(player.getLocation(), Sound.ENTITY_SPLASH_POTION_BREAK, 1.0f, 1.0f);
+        }
+    }
+
+    /** Dispatches kit {@code startCommands} as console with {@code {player}} replaced. */
+    private void runStartCommands(Player player, KitDefinition kit) {
+        if (player == null || kit == null || kit.startCommands().isEmpty()) {
+            return;
+        }
+        for (String raw : kit.startCommands()) {
+            if (raw == null || raw.isBlank()) {
+                continue;
+            }
+            String command = raw.replace("{player}", player.getName());
+            if (command.startsWith("/")) {
+                command = command.substring(1);
+            }
+            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
+        }
     }
 
     private void scheduleMatchTimeout(MatchSession session) {
@@ -527,6 +870,16 @@ public final class MatchService {
     public void handleLethal(MatchSession session, UUID victimId, UUID attackerId) {
         if (session.state() != MatchState.ACTIVE || session.isResultApplied()) {
             return;
+        }
+        // Snapshot victim inventory before spectator / lobby wipe so kill-feed End Inv is accurate.
+        Player victimPre = Bukkit.getPlayer(victimId);
+        if (victimPre != null) {
+            byte[] inv = serializePlayerInventory(victimPre);
+            session.rememberEndInventory(victimId, inv);
+            if (inventoryStore != null) {
+                inventoryStore.captureIfAbsent(
+                        session.id(), victimId, StatsService.nameOf(victimId), inv);
+            }
         }
         // Count a kill for the attacker (skip self-inflicted / environmental deaths).
         if (attackerId != null && !attackerId.equals(victimId)) {
@@ -560,6 +913,8 @@ public final class MatchService {
     private void handleTeamLethal(MatchSession session, UUID victimId, UUID attackerId) {
         Player downed = Bukkit.getPlayer(victimId);
         if (downed != null) {
+            // Freeze end-inventory at death so mid-fight eliminations are not lost / emptied later.
+            captureParticipantInventory(session, downed);
             downed.setGameMode(org.bukkit.GameMode.SPECTATOR);
             downed.sendActionBar(Component.text("You were eliminated!", NamedTextColor.RED)
                     .decorate(TextDecoration.BOLD));
@@ -660,13 +1015,18 @@ public final class MatchService {
             return LeaveOutcome.NOT_COUNTDOWN;
         }
         UUID leaverId = player.getUniqueId();
-        UUID opponentId = session.opponentOf(leaverId);
         cancelMatchNoResult(session);
 
         int streak = countdownLeaveStreak.merge(leaverId, 1, Integer::sum);
-        Player opponent = opponentId == null ? null : Bukkit.getPlayer(opponentId);
-        if (opponent != null && messageService != null) {
-            messageService.send(opponent, "match.opponent-left-countdown");
+        for (UUID id : session.participants()) {
+            if (id.equals(leaverId)) {
+                continue;
+            }
+            Player other = Bukkit.getPlayer(id);
+            if (other != null && messageService != null) {
+                messageService.send(other, "match.opponent-left-countdown",
+                        MessageService.tags("player", player.getName()));
+            }
         }
         if (streak >= 3 && chatBanService != null) {
             String reason = messageService != null
@@ -690,6 +1050,9 @@ public final class MatchService {
         for (UUID id : session.participants()) {
             Player p = Bukkit.getPlayer(id);
             if (p != null) {
+                if (teamColoredArmorService != null) {
+                    teamColoredArmorService.clearForPlayer(p);
+                }
                 lobbyService.sendToLobby(p);
             }
             stateManager.resetToLobby(id);
@@ -708,6 +1071,8 @@ public final class MatchService {
             return;
         }
         cancelTask(session.id());
+        // Capture end inventories before rematch items wipe them (winner + loser / both sides).
+        snapshotMatchInventories(session);
         session.end(winnerId, draw);
         if (!draw && winnerId != null) {
             session.addSeriesWin(winnerId);
@@ -722,6 +1087,8 @@ public final class MatchService {
             if (player == null) {
                 continue;
             }
+            // Players stay in the arena during the rematch window — clear arrows/fire/etc.
+            PlayerVitals.clearCombatState(player);
             player.getInventory().clear();
             // Eliminated team players were parked in spectator mode — restore them so they
             // can see and use the rematch/report items during the ENDING window.
@@ -753,7 +1120,7 @@ public final class MatchService {
             } else {
                 soundService.play(player, "match-end-anvil");
             }
-            giveRematchItems(player);
+            giveRematchItems(player, session);
             recentMatch.put(id, session.id());
             sendEndSummary(player, session, id, win);
         }
@@ -789,6 +1156,23 @@ public final class MatchService {
             if (session.state() != MatchState.ENDING) {
                 return;
             }
+            if (session.rematchStarting()) {
+                return;
+            }
+            if (session.isTeamMatch()) {
+                Team team = teamService == null
+                        ? null
+                        : teamService.teamOf(player.getUniqueId()).orElse(null);
+                if (team == null || !team.isOwner(player.getUniqueId())) {
+                    return;
+                }
+            }
+            // Avoid racing into PREPARING while cleanup / rematch is already underway.
+            PlayerState selfState = stateManager.getState(player.getUniqueId());
+            if (selfState == PlayerState.PREPARING_MATCH || selfState == PlayerState.COUNTDOWN
+                    || selfState == PlayerState.FIGHTING) {
+                return;
+            }
             session.setRematchRequested(player.getUniqueId(), true);
             // Notify the other side: the 1v1 opponent, or every enemy-team member in a team battle.
             List<UUID> others = session.isTeamMatch()
@@ -809,24 +1193,62 @@ public final class MatchService {
                 }
             }
             if (session.bothRematchRequested()) {
+                if (!session.tryBeginRematch()) {
+                    return;
+                }
                 cancelTask(session.id());
+                clearRematchItems(session);
+                // Clear combat leftovers while players remain in the arena before the next duel.
+                for (UUID id : session.participants()) {
+                    Player online = Bukkit.getPlayer(id);
+                    if (online != null) {
+                        PlayerVitals.clearCombatState(online);
+                    }
+                }
                 UUID a = session.participants().get(0);
                 UUID b = session.participants().get(1);
                 String kit = session.kitName();
                 MatchMode mode = session.mode();
                 int bestOf = session.bestOf();
                 Map<UUID, Integer> carrySeries = session.seriesWinsSnapshot();
+                String preferredArena = session.preferredArenaName();
                 cleanupSession(session, false);
                 if (session.isTeamMatch()) {
-                    // Rematch a team battle with the same rosters and sides.
-                    startTeamMatch(new ArrayList<>(session.team(TeamColor.RED)),
+                    startTeamMatch(
+                            new ArrayList<>(session.team(TeamColor.RED)),
                             new ArrayList<>(session.team(TeamColor.BLUE)),
-                            kit, mode, bestOf);
+                            kit,
+                            mode,
+                            bestOf,
+                            preferredArena,
+                            session.friendlyFire(),
+                            carrySeries);
                 } else {
-                    startDuel(a, b, kit, mode, bestOf, carrySeries);
+                    startDuel(a, b, kit, mode, bestOf, carrySeries, preferredArena);
                 }
             }
         });
+    }
+
+    private void clearRematchItems(MatchSession session) {
+        for (UUID id : session.participants()) {
+            Player p = Bukkit.getPlayer(id);
+            if (p == null) {
+                continue;
+            }
+            for (int slot = 0; slot < p.getInventory().getSize(); slot++) {
+                ItemStack stack = p.getInventory().getItem(slot);
+                if (stack == null || !stack.hasItemMeta()) {
+                    continue;
+                }
+                var pdc = stack.getItemMeta().getPersistentDataContainer();
+                if (pdc.has(ItemKeys.rematch(), PersistentDataType.BYTE)
+                        || pdc.has(ItemKeys.returnLobby(), PersistentDataType.BYTE)
+                        || pdc.has(ItemKeys.matchReport(), PersistentDataType.BYTE)) {
+                    p.getInventory().setItem(slot, null);
+                }
+            }
+        }
     }
 
     /** Opens the match report for the player's most recent (still cached) match, if any. */
@@ -849,8 +1271,7 @@ public final class MatchService {
 
     public void returnToLobby(Player player) {
         registry.byPlayer(player.getUniqueId()).ifPresent(session -> {
-            session.setRematchRequested(player.getUniqueId(), false);
-            session.setRematchRequested(session.opponentOf(player.getUniqueId()), false);
+            session.clearRematchRequests();
             returnPlayersToLobby(session);
         });
     }
@@ -861,6 +1282,13 @@ public final class MatchService {
         for (UUID id : session.participants()) {
             Player player = Bukkit.getPlayer(id);
             if (player != null) {
+                if (teamColoredArmorService != null) {
+                    teamColoredArmorService.clearForPlayer(player);
+                }
+                MatchTeamVisuals.clear(player.getScoreboard());
+                if (tabVisibilityService != null) {
+                    tabVisibilityService.showAll(player);
+                }
                 lobbyService.sendToLobby(player);
             }
             stateManager.resetToLobby(id);
@@ -886,6 +1314,46 @@ public final class MatchService {
                 }
             }
         }
+    }
+
+    private void snapshotMatchInventories(MatchSession session) {
+        if (inventoryStore == null || session == null || session.participants().isEmpty()) {
+            return;
+        }
+        // Death path already captured eliminated teammates; save anyone still missing (alive).
+        for (UUID id : session.participants()) {
+            Player player = Bukkit.getPlayer(id);
+            if (player == null) {
+                continue;
+            }
+            captureParticipantInventory(session, player);
+        }
+        inventoryStore.finalizeMatch(session.id(), System.currentTimeMillis());
+    }
+
+    private void captureParticipantInventory(MatchSession session, Player player) {
+        if (inventoryStore == null || session == null || player == null) {
+            return;
+        }
+        inventoryStore.captureIfAbsent(
+                session.id(),
+                player.getUniqueId(),
+                StatsService.nameOf(player.getUniqueId()),
+                serializePlayerInventory(player)
+        );
+    }
+
+    private static byte[] serializePlayerInventory(Player player) {
+        if (player == null) {
+            return ItemSerializer.serialize(new ItemStack[41]);
+        }
+        ItemStack[] contents = new ItemStack[41];
+        ItemStack[] storage = player.getInventory().getStorageContents();
+        System.arraycopy(storage, 0, contents, 0, Math.min(storage.length, 36));
+        ItemStack[] armor = player.getInventory().getArmorContents();
+        System.arraycopy(armor, 0, contents, 36, Math.min(armor.length, 4));
+        contents[40] = player.getInventory().getItemInOffHand();
+        return ItemSerializer.serialize(contents);
     }
 
     private void failMatch(MatchSession session, String reason) {
@@ -920,7 +1388,13 @@ public final class MatchService {
         combatTracker.clear(session.id());
     }
 
-    private void giveRematchItems(Player player) {
+    private void giveRematchItems(Player player, MatchSession session) {
+        if (session.isTeamMatch()) {
+            Team team = teamService == null ? null : teamService.teamOf(player.getUniqueId()).orElse(null);
+            if (team == null || !team.isOwner(player.getUniqueId())) {
+                return;
+            }
+        }
         ItemStack rematch = new ItemStack(Material.LIME_DYE);
         ItemMeta rematchMeta = rematch.getItemMeta();
         rematchMeta.displayName(Component.text("Rematch", NamedTextColor.GREEN)
@@ -990,7 +1464,17 @@ public final class MatchService {
         }
     }
 
-    private void tryTransition(UUID playerId, PlayerState target) {
+    private boolean transitionAll(MatchSession session, PlayerState target) {
+        boolean ok = true;
+        for (UUID id : session.participants()) {
+            if (!tryTransition(id, target)) {
+                ok = false;
+            }
+        }
+        return ok;
+    }
+
+    private boolean tryTransition(UUID playerId, PlayerState target) {
         try {
             PlayerState current = stateManager.getState(playerId);
             if (current == PlayerState.IDLE) {
@@ -1003,11 +1487,18 @@ public final class MatchService {
                     stateManager.resetToLobby(playerId);
                     if (PlayerStateManager.canTransition(PlayerState.LOBBY, target)) {
                         stateManager.transition(playerId, target);
+                    } else {
+                        return false;
                     }
                 }
             }
+            return stateManager.getState(playerId) == target;
         } catch (Exception e) {
-            stateManager.resetToLobby(playerId);
+            try {
+                stateManager.resetToLobby(playerId);
+            } catch (Exception ignored) {
+            }
+            return false;
         }
     }
 

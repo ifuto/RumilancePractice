@@ -1,6 +1,7 @@
 package com.rumilance.practice.sight;
 
 import com.rumilance.practice.arena.ArenaService;
+import com.rumilance.practice.guard.PracticeGuards;
 import com.rumilance.practice.model.ArenaInstance;
 import com.rumilance.practice.session.MatchSession;
 import com.rumilance.practice.util.Cuboid;
@@ -31,6 +32,10 @@ public final class ViewControlService {
     public ViewControlService(ArenaService arenaService, boolean enabled) {
         this.arenaService = arenaService;
         this.enabled = enabled;
+    }
+
+    public ViewControlService(ArenaService arenaService, SightSettings sightSettings) {
+        this(arenaService, sightSettings == null || sightSettings.enabled());
     }
 
     /**
@@ -91,14 +96,11 @@ public final class ViewControlService {
 
     private void applyBorder(Player player, Cuboid region) {
         WorldBorder border = Bukkit.createWorldBorder();
-        double centerX = (region.minX() + region.maxX() + 1) / 2.0;
-        double centerZ = (region.minZ() + region.maxZ() + 1) / 2.0;
-        // Vanilla borders are square: cover the larger horizontal dimension (+2 margin so
-        // players standing exactly on the region edge are not inside the warning band).
-        double width = region.maxX() - region.minX() + 1;
-        double depth = region.maxZ() - region.minZ() + 1;
-        border.setCenter(centerX, centerZ);
-        border.setSize(Math.max(width, depth) + 2);
+        border.setCenter(
+                PracticeGuards.matchBorderCenterX(region.minX(), region.maxX()),
+                PracticeGuards.matchBorderCenterZ(region.minZ(), region.maxZ()));
+        border.setSize(PracticeGuards.matchBorderSize(
+                region.minX(), region.maxX(), region.minZ(), region.maxZ()));
         border.setWarningDistance(0);
         border.setWarningTime(0);
         player.setWorldBorder(border);

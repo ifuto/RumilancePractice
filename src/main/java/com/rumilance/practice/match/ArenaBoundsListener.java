@@ -1,12 +1,11 @@
 package com.rumilance.practice.match;
 
 import com.rumilance.practice.arena.ArenaService;
+import com.rumilance.practice.guard.PracticeGuards;
 import com.rumilance.practice.model.ArenaInstance;
 import com.rumilance.practice.session.MatchSession;
-import com.rumilance.practice.state.MatchState;
 import com.rumilance.practice.util.Cuboid;
-import com.rumilance.practice.util.LocationUtil;
-import org.bukkit.Location;
+import com.rumilance.practice.util.PlayAreaWall;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -14,7 +13,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerMoveEvent;
 
 /**
- * Pushes duel participants back inside their arena bounds (participants only).
+ * Soft wall for duel participants: slide along the border (never teleport to spawn/center).
  */
 public final class ArenaBoundsListener implements Listener {
 
@@ -36,7 +35,7 @@ public final class ArenaBoundsListener implements Listener {
         }
         Player player = event.getPlayer();
         MatchSession session = matchService.registry().byPlayer(player.getUniqueId()).orElse(null);
-        if (session == null || session.state() != MatchState.ACTIVE && session.state() != MatchState.COUNTDOWN) {
+        if (session == null || !PracticeGuards.arenaBoundsActive(session.state())) {
             return;
         }
         if (session.arenaInstanceId() == null) {
@@ -46,18 +45,9 @@ public final class ArenaBoundsListener implements Listener {
         if (instance == null) {
             return;
         }
-        // Use the instance's own bounds: for disposable copies these are origin-shifted.
         Cuboid region = Cuboid.of(instance.template().world(),
                 instance.minX(), instance.minY(), instance.minZ(),
                 instance.maxX(), instance.maxY(), instance.maxZ());
-        if (!region.contains(event.getTo())) {
-            // RED returns to spawn A, BLUE to spawn B (correct for 1v1 AND team matches;
-            // previously only participant #0 got spawn A, so most team members were sent
-            // to the enemy spawn when pushed back).
-            Location spawn = session.teamColor(player.getUniqueId()) == com.rumilance.practice.state.TeamColor.RED
-                    ? arenaService.spawnA(instance)
-                    : arenaService.spawnB(instance);
-            event.setTo(LocationUtil.safeTeleportLocation(spawn, player));
-        }
+        PlayAreaWall.constrain(event, region, player);
     }
 }

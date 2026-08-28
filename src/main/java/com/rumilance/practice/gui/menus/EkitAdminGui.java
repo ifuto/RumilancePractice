@@ -7,12 +7,14 @@ import com.rumilance.practice.gui.GuiDecorator;
 import com.rumilance.practice.gui.GuiSession;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.GuiType;
+import com.rumilance.practice.gui.ItemBuilder;
+import com.rumilance.practice.gui.MenuScaffold;
+import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.sound.SoundService;
 import com.rumilance.practice.util.GuiSlots;
 import com.rumilance.practice.util.ItemKeys;
 import com.rumilance.practice.util.PotionRules;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -49,9 +51,11 @@ public final class EkitAdminGui extends AbstractGui implements BottomInventoryCl
         String view = session.get("admin_view", String.class);
         if ("chest".equals(view)) {
             String cat = session.get("admin_cat", String.class);
-            return Component.text("カテゴリ: " + (cat == null ? "" : cat), NamedTextColor.WHITE);
+            return Component.text("カテゴリ: " + (cat == null ? "" : cat), UiTheme.PRIMARY)
+                    .decoration(TextDecoration.ITALIC, false);
         }
-        return Component.text("オリジナルキット管理", NamedTextColor.WHITE);
+        return Component.text("オリジナルキット管理", UiTheme.PRIMARY)
+                .decoration(TextDecoration.ITALIC, false);
     }
 
     @Override
@@ -65,7 +69,7 @@ public final class EkitAdminGui extends AbstractGui implements BottomInventoryCl
     }
 
     private void renderCategories(Inventory inventory) {
-        inventory.clear();
+        MenuScaffold.chrome(inventory);
         String[][] cats = {
                 {"武器/防具", "NETHERITE_CHESTPLATE"},
                 {"サブアイテム", "WATER_BUCKET"},
@@ -76,14 +80,13 @@ public final class EkitAdminGui extends AbstractGui implements BottomInventoryCl
             Material material = Material.matchMaterial(cats[i][1]);
             inventory.setItem(GuiSlots.slot(1, 2 + i), GuiDecorator.button(
                     material == null ? Material.STONE : material,
-                    Component.text(cats[i][0], NamedTextColor.WHITE), "cat:" + cats[i][0]));
+                    Component.text(cats[i][0], UiTheme.VALUE), "cat:" + cats[i][0]));
         }
-        inventory.setItem(GuiSlots.slot(5, 4), GuiDecorator.button(Material.BARRIER,
-                Component.text("閉じる", NamedTextColor.GRAY), "close"));
+        MenuScaffold.closeButton(inventory, Component.text("閉じる", UiTheme.DANGER));
     }
 
     private void renderChest(Player player, GuiSession session, Inventory inventory) {
-        inventory.clear();
+        MenuScaffold.chrome(inventory);
         String cat = session.get("admin_cat", String.class);
         if (cat == null) {
             return;
@@ -93,7 +96,7 @@ public final class EkitAdminGui extends AbstractGui implements BottomInventoryCl
             if (i < entries.size()) {
                 ItemStack display = ekitItems.displayItem(cat, entries.get(i)).clone();
                 ItemMeta meta = display.getItemMeta();
-                meta.lore(List.of(Component.text("クリックで取り出し", NamedTextColor.GRAY)
+                meta.lore(List.of(Component.text("クリックで取り出し", UiTheme.MUTED)
                         .decoration(TextDecoration.ITALIC, false)));
                 meta.getPersistentDataContainer().set(ItemKeys.guiAction(), PersistentDataType.STRING, "item:" + i);
                 display.setItemMeta(meta);
@@ -101,19 +104,19 @@ public final class EkitAdminGui extends AbstractGui implements BottomInventoryCl
             } else {
                 ItemStack glass = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
                 ItemMeta meta = glass.getItemMeta();
-                meta.displayName(Component.text(" ", NamedTextColor.GRAY)
+                meta.displayName(Component.text(" ", UiTheme.MUTED)
                         .decoration(TextDecoration.ITALIC, false));
-                meta.lore(List.of(Component.text("アイテムをここにドロップして追加", NamedTextColor.GRAY)
+                meta.lore(List.of(Component.text("アイテムをここにドロップして追加", UiTheme.MUTED)
                         .decoration(TextDecoration.ITALIC, false)));
                 meta.getPersistentDataContainer().set(ItemKeys.guiAction(), PersistentDataType.STRING, "empty");
                 glass.setItemMeta(meta);
                 inventory.setItem(i, glass);
             }
         }
-        inventory.setItem(45, GuiDecorator.button(Material.RED_DYE,
-                Component.text("戻る", NamedTextColor.RED), "back"));
-        inventory.setItem(53, GuiDecorator.button(Material.BARRIER,
-                Component.text("閉じる", NamedTextColor.GRAY), "close"));
+        inventory.setItem(45, ItemBuilder.action(UiTheme.BACK,
+                Component.text("戻る", UiTheme.WARNING), "back"));
+        inventory.setItem(53, ItemBuilder.action(UiTheme.CLOSE,
+                Component.text("閉じる", UiTheme.DANGER), "close"));
     }
 
     @Override
@@ -201,7 +204,7 @@ public final class EkitAdminGui extends AbstractGui implements BottomInventoryCl
         if (ekitItems.isPotionCategory(cat)) {
             String effect = PotionRules.effectOf(item);
             if (effect == null) {
-                player.sendMessage(Component.text("このアイテムはポーションではありません。", NamedTextColor.RED));
+                player.sendMessage(Component.text("このアイテムはポーションではありません。", UiTheme.DANGER));
                 return false;
             }
             ekitItems.add(cat, effect);

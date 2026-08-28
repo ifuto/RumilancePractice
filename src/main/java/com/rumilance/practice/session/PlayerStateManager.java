@@ -17,8 +17,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>Allowed transitions:</p>
  * <pre>
  * IDLE              -&gt; LOBBY
- * LOBBY             -&gt; OPENING_GUI, QUEUED_RANKED, QUEUED_UNRANKED, REQUESTING_DUEL, SPECTATING, FFA, EDITING_KIT, PREPARING_MATCH
- * OPENING_GUI       -&gt; LOBBY, QUEUED_RANKED, QUEUED_UNRANKED, REQUESTING_DUEL, SPECTATING, FFA, EDITING_KIT, PREPARING_MATCH
+ * LOBBY             -&gt; OPENING_GUI, QUEUED_RANKED, QUEUED_UNRANKED, REQUESTING_DUEL, SPECTATING, FFA, EDITING_KIT, PREPARING_MATCH, PRACTICE_WAIT, PRACTICE_ACTIVE
+ * OPENING_GUI       -&gt; LOBBY, QUEUED_RANKED, QUEUED_UNRANKED, REQUESTING_DUEL, SPECTATING, FFA, EDITING_KIT, PREPARING_MATCH, PRACTICE_WAIT, PRACTICE_ACTIVE
  * QUEUED_RANKED     -&gt; LOBBY, PREPARING_MATCH
  * QUEUED_UNRANKED   -&gt; LOBBY, PREPARING_MATCH
  * REQUESTING_DUEL   -&gt; LOBBY, PREPARING_MATCH
@@ -29,6 +29,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * SPECTATING        -&gt; LOBBY
  * FFA               -&gt; LOBBY
  * EDITING_KIT       -&gt; LOBBY
+ * PRACTICE_WAIT     -&gt; PRACTICE_ACTIVE, LOBBY, OPENING_GUI
+ * PRACTICE_ACTIVE   -&gt; PRACTICE_WAIT, LOBBY, OPENING_GUI
  * </pre>
  *
  * <p>Bugs the spec explicitly calls out are prevented by this graph: a player cannot be in two
@@ -109,12 +111,14 @@ public final class PlayerStateManager {
                 // match straight from LOBBY (no queue). Without this edge every tryTransition
                 // silently failed, players stayed in LOBBY state for the whole fight and the
                 // lobby damage protection made them unhittable.
-                PlayerState.PREPARING_MATCH
+                PlayerState.PREPARING_MATCH,
+                PlayerState.PRACTICE_WAIT, PlayerState.PRACTICE_ACTIVE
         ));
         map.put(PlayerState.OPENING_GUI, Set.of(
                 PlayerState.LOBBY, PlayerState.QUEUED_RANKED, PlayerState.QUEUED_UNRANKED,
                 PlayerState.REQUESTING_DUEL, PlayerState.SPECTATING, PlayerState.FFA, PlayerState.EDITING_KIT,
-                PlayerState.PREPARING_MATCH
+                PlayerState.PREPARING_MATCH,
+                PlayerState.PRACTICE_WAIT, PlayerState.PRACTICE_ACTIVE
         ));
         map.put(PlayerState.QUEUED_RANKED, Set.of(PlayerState.LOBBY, PlayerState.PREPARING_MATCH));
         map.put(PlayerState.QUEUED_UNRANKED, Set.of(PlayerState.LOBBY, PlayerState.PREPARING_MATCH));
@@ -126,6 +130,10 @@ public final class PlayerStateManager {
         map.put(PlayerState.SPECTATING, Set.of(PlayerState.LOBBY));
         map.put(PlayerState.FFA, Set.of(PlayerState.LOBBY));
         map.put(PlayerState.EDITING_KIT, Set.of(PlayerState.LOBBY));
+        map.put(PlayerState.PRACTICE_WAIT, Set.of(
+                PlayerState.PRACTICE_ACTIVE, PlayerState.LOBBY, PlayerState.OPENING_GUI));
+        map.put(PlayerState.PRACTICE_ACTIVE, Set.of(
+                PlayerState.PRACTICE_WAIT, PlayerState.LOBBY, PlayerState.OPENING_GUI));
         return Collections.unmodifiableMap(map);
     }
 }

@@ -17,6 +17,7 @@ duel:
 
 ffa:
   joined: "<green>Joined the <arena> FFA arena."
+  leave-hint: "<grey>Leave with </grey><yellow>/lobby</yellow>"
   left: "<grey>You left the FFA arena."
   killed-by: "<red>You were killed by <yellow><killer></yellow>."
 
@@ -31,9 +32,11 @@ queue:
 
 match:
   countdown: "<yellow>Match starting in <seconds>..."
-  start-title: "<light_purple><bold>FIGHT!"
-  win-title: "<green><bold>VICTORY"
-  lose-title: "<red><bold>DEFEAT"
+  found-title: "<gold><bold>Match Found"
+  found-subtitle: "<dark_gray>· · ·"
+  start-title: "<yellow><bold>⚔ START ⚔"
+  win-title: "<yellow><bold>🏆 WIN 🏆"
+  lose-title: "<blue><bold>LOSE"
   draw-title: "<yellow><bold>DRAW"
 
 kit:

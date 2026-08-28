@@ -59,7 +59,7 @@ public final class StatsKitGui extends AbstractGui {
     @Override
     protected Component title(Player player, GuiSession session) {
         UUID target = session.targetPlayer() == null ? player.getUniqueId() : session.targetPlayer();
-        return Component.text("✦ " + StatsService.nameOf(target) + " — Stats", UiTheme.HEADER)
+        return Component.text(StatsService.nameOf(target) + " — Stats", UiTheme.HEADER)
                 .decoration(TextDecoration.ITALIC, false);
     }
 

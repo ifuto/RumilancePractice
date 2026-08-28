@@ -64,7 +64,7 @@ public final class MatchReportGui extends AbstractGui {
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return Component.text("✦ Match Report", UiTheme.PRIMARY).decoration(TextDecoration.ITALIC, false);
+        return Component.text("Match Report", UiTheme.PRIMARY).decoration(TextDecoration.ITALIC, false);
     }
 
     @Override

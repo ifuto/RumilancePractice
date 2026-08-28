@@ -31,5 +31,9 @@ public enum PlayerState {
     /** Participating in a free-for-all arena. */
     FFA,
     /** Editing the slot layout of an official kit inside the Edit Kit GUI. */
-    EDITING_KIT
+    EDITING_KIT,
+    /** Waiting in a practice room (ANKER wait hotbar / countdown). */
+    PRACTICE_WAIT,
+    /** Actively practicing (ANKER round or MACE session). */
+    PRACTICE_ACTIVE
 }

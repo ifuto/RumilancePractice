@@ -41,13 +41,13 @@ public final class SetFuncCommand implements CommandExecutor, TabCompleter {
         Component name = switch (type) {
             case "ranked" -> FunctionalItemListener.rankedName();
             case "unranked" -> FunctionalItemListener.unrankedName();
-            case "ffa" -> Component.text("🔥 FFA 🔥", NamedTextColor.GREEN);
-            case "ekit" -> Component.text("🪓 Edit Kit 🪓", NamedTextColor.BLUE);
-            case "settings" -> Component.text("⚙️ Settings ⚙️", NamedTextColor.YELLOW);
-            case "spectate" -> Component.text("👀 Spectate 👀", NamedTextColor.LIGHT_PURPLE);
-            case "titles" -> Component.text("✦ Kill Titles ✦", NamedTextColor.AQUA);
-            case "party" -> Component.text(" Party", NamedTextColor.AQUA);
-            case "menu" -> Component.text("✦ Game Menu ✦", NamedTextColor.AQUA);
+            case "ffa" -> Component.text(FunctionalItemListener.stripVariationSelectors("FFA"), NamedTextColor.GREEN);
+            case "ekit" -> Component.text("Edit Kit", NamedTextColor.BLUE);
+            case "settings" -> Component.text("Settings", NamedTextColor.YELLOW);
+            case "spectate" -> Component.text("Spectate", NamedTextColor.LIGHT_PURPLE);
+            case "titles" -> Component.text("Kill Titles", NamedTextColor.AQUA);
+            case "party" -> Component.text("Party", NamedTextColor.AQUA);
+            case "menu" -> Component.text("Game Menu", NamedTextColor.AQUA);
             case "leavequeue" -> Component.text("Leave Queue", NamedTextColor.RED);
             default -> null;
         };

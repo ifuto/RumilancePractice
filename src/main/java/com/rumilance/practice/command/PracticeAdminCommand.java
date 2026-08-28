@@ -38,6 +38,9 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
     private final ArenaTemplateStore arenaStore;
     private final ArenaService arenaService;
     private final FfaService ffaService;
+    private com.rumilance.practice.practice.PracticeService practiceService;
+    private java.util.function.Consumer<Player> openAdminMenu;
+    private com.rumilance.practice.scoreboard.ScoreboardService scoreboardService;
 
     public PracticeAdminCommand(
             RumilancePractice plugin,
@@ -61,6 +64,18 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
         this.arenaStore = arenaStore;
         this.arenaService = arenaService;
         this.ffaService = ffaService;
+    }
+
+    public void setPracticeService(com.rumilance.practice.practice.PracticeService practiceService) {
+        this.practiceService = practiceService;
+    }
+
+    public void setOpenAdminMenu(java.util.function.Consumer<Player> openAdminMenu) {
+        this.openAdminMenu = openAdminMenu;
+    }
+
+    public void setScoreboardService(com.rumilance.practice.scoreboard.ScoreboardService scoreboardService) {
+        this.scoreboardService = scoreboardService;
     }
 
     @Override
@@ -107,7 +122,15 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
                 arenaStore.reload();
                 arenaService.setTemplates(arenaStore.templates());
                 ffaService.reload();
-                sender.sendMessage(Component.text("Reloaded safe configs (kits/arenas/ffa/lobby/sounds).",
+                if (practiceService != null) {
+                    practiceService.reload();
+                }
+                if (scoreboardService != null) {
+                    scoreboardService.reload(new com.rumilance.practice.scoreboard.ScoreboardConfig(
+                            configService.scoreboard()));
+                }
+                sender.sendMessage(Component.text(
+                        "Reloaded safe configs (kits/arenas/practices/ffa/lobby/sounds/scoreboard).",
                         NamedTextColor.GREEN));
                 yield true;
             }

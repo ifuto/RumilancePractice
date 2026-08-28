@@ -78,6 +78,25 @@ public final class MatchHistoryRepository {
         return result;
     }
 
+    public int deleteForPlayer(UUID uuid) throws SQLException {
+        String sql = "DELETE FROM " + databaseService.table("match_history")
+                + " WHERE player_a = ? OR player_b = ?";
+        try (Connection connection = databaseService.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, uuid.toString());
+            statement.setString(2, uuid.toString());
+            return statement.executeUpdate();
+        }
+    }
+
+    public int deleteAll() throws SQLException {
+        try (Connection connection = databaseService.getConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "DELETE FROM " + databaseService.table("match_history"))) {
+            return statement.executeUpdate();
+        }
+    }
+
     private MatchHistoryEntry map(ResultSet resultSet) throws SQLException {
         String winner = resultSet.getString("winner");
         return new MatchHistoryEntry(

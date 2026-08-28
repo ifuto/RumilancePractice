@@ -4,6 +4,7 @@ import com.rumilance.practice.config.ConfigService;
 import com.rumilance.practice.util.Cuboid;
 import com.rumilance.practice.util.ItemSerializer;
 import com.rumilance.practice.util.LocationUtil;
+import com.rumilance.practice.util.SafeTeleport;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -113,26 +114,51 @@ public final class LobbyService {
         configService.save(ConfigService.LOBBY);
     }
 
+    /**
+     * @param ignoreInventory unused compatibility flag from newer callers (always applies lobby inventory)
+     */
+    public void sendToLobby(Player player, boolean ignoreInventory) {
+        sendToLobby(player);
+    }
+
     public void sendToLobby(Player player) {
+        ensureHubReturn(player);
+    }
+
+    /**
+     * Full lobby reset: gamemode, vitals, inventory, compass, sight hook, and a guaranteed
+     * teleport to the configured lobby spawn (retries once if the first teleport fails).
+     */
+    public void ensureHubReturn(Player player) {
+        if (player == null || !player.isOnline()) {
+            return;
+        }
         player.setGameMode(GameMode.ADVENTURE);
-        player.setHealth(player.getMaxHealth());
+        com.rumilance.practice.util.PlayerVitals.clearCombatState(player);
+        com.rumilance.practice.util.PlayerVitals.refillHealth(player);
         player.setFoodLevel(20);
         player.setSaturation(20f);
-        player.setFireTicks(0);
-        player.setFallDistance(0f);
         player.setAllowFlight(false);
         player.setFlying(false);
-        // Copy to a list first: removing effects while iterating the live collection can
-        // throw ConcurrentModificationException depending on the server implementation.
-        for (PotionEffect effect : new java.util.ArrayList<>(player.getActivePotionEffects())) {
-            player.removePotionEffect(effect.getType());
+        player.setGlowing(false);
+        player.setCollidable(true);
+        try {
+            player.setInvisible(false);
+        } catch (NoSuchMethodError ignored) {
         }
+        applyLobbyResistance(player);
         applyLobbyInventory(player);
         Location destination = spawn();
         if (destination != null && destination.getWorld() != null) {
-            player.teleportAsync(LocationUtil.safeTeleportLocation(destination, player));
-            // Make every compass needle (including the Game Menu compass) point at the
-            // lobby spawn instead of the world spawn.
+            Location safe = LocationUtil.safeTeleportLocation(destination, player);
+            com.rumilance.practice.util.SafeTeleport.teleport(player, safe).thenAccept(ok -> {
+                if (Boolean.TRUE.equals(ok)) {
+                    return;
+                }
+                org.bukkit.Bukkit.getScheduler().runTask(
+                        org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(LobbyService.class),
+                        () -> com.rumilance.practice.util.SafeTeleport.teleport(player, safe));
+            });
             player.setCompassTarget(destination);
         }
         java.util.function.Consumer<Player> hook = sightHook;
@@ -147,6 +173,18 @@ public final class LobbyService {
      */
     public void setSightHook(java.util.function.Consumer<Player> sightHook) {
         this.sightHook = sightHook;
+    }
+
+    /**
+     * Resistance 255 while in the lobby region / kit editor — belt-and-suspenders with
+     * {@link LobbyListener} damage cancel so Match Found punches never chip lobby players.
+     */
+    public void applyLobbyResistance(Player player) {
+        if (player == null) {
+            return;
+        }
+        player.addPotionEffect(new PotionEffect(
+                PotionEffectType.RESISTANCE, PotionEffect.INFINITE_DURATION, 255, false, false, false));
     }
 
     public void applyLobbyInventory(Player player) {

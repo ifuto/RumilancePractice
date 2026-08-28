@@ -1,5 +1,6 @@
 package com.rumilance.practice.gui;
 
+import com.rumilance.practice.kit.KitLayoutEditor;
 import com.rumilance.practice.originalkit.OriginalKitService;
 import com.rumilance.practice.session.PlayerStateManager;
 import com.rumilance.practice.state.PlayerState;
@@ -31,6 +32,10 @@ public final class GuiListener implements Listener {
     private final Map<GuiType, AbstractGui> handlers = new EnumMap<>(GuiType.class);
     /** Opens the Game Menu; wired from bootstrap (null = feature disabled). */
     private java.util.function.Consumer<Player> menuReturn;
+    /** Opens the Battle Menu for screens marked {@link GuiSession#fromBattleMenu()}. */
+    private java.util.function.Consumer<Player> battleMenuReturn;
+    /** Re-opens the original-kit editor after a nested confirm/enchant flow. */
+    private java.util.function.Consumer<Player> reopenOriginalEditor;
 
     public GuiListener(GuiSessionRegistry registry, PlayerStateManager stateManager,
                        OriginalKitService originalKitService) {
@@ -41,10 +46,19 @@ public final class GuiListener implements Listener {
 
     public void register(AbstractGui gui) {
         handlers.put(gui.type(), gui);
+        gui.setStateManager(stateManager);
     }
 
     public void setMenuReturn(java.util.function.Consumer<Player> menuReturn) {
         this.menuReturn = menuReturn;
+    }
+
+    public void setBattleMenuReturn(java.util.function.Consumer<Player> battleMenuReturn) {
+        this.battleMenuReturn = battleMenuReturn;
+    }
+
+    public void setReopenOriginalEditor(java.util.function.Consumer<Player> reopenOriginalEditor) {
+        this.reopenOriginalEditor = reopenOriginalEditor;
     }
 
     /** True when the player may be bounced back to the Game Menu (lobby-ish states only). */
@@ -59,6 +73,16 @@ public final class GuiListener implements Listener {
         org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
             if (player.isOnline() && menuReturn != null && canReturnToMenu(player)) {
                 menuReturn.accept(player);
+            }
+        });
+    }
+
+    private void openBattleMenuLater(Player player) {
+        org.bukkit.plugin.Plugin plugin =
+                org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(GuiListener.class);
+        org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+            if (player.isOnline() && battleMenuReturn != null && canReturnToMenu(player)) {
+                battleMenuReturn.accept(player);
             }
         });
     }
@@ -115,13 +139,17 @@ public final class GuiListener implements Listener {
             if (guiAction == null || "decorate".equals(guiAction)) {
                 return;
             }
-            // Central "Close" interception: ONLY screens opened from the Game Menu navigate
-            // back to it (session.fromGameMenu). Screens opened via /setfunc items, commands
-            // or other flows simply close (Esc behaves the same below).
-            if ("close".equals(guiAction) && menuReturn != null
-                    && session.fromGameMenu() && canReturnToMenu(player)) {
-                openMenuLater(player);
-                return;
+            // Central "Close" interception: battle-menu children return to Battle Menu;
+            // game-menu children return to Game Menu. Other flows just close.
+            if ("close".equals(guiAction) && canReturnToMenu(player)) {
+                if (session.fromBattleMenu() && battleMenuReturn != null) {
+                    openBattleMenuLater(player);
+                    return;
+                }
+                if (session.fromGameMenu() && menuReturn != null) {
+                    openMenuLater(player);
+                    return;
+                }
             }
             handler.handleClick(player, session, top, event.getSlot(), guiAction, event.getClick());
         } else if (handler instanceof BottomInventoryClickHandler bottom) {
@@ -131,9 +159,59 @@ public final class GuiListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onDrag(InventoryDragEvent event) {
-        if (event.getInventory().getHolder() instanceof PracticeGuiHolder) {
-            event.setCancelled(true);
+        if (!(event.getWhoClicked() instanceof Player player)) {
+            return;
         }
+        Inventory top = event.getView().getTopInventory();
+        if (!(top.getHolder() instanceof PracticeGuiHolder holder)) {
+            return;
+        }
+        if (holder.type() != GuiType.EDIT_KIT) {
+            event.setCancelled(true);
+            return;
+        }
+        if (!registry.isCurrent(player.getUniqueId(), holder.sessionId())) {
+            event.setCancelled(true);
+            return;
+        }
+        for (int rawSlot : event.getRawSlots()) {
+            if (rawSlot < top.getSize()) {
+                if (!KitLayoutEditor.isKitSlot(rawSlot)) {
+                    event.setCancelled(true);
+                    return;
+                }
+            } else {
+                // Rearrange-only: no pulling items from the player's survival inventory.
+                event.setCancelled(true);
+                return;
+            }
+        }
+        GuiSession session = registry.get(player.getUniqueId()).orElse(null);
+        if (session == null) {
+            event.setCancelled(true);
+            return;
+        }
+        org.bukkit.plugin.Plugin plugin =
+                org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(GuiListener.class);
+        org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+            if (!player.isOnline()) {
+                return;
+            }
+            GuiSession live = registry.get(player.getUniqueId()).orElse(null);
+            if (live == null) {
+                return;
+            }
+            ItemStack[] layout = live.get("layout", ItemStack[].class);
+            if (layout == null) {
+                layout = new ItemStack[41];
+            }
+            KitLayoutEditor.syncLayoutFromTopInventory(player.getOpenInventory().getTopInventory(), layout);
+            live.put("layout", layout);
+            AbstractGui handler = handlers.get(GuiType.EDIT_KIT);
+            if (handler != null) {
+                handler.renderPublic(player, live, player.getOpenInventory().getTopInventory());
+            }
+        });
     }
 
     @EventHandler
@@ -144,6 +222,10 @@ public final class GuiListener implements Listener {
         if (!(event.getInventory().getHolder() instanceof PracticeGuiHolder holder)) {
             return;
         }
+        boolean openedFromBattleMenu = registry.get(player.getUniqueId())
+                .filter(session -> session.sessionId().equals(holder.sessionId()))
+                .map(GuiSession::fromBattleMenu)
+                .orElse(false);
         boolean openedFromGameMenu = registry.get(player.getUniqueId())
                 .filter(session -> session.sessionId().equals(holder.sessionId()))
                 .map(GuiSession::fromGameMenu)
@@ -153,21 +235,40 @@ public final class GuiListener implements Listener {
                 registry.close(player.getUniqueId());
             }
         });
-        // Esc returns to the Game Menu ONLY for screens opened from it (reason PLAYER only,
-        // so programmatic OPEN_NEW/PLUGIN closes never loop). /setfunc-opened screens just close.
-        if (openedFromGameMenu
-                && event.getReason() == InventoryCloseEvent.Reason.PLAYER
-                && menuReturn != null
-                && canReturnToMenu(player)) {
-            openMenuLater(player);
+        // Esc: battle children → Battle Menu; game-menu children → Game Menu.
+        if (event.getReason() == InventoryCloseEvent.Reason.PLAYER && canReturnToMenu(player)) {
+            if (openedFromBattleMenu && battleMenuReturn != null) {
+                openBattleMenuLater(player);
+            } else if (openedFromGameMenu && menuReturn != null) {
+                openMenuLater(player);
+            }
         }
-        if ((holder.type() == GuiType.EDIT_KIT || holder.type() == GuiType.EKIT_EDIT)
-                && stateManager.getState(player.getUniqueId()) == PlayerState.EDITING_KIT) {
+        PlayerState state = stateManager.getState(player.getUniqueId());
+        if (state == PlayerState.OPENING_GUI) {
+            stateManager.resetToLobby(player.getUniqueId());
+        } else if ((holder.type() == GuiType.EDIT_KIT || holder.type() == GuiType.EKIT_EDIT)
+                && state == PlayerState.EDITING_KIT) {
             stateManager.resetToLobby(player.getUniqueId());
         }
         if (originalKitService != null) {
             if (holder.type() == GuiType.EKIT_EDIT) {
                 originalKitService.onEditGuiClosed(player.getUniqueId());
+            } else if (holder.type() == GuiType.CONFIRM) {
+                boolean navigating = originalKitService.consumeNavigating(player.getUniqueId());
+                if (!navigating
+                        && event.getReason() == InventoryCloseEvent.Reason.PLAYER
+                        && reopenOriginalEditor != null
+                        && originalKitService.context(player.getUniqueId()) != null) {
+                    org.bukkit.plugin.Plugin plugin =
+                            org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(GuiListener.class);
+                    org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+                        if (player.isOnline() && originalKitService.context(player.getUniqueId()) != null) {
+                            reopenOriginalEditor.accept(player);
+                        }
+                    });
+                } else if (!navigating && originalKitService.isStashed(player.getUniqueId())) {
+                    originalKitService.abortFlow(player.getUniqueId());
+                }
             } else if (originalKitService.isStashed(player.getUniqueId())
                     && !originalKitService.consumeNavigating(player.getUniqueId())) {
                 originalKitService.abortFlow(player.getUniqueId());

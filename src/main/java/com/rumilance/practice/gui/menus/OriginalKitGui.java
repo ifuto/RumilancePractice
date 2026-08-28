@@ -1,16 +1,16 @@
 package com.rumilance.practice.gui.menus;
 
 import com.rumilance.practice.gui.AbstractGui;
-import com.rumilance.practice.gui.GuiDecorator;
 import com.rumilance.practice.gui.GuiSession;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.GuiType;
+import com.rumilance.practice.gui.MenuScaffold;
+import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.originalkit.OriginalKitService;
 import com.rumilance.practice.sound.SoundService;
 import com.rumilance.practice.util.GuiSlots;
 import com.rumilance.practice.util.ItemKeys;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -51,11 +51,12 @@ public final class OriginalKitGui extends AbstractGui {
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return Component.text("オリジナルキット", NamedTextColor.WHITE);
+        return Component.text("オリジナルキット", UiTheme.PRIMARY).decoration(TextDecoration.ITALIC, false);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
+        MenuScaffold.chrome(inventory);
         OriginalKitService.Plan plan = service.planOf(player);
         for (int slot = 0; slot < 45; slot++) {
             if (slot == 44) {
@@ -72,13 +73,13 @@ public final class OriginalKitGui extends AbstractGui {
     private ItemStack paperItem(Player player, int slot) {
         ItemStack stack = new ItemStack(Material.PAPER);
         ItemMeta meta = stack.getItemMeta();
-        meta.displayName(Component.text("オリジナルキット", NamedTextColor.YELLOW)
+        meta.displayName(Component.text("オリジナルキット", UiTheme.WARNING)
                 .decoration(TextDecoration.ITALIC, false));
         String saved = service.hasSaved(player.getUniqueId(), slot) ? "保存済み" : "未作成";
         meta.lore(List.of(
-                Component.text("スロット " + (slot + 1) + " (" + saved + ")", NamedTextColor.GRAY)
+                Component.text("スロット " + (slot + 1) + " (" + saved + ")", UiTheme.MUTED)
                         .decoration(TextDecoration.ITALIC, false),
-                Component.text("クリックして編集", NamedTextColor.GRAY)
+                Component.text("クリックして編集", UiTheme.MUTED)
                         .decoration(TextDecoration.ITALIC, false)));
         meta.getPersistentDataContainer().set(ItemKeys.guiAction(), PersistentDataType.STRING, "paper:" + slot);
         stack.setItemMeta(meta);
@@ -88,9 +89,9 @@ public final class OriginalKitGui extends AbstractGui {
     private ItemStack barrierItem(OriginalKitService.Plan plan, int slot) {
         ItemStack stack = new ItemStack(Material.BARRIER);
         ItemMeta meta = stack.getItemMeta();
-        meta.displayName(Component.text("ロック中", NamedTextColor.RED)
+        meta.displayName(Component.text("ロック中", UiTheme.DANGER)
                 .decoration(TextDecoration.ITALIC, false));
-        meta.lore(List.of(Component.text(service.barrierLabel(plan, slot), NamedTextColor.GRAY)
+        meta.lore(List.of(Component.text(service.barrierLabel(plan, slot), UiTheme.MUTED)
                 .decoration(TextDecoration.ITALIC, false)));
         meta.getPersistentDataContainer().set(ItemKeys.guiAction(), PersistentDataType.STRING, "locked");
         stack.setItemMeta(meta);
@@ -111,9 +112,9 @@ public final class OriginalKitGui extends AbstractGui {
             }
             confirmGui.open(
                     player,
-                    Component.text("本当にこのキットを編集しますか？", NamedTextColor.RED),
+                    Component.text("本当にこのキットを編集しますか？", UiTheme.DANGER),
                     List.of(Component.text("今月の残り編集可能回数 : " + service.remainingEditsLabel(player),
-                            NamedTextColor.GRAY)),
+                            UiTheme.MUTED)),
                     p -> startEdit(p, kitSlot),
                     p -> originalGuiOpen(p)
             );

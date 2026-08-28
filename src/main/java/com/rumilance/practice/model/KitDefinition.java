@@ -1,91 +1,75 @@
 package com.rumilance.practice.model;
 
-
+import com.rumilance.practice.util.KitNames;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * Full definition of a selectable practice kit, as configured in {@code kits.yml} or created
- * at runtime via {@code /kit create}. Defensive, immutable copies are taken of the collections.
- *
- * <p>Phase 3 extends the original Phase 1 shape (name/display/icon/ranked/ffa/health/items/armor)
- * with the full set of admin-configurable match rules exposed by {@code /kit}: enable state,
- * preferred arena terrain, auto-regen/auto-food/sword-shield-break toggles, block place/break
- * permissions (plus an explicit allow-list of breakable materials), ender pearl/totem permissions
- * and a per-kit match timeout override. Use {@link #builder()} / {@link #toBuilder()} rather than
- * the full canonical constructor when only a handful of fields need to change.</p>
- */
-public record KitDefinition(
-        String name,
-        String displayName,
-        String icon,
-        boolean ranked,
-        boolean ffaEnabled,
-        double maxHealth,
-        boolean naturalHealthRegen,
-        double knockbackMultiplier,
-        List<KitItemEntry> items,
-        Map<String, String> armor,
-        boolean enabled,
-        boolean autoFood,
-        boolean swordShieldBreak,
-        boolean blockPlace,
-        boolean blockBreak,
-        List<String> canBreak,
-        boolean pearl,
-        boolean totem,
-        boolean forceAdventure,
-        int timeoutSeconds,
-        String arenaName
-) {
-
-    /**
-     * {@link #naturalHealthRegen()} doubles as the {@code /kit autoregen} toggle: when disabled,
-     * {@code com.rumilance.practice.kit.KitListener} cancels {@code EntityRegainHealthEvent}s whose
-     * {@code RegainReason} is {@code SATIATED} (regen from a full hunger bar) for players fighting
-     * with this kit, while leaving other regen sources (golden apples, potions, ...) untouched.
-     *
-     * <p>{@link #arenaName()} pins the kit to ONE specific arena template
-     * (empty = any free arena).</p>
-     */
+public record KitDefinition(String name, String displayName, String icon, boolean ranked, boolean ffaEnabled, double maxHealth, boolean naturalHealthRegen, double knockbackMultiplier, List<KitItemEntry> items, Map<String, String> armor, boolean enabled, boolean autoFood, boolean swordShieldBreak, boolean blockPlace, boolean blockBreak, boolean breakPlayerPlacedOnly, List<String> canBreak, boolean pearl, boolean totem, boolean forceAdventure, int timeoutSeconds, List<String> arenas, List<String> partyArenas, List<String> startCommands, List<KitStartEffect> startEffects, boolean presetEnabled) {
     public KitDefinition {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(displayName, "displayName");
         Objects.requireNonNull(icon, "icon");
-        maxHealth = maxHealth <= 0 ? 20.0d : maxHealth;
-        knockbackMultiplier = knockbackMultiplier <= 0 ? 1.0d : knockbackMultiplier;
+        maxHealth = maxHealth <= 0.0 ? 20.0 : maxHealth;
+        knockbackMultiplier = knockbackMultiplier <= 0.0 ? 1.0 : knockbackMultiplier;
         items = List.copyOf(items);
         armor = Map.copyOf(armor);
         canBreak = List.copyOf(canBreak);
         timeoutSeconds = Math.max(0, timeoutSeconds);
-        arenaName = arenaName == null ? "" : arenaName;
+        arenas = KitDefinition.normalizeArenas(arenas);
+        partyArenas = KitDefinition.normalizeArenas(partyArenas);
+        startCommands = List.copyOf(startCommands == null ? List.of() : startCommands);
+        startEffects = List.copyOf(startEffects == null ? List.of() : startEffects);
     }
 
-    /** @return true when this kit is pinned to one specific arena template. */
+    private static List<String> normalizeArenas(List<String> raw) {
+        if (raw == null || raw.isEmpty()) {
+            return List.of();
+        }
+        ArrayList<String> out = new ArrayList<String>();
+        for (String entry : raw) {
+            String id;
+            if (entry == null || entry.isBlank() || out.contains(id = entry.trim().toLowerCase(Locale.ROOT))) continue;
+            out.add(id);
+        }
+        return List.copyOf(out);
+    }
+
+    public String arenaName() {
+        return this.arenas.isEmpty() ? "" : this.arenas.getFirst();
+    }
+
     public boolean hasFixedArena() {
-        return arenaName != null && !arenaName.isBlank();
+        return !this.arenas.isEmpty();
+    }
+
+    public boolean usesAnyArena() {
+        return this.arenas.isEmpty();
+    }
+
+    public boolean hasPartyArenaPool() {
+        return !this.partyArenas.isEmpty();
+    }
+
+    public String partyArenaName() {
+        return this.partyArenas.isEmpty() ? "" : this.partyArenas.getFirst();
     }
 
     public static KitDefinition simple(String name, String displayName, String icon) {
-        return builder(name).displayName(displayName).icon(icon).build();
+        return KitDefinition.builder(name).displayName(displayName).icon(icon).build();
     }
 
-    /**
-     * Display name for GUIs. When the configured display name is "just the id" (same text up
-     * to case, with underscores/spaces interchangeable), underscores become spaces and the
-     * configured case style applies — e.g. {@code "no_debuff"} renders as {@code "No Debuff"}.
-     * Genuinely custom display names (MiniMessage markup or different wording) are untouched.
-     */
     public String prettyDisplayName() {
-        boolean looksLikeId = !displayName.contains("<")
-                && displayName.replace(' ', '_').equalsIgnoreCase(name);
+        boolean looksLikeId;
+        boolean bl = looksLikeId = !this.displayName.contains("<") && this.displayName.replace(' ', '_').equalsIgnoreCase(this.name);
         if (!looksLikeId) {
-            return displayName;
+            return this.displayName;
         }
-        // Pass the display name (not the lowercased id) so KEEP style retains original casing.
-        return com.rumilance.practice.util.KitNames.pretty(displayName);
+        return KitNames.pretty((String)this.displayName);
     }
 
     public static Builder builder(String name) {
@@ -96,41 +80,52 @@ public record KitDefinition(
         return new Builder(this);
     }
 
-    /**
-     * @return {@code true} if {@code material} (a Bukkit {@code Material} name) may be broken
-     * even when {@link #blockBreak()} is disabled for this kit.
-     */
     public boolean isExplicitlyBreakable(String material) {
-        return canBreak.stream().anyMatch(m -> m.equalsIgnoreCase(material));
+        return this.canBreak.stream().anyMatch(m -> m.equalsIgnoreCase(material));
     }
 
-    /**
-     * Fluent, defensively-copying builder for {@link KitDefinition}. Every setter returns
-     * {@code this} so multiple kit-admin subcommands (icon/rename/enable/type/...) can each
-     * apply a single targeted change on top of {@link KitDefinition#toBuilder()}.
-     */
+    public boolean blockInteract() {
+        return this.blockPlace || this.blockBreak;
+    }
+
+    public boolean allowsBlockPlace() {
+        return this.blockPlace || this.breakPlayerPlacedOnly;
+    }
+
+    public boolean allowsBlockBreak(boolean playerPlaced) {
+        if (this.breakPlayerPlacedOnly) {
+            return playerPlaced;
+        }
+        return this.blockBreak;
+    }
+
     public static final class Builder {
         private String name;
         private String displayName;
         private String icon = "STONE";
         private boolean ranked = true;
         private boolean ffaEnabled = true;
-        private double maxHealth = 20.0d;
+        private double maxHealth = 20.0;
         private boolean naturalHealthRegen = true;
-        private double knockbackMultiplier = 1.0d;
-        private List<KitItemEntry> items = new ArrayList<>();
-        private Map<String, String> armor = new java.util.LinkedHashMap<>();
+        private double knockbackMultiplier = 1.0;
+        private List<KitItemEntry> items = new ArrayList<KitItemEntry>();
+        private Map<String, String> armor = new LinkedHashMap<String, String>();
         private boolean enabled = true;
         private boolean autoFood = false;
         private boolean swordShieldBreak = false;
         private boolean blockPlace = false;
         private boolean blockBreak = false;
-        private List<String> canBreak = new ArrayList<>();
+        private boolean breakPlayerPlacedOnly = false;
+        private List<String> canBreak = new ArrayList<String>();
         private boolean pearl = true;
         private boolean totem = true;
         private boolean forceAdventure = false;
         private int timeoutSeconds = 0;
-        private String arenaName = "";
+        private List<String> arenas = new ArrayList<String>();
+        private List<String> partyArenas = new ArrayList<String>();
+        private List<String> startCommands = new ArrayList<String>();
+        private List<KitStartEffect> startEffects = new ArrayList<KitStartEffect>();
+        private boolean presetEnabled;
 
         private Builder(String name) {
             this.name = Objects.requireNonNull(name, "name");
@@ -146,19 +141,24 @@ public record KitDefinition(
             this.maxHealth = source.maxHealth;
             this.naturalHealthRegen = source.naturalHealthRegen;
             this.knockbackMultiplier = source.knockbackMultiplier;
-            this.items = new ArrayList<>(source.items);
-            this.armor = new java.util.LinkedHashMap<>(source.armor);
+            this.items = new ArrayList<KitItemEntry>(source.items);
+            this.armor = new LinkedHashMap<String, String>(source.armor);
             this.enabled = source.enabled;
             this.autoFood = source.autoFood;
             this.swordShieldBreak = source.swordShieldBreak;
             this.blockPlace = source.blockPlace;
             this.blockBreak = source.blockBreak;
-            this.canBreak = new ArrayList<>(source.canBreak);
+            this.breakPlayerPlacedOnly = source.breakPlayerPlacedOnly;
+            this.canBreak = new ArrayList<String>(source.canBreak);
             this.pearl = source.pearl;
             this.totem = source.totem;
             this.forceAdventure = source.forceAdventure;
             this.timeoutSeconds = source.timeoutSeconds;
-            this.arenaName = source.arenaName;
+            this.arenas = new ArrayList<String>(source.arenas);
+            this.partyArenas = new ArrayList<String>(source.partyArenas);
+            this.startCommands = new ArrayList<String>(source.startCommands);
+            this.startEffects = new ArrayList<KitStartEffect>(source.startEffects);
+            this.presetEnabled = source.presetEnabled;
         }
 
         public Builder name(String value) {
@@ -202,12 +202,12 @@ public record KitDefinition(
         }
 
         public Builder items(List<KitItemEntry> value) {
-            this.items = new ArrayList<>(Objects.requireNonNull(value, "items"));
+            this.items = new ArrayList<KitItemEntry>((Collection)Objects.requireNonNull(value, "items"));
             return this;
         }
 
         public Builder armor(Map<String, String> value) {
-            this.armor = new java.util.LinkedHashMap<>(Objects.requireNonNull(value, "armor"));
+            this.armor = new LinkedHashMap<String, String>(Objects.requireNonNull(value, "armor"));
             return this;
         }
 
@@ -236,8 +236,19 @@ public record KitDefinition(
             return this;
         }
 
+        public Builder blockInteract(boolean value) {
+            this.blockPlace = value;
+            this.blockBreak = value;
+            return this;
+        }
+
+        public Builder breakPlayerPlacedOnly(boolean value) {
+            this.breakPlayerPlacedOnly = value;
+            return this;
+        }
+
         public Builder canBreak(List<String> value) {
-            this.canBreak = new ArrayList<>(Objects.requireNonNull(value, "canBreak"));
+            this.canBreak = new ArrayList<String>((Collection)Objects.requireNonNull(value, "canBreak"));
             return this;
         }
 
@@ -267,17 +278,83 @@ public record KitDefinition(
         }
 
         public Builder arenaName(String value) {
-            this.arenaName = value == null ? "" : value;
+            this.arenas = value == null || value.isBlank() ? new ArrayList<String>() : new ArrayList<String>(List.of(value.trim().toLowerCase(Locale.ROOT)));
+            return this;
+        }
+
+        public Builder arenas(List<String> value) {
+            this.arenas = new ArrayList<String>();
+            if (value != null) {
+                for (String entry : value) {
+                    String id;
+                    if (entry == null || entry.isBlank() || this.arenas.contains(id = entry.trim().toLowerCase(Locale.ROOT))) continue;
+                    this.arenas.add(id);
+                }
+            }
+            return this;
+        }
+
+        public Builder addArena(String value) {
+            String id;
+            if (value != null && !value.isBlank() && !this.arenas.contains(id = value.trim().toLowerCase(Locale.ROOT))) {
+                this.arenas.add(id);
+            }
+            return this;
+        }
+
+        public Builder partyArenas(List<String> value) {
+            this.partyArenas = new ArrayList<String>();
+            if (value != null) {
+                for (String entry : value) {
+                    String id;
+                    if (entry == null || entry.isBlank() || this.partyArenas.contains(id = entry.trim().toLowerCase(Locale.ROOT))) {
+                        continue;
+                    }
+                    this.partyArenas.add(id);
+                }
+            }
+            return this;
+        }
+
+        public Builder addPartyArena(String value) {
+            String id;
+            if (value != null && !value.isBlank() && !this.partyArenas.contains(id = value.trim().toLowerCase(Locale.ROOT))) {
+                this.partyArenas.add(id);
+            }
+            return this;
+        }
+
+        public Builder startCommands(List<String> value) {
+            this.startCommands = new ArrayList<String>(value == null ? List.of() : value);
+            return this;
+        }
+
+        public Builder addStartCommand(String command) {
+            if (command != null && !command.isBlank()) {
+                this.startCommands.add(command.trim());
+            }
+            return this;
+        }
+
+        public Builder startEffects(List<KitStartEffect> value) {
+            this.startEffects = new ArrayList<KitStartEffect>(value == null ? List.of() : value);
+            return this;
+        }
+
+        public Builder addStartEffect(KitStartEffect effect) {
+            if (effect != null) {
+                this.startEffects.add(effect);
+            }
+            return this;
+        }
+
+        public Builder presetEnabled(boolean value) {
+            this.presetEnabled = value;
             return this;
         }
 
         public KitDefinition build() {
-            return new KitDefinition(
-                    name, displayName, icon, ranked, ffaEnabled, maxHealth, naturalHealthRegen,
-                    knockbackMultiplier, items, armor, enabled, autoFood,
-                    swordShieldBreak, blockPlace, blockBreak, canBreak, pearl, totem, forceAdventure,
-                    timeoutSeconds, arenaName
-            );
+            return new KitDefinition(this.name, this.displayName, this.icon, this.ranked, this.ffaEnabled, this.maxHealth, this.naturalHealthRegen, this.knockbackMultiplier, this.items, this.armor, this.enabled, this.autoFood, this.swordShieldBreak, this.blockPlace, this.blockBreak, this.breakPlayerPlacedOnly, this.canBreak, this.pearl, this.totem, this.forceAdventure, this.timeoutSeconds, this.arenas, this.partyArenas, this.startCommands, this.startEffects, this.presetEnabled);
         }
     }
 }

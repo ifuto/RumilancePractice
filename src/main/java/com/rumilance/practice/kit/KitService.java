@@ -1,15 +1,16 @@
 package com.rumilance.practice.kit;
 
 import com.rumilance.practice.config.ConfigService;
+import com.rumilance.practice.guard.PracticeGuards;
 import com.rumilance.practice.model.KitDefinition;
 import com.rumilance.practice.model.KitItemEntry;
+import com.rumilance.practice.model.KitStartEffect;
 import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.GameMode;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.PlayerInventory;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -65,8 +66,18 @@ public final class KitService {
                     .totem(section.getBoolean("totem", true))
                     .forceAdventure(section.getBoolean("adventure", false))
                     .timeoutSeconds(section.getInt("timeout-seconds", 0))
-                    .arenaName(section.getString("arena", ""))
-                    .canBreak(section.getStringList("can-break"));
+                    .canBreak(section.getStringList("can-break"))
+                    .presetEnabled(section.getBoolean("preset-enabled", false));
+
+            List<String> arenaList = section.getStringList("arenas");
+            if (arenaList.isEmpty()) {
+                String legacyArena = section.getString("arena", "");
+                if (legacyArena != null && !legacyArena.isBlank()) {
+                    arenaList = List.of(legacyArena);
+                }
+            }
+            builder.arenas(arenaList);
+            builder.partyArenas(section.getStringList("party-arenas"));
 
             List<KitItemEntry> items = new ArrayList<>();
             List<Map<?, ?>> itemMaps = section.getMapList("items");
@@ -96,6 +107,8 @@ public final class KitService {
                 }
             }
             builder.armor(armor);
+            builder.startCommands(section.getStringList("start-commands"));
+            builder.startEffects(parseStartEffects(section.getMapList("start-effects")));
             kits.put(id.toLowerCase(Locale.ROOT), builder.build());
             queueEnabled.putIfAbsent(id.toLowerCase(Locale.ROOT), true);
         }
@@ -235,61 +248,20 @@ public final class KitService {
 
     /**
      * Applies the official kit, optionally overlaying a player-saved layout (slots 0-40).
+     * Always uses {@link KitLoadout#give} so loadout indices 36-39 map to helmet/chest/legs/boots
+     * via setHelmet/setChestplate/... — never Bukkit raw {@code setItem(36-39)} (boots/legs/chest/helmet).
      */
     public void apply(Player player, KitDefinition kit, ItemStack[] layout) {
-        PlayerInventory inventory = player.getInventory();
-        inventory.clear();
-        if (layout != null && layout.length > 0) {
-            for (int i = 0; i < Math.min(36, layout.length); i++) {
-                ItemStack stack = layout[i];
-                if (stack != null && !stack.getType().isAir() && stack.getType() != Material.GRAY_STAINED_GLASS_PANE) {
-                    inventory.setItem(i, stack.clone());
-                }
-            }
-            if (layout.length > 36) {
-                inventory.setHelmet(clean(layout[36]));
-            }
-            if (layout.length > 37) {
-                inventory.setChestplate(clean(layout[37]));
-            }
-            if (layout.length > 38) {
-                inventory.setLeggings(clean(layout[38]));
-            }
-            if (layout.length > 39) {
-                inventory.setBoots(clean(layout[39]));
-            }
-            if (layout.length > 40) {
-                inventory.setItemInOffHand(clean(layout[40]));
-            }
-        } else {
-            for (KitItemEntry entry : kit.items()) {
-                if (entry.slot() == OFFHAND_SLOT) {
-                    inventory.setItemInOffHand(resolveItem(entry));
-                    continue;
-                }
-                ItemStack stack = resolveItem(entry);
-                if (stack != null) {
-                    inventory.setItem(entry.slot(), stack);
-                }
-            }
-            inventory.setHelmet(armorStack(kit.armor().get("helmet")));
-            inventory.setChestplate(armorStack(kit.armor().get("chestplate")));
-            inventory.setLeggings(armorStack(kit.armor().get("leggings")));
-            inventory.setBoots(armorStack(kit.armor().get("boots")));
-        }
+        KitLoadout.give(player.getInventory(), KitLoadout.resolve(kit, layout));
         player.setHealth(Math.min(player.getMaxHealth(), kit.maxHealth()));
         player.setFoodLevel(20);
         player.setSaturation(20f);
+        if (kit.totem()) {
+            PracticeGuards.enforceTotemCap(player, 14);
+        }
         // Default to SURVIVAL so PvP kits behave normally; kits flagged adventure force ADVENTURE
         // (e.g. kits where block interaction should be fully disabled).
         player.setGameMode(kit.forceAdventure() ? GameMode.ADVENTURE : GameMode.SURVIVAL);
-    }
-
-    private static ItemStack clean(ItemStack stack) {
-        if (stack == null || stack.getType().isAir() || stack.getType() == Material.GRAY_STAINED_GLASS_PANE) {
-            return null;
-        }
-        return stack.clone();
     }
 
     /**
@@ -353,8 +325,19 @@ public final class KitService {
         yaml.set(path + ".totem", kit.totem());
         yaml.set(path + ".adventure", kit.forceAdventure());
         yaml.set(path + ".timeout-seconds", kit.timeoutSeconds());
-        yaml.set(path + ".arena", kit.arenaName());
+        yaml.set(path + ".arenas", kit.arenas());
+        yaml.set(path + ".party-arenas", kit.partyArenas());
+        yaml.set(path + ".preset-enabled", kit.presetEnabled());
         yaml.set(path + ".can-break", kit.canBreak());
+        yaml.set(path + ".start-commands", kit.startCommands());
+        List<Map<String, Object>> startEffectMaps = new ArrayList<>();
+        for (KitStartEffect effect : kit.startEffects()) {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("type", effect.potionEffectKey().toUpperCase(Locale.ROOT));
+            map.put("amplifier", effect.amplifier());
+            startEffectMaps.add(map);
+        }
+        yaml.set(path + ".start-effects", startEffectMaps);
         List<Map<String, Object>> itemMaps = new ArrayList<>();
         for (KitItemEntry entry : kit.items()) {
             Map<String, Object> map = new LinkedHashMap<>();
@@ -371,6 +354,44 @@ public final class KitService {
             yaml.set(path + ".armor." + armor.getKey(), armor.getValue());
         }
         configService.save(ConfigService.KITS);
+    }
+
+    /**
+     * Parses {@code start-effects} entries supporting either
+     * {@code {type, amplifier}} (0-based) or {@code {effect, level}} (1-based).
+     */
+    private static List<KitStartEffect> parseStartEffects(List<Map<?, ?>> maps) {
+        List<KitStartEffect> out = new ArrayList<>();
+        if (maps == null) {
+            return out;
+        }
+        for (Map<?, ?> map : maps) {
+            if (map == null || map.isEmpty()) {
+                continue;
+            }
+            Object typeObj = map.containsKey("type") ? map.get("type") : map.get("effect");
+            if (typeObj == null) {
+                continue;
+            }
+            String key = String.valueOf(typeObj).trim();
+            if (key.isEmpty()) {
+                continue;
+            }
+            int amplifier = 0;
+            Object ampObj = map.get("amplifier");
+            Object levelObj = map.get("level");
+            if (ampObj instanceof Number number) {
+                amplifier = Math.max(0, number.intValue());
+            } else if (levelObj instanceof Number number) {
+                amplifier = Math.max(0, number.intValue() - 1);
+            }
+            try {
+                out.add(new KitStartEffect(key, amplifier));
+            } catch (IllegalArgumentException ignored) {
+                // skip blank / invalid
+            }
+        }
+        return out;
     }
 
     /** Virtual slot index used for the off-hand item inside {@link KitItemEntry}. */
@@ -391,38 +412,6 @@ public final class KitService {
             }
         }
         armor.put(key, stack.getType().name());
-    }
-
-    /** Resolves a stored armor value: either a {@code data:<base64>} full item or a material name. */
-    private static ItemStack armorStack(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        if (value.startsWith(ARMOR_DATA_PREFIX)) {
-            ItemStack decoded = com.rumilance.practice.util.ItemSerializer
-                    .singleFromBase64(value.substring(ARMOR_DATA_PREFIX.length()));
-            if (decoded != null) {
-                return decoded;
-            }
-        }
-        Material material = Material.matchMaterial(value);
-        return material == null || material.isAir() ? null : new ItemStack(material);
-    }
-
-    /** Rebuilds a kit item: prefers the full NBT snapshot, falls back to material+amount. */
-    private static ItemStack resolveItem(KitItemEntry entry) {
-        if (entry.hasSerializedItem()) {
-            ItemStack decoded = com.rumilance.practice.util.ItemSerializer
-                    .singleFromBase64(entry.itemDataBase64());
-            if (decoded != null) {
-                return decoded;
-            }
-        }
-        Material material = Material.matchMaterial(entry.material());
-        if (material == null || material.isAir()) {
-            return null;
-        }
-        return new ItemStack(material, Math.max(1, entry.amount()));
     }
 
 }

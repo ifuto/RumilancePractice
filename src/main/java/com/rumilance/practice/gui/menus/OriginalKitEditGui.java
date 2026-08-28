@@ -7,11 +7,14 @@ import com.rumilance.practice.gui.GuiDecorator;
 import com.rumilance.practice.gui.GuiSession;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.GuiType;
+import com.rumilance.practice.gui.ItemBuilder;
+import com.rumilance.practice.gui.MenuScaffold;
+import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.originalkit.OriginalKitService;
 import com.rumilance.practice.sound.SoundService;
 import com.rumilance.practice.util.ItemKeys;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -73,7 +76,8 @@ public final class OriginalKitEditGui extends AbstractGui implements BottomInven
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return Component.text("オリジナルキット編集", NamedTextColor.WHITE);
+        return Component.text("オリジナルキット編集", UiTheme.PRIMARY)
+                .decoration(TextDecoration.ITALIC, false);
     }
 
     @Override
@@ -88,7 +92,7 @@ public final class OriginalKitEditGui extends AbstractGui implements BottomInven
 
     private void renderTop(Inventory inventory, OriginalKitService.EditContext ctx) {
         ItemStack[] layout = ctx.layout;
-        inventory.clear();
+        MenuScaffold.chrome(inventory);
         inventory.setItem(0, decorative());
         inventory.setItem(1, tagged(layout[36], "slot:36"));
         inventory.setItem(2, tagged(layout[37], "slot:37"));
@@ -104,17 +108,17 @@ public final class OriginalKitEditGui extends AbstractGui implements BottomInven
         for (int hot = 0; hot < 9; hot++) {
             inventory.setItem(36 + hot, tagged(layout[hot], "slot:" + hot));
         }
-        inventory.setItem(45, GuiDecorator.button(Material.RED_DYE,
-                Component.text("戻る", NamedTextColor.RED), "back"));
+        inventory.setItem(45, ItemBuilder.action(UiTheme.BACK,
+                Component.text("戻る", UiTheme.WARNING), "back"));
         for (int i = 0; i < EkitItems.CATEGORIES.size(); i++) {
             String cat = EkitItems.CATEGORIES.get(i);
             boolean selected = cat.equals(ctx.category);
             inventory.setItem(46 + i, GuiDecorator.button(tabMaterial(cat),
-                    Component.text(cat, selected ? NamedTextColor.GREEN : NamedTextColor.WHITE),
+                    Component.text(cat, selected ? UiTheme.SUCCESS : UiTheme.VALUE),
                     "cat:" + cat));
         }
-        inventory.setItem(53, GuiDecorator.button(Material.LIME_DYE,
-                Component.text("保存", NamedTextColor.GREEN), "save"));
+        inventory.setItem(53, ItemBuilder.action(UiTheme.CONFIRM,
+                Component.text("保存", UiTheme.SUCCESS), "save"));
     }
 
     private static Material tabMaterial(String category) {
@@ -165,7 +169,7 @@ public final class OriginalKitEditGui extends AbstractGui implements BottomInven
         inv.setItem(2, deleteGlass());
         inv.setItem(3, deleteGlass());
         inv.setItem(4, GuiDecorator.button(Material.LIME_STAINED_GLASS_PANE,
-                Component.text("続行", NamedTextColor.GREEN), "continue"));
+                Component.text("続行", UiTheme.SUCCESS), "continue"));
         inv.setItem(5, deleteGlass());
         inv.setItem(6, deleteGlass());
         inv.setItem(7, deleteGlass());
@@ -176,16 +180,16 @@ public final class OriginalKitEditGui extends AbstractGui implements BottomInven
 
     private ItemStack deleteGlass() {
         ItemStack stack = GuiDecorator.button(Material.BLUE_STAINED_GLASS_PANE,
-                Component.text("削除", NamedTextColor.WHITE), "delete");
+                Component.text("削除", UiTheme.VALUE), "delete");
         ItemMeta meta = stack.getItemMeta();
-        meta.lore(List.of(Component.text("ここにドラッグでアイテムを削除", NamedTextColor.GRAY)));
+        meta.lore(List.of(Component.text("ここにドラッグでアイテムを削除", UiTheme.MUTED)));
         stack.setItemMeta(meta);
         return stack;
     }
 
     private ItemStack pageButton(String name, String action) {
         return GuiDecorator.button(Material.LIME_STAINED_GLASS_PANE,
-                Component.text(name, NamedTextColor.GREEN), action);
+                Component.text(name, UiTheme.SUCCESS), action);
     }
 
     @Override
@@ -276,7 +280,7 @@ public final class OriginalKitEditGui extends AbstractGui implements BottomInven
             }
             boolean placed = OriginalKitService.addToLayout(ctx, item);
             if (!placed) {
-                player.sendMessage(Component.text("キットのインベントリが満杯です。", NamedTextColor.RED));
+                player.sendMessage(Component.text("キットのインベントリが満杯です。", UiTheme.DANGER));
                 return;
             }
             sounds.play(player, "select");
@@ -317,8 +321,8 @@ public final class OriginalKitEditGui extends AbstractGui implements BottomInven
             if (confirmGui != null) {
                 ctx.suppressRestore = true;
                 confirmGui.open(player,
-                        Component.text("本当にすべて削除しますか？", NamedTextColor.RED),
-                        List.of(Component.text("キット内のアイテムを全て削除します。", NamedTextColor.GRAY)),
+                        Component.text("本当にすべて削除しますか？", UiTheme.DANGER),
+                        List.of(Component.text("キット内のアイテムを全て削除します。", UiTheme.MUTED)),
                         p -> {
                             OriginalKitService.EditContext c = service.context(p.getUniqueId());
                             if (c != null) {

@@ -52,6 +52,10 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
     private final SoundService soundService;
     private final KitAdminGui kitAdminGui;
     private final Map<String, ArenaTemplate> drafts = new ConcurrentHashMap<>();
+    private com.rumilance.practice.kit.PresetItems presetItems;
+    private com.rumilance.practice.gui.menus.PresetAdminGui presetAdminGui;
+    private com.rumilance.practice.gui.menus.ArenaAdminGui arenaAdminGui;
+    private java.util.function.BiConsumer<Player, String> partyIconPrompt;
 
     public ArenaKitAdminCommand(
             ConfigService configService,
@@ -73,6 +77,22 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
         this.schematicRoot = schematicRoot;
         this.soundService = soundService;
         this.kitAdminGui = kitAdminGui;
+    }
+
+    public void setPresetItems(com.rumilance.practice.kit.PresetItems presetItems) {
+        this.presetItems = presetItems;
+    }
+
+    public void setPresetAdminGui(com.rumilance.practice.gui.menus.PresetAdminGui presetAdminGui) {
+        this.presetAdminGui = presetAdminGui;
+    }
+
+    public void setArenaAdminGui(com.rumilance.practice.gui.menus.ArenaAdminGui arenaAdminGui) {
+        this.arenaAdminGui = arenaAdminGui;
+    }
+
+    public void setPartyIconPrompt(java.util.function.BiConsumer<Player, String> partyIconPrompt) {
+        this.partyIconPrompt = partyIconPrompt;
     }
 
     @Override
@@ -138,33 +158,15 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                 player.sendMessage(Component.text("/kit <flag> <name> <on|off> - regen/food/place/break/pearl/totem/shield", NamedTextColor.GRAY));
                 player.sendMessage(Component.text("/kit order <name> <up|down> - GUI表示順を移動 (GUIでShift+クリックでも可)", NamedTextColor.GRAY));
                 player.sendMessage(Component.text("/kit rename <nowname> <newname> - 改名 (入力した大文字小文字がそのまま表示名に)", NamedTextColor.GRAY));
-                player.sendMessage(Component.text("/kit arena <kit> <arena|any> - キットの使用アリーナを1つに固定", NamedTextColor.GRAY));
+                player.sendMessage(Component.text("/kit arena <kit> add|remove|list|clear [arena] - デュエル用アリーナプール", NamedTextColor.GRAY));
+                player.sendMessage(Component.text("/kit party-arena <kit> add|remove|list|clear [arena] - パーティ用アリーナプール", NamedTextColor.GRAY));
                 yield true;
             }
             case "arena" -> {
-                if (args.length < 3) {
-                    player.sendMessage(Component.text("/kit arena <kit> <arena|any>  - キットに使用アリーナを1つ固定 (any=解除)", NamedTextColor.YELLOW));
-                    yield true;
-                }
-                var kitOpt = kitService.get(args[1]);
-                if (kitOpt.isEmpty()) {
-                    player.sendMessage(Component.text("Unknown kit: " + args[1], NamedTextColor.RED));
-                    yield true;
-                }
-                if (args[2].equalsIgnoreCase("any") || args[2].equalsIgnoreCase("none")) {
-                    kitService.save(kitOpt.get().toBuilder().arenaName("").build());
-                    player.sendMessage(Component.text("Kit '" + args[1] + "' の固定アリーナを解除しました。", NamedTextColor.GREEN));
-                    yield true;
-                }
-                boolean exists = arenaStore.templates().stream()
-                        .anyMatch(t -> t.name().equalsIgnoreCase(args[2]));
-                if (!exists) {
-                    player.sendMessage(Component.text("Unknown arena: " + args[2], NamedTextColor.RED));
-                    yield true;
-                }
-                kitService.save(kitOpt.get().toBuilder().arenaName(args[2].toLowerCase(Locale.ROOT)).build());
-                player.sendMessage(Component.text("Kit '" + args[1] + "' は常にアリーナ '" + args[2] + "' を使用します。", NamedTextColor.GREEN));
-                yield true;
+                yield handleArenaPool(player, args, false);
+            }
+            case "party-arena" -> {
+                yield handleArenaPool(player, args, true);
             }
             case "rename" -> {
                 if (args.length < 3) {
@@ -307,9 +309,14 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
         if (!(sender instanceof Player player)) {
             return true;
         }
-        if (args.length < 1) {
-            player.sendMessage(Component.text("/arena <draft|selection|p1|p2|type|save|enable|disable|list|info|delete>",
-                    NamedTextColor.YELLOW));
+        if (args.length < 1 || args[0].equalsIgnoreCase("gui")) {
+            if (arenaAdminGui != null) {
+                arenaAdminGui.open(player);
+            } else {
+                player.sendMessage(Component.text(
+                        "/arena <draft|selection|p1|p2|type|save|enable|disable|list|info|delete|rename|party|set>",
+                        NamedTextColor.YELLOW));
+            }
             return true;
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
@@ -319,7 +326,7 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                     player.sendMessage(Component.text("Invalid arena name.", NamedTextColor.RED));
                     yield true;
                 }
-                String id = args[1].toLowerCase(Locale.ROOT);
+                String id = args[1]; // case-sensitive, like /practice
                 drafts.put(id, new ArenaTemplate(UUID.randomUUID(), id, ArenaType.DUEL,
                         player.getWorld().getName(), 0, 0, 0, 0, 0, 0,
                         LocationUtil.serialize(player.getLocation()),
@@ -328,7 +335,6 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                 yield true;
             }
             case "pos1" -> {
-                // Feet-position selection: /arena pos1 marks the block you are standing on.
                 AdminTools.setPos1(player, player.getLocation().getBlock().getLocation());
                 player.sendMessage(Component.text("Selection pos1 = ここ(足元)に設定しました。", NamedTextColor.GREEN));
                 yield true;
@@ -339,9 +345,6 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                 yield true;
             }
             case "selection", "selectionapply" -> {
-                if (args.length < 2 && !sub.equals("selection")) {
-                    yield true;
-                }
                 String arena = args.length >= 3 ? args[2] : (args.length >= 2 ? args[1] : null);
                 if (sub.equals("selection") && args.length >= 2 && args[1].equalsIgnoreCase("apply")) {
                     arena = args.length >= 3 ? args[2] : null;
@@ -356,16 +359,15 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                     yield true;
                 }
                 Cuboid cuboid = Cuboid.of(p1, p2);
-                ArenaTemplate draft = drafts.getOrDefault(arena.toLowerCase(Locale.ROOT),
-                        new ArenaTemplate(UUID.randomUUID(), arena.toLowerCase(Locale.ROOT), ArenaType.DUEL,
+                ArenaTemplate draft = drafts.getOrDefault(arena,
+                        new ArenaTemplate(UUID.randomUUID(), arena, ArenaType.DUEL,
                                 cuboid.worldName(), cuboid.minX(), cuboid.minY(), cuboid.minZ(),
                                 cuboid.maxX(), cuboid.maxY(), cuboid.maxZ(),
                                 LocationUtil.serialize(player.getLocation()),
                                 LocationUtil.serialize(player.getLocation()), "", false));
-                drafts.put(arena.toLowerCase(Locale.ROOT), new ArenaTemplate(
-                        draft.id(), draft.name(), draft.type(), cuboid.worldName(),
-                        cuboid.minX(), cuboid.minY(), cuboid.minZ(), cuboid.maxX(), cuboid.maxY(), cuboid.maxZ(),
-                        draft.serializedSpawnA(), draft.serializedSpawnB(), draft.schematicPath(), draft.enabled()));
+                drafts.put(arena, draft.withBounds(cuboid.worldName(),
+                        cuboid.minX(), cuboid.minY(), cuboid.minZ(),
+                        cuboid.maxX(), cuboid.maxY(), cuboid.maxZ()));
                 player.sendMessage(Component.text("Selection applied.", NamedTextColor.GREEN));
                 yield true;
             }
@@ -373,26 +375,46 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                 if (args.length < 2) {
                     yield true;
                 }
-                ArenaTemplate draft = drafts.get(args[1].toLowerCase(Locale.ROOT));
+                ArenaTemplate draft = drafts.get(args[1]);
                 if (draft == null) {
                     player.sendMessage(Component.text("Draft missing. /arena draft <name>", NamedTextColor.RED));
                     yield true;
                 }
                 String serialized = LocationUtil.serialize(player.getLocation());
-                drafts.put(draft.name(), new ArenaTemplate(
-                        draft.id(), draft.name(), draft.type(), draft.world(),
-                        draft.minX(), draft.minY(), draft.minZ(), draft.maxX(), draft.maxY(), draft.maxZ(),
+                drafts.put(draft.name(), draft.withSpawns(
                         sub.equals("p1") ? serialized : draft.serializedSpawnA(),
-                        sub.equals("p2") ? serialized : draft.serializedSpawnB(),
-                        draft.schematicPath(), draft.enabled()));
+                        sub.equals("p2") ? serialized : draft.serializedSpawnB()));
                 player.sendMessage(Component.text(sub + " set.", NamedTextColor.GREEN));
+                yield true;
+            }
+            case "type" -> {
+                if (args.length < 3) {
+                    player.sendMessage(Component.text("Usage: /arena type <name> <DUEL|FFA|...>", NamedTextColor.YELLOW));
+                    yield true;
+                }
+                ArenaType type;
+                try {
+                    type = ArenaType.valueOf(args[2].toUpperCase(Locale.ROOT));
+                } catch (IllegalArgumentException e) {
+                    player.sendMessage(Component.text("Unknown type.", NamedTextColor.RED));
+                    yield true;
+                }
+                ArenaTemplate draft = drafts.get(args[1]);
+                if (draft != null) {
+                    drafts.put(args[1], draft.withType(type));
+                    player.sendMessage(Component.text("Draft type set to " + type, NamedTextColor.GREEN));
+                } else {
+                    arenaStore.setType(args[1], type);
+                    arenaService.setTemplates(arenaStore.templates());
+                    player.sendMessage(Component.text("Type updated.", NamedTextColor.GREEN));
+                }
                 yield true;
             }
             case "save" -> {
                 if (args.length < 2) {
                     yield true;
                 }
-                ArenaTemplate draft = drafts.get(args[1].toLowerCase(Locale.ROOT));
+                ArenaTemplate draft = drafts.get(args[1]);
                 if (draft == null) {
                     player.sendMessage(Component.text("No draft.", NamedTextColor.RED));
                     yield true;
@@ -403,12 +425,10 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                     faweBridge.saveSchematic(player.getWorld(), draft.minX(), draft.minY(), draft.minZ(),
                             draft.maxX(), draft.maxY(), draft.maxZ(), out);
                 }
-                ArenaTemplate saved = new ArenaTemplate(
-                        draft.id(), draft.name(), draft.type(), draft.world(),
-                        draft.minX(), draft.minY(), draft.minZ(), draft.maxX(), draft.maxY(), draft.maxZ(),
-                        draft.serializedSpawnA(), draft.serializedSpawnB(), schematic, false);
+                ArenaTemplate saved = draft.withSchematic(schematic).withEnabled(false);
                 arenaStore.upsert(saved);
                 arenaService.setTemplates(arenaStore.templates());
+                drafts.remove(draft.name());
                 player.sendMessage(Component.text("Arena saved (disabled until /arena enable).", NamedTextColor.GREEN));
                 yield true;
             }
@@ -423,14 +443,16 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
             }
             case "list" -> {
                 arenaStore.templates().forEach(t -> player.sendMessage(Component.text(
-                        t.name() + " enabled=" + t.enabled(), NamedTextColor.AQUA)));
+                        com.rumilance.practice.util.NameDisplay.pretty(t.name())
+                                + " [" + t.name() + "] enabled=" + t.enabled()
+                                + " party=" + t.party(), NamedTextColor.AQUA)));
                 yield true;
             }
             case "info" -> {
                 if (args.length < 2) {
                     yield true;
                 }
-                arenaStore.templates().stream().filter(t -> t.name().equalsIgnoreCase(args[1])).findFirst()
+                arenaStore.findExact(args[1])
                         .ifPresentOrElse(t -> player.sendMessage(Component.text(t.toString(), NamedTextColor.GRAY)),
                                 () -> player.sendMessage(Component.text("Not found.", NamedTextColor.RED)));
                 yield true;
@@ -443,6 +465,50 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                 arenaService.setTemplates(arenaStore.templates());
                 player.sendMessage(Component.text("Deleted.", NamedTextColor.YELLOW));
                 soundService.play(player, "delete");
+                yield true;
+            }
+            case "rename" -> {
+                if (args.length < 3) {
+                    player.sendMessage(Component.text("Usage: /arena rename <old> <new>", NamedTextColor.YELLOW));
+                    yield true;
+                }
+                ArenaTemplateStore.RenameResult r = arenaStore.rename(args[1], args[2]);
+                arenaService.setTemplates(arenaStore.templates());
+                player.sendMessage(Component.text(switch (r) {
+                    case OK -> "Renamed: " + args[1] + " -> " + args[2];
+                    case NOT_FOUND -> "Arena not found: " + args[1];
+                    case TARGET_EXISTS -> "Target name already exists: " + args[2];
+                }, r == ArenaTemplateStore.RenameResult.OK ? NamedTextColor.GREEN : NamedTextColor.RED));
+                yield true;
+            }
+            case "party", "set" -> {
+                // /arena set party <name>  or  /arena party <name>
+                String arenaName;
+                if (sub.equals("set")) {
+                    if (args.length < 3 || !args[1].equalsIgnoreCase("party")) {
+                        player.sendMessage(Component.text("Usage: /arena set party <name>", NamedTextColor.YELLOW));
+                        yield true;
+                    }
+                    arenaName = args[2];
+                } else {
+                    if (args.length < 2) {
+                        player.sendMessage(Component.text("Usage: /arena party <name>", NamedTextColor.YELLOW));
+                        yield true;
+                    }
+                    arenaName = args[1];
+                }
+                if (arenaStore.findExact(arenaName).isEmpty()) {
+                    player.sendMessage(Component.text("Arena not found: " + arenaName, NamedTextColor.RED));
+                    yield true;
+                }
+                arenaStore.setParty(arenaName, true);
+                arenaService.setTemplates(arenaStore.templates());
+                player.sendMessage(Component.text(
+                        "Marked as party map: " + arenaName + ". Place the icon block in the center.",
+                        NamedTextColor.GREEN));
+                if (partyIconPrompt != null) {
+                    partyIconPrompt.accept(player, arenaName);
+                }
                 yield true;
             }
             default -> {
@@ -514,25 +580,32 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
     private List<String> completeArena(String[] args) {
         if (args.length == 1) {
             return filter(List.of(
-                    "draft", "pos1", "pos2", "selection", "p1", "p2", "save", "enable", "disable",
-                    "list", "info", "delete"), args[0]);
+                    "gui", "draft", "pos1", "pos2", "selection", "p1", "p2", "type", "save", "enable", "disable",
+                    "list", "info", "delete", "rename", "party", "set"), args[0]);
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
         List<String> arenaNames = arenaStore.templates().stream().map(ArenaTemplate::name).toList();
         List<String> draftNames = new ArrayList<>(drafts.keySet());
         if (args.length == 2) {
             return switch (sub) {
-                // Draft-stage subcommands operate on DRAFTS only.
-                case "p1", "p2", "save" -> filter(draftNames, args[1]);
-                // Template management operates on SAVED templates only.
-                case "enable", "disable", "info", "delete" -> filter(arenaNames, args[1]);
+                case "p1", "p2", "save", "type" -> filter(draftNames.isEmpty() ? arenaNames : draftNames, args[1]);
+                case "enable", "disable", "info", "delete", "party", "rename" -> filter(arenaNames, args[1]);
                 case "selection" -> filter(List.of("apply"), args[1]);
+                case "set" -> filter(List.of("party"), args[1]);
                 default -> List.of();
             };
         }
         if (args.length == 3 && sub.equals("selection") && args[1].equalsIgnoreCase("apply")) {
-            // /arena selection apply <draft> — drafts only.
             return filter(draftNames, args[2]);
+        }
+        if (args.length == 3 && sub.equals("set") && args[1].equalsIgnoreCase("party")) {
+            return filter(arenaNames, args[2]);
+        }
+        if (args.length == 3 && sub.equals("rename")) {
+            return filter(List.of("<newName>"), args[2]);
+        }
+        if (args.length == 3 && sub.equals("type")) {
+            return filter(java.util.Arrays.stream(ArenaType.values()).map(Enum::name).toList(), args[2]);
         }
         return List.of();
     }
@@ -561,5 +634,99 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
         }
         String lower = prefix.toLowerCase(Locale.ROOT);
         return options.stream().filter(o -> o.toLowerCase(Locale.ROOT).startsWith(lower)).toList();
+    }
+
+    private boolean handleArenaPool(Player player, String[] args, boolean party) {
+        String label = party ? "party-arena" : "arena";
+        if (args.length < 2) {
+            player.sendMessage(Component.text("/kit " + label + " <kit> add|remove|list|clear [arena]", NamedTextColor.YELLOW));
+            return true;
+        }
+        var kitOpt = kitService.get(args[1]);
+        if (kitOpt.isEmpty()) {
+            player.sendMessage(Component.text("Unknown kit: " + args[1], NamedTextColor.RED));
+            return true;
+        }
+        KitDefinition kit = kitOpt.get();
+        if (args.length == 3 && !isPoolAction(args[2])) {
+            if (party) {
+                player.sendMessage(Component.text("Use /kit party-arena with add/remove/list/clear.", NamedTextColor.YELLOW));
+                return true;
+            }
+            if (args[2].equalsIgnoreCase("any") || args[2].equalsIgnoreCase("none")) {
+                kitService.save(kit.toBuilder().arenas(List.of()).build());
+                player.sendMessage(Component.text("Cleared duel arena pool for " + args[1], NamedTextColor.GREEN));
+                return true;
+            }
+            if (!arenaExists(args[2])) {
+                player.sendMessage(Component.text("Unknown arena: " + args[2], NamedTextColor.RED));
+                return true;
+            }
+            kitService.save(kit.toBuilder().arenas(List.of(args[2].toLowerCase(Locale.ROOT))).build());
+            player.sendMessage(Component.text("Duel pool set to: " + args[2], NamedTextColor.GREEN));
+            return true;
+        }
+        if (args.length < 3) {
+            player.sendMessage(Component.text("/kit " + label + " <kit> add|remove|list|clear [arena]", NamedTextColor.YELLOW));
+            return true;
+        }
+        String action = args[2].toLowerCase(Locale.ROOT);
+        List<String> current = new ArrayList<>(party ? kit.partyArenas() : kit.arenas());
+        return switch (action) {
+            case "list" -> {
+                player.sendMessage(Component.text((party ? "Party" : "Duel") + " pool for "
+                        + kit.name() + ": " + (current.isEmpty() ? "(random)" : String.join(", ", current)),
+                        NamedTextColor.AQUA));
+                yield true;
+            }
+            case "clear" -> {
+                if (party) {
+                    kitService.save(kit.toBuilder().partyArenas(List.of()).build());
+                } else {
+                    kitService.save(kit.toBuilder().arenas(List.of()).build());
+                }
+                player.sendMessage(Component.text("Cleared " + label + " pool.", NamedTextColor.GREEN));
+                yield true;
+            }
+            case "add", "remove" -> {
+                if (args.length < 4) {
+                    player.sendMessage(Component.text("/kit " + label + " <kit> " + action + " <arena>", NamedTextColor.YELLOW));
+                    yield true;
+                }
+                if (!arenaExists(args[3])) {
+                    player.sendMessage(Component.text("Unknown arena: " + args[3], NamedTextColor.RED));
+                    yield true;
+                }
+                String arenaId = args[3].toLowerCase(Locale.ROOT);
+                if ("add".equals(action)) {
+                    if (!current.contains(arenaId)) {
+                        current.add(arenaId);
+                    }
+                } else {
+                    current.remove(arenaId);
+                }
+                KitDefinition updated = party
+                        ? kit.toBuilder().partyArenas(current).build()
+                        : kit.toBuilder().arenas(current).build();
+                kitService.save(updated);
+                player.sendMessage(Component.text("Updated " + label + " pool: " + current, NamedTextColor.GREEN));
+                yield true;
+            }
+            default -> {
+                player.sendMessage(Component.text("Unknown action. Use add, remove, list, or clear.", NamedTextColor.RED));
+                yield true;
+            }
+        };
+    }
+
+    private boolean isPoolAction(String arg) {
+        return switch (arg.toLowerCase(Locale.ROOT)) {
+            case "add", "remove", "list", "clear" -> true;
+            default -> false;
+        };
+    }
+
+    private boolean arenaExists(String name) {
+        return arenaStore.templates().stream().anyMatch(t -> t.name().equalsIgnoreCase(name));
     }
 }

@@ -1,0 +1,3 @@
+# Practice rooms (case-sensitive IDs). Create with /practice draft <Name> <ANKER|MACE>.
+# Display name replaces '_' with a half-width space.
+practices: {}

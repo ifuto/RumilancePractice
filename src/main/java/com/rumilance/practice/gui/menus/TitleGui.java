@@ -35,7 +35,7 @@ public final class TitleGui extends AbstractGui {
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return Component.text("✦ Kill Titles", UiTheme.PRIMARY).decoration(TextDecoration.ITALIC, false);
+        return Component.text("Kill Titles", UiTheme.PRIMARY).decoration(TextDecoration.ITALIC, false);
     }
 
     @Override

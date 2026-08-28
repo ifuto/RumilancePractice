@@ -5,12 +5,14 @@ import com.rumilance.practice.gui.GuiDecorator;
 import com.rumilance.practice.gui.GuiSession;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.GuiType;
+import com.rumilance.practice.gui.ItemBuilder;
+import com.rumilance.practice.gui.MenuScaffold;
+import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.model.KitDefinition;
 import com.rumilance.practice.sound.SoundService;
 import com.rumilance.practice.util.GuiSlots;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Material;
@@ -46,11 +48,12 @@ public final class EkitSelectGui extends AbstractGui {
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return Component.text("Kit選択", NamedTextColor.WHITE);
+        return Component.text("Kit選択", UiTheme.PRIMARY).decoration(TextDecoration.ITALIC, false);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
+        MenuScaffold.chrome(inventory);
         List<KitDefinition> kits = kitService.enabled();
         int shown = Math.min(kits.size(), 35);
         for (int i = 0; i < shown; i++) {
@@ -70,12 +73,12 @@ public final class EkitSelectGui extends AbstractGui {
             center = kit == null ? GuiDecorator.decorative(Material.LIME_STAINED_GLASS_PANE, "キットをクリックして選択") : kitIcon(kit);
         }
         inventory.setItem(GuiSlots.slot(0, 4), center);
-        inventory.setItem(GuiSlots.slot(5, 0), GuiDecorator.button(Material.RED_DYE,
-                Component.text("戻る", NamedTextColor.RED), "back"));
-        inventory.setItem(GuiSlots.slot(5, 4), GuiDecorator.button(Material.LIME_STAINED_GLASS_PANE,
-                Component.text("選択", NamedTextColor.GREEN), "select"));
-        inventory.setItem(GuiSlots.slot(5, 8), GuiDecorator.button(Material.BARRIER,
-                Component.text("閉じる", NamedTextColor.GRAY), "close"));
+        inventory.setItem(GuiSlots.slot(5, 0), ItemBuilder.action(UiTheme.BACK,
+                Component.text("戻る", UiTheme.WARNING), "back"));
+        inventory.setItem(GuiSlots.slot(5, 4), ItemBuilder.action(UiTheme.CONFIRM,
+                Component.text("選択", UiTheme.SUCCESS), "select"));
+        inventory.setItem(GuiSlots.slot(5, 8), ItemBuilder.action(UiTheme.CLOSE,
+                Component.text("閉じる", UiTheme.DANGER), "close"));
     }
 
     private ItemStack kitIcon(KitDefinition kit) {
@@ -84,7 +87,7 @@ public final class EkitSelectGui extends AbstractGui {
         ItemMeta meta = stack.getItemMeta();
         meta.displayName(MiniMessage.miniMessage().deserialize(kit.prettyDisplayName())
                 .decoration(TextDecoration.ITALIC, false));
-        meta.lore(List.of(Component.text("クリックして選択", NamedTextColor.GRAY)
+        meta.lore(List.of(Component.text("クリックして選択", UiTheme.MUTED)
                 .decoration(TextDecoration.ITALIC, false)));
         meta.getPersistentDataContainer().set(com.rumilance.practice.util.ItemKeys.guiAction(),
                 org.bukkit.persistence.PersistentDataType.STRING, "kit:" + kit.name());
@@ -95,9 +98,9 @@ public final class EkitSelectGui extends AbstractGui {
     private ItemStack originalPaper() {
         ItemStack stack = new ItemStack(Material.PAPER);
         ItemMeta meta = stack.getItemMeta();
-        meta.displayName(Component.text("オリジナルキット", NamedTextColor.RED)
+        meta.displayName(Component.text("オリジナルキット", UiTheme.DANGER)
                 .decoration(TextDecoration.ITALIC, false));
-        meta.lore(List.of(Component.text("クリックして選択", NamedTextColor.GRAY)
+        meta.lore(List.of(Component.text("クリックして選択", UiTheme.MUTED)
                 .decoration(TextDecoration.ITALIC, false)));
         meta.getPersistentDataContainer().set(com.rumilance.practice.util.ItemKeys.guiAction(),
                 org.bukkit.persistence.PersistentDataType.STRING, "original");

@@ -63,6 +63,13 @@ public final class ChatBanService {
     }
 
     public void issue(UUID target, UUID staff, String type, String reason, Duration duration) {
+        issue(target, staff, type, reason, duration, false);
+    }
+
+    /**
+     * @param announce reserved for callers that previously broadcasted; persistence is unchanged
+     */
+    public void issue(UUID target, UUID staff, String type, String reason, Duration duration, boolean announce) {
         Instant now = Instant.now();
         PunishmentRecord record = new PunishmentRecord(
                 UUID.randomUUID(), target, staff, type, reason, now,
@@ -73,7 +80,8 @@ public final class ChatBanService {
             try {
                 punishmentRepository.insert(record);
                 auditLogRepository.insert(AuditLogEntry.of(staff, "CHATBAN",
-                        "target=" + target + " reason=" + reason + " id=" + record.id()));
+                        "target=" + target + " reason=" + reason + " id=" + record.id()
+                                + (announce ? " announce=1" : "")));
             } catch (Exception e) {
                 logger.log(Level.WARNING, "Failed to persist chatban", e);
             }

@@ -25,14 +25,23 @@ public final class TeamCommand implements CommandExecutor, TabCompleter {
     private final com.rumilance.practice.kit.KitService kitService;
     private final com.rumilance.practice.gui.menus.TeamHubGui teamHubGui;
     private final com.rumilance.practice.gui.menus.TeamsBrowserGui teamsBrowserGui;
+    private final com.rumilance.practice.locale.MessageService messageService;
 
     public TeamCommand(TeamService teamService, com.rumilance.practice.kit.KitService kitService,
                        com.rumilance.practice.gui.menus.TeamHubGui teamHubGui,
                        com.rumilance.practice.gui.menus.TeamsBrowserGui teamsBrowserGui) {
+        this(teamService, kitService, teamHubGui, teamsBrowserGui, null);
+    }
+
+    public TeamCommand(TeamService teamService, com.rumilance.practice.kit.KitService kitService,
+                       com.rumilance.practice.gui.menus.TeamHubGui teamHubGui,
+                       com.rumilance.practice.gui.menus.TeamsBrowserGui teamsBrowserGui,
+                       com.rumilance.practice.locale.MessageService messageService) {
         this.teamService = teamService;
         this.kitService = kitService;
         this.teamHubGui = teamHubGui;
         this.teamsBrowserGui = teamsBrowserGui;
+        this.messageService = messageService;
     }
 
     @Override

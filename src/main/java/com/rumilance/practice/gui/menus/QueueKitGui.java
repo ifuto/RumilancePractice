@@ -9,6 +9,7 @@ import com.rumilance.practice.gui.MenuScaffold;
 import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.model.KitDefinition;
+import com.rumilance.practice.platform.PlayerPlatform;
 import com.rumilance.practice.queue.QueueCoordinator;
 import com.rumilance.practice.queue.QueueService;
 import com.rumilance.practice.sound.SoundService;
@@ -36,6 +37,7 @@ public final class QueueKitGui extends AbstractGui {
     private final QueueCoordinator queueCoordinator;
     private final boolean ranked;
     private KitPreviewGui previewGui;
+    private com.rumilance.practice.database.repository.WinStreakRepository winStreakRepository;
 
     public QueueKitGui(
             GuiSessionRegistry registry,
@@ -50,6 +52,7 @@ public final class QueueKitGui extends AbstractGui {
         this.queueService = queueService;
         this.queueCoordinator = queueCoordinator;
         this.ranked = ranked;
+        this.winStreakRepository = null;
     }
 
     public void setPreviewGui(KitPreviewGui previewGui) {
@@ -89,13 +92,14 @@ public final class QueueKitGui extends AbstractGui {
             if (index >= MenuScaffold.gridPageSize()) {
                 break;
             }
-            inventory.setItem(MenuScaffold.gridSlot(index++), kitIcon(kit));
+            inventory.setItem(MenuScaffold.gridSlot(index++), kitIcon(player, kit));
         }
 
         // Info tile showing total queue depth.
+        PlayerPlatform platform = PlayerPlatform.of(player);
         int totalWaiting = kits.stream()
                 .filter(k -> kitService.isQueueEnabled(k.name()))
-                .mapToInt(k -> queueService.waitingCount(mode(), k.name()))
+                .mapToInt(k -> queueService.waitingCount(mode(), k.name(), platform))
                 .sum();
         inventory.setItem(GuiSlots.slot(5, 1),
                 ItemBuilder.of(Material.CLOCK)
@@ -120,9 +124,9 @@ public final class QueueKitGui extends AbstractGui {
                         Component.text("Close", UiTheme.DANGER), "close"));
     }
 
-    private ItemStack kitIcon(KitDefinition kit) {
+    private ItemStack kitIcon(Player player, KitDefinition kit) {
         boolean queueOn = kitService.isQueueEnabled(kit.name());
-        int waiting = queueService.waitingCount(mode(), kit.name());
+        int waiting = queueService.waitingCount(mode(), kit.name(), PlayerPlatform.of(player));
 
         if (!queueOn) {
             return ItemBuilder.of(Material.BARRIER)

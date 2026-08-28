@@ -16,10 +16,7 @@ import java.util.Map;
 import java.util.logging.Level;
 
 /**
- * Loads, caches and reloads all of RumilancePractice's YAML resource files, copying bundled
- * defaults from the plugin jar into the data folder on first run and layering any file already
- * present in the data folder on top of the jar's own defaults (so partial user overrides never
- * lose access to newly introduced keys).
+ * Loads, caches and reloads YAML resource files for RumilancePractice.
  */
 public final class ConfigService {
 
@@ -30,14 +27,18 @@ public final class ConfigService {
     public static final String PROFILE = "profile.yml";
     public static final String KITS = "kits.yml";
     public static final String ARENAS = "arenas.yml";
+    public static final String PRACTICES = "practices.yml";
     public static final String LOBBY = "lobby.yml";
     public static final String FFA = "ffa.yml";
     public static final String PLANS = "plans.yml";
     public static final String ARROW_EFFECTS = "arrow-effects.yml";
     public static final String EKIT_ITEMS = "ekit-items.yml";
+    public static final String PRESET_ITEMS = "preset-items.yml";
+    public static final String SCOREBOARD = "scoreboard.yml";
 
     private static final List<String> RESOURCE_FILES = List.of(
-            CONFIG, DATABASE, GUI, SOUNDS, PROFILE, KITS, ARENAS, LOBBY, FFA, PLANS, ARROW_EFFECTS, EKIT_ITEMS
+            CONFIG, DATABASE, GUI, SOUNDS, PROFILE, KITS, ARENAS, PRACTICES, LOBBY, FFA, PLANS,
+            ARROW_EFFECTS, EKIT_ITEMS, PRESET_ITEMS, SCOREBOARD
     );
 
     private final JavaPlugin plugin;
@@ -47,9 +48,10 @@ public final class ConfigService {
         this.plugin = plugin;
     }
 
-    /**
-     * Loads (or reloads) every managed YAML file. Safe to call multiple times.
-     */
+    public JavaPlugin plugin() {
+        return plugin;
+    }
+
     public void loadAll() {
         File dataFolder = plugin.getDataFolder();
         if (!dataFolder.exists() && !dataFolder.mkdirs()) {
@@ -65,17 +67,48 @@ public final class ConfigService {
         if (!target.exists()) {
             plugin.saveResource(fileName, false);
         }
-        YamlConfiguration configuration = YamlConfiguration.loadConfiguration(target);
+        YamlConfiguration onDisk = YamlConfiguration.loadConfiguration(target);
+        YamlConfiguration jarDefaults = new YamlConfiguration();
         try (InputStream resource = plugin.getResource(fileName)) {
             if (resource != null) {
                 try (Reader reader = new InputStreamReader(resource, StandardCharsets.UTF_8)) {
-                    configuration.setDefaults(YamlConfiguration.loadConfiguration(reader));
+                    jarDefaults = YamlConfiguration.loadConfiguration(reader);
                 }
             }
         } catch (IOException e) {
             plugin.getLogger().log(Level.WARNING, "Failed to load bundled defaults for " + fileName, e);
         }
-        return configuration;
+        YamlConfiguration merged = deepMerge(jarDefaults, onDisk);
+        merged.setDefaults(jarDefaults);
+        return merged;
+    }
+
+    static YamlConfiguration deepMerge(YamlConfiguration base, YamlConfiguration overlay) {
+        YamlConfiguration out = new YamlConfiguration();
+        if (base != null) {
+            for (String key : base.getKeys(true)) {
+                if (!base.isConfigurationSection(key)) {
+                    out.set(key, base.get(key));
+                }
+            }
+        }
+        if (overlay != null) {
+            for (String key : overlay.getKeys(true)) {
+                if (overlay.isConfigurationSection(key)) {
+                    continue;
+                }
+                Object value = overlay.get(key);
+                if (value instanceof List<?> list
+                        && list.isEmpty()
+                        && key.startsWith("layouts.")
+                        && out.get(key) instanceof List<?> baseList
+                        && !baseList.isEmpty()) {
+                    continue;
+                }
+                out.set(key, value);
+            }
+        }
+        return out;
     }
 
     public void reload() {
@@ -130,6 +163,10 @@ public final class ConfigService {
         return get(ARENAS);
     }
 
+    public FileConfiguration practices() {
+        return get(PRACTICES);
+    }
+
     public FileConfiguration lobby() {
         return get(LOBBY);
     }
@@ -148,5 +185,13 @@ public final class ConfigService {
 
     public FileConfiguration ekitItems() {
         return get(EKIT_ITEMS);
+    }
+
+    public FileConfiguration presetItems() {
+        return get(PRESET_ITEMS);
+    }
+
+    public FileConfiguration scoreboard() {
+        return get(SCOREBOARD);
     }
 }

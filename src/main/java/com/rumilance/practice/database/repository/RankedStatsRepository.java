@@ -124,6 +124,23 @@ public final class RankedStatsRepository {
         return result;
     }
 
+    public int deleteForPlayer(UUID uuid) throws SQLException {
+        String sql = "DELETE FROM " + databaseService.table("ranked_stats") + " WHERE uuid = ?";
+        try (Connection connection = databaseService.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, uuid.toString());
+            return statement.executeUpdate();
+        }
+    }
+
+    public int deleteAll() throws SQLException {
+        try (Connection connection = databaseService.getConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "DELETE FROM " + databaseService.table("ranked_stats"))) {
+            return statement.executeUpdate();
+        }
+    }
+
     private RankedKitStats map(ResultSet resultSet) throws SQLException {
         return new RankedKitStats(
                 UUID.fromString(resultSet.getString("id")),

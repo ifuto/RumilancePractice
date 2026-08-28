@@ -7,6 +7,10 @@ defaults:
   spectate-visible: true
   accept-duel-requests: true
   show-ranked-prompt: true
+  # Packet-only team leather look for others (Settings GUI). Default ON. Party matches only.
+  team-colored-armor: true
+  # Team-coloured glow outline. Default ON. Party matches only.
+  team-glow: true
 
 scoreboard:
   enabled: true

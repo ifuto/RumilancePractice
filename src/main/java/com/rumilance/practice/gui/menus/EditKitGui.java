@@ -6,7 +6,12 @@ import com.rumilance.practice.gui.GuiDecorator;
 import com.rumilance.practice.gui.GuiSession;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.GuiType;
+import com.rumilance.practice.gui.ItemBuilder;
+import com.rumilance.practice.gui.MenuScaffold;
+import com.rumilance.practice.gui.UiTheme;
+import com.rumilance.practice.kit.KitLayoutEditor;
 import com.rumilance.practice.kit.KitLayoutCache;
+import com.rumilance.practice.kit.KitLayoutContents;
 import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.model.KitDefinition;
 import com.rumilance.practice.model.KitItemEntry;
@@ -19,7 +24,6 @@ import com.rumilance.practice.util.GuiSlots;
 import com.rumilance.practice.util.ItemKeys;
 import com.rumilance.practice.util.ItemSerializer;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -28,15 +32,11 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.List;
 import java.util.UUID;
 
 /**
- * Edit official kit slot layout only (GUI 5). Click-swap rearrange, content validated on save.
+ * Edit official kit slot layout only (GUI 5). Rearrange with vanilla-style click/drag;
+ * content validated on save (no adding/removing items).
  */
 public final class EditKitGui extends AbstractGui {
 
@@ -45,6 +45,18 @@ public final class EditKitGui extends AbstractGui {
     private final KitLayoutCache layoutCache;
     private final AsyncExecutor asyncExecutor;
     private final PlayerStateManager stateManager;
+    private final com.rumilance.practice.kit.PresetItems presetItems;
+    private KitPresetPickerGui presetPickerGui;
+    private com.rumilance.practice.gui.KitAnvilRenameService kitAnvilRenameService;
+    private SmithingTrimGui smithingTrimGui;
+
+    public void setKitAnvilRenameService(com.rumilance.practice.gui.KitAnvilRenameService kitAnvilRenameService) {
+        this.kitAnvilRenameService = kitAnvilRenameService;
+    }
+
+    public void setSmithingTrimGui(SmithingTrimGui smithingTrimGui) {
+        this.smithingTrimGui = smithingTrimGui;
+    }
 
     public EditKitGui(
             GuiSessionRegistry registry,
@@ -55,20 +67,54 @@ public final class EditKitGui extends AbstractGui {
             AsyncExecutor asyncExecutor,
             PlayerStateManager stateManager
     ) {
+        this(registry, sounds, kitService, layoutRepository, layoutCache, asyncExecutor, stateManager, null);
+    }
+
+    public EditKitGui(
+            GuiSessionRegistry registry,
+            SoundService sounds,
+            KitService kitService,
+            KitLayoutRepository layoutRepository,
+            KitLayoutCache layoutCache,
+            AsyncExecutor asyncExecutor,
+            PlayerStateManager stateManager,
+            com.rumilance.practice.kit.PresetItems presetItems
+    ) {
         super(registry, sounds, GuiType.EDIT_KIT, 5, true);
         this.kitService = kitService;
         this.layoutRepository = layoutRepository;
         this.layoutCache = layoutCache;
         this.asyncExecutor = asyncExecutor;
         this.stateManager = stateManager;
+        this.presetItems = presetItems;
+    }
+
+    public void setPresetPickerGui(KitPresetPickerGui presetPickerGui) {
+        this.presetPickerGui = presetPickerGui;
+    }
+
+    public void reopenWithLayout(Player player, String kitName, ItemStack[] layout) {
+        openKitEditor(player, kitName, null);
+        GuiSession session = registry.get(player.getUniqueId()).orElse(null);
+        if (session != null && layout != null) {
+            session.put("layout", layout);
+            render(player, session, player.getOpenInventory().getTopInventory());
+        }
     }
 
     /** Opens the editor directly in edit mode for the given kit (/ekit select flow). */
     public void openKitEditor(Player player, String kitName) {
+        openKitEditor(player, kitName, null);
+    }
+
+    /** Opens the kit editor; {@code preset} is stored on the session when non-blank. */
+    public void openKitEditor(Player player, String kitName, String preset) {
         GuiSession session = registry.open(player.getUniqueId(), type(), rows);
         session.setSelectedKit(kitName);
         session.put("mode", "edit");
-        session.put("selected_slot", null);
+        if (preset != null && !preset.isBlank()) {
+            session.put("preset", preset);
+        }
         try {
             if (stateManager.getState(player.getUniqueId()) == PlayerState.LOBBY
                     || stateManager.getState(player.getUniqueId()) == PlayerState.OPENING_GUI) {
@@ -79,6 +125,41 @@ public final class EditKitGui extends AbstractGui {
         }
         PracticeGuiOpen.open(this, player, session);
         sounds.play(player, "gui-open");
+    }
+
+    /**
+     * Applies an anvil-renamed tool back into the kit layout and reopens the editor.
+     */
+    public void applyRenamedItem(Player player, String kitId, String preset, int layoutSlot, ItemStack renamed) {
+        openKitEditor(player, kitId, preset);
+        GuiSession session = registry.get(player.getUniqueId()).orElse(null);
+        if (session == null || renamed == null) {
+            return;
+        }
+        ItemStack[] layout = session.get("layout", ItemStack[].class);
+        if (layout == null || layoutSlot < 0 || layoutSlot >= layout.length) {
+            return;
+        }
+        layout[layoutSlot] = renamed.clone();
+        session.put("layout", layout);
+        Inventory top = player.getOpenInventory().getTopInventory();
+        render(player, session, top);
+    }
+
+    public void applyTrimmedItem(Player player, String kitId, String preset, int layoutSlot, ItemStack trimmed) {
+        openKitEditor(player, kitId, preset);
+        GuiSession session = registry.get(player.getUniqueId()).orElse(null);
+        if (session == null || trimmed == null) {
+            return;
+        }
+        ItemStack[] layout = session.get("layout", ItemStack[].class);
+        if (layout == null || layoutSlot < 0 || layoutSlot >= layout.length) {
+            return;
+        }
+        layout[layoutSlot] = trimmed.clone();
+        session.put("layout", layout);
+        Inventory top = player.getOpenInventory().getTopInventory();
+        render(player, session, top);
     }
 
     public void openKitPicker(Player player) {
@@ -100,11 +181,13 @@ public final class EditKitGui extends AbstractGui {
     protected Component title(Player player, GuiSession session) {
         String kit = session.selectedKit();
         return Component.text(kit == null ? "Edit Kit"
-                : "Edit: " + com.rumilance.practice.util.KitNames.pretty(kit), NamedTextColor.WHITE);
+                : "Edit: " + com.rumilance.practice.util.KitNames.pretty(kit), UiTheme.PRIMARY)
+                .decoration(TextDecoration.ITALIC, false);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
+        MenuScaffold.editorChrome(inventory);
         if ("picker".equals(session.get("mode", String.class)) || session.selectedKit() == null) {
             int i = 0;
             for (KitDefinition kit : kitService.enabled()) {
@@ -114,7 +197,7 @@ public final class EditKitGui extends AbstractGui {
                 Material mat = Material.matchMaterial(kit.icon());
                 ItemStack icon = new ItemStack(mat == null ? Material.DIAMOND_SWORD : mat);
                 ItemMeta meta = icon.getItemMeta();
-                meta.displayName(Component.text(kit.prettyDisplayName(), NamedTextColor.AQUA)
+                meta.displayName(Component.text(kit.prettyDisplayName(), UiTheme.PRIMARY)
                         .decoration(TextDecoration.ITALIC, false));
                 meta.getPersistentDataContainer().set(ItemKeys.guiAction(), PersistentDataType.STRING,
                         "editkit:" + kit.name());
@@ -122,15 +205,18 @@ public final class EditKitGui extends AbstractGui {
                 inventory.setItem(GuiSlots.slot(1 + i / 7, 1 + i % 7), icon);
                 i++;
             }
-            inventory.setItem(GuiSlots.slot(4, 4), GuiDecorator.button(Material.BARRIER,
-                    Component.text("Close", NamedTextColor.RED), "close"));
+            inventory.setItem(GuiSlots.slot(4, 4),
+                    ItemBuilder.action(UiTheme.CLOSE, Component.text("Close", UiTheme.DANGER), "close"));
             return;
         }
         KitDefinition kit = kitService.get(session.selectedKit()).orElse(null);
         if (kit == null) {
             return;
         }
-        ItemStack[] layout = loadLayout(player.getUniqueId(), kit);
+        // Keep in-session rearranges across re-render; reloading from disk wiped swaps before Save.
+        ItemStack[] layout = KitLayoutContents.retainOrLoad(
+                session.get("layout", ItemStack[].class),
+                loadLayout(player.getUniqueId(), kit));
         // armor row visually: helmet/chest/legs/boots + offhand
         inventory.setItem(GuiSlots.slot(0, 1), tagged(layout.length > 36 ? layout[36] : null, "slot:36"));
         inventory.setItem(GuiSlots.slot(0, 2), tagged(layout.length > 37 ? layout[37] : null, "slot:37"));
@@ -149,10 +235,14 @@ public final class EditKitGui extends AbstractGui {
         for (int hot = 0; hot < 9; hot++) {
             inventory.setItem(GuiSlots.slot(4, hot), tagged(layout[hot], "slot:" + hot));
         }
-        inventory.setItem(GuiSlots.slot(0, 8), GuiDecorator.button(Material.LIME_DYE,
-                Component.text("Save", NamedTextColor.GREEN), "save"));
-        inventory.setItem(GuiSlots.slot(0, 0), GuiDecorator.button(Material.RED_DYE,
-                Component.text("Back", NamedTextColor.RED), "back"));
+        inventory.setItem(GuiSlots.slot(0, 0),
+                ItemBuilder.action(UiTheme.BACK, Component.text("Back", UiTheme.WARNING), "back"));
+        if (kit.presetEnabled() && presetItems != null) {
+            inventory.setItem(GuiSlots.slot(0, 7), ItemBuilder.action(Material.CHEST,
+                    Component.text("Preset Items", UiTheme.SECONDARY), "open:preset"));
+        }
+        inventory.setItem(GuiSlots.slot(0, 8),
+                ItemBuilder.action(UiTheme.CONFIRM, Component.text("Save", UiTheme.SUCCESS), "save"));
         session.put("layout", layout);
     }
 
@@ -229,6 +319,31 @@ public final class EditKitGui extends AbstractGui {
 
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot, String action) {
+        handleClick(player, session, inventory, slot, action, org.bukkit.event.inventory.ClickType.LEFT);
+    }
+
+    @Override
+    public void handleClick(Player player, GuiSession session, Inventory inventory, int slot,
+                            String action, org.bukkit.event.inventory.ClickType clickType) {
+        if (clickType == org.bukkit.event.inventory.ClickType.RIGHT && action.startsWith("slot:")) {
+            int layoutIndex = Integer.parseInt(action.substring(5));
+            ItemStack[] layout = session.get("layout", ItemStack[].class);
+            if (layout != null && layoutIndex >= 0 && layoutIndex < layout.length) {
+                ItemStack item = layout[layoutIndex];
+                String kitId = session.selectedKit();
+                String preset = session.get("preset", String.class);
+                if (item != null && kitAnvilRenameService != null
+                        && com.rumilance.practice.gui.KitAnvilRenameService.isRenameableTool(item.getType())
+                        && kitAnvilRenameService.tryOpenRename(player, item, layoutIndex, kitId, preset)) {
+                    return;
+                }
+                if (item != null && item.getItemMeta() instanceof org.bukkit.inventory.meta.ArmorMeta
+                        && smithingTrimGui != null && kitId != null) {
+                    smithingTrimGui.openForLayoutSlot(player, item, layoutIndex, kitId, preset);
+                    return;
+                }
+            }
+        }
         if ("close".equals(action) || "back".equals(action)) {
             if ("back".equals(action) && session.selectedKit() != null) {
                 session.setSelectedKit(null);
@@ -243,35 +358,32 @@ public final class EditKitGui extends AbstractGui {
         if (action.startsWith("editkit:")) {
             session.setSelectedKit(action.substring(8));
             session.put("mode", "edit");
-            session.put("selected_slot", null);
             render(player, session, inventory);
             sounds.play(player, "kit-select");
             return;
         }
         if (action.startsWith("slot:")) {
-            int clicked = Integer.parseInt(action.substring(5));
-            Integer selected = session.get("selected_slot", Integer.class);
+            int layoutIndex = Integer.parseInt(action.substring(5));
             ItemStack[] layout = session.get("layout", ItemStack[].class);
             if (layout == null) {
                 return;
             }
-            if (selected == null) {
-                session.put("selected_slot", clicked);
-                sounds.play(player, "gui-click");
-                player.sendActionBar(Component.text("Selected slot " + clicked, NamedTextColor.YELLOW));
-            } else {
-                ItemStack tmp = layout[selected];
-                layout[selected] = layout[clicked];
-                layout[clicked] = tmp;
-                session.put("selected_slot", null);
-                session.put("layout", layout);
-                sounds.play(player, "select");
-                render(player, session, inventory);
-            }
+            KitLayoutEditor.handleSlotPickup(player, layout, layoutIndex);
+            session.put("layout", layout);
+            sounds.play(player, "gui-click");
+            render(player, session, inventory);
             return;
         }
         if ("save".equals(action)) {
             save(player, session);
+            return;
+        }
+        if ("open:preset".equals(action)) {
+            if (presetPickerGui != null && session.selectedKit() != null) {
+                ItemStack[] layout = session.get("layout", ItemStack[].class);
+                presetPickerGui.open(player, session.selectedKit(), layout);
+            }
+            return;
         }
     }
 
@@ -282,6 +394,8 @@ public final class EditKitGui extends AbstractGui {
         if (kit == null || layout == null) {
             return;
         }
+        KitLayoutEditor.syncLayoutFromTopInventory(player.getOpenInventory().getTopInventory(), layout);
+        session.put("layout", layout);
         // Baseline straight from the kit definition (full NBT items included).
         ItemStack[] baseline = new ItemStack[41];
         for (KitItemEntry entry : kit.items()) {
@@ -300,9 +414,9 @@ public final class EditKitGui extends AbstractGui {
         baseline[38] = material(kit.armor().get("leggings"));
         baseline[39] = material(kit.armor().get("boots"));
 
-        if (!sameContents(baseline, layout)) {
+        if (!kit.presetEnabled() && !com.rumilance.practice.guard.PracticeGuards.kitLayoutUnchanged(baseline, layout)) {
             sounds.play(player, "error");
-            player.sendMessage(Component.text("Layout content mismatch. Only rearranging is allowed.", NamedTextColor.RED));
+            player.sendMessage(Component.text("Layout content mismatch. Only rearranging is allowed.", UiTheme.DANGER));
             return;
         }
         String base64 = ItemSerializer.toBase64(layout);
@@ -315,31 +429,14 @@ public final class EditKitGui extends AbstractGui {
                         org.bukkit.Bukkit.getPluginManager().getPlugin("RumilancePractice"),
                         () -> {
                             sounds.play(player, "select");
-                            player.sendMessage(Component.text("Kit layout saved.", NamedTextColor.GREEN));
+                            player.sendMessage(Component.text("Kit layout saved.", UiTheme.SUCCESS));
                         });
             } catch (Exception e) {
                 player.getServer().getScheduler().runTask(
                         org.bukkit.Bukkit.getPluginManager().getPlugin("RumilancePractice"),
-                        () -> player.sendMessage(Component.text("Save failed.", NamedTextColor.RED)));
+                        () -> player.sendMessage(Component.text("Save failed.", UiTheme.DANGER)));
             }
         });
     }
 
-    private static boolean sameContents(ItemStack[] a, ItemStack[] b) {
-        List<String> left = canonicalize(a);
-        List<String> right = canonicalize(b);
-        return left.equals(right);
-    }
-
-    private static List<String> canonicalize(ItemStack[] items) {
-        List<String> list = new ArrayList<>();
-        for (ItemStack item : items) {
-            if (item == null || item.getType().isAir() || item.getType() == Material.GRAY_STAINED_GLASS_PANE) {
-                continue;
-            }
-            list.add(item.getType().name() + ":" + item.getAmount());
-        }
-        list.sort(Comparator.naturalOrder());
-        return list;
-    }
 }

@@ -52,6 +52,23 @@ public final class FfaStatsRepository {
         bump(playerId, arenaId, 0, 1);
     }
 
+    public int deleteForPlayer(UUID playerId) throws SQLException {
+        String sql = "DELETE FROM " + databaseService.table("ffa_stats") + " WHERE player_uuid = ?";
+        try (Connection connection = databaseService.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, playerId.toString());
+            return statement.executeUpdate();
+        }
+    }
+
+    public int deleteAll() throws SQLException {
+        try (Connection connection = databaseService.getConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "DELETE FROM " + databaseService.table("ffa_stats"))) {
+            return statement.executeUpdate();
+        }
+    }
+
     private void bump(UUID playerId, String arenaId, int kills, int deaths) throws SQLException {
         String id = arenaId.toLowerCase();
         try (Connection connection = databaseService.getConnection()) {

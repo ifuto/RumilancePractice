@@ -29,7 +29,7 @@ public final class SettingsRepository {
     public Optional<PlayerSettings> findByUuid(UUID uuid) throws SQLException {
         String sql = "SELECT uuid, sounds_enabled, scoreboard_enabled, arrow_effect, spectate_visible, "
                 + "accept_duel_requests, auto_requeue, hide_other_chat, chat_whitelist, locale, "
-                + "selected_title, show_match_report FROM "
+                + "selected_title, show_match_report, team_glow, team_colored_armor FROM "
                 + databaseService.table("player_settings") + " WHERE uuid = ?";
         try (Connection connection = databaseService.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -51,11 +51,12 @@ public final class SettingsRepository {
         String sql = "INSERT INTO " + databaseService.table("player_settings")
                 + " (uuid, sounds_enabled, scoreboard_enabled, arrow_effect, spectate_visible, "
                 + "accept_duel_requests, auto_requeue, hide_other_chat, chat_whitelist, locale, "
-                + "selected_title, show_match_report) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                + "selected_title, show_match_report, team_glow, team_colored_armor) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
                 + databaseService.upsertClause("uuid", "sounds_enabled", "scoreboard_enabled", "arrow_effect",
                 "spectate_visible", "accept_duel_requests", "auto_requeue", "hide_other_chat",
-                "chat_whitelist", "locale", "selected_title", "show_match_report");
+                "chat_whitelist", "locale", "selected_title", "show_match_report",
+                "team_glow", "team_colored_armor");
         try (Connection connection = databaseService.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, settings.uuid().toString());
@@ -70,6 +71,8 @@ public final class SettingsRepository {
             statement.setString(10, settings.locale());
             statement.setString(11, settings.selectedTitle());
             statement.setInt(12, settings.showMatchReport() ? 1 : 0);
+            statement.setInt(13, settings.teamGlow() ? 1 : 0);
+            statement.setInt(14, settings.teamColoredArmor() ? 1 : 0);
             statement.executeUpdate();
         }
     }
@@ -94,14 +97,12 @@ public final class SettingsRepository {
                 whitelist,
                 resultSet.getString("locale"),
                 columnOrDefault(resultSet, "selected_title", "none"),
-                columnOrDefault(resultSet, "show_match_report", 0) != 0
+                columnOrDefault(resultSet, "show_match_report", 0) != 0,
+                columnOrDefault(resultSet, "team_glow", 1) != 0,
+                columnOrDefault(resultSet, "team_colored_armor", 1) != 0
         );
     }
 
-    /**
-     * Reads a string column that may not exist yet (added by a later migration), returning a
-     * default when the column is absent.
-     */
     private static String columnOrDefault(ResultSet rs, String column, String def) throws SQLException {
         ResultSetMetaData meta = rs.getMetaData();
         for (int i = 1; i <= meta.getColumnCount(); i++) {
@@ -113,12 +114,12 @@ public final class SettingsRepository {
         return def;
     }
 
-    /** Same as {@link #columnOrDefault(ResultSet, String, String)} but for integer columns. */
     private static int columnOrDefault(ResultSet rs, String column, int def) throws SQLException {
         ResultSetMetaData meta = rs.getMetaData();
         for (int i = 1; i <= meta.getColumnCount(); i++) {
             if (column.equalsIgnoreCase(meta.getColumnName(i))) {
-                return rs.getInt(i);
+                int value = rs.getInt(i);
+                return rs.wasNull() ? def : value;
             }
         }
         return def;
