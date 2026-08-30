@@ -35,6 +35,8 @@ public final class SpectatorService {
     private final PluginSettings settings;
     private final Map<UUID, UUID> spectatorToMatch = new ConcurrentHashMap<>();
     private final Map<UUID, Set<UUID>> matchSpectators = new ConcurrentHashMap<>();
+    /** Spectators currently inside an FFA arena: spectator -> FFA arena id. */
+    private final Map<UUID, String> spectatorToFfa = new ConcurrentHashMap<>();
     /** Optional per-player border/view-distance control (null = feature off). */
     private volatile com.rumilance.practice.sight.ViewControlService viewControl;
     private volatile com.rumilance.practice.ffa.FfaService ffaService;
@@ -85,11 +87,21 @@ public final class SpectatorService {
             return false;
         }
         Optional<MatchSession> matchOpt = matchRegistry.byPlayer(target.getUniqueId());
-        if (matchOpt.isEmpty() || matchOpt.get().state() != MatchState.ACTIVE) {
-            spectator.sendMessage(Component.text("That player is not in an active match.", NamedTextColor.RED));
-            return false;
+        boolean inMatch = matchOpt.isPresent() && matchOpt.get().state() == MatchState.ACTIVE;
+
+        if (inMatch) {
+            return spectateMatch(spectator, target, matchOpt.get());
         }
-        MatchSession match = matchOpt.get();
+        // Not a duel/team match: spectate an FFA fighter instead (FFA players are tracked
+        // by FfaService, not the MatchRegistry).
+        if (ffaService != null && ffaService.isInFfa(target.getUniqueId())) {
+            return spectateFfa(spectator, target);
+        }
+        spectator.sendMessage(Component.text("That player is not in an active fight.", NamedTextColor.RED));
+        return false;
+    }
+
+    private boolean spectateMatch(Player spectator, Player target, MatchSession match) {
         for (UUID participant : match.participants()) {
             if (!settingsService.get(participant).spectateVisible()) {
                 spectator.sendMessage(Component.text("Spectating is disabled by a participant.", NamedTextColor.RED));
@@ -102,25 +114,63 @@ public final class SpectatorService {
             spectator.sendMessage(Component.text("Cannot enter spectate state.", NamedTextColor.RED));
             return false;
         }
+        spectatorToFfa.remove(spectator.getUniqueId());
         spectatorToMatch.put(spectator.getUniqueId(), match.id());
         matchSpectators.computeIfAbsent(match.id(), id -> ConcurrentHashMap.newKeySet()).add(spectator.getUniqueId());
         spectator.setGameMode(GameMode.SPECTATOR);
         spectator.setAllowFlight(settings.spectatorAllowFlight());
-        spectator.teleport(LocationUtil.safeTeleportLocation(target.getLocation(), spectator));
+        moveSpectatorTo(spectator, target.getLocation());
         // Confine the spectator's view to this arena (per-player border + view distance);
         // SpectatorBoundsListener is the hard server-side backstop against flying out.
         if (viewControl != null) {
             viewControl.applyForMatch(spectator, match);
         }
-        if (settings.spectatorHideFromPlayers()) {
-            hideInWorld(spectator);
-        }
+        hideInWorld(spectator);
         spectator.sendMessage(Component.text("Spectating " + target.getName(), NamedTextColor.AQUA));
         return true;
     }
 
+    private boolean spectateFfa(Player spectator, Player target) {
+        String arenaId = ffaService.arenaOf(target.getUniqueId()).orElse(null);
+        com.rumilance.practice.ffa.FfaService.FfaArena arena =
+                arenaId == null ? null : ffaService.get(arenaId).orElse(null);
+        if (arena == null || arena.region() == null) {
+            spectator.sendMessage(Component.text("That player is not in an active fight.", NamedTextColor.RED));
+            return false;
+        }
+        try {
+            stateManager.transition(spectator.getUniqueId(), PlayerState.SPECTATING);
+        } catch (Exception e) {
+            spectator.sendMessage(Component.text("Cannot enter spectate state.", NamedTextColor.RED));
+            return false;
+        }
+        spectatorToMatch.remove(spectator.getUniqueId());
+        spectatorToFfa.put(spectator.getUniqueId(), arenaId);
+        spectator.setGameMode(GameMode.SPECTATOR);
+        spectator.setAllowFlight(settings.spectatorAllowFlight());
+        moveSpectatorTo(spectator, target.getLocation());
+        // Confine the spectator's camera to the FFA arena region.
+        if (viewControl != null) {
+            viewControl.applyRegion(spectator, arena.region());
+        }
+        hideInWorld(spectator);
+        spectator.sendMessage(Component.text("Spectating FFA: " + target.getName(), NamedTextColor.AQUA));
+        return true;
+    }
+
+    /**
+     * Moves a spectator to the target spot via SafeTeleport (chunk-load + anti-bury) instead
+     * of a raw {@code teleport}, so spectating never drops the camera into blocks or a
+     * stale-border corner.
+     */
+    private void moveSpectatorTo(Player spectator, org.bukkit.Location at) {
+        com.rumilance.practice.util.SafeTeleport
+                .teleport(spectator, LocationUtil.safeTeleportLocation(at));
+    }
+
     public void leave(Player spectator) {
         UUID matchId = spectatorToMatch.remove(spectator.getUniqueId());
+        spectatorToFfa.remove(spectator.getUniqueId());
         if (matchId != null) {
             Set<UUID> set = matchSpectators.get(matchId);
             if (set != null) {
@@ -128,7 +178,10 @@ public final class SpectatorService {
             }
         }
         revealInWorld(spectator);
+        spectator.setAllowFlight(false);
+        spectator.setFlying(false);
         stateManager.resetToLobby(spectator.getUniqueId());
+        // sendToLobby already routes the return through SafeTeleport + post-teleport sight.
         lobbyService.sendToLobby(spectator);
     }
 
@@ -189,16 +242,37 @@ public final class SpectatorService {
     }
 
     public boolean isSpectating(UUID uuid) {
-        return spectatorToMatch.containsKey(uuid);
+        return spectatorToMatch.containsKey(uuid) || spectatorToFfa.containsKey(uuid);
     }
 
     public Optional<UUID> matchOf(UUID spectator) {
         return Optional.ofNullable(spectatorToMatch.get(spectator));
     }
 
-    /** FFA-arena spectate is not wired yet; reserved for scoreboard layouts. */
+    /** @return the FFA arena id this spectator is watching, if any. */
     public Optional<String> ffaArenaOf(UUID spectator) {
-        return Optional.empty();
+        return Optional.ofNullable(spectatorToFfa.get(spectator));
+    }
+
+    /** Clears all spectators watching an FFA arena (called when the arena resets). */
+    public void clearFfaArena(String arenaId) {
+        if (arenaId == null) {
+            return;
+        }
+        spectatorToFfa.entrySet().removeIf(e -> {
+            if (!arenaId.equals(e.getValue())) {
+                return false;
+            }
+            Player player = Bukkit.getPlayer(e.getKey());
+            if (player != null) {
+                revealInWorld(player);
+                player.setAllowFlight(false);
+                player.setFlying(false);
+                stateManager.resetToLobby(e.getKey());
+                lobbyService.sendToLobby(player);
+            }
+            return true;
+        });
     }
 
     /** Snapshot of spectators currently watching {@code matchId}. */

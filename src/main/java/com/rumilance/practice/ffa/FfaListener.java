@@ -268,6 +268,10 @@ public final class FfaListener implements Listener {
         if (kit.swordShieldBreak() && victim.isBlocking() && isSword(attacker.getInventory().getItemInMainHand().getType())) {
             victim.setCooldown(Material.SHIELD, 100);
             victim.clearActiveItem();
+            // Paper 1.20.6+ arms invulnerability frames on the shield hit so the follow-up
+            // swing after a break is swallowed; clear the victim's i-frames (Paper #10742).
+            com.rumilance.practice.combat.ShieldBreakStunFix.allowFollowUpHit(
+                    JavaPlugin.getProvidingPlugin(FfaListener.class), victim);
         }
         if (Math.abs(kit.knockbackMultiplier() - 1.0d) > 0.001d) {
             double mult = kit.knockbackMultiplier();

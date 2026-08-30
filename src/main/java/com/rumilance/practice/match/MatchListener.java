@@ -166,6 +166,10 @@ public final class MatchListener implements Listener {
                 && attacker.getInventory().getItemInMainHand().getType().name().endsWith("_SWORD")) {
             victim.setCooldown(Material.SHIELD, 100);
             victim.clearActiveItem();
+            // Paper 1.20.6+ arms invulnerability frames on the shield hit so the follow-up
+            // swing after a break is swallowed; clear the victim's i-frames (Paper #10742).
+            com.rumilance.practice.combat.ShieldBreakStunFix.allowFollowUpHit(
+                    org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(MatchListener.class), victim);
         }
         if (Math.abs(kit.knockbackMultiplier() - 1.0d) > 0.001d) {
             double mult = kit.knockbackMultiplier();

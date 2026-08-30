@@ -486,6 +486,8 @@ public final class FfaService {
             int streak = killStreaks.merge(killerId, 1, Integer::sum);
             Player killer = Bukkit.getPlayer(killerId);
             if (killer != null) {
+                // Full kit refill on a confirmed kill (someone other than yourself).
+                restoreKit(killer);
                 FfaStats s = stats(killerId);
                 killer.sendActionBar(Component.text("Kills: " + s.kills() + " Deaths: " + s.deaths(),
                         NamedTextColor.GOLD));

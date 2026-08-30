@@ -93,15 +93,38 @@ public final class SpectateListGui extends AbstractGui {
             }
         }
 
+        // FFA arenas with at least one fighter are spectatable too — one entry per live arena.
+        List<java.util.Map.Entry<com.rumilance.practice.ffa.FfaService.FfaArena, java.util.UUID>> ffa =
+                new java.util.ArrayList<>();
+        if (ffaService != null) {
+            for (com.rumilance.practice.ffa.FfaService.FfaArena arena : ffaService.list()) {
+                if (!arena.enabled()) {
+                    continue;
+                }
+                java.util.UUID target = firstFfaFighter(arena.id());
+                if (target != null) {
+                    ffa.add(java.util.Map.entry(arena, target));
+                }
+            }
+        }
+
+        int matchCount = active.size();
+        int total = matchCount + ffa.size();
+
         int page = session.page();
         int perPage = MenuScaffold.gridPageSize();
         int start = page * perPage;
         int index = 0;
-        for (int i = start; i < active.size() && index < perPage; i++, index++) {
-            inventory.setItem(MenuScaffold.gridSlot(index), matchIcon(player, active.get(i)));
+        for (int i = start; i < total && index < perPage; i++, index++) {
+            if (i < matchCount) {
+                inventory.setItem(MenuScaffold.gridSlot(index), matchIcon(player, active.get(i)));
+            } else {
+                var e = ffa.get(i - matchCount);
+                inventory.setItem(MenuScaffold.gridSlot(index), ffaIcon(player, e.getKey(), e.getValue()));
+            }
         }
 
-        if (active.isEmpty()) {
+        if (total == 0) {
             inventory.setItem(MenuScaffold.gridSlot(0),
                     ItemBuilder.of(Material.BARRIER)
                             .name(t(player, "gui.spectate-empty").color(UiTheme.MUTED))
@@ -110,8 +133,51 @@ public final class SpectateListGui extends AbstractGui {
                             .build());
         }
 
-        paintPaging(player, inventory, page, active.size());
+        paintPaging(player, inventory, page, total);
         paintNav(player, session, inventory);
+    }
+
+    private java.util.UUID firstFfaFighter(String arenaId) {
+        if (ffaService == null) {
+            return null;
+        }
+        for (java.util.UUID id : ffaService.occupantIds()) {
+            if (arenaId.equals(ffaService.arenaOf(id).orElse(null))) {
+                org.bukkit.entity.Player p = org.bukkit.Bukkit.getPlayer(id);
+                if (p != null && p.getGameMode() != org.bukkit.GameMode.SPECTATOR) {
+                    return id;
+                }
+            }
+        }
+        return null;
+    }
+
+    private ItemStack ffaIcon(Player viewer, com.rumilance.practice.ffa.FfaService.FfaArena arena, java.util.UUID target) {
+        Material iconMat = Material.IRON_SWORD;
+        if (kitService != null) {
+            KitDefinition kit = kitService.get(arena.kitId()).orElse(null);
+            if (kit != null) {
+                Material matched = Material.matchMaterial(kit.icon());
+                if (matched != null) {
+                    iconMat = matched;
+                }
+            }
+        }
+        return ItemBuilder.of(iconMat)
+                .name(Component.text(com.rumilance.practice.util.NameDisplay.pretty(arena.id()))
+                        .decoration(TextDecoration.ITALIC, false))
+                .lore(
+                        UiTheme.divider(),
+                        UiTheme.labelValue(line(viewer, "gui.spectate-kit"),
+                                com.rumilance.practice.util.KitNames.pretty(arena.kitId())),
+                        UiTheme.labelValue(line(viewer, "gui.spectate-mode"), "FFA"),
+                        UiTheme.blank(),
+                        UiTheme.status("LIVE", UiTheme.SUCCESS),
+                        UiTheme.hint(line(viewer, "gui.spectate-hint"))
+                )
+                .glint(true)
+                .action("spec:" + target.toString())
+                .build();
     }
 
     private ItemStack matchIcon(Player viewer, MatchSession match) {
