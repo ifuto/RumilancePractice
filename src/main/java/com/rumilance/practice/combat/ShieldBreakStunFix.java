@@ -23,7 +23,7 @@ public final class ShieldBreakStunFix {
     /** Ticks to keep the post-break target damageable (covers the vanilla stun window). */
     private static final int WINDOW_TICKS = 8;
     /** Victims whose shield was just broken -> tick timestamp of the break. */
-    private static final Map<UUID, Long> RECENT_BREAKS = new ConcurrentHashMap<>();
+    private static final Map<UUID, Integer> RECENT_BREAKS = new ConcurrentHashMap<>();
 
     private ShieldBreakStunFix() {
     }
@@ -60,8 +60,8 @@ public final class ShieldBreakStunFix {
         if (victim == null) {
             return false;
         }
-        Long tick = RECENT_BREAKS.get(victim.getUniqueId());
-        return tick != null && (Bukkit.getCurrentTick() - tick) <= (WINDOW_TICKS + 2L);
+        Integer tick = RECENT_BREAKS.get(victim.getUniqueId());
+        return tick != null && (Bukkit.getCurrentTick() - tick) <= (WINDOW_TICKS + 2);
     }
 
     /** @return true if the attacker is holding a sword/axe/mace (tools that can disable a shield). */
