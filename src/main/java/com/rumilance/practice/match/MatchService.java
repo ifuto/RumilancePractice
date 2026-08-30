@@ -107,6 +107,9 @@ public final class MatchService {
      */
     private final Map<UUID, Integer> lastLethalTickByMatch = new ConcurrentHashMap<>();
     private final Map<UUID, java.util.Set<UUID>> lethalPlayersByMatch = new ConcurrentHashMap<>();
+    /** Fighters whose lethal has already been processed this match — guards against a second
+     *  lethal event for the same player (double damage events in the 1-tick resolution window). */
+    private final Map<UUID, java.util.Set<UUID>> resolvedLethalByMatch = new ConcurrentHashMap<>();
     private com.rumilance.practice.spectator.SpectatorService spectatorService;
     private com.rumilance.practice.punishment.ChatBanService chatBanService;
     private SettingsService settingsService;
@@ -1100,6 +1103,15 @@ public final class MatchService {
         if (session.state() != MatchState.ACTIVE || session.isResultApplied()) {
             return;
         }
+        // Dedupe: a fighter can only be processed once per match. Without this, two lethal damage
+        // events for the same player (e.g. a pearl fall and a sword hit resolving in the same tick,
+        // before the 1-tick-deferred solo ruling ends the match) would double-count the kill, play
+        // the death sound twice and post two kill-feed lines.
+        java.util.Set<UUID> resolved = resolvedLethalByMatch
+                .computeIfAbsent(session.id(), k -> ConcurrentHashMap.newKeySet());
+        if (!resolved.add(victimId)) {
+            return;
+        }
         // Snapshot victim inventory before spectator / lobby wipe so kill-feed End Inv is accurate.
         Player victimPre = Bukkit.getPlayer(victimId);
         if (victimPre != null) {
@@ -1684,6 +1696,7 @@ public final class MatchService {
         combatTracker.clear(session.id());
         lastLethalTickByMatch.remove(session.id());
         lethalPlayersByMatch.remove(session.id());
+        resolvedLethalByMatch.remove(session.id());
         if (playerPlacedBlocks != null) {
             playerPlacedBlocks.clearScope(session.id().toString());
         }

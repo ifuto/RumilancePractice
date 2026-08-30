@@ -67,6 +67,14 @@ public final class PaperCombatCompatListener implements Listener {
         if (!combatant(player)) {
             return;
         }
+        // Never touch an ender-pearl / chorus-fruit move: those are in-fight mobility teleports
+        // and lowering the shield or arming a cooldown there would add bogus input lag. The
+        // MC-86252 desync is tied to dimension/plugin teleports, not to item teleports.
+        PlayerTeleportEvent.TeleportCause cause = event.getCause();
+        if (cause == PlayerTeleportEvent.TeleportCause.ENDER_PEARL
+                || cause == PlayerTeleportEvent.TeleportCause.CHORUS_FRUIT) {
+            return;
+        }
         if (player.isBlocking()) {
             player.clearActiveItem();
             try {

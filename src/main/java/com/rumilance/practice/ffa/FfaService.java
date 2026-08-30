@@ -161,6 +161,9 @@ public final class FfaService {
     private final Map<UUID, FfaStats> sessionStats = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> killStreaks = new ConcurrentHashMap<>();
     private final Map<UUID, CombatTag> combatUntil = new ConcurrentHashMap<>();
+    /** Last server tick each player went lethal — guards against double-processing a death. */
+    private final Map<UUID, Integer> lastLethalTick = new ConcurrentHashMap<>();
+    private static final int LETHAL_DEDUPE_TICKS = 20;
     private final Map<String, Boolean> resetting = new ConcurrentHashMap<>();
     private final Map<String, List<BlockChange>> blockDiffs = new ConcurrentHashMap<>();
     /** Per-arena countdown deadline (millis); absent or 0 = timer inactive. */
@@ -529,6 +532,14 @@ public final class FfaService {
     public void handleLethal(Player victim, UUID killerId) {
         String arenaId = playerArena.get(victim.getUniqueId());
         if (arenaId == null) {
+            return;
+        }
+        // Dedupe: ignore another lethal for a victim who already died within the respawn window
+        // (e.g. two lethal damage events in the same tick before the kit/health is restored).
+        // Without this the death/kill counts double and respawn() runs twice.
+        int now = Bukkit.getCurrentTick();
+        Integer last = lastLethalTick.put(victim.getUniqueId(), now);
+        if (last != null && now - last < LETHAL_DEDUPE_TICKS) {
             return;
         }
         soundService.play(victim, "death");
