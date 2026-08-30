@@ -1,5 +1,6 @@
 package com.rumilance.practice.combat;
 
+import org.bukkit.Material;
 import org.bukkit.entity.AbstractArrow;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
@@ -8,6 +9,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.projectiles.ProjectileSource;
 import org.bukkit.util.Vector;
@@ -50,6 +52,29 @@ public final class PaperCombatCompatListener implements Listener {
 
     private boolean combatant(Player player) {
         return player != null && combatantTest.test(player.getUniqueId());
+    }
+
+    /**
+     * MC-86252 class of bug: a raised shield can remain "blocking" server-side after a
+     * teleport / world change while the client is no longer blocking (an always-effective
+     * shield that also lets the player attack). Our arenas never cross dimensions, but the same
+     * desync can appear on our SafeTeleport moves. Drop any raised-shield state on teleport so
+     * the server can never keep blocking for a player who isn't.
+     */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onTeleportClearShield(PlayerTeleportEvent event) {
+        Player player = event.getPlayer();
+        if (!combatant(player)) {
+            return;
+        }
+        if (player.isBlocking()) {
+            player.clearActiveItem();
+            try {
+                player.setCooldown(Material.SHIELD, 2);
+            } catch (RuntimeException ignored) {
+                // Best effort.
+            }
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)

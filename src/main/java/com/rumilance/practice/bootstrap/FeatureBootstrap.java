@@ -917,7 +917,7 @@ public final class FeatureBootstrap {
         // Paper #11012/#9504: resync the hotbar when our kit/arena rules cancel a place/break.
         pm.registerEvents(new com.rumilance.practice.guard.BlockInteractionResyncListener(plugin, combatant), plugin);
         pm.registerEvents(new GoldenHeadListener(plugin, matchRegistry), plugin);
-        pm.registerEvents(new TotemPickupListener(), plugin);
+        pm.registerEvents(new TotemPickupListener(combatant), plugin);
         pm.registerEvents(guiListener, plugin);
         pm.registerEvents(kitAnvilRenameService, plugin);
         pm.registerEvents(opponentHealthNametagService, plugin);
