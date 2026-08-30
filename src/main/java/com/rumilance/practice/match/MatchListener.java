@@ -10,7 +10,6 @@ import com.rumilance.practice.util.ItemKeys;
 import com.rumilance.practice.util.KitBlockRules;
 import com.rumilance.practice.util.LocationUtil;
 import com.rumilance.practice.util.PlayerPlacedBlockTracker;
-import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.EnderCrystal;
 import org.bukkit.entity.Player;
@@ -34,7 +33,6 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.projectiles.ProjectileSource;
-import org.bukkit.util.Vector;
 
 import java.util.UUID;
 
@@ -171,15 +169,9 @@ public final class MatchListener implements Listener {
             com.rumilance.practice.combat.ShieldBreakStunFix.allowFollowUpHit(
                     org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(MatchListener.class), victim);
         }
-        if (Math.abs(kit.knockbackMultiplier() - 1.0d) > 0.001d) {
-            double mult = kit.knockbackMultiplier();
-            Bukkit.getScheduler().runTask(
-                    org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(MatchListener.class),
-                    () -> {
-                        Vector velocity = victim.getVelocity();
-                        victim.setVelocity(new Vector(velocity.getX() * mult, velocity.getY(), velocity.getZ() * mult));
-                    });
-        }
+        // Knockback coefficients (incl. per-kit horizontal scaling) are delegated to an
+        // external knockback plugin (KnockBackSync). No velocity scaling here, otherwise it
+        // would stack on top of the external plugin's shaped knockback.
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)

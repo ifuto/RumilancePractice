@@ -21,7 +21,6 @@ import com.rumilance.practice.combat.CombatSyncListener;
 import com.rumilance.practice.combat.TotemPickupListener;
 import com.rumilance.practice.combat.CrystalAnchorPerfListener;
 import com.rumilance.practice.combat.InstantExpCollectListener;
-import com.rumilance.practice.combat.KnockbackService;
 import com.rumilance.practice.combat.PaperCombatTuning;
 import com.rumilance.practice.combat.KillFeed;
 import com.rumilance.practice.command.AcceptDenyCommand;
@@ -35,7 +34,6 @@ import com.rumilance.practice.command.DuelCommand;
 import com.rumilance.practice.command.EkitAdminCommand;
 import com.rumilance.practice.command.FfaCommand;
 import com.rumilance.practice.command.GiveItemCommand;
-import com.rumilance.practice.command.KbCommand;
 import com.rumilance.practice.command.LangCommand;
 import com.rumilance.practice.command.LeaveCommand;
 import com.rumilance.practice.command.LobbyCommand;
@@ -458,10 +456,8 @@ public final class FeatureBootstrap {
 
         CombatSyncListener combatSync = new CombatSyncListener(
                 plugin, combatNet, matchService, ffaService, lobbyService, arenaService, viewControl, kitService);
-        KnockbackService knockbackService = new KnockbackService(plugin);
-        knockbackService.load();
-        combatSync.setKnockbackService(knockbackService);
-        services.register(KnockbackService.class, knockbackService);
+        // Knockback shaping (coefficients, Y/ping sync) is delegated to an external plugin
+        // (KnockBackSync); this plugin no longer creates its own knockback profile service.
         if (configService.config().getBoolean("combat.vanilla-item-swap", true)) {
             PaperCombatTuning.applyVanillaItemSwap(plugin.getLogger());
         }
@@ -1029,7 +1025,6 @@ public final class FeatureBootstrap {
         bind("matchreport", new MatchReportCommand(matchService, settingsService));
         bind("walltext", new WallTextCommand(wallTextService));
         bind("ffa", ffaCommand);
-        bind("kb", new KbCommand(knockbackService));
         bind("leave", new LeaveCommand(matchService, messageService));
         bind("team", new TeamCommand(teamService, kitService, teamHubGui, teamsBrowserGui, messageService));
         bind("prac", new PracCommand(practiceService));

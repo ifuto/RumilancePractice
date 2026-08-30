@@ -29,7 +29,6 @@ import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.projectiles.ProjectileSource;
-import org.bukkit.util.Vector;
 
 import java.util.UUID;
 
@@ -273,15 +272,8 @@ public final class FfaListener implements Listener {
             com.rumilance.practice.combat.ShieldBreakStunFix.allowFollowUpHit(
                     JavaPlugin.getProvidingPlugin(FfaListener.class), victim);
         }
-        if (Math.abs(kit.knockbackMultiplier() - 1.0d) > 0.001d) {
-            double mult = kit.knockbackMultiplier();
-            org.bukkit.Bukkit.getScheduler().runTask(
-                    org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(FfaListener.class),
-                    () -> {
-                        Vector velocity = victim.getVelocity();
-                        victim.setVelocity(new Vector(velocity.getX() * mult, velocity.getY(), velocity.getZ() * mult));
-                    });
-        }
+        // Knockback coefficients are delegated to an external knockback plugin (KnockBackSync);
+        // no per-kit velocity scaling here so it doesn't stack with the external plugin.
     }
 
     private static boolean isSword(Material material) {

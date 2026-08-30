@@ -28,7 +28,6 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.player.PlayerToggleSprintEvent;
-import org.bukkit.event.player.PlayerVelocityEvent;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.util.Vector;
@@ -40,13 +39,13 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Ping-aware combat netcode and anti-void transit:
  * <ul>
- *   <li>Knockback Y is rewritten so high-ping victims take the same off-ground combo
- *       as a 25ms player (stray / KnockbackSync baseline). Spikes skip compensation.</li>
  *   <li>Attacker crits are rewound by compensated ping so falling hits are not lost.</li>
  *   <li>Bukkit's sprint-stop-on-attack desync is repaired from the client's toggle intent.</li>
  *   <li>{@code PlayerFailMoveEvent} swallows "moved too quickly" rubberbands; burst packets
  *       after a client freeze are clamped instead of dumped into the void.</li>
  * </ul>
+ * Knockback shaping and ping/Y compensation are intentionally NOT handled here: they are
+ * delegated to an external knockback plugin (KnockBackSync).
  */
 public final class CombatSyncListener implements Listener {
 
@@ -58,7 +57,6 @@ public final class CombatSyncListener implements Listener {
     private final ArenaService arenaService;
     private final ViewControlService viewControl;
     private final KitService kitService;
-    private volatile KnockbackService knockbackService;
     private final Set<UUID> voidTotemExpected = ConcurrentHashMap.newKeySet();
 
     public CombatSyncListener(
@@ -79,10 +77,6 @@ public final class CombatSyncListener implements Listener {
         this.arenaService = arenaService;
         this.viewControl = viewControl;
         this.kitService = kitService;
-    }
-
-    public void setKnockbackService(KnockbackService knockbackService) {
-        this.knockbackService = knockbackService;
     }
 
     public CombatNetTracker tracker() {
@@ -231,72 +225,13 @@ public final class CombatSyncListener implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
-    public void onKnockbackSync(PlayerVelocityEvent event) {
-        Player player = event.getPlayer();
-        if (!isCombatant(player.getUniqueId())) {
-            return;
-        }
-        UUID id = player.getUniqueId();
-        // Pearl landings, explosions, fishing-rod pulls also fire this event. Rewriting Y
-        // there made pearls float and rods feel like melee knockback.
-        if (!tracker.takePendingMeleeKnockback(id)) {
-            return;
-        }
-        UUID attackerId = tracker.takePendingMeleeAttacker(id);
-        Player attacker = attackerId == null ? null : Bukkit.getPlayer(attackerId);
-        Vector preHit = tracker.takePendingPreHitVelocity(id);
-        boolean attackerSprinting = tracker.takePendingAttackerSprinting(id);
-        Vector velocity;
-        KnockbackService kb = knockbackService;
-        boolean rewriting = kb != null && kb.rewriteEnabled();
-        boolean syncing = kb != null && kb.syncEnabled();
-        double multiplier = tracker.takePendingKbMultiplier(id);
-        if (rewriting && attacker != null) {
-            // Rebuild from pre-hit motion so the preset replaces Paper (does not stack).
-            velocity = applyProfile(player, attacker, kb.profile(), preHit, attackerSprinting);
-            // Vanilla / Marlow KB Control: sprint hits cancel server sprint so W-tap matters.
-            if (attackerSprinting && attacker.isOnline()) {
-                attacker.setSprinting(false);
-            }
-        } else {
-            velocity = event.getVelocity().clone();
-        }
-        if (Math.abs(multiplier - 1.0d) > 0.001d) {
-            velocity.setX(velocity.getX() * multiplier);
-            velocity.setZ(velocity.getZ() * multiplier);
-        }
-        // KnockbackSync-style: adjust Y only (never re-scale XZ  Ethat made hits feel rubbery).
-        int ticks = tracker.isSpike(id) || tracker.inBurst(id) ? 0 : tracker.compensatedTicks(id);
-        if (syncing && ticks > 0) {
-            double ground = tracker.distanceToGround(player);
-            double preY = preHit != null ? preHit.getY() : tracker.lastVerticalVelocity(id);
-            boolean clientGround = CombatPhysics.clientOnGround(
-                    velocity.getY(), ground, ticks, CombatPhysics.GRAVITY);
-            if (player.isOnGround() && !clientGround) {
-                velocity.setY(CombatPhysics.toOffGroundVertical(velocity.getY(), preY));
-                velocity.setY(CombatPhysics.compensatedOffGroundVertical(velocity.getY(), ticks));
-            } else if (!player.isOnGround()) {
-                velocity.setY(CombatPhysics.compensatedOffGroundVertical(velocity.getY(), ticks));
-            }
-        }
-        event.setVelocity(velocity);
-        tracker.markKnockback(id, velocity.getY());
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onMeleeKnockbackMark(EntityDamageByEntityEvent event) {
-        if (!(event.getDamager() instanceof Player attacker) || !(event.getEntity() instanceof Player victim)) {
-            return;
-        }
-        if (isCombatant(victim.getUniqueId())) {
-            tracker.markPendingMeleeKnockback(
-                    victim.getUniqueId(),
-                    attacker.getUniqueId(),
-                    victim.getVelocity(),
-                    attacker.isSprinting());
-        }
-    }
+    // NOTE: Knockback is intentionally NOT touched here. Knockback shaping and ping/Y
+    // compensation are delegated to an external plugin (KnockBackSync), so this listener
+    // no longer rewrites PlayerVelocityEvent or scales melee velocity itself. Paper handles
+    // the vanilla sprint-stop-on-attack knockback bonus natively; the only place this
+    // plugin supplies a velocity for melee is PaperCombatCompatListener (shield-blocked /
+    // post-stun hits where Paper omits knockback entirely), which fires PlayerVelocityEvent
+    // so an external knockback plugin can still shape it.
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onFailMove(PlayerFailMoveEvent event) {
@@ -476,49 +411,6 @@ public final class CombatSyncListener implements Listener {
         UUID id = event.getPlayer().getUniqueId();
         voidTotemExpected.remove(id);
         tracker.remove(id);
-    }
-
-    private Vector applyProfile(
-            Player victim,
-            Player attacker,
-            KnockbackProfile profile,
-            Vector preHit,
-            boolean attackerSprinting
-    ) {
-        Location victimLoc = victim.getLocation();
-        Location attackerLoc = attacker.getLocation();
-        double dirX;
-        double dirZ;
-        if (profile.knockbackDirection() == KnockbackProfile.Direction.ATTACKER_LOOK) {
-            Vector look = attackerLoc.getDirection();
-            dirX = look.getX();
-            dirZ = look.getZ();
-        } else {
-            dirX = victimLoc.getX() - attackerLoc.getX();
-            dirZ = victimLoc.getZ() - attackerLoc.getZ();
-        }
-        Vector look = attackerLoc.getDirection();
-        Vector existing = preHit == null ? new Vector() : preHit;
-        Vector attackerVel = attacker.getVelocity();
-        return profile.apply(
-                existing.getX(), existing.getY(), existing.getZ(),
-                dirX, dirZ,
-                look.getX(), look.getZ(),
-                attackerVel.getX(), attackerVel.getZ(),
-                attackerSprinting,
-                victim.isOnGround(),
-                knockbackEnchantLevel(attacker)
-        );
-    }
-
-    private static int knockbackEnchantLevel(Player attacker) {
-        org.bukkit.inventory.ItemStack hand = attacker.getInventory().getItemInMainHand();
-        if (hand == null || hand.getType().isAir()) {
-            return 0;
-        }
-        org.bukkit.enchantments.Enchantment enchant = org.bukkit.Registry.ENCHANTMENT.get(
-                org.bukkit.NamespacedKey.minecraft("knockback"));
-        return enchant == null ? 0 : hand.getEnchantmentLevel(enchant);
     }
 
     public void rescue(Player player) {

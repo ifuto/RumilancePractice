@@ -269,10 +269,6 @@ commands:
     description: Place wall-mounted text labels (TextDisplay) on the block face in sight.
     usage: /walltext <set|scale|remove|list|reload> ...
     permission: rumilance.admin
-  kb:
-    description: Apply an operator knockback preset from plugins/RumilancePractice/kb/.
-    usage: /kb off | /kb set <file.json>
-    permission: rumilance.admin
 
 permissions:
   rumilance.user:

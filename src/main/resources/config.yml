@@ -136,9 +136,11 @@ performance:
   # Soft cap on particles spawned per player per visual effect (region selection, arrow trails).
   particle-limit-per-player: 40
 
-# Ping-aware combat netcode. Defaults match stray.gg / KnockbackSync 1.3.2.
+# Ping-aware combat netcode. This controls crit rewind and rubber-band/anti-void handling.
+# Knockback shaping (coefficients, horizontal/vertical KB, ping-based KB sync) is NOT done
+# here: install an external knockback plugin such as KnockBackSync and configure it there.
 # Compensation is clamped (max 320ms) and skipped on ping spikes so lag-switches cannot
-# buy extra knockback reduction or crit rewind.
+# buy extra crit rewind.
 combat:
   ping-offset-ms: 25
   spike-threshold-ms: 20
