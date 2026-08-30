@@ -591,6 +591,12 @@ public final class FfaService {
             return;
         }
         KitDefinition kit = kitService.get(arena.kitId()).orElse(null);
+        // Wipe the previous life's items BEFORE re-applying the kit. Without this reset,
+        // the fake-death flow (damage cancelled, no vanilla death screen) leaves the old
+        // kit on the player and KitLoadout#give was the only thing clearing it — a window
+        // in which looted/dropped items from the arena floor survived the respawn into
+        // the next life (and could later be carried back to the lobby).
+        com.rumilance.practice.util.PlayerVitals.fakeDeathReset(player);
         player.setHealth(player.getMaxHealth());
         player.setFireTicks(0);
         player.setCanPickupItems(true);

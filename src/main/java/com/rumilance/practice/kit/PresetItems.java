@@ -29,10 +29,15 @@ public final class PresetItems {
     public static final int MAX_SLOTS = SLOTS_PER_PAGE * MAX_PAGES;
     public static final String DATA_PREFIX = "data:";
 
+    /** YAML root for per-kit preset overrides: {@code kits.<kitId>.categories.<Cat>...}. */
+    public static final String KITS_ROOT = "kits";
+
     private final ConfigService configService;
     private final Map<String, Map<Integer, String>> items = new ConcurrentHashMap<>();
     /** Disk YAML key used per canonical category (e.g. {@code 防具} for {@code Armor}). */
     private final Map<String, String> yamlKeyByCategory = new ConcurrentHashMap<>();
+    /** Per-kit overrides: {@code kitId -> canonicalCategory -> slot -> value}. */
+    private final Map<String, Map<String, Map<Integer, String>>> kitItems = new ConcurrentHashMap<>();
 
     public PresetItems(ConfigService configService) {
         this.configService = configService;
@@ -42,6 +47,7 @@ public final class PresetItems {
     public void reload() {
         items.clear();
         yamlKeyByCategory.clear();
+        kitItems.clear();
         FileConfiguration yaml = configService.presetItems();
         ConfigurationSection root = yaml.getConfigurationSection("categories");
         if (root != null) {
@@ -68,11 +74,44 @@ public final class PresetItems {
             }
             items.putIfAbsent(category, Map.of());
         }
+        reloadKitOverrides(yaml);
+    }
+
+    /**
+     * Loads per-kit preset overrides from {@code kits.<kitId>.categories...}. A kit override
+     * replaces the global pool for that category <em>for that kit only</em>; categories the kit
+     * does not override fall through to the global pool.
+     */
+    private void reloadKitOverrides(FileConfiguration yaml) {
+        ConfigurationSection kits = yaml.getConfigurationSection(KITS_ROOT);
+        if (kits == null) {
+            return;
+        }
+        for (String kitId : kits.getKeys(false)) {
+            ConfigurationSection categories = yaml.getConfigurationSection(KITS_ROOT + "." + kitId + ".categories");
+            if (categories == null) {
+                continue;
+            }
+            Map<String, Map<Integer, String>> byCategory = new ConcurrentHashMap<>();
+            for (String yamlKey : categories.getKeys(false)) {
+                Map<Integer, String> loaded = loadUnder(yaml, KITS_ROOT + "." + kitId + ".categories", yamlKey);
+                if (!loaded.isEmpty()) {
+                    byCategory.put(CategoryKeys.canonicalPreset(yamlKey), loaded);
+                }
+            }
+            if (!byCategory.isEmpty()) {
+                kitItems.put(kitId.toLowerCase(java.util.Locale.ROOT), byCategory);
+            }
+        }
     }
 
     private Map<Integer, String> load(FileConfiguration yaml, String category) {
+        return loadUnder(yaml, "categories", category);
+    }
+
+    private Map<Integer, String> loadUnder(FileConfiguration yaml, String rootPath, String category) {
         Map<Integer, String> map = new TreeMap<>();
-        String base = "categories." + category;
+        String base = rootPath + "." + category;
         if (yaml.isList(base)) {
             List<String> list = yaml.getStringList(base);
             for (int i = 0; i < list.size() && i < MAX_SLOTS; i++) {
@@ -103,14 +142,60 @@ public final class PresetItems {
         return new TreeMap<>(items.getOrDefault(CategoryKeys.canonicalPreset(category), Map.of()));
     }
 
+    /**
+     * Slot map for {@code category} when editing {@code kitId}: the kit's own override if the
+     * kit defines that category, otherwise the global pool.
+     */
+    public Map<Integer, String> slots(String kitId, String category) {
+        String canonical = CategoryKeys.canonicalPreset(category);
+        Map<String, Map<Integer, String>> byCategory = kitOverride(kitId);
+        if (byCategory != null) {
+            Map<Integer, String> kitMap = byCategory.get(canonical);
+            if (kitMap != null && !kitMap.isEmpty()) {
+                return new TreeMap<>(kitMap);
+            }
+        }
+        return slots(category);
+    }
+
     public List<String> items(String category) {
         return List.copyOf(slots(category).values());
+    }
+
+    /** Per-kit variant of {@link #items(String)} (falls back to the global pool). */
+    public List<String> items(String kitId, String category) {
+        return List.copyOf(slots(kitId, category).values());
     }
 
     public String entryAt(String category, int slot) {
         String canonical = CategoryKeys.canonicalPreset(category);
         Map<Integer, String> map = items.get(canonical);
         return map == null ? null : map.get(slot);
+    }
+
+    /** Per-kit variant of {@link #entryAt(String, int)} (falls back to the global pool). */
+    public String entryAt(String kitId, String category, int slot) {
+        String canonical = CategoryKeys.canonicalPreset(category);
+        Map<String, Map<Integer, String>> byCategory = kitOverride(kitId);
+        if (byCategory != null) {
+            Map<Integer, String> kitMap = byCategory.get(canonical);
+            if (kitMap != null && kitMap.containsKey(slot)) {
+                return kitMap.get(slot);
+            }
+        }
+        return entryAt(category, slot);
+    }
+
+    /** True when {@code kitId} defines at least one preset category override. */
+    public boolean hasKitOverride(String kitId) {
+        return kitOverride(kitId) != null;
+    }
+
+    private Map<String, Map<Integer, String>> kitOverride(String kitId) {
+        if (kitId == null) {
+            return null;
+        }
+        return kitItems.get(kitId.toLowerCase(java.util.Locale.ROOT));
     }
 
     public boolean isPotionCategory(String category) {

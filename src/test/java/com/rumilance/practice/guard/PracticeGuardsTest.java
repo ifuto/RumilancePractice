@@ -405,4 +405,47 @@ class PracticeGuardsTest {
     ) {
         return new QueueService.QueueEntry(id, kit, mode, elo, joined, ip, platform);
     }
+
+    // --- Item flow guards ---
+
+    @Test
+    void hubStatesBlockVanillaContainerMoves() {
+        for (PlayerState state : new PlayerState[]{
+                PlayerState.IDLE, PlayerState.LOBBY, PlayerState.OPENING_GUI,
+                PlayerState.QUEUED_RANKED, PlayerState.QUEUED_UNRANKED,
+                PlayerState.REQUESTING_DUEL, PlayerState.EDITING_KIT,
+                PlayerState.PREPARING_MATCH, PlayerState.COUNTDOWN,
+                PlayerState.SPECTATING, PlayerState.ENDING}) {
+            assertTrue(PracticeGuards.vanillaContainerItemMoveBlocked(state),
+                    "state " + state + " must block container item moves");
+        }
+    }
+
+    @Test
+    void combatStatesAllowContainerAccess() {
+        // FIGHTING/FFA rely on kit flags; PRACTICE_ACTIVE uses its own inventories.
+        assertFalse(PracticeGuards.vanillaContainerItemMoveBlocked(PlayerState.FIGHTING));
+        assertFalse(PracticeGuards.vanillaContainerItemMoveBlocked(PlayerState.FFA));
+        assertFalse(PracticeGuards.vanillaContainerItemMoveBlocked(PlayerState.PRACTICE_ACTIVE));
+    }
+
+    @Test
+    void nullStateIsTreatedAsProtected() {
+        assertTrue(PracticeGuards.vanillaContainerItemMoveBlocked(null));
+        assertTrue(PracticeGuards.looseItemMoveBlocked(null));
+        assertTrue(PracticeGuards.lobbyProtectedStates(null));
+    }
+
+    @Test
+    void looseItemDropsBlockedInHubAndCountdownButNotInFight() {
+        assertTrue(PracticeGuards.looseItemMoveBlocked(PlayerState.LOBBY));
+        assertTrue(PracticeGuards.looseItemMoveBlocked(PlayerState.QUEUED_RANKED));
+        assertTrue(PracticeGuards.looseItemMoveBlocked(PlayerState.COUNTDOWN));
+        assertFalse(PracticeGuards.looseItemMoveBlocked(PlayerState.FIGHTING));
+        assertFalse(PracticeGuards.looseItemMoveBlocked(PlayerState.FFA));
+        // ENDING: rematch items may be clicked (GUI), but Q-dropping them into the world
+        // is blocked by MatchListener already; looseItemMoveBlocked governs world drops,
+        // and rematch items must never hit the ground.
+        assertTrue(PracticeGuards.looseItemMoveBlocked(PlayerState.ENDING));
+    }
 }

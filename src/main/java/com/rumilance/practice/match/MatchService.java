@@ -828,6 +828,14 @@ public final class MatchService {
     }
 
     private void startCountdown(MatchSession session) {
+        // Never start the countdown while a participant is outside the arena (or buried):
+        // on rematch especially, players stand where the last fight ended and an earlier
+        // teleport that technically succeeded but landed on a bad spot would otherwise
+        // freeze the fight outside the walls. Re-pin everyone onto their team spawn first.
+        ensureParticipantsInsideArena(session, () -> beginCountdown(session));
+    }
+
+    private void beginCountdown(MatchSession session) {
         session.setState(MatchState.COUNTDOWN);
         if (!transitionAll(session, PlayerState.COUNTDOWN)) {
             failMatch(session, "Could not start countdown");
@@ -855,6 +863,99 @@ public final class MatchService {
             remaining[0]--;
         }, 0L, 20L);
         tasks.put(session.id(), task);
+    }
+
+    /**
+     * Confirms every participant is standing inside the arena bounds and not buried before
+     * the countdown starts. Anyone misplaced is re-teleported to their team spawn. Only when
+     * all re-teleports report success does {@code andThen} run; if a spawn cannot be resolved
+     * (incomplete arena), the arena is released once and preparation is retried — so the
+     * countdown never begins with a player outside the walls.
+     */
+    private void ensureParticipantsInsideArena(MatchSession session, Runnable andThen) {
+        ArenaInstance instance = session.arenaInstanceId() == null
+                ? null
+                : arenaService.get(session.arenaInstanceId()).orElse(null);
+        if (instance == null) {
+            failMatch(session, "Arena missing before countdown");
+            return;
+        }
+        com.rumilance.practice.util.Cuboid bounds = instance.bounds();
+        Location spawnABase = LocationUtil.safeTeleportLocation(arenaService.spawnA(instance));
+        Location spawnBBase = LocationUtil.safeTeleportLocation(arenaService.spawnB(instance));
+
+        java.util.List<java.util.concurrent.CompletableFuture<Boolean>> teleports = new ArrayList<>();
+        for (UUID id : session.participants()) {
+            Player player = Bukkit.getPlayer(id);
+            if (player == null) {
+                failMatch(session, "Player offline during prepare");
+                return;
+            }
+            if (isCorrectlyPlaced(player, bounds)) {
+                continue;
+            }
+            TeamColor color = session.teamColor(id);
+            Location spawn = color == TeamColor.RED ? spawnABase : spawnBBase;
+            if (session.isTeamMatch()) {
+                List<UUID> side = session.team(color);
+                int withinTeam = side.indexOf(id);
+                double offset = (withinTeam - (side.size() - 1) / 2.0) * 1.2;
+                spawn = spawn.clone().add(offset, 0, 0);
+                spawn.setYaw(spawnABase.getYaw());
+                spawn.setPitch(spawnABase.getPitch());
+            }
+            teleports.add(SafeTeleport.teleport(player, LocationUtil.safeTeleportLocation(spawn, player)));
+        }
+
+        if (teleports.isEmpty()) {
+            andThen.run();
+            return;
+        }
+        plugin.getLogger().info("Re-pinning " + teleports.size()
+                + " participant(s) into arena " + instance.id() + " before countdown (match " + session.id() + ").");
+        java.util.concurrent.CompletableFuture.allOf(
+                teleports.toArray(new java.util.concurrent.CompletableFuture[0])
+        ).whenComplete((ignored, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
+            if (error != null || !allTeleportsSucceeded(teleports) || !allParticipantsPlaced(session, bounds)) {
+                // A spawn could not be resolved (freshly pasted / broken arena): reset the arena
+                // and retry the whole prepare once, matching the teleport-failure path.
+                KitDefinition kit = kitService.get(session.kitName()).orElse(null);
+                retryPrepareAfterBadArena(session, kit, instance, false);
+                return;
+            }
+            for (UUID id : session.participants()) {
+                Player player = Bukkit.getPlayer(id);
+                if (player != null) {
+                    applySight(player, session);
+                }
+            }
+            andThen.run();
+        }));
+    }
+
+    private boolean allParticipantsPlaced(MatchSession session, com.rumilance.practice.util.Cuboid bounds) {
+        for (UUID id : session.participants()) {
+            Player player = Bukkit.getPlayer(id);
+            if (player == null || !isCorrectlyPlaced(player, bounds)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Inside the arena horizontal bounds, within its vertical span, and not overlapping blocks. */
+    private boolean isCorrectlyPlaced(Player player, com.rumilance.practice.util.Cuboid bounds) {
+        Location at = player.getLocation();
+        if (at == null || at.getWorld() == null || bounds == null) {
+            return false;
+        }
+        if (!bounds.worldName().equals(at.getWorld().getName())) {
+            return false;
+        }
+        if (!bounds.contains(at)) {
+            return false;
+        }
+        return !com.rumilance.practice.util.SpawnFooting.isBuried(player);
     }
 
     private void beginFight(MatchSession session) {

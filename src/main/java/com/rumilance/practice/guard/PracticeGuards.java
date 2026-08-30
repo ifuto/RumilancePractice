@@ -378,4 +378,58 @@ public final class PracticeGuards {
         double depth = maxZ - minZ + 1;
         return Math.max(width, depth) + 2;
     }
+
+    // --- Item handling invariants ---
+
+    /**
+     * States in which a player must never move items through a <em>vanilla</em> container
+     * (chests, barrels, shulkers, hoppers/dispensers inventories...):
+     * <ul>
+     *   <li>non-combat states ({@link #lobbyProtectedStates(PlayerState)}) — combat kit
+     *       items must not exist there at all, so any container access is abuse;</li>
+     *   <li>{@code PREPARING_MATCH}/{@code COUNTDOWN}/{@code SPECTATING} — the kit is fixed
+     *       and nothing may be stashed or pulled.</li>
+     * </ul>
+     * Fighting ({@code FIGHTING}/{@code FFA}) is intentionally excluded: kits may place/use
+     * blocks, and PvP container rules are governed by kit flags elsewhere.
+     */
+    public static boolean vanillaContainerItemMoveBlocked(PlayerState state) {
+        if (state == null) {
+            return true;
+        }
+        if (lobbyProtectedStates(state)) {
+            return true;
+        }
+        return switch (state) {
+            case PREPARING_MATCH, COUNTDOWN, SPECTATING, ENDING -> true;
+            default -> false;
+        };
+    }
+
+    /**
+     * States where dropping / picking up loose items is illegal (the lobby inventory is a
+     * fixed hotbar and the player must not be carrying kit items at all).
+     */
+    public static boolean looseItemMoveBlocked(PlayerState state) {
+        return lobbyProtectedStates(state)
+                || state == PlayerState.PREPARING_MATCH
+                || state == PlayerState.COUNTDOWN
+                || state == PlayerState.SPECTATING
+                || state == PlayerState.ENDING;
+    }
+
+    /**
+     * Non-combat "hub" states: lobby, menus, queues, duel requests, idle. Matches the
+     * protection matrix in {@code LobbyListener#shouldProtect}.
+     */
+    public static boolean lobbyProtectedStates(PlayerState state) {
+        if (state == null) {
+            return true;
+        }
+        return switch (state) {
+            case IDLE, LOBBY, OPENING_GUI, QUEUED_RANKED, QUEUED_UNRANKED,
+                 REQUESTING_DUEL, EDITING_KIT, PRACTICE_WAIT -> true;
+            default -> false;
+        };
+    }
 }

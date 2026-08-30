@@ -55,3 +55,33 @@ categories:
     - EXPERIENCE_BOTTLE
     - FIREWORK_ROCKET
     - COOKED_BEEF
+
+# ─────────────────────────────────────────────────────────────────────────────
+# キット別プリセット（任意）
+#   プリセットはキットごとに異なる内容を設定できます。
+#   kits.<キットID>.categories.<カテゴリ> を定義すると、そのキットの編集時だけ
+#   グローバル categories の代わりにこの候補が使われます。
+#   定義していないカテゴリはグローバルの候補にフォールバックします。
+#
+#   カテゴリ名: Armor / Gear / Potions / Consumables
+#   （日本語キー 防具/武器/ポーション/消耗品 も可）
+#   値は Material 名 / ポーションエフェクト名 / data:<base64> NBT スナップショット。
+#   slots: 形式で配置スロットを明示することもできます（グローバルと同様）。
+#
+# 例: nodebuff キットではポーションと消耗品を独自候補にする
+#
+# kits:
+#   nodebuff:
+#     categories:
+#       Potions:
+#         - instant_health
+#         - regeneration
+#         - speed
+#       Consumables:
+#         - ENCHANTED_GOLDEN_APPLE
+#         - ENDER_PEARL
+#   boxing:
+#     categories:
+#       Gear:
+#         slots:
+#           0: IRON_SWORD

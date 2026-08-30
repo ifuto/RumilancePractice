@@ -402,9 +402,9 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
 
         PlayerInventory inv = player.getInventory();
         inv.clear();
-        List<String> catItems = presetItems.items(category);
+        String kitId = session.selectedKit();
         int start = page * PRESET_ITEMS_PER_PAGE;
-        java.util.Map<Integer, String> slotMap = presetItems.slots(category);
+        java.util.Map<Integer, String> slotMap = presetItems.slots(kitId, category);
         for (int i = 0; i < PRESET_ITEMS_PER_PAGE; i++) {
             int absSlot = start + i;
             String entry = slotMap.get(absSlot);
@@ -614,7 +614,7 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             }
             String category = session.get("preset_category", String.class);
             int page = presetPage(session);
-            java.util.Map<Integer, String> slotMap = presetItems.slots(category);
+            java.util.Map<Integer, String> slotMap = presetItems.slots(session.selectedKit(), category);
             int absSlot = page * PRESET_ITEMS_PER_PAGE + (slot - 9);
             String entry = slotMap.get(absSlot);
             if (entry == null) {
@@ -648,7 +648,7 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             if (slot == 8) {
                 String category = session.get("preset_category", String.class);
                 int page = presetPage(session);
-                java.util.Map<Integer, String> slotMap = presetItems.slots(category);
+                java.util.Map<Integer, String> slotMap = presetItems.slots(session.selectedKit(), category);
                 int maxSlot = slotMap.keySet().stream().mapToInt(Integer::intValue).max().orElse(-1);
                 if ((page + 1) * PRESET_ITEMS_PER_PAGE <= maxSlot) {
                     setPresetPage(session, page + 1);

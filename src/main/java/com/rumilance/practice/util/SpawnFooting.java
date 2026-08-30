@@ -22,6 +22,11 @@ public final class SpawnFooting {
     /** Same-column: pop out of a thick floor after schematic paste; not a cave hunt. */
     static final int PIN_UP = 16;
     static final int FORCE_UP = 48;
+
+    /** Upward scan cap for the post-teleport un-bury sweep in SafeTeleport. */
+    public static int maxLiftForUnbury() {
+        return FORCE_UP;
+    }
     private static final double HALF_WIDTH = 0.3d;
     private static final double HEIGHT = 1.8d;
     private static final double EPS = 1.0e-3d;

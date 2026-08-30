@@ -34,7 +34,8 @@ import java.io.File;
 import java.util.logging.Level;
 
 /**
- * NARENA main plugin entry. Data files remain under {@code plugins/RumilancePractice}.
+ * NARENA main plugin entry. Data files live under {@code plugins/n-arena}
+ * (auto-migrated from the legacy {@code plugins/RumilancePractice} folder once).
  */
 public final class RumilancePractice extends JavaPlugin {
 
@@ -60,6 +61,9 @@ public final class RumilancePractice extends JavaPlugin {
     private void enableInternal() {
         this.serviceRegistry = new ServiceRegistry();
         ItemKeys.init(this);
+
+        // One-shot migration from the legacy plugins/RumilancePractice folder (if present).
+        PluginIdentity.migrateLegacyDataIfNeeded(this);
 
         ConfigService configService = new ConfigService(this);
         configService.loadAll();
@@ -185,13 +189,13 @@ public final class RumilancePractice extends JavaPlugin {
         if (!bukkitFolder.exists() && !bukkitFolder.mkdirs()) {
             return;
         }
-        File pointer = new File(bukkitFolder, "USE_RumilancePractice_FOLDER.txt");
+        File pointer = new File(bukkitFolder, "USE_n-arena_FOLDER.txt");
         if (pointer.exists()) {
             return;
         }
         try {
             java.nio.file.Files.writeString(pointer.toPath(),
-                    "NARENA keeps all YAML and data in plugins/RumilancePractice/\n");
+                    "NARENA keeps all YAML and data in plugins/n-arena/\n");
         } catch (java.io.IOException ignored) {
         }
     }

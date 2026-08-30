@@ -81,6 +81,7 @@ import com.rumilance.practice.elo.EloCalculator;
 import com.rumilance.practice.ffa.FfaBlockTracker;
 import com.rumilance.practice.ffa.FfaListener;
 import com.rumilance.practice.ffa.FfaService;
+import com.rumilance.practice.guard.ItemFlowGuardListener;
 import com.rumilance.practice.ffa.FfaSpawnIndex;
 import com.rumilance.practice.gui.KitAnvilRenameService;
 import com.rumilance.practice.gui.KitEditStash;
@@ -837,6 +838,7 @@ public final class FeatureBootstrap {
                 spectatorService, matchRegistry, arenaService, ffaService), plugin);
         pm.registerEvents(new FfaListener(ffaService, kitService, stateManager, combatNet, practiceTnt, playerPlacedBlockTracker), plugin);
         pm.registerEvents(new FfaBlockTracker(ffaService), plugin);
+        pm.registerEvents(new ItemFlowGuardListener(stateManager, ffaService), plugin);
         pm.registerEvents(ffaSpawnIndex, plugin);
         pm.registerEvents(new InstantExpCollectListener(), plugin);
         pm.registerEvents(new PracticeTntListener(practiceTnt, matchService, ffaService, plugin), plugin);
