@@ -8,11 +8,15 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
+import org.bukkit.event.player.PlayerItemHeldEvent;
+import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.projectiles.ProjectileSource;
 import org.bukkit.util.Vector;
 
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 
 /**
@@ -38,8 +42,13 @@ import java.util.function.Predicate;
  */
 public final class PaperCombatCompatListener implements Listener {
 
+    /** Ticks in which a hit after a weapon draw/swap is treated as not fully charged (anti attribute-swap). */
+    private static final int SWAP_GRACE_TICKS = 5;
+
     private final Plugin plugin;
     private final Predicate<UUID> combatantTest;
+    /** Last tick a combatant drew/changed the item in a hand (hotbar scroll or F swap). */
+    private final Map<UUID, Integer> lastWeaponDraw = new ConcurrentHashMap<>();
 
     public PaperCombatCompatListener(Plugin plugin, Predicate<UUID> combatantTest) {
         this.plugin = plugin;
@@ -48,6 +57,58 @@ public final class PaperCombatCompatListener implements Listener {
 
     private boolean combatant(Player player) {
         return player != null && combatantTest.test(player.getUniqueId());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onHeldItem(PlayerItemHeldEvent event) {
+        if (combatant(event.getPlayer()) && ShieldBreakStunFix.holdsShieldBreaker(event.getPlayer())) {
+            lastWeaponDraw.put(event.getPlayer().getUniqueId(), org.bukkit.Bukkit.getCurrentTick());
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onSwapHands(PlayerSwapHandItemsEvent event) {
+        if (combatant(event.getPlayer()) && ShieldBreakStunFix.holdsShieldBreaker(event.getPlayer())) {
+            lastWeaponDraw.put(event.getPlayer().getUniqueId(), org.bukkit.Bukkit.getCurrentTick());
+        }
+    }
+
+    /**
+     * Paper #11552 / #13436 / #13588: quick-swapping from a non-cooldown item to a weapon makes
+     * {@code getAttackCooldown()} read 1.0 for a few ticks (attribute-swap), letting a freshly
+     * drawn axe/mace/spear land a free full-charge/crit hit. Treat such a hit as a glancing,
+     * non-charged swing: cap the damage low and strip the crit bonus.
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onAttributeSwapHit(EntityDamageByEntityEvent event) {
+        if (!(event.getDamager() instanceof Player attacker) || !(event.getEntity() instanceof Player victim)) {
+            return;
+        }
+        if (!combatant(attacker) || !combatant(victim)) {
+            return;
+        }
+        if (!ShieldBreakStunFix.holdsShieldBreaker(attacker)) {
+            return;
+        }
+        Integer drewAt = lastWeaponDraw.get(attacker.getUniqueId());
+        boolean justDrew = drewAt != null
+                && (org.bukkit.Bukkit.getCurrentTick() - drewAt) <= SWAP_GRACE_TICKS;
+        boolean uncharged = attacker.getAttackCooldown() < 0.9f;
+        if (!justDrew && !uncharged) {
+            return;
+        }
+        // Glancing hit: a not-yet-charged melee swing in vanilla deals ~20% and cannot crit.
+        event.setDamage(event.getDamage() * 0.2d);
+        stripCritical(event);
+    }
+
+    /** Clears the critical flag if the running Paper exposes the setter (1.21+ does). */
+    private static void stripCritical(EntityDamageByEntityEvent event) {
+        try {
+            event.getClass().getMethod("setCritical", boolean.class).invoke(event, false);
+        } catch (ReflectiveOperationException ignored) {
+            // Older API without the setter: the damage cap alone still prevents the one-shot.
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
