@@ -591,6 +591,7 @@ public final class MatchService {
                                          boolean arenaRetried) {
         Location spawnA = LocationUtil.safeTeleportLocation(arenaService.spawnA(instance));
         Location spawnB = LocationUtil.safeTeleportLocation(arenaService.spawnB(instance));
+        sweepLeftoverEntities(instance);
         List<java.util.concurrent.CompletableFuture<Boolean>> teleports = new ArrayList<>();
         for (UUID id : session.participants()) {
             Player player = Bukkit.getPlayer(id);
@@ -655,6 +656,7 @@ public final class MatchService {
         }
         Location spawnA = LocationUtil.safeTeleportLocation(arenaService.spawnA(instance));
         Location spawnB = LocationUtil.safeTeleportLocation(arenaService.spawnB(instance));
+        sweepLeftoverEntities(instance);
         // Brief beat (0.5s) so players register the MATCH FOUND notification before the teleport.
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (Bukkit.getPlayer(p1.getUniqueId()) == null || Bukkit.getPlayer(p2.getUniqueId()) == null) {
@@ -694,8 +696,53 @@ public final class MatchService {
         }, 10L);
     }
 
-    private static boolean allTeleportsSucceeded(java.util.List<java.util.concurrent.CompletableFuture<Boolean>> futures) {
-        if (futures == null || futures.isEmpty()) {
+    /**
+     * Removes combat leftovers from the previous occupant of a reused arena before players are
+     * teleported in: arrows/tridents, ender crystals, primed TNT, falling blocks, dropped items
+     * and other projectiles. Without this, arenas served by the FAWE-free SimpleArenaService
+     * (which only flips a reservation flag and never repastes) would carry an old fight's arrows
+     * and crystals into the next match — a stray arrow or armed crystal could hit a spawning
+     * fighter. Players and permanent fixtures (item frames, armor stands, NPCs) are left intact.
+     */
+    private void sweepLeftoverEntities(ArenaInstance instance) {
+        if (instance == null) {
+            return;
+        }
+        try {
+            com.rumilance.practice.util.Cuboid bounds = instance.bounds();
+            if (bounds == null) {
+                return;
+            }
+            org.bukkit.World world = bounds.world();
+            if (world == null) {
+                return;
+            }
+            for (org.bukkit.entity.Entity entity : world.getEntities()) {
+                if (entity instanceof org.bukkit.entity.Player) {
+                    continue;
+                }
+                if (!bounds.contains(entity.getLocation())) {
+                    continue;
+                }
+                if (entity instanceof org.bukkit.entity.AbstractArrow
+                        || entity instanceof org.bukkit.entity.EnderCrystal
+                        || entity instanceof org.bukkit.entity.TNTPrimed
+                        || entity instanceof org.bukkit.entity.ExplosiveMinecart
+                        || entity instanceof org.bukkit.entity.FallingBlock
+                        || entity instanceof org.bukkit.entity.Item
+                        || entity instanceof org.bukkit.entity.Projectile
+                        || entity instanceof org.bukkit.entity.EnderSignal
+                        || entity instanceof org.bukkit.entity.Firework) {
+                    entity.remove();
+                }
+            }
+        } catch (RuntimeException e) {
+            plugin.getLogger().log(java.util.logging.Level.WARNING,
+                    "Failed to sweep leftover entities in arena " + instance.id(), e);
+        }
+    }
+
+    private static boolean allTeleportsSucceeded(java.util.List<java.util.concurrent.CompletableFuture<Boolean>> futures) {        if (futures == null || futures.isEmpty()) {
             return false;
         }
         for (java.util.concurrent.CompletableFuture<Boolean> future : futures) {
