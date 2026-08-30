@@ -174,6 +174,13 @@ public final class KitAnvilRenameService implements Listener {
         });
     }
 
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onQuit(org.bukkit.event.player.PlayerQuitEvent event) {
+        // An anvil left open on disconnect does not fire InventoryCloseEvent, so drop the pending
+        // rename (which holds a cloned item + layout snapshot) to avoid a per-player leak.
+        pending.remove(event.getPlayer().getUniqueId());
+    }
+
     private void reopenEditor(Player player, String kitId, String preset, ItemStack[] layout) {
         if (editKitGui == null || !player.isOnline()) {
             return;
