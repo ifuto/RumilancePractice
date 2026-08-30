@@ -119,11 +119,16 @@ tasks.shadowJar {
         exclude(dependency("org.mariadb.jdbc:mariadb-java-client:.*"))
     }
 
+    // Resolve file paths at configuration time so the task is configuration-cache compatible
+    // (referencing Task.project at execution time is unsupported with the configuration cache).
+    val brandingIcon = layout.projectDirectory.file("src/main/resources/branding/server-icon.png")
+    val libsIcon = layout.buildDirectory.file("libs/server-icon.png")
+    val rootIcon = layout.projectDirectory.file("server-icon.png")
     doLast {
-        val icon = project.file("src/main/resources/branding/server-icon.png")
+        val icon = brandingIcon.asFile
         if (icon.exists()) {
-            icon.copyTo(project.file("build/libs/server-icon.png"), overwrite = true)
-            icon.copyTo(project.file("server-icon.png"), overwrite = true)
+            icon.copyTo(libsIcon.get().asFile, overwrite = true)
+            icon.copyTo(rootIcon.asFile, overwrite = true)
         } else {
             logger.warn("[Branding] branding/server-icon.png missing — ops icon not copied.")
         }
