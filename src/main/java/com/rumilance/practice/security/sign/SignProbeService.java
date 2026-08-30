@@ -270,6 +270,17 @@ public final class SignProbeService {
         }
     }
 
+    /** Drop all scan state for a player (call on quit). Without this a disconnect during the
+     *  short scan window leaks a {@link PendingProbe} that never gets a response and is never
+     *  reverted, and lingers in the map keyed by that player. */
+    public void abandon(UUID playerId) {
+        if (playerId == null) {
+            return;
+        }
+        pending.remove(playerId);
+        reportTargets.remove(playerId);
+    }
+
     private void onDetected(Player player, List<String> mods) {
         String joined = String.join(", ", mods);
         auditAsync(player, "SIGN_PROBE_HIT", "mods=" + joined);

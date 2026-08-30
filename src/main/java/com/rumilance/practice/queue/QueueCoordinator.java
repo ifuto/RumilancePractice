@@ -198,6 +198,9 @@ public final class QueueCoordinator {
         if (runtimeFlags.maintenance()) {
             return;
         }
+        // Belt-and-suspenders: evict any queued player who is no longer online (e.g. missed by the
+        // quit hook) BEFORE polling, so an offline entry can never be paired with a live waiter.
+        queueService.pruneOffline();
         List<QueueService.MatchPair> pairs = queueService.pollMatches(blockSameIp, avoidRecent, Instant.now());
         for (QueueService.MatchPair pair : pairs) {
             matchService.startDuel(

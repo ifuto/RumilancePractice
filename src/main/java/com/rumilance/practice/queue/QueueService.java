@@ -100,6 +100,16 @@ public final class QueueService {
         byQueue.clear();
     }
 
+    /** Remove entries for players who are no longer connected. Called before each matchmaking
+     *  poll so a disconnect-during-queue can never leave a ghost entry that pairs with a live
+     *  player. Runs on the main thread (scheduler tick). */
+    public synchronized void pruneOffline() {
+        byPlayer.values().removeIf(entry -> org.bukkit.Bukkit.getPlayer(entry.playerId()) == null);
+        for (List<QueueEntry> list : byQueue.values()) {
+            list.removeIf(e -> org.bukkit.Bukkit.getPlayer(e.playerId()) == null);
+        }
+    }
+
     public synchronized List<MatchPair> pollMatches(boolean blockSameIp, boolean avoidRecent, Instant now) {
         List<MatchPair> pairs = new ArrayList<>();
         for (Map.Entry<String, List<QueueEntry>> entry : byQueue.entrySet()) {

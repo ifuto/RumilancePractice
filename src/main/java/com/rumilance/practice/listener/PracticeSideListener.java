@@ -115,10 +115,10 @@ public final class PracticeSideListener implements Listener {
     public void onQuit(PlayerQuitEvent event) {
         settingsService.unload(event.getPlayer().getUniqueId());
         if (spectatorService.isSpectating(event.getPlayer().getUniqueId())) {
-            spectatorService.leave(event.getPlayer());
+            spectatorService.leave(event.getPlayer(), false);
         }
         if (ffaService.isInFfa(event.getPlayer().getUniqueId())) {
-            ffaService.leave(event.getPlayer());
+            ffaService.leaveOnQuit(event.getPlayer());
         }
         if (originalKitService != null) {
             originalKitService.restoreOnQuit(event.getPlayer().getUniqueId());

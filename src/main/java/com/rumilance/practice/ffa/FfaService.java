@@ -212,6 +212,10 @@ public final class FfaService {
         combatUntil.clear();
         nextResetAtMillis.clear();
         lastResetRemaining.clear();
+        lastLethalTick.clear();
+        playerArena.clear();
+        sessionStats.clear();
+        killStreaks.clear();
     }
 
     public void reload() {
@@ -376,12 +380,27 @@ public final class FfaService {
     }
 
     public void leave(Player player) {
+        leave(player, true);
+    }
+
+    /** Bookkeeping-only removal for a disconnecting player: drop the FFA maps without a
+     *  teleport / hub return / delayed re-send, all of which are wasted (and schedule needless
+     *  chunk loads) for someone who is leaving the server. */
+    public void leaveOnQuit(Player player) {
+        leave(player, false);
+    }
+
+    private void leave(Player player, boolean returnToLobby) {
         UUID id = player.getUniqueId();
         playerArena.remove(id);
         sessionStats.remove(id);
         killStreaks.remove(id);
         combatUntil.remove(id);
+        lastLethalTick.remove(id);
         stateManager.resetToLobby(id);
+        if (!returnToLobby || !player.isOnline()) {
+            return;
+        }
         if (hubReturn != null) {
             hubReturn.accept(player);
             Bukkit.getScheduler().runTaskLater(plugin, () -> {

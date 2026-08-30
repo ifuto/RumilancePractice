@@ -169,6 +169,15 @@ public final class SpectatorService {
     }
 
     public void leave(Player spectator) {
+        leave(spectator, true);
+    }
+
+    /**
+     * @param returnToLobby when false (used from PlayerQuitEvent) only drop the bookkeeping and
+     *                      visibility state; teleporting / re-applying a lobby inventory to a player
+     *                      who is disconnecting is wasted work and schedules needless chunk loads.
+     */
+    public void leave(Player spectator, boolean returnToLobby) {
         UUID matchId = spectatorToMatch.remove(spectator.getUniqueId());
         spectatorToFfa.remove(spectator.getUniqueId());
         if (matchId != null) {
@@ -177,10 +186,13 @@ public final class SpectatorService {
                 set.remove(spectator.getUniqueId());
             }
         }
+        stateManager.resetToLobby(spectator.getUniqueId());
+        if (!returnToLobby || !spectator.isOnline()) {
+            return;
+        }
         revealInWorld(spectator);
         spectator.setAllowFlight(false);
         spectator.setFlying(false);
-        stateManager.resetToLobby(spectator.getUniqueId());
         // sendToLobby already routes the return through SafeTeleport + post-teleport sight.
         lobbyService.sendToLobby(spectator);
     }

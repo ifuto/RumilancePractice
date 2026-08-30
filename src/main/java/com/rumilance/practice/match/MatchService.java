@@ -1421,9 +1421,15 @@ public final class MatchService {
             sendEndSummary(player, session, id, win);
         }
         // Drop the recent-match pointers after 60s so /matchreport cannot open a cleaned-up match.
-        UUID matchIdForCleanup = session.id();
-        Bukkit.getScheduler().runTaskLater(plugin,
-                () -> session.participants().forEach(recentMatch::remove), 60L * 20L);
+        // Only remove while the pointer still points at THIS match: a fast rematch / queue into a
+        // new match overwrites the entry, and an unconditional remove would then clear the NEW
+        // match's report pointer (making /matchreport fail for the follow-up game).
+        final UUID endedMatchId = session.id();
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            for (UUID id : session.participants()) {
+                recentMatch.remove(id, endedMatchId);
+            }
+        }, 60L * 20L);
 
         MatchResultProcessor processor = switch (session.mode()) {
             case RANKED -> rankedResultProcessor;

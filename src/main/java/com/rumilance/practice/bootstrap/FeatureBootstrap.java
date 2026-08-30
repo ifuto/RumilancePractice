@@ -948,6 +948,12 @@ public final class FeatureBootstrap {
                 plugin.getServer().getScheduler().runTaskLater(plugin,
                         () -> signProbeService.probe(joined, null), delay);
             }
+
+            @EventHandler
+            public void onQuit(PlayerQuitEvent event) {
+                // Release any in-flight probe state so a disconnect mid-scan can't leak it.
+                signProbeService.abandon(event.getPlayer().getUniqueId());
+            }
         }, plugin);
         PendingInput.init(plugin);
         FloatingTextCleanup.start(plugin,
