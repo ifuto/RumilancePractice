@@ -151,30 +151,43 @@ public final class LobbyService {
         applyLobbyResistance(player);
         applyLobbyInventory(player);
         Location destination = spawn();
+        java.util.function.Consumer<Player> hook = sightHook;
         if (destination != null && destination.getWorld() != null) {
-            Location safe = LocationUtil.safeTeleportLocation(destination, player);
+            Location safe = LocationUtil.safeTeleportLocation(destination);
+            // Teleport FIRST (SafeTeleport clears the stale arena/personal border), then
+            // apply the lobby border/view only after the move landed. Applying the lobby
+            // border before the teleport used to leave players clamped into a stale wall
+            // (and burying on return) because the border present during the teleport was
+            // the OLD arena/lobby one.
             player.teleportAsync(safe).thenAccept(ok -> {
+                player.setCompassTarget(destination);
                 if (Boolean.TRUE.equals(ok)) {
-                    player.setCompassTarget(destination);
+                    applySightAfterTeleport(player, hook);
                     return;
                 }
                 com.rumilance.practice.util.SafeTeleport.teleport(player, safe).thenAccept(retry -> {
-                    if (!Boolean.TRUE.equals(retry)) {
-                        org.bukkit.Bukkit.getScheduler().runTaskLater(
-                                org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(LobbyService.class),
-                                () -> {
-                                    if (player.isOnline()) {
-                                        player.teleportAsync(safe);
-                                        com.rumilance.practice.util.SafeTeleport.teleport(player, safe);
-                                    }
-                                }, 8L);
+                    if (Boolean.TRUE.equals(retry)) {
+                        applySightAfterTeleport(player, hook);
+                        return;
                     }
+                    org.bukkit.Bukkit.getScheduler().runTaskLater(
+                            org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(LobbyService.class),
+                            () -> {
+                                if (player.isOnline()) {
+                                    com.rumilance.practice.util.SafeTeleport.teleport(player, safe);
+                                    applySightAfterTeleport(player, hook);
+                                }
+                            }, 8L);
                 });
             });
             player.setCompassTarget(destination);
+        } else if (hook != null) {
+            hook.accept(player);
         }
-        java.util.function.Consumer<Player> hook = sightHook;
-        if (hook != null) {
+    }
+
+    private void applySightAfterTeleport(Player player, java.util.function.Consumer<Player> hook) {
+        if (hook != null && player != null && player.isOnline()) {
             hook.accept(player);
         }
     }

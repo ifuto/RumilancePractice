@@ -388,7 +388,9 @@ public final class TeamHubGui extends AbstractGui {
                 }
             }
             case "select_map" -> {
-                if (!owner || partyMapSelectGui == null) {
+                // Map selection now always goes through kit selection first: picking a kit
+                // opens that kit's party-map list, and choosing a map starts the battle.
+                if (!owner) {
                     return;
                 }
                 sounds.play(player, "gui-click");
@@ -396,7 +398,7 @@ public final class TeamHubGui extends AbstractGui {
                         org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
                         () -> {
                             if (player.isOnline()) {
-                                partyMapSelectGui.open(player);
+                                kitSelect.open(player);
                             }
                         });
             }

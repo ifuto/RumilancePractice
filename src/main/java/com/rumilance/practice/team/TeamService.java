@@ -419,6 +419,25 @@ public final class TeamService {
 
     // ---- start team battle (no queue) ----
 
+    /**
+     * Validates that {@code owner} could start a party battle right now (team, ownership,
+     * size, side balance), without consuming the chosen kit or map. Used to gate the kit →
+     * map selection flow before the player picks an arena.
+     */
+    public Result preflightStart(Player owner) {
+        Team team = byMember.get(owner.getUniqueId());
+        if (team == null) return Result.NOT_IN_TEAM;
+        if (!team.isOwner(owner.getUniqueId())) return Result.NOT_OWNER;
+        if (team.size() < MIN_TEAM_SIZE) return Result.TOO_SMALL;
+        if (!team.isSplitReady()) return Result.UNBALANCED;
+
+        List<UUID> red = new ArrayList<>(team.side(TeamColor.RED));
+        List<UUID> blue = new ArrayList<>(team.side(TeamColor.BLUE));
+        if (red.isEmpty() || blue.isEmpty()) return Result.UNBALANCED;
+        if (red.size() > MAX_SIDE_SIZE || blue.size() > MAX_SIDE_SIZE) return Result.UNBALANCED;
+        return Result.OK;
+    }
+
     public Result start(Player owner, String kitId) {
         Team team = byMember.get(owner.getUniqueId());
         if (team == null) return Result.NOT_IN_TEAM;

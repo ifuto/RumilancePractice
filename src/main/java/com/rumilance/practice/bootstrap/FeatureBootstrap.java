@@ -524,6 +524,41 @@ public final class FeatureBootstrap {
 
         RankService rankService = new RankService(plugin, rankRepository, asyncExecutor);
         services.register(RankService.class, rankService);
+        // When a player drops below VIP+, reset smithing trims to default: strip premium
+        // materials/patterns from everything worn/held, and scrub saved kit layouts.
+        final KitLayoutRepository kitLayoutRepositoryRef = kitLayoutRepository;
+        final AsyncExecutor asyncExecutorRef = asyncExecutor;
+        final org.slf4j.Logger trimLogger = plugin.getSLF4JLogger();
+        rankService.setRankChangeListener(player -> {
+            try {
+                int worn = com.rumilance.practice.cosmetic.ArmorTrimReset.stripPremiumTrims(
+                        java.util.Arrays.asList(player.getInventory().getContents()));
+                if (worn > 0) {
+                    player.updateInventory();
+                }
+            } catch (RuntimeException e) {
+                trimLogger.warn("Failed to reset worn trims on rank downgrade", e);
+            }
+            final java.util.UUID pid = player.getUniqueId();
+            asyncExecutorRef.runAsync(() -> {
+                try {
+                    for (var snap : kitLayoutRepositoryRef.findAllForPlayer(pid)) {
+                        org.bukkit.inventory.ItemStack[] items =
+                                com.rumilance.practice.util.ItemSerializer.fromBase64(snap.itemDataBase64());
+                        if (items == null) {
+                            continue;
+                        }
+                        if (com.rumilance.practice.cosmetic.ArmorTrimReset.stripPremiumTrims(java.util.Arrays.asList(items)) > 0) {
+                            kitLayoutRepositoryRef.upsert(com.rumilance.practice.model.KitLayoutSnapshot.create(
+                                    snap.uuid(), snap.kit(),
+                                    com.rumilance.practice.util.ItemSerializer.toBase64(items)));
+                        }
+                    }
+                } catch (RuntimeException | java.sql.SQLException e) {
+                    trimLogger.warn("Failed to reset saved kit trims on rank downgrade", e);
+                }
+            });
+        });
 
         QueueKitGui rankedGui = new QueueKitGui(
                 guiSessions, soundService, kitService, queueService, queueCoordinator, true);
@@ -590,6 +625,8 @@ public final class FeatureBootstrap {
         PartyMapSelectGui partyMapSelectGui = new PartyMapSelectGui(
                 guiSessions, soundService, teamService, arenaStore, kitService);
         partyMapSelectGui.setTeamHubGui(teamHubGui);
+        partyMapSelectGui.setTeamKitSelectGui(teamKitSelectGui);
+        teamKitSelectGui.setPartyMapSelectGui(partyMapSelectGui);
         teamHubGui.setPartyMapSelectGui(partyMapSelectGui);
         teamHubGui.setArenaStoreSupplier(arenaStore::partyArenas);
         ArenaAdminGui arenaAdminGui = new ArenaAdminGui(
@@ -599,6 +636,11 @@ public final class FeatureBootstrap {
 
         PresetItems presetItems = new PresetItems(configService);
         services.register(PresetItems.class, presetItems);
+        // Wire the kit-id catalogue so each kit gets its own independently-editable
+        // preset; wiring also performs the one-time migration of the old shared pool.
+        presetItems.setKitIdProvider(() -> kitService.all().stream()
+                .map(com.rumilance.practice.model.KitDefinition::name)
+                .toList());
         EditKitGui editKitGui = new EditKitGui(
                 guiSessions, soundService, kitService, kitLayoutRepository, layoutCache, asyncExecutor,
                 stateManager, presetItems);
@@ -824,6 +866,7 @@ public final class FeatureBootstrap {
 
         PluginManager pm = plugin.getServer().getPluginManager();
         pm.registerEvents(new BanLoginListener(banService), plugin);
+        pm.registerEvents(new com.rumilance.practice.listener.ChatBanGuardListener(chatBanService), plugin);
         pm.registerEvents(new SessionBootstrapListener(
                 sessionManager, stateManager, lobbyService, settings.defaultLocale(), playerRepository,
                 layoutCache, settingsService, asyncExecutor, plugin, messageService, rankService, chatBanService), plugin);

@@ -278,7 +278,7 @@ public final class FfaService {
         if (arena == null || arena.spawn() == null) {
             return null;
         }
-        return LocationUtil.safeTeleportLocation(arena.spawn(), player);
+        return LocationUtil.safeTeleportLocation(arena.spawn());
     }
 
     /** Re-applies per-player border / view distance for the player's current FFA arena. */
@@ -352,7 +352,7 @@ public final class FfaService {
             messageService.send(player, "ffa.unavailable");
             return false;
         }
-        SafeTeleport.teleport(player, LocationUtil.safeTeleportLocation(dest, player))
+        SafeTeleport.teleport(player, LocationUtil.safeTeleportLocation(dest))
                 .whenComplete((ok, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
                     if (!player.isOnline() || !isInFfa(player.getUniqueId())) {
                         return;
@@ -622,9 +622,18 @@ public final class FfaService {
 
     private void teleportIntoArena(Player player, FfaArena arena) {
         Location dest = pickSpawn(arena, player.getUniqueId());
-        if (dest != null && dest.getWorld() != null) {
-            SafeTeleport.teleport(player, LocationUtil.safeTeleportLocation(dest, player));
+        if (dest == null || dest.getWorld() == null) {
+            return;
         }
+        // SafeTeleport clears the stale per-player border before the move; re-apply THIS
+        // arena's region border/view only after the teleport landed, so a wiped border can
+        // never leave the FFA player with no (or the lobby's) wall.
+        SafeTeleport.teleport(player, LocationUtil.safeTeleportLocation(dest))
+                .whenComplete((ok, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (player.isOnline() && isInFfa(player.getUniqueId())) {
+                        applySight(player);
+                    }
+                }));
     }
 
     private Location pickSpawn(FfaArena arena, UUID joining) {

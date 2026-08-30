@@ -55,15 +55,10 @@ public final class PracticeSideListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onChat(AsyncChatEvent event) {
+        // NOTE: chat-ban enforcement lives in ChatBanGuardListener (LOWEST, runs even if
+        // another plugin cancelled the event). This handler only covers GUI chat input
+        // (whitelist / hide-chat input); it must not gate normal chat.
         Player player = event.getPlayer();
-        if (chatBanService.isChatBanned(player.getUniqueId())
-                && !player.hasPermission("rumilance.punishment.bypass")) {
-            event.setCancelled(true);
-            player.sendMessage(net.kyori.adventure.text.Component.text(
-                    "You are ChatBanned. /objection <reason>",
-                    net.kyori.adventure.text.format.NamedTextColor.RED));
-            return;
-        }
         guiSessions.get(player.getUniqueId()).ifPresent(session -> {
             if (Boolean.TRUE.equals(session.get("await_whitelist", Boolean.class))) {
                 event.setCancelled(true);

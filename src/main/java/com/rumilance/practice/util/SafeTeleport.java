@@ -59,11 +59,20 @@ public final class SafeTeleport {
         Location target = dest;
         if (footingAdjust) {
             Location clear = SpawnFooting.standOneAbove(dest);
-            if (clear == null) {
-                return false;
+            if (clear != null) {
+                target = clear;
             }
-            target = clear;
+            // No footing found (void / incomplete schematic): still teleport to the raw
+            // desired point instead of failing. Lobby spawns are configured safe, and a
+            // failed footing attempt must not strand players with "could not teleport".
+            // The post-teleport un-bury sweep catches anyone still overlapping blocks.
         }
+        // Reset any stale per-player WorldBorder (lobby / previous arena) BEFORE the
+        // teleport. Paper enforces the border during teleport and would otherwise reject
+        // or clamp the player back onto the OLD border's corner — the source of the
+        // "rematch snaps to a random arena corner" and "border in a weird place" bugs.
+        // Callers re-apply the destination area's border AFTER the teleport succeeds.
+        resetPersonalBorder(player);
         player.setVelocity(new Vector());
         player.setFallDistance(0f);
         boolean ok = player.teleport(target);
@@ -71,6 +80,15 @@ public final class SafeTeleport {
             unBury(player);
         }
         return ok;
+    }
+
+    private static void resetPersonalBorder(Player player) {
+        try {
+            // null restores the world's default border (see ViewControlService#clear).
+            player.setWorldBorder(null);
+        } catch (RuntimeException ignored) {
+            // Older/forked servers without per-player borders: nothing to reset.
+        }
     }
 
     /**

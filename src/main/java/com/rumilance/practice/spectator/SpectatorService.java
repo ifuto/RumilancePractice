@@ -134,14 +134,25 @@ public final class SpectatorService {
 
     /** World-only hide so TAB still lists spectators / dead fighters. */
     public void hideInWorld(Player hidden) {
-        if (hidden == null || !settings.spectatorHideFromPlayers()) {
+        if (hidden == null) {
             return;
         }
+        // Spectators are ALWAYS fully invisible to everyone, including other spectators:
+        // a spectator must never see another camera flying around.
+        boolean hiddenIsSpectator = hidden.getGameMode() == GameMode.SPECTATOR
+                || isSpectating(hidden.getUniqueId());
         for (Player online : Bukkit.getOnlinePlayers()) {
             if (online.equals(hidden)) {
                 continue;
             }
-            online.hideEntity(plugin, hidden);
+            if (hiddenIsSpectator) {
+                online.hideEntity(plugin, hidden);
+                hidden.hideEntity(plugin, online);
+                continue;
+            }
+            if (settings.spectatorHideFromPlayers()) {
+                online.hideEntity(plugin, hidden);
+            }
             if (online.getGameMode() == GameMode.SPECTATOR) {
                 hidden.hideEntity(plugin, online);
             }

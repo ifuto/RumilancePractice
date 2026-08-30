@@ -192,8 +192,8 @@ commands:
     usage: /setfunc <ranked|unranked|ffa|ekit|settings|spectate|titles|party|menu|battle|leavequeue>
     permission: rumilance.admin
   setrank:
-    description: Set a player's donor/staff rank (OP).
-    usage: /setrank <player> <norm|VIP|VIP+|admin|owner>
+    description: Set a player's donor/staff rank (OP), optionally for a duration.
+    usage: /rank <player> <norm|VIP|VIP+|admin|owner> [duration e.g. 30d]
     aliases: [rank]
     permission: rumilance.admin
   arena:

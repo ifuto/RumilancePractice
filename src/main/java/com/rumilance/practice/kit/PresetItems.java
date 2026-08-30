@@ -31,6 +31,8 @@ public final class PresetItems {
 
     /** YAML root for per-kit preset overrides: {@code kits.<kitId>.categories.<Cat>...}. */
     public static final String KITS_ROOT = "kits";
+    /** One-shot migration marker: set once the legacy global pool has been copied per kit. */
+    public static final String MIGRATION_KEY = "_per-kit-migrated";
 
     private final ConfigService configService;
     private final Map<String, Map<Integer, String>> items = new ConcurrentHashMap<>();
@@ -38,10 +40,74 @@ public final class PresetItems {
     private final Map<String, String> yamlKeyByCategory = new ConcurrentHashMap<>();
     /** Per-kit overrides: {@code kitId -> canonicalCategory -> slot -> value}. */
     private final Map<String, Map<String, Map<Integer, String>>> kitItems = new ConcurrentHashMap<>();
+    /** Supplies the current kit ids so the one-time global->per-kit copy knows all targets. */
+    private volatile java.util.function.Supplier<java.util.Collection<String>> kitIdProvider;
 
     public PresetItems(ConfigService configService) {
         this.configService = configService;
         reload();
+    }
+
+    /**
+     * Wires the kit catalogue and immediately performs the one-time migration: if the YAML
+     * has a global {@code categories} pool but no {@code kits.<id>.categories} and no migration
+     * marker, the global pool is duplicated into <strong>every</strong> kit so each kit gets its
+     * own independently-editable preset (previously every kit silently shared the global pool).
+     */
+    public void setKitIdProvider(java.util.function.Supplier<java.util.Collection<String>> kitIdProvider) {
+        this.kitIdProvider = kitIdProvider;
+        migrateGlobalToPerKit();
+    }
+
+    private synchronized void migrateGlobalToPerKit() {
+        FileConfiguration yaml = configService.presetItems();
+        if (yaml.getBoolean(MIGRATION_KEY, false)) {
+            return;
+        }
+        ConfigurationSection kits = yaml.getConfigurationSection(KITS_ROOT);
+        boolean anyKitSection = kits != null && !kits.getKeys(false).isEmpty();
+        if (anyKitSection) {
+            yaml.set(MIGRATION_KEY, true);
+            configService.save(ConfigService.PRESET_ITEMS);
+            return;
+        }
+        if (kitIdProvider == null) {
+            return;
+        }
+        java.util.Collection<String> kitIds = kitIdProvider.get();
+        if (kitIds == null || kitIds.isEmpty()) {
+            return;
+        }
+        Map<String, Map<Integer, String>> global = new LinkedHashMap<>();
+        for (String category : CATEGORIES) {
+            Map<Integer, String> map = slots(category);
+            if (!map.isEmpty()) {
+                global.put(category, new TreeMap<>(map));
+            }
+        }
+        if (global.isEmpty()) {
+            yaml.set(MIGRATION_KEY, true);
+            configService.save(ConfigService.PRESET_ITEMS);
+            return;
+        }
+        for (String kitId : kitIds) {
+            if (kitId == null || kitId.isBlank()) {
+                continue;
+            }
+            String key = kitId.toLowerCase(java.util.Locale.ROOT);
+            for (Map.Entry<String, Map<Integer, String>> e : global.entrySet()) {
+                String canonical = e.getKey();
+                String yamlCat = yamlKeyByCategory.getOrDefault(canonical, canonical);
+                String base = KITS_ROOT + "." + key + ".categories." + yamlCat + ".slots";
+                for (Map.Entry<Integer, String> slot : e.getValue().entrySet()) {
+                    yaml.set(base + "." + slot.getKey(), slot.getValue());
+                }
+                kitItems.computeIfAbsent(key, k -> new ConcurrentHashMap<>())
+                        .put(canonical, new TreeMap<>(e.getValue()));
+            }
+        }
+        yaml.set(MIGRATION_KEY, true);
+        configService.save(ConfigService.PRESET_ITEMS);
     }
 
     public void reload() {

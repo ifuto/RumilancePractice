@@ -61,7 +61,9 @@ public final class BanCommand implements CommandExecutor, TabCompleter {
     private boolean handleBan(CommandSender sender, String[] args) {
         if (args.length < 2) {
             sender.sendMessage(Component.text(
-                    "Usage: /ban <player> <reason> [duration<d|w|mo>]", NamedTextColor.YELLOW));
+                    "Usage: /ban <player> <reason_with_underscores> [duration<d|w|mo>]", NamedTextColor.YELLOW));
+            sender.sendMessage(Component.text(
+                    "Example: /ban Steve Cheating_Advertising 30d  (_ becomes a space)", NamedTextColor.GRAY));
             return true;
         }
         String targetName = args[0];
@@ -91,13 +93,23 @@ public final class BanCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(Component.text("Reason is required.", NamedTextColor.RED));
             return true;
         }
+        // Multi-word reasons use underscores (Cheating_Teaming -> "Cheating Teaming"); typed
+        // casing is preserved verbatim (same KEEP-casing rule as kit name registration).
+        String reasonText = com.rumilance.practice.util.KitNames.pretty(reason.toString()).trim();
+        if (reasonText.isEmpty()) {
+            sender.sendMessage(Component.text("Reason is required.", NamedTextColor.RED));
+            return true;
+        }
         String storedName = BanService.nameOf(targetId, targetName);
         if (durationToken != null && durationToken.equalsIgnoreCase("auto")) {
             int offense = banService.banCount(targetId) + 1;
             duration = BanDuration.forOffenseNumber(offense);
             durationToken = BanDuration.autoToken(offense);
         }
-        banService.ban(targetId, storedName, reason.toString(), duration, durationToken, sender.getName());
+        banService.ban(targetId, storedName, reasonText, duration, durationToken, sender.getName());
+        sender.sendMessage(Component.text("Banned " + targetName + " for \"" + reasonText + "\""
+                + (durationToken != null ? " (" + durationToken + ")." : " (permanent)."),
+                NamedTextColor.GREEN));
         return true;
     }
 

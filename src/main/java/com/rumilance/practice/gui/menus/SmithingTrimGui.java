@@ -149,14 +149,18 @@ public final class SmithingTrimGui extends AbstractGui implements GuiCloseHandle
                         UiTheme.hint(line(player, "gui.trim-vip-materials"))
                 );
             }
-            int slot = matIndex < 5
+            // 10 ores don't fit a single 9-wide chest row. Lay them out as one tight band:
+            // the first 9 fill row 4, and the 10th sits at the start of row 5 — keeping all
+            // materials together (no 5/5 split) and clear of the apply/back controls which
+            // occupy the right of row 5.
+            int slot = matIndex < 9
                     ? GuiSlots.slot(4, matIndex)
-                    : GuiSlots.slot(5, matIndex - 5);
+                    : GuiSlots.slot(5, 0);
             inventory.setItem(slot, matBuilder.build());
             matIndex++;
         }
 
-        inventory.setItem(GuiSlots.slot(5, 3),
+        inventory.setItem(GuiSlots.slot(5, 7),
                 ItemBuilder.of(Material.SMITHING_TABLE)
                         .name(t(player, "gui.trim-apply").color(UiTheme.SUCCESS))
                         .lore(
@@ -166,7 +170,7 @@ public final class SmithingTrimGui extends AbstractGui implements GuiCloseHandle
                         )
                         .action("apply")
                         .build());
-        inventory.setItem(GuiSlots.slot(5, 5),
+        inventory.setItem(GuiSlots.slot(5, 8),
                 ItemBuilder.action(UiTheme.BACK, t(player, "menu.back"), "back"));
     }
 

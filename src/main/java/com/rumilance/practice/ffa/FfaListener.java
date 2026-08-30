@@ -117,7 +117,7 @@ public final class FfaListener implements Listener {
         }
         org.bukkit.Location dest = ffaService.respawnLocation(event.getPlayer());
         if (dest != null && dest.getWorld() != null) {
-            event.setRespawnLocation(LocationUtil.safeTeleportLocation(dest, event.getPlayer()));
+            event.setRespawnLocation(LocationUtil.safeTeleportLocation(dest));
         }
         org.bukkit.plugin.Plugin plugin = JavaPlugin.getProvidingPlugin(FfaListener.class);
         if (plugin != null) {

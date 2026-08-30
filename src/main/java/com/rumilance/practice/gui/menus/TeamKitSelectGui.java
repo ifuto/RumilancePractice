@@ -33,6 +33,7 @@ public final class TeamKitSelectGui extends AbstractGui {
     private final TeamService teamService;
     private final KitService kitService;
     private final com.rumilance.practice.locale.MessageService messageService;
+    private PartyMapSelectGui partyMapSelectGui;
 
     public TeamKitSelectGui(GuiSessionRegistry registry, SoundService sounds,
                             TeamService teamService, KitService kitService) {
@@ -46,6 +47,14 @@ public final class TeamKitSelectGui extends AbstractGui {
         this.teamService = teamService;
         this.kitService = kitService;
         this.messageService = messageService;
+    }
+
+    /**
+     * Party flow: pick a kit here, then pick the party map in {@link PartyMapSelectGui};
+     * the match starts when the map is chosen. Wired from bootstrap.
+     */
+    public void setPartyMapSelectGui(PartyMapSelectGui partyMapSelectGui) {
+        this.partyMapSelectGui = partyMapSelectGui;
     }
 
     @Override
@@ -104,12 +113,33 @@ public final class TeamKitSelectGui extends AbstractGui {
             default -> {
                 if (action.startsWith("kit:")) {
                     String kitId = action.substring("kit:".length());
-                    player.closeInventory();
-                    TeamService.Result r = teamService.start(player, kitId);
-                    sounds.play(player, r == TeamService.Result.OK ? "match-found" : "error");
-                    if (r != TeamService.Result.OK) {
-                        player.sendMessage(Component.text(teamService.errorMessage(player, r), UiTheme.DANGER)
+                    // Validate split readiness BEFORE entering map selection so the owner
+                    // gets the same errors as before.
+                    TeamService.Result precheck = teamService.preflightStart(player);
+                    if (precheck != TeamService.Result.OK) {
+                        sounds.play(player, "error");
+                        player.sendMessage(Component.text(teamService.errorMessage(player, precheck), UiTheme.DANGER)
                                 .decoration(TextDecoration.ITALIC, false));
+                        return;
+                    }
+                    sounds.play(player, "gui-click");
+                    if (partyMapSelectGui != null) {
+                        final String chosenKit = kitId;
+                        org.bukkit.Bukkit.getScheduler().runTask(
+                                org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
+                                () -> {
+                                    if (player.isOnline()) {
+                                        partyMapSelectGui.openForKit(player, chosenKit);
+                                    }
+                                });
+                    } else {
+                        player.closeInventory();
+                        TeamService.Result r = teamService.start(player, kitId);
+                        sounds.play(player, r == TeamService.Result.OK ? "match-found" : "error");
+                        if (r != TeamService.Result.OK) {
+                            player.sendMessage(Component.text(teamService.errorMessage(player, r), UiTheme.DANGER)
+                                    .decoration(TextDecoration.ITALIC, false));
+                        }
                     }
                 }
             }

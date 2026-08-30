@@ -595,7 +595,7 @@ public final class MatchService {
             Location dest = base.clone().add(offset, 0, 0);
             dest.setYaw(base.getYaw());
             dest.setPitch(base.getPitch());
-            teleports.add(SafeTeleport.teleport(player, LocationUtil.safeTeleportLocation(dest, player)));
+            teleports.add(SafeTeleport.teleport(player, LocationUtil.safeTeleportLocation(dest)));
         }
         java.util.concurrent.CompletableFuture.allOf(
                 teleports.toArray(new java.util.concurrent.CompletableFuture[0])
@@ -642,8 +642,8 @@ public final class MatchService {
             failMatch(session, "Player offline during prepare");
             return;
         }
-        Location spawnA = LocationUtil.safeTeleportLocation(arenaService.spawnA(instance), p1);
-        Location spawnB = LocationUtil.safeTeleportLocation(arenaService.spawnB(instance), p2);
+        Location spawnA = LocationUtil.safeTeleportLocation(arenaService.spawnA(instance));
+        Location spawnB = LocationUtil.safeTeleportLocation(arenaService.spawnB(instance));
         // Brief beat (0.5s) so players register the MATCH FOUND notification before the teleport.
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (Bukkit.getPlayer(p1.getUniqueId()) == null || Bukkit.getPlayer(p2.getUniqueId()) == null) {
@@ -904,7 +904,7 @@ public final class MatchService {
                 spawn.setYaw(spawnABase.getYaw());
                 spawn.setPitch(spawnABase.getPitch());
             }
-            teleports.add(SafeTeleport.teleport(player, LocationUtil.safeTeleportLocation(spawn, player)));
+            teleports.add(SafeTeleport.teleport(player, LocationUtil.safeTeleportLocation(spawn)));
         }
 
         if (teleports.isEmpty()) {
@@ -986,7 +986,7 @@ public final class MatchService {
                         double offset = (withinTeam - (side.size() - 1) / 2.0) * 1.2;
                         spawn = spawn.clone().add(offset, 0, 0);
                     }
-                    SafeTeleport.teleport(player, LocationUtil.safeTeleportLocation(spawn, player));
+                    SafeTeleport.teleport(player, LocationUtil.safeTeleportLocation(spawn));
                 }
                 applySight(player, session);
                 if (kit != null) {
