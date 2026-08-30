@@ -24,13 +24,20 @@ public final class KillEffectService {
     private final Plugin plugin;
     private final SettingsService settingsService;
     private final RankService rankService;
+    private final KillEffectRegistry registry;
     private final Deque<Active> active = new ArrayDeque<>();
     private BukkitTask task;
 
-    public KillEffectService(Plugin plugin, SettingsService settingsService, RankService rankService) {
+    public KillEffectService(Plugin plugin, SettingsService settingsService, RankService rankService,
+                             KillEffectRegistry registry) {
         this.plugin = plugin;
         this.settingsService = settingsService;
         this.rankService = rankService;
+        this.registry = registry;
+    }
+
+    public KillEffectRegistry registry() {
+        return registry;
     }
 
     public void start() {
@@ -57,8 +64,8 @@ public final class KillEffectService {
             return;
         }
         String id = settingsService.get(killer).killEffect();
-        KillEffect effect = KillEffect.byId(id);
-        if (effect.isNone()) {
+        KillEffect effect = registry.byId(id);
+        if (effect == null || effect.isNone()) {
             return;
         }
         Location origin = victimLocation.clone();
@@ -72,7 +79,6 @@ public final class KillEffectService {
         if (active.isEmpty()) {
             return;
         }
-        // Effects run a fixed tick count counted down per pass.
         int size = active.size();
         for (int i = 0; i < size; i++) {
             Active a = active.poll();

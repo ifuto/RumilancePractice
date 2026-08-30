@@ -99,6 +99,14 @@ public final class MatchService {
     private final MatchCombatTracker combatTracker = new MatchCombatTracker();
     /** Each player's most recent match id, retained for a short time so /matchreport works. */
     private final Map<UUID, UUID> recentMatch = new ConcurrentHashMap<>();
+    /**
+     * Server tick at which each match last saw a lethal, plus the set of participants that went
+     * lethal on that tick. A 1v1 is a draw ONLY when both fighters drop on the exact same tick
+     * (truly simultaneous); any other death — self-inflicted ender-pearl fall damage, crystal
+     * misfire, void, etc. — is a win for the survivor.
+     */
+    private final Map<UUID, Integer> lastLethalTickByMatch = new ConcurrentHashMap<>();
+    private final Map<UUID, java.util.Set<UUID>> lethalPlayersByMatch = new ConcurrentHashMap<>();
     private com.rumilance.practice.spectator.SpectatorService spectatorService;
     private com.rumilance.practice.punishment.ChatBanService chatBanService;
     private SettingsService settingsService;
@@ -1123,9 +1131,43 @@ public final class MatchService {
             return;
         }
 
-        boolean draw = attackerId != null && victimId.equals(attackerId);
-        UUID winner = draw ? null : attackerId;
-        if (winner == null && !draw) {
+        // A duel is a draw ONLY when both fighters die on the exact same tick (truly
+        // simultaneous). Damage events are processed one at a time, so defer the final ruling by
+        // one tick: if the opponent also goes lethal on the very same tick we score a draw,
+        // otherwise the survivor wins. Any single death — an environmental / self-inflicted one
+        // such as an ender-pearl collision fall, void, or own crystal — is therefore a win for
+        // the surviving opponent, never a draw.
+        int now = Bukkit.getCurrentTick();
+        java.util.Set<UUID> lethalSet = lethalPlayersByMatch.computeIfAbsent(session.id(), k -> ConcurrentHashMap.newKeySet());
+        Integer lastTick = lastLethalTickByMatch.get(session.id());
+        if (lastTick == null || lastTick != now) {
+            lethalSet.clear();
+            lastLethalTickByMatch.put(session.id(), now);
+        }
+        lethalSet.add(victimId);
+        final UUID lethalAttacker = attackerId;
+        Bukkit.getScheduler().runTaskLater(plugin, () -> resolveSoloOutcome(session, victimId, lethalAttacker, now), 1L);
+    }
+
+    private void resolveSoloOutcome(MatchSession session, UUID victimId, UUID attackerId, int lethalTick) {
+        if (session.state() != MatchState.ACTIVE || session.isResultApplied()) {
+            return;
+        }
+        java.util.Set<UUID> lethalSet = lethalPlayersByMatch.getOrDefault(session.id(), java.util.Set.of());
+        boolean sameTick = lastLethalTickByMatch.getOrDefault(session.id(), -1) == lethalTick;
+        // True mutual kill: BOTH participants went lethal on the very same tick.
+        boolean draw = sameTick
+                && session.participants().size() == 2
+                && lethalSet.containsAll(session.participants());
+        UUID winner;
+        if (draw) {
+            winner = null;
+        } else if (attackerId != null && !attackerId.equals(victimId) && session.isParticipant(attackerId)) {
+            // Killed by the opponent.
+            winner = attackerId;
+        } else {
+            // Self-inflicted / environmental death, or killed by a non-participant: the
+            // surviving opponent wins.
             winner = session.opponentOf(victimId);
         }
         broadcastKillFeed(session, winner, victimId, draw);
@@ -1640,6 +1682,8 @@ public final class MatchService {
             arenaService.release(arenaId);
         }
         combatTracker.clear(session.id());
+        lastLethalTickByMatch.remove(session.id());
+        lethalPlayersByMatch.remove(session.id());
         if (playerPlacedBlocks != null) {
             playerPlacedBlocks.clearScope(session.id().toString());
         }

@@ -77,9 +77,7 @@ public final class SmithingTrimGui extends AbstractGui implements GuiCloseHandle
         session.put("armor", armor.clone());
         session.put("inv_slot", inventorySlot);
         session.put("layout_slot", -1);
-        String defaultMaterial = rankService.isVipPlusOrAbove(player) ? "gold" : "copper";
-        session.put("trim_material", defaultMaterial);
-        session.put("trim_pattern", "sentry");
+        initSelectionFromExistingTrim(player, session, armor);
         PracticeGuiOpen.open(this, player, session);
         sounds.play(player, "gui-open");
     }
@@ -96,11 +94,34 @@ public final class SmithingTrimGui extends AbstractGui implements GuiCloseHandle
         session.put("kit_id", kitId);
         session.put("preset", preset == null ? "" : preset);
         session.put("inv_slot", -1);
-        String defaultMaterial = rankService.isVipPlusOrAbove(player) ? "gold" : "copper";
-        session.put("trim_material", defaultMaterial);
-        session.put("trim_pattern", "sentry");
+        initSelectionFromExistingTrim(player, session, armor);
         PracticeGuiOpen.open(this, player, session);
         sounds.play(player, "gui-open");
+    }
+
+    /**
+     * Seeds the GUI selection from the trim already on the armor piece (so opening a trimmed
+     * piece highlights its current material/pattern instead of forcing gold/copper + sentry).
+     * Falls back to the rank-based defaults only when the piece has no trim.
+     */
+    private void initSelectionFromExistingTrim(Player player, GuiSession session, ItemStack armor) {
+        String material = rankService.isVipPlusOrAbove(player) ? "gold" : "copper";
+        String pattern = "sentry";
+        if (armor != null && armor.getItemMeta() instanceof ArmorMeta armorMeta && armorMeta.hasTrim()) {
+            ArmorTrim existing = armorMeta.getTrim();
+            String existingMat = trimKey(existing.getMaterial());
+            String existingPat = trimKey(existing.getPattern());
+            // Only preselect a premium material/pattern the player is still allowed to keep;
+            // otherwise fall back to the defaults so a downgraded player can't re-apply premium.
+            if (canUseMaterial(player, existingMat)) {
+                material = existingMat;
+            }
+            if (canUsePattern(player, existingPat)) {
+                pattern = existingPat;
+            }
+        }
+        session.put("trim_material", material);
+        session.put("trim_pattern", pattern);
     }
 
     @Override
@@ -160,6 +181,15 @@ public final class SmithingTrimGui extends AbstractGui implements GuiCloseHandle
             matIndex++;
         }
 
+        inventory.setItem(GuiSlots.slot(5, 6),
+                ItemBuilder.of(Material.SHEARS)
+                        .name(t(player, "gui.trim-remove").color(UiTheme.DANGER))
+                        .lore(
+                                UiTheme.divider(),
+                                UiTheme.line(line(player, "gui.trim-remove-lore"))
+                        )
+                        .action("remove")
+                        .build());
         inventory.setItem(GuiSlots.slot(5, 7),
                 ItemBuilder.of(Material.SMITHING_TABLE)
                         .name(t(player, "gui.trim-apply").color(UiTheme.SUCCESS))
@@ -253,6 +283,31 @@ public final class SmithingTrimGui extends AbstractGui implements GuiCloseHandle
             refresh(player, session, inventory);
             return;
         }
+        if ("remove".equals(action)) {
+            ItemStack armor = session.get("armor", ItemStack.class);
+            Integer invSlot = session.get("inv_slot", Integer.class);
+            if (armor == null) {
+                return;
+            }
+            ItemStack result = armor.clone();
+            if (!removeTrim(result)) {
+                sounds.play(player, "error");
+                player.sendMessage(t(player, "gui.trim-none"));
+                return;
+            }
+            Integer layoutSlot = session.get("layout_slot", Integer.class);
+            if (layoutSlot != null && layoutSlot >= 0 && editKitGui != null) {
+                String kitId = session.get("kit_id", String.class);
+                String preset = session.get("preset", String.class);
+                editKitGui.applyTrimmedItem(player, kitId, preset, layoutSlot, result);
+            } else {
+                writeBack(player, result, invSlot == null ? -1 : invSlot);
+                player.closeInventory();
+            }
+            sounds.play(player, "select");
+            player.sendMessage(t(player, "gui.trim-removed"));
+            return;
+        }
         if ("apply".equals(action)) {
             ItemStack armor = session.get("armor", ItemStack.class);
             Integer invSlot = session.get("inv_slot", Integer.class);
@@ -337,6 +392,19 @@ public final class SmithingTrimGui extends AbstractGui implements GuiCloseHandle
             return false;
         }
         meta.setTrim(new ArmorTrim(material, pattern));
+        stack.setItemMeta(meta);
+        return true;
+    }
+
+    /** Strips any trim from the piece. Returns false when the piece had no trim to remove. */
+    private static boolean removeTrim(ItemStack stack) {
+        if (!(stack.getItemMeta() instanceof ArmorMeta meta)) {
+            return false;
+        }
+        if (!meta.hasTrim()) {
+            return false;
+        }
+        meta.setTrim(null);
         stack.setItemMeta(meta);
         return true;
     }

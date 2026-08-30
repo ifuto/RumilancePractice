@@ -1,0 +1,274 @@
+# ============================================================================
+# Kill effects — paid cosmetic burst played at the victim's death position when
+# the killer has one selected. ALL effects below (other than "none") require
+# VIP+; they never affect gameplay.
+#
+# Shape: one of ring | helix | column | sphere | burst | none
+#   ring   — expanding horizontal ring
+#   helix  — vertical spiral twisting upward
+#   column — straight particle column
+#   sphere — filled shell of particles
+#   burst  — single one-shot explosion (ignores duration/radius expansion)
+#   none   — sound + initial burst only
+#
+# particle: Bukkit Particle enum name (1.21+).
+# sound:    Bukkit Sound enum name, or leave blank for no sound.
+# icon:     Bukkit Material for the GUI icon.
+# radius:   shape radius in blocks.
+# duration: animation length in ticks (20 = 1s).
+# volume/pitch: sound parameters.
+#
+# Add or edit entries freely; the GUI pages through them automatically.
+# ============================================================================
+
+default-effect: none
+
+effects:
+  none:
+    display-name: "<gray>None"
+    icon: BARRIER
+    particle: null
+    sound: ""
+    shape: none
+    radius: 0.0
+    duration: 0
+  flame:
+    display-name: "<gold>Flame"
+    icon: BLAZE_POWDER
+    particle: FLAME
+    sound: ENTITY_BLAZE_SHOOT
+    shape: ring
+    radius: 1.4
+    duration: 12
+  soul:
+    display-name: "<aqua>Soul Fire"
+    icon: SOUL_TORCH
+    particle: SOUL_FIRE_FLAME
+    sound: PARTICLE_SOUL_ESCAPE
+    shape: helix
+    radius: 1.3
+    duration: 16
+  heart:
+    display-name: "<light_purple>Hearts"
+    icon: POPPY
+    particle: HEART
+    sound: ENTITY_PLAYER_LEVELUP
+    shape: column
+    radius: 1.0
+    duration: 14
+  portal:
+    display-name: "<dark_purple>Portal"
+    icon: ENDER_EYE
+    particle: PORTAL
+    sound: BLOCK_PORTAL_TRAVEL
+    shape: sphere
+    radius: 1.5
+    duration: 14
+  ender:
+    display-name: "<dark_green>Ender"
+    icon: ENDER_PEARL
+    particle: REVERSE_PORTAL
+    sound: ENTITY_ENDERMAN_TELEPORT
+    shape: burst
+    radius: 1.2
+    duration: 10
+  crit:
+    display-name: "<white>Crit Storm"
+    icon: IRON_SWORD
+    particle: CRIT
+    sound: ENTITY_PLAYER_ATTACK_CRIT
+    shape: ring
+    radius: 1.5
+    duration: 12
+  magiccrit:
+    display-name: "<purple>Magic Crit"
+    icon: NETHER_STAR
+    particle: ENCHANTED_HIT
+    sound: ENCHANT_THORNS_HIT
+    shape: sphere
+    radius: 1.4
+    duration: 12
+  witch:
+    display-name: "<dark_purple>Witch"
+    icon: SPLASH_POTION
+    particle: WITCH
+    sound: ENTITY_WITCH_THROW
+    shape: burst
+    radius: 1.2
+    duration: 10
+  happy:
+    display-name: "<yellow>Happy Villager"
+    icon: EMERALD
+    particle: HAPPY_VILLAGER
+    sound: ENTITY_VILLAGER_YES
+    shape: column
+    radius: 1.0
+    duration: 14
+  angry:
+    display-name: "<red>Angry Villager"
+    icon: FIRE_CHARGE
+    particle: ANGRY_VILLAGER
+    sound: ENTITY_VILLAGER_NO
+    shape: burst
+    radius: 1.2
+    duration: 8
+  note:
+    display-name: "<aqua>Music"
+    icon: NOTE_BLOCK
+    particle: NOTE
+    sound: BLOCK_NOTE_BLOCK_PLING
+    shape: ring
+    radius: 1.6
+    duration: 12
+  enchant:
+    display-name: "<light_purple>Enchant"
+    icon: ENCHANTING_TABLE
+    particle: ENCHANT
+    sound: BLOCK_ENCHANTMENT_TABLE_USE
+    shape: helix
+    radius: 1.3
+    duration: 16
+  cloud:
+    display-name: "<gray>Cloud"
+    icon: WHITE_WOOL
+    particle: CLOUD
+    sound: ENTITY_FIREWORK_ROCKET_BLAST
+    shape: ring
+    radius: 1.5
+    duration: 12
+  poof:
+    display-name: "<white>Poof"
+    icon: SNOWBALL
+    particle: POOF
+    sound: ENTITY_ITEM_PICKUP
+    shape: burst
+    radius: 1.2
+    duration: 8
+  explosion:
+    display-name: "<dark_red>Explosion"
+    icon: TNT
+    particle: EXPLOSION
+    sound: ENTITY_GENERIC_EXPLODE
+    shape: burst
+    radius: 1.6
+    duration: 6
+  ember:
+    display-name: "<gold>Ember"
+    icon: FLINT_AND_STEEL
+    particle: LAVA
+    sound: BLOCK_LAVA_POP
+    shape: column
+    radius: 1.1
+    duration: 14
+  smoke:
+    display-name: "<dark_gray>Smoke"
+    icon: COAL
+    particle: LARGE_SMOKE
+    sound: BLOCK_FIRE_EXTINGUISH
+    shape: column
+    radius: 1.2
+    duration: 16
+  drip:
+    display-name: "<blue>Drip"
+    icon: WATER_BUCKET
+    particle: DRIPPING_DRIPSTONE_WATER
+    sound: BLOCK_POINTED_DRIPSTONE_LAND
+    shape: ring
+    radius: 1.3
+    duration: 12
+  glow:
+    display-name: "<yellow>Glow"
+    icon: GLOWSTONE_DUST
+    particle: GLOW
+    sound: BLOCK_AMETHYST_BLOCK_CHIME
+    shape: sphere
+    radius: 1.4
+    duration: 12
+  sculk:
+    display-name: "<dark_teal>Sculk"
+    icon: SCULK
+    particle: SCULK_SOUL
+    sound: BLOCK_SCULK_SHRIEKER_SHRIEK
+    shape: sphere
+    radius: 1.5
+    duration: 14
+  wax:
+    display-name: "<gold>Wax On"
+    icon: HONEYCOMB
+    particle: WAX_ON
+    sound: BLOCK_HONEY_BLOCK_BREAK
+    shape: burst
+    radius: 1.2
+    duration: 10
+  totem:
+    display-name: "<gold>Totem"
+    icon: TOTEM_OF_UNDYING
+    particle: TOTEM_OF_UNDYING
+    sound: ITEM_TOTEM_USE
+    shape: helix
+    radius: 1.4
+    duration: 18
+  trial:
+    display-name: "<aqua>Trial Spawner"
+    icon: TRIAL_KEY
+    particle: TRIAL_SPAWNER_DETECTION
+    sound: BLOCK_TRIAL_SPAWNER_SPAWN_MOB
+    shape: ring
+    radius: 1.5
+    duration: 12
+  cherry:
+    display-name: "<pink>Cherry Blossom"
+    icon: CHERRY_SAPLING
+    particle: CHERRY_LEAVES
+    sound: BLOCK_CHERRY_LEAVES_BREAK
+    shape: helix
+    radius: 1.3
+    duration: 16
+  spore:
+    display-name: "<green>Spore Blossom"
+    icon: SPORE_BLOSSOM
+    particle: SPORE_BLOSSOM_AIR
+    sound: BLOCK_SPORE_BLOSSOM_BREAK
+    shape: column
+    radius: 1.1
+    duration: 14
+  white_ash:
+    display-name: "<gray>White Ash"
+    icon: BONE_MEAL
+    particle: WHITE_ASH
+    sound: BLOCK_BASALT_BREAK
+    shape: column
+    radius: 1.1
+    duration: 14
+  electric:
+    display-name: "<aqua>Electric"
+    icon: LIGHTNING_ROD
+    particle: ELECTRIC_SPARK
+    sound: ENTITY_LIGHTNING_BOLT_IMPACT
+    shape: burst
+    radius: 1.5
+    duration: 8
+  firework:
+    display-name: "<red>Firework"
+    icon: FIREWORK_ROCKET
+    particle: FIREWORK
+    sound: ENTITY_FIREWORK_ROCKET_LAUNCH
+    shape: sphere
+    radius: 1.6
+    duration: 16
+  damage:
+    display-name: "<dark_red>Damage"
+    icon: REDSTONE
+    particle: DAMAGE_INDICATOR
+    sound: ENTITY_PLAYER_HURT
+    shape: burst
+    radius: 1.3
+    duration: 8
+  dragonbreath:
+    display-name: "<purple>Dragon Breath"
+    icon: DRAGON_BREATH
+    particle: DRAGON_BREATH
+    sound: ENTITY_ENDER_DRAGON_SHOOT
+    shape: sphere
+    radius: 1.5
+    duration: 16

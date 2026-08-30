@@ -522,8 +522,11 @@ public final class FeatureBootstrap {
         services.register(RankService.class, rankService);
 
         // Paid kill-effect cosmetics: played at a victim's death position for VIP+ killers.
+        com.rumilance.practice.cosmetic.kill.KillEffectRegistry killEffectRegistry =
+                new com.rumilance.practice.cosmetic.kill.KillEffectRegistry(configService, plugin.getLogger());
         com.rumilance.practice.cosmetic.kill.KillEffectService killEffectService =
-                new com.rumilance.practice.cosmetic.kill.KillEffectService(plugin, settingsService, rankService);
+                new com.rumilance.practice.cosmetic.kill.KillEffectService(
+                        plugin, settingsService, rankService, killEffectRegistry);
         killEffectService.start();
         services.register(com.rumilance.practice.cosmetic.kill.KillEffectService.class, killEffectService);
         com.rumilance.practice.combat.KillFeed.setKillEffectPlayer(killEffectService::playOnKill);
@@ -658,7 +661,7 @@ public final class FeatureBootstrap {
         ArrowEffectGui arrowEffectGui =
                 new ArrowEffectGui(guiSessions, soundService, arrowEffectService, settingsService);
         com.rumilance.practice.gui.menus.KillEffectGui killEffectGui =
-                new com.rumilance.practice.gui.menus.KillEffectGui(guiSessions, soundService, settingsService, rankService);
+                new com.rumilance.practice.gui.menus.KillEffectGui(guiSessions, soundService, settingsService, rankService, killEffectService);
 
         OriginalKitService originalKitService = new OriginalKitService(
                 originalKitRepository, asyncExecutor, plugin.getLogger(), configService);

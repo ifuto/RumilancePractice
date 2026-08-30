@@ -34,13 +34,14 @@ public final class ConfigService {
     public static final String FFA = "ffa.yml";
     public static final String PLANS = "plans.yml";
     public static final String ARROW_EFFECTS = "arrow-effects.yml";
+    public static final String KILL_EFFECTS = "kill-effects.yml";
     public static final String EKIT_ITEMS = "ekit-items.yml";
     public static final String PRESET_ITEMS = "preset-items.yml";
     public static final String SCOREBOARD = "scoreboard.yml";
 
     private static final List<String> RESOURCE_FILES = List.of(
             CONFIG, DATABASE, GUI, SOUNDS, PROFILE, KITS, ARENAS, PRACTICES, LOBBY, FFA, PLANS,
-            ARROW_EFFECTS, EKIT_ITEMS, PRESET_ITEMS, SCOREBOARD
+            ARROW_EFFECTS, KILL_EFFECTS, EKIT_ITEMS, PRESET_ITEMS, SCOREBOARD
     );
 
     private final JavaPlugin plugin;
@@ -214,6 +215,10 @@ public final class ConfigService {
 
     public FileConfiguration arrowEffects() {
         return get(ARROW_EFFECTS);
+    }
+
+    public FileConfiguration killEffects() {
+        return get(KILL_EFFECTS);
     }
 
     public FileConfiguration ekitItems() {
