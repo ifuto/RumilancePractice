@@ -26,11 +26,23 @@ public final class KillFeed {
 
     private static volatile InventoryOpener inventoryOpener;
 
+    /** Plays the killer's selected (paid) kill effect at the victim's death position. */
+    @FunctionalInterface
+    public interface KillEffectPlayer {
+        void play(Player killer, org.bukkit.Location victimLocation);
+    }
+
+    private static volatile KillEffectPlayer killEffectPlayer;
+
     private KillFeed() {
     }
 
     public static void setInventoryOpener(InventoryOpener opener) {
         inventoryOpener = opener;
+    }
+
+    public static void setKillEffectPlayer(KillEffectPlayer player) {
+        killEffectPlayer = player;
     }
 
     public static void broadcast(Player killer, Player victim, TeamColor killerTeam) {
@@ -72,6 +84,16 @@ public final class KillFeed {
                                  double killerHealth, double killerMax, UUID matchId) {
         Component killerName = clickableName(killer.getName(), killerColor, true, matchId, killer.getUniqueId());
         Component victimName = clickableName(victim.getName(), victimColor, false, matchId, victim.getUniqueId());
+        // Fire the killer's selected paid kill effect at the victim's position. All kill paths
+        // (solo/team match, FFA) funnel through this broadcast, so this is the single hook.
+        KillEffectPlayer fx = killEffectPlayer;
+        if (fx != null) {
+            try {
+                fx.play(killer, victim.getLocation());
+            } catch (RuntimeException ignored) {
+                // Cosmetics must never interfere with the kill flow.
+            }
+        }
         double scaled = scaledToTen(killerHealth, killerMax);
         return Component.text("⚔ ", NamedTextColor.WHITE)
                 .append(killerName)

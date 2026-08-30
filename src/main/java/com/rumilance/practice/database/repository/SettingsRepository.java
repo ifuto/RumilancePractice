@@ -29,7 +29,7 @@ public final class SettingsRepository {
     public Optional<PlayerSettings> findByUuid(UUID uuid) throws SQLException {
         String sql = "SELECT uuid, sounds_enabled, scoreboard_enabled, arrow_effect, spectate_visible, "
                 + "accept_duel_requests, auto_requeue, hide_other_chat, chat_whitelist, locale, "
-                + "selected_title, show_match_report, team_glow, team_colored_armor FROM "
+                + "selected_title, show_match_report, team_glow, team_colored_armor, kill_effect FROM "
                 + databaseService.table("player_settings") + " WHERE uuid = ?";
         try (Connection connection = databaseService.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -51,12 +51,12 @@ public final class SettingsRepository {
         String sql = "INSERT INTO " + databaseService.table("player_settings")
                 + " (uuid, sounds_enabled, scoreboard_enabled, arrow_effect, spectate_visible, "
                 + "accept_duel_requests, auto_requeue, hide_other_chat, chat_whitelist, locale, "
-                + "selected_title, show_match_report, team_glow, team_colored_armor) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                + "selected_title, show_match_report, team_glow, team_colored_armor, kill_effect) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
                 + databaseService.upsertClause("uuid", "sounds_enabled", "scoreboard_enabled", "arrow_effect",
                 "spectate_visible", "accept_duel_requests", "auto_requeue", "hide_other_chat",
                 "chat_whitelist", "locale", "selected_title", "show_match_report",
-                "team_glow", "team_colored_armor");
+                "team_glow", "team_colored_armor", "kill_effect");
         try (Connection connection = databaseService.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, settings.uuid().toString());
@@ -73,6 +73,7 @@ public final class SettingsRepository {
             statement.setInt(12, settings.showMatchReport() ? 1 : 0);
             statement.setInt(13, settings.teamGlow() ? 1 : 0);
             statement.setInt(14, settings.teamColoredArmor() ? 1 : 0);
+            statement.setString(15, settings.killEffect());
             statement.executeUpdate();
         }
     }
@@ -99,7 +100,8 @@ public final class SettingsRepository {
                 columnOrDefault(resultSet, "selected_title", "none"),
                 columnOrDefault(resultSet, "show_match_report", 0) != 0,
                 columnOrDefault(resultSet, "team_glow", 1) != 0,
-                columnOrDefault(resultSet, "team_colored_armor", 1) != 0
+                columnOrDefault(resultSet, "team_colored_armor", 1) != 0,
+                columnOrDefault(resultSet, "kill_effect", "none")
         );
     }
 

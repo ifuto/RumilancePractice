@@ -17,6 +17,7 @@ public enum GuiType {
     ORIGINAL_KIT,
     FFA_LIST,
     ARROW_EFFECT,
+    KILL_EFFECT,
     ADMIN_MENU,
     KIT_ADMIN,
     PROFILE,

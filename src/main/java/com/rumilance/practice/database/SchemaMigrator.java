@@ -383,6 +383,12 @@ public final class SchemaMigrator {
                     "INTEGER NOT NULL DEFAULT 1");
         }));
 
+        migrations.add(new Migration(27, "add kill_effect column to player_settings", connection -> {
+            String table = databaseService.table("player_settings");
+            databaseService.ensureColumn(connection, table, "kill_effect",
+                    "VARCHAR(64) NOT NULL DEFAULT 'none'");
+        }));
+
         return migrations;
     }
 }

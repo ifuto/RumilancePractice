@@ -113,16 +113,14 @@ public final class ArrowEffectService {
             if (def == null || def.particle() == null) {
                 return true;
             }
-            int sent = 0;
-            for (Player viewer : arrow.getWorld().getPlayers()) {
-                if (viewer.getLocation().distanceSquared(arrow.getLocation()) > 48 * 48) {
-                    continue;
-                }
-                if (sent >= particleLimit) {
-                    break;
-                }
-                viewer.spawnParticle(def.particle(), arrow.getLocation(), def.particlesPerTick(), 0.01, 0.01, 0.01, 0);
-                sent += def.particlesPerTick();
+            // Trails are rendered ONLY for the shooter: a particle trail visible to opponents
+            // would clutter their view and read as a visual tell in combat. Kept low-density so
+            // it never obstructs the shooter's own aim either.
+            if (shooter.isOnline()
+                    && shooter.getWorld().equals(arrow.getWorld())
+                    && shooter.getLocation().distanceSquared(arrow.getLocation()) <= 48 * 48) {
+                shooter.spawnParticle(def.particle(), arrow.getLocation(),
+                        def.particlesPerTick(), 0.01, 0.01, 0.01, 0);
             }
             return false;
         });

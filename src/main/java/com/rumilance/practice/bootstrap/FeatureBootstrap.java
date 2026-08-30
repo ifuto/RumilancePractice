@@ -520,6 +520,14 @@ public final class FeatureBootstrap {
 
         RankService rankService = new RankService(plugin, rankRepository, asyncExecutor);
         services.register(RankService.class, rankService);
+
+        // Paid kill-effect cosmetics: played at a victim's death position for VIP+ killers.
+        com.rumilance.practice.cosmetic.kill.KillEffectService killEffectService =
+                new com.rumilance.practice.cosmetic.kill.KillEffectService(plugin, settingsService, rankService);
+        killEffectService.start();
+        services.register(com.rumilance.practice.cosmetic.kill.KillEffectService.class, killEffectService);
+        com.rumilance.practice.combat.KillFeed.setKillEffectPlayer(killEffectService::playOnKill);
+
         // When a player drops below VIP+, reset smithing trims to default: strip premium
         // materials/patterns from everything worn/held, and scrub saved kit layouts.
         final KitLayoutRepository kitLayoutRepositoryRef = kitLayoutRepository;
@@ -649,6 +657,8 @@ public final class FeatureBootstrap {
         services.register(KitAnvilRenameService.class, kitAnvilRenameService);
         ArrowEffectGui arrowEffectGui =
                 new ArrowEffectGui(guiSessions, soundService, arrowEffectService, settingsService);
+        com.rumilance.practice.gui.menus.KillEffectGui killEffectGui =
+                new com.rumilance.practice.gui.menus.KillEffectGui(guiSessions, soundService, settingsService, rankService);
 
         OriginalKitService originalKitService = new OriginalKitService(
                 originalKitRepository, asyncExecutor, plugin.getLogger(), configService);
@@ -764,6 +774,7 @@ public final class FeatureBootstrap {
         guiListener.register(ffaListGui);
         guiListener.register(editKitGui);
         guiListener.register(arrowEffectGui);
+        guiListener.register(killEffectGui);
         guiListener.register(kitAdminGui);
         guiListener.register(kitArenaSelectGui);
         guiListener.register(kitStartEffectsGui);
@@ -1025,6 +1036,7 @@ public final class FeatureBootstrap {
         bind("matchreport", new MatchReportCommand(matchService, settingsService));
         bind("walltext", new WallTextCommand(wallTextService));
         bind("ffa", ffaCommand);
+        bind("killeffect", new com.rumilance.practice.command.KillEffectCommand(killEffectGui));
         bind("leave", new LeaveCommand(matchService, messageService));
         bind("team", new TeamCommand(teamService, kitService, teamHubGui, teamsBrowserGui, messageService));
         bind("prac", new PracCommand(practiceService));
@@ -1115,6 +1127,8 @@ public final class FeatureBootstrap {
         if (arrowEffectService != null) {
             arrowEffectService.stop();
         }
+        services.find(com.rumilance.practice.cosmetic.kill.KillEffectService.class)
+                .ifPresent(com.rumilance.practice.cosmetic.kill.KillEffectService::stop);
         if (settingsService != null) {
             settingsService.flushAll();
         }

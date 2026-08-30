@@ -269,6 +269,10 @@ commands:
     description: Place wall-mounted text labels (TextDisplay) on the block face in sight.
     usage: /walltext <set|scale|remove|list|reload> ...
     permission: rumilance.admin
+  killeffect:
+    description: Open the paid kill-effect cosmetic picker.
+    usage: /killeffect
+    aliases: [killeffects, killeffects, kefx]
 
 permissions:
   rumilance.user:

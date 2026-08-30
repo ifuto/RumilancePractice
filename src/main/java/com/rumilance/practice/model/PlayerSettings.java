@@ -24,7 +24,8 @@ public record PlayerSettings(
         String selectedTitle,
         boolean showMatchReport,
         boolean teamGlow,
-        boolean teamColoredArmor
+        boolean teamColoredArmor,
+        String killEffect
 ) {
 
     public PlayerSettings {
@@ -34,6 +35,7 @@ public record PlayerSettings(
                 ? Set.of()
                 : Collections.unmodifiableSet(new LinkedHashSet<>(chatWhitelist));
         selectedTitle = selectedTitle == null ? "none" : selectedTitle;
+        killEffect = killEffect == null ? "none" : killEffect;
     }
 
     /** Legacy constructor used by older call sites (match report off, team glow on, leather on). */
@@ -45,7 +47,7 @@ public record PlayerSettings(
     ) {
         this(uuid, soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
                 acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale, selectedTitle,
-                showMatchReport, true, true);
+                showMatchReport, true, true, "none");
     }
 
     public PlayerSettings(
@@ -55,77 +57,84 @@ public record PlayerSettings(
     ) {
         this(uuid, soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
                 acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale, selectedTitle,
-                false, true, true);
+                false, true, true, "none");
     }
 
     public static PlayerSettings defaultsFor(UUID uuid, String defaultLocale) {
         return new PlayerSettings(uuid, true, true, "none", true, true, false, false,
-                Set.of(), defaultLocale, "none", false, true, true);
+                Set.of(), defaultLocale, "none", false, true, true, "none");
     }
 
     private PlayerSettings copy(
             boolean soundsEnabled, boolean scoreboardEnabled, String arrowEffect,
             boolean spectateVisible, boolean acceptDuelRequests, boolean autoRequeue,
             boolean hideOtherChat, Set<String> chatWhitelist, String locale, String selectedTitle,
-            boolean showMatchReport, boolean teamGlow, boolean teamColoredArmor
+            boolean showMatchReport, boolean teamGlow, boolean teamColoredArmor, String killEffect
     ) {
         return new PlayerSettings(uuid, soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
                 acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
-                selectedTitle, showMatchReport, teamGlow, teamColoredArmor);
+                selectedTitle, showMatchReport, teamGlow, teamColoredArmor, killEffect);
+    }
+
+    public PlayerSettings withKillEffect(String newKillEffect) {
+        return copy(soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
+                acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
+                selectedTitle, showMatchReport, teamGlow, teamColoredArmor,
+                newKillEffect == null ? "none" : newKillEffect);
     }
 
     public PlayerSettings withLocale(String newLocale) {
         return copy(soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
                 acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, newLocale,
-                selectedTitle, showMatchReport, teamGlow, teamColoredArmor);
+                selectedTitle, showMatchReport, teamGlow, teamColoredArmor, killEffect);
     }
 
     public PlayerSettings withArrowEffect(String newArrowEffect) {
         return copy(soundsEnabled, scoreboardEnabled, newArrowEffect, spectateVisible,
                 acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
-                selectedTitle, showMatchReport, teamGlow, teamColoredArmor);
+                selectedTitle, showMatchReport, teamGlow, teamColoredArmor, killEffect);
     }
 
     public PlayerSettings withSoundsEnabled(boolean enabled) {
         return copy(enabled, scoreboardEnabled, arrowEffect, spectateVisible,
                 acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
-                selectedTitle, showMatchReport, teamGlow, teamColoredArmor);
+                selectedTitle, showMatchReport, teamGlow, teamColoredArmor, killEffect);
     }
 
     public PlayerSettings withScoreboardEnabled(boolean enabled) {
         return copy(soundsEnabled, enabled, arrowEffect, spectateVisible,
                 acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
-                selectedTitle, showMatchReport, teamGlow, teamColoredArmor);
+                selectedTitle, showMatchReport, teamGlow, teamColoredArmor, killEffect);
     }
 
     public PlayerSettings withSpectateVisible(boolean visible) {
         return copy(soundsEnabled, scoreboardEnabled, arrowEffect, visible,
                 acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
-                selectedTitle, showMatchReport, teamGlow, teamColoredArmor);
+                selectedTitle, showMatchReport, teamGlow, teamColoredArmor, killEffect);
     }
 
     public PlayerSettings withAcceptDuelRequests(boolean accept) {
         return copy(soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
                 accept, autoRequeue, hideOtherChat, chatWhitelist, locale,
-                selectedTitle, showMatchReport, teamGlow, teamColoredArmor);
+                selectedTitle, showMatchReport, teamGlow, teamColoredArmor, killEffect);
     }
 
     public PlayerSettings withAutoRequeue(boolean enabled) {
         return copy(soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
                 acceptDuelRequests, enabled, hideOtherChat, chatWhitelist, locale,
-                selectedTitle, showMatchReport, teamGlow, teamColoredArmor);
+                selectedTitle, showMatchReport, teamGlow, teamColoredArmor, killEffect);
     }
 
     public PlayerSettings withHideOtherChat(boolean enabled) {
         return copy(soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
                 acceptDuelRequests, autoRequeue, enabled, chatWhitelist, locale,
-                selectedTitle, showMatchReport, teamGlow, teamColoredArmor);
+                selectedTitle, showMatchReport, teamGlow, teamColoredArmor, killEffect);
     }
 
     public PlayerSettings withChatWhitelist(Set<String> newWhitelist) {
         return copy(soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
                 acceptDuelRequests, autoRequeue, hideOtherChat, newWhitelist, locale,
-                selectedTitle, showMatchReport, teamGlow, teamColoredArmor);
+                selectedTitle, showMatchReport, teamGlow, teamColoredArmor, killEffect);
     }
 
     public PlayerSettings withChatWhitelistAdded(String name) {
@@ -143,24 +152,24 @@ public record PlayerSettings(
     public PlayerSettings withSelectedTitle(String titleId) {
         return copy(soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
                 acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
-                titleId == null ? "none" : titleId, showMatchReport, teamGlow, teamColoredArmor);
+                titleId == null ? "none" : titleId, showMatchReport, teamGlow, teamColoredArmor, killEffect);
     }
 
     public PlayerSettings withShowMatchReport(boolean show) {
         return copy(soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
                 acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
-                selectedTitle, show, teamGlow, teamColoredArmor);
+                selectedTitle, show, teamGlow, teamColoredArmor, killEffect);
     }
 
     public PlayerSettings withTeamGlow(boolean enabled) {
         return copy(soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
                 acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
-                selectedTitle, showMatchReport, enabled, teamColoredArmor);
+                selectedTitle, showMatchReport, enabled, teamColoredArmor, killEffect);
     }
 
     public PlayerSettings withTeamColoredArmor(boolean enabled) {
         return copy(soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
                 acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
-                selectedTitle, showMatchReport, teamGlow, enabled);
+                selectedTitle, showMatchReport, teamGlow, enabled, killEffect);
     }
 }
