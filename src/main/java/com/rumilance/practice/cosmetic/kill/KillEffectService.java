@@ -86,8 +86,17 @@ public final class KillEffectService {
                 continue;
             }
             int elapsed = a.effect().durationTicks() - a.ticksLeft();
-            a.effect().playTick(a.origin(), elapsed);
             int remaining = a.ticksLeft() - 1;
+            try {
+                // Isolate each effect: a bad particle/world-unload for one must never kill the
+                // repeating task (which would silently disable kill effects for everyone until
+                // restart) or drop the still-running sibling effects queued behind it.
+                a.effect().playTick(a.origin(), elapsed);
+            } catch (RuntimeException e) {
+                plugin.getLogger().log(java.util.logging.Level.WARNING,
+                        "Kill effect tick failed for " + a.effect().id(), e);
+                continue;
+            }
             if (remaining > 0) {
                 active.add(new Active(a.effect(), a.origin(), remaining));
             }

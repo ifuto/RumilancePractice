@@ -116,11 +116,16 @@ public final class ArrowEffectService {
             // Trails are rendered ONLY for the shooter: a particle trail visible to opponents
             // would clutter their view and read as a visual tell in combat. Kept low-density so
             // it never obstructs the shooter's own aim either.
-            if (shooter.isOnline()
-                    && shooter.getWorld().equals(arrow.getWorld())
-                    && shooter.getLocation().distanceSquared(arrow.getLocation()) <= 48 * 48) {
-                shooter.spawnParticle(def.particle(), arrow.getLocation(),
-                        def.particlesPerTick(), 0.01, 0.01, 0.01, 0);
+            try {
+                if (shooter.isOnline()
+                        && shooter.getWorld().equals(arrow.getWorld())
+                        && shooter.getLocation().distanceSquared(arrow.getLocation()) <= 48 * 48) {
+                    shooter.spawnParticle(def.particle(), arrow.getLocation(),
+                            def.particlesPerTick(), 0.01, 0.01, 0.01, 0);
+                }
+            } catch (RuntimeException e) {
+                // A single bad particle call must not kill the repeating trail task.
+                plugin.getLogger().log(java.util.logging.Level.WARNING, "Arrow effect tick failed", e);
             }
             return false;
         });
