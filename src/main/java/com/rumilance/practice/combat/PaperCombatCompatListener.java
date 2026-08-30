@@ -184,22 +184,81 @@ public final class PaperCombatCompatListener implements Listener {
     }
 
     private void applyVanillaMeleeKnockback(Player victim, Player attacker) {
+        // Reproduce LivingEntity#knockback exactly:
+        //   dir = normalised position from attacker to victim (pushes the victim AWAY),
+        //   base melee knockback strength 0.4, plus a Player#attack extra when sprinting and
+        //   per Knockback-enchant level; horizontal impulse scales with knockback resistance
+        //   (so netherite with no resistance attribute = full, resistance potion/attribute =
+        //   reduced), grounded targets get the vanilla 0.4 upward hop.
         double dx = victim.getLocation().getX() - attacker.getLocation().getX();
         double dz = victim.getLocation().getZ() - attacker.getLocation().getZ();
         double horizontal = Math.sqrt(dx * dx + dz * dz);
+        double unitX;
+        double unitZ;
         if (horizontal < 1.0E-4) {
             float yaw = attacker.getLocation().getYaw();
-            dx = -Math.sin(Math.toRadians(yaw));
-            dz = Math.cos(Math.toRadians(yaw));
-            horizontal = Math.sqrt(dx * dx + dz * dz);
+            unitX = -Math.sin(Math.toRadians(yaw));
+            unitZ = Math.cos(Math.toRadians(yaw));
+            double len = Math.sqrt(unitX * unitX + unitZ * unitZ);
+            unitX /= len;
+            unitZ /= len;
+        } else {
+            unitX = dx / horizontal;
+            unitZ = dz / horizontal;
         }
-        double strength = 0.4d;
-        double nx = dx / horizontal;
-        double nz = dz / horizontal;
+        double resistScale = knockbackResistanceScale(victim);
+
+        // Base melee knockback applied by LivingEntity#hurtServer (strength 0.4).
+        applyKnockbackBody(victim, unitX, unitZ, 0.4d * resistScale);
+
+        // Player#attack adds knockback for sprint hits and the Knockback enchantment, each as a
+        // further knockback(strength*0.5) call; replicate those extra calls so totals match.
+        int bonus = (attacker.isSprinting() ? 1 : 0) + knockbackEnchantLevel(attacker);
+        if (bonus > 0) {
+            applyKnockbackBody(victim, unitX, unitZ, 0.5d * bonus * resistScale);
+        }
+    }
+
+    /** One LivingEntity#knockback step: halve current horizontal speed, add directional impulse, hop if grounded. */
+    private void applyKnockbackBody(Player victim, double unitX, double unitZ, double strength) {
         Vector vel = victim.getVelocity();
-        double newX = vel.getX() / 2.0d - nx * strength;
-        double newZ = vel.getZ() / 2.0d - nz * strength;
-        double newY = Math.min(0.4d, vel.getY() / 2.0d + 0.5d);
+        double impulse = strength * 0.5d;
+        double newX = vel.getX() * 0.5d + unitX * impulse;
+        double newZ = vel.getZ() * 0.5d + unitZ * impulse;
+        double newY = vel.getY();
+        // LivingEntity#knockbackStrength: grounded targets get the fixed vertical hop.
+        if (victim.isOnGround()) {
+            newY = 0.4d;
+        }
         victim.setVelocity(new Vector(newX, newY, newZ));
+    }
+
+    private static double knockbackResistanceScale(Player victim) {
+        try {
+            org.bukkit.attribute.AttributeInstance attr =
+                    victim.getAttribute(org.bukkit.attribute.Attribute.KNOCKBACK_RESISTANCE);
+            double resist = attr == null ? 0.0d : attr.getValue();
+            // Vanilla: knockback strength is scaled by (1 - clamp(resistance)); netherite has no
+            // knockback-resistance attribute, so it is unaffected unless a potion/modifier adds it.
+            double scale = 1.0d - Math.max(0.0d, Math.min(1.0d, resist));
+            return Math.max(0.0d, scale);
+        } catch (RuntimeException e) {
+            return 1.0d;
+        }
+    }
+
+    private static int knockbackEnchantLevel(Player attacker) {
+        try {
+            org.bukkit.enchantments.Enchantment kb =
+                    org.bukkit.Registry.ENCHANTMENT.get(org.bukkit.NamespacedKey.minecraft("knockback"));
+            if (kb == null) {
+                return 0;
+            }
+            return Math.max(
+                    attacker.getInventory().getItemInMainHand().getEnchantmentLevel(kb),
+                    attacker.getInventory().getItemInOffHand().getEnchantmentLevel(kb));
+        } catch (RuntimeException e) {
+            return 0;
+        }
     }
 }

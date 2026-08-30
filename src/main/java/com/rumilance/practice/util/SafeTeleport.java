@@ -73,6 +73,10 @@ public final class SafeTeleport {
         // "rematch snaps to a random arena corner" and "border in a weird place" bugs.
         // Callers re-apply the destination area's border AFTER the teleport succeeds.
         resetPersonalBorder(player);
+        // Paper #13473: teleporting a spectator who is locked onto a camera target leaves
+        // the client spectating the old entity while the server moves the camera, causing a
+        // nasty unloaded-chunk desync. Detach from the target (vanilla behaviour) first.
+        releaseSpectatorTarget(player);
         player.setVelocity(new Vector());
         player.setFallDistance(0f);
         boolean ok = player.teleport(target);
@@ -88,6 +92,23 @@ public final class SafeTeleport {
             player.setWorldBorder(null);
         } catch (RuntimeException ignored) {
             // Older/forked servers without per-player borders: nothing to reset.
+        }
+    }
+
+    /**
+     * Paper #13473: detaches a spectator from the entity they are locked onto before the
+     * teleport, matching vanilla (which stops spectating on teleport). Without this the client
+     * keeps the old camera while the server moves the player, leaving the view in unloaded
+     * chunks. A no-op when the player isn't spectating an entity.
+     */
+    private static void releaseSpectatorTarget(Player player) {
+        try {
+            if (player.getGameMode() == org.bukkit.GameMode.SPECTATOR
+                    && player.getSpectatorTarget() != null) {
+                player.setSpectatorTarget(null);
+            }
+        } catch (RuntimeException ignored) {
+            // Best-effort: a teleport must never fail because of camera detachment.
         }
     }
 
