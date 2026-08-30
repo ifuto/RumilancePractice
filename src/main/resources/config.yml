@@ -1,0 +1,275 @@
+# RumilancePractice main configuration file.
+# Most values here can be reloaded at runtime with /rpadmin reload.
+
+plugin:
+  # Locale used when a player has not selected one, and as the ultimate fallback
+  # when a translation key is missing from the player's own locale.
+  default-locale: en_us
+  # Enables verbose debug logging to the console.
+  debug: false
+  # When enabled, new queue/duel/FFA joins are refused with a maintenance notice.
+  # Toggle at runtime with /practiceadmin maintenance <on|off>.
+  maintenance: false
+
+executor:
+  # Size of the async worker pool used for I/O and heavier computations
+  # (database queries, schematic pastes, statistics recalculation, etc.).
+  # Must be between 1 and 4 threads; defaults to 2.
+  min-threads: 1
+  max-threads: 4
+  core-threads: 2
+  keep-alive-seconds: 60
+
+match:
+  # Countdown, in seconds, before a duel/FFA match starts.
+  countdown-seconds: 5
+  # Maximum match duration in seconds before a draw is forced. 0 disables the limit.
+  max-duration-seconds: 0
+  # Number of seconds a player has to reconnect after a disconnect before forfeiting.
+  reconnect-grace-seconds: 30
+  # Whether to regenerate the arena (via FAWE/WorldEdit) between matches.
+  regenerate-arena: true
+  # Countdown after match end before players/spectators are teleported back to the lobby.
+  end-teleport-delay-seconds: 5
+
+queue:
+  # Maximum time, in seconds, a player may wait in a ranked queue before being notified.
+  max-wait-notify-seconds: 60
+  # Maximum ELO difference tolerated when matching players, widened over time.
+  initial-elo-range: 75
+  elo-range-growth-per-interval: 25
+  growth-interval-seconds: 15
+  # When greater than 0, players whose ping (ms) is above this value cannot join the ranked
+  # queue (they receive a warning). 0 disables the check.
+  max-ranked-ping-ms: 0
+
+ranking:
+  # Display points start (rounded OpenSkill mu). Hidden Gaussian is mu=1000, sigma=250.
+  starting-elo: 1000
+  # Legacy Elo K-factors are unused. Ranked uses a farm-protected OpenSkill (Weng-Lin) 1v1.
+  k-factor:
+    # First N ranked matches (per kit) use provisional-k.
+    provisional-games: 20
+    provisional-k: 64
+    standard-k: 32
+    # Players within the top-percent-fraction of Elo (among players with >=1 ranked match) use
+    # top-percent-k instead, overriding even the provisional K-factor.
+    top-percent-fraction: 0.10
+    top-percent-k: 26
+
+spectator:
+  allow-flight: true
+  hide-from-players: true
+
+lobby:
+  world: world
+  return-to-lobby-on-death: false
+
+# Per-player sight control: world borders + send-view-distance clamp.
+# Play-area walls ({@code PlayAreaWall}) slide you back along your move — they never snap to center.
+# Admins (rumilance.admin) skip view-distance cap only.
+sight:
+  enabled: true
+  # Personal WorldBorder for fighters. Spectators default OFF — vanilla WB pulls outsiders toward center.
+  world-border-combatants: true
+  world-border-spectators: false
+  # Pearl: max blocks to search upward when fixing footing (stops glass-border rooftop teleports).
+  pearl-max-lift-blocks: 2
+
+cleanup:
+  # Floating-text (hologram) sweep window after startup, in seconds. Entities load
+  # asynchronously after their chunks (MC 1.17+), so the sweep listens to EntitiesLoadEvent
+  # for this long and removes stray TextDisplays / hologram armor stands as chunks load in.
+  # 0 = only sweep already-loaded entities; negative = keep sweeping forever.
+  floating-text-window-seconds: 300
+
+# Disposable arena copies (requires FAWE/WorldEdit): every match pastes a fresh copy of the
+# arena template at a random, chunk-aligned spot that never overlaps another live copy or any
+# template's own build, and deletes the copy when the match ends. Allows unlimited concurrent
+# matches per template. Set disposable-copies to false to revert to the old in-place mode
+# (one match per template, regenerated between matches).
+arena:
+  disposable-copies: true
+  # Copies are placed within +/- this many blocks of the placement centre (min 256).
+  # Distance is free - copies can go arbitrarily far out: every chunk of a copy is
+  # async-pregenerated and pinned with chunk tickets BEFORE players are teleported,
+  # so arrival never triggers fresh chunk generation around the players.
+  placement-range: 100000
+  # Minimum empty margin, in blocks, kept between a copy and anything else (min 16).
+  placement-spacing: 64
+  # Centre of the placement band (defaults to world origin).
+  placement-center-x: 0
+  placement-center-z: 0
+
+fawe:
+  # Whether to attempt to use FastAsyncWorldEdit/WorldEdit for arena snapshot/restore.
+  enabled: true
+  # Timeout, in seconds, for a single arena regeneration operation.
+  operation-timeout-seconds: 30
+
+hooks:
+  placeholderapi: true
+
+gui:
+  # How kit ids are displayed in menus when no custom display-name is set.
+  # Underscores always become spaces; casing is one of:
+  #   KEEP  - exactly as typed in /kit create (default: "NoDebuff" stays "NoDebuff")
+  #   TITLE - capitalise each word ("No Debuff")
+  #   UPPER - all caps ("NO DEBUFF")
+  #   LOWER - all lowercase ("no debuff")
+  kit-name-case: KEEP
+  # Minimum seconds between /setting (and similar) toggle clicks per player,
+  # to stop rapid ON/OFF spam from hammering the settings store.
+  toggle-cooldown-seconds: 2
+
+# Central Scoreboard/TAB — 文言・レイアウトは scoreboard.yml が正。
+# ここは後方互換のフォールバック（プラグイン起動時に scoreboard.yml が無い場合の既定）。
+# 通常は plugins/RumilancePractice/scoreboard.yml を編集してください。
+scoreboard:
+  enabled: true
+  update-interval-ticks: 20
+  tab-header-footer: true
+  server-name: "N Arena"
+  server-ip: "play.example.com"
+
+performance:
+  # Soft cap on particles spawned per player per visual effect (region selection, arrow trails).
+  particle-limit-per-player: 40
+
+# Ping-aware combat netcode. Defaults match stray.gg / KnockbackSync 1.3.2.
+# Compensation is clamped (max 320ms) and skipped on ping spikes so lag-switches cannot
+# buy extra knockback reduction or crit rewind.
+combat:
+  ping-offset-ms: 25
+  spike-threshold-ms: 20
+  # Paper 1.21.4+ defaults update-equipment-on-player-actions to true, which makes hotbar/F-key
+  # swaps feel 50-50 vs vanilla. true = restore vanilla swap at runtime (also set the same key
+  # to false in config/paper-global.yml so it survives a restart without this plugin).
+  vanilla-item-swap: true
+
+# Fast TNT / creeper fuse for practice PvP.
+# Only applies in active duels and FFA — lobby eggs/TNT stay vanilla.
+practice-tnt:
+  enabled: true
+  # Vanilla primed TNT remaining fuse is 80 ticks (4s). 20 = 1 second.
+  tnt-fuse-ticks: 20
+  creeper-from-egg:
+    enabled: true
+    # Max swell ticks from spawn. Vanilla is 30; 20 = 1 second. Fuse is locked
+    # (cannot cancel and walk away if thrown out of sight). Never charged.
+    fuse-ticks: 20
+
+original-kit:
+  # /admin orkit close|open. When false, /originalkit is refused for non-admins.
+  enabled: true
+
+# Chat spam filter. Detections are counted persistently; once a player reaches ban-threshold
+# detections they receive an escalating ChatBan (2 weeks -> 1 month -> 3 months). Kept
+# conservative so a single false positive is harmless (message blocked, no ban).
+spam-filter:
+  enabled: true
+  # A message shorter than this many characters is never treated as spam.
+  min-message-length: 2
+  # More than max-messages within window-seconds counts as spam.
+  max-messages: 5
+  window-seconds: 10
+  # This many identical consecutive messages counts as spam.
+  max-repeat: 3
+  # Total lifetime detections before an automatic escalating ChatBan is issued.
+  ban-threshold: 10
+
+# Sign translation-key anti-cheat. Scans each sign edit's component tree for structures cheat
+# clients use to probe/exploit servers (keybind components, click events, key.* probes, known
+# probe keys). High-confidence structures auto-ban; ambiguous ones are only blocked + logged.
+sign-guard:
+  enabled: true
+  auto-ban: true
+  # "auto" = escalating ban (2w -> 2mo -> 3mo -> permanent), or a token like 7d / 2w / 1mo.
+  auto-ban-duration: auto
+  notify-player: true
+  max-nest-depth: 10
+  # Translatable keys under these namespaces are considered legitimate (vanilla block/item names).
+  allowed-translatable-prefixes:
+    - "block.minecraft."
+    - "item.minecraft."
+    - "entity.minecraft."
+  # Exact translation keys treated as malicious mod/probe signatures (TRANSLATE-style: keys that
+  # are NOT under the key.* namespace, so they need to be listed explicitly). These double as the
+  # signature DB for mod fingerprinting (Item Scroller, Litematica, etc.).
+  # NOTE: keys marked (verified) are confirmed; the rest are the mod's documented namespace and
+  # should be verified against each mod's assets/<modid>/lang/en_us.json before relying on a ban.
+  # Exact non-key.* keys verified from source. (key.* is already flagged generically below.)
+  critical-keys:
+    - "translation.test.invalid"                          # generic probe
+    - "commands.debug.started"                            # generic probe
+    - "chat.type.text"                                    # generic probe
+    - "liquidbounce.module.killaura.name"                 # LiquidBounce (verified)
+    - "bleachhack.module.killaura"                        # BleachHack (verified)
+    - "emc.module.killaura.name"                          # Aristois (verified)
+    - "coffee.module.killaura.name"                       # Coffee Client (verified)
+    - "autoclicker-fabric.hud.holding"                    # AutoClicker Fabric (verified)
+    - "xray.config.toggle"                                # XRay Fabric (verified)
+    - "itemscroller.gui.button.config_gui.generic"       # Item Scroller (verified)
+    - "text.autoconfig.accurateblockplacement.title"      # Accurate Block Placement (verified)
+    - "sodium.options.buttons.donate"                    # Sodium (verified)
+    - "options.iris.shaderPackSelection"                 # Iris Shaders (verified)
+  # Non-key.* mod namespaces treated as malicious signatures (prefix match). Any key.* keybind /
+  # translatable is already flagged generically, so this list focuses on the module-namespace probes.
+  critical-key-prefixes:
+    - "liquidbounce.module."   # LiquidBounce modules
+    - "bleachhack.module."     # BleachHack modules
+    - "emc.module."            # Aristois modules
+    - "coffee.module."         # Coffee Client modules
+    - "autoclicker-fabric."    # AutoClicker (Fabric)
+    - "xray.config."           # XRay (Fabric)
+    - "itemscroller.gui."      # Item Scroller
+
+  # ---------------------------------------------------------------------------------------------
+  # Active mod detector (DonutSMP-style, MC-265322). Requires ProtocolLib on the server.
+  # How it works: a fake sign is shown to the CLIENT ONLY (no world block is ever changed),
+  # loaded with mod translation keys, the sign editor is force-opened, then the fake block is
+  # reverted a couple ticks later so the editor auto-closes and the client echoes back the
+  # resolved text. If the returned text differs from the raw key, the mod is installed.
+  # Trigger manually with /signcheck <player> (or enable check-on-join below).
+  active-probe:
+    enabled: false          # master switch (needs ProtocolLib)
+    auto-ban: false         # false = log/notify only (recommended until verified); true = ban on hit
+    auto-ban-duration: "auto"
+    check-on-join: false    # silently probe every player shortly after they join
+    join-delay-ticks: 60
+    batch-delay-ticks: 12   # ticks between each 4-key probe sign
+    revert-delay-ticks: 3   # ticks before reverting the fake sign (forces the editor to close)
+    # Format: "Display Name|translation.key|MODE"  (MODE = KEYBIND or TRANSLATE, default TRANSLATE).
+    #   KEYBIND  -> a {"keybind":key} component is sent; the client resolves it to its BOUND key,
+    #               so it works even for mods that register only a keybind and ship no lang entry.
+    #   TRANSLATE-> a {"translate":key} component is sent; the client resolves it to translated text.
+    # Up to 4 keys are packed per probe sign. All keys below were verified against source
+    # (CheckHacks production config / AppleModDetector / each mod's assets/<modid>/lang/en_us.json).
+    #
+    # Cheat / disallowed clients - these ARE eligible for auto-ban when auto-ban is true.
+    cheat-signatures:
+      - "Meteor Client|key.meteor-client.open-gui|TRANSLATE"
+      - "LiquidBounce|liquidbounce.module.killaura.name|TRANSLATE"
+      - "Freecam|key.freecam.toggle|KEYBIND"
+      - "Wurst Client|key.wurst.zoom|KEYBIND"
+      - "XRay (Fabric)|xray.config.toggle|KEYBIND"
+      - "ChestESP|key.chestesp.toggle|KEYBIND"
+      - "KillAura (Fabric)|key.killaura|KEYBIND"
+      - "AutoFish|key.autofish.open_gui|KEYBIND"
+      - "Lumina|key.lumina.open_click_gui|KEYBIND"
+      - "AutoSwitch|key.autoswitch.toggle|KEYBIND"
+      - "BleachHack|bleachhack.module.killaura|TRANSLATE"
+      - "Aristois|emc.module.killaura.name|TRANSLATE"
+      - "Coffee Client|coffee.module.killaura.name|TRANSLATE"
+      - "World Downloader|key.wdl.startStop|TRANSLATE"
+      - "AutoClicker (Fabric)|autoclicker-fabric.hud.holding|TRANSLATE"
+      - "AntiAFK|key.antiafk.toggle|TRANSLATE"
+      - "Auto Clicker (p1k0chu)|key.auto-clicker_.toggle|KEYBIND"
+      - "AutoTotem|key.autototem.toggle|KEYBIND"
+    # Utility / legitimate mods - detected & logged only; NEVER auto-banned (avoids false bans).
+    utility-signatures:
+      - "Item Scroller|itemscroller.gui.button.config_gui.generic|TRANSLATE"
+      - "Accurate Block Placement|text.autoconfig.accurateblockplacement.title|TRANSLATE"
+      - "Sodium|sodium.options.buttons.donate|TRANSLATE"
+      - "Iris Shaders|options.iris.shaderPackSelection|TRANSLATE"
+      - "Just Enough Items|key.jei.toggleOverlay|KEYBIND"

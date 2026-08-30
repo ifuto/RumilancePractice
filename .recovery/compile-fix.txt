@@ -1,0 +1,38 @@
+﻿.\gradlew.bat : Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Dfile.encoding=UTF-8
+発生場所 C:\Users\Junji\AppData\Local\Temp\ps-script-b57d8ce1-7155-4820-8559-75c4c19d69c7.ps1:78 文字:68
++ ... ing=UTF-8"; .\gradlew.bat compileJava --no-configuration-cache 2>&1 | ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnam
+ed module (file:/C:/Users/Junji/.gradle/wrapper/dists/gradle-9.6.1-bin/4ticwg1pgcbps2hj28r8so764/gradle-9.6.1/lib/nativ
+e-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+
+> Task :compileJava
+Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Dfile.encoding=UTF-8
+
+BUILD SUCCESSFUL in 15s
+1 actionable task: 1 executed
+
+--- API stubs / methods added ---
+LobbyService.sendToLobby(Player, boolean)
+ChatBanService.issue(..., Duration, boolean)
+FfaService.arenasView / occupantIds / spawnDestination / applySight
+MatchSession.kitFor(UUID) / friendlyFire()
+ArenaInstance.bounds()
+GuiSession.fromBattleMenu / setFromBattleMenu
+PlayerRepository.findByUsername
+*Stats/MatchHistoryRepository.deleteAll / deleteForPlayer
+PresetItems.SLOTS_PER_PAGE / MAX_PAGES / MAX_SLOTS / replacePageFromInventory
+EditKitGui.openKitEditor(Player,String,String) / applyRenamedItem
+ReplayService.startFromReport
+TeamService.errorMessage
+ReportGui.open renamed to openReport (caller adapted)
+SignProbeService WrappedBlockData + NbtCompound write fix
+SignGuardService 4-arg SignComponentScanner
+Remaining compile errors: NONE

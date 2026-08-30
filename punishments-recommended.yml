@@ -1,0 +1,140 @@
+# N Arena 向け GrimAC おすすめ punishments.yml（フル）
+#
+# 使い方:
+#   1. このファイルを Grim の punishments.yml としてコピーする
+#      (plugins/GrimAC/punishments.yml)
+#   2. プロジェクト直下の punishments.yml は Grim のデフォルト（alert/log のみ）なので残しておく
+#
+# BAN 段階は Grim ではなく RumilancePractice の /ban ... auto が決める:
+#   1回目 = 2週間 / 2回目 = 2か月 / 3回目 = 3か月 / 4回目以降 = 永久
+# Aim は即 BAN しない。Reach は VL を高めに取ってからキック。
+#
+# %check_name% – チェックの名前
+# %description% - チェックの説明
+# %vl% - 違反回数
+# %verbose% - 追加情報
+# %player% - プレイヤー名
+# [alert] - アラート通知を行う特別なコマンド
+# [webhook] - DiscordのWebhookに通知する特別なコマンド
+# [proxy] - プロキシに接続された他のサーバーに通知する特別なコマンド（BungeeCord/Velocity用）
+Punishments:
+  Simulation:
+    remove-violations-after: 300
+    checks:
+      - "Simulation"
+      - "GroundSpoof"
+      - "Timer"
+      - "TimerLimit"
+      - "NoFall"
+    commands:
+      - "100:40 [alert]"
+      - "100:40 [log]"
+      - "100:100 [webhook]"
+      - "100:100 [proxy]"
+      - "400:0 kick %player% Unfair advantage"
+      - "800:0 ban %player% Unfair advantage auto"
+
+  Knockback:
+    remove-violations-after: 300
+    checks:
+      - "Knockback"
+      - "Explosion"
+    commands:
+      - "5:5 [alert]"
+      - "5:5 [log]"
+      - "20:20 [webhook]"
+      - "20:20 [proxy]"
+      - "40:0 kick %player% Unfair advantage"
+      - "80:0 ban %player% Unfair advantage auto"
+
+  Post:
+    # 1.21 では Grim 側で enable-post-packet: false を推奨。処罰はアラート中心。
+    remove-violations-after: 300
+    checks:
+      - "Post"
+    commands:
+      - "20:20 [alert]"
+      - "20:20 [log]"
+      - "40:40 [webhook]"
+      - "40:40 [proxy]"
+
+  BadPackets:
+    remove-violations-after: 300
+    checks:
+      - "BadPackets"
+      - "PacketOrder"
+      - "Crash"
+    commands:
+      - "20:20 [alert]"
+      - "20:20 [log]"
+      - "40:40 [webhook]"
+      - "40:40 [proxy]"
+      - "80:0 kick %player% Unfair advantage"
+      - "120:0 ban %player% Unfair advantage auto"
+
+  Reach:
+    # 1.21 は誤検知が出やすいので、即キックせず VL を積んでからキックする。
+    remove-violations-after: 300
+    checks:
+      - "Reach"
+    commands:
+      - "1:1 [alert]"
+      - "1:1 [log]"
+      - "8:4 [webhook]"
+      - "8:4 [proxy]"
+      - "12:0 kick %player% Unfair advantage"
+      - "20:0 ban %player% Unfair advantage auto"
+
+  Hitboxes:
+    remove-violations-after: 300
+    checks:
+      - "Hitboxes"
+    commands:
+      - "5:3 [alert]"
+      - "5:3 [log]"
+      - "12:6 [webhook]"
+      - "12:6 [proxy]"
+      - "18:0 kick %player% Unfair advantage"
+      - "28:0 ban %player% Unfair advantage auto"
+
+  Misc:
+    remove-violations-after: 300
+    checks:
+      - "Vehicle"
+      - "NoSlow"
+      - "Sprint"
+      - "MultiActions"
+      - "Place"
+      - "Baritone"
+      - "Break"
+      - "TransactionOrder"
+      - "Elytra"
+      - "Chat"
+      - "Exploit"
+    commands:
+      - "10:5 [alert]"
+      - "10:5 [log]"
+      - "20:10 [webhook]"
+      - "20:10 [proxy]"
+      - "40:0 kick %player% Unfair advantage"
+      - "70:0 ban %player% Unfair advantage auto"
+
+  Combat:
+    # Aim は即 BAN しない。スタッフ確認用のアラートのみ。
+    remove-violations-after: 300
+    checks:
+      - "Interact"
+      - "Aim"
+    commands:
+      - "20:40 [alert]"
+      - "20:40 [log]"
+      - "80:80 [webhook]"
+
+  Autoclicker:
+    remove-violations-after: 300
+    checks:
+      - "Autoclicker"
+    commands:
+      - "20:40 [alert]"
+      - "20:40 [log]"
+      - "80:80 [webhook]"

@@ -1,0 +1,130 @@
+=== C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\ffa\FfaService.java
+    private final Map<UUID, CombatTag> combatUntil = new ConcurrentHashMap<>();
+    private volatile int resetIntervalSeconds;
+    private volatile long nextResetAtMillis;
+    private volatile int lastResetRemaining = Integer.MAX_VALUE;
+
+=== C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\ffa\FfaService.java
+        reload();
+        Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            tickCombat();
+            tickReset();
+        }, 20L, 20L);
+    }
+
+=== C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\ffa\FfaService.java
+            int seconds = (int) Math.max(1L, (tag.untilMillis() - now + 999L) / 1000L);
+            player.sendActionBar(Component.text("Combat : " + seconds + "s", NamedTextColor.RED));
+        }
+    }
+
+    public int resetIntervalSeconds() {
+        return resetIntervalSeconds;
+    }
+
+    public long nextResetAtMillis() {
+        return nextResetAtMillis;
+    }
+
+    public void setResetIntervalSeconds(int seconds) {
+        applyResetInterval(Math.max(0, seconds), true);
+    }
+
+    private void applyResetInterval(int seconds, boolean persist) {
+        this.resetIntervalSeconds = seconds;
+        this.lastResetRemaining = Integer.MAX_VALUE;
+        if (seconds <= 0) {
+            this.nextResetAtMillis = 0L;
+        } else {
+            this.nextResetAtMillis = System.currentTimeMillis() + seconds * 1000L;
+        }
+        if (persist) {
+            configService.ffa().set("settings.reset-interval-seconds", seconds);
+            configService.save(ConfigService.FFA);
+        }
+    }
+
+    private void tickReset() {
+        if (resetIntervalSeconds <= 0 || nextResetAtMillis <= 0L) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        int remaining = (int) Math.max(0L, (nextResetAtMillis - now + 999L) / 1000L);
+        if (remaining <= 0) {
+            for (FfaArena arena : arenas.values()) {
+                if (arena.enabled()) {
+                    reset(arena.id());
+                }
+            }
+            lastResetRemaining = Integer.MAX_VALUE;
+            nextResetAtMillis = now + resetIntervalSeconds * 1000L;
+            return;
+        }
+        int prev = lastResetRemaining;
+        lastResetRemaining = remaining;
+        for (int at : RESET_WARN_AT) {
+            if (prev > at && remaining <= at) {
+                announceReset(at);
+            }
+        }
+    }
+
+    private static final int[] RESET_WARN_AT = {300, 240, 180, 120, 60, 30, 5, 4, 3, 2, 1};
+
+    private void announceReset(int remainingSeconds) {
+        String time = remainingSeconds >= 60 && remainingSeconds % 60 == 0
+                ? FfaResetTimes.format(remainingSeconds) + "."
+                : remainingSeconds + (remainingSeconds == 1 ? " second." : " seconds.");
+        for (FfaArena arena : arenas.values()) {
+            if (!arena.enabled()) {
+                continue;
+            }
+            Component message = Component.text("⚠ ", NamedTextColor.YELLOW)
+                    .append(Component.text(arena.id() + " FFA will reset in ", NamedTextColor.WHITE))
+                    .append(Component.text(time, NamedTextColor.YELLOW));
+            Bukkit.broadcast(message);
+        }
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            soundService.play(player, "ffa-reset-warn");
+        }
+    }
+
+=== C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\command\FfaCommand.java
+            case "reset" -> {
+                if (args.length < 2) {
+                    sender.sendMessage(Component.text("Usage: /ffa reset <arena>", NamedTextColor.YELLOW));
+                    yield true;
+                }
+                ffaService.reset(args[1]);
+                sender.sendMessage(Component.text("Reset started: " + args[1], NamedTextColor.GREEN));
+                yield true;
+            }
+            case "resettime" -> {
+                if (args.length < 2) {
+                    int seconds = ffaService.resetIntervalSeconds();
+                    if (seconds <= 0) {
+                        sender.sendMessage(Component.text("FFA periodic reset is off.", NamedTextColor.YELLOW));
+                    } else {
+                        sender.sendMessage(Component.text(
+                                "FFA resets every " + com.rumilance.practice.ffa.FfaResetTimes.format(seconds) + ".",
+                                NamedTextColor.AQUA));
+                    }
+                    yield true;
+                }
+                var parsed = com.rumilance.practice.ffa.FfaResetTimes.parse(args[1]);
+                if (parsed.isEmpty()) {
+                    sender.sendMessage(Component.text(
+                            "Usage: /ffa resettime <n><sec|min|hour> | /ffa resettime off", NamedTextColor.YELLOW));
+                    yield true;
+                }
+                int seconds = parsed.getAsInt();
+                ffaService.setResetIntervalSeconds(seconds);
+                if (seconds <= 0) {
+                    sender.sendMessage(Component.text("FFA periodic reset disabled.", NamedTextColor.YELLOW));
+                } else {
+                    sender.sendMessage(Component.text(
+                            "FFA will reset every " + com.rumilance.practice.ffa.FfaResetTimes.format(seconds) + ".",
+                            NamedTextColor.GREEN));
+                }
+                yield true;
+            }

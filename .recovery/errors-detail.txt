@@ -1,0 +1,223 @@
+﻿
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\bot\SwordBotService.java:184: error: method sendTo
+Lo
+  bby in class LobbyService cannot be applied to given types;
+              lobbyService.sendToLobby(player, true);
+                          ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\chat\SpamFilterService.java:124: error: method iss
+ue
+   in class ChatBanService cannot be applied to given types;
+                      chatBanService.issue(uuid, null, "CHATBAN",
+                                    ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\combat\CombatSyncListener.java:108: error: cannot 
+fi
+  nd symbol
+          for (UUID id : ffaService.occupantIds()) {
+                                   ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\combat\CombatSyncListener.java:421: error: cannot 
+fi
+  nd symbol
+              return kitService.get(session.kitFor(player.getUniqueId())).orElse(null);
+                                           ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\combat\CombatSyncListener.java:511: error: cannot 
+fi
+  nd symbol
+              dest = ffaService.spawnDestination(player);
+                               ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\combat\CombatSyncListener.java:544: error: cannot 
+fi
+  nd symbol
+              ffaService.applySight(player);
+                        ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\command\AdminCommand.java:82: error: cannot find s
+ym
+  bol
+                      target = playerRepository.findByUsername(name).map(PlayerData::uuid).orElse(null);
+                                               ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\stats\StatsResetService.java:40: error: cannot fin
+d 
+  symbol
+          rankedStatsRepository.deleteAll();
+                               ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\stats\StatsResetService.java:41: error: cannot fin
+d 
+  symbol
+          ffaStatsRepository.deleteAll();
+                            ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\stats\StatsResetService.java:42: error: cannot fin
+d 
+  symbol
+          dailyRankedStatsRepository.deleteAll();
+                                    ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\stats\StatsResetService.java:43: error: cannot fin
+d 
+  symbol
+          matchHistoryRepository.deleteAll();
+                                ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\stats\StatsResetService.java:49: error: cannot fin
+d 
+  symbol
+          rankedStatsRepository.deleteForPlayer(uuid);
+                               ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\stats\StatsResetService.java:50: error: cannot fin
+d 
+  symbol
+          ffaStatsRepository.deleteForPlayer(uuid);
+                            ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\stats\StatsResetService.java:51: error: cannot fin
+d 
+  symbol
+          dailyRankedStatsRepository.deleteForPlayer(uuid);
+                                    ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\stats\StatsResetService.java:52: error: cannot fin
+d 
+  symbol
+          matchHistoryRepository.deleteForPlayer(uuid);
+                                ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\command\BanCommand.java:176: error: cannot find sy
+mb
+  ol
+                  var row = playerRepository.findByUsername(name);
+                                            ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\gui\menus\ReportGui.java:39: error: open(Player) i
+n 
+  ReportGui cannot override open(Player) in AbstractGui
+      public void open(Player reporter) {
+                  ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\gui\menus\ReportListGui.java:121: error: cannot fi
+nd
+   symbol
+          replayService.startFromReport(player, reportService, reportId);
+                       ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\command\SetRankCommand.java:78: error: cannot find
+ s
+  ymbol
+              return playerRepository.findByUsername(name).map(d -> d.uuid()).orElse(null);
+                                     ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\security\sign\SignProbeService.java:212: error: in
+co
+  mpatible types: BlockData cannot be converted to WrappedBlockData
+                      sendPacket(target, blockChange(pos, realBlock));
+                                                          ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\security\sign\SignProbeService.java:347: error: in
+co
+  mpatible types: Map<String,NbtBase<?>> cannot be converted to NbtBase<?>
+          p.getNbtModifier().write(0, NbtFactory.fromBase(nbt).getValue());
+                                                                       ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\ffa\FfaSpawnIndex.java:149: error: cannot find sym
+bo
+  l
+          for (FfaService.FfaArena arena : ffaService.arenasView()) {
+                                                     ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\gui\KitAnvilRenameService.java:135: error: cannot 
+fi
+  nd symbol
+                  editKitGui.applyRenamedItem(player, rename.kitId(), rename.preset(),
+                            ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\gui\KitAnvilRenameService.java:145: error: method 
+op
+  enKitEditor in class EditKitGui cannot be applied to given types;
+              editKitGui.openKitEditor(player, kitId, preset);
+                        ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\gui\menus\BattleMenuGui.java:115: error: cannot fi
+nd
+   symbol
+          registry.get(player.getUniqueId()).ifPresent(child -> child.setFromBattleMenu(true));
+                                                                     ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\gui\menus\DuelMapSelectGui.java:54: error: cannot 
+fi
+  nd symbol
+          session.setFromBattleMenu(parent.fromBattleMenu());
+                                          ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\gui\menus\DuelMapSelectGui.java:157: error: cannot
+ f
+  ind symbol
+          boolean fromBattle = session.fromBattleMenu();
+                                      ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\gui\menus\DuelMapSelectGui.java:163: error: cannot
+ f
+  ind symbol
+              s.setFromBattleMenu(fromBattle);
+               ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\gui\menus\PartyInviteGui.java:166: error: cannot f
+in
+  d symbol
+                  player.sendMessage(Component.text(teamService.errorMessage(player, r), UiTheme.DANGER)
+                                                               ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\gui\menus\PresetAdminGui.java:71: error: cannot fi
+nd
+   symbol
+                      + " (" + (page + 1) + "/" + PresetItems.MAX_PAGES + ")", NamedTextColor.AQUA);
+                                                             ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\gui\menus\PresetAdminGui.java:105: error: cannot f
+in
+  d symbol
+          int base = page * PresetItems.SLOTS_PER_PAGE;
+                                       ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\gui\menus\PresetAdminGui.java:107: error: cannot f
+in
+  d symbol
+          for (int local = 0; local < PresetItems.SLOTS_PER_PAGE; local++) {
+                                                 ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\gui\menus\PresetAdminGui.java:120: error: cannot f
+in
+  d symbol
+                  Component.text("繝壹・繧ｸ " + (page + 1) + " / " + PresetItems.MAX_PAGES, NamedTextColor.YELLOW),
+                                                                          ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\gui\menus\PresetAdminGui.java:122: error: cannot f
+in
+  d symbol
+          if (page < PresetItems.MAX_PAGES - 1) {
+                                ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\gui\menus\PresetAdminGui.java:151: error: cannot f
+in
+  d symbol
+          return Math.max(0, Math.min(PresetItems.MAX_PAGES - 1, page));
+                                                 ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\gui\menus\PresetAdminGui.java:161: error: cannot f
+in
+  d symbol
+          return topSlot >= PresetItems.SLOTS_PER_PAGE;
+                                       ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\gui\menus\PresetAdminGui.java:173: error: cannot f
+in
+  d symbol
+          ItemStack[] snap = new ItemStack[PresetItems.SLOTS_PER_PAGE];
+                                                      ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\gui\menus\PresetAdminGui.java:174: error: cannot f
+in
+  d symbol
+          for (int i = 0; i < PresetItems.SLOTS_PER_PAGE; i++) {
+                                         ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\gui\menus\PresetAdminGui.java:177: error: cannot f
+in
+  d symbol
+          presetItems.replacePageFromInventory(cat, pageOf(session), snap);
+                     ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\gui\menus\PresetAdminGui.java:226: error: cannot f
+in
+  d symbol
+              session.put(PAGE, Math.min(PresetItems.MAX_PAGES - 1, pageOf(session) + 1));
+                                                    ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\listener\PracticePearlListener.java:149: error: ca
+nn
+  ot find symbol
+              return instance == null ? null : instance.bounds();
+                                                       ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\match\MatchTeamVisuals.java:28: error: cannot find
+ s
+  ymbol
+          boolean ff = session.friendlyFire();
+                              ^
+> C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\security\sign\SignGuardService.java:54: error: con
+st
+  ructor SignComponentScanner in class SignComponentScanner cannot be applied to given types;
+          return new SignComponentScanner(depth, allowed, critical);
+                 ^
+>   C:\projects\RumilancePractice\src\main\java\com\rumilance\practice\bot\SwordBotService.java:184: error: method send
+To
+  Lobby in class LobbyService cannot be applied to given types;
+                lobbyService.sendToLobby(player, true);
+                            ^
+
+

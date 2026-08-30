@@ -1,0 +1,15 @@
+{
+  "description": "Knockback-Manager modern defaults (Club/Hypixel-like). H 0.4, V 0.36075, air V 0.24775, sprint extra H 0.5 look-dir + V 0.1, Y limit 0.675. Sprint extras use attacker look so Marlow KB Control works.",
+  "attack-knockback": 1.0,
+  "horizontal-kb": 0.4,
+  "vertical-kb": 0.36075,
+  "air-vertical-kb": 0.24775,
+  "sprint-kb": 0.5,
+  "sprint-vertical-kb": 0.1,
+  "vertical-limit": 0.675,
+  "knockback-resistance": 0.0,
+  "attacker-velocity-influence": 0.0,
+  "target-velocity": 0.5,
+  "knockback-direction": "relative",
+  "velocity-clamp": 4.0
+}

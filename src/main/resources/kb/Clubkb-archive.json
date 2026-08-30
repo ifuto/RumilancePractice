@@ -1,0 +1,15 @@
+{
+  "description": "Paper 26.1.2 modern-vanilla archive mapped to OCM knobs (V 0.3608).",
+  "attack-knockback": 1.0,
+  "horizontal-kb": 0.4,
+  "vertical-kb": 0.3608,
+  "air-vertical-kb": 0.24775,
+  "sprint-kb": 0.5,
+  "sprint-vertical-kb": 0.1,
+  "vertical-limit": 0.675,
+  "knockback-resistance": 0.0,
+  "attacker-velocity-influence": 0.0,
+  "target-velocity": 0.5,
+  "knockback-direction": "relative",
+  "velocity-clamp": 4.0
+}

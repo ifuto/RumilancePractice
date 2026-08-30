@@ -1,0 +1,315 @@
+name: NARENA
+provides:
+  - RumilancePractice
+prefix: NARENA
+main: com.rumilance.practice.RumilancePractice
+version: ${version}
+api-version: '1.21'
+author: Rumilance
+description: N Arena practice PvP plugin for Paper (ranked/unranked duels, FFA, kits, arenas).
+folia-supported: false
+softdepend:
+  - FastAsyncWorldEdit
+  - WorldEdit
+  - ProtocolLib
+  - Apollo
+
+commands:
+  duel:
+    description: Unranked queue, or challenge a player (GUI / kit).
+    usage: /duel [player [kit]|cancel|accept|deny]
+    aliases: [d]
+    permission: rumilance.user
+  ranked:
+    description: Ranked queue GUI or send a ranked duel request.
+    usage: /ranked [player [kit]|cancel|accept|deny]
+    aliases: [rd]
+    permission: rumilance.user
+  unranked:
+    description: Unranked queue GUI or send an unranked duel request.
+    usage: /unranked [player]
+    permission: rumilance.user
+  report:
+    description: Report the opponent of your most recent 1v1 match.
+    usage: /report
+    permission: rumilance.user
+  reportlist:
+    description: Open the operator report review list.
+    usage: /reportlist
+    permission: rumilance.admin
+  replay:
+    description: Control the report replay viewer.
+    usage: /replay <pause|rewind|forward|speed|restart|stop>
+    permission: rumilance.admin
+  signcheck:
+    description: Actively probe a player for disallowed client mods (needs ProtocolLib).
+    usage: /signcheck <player>
+    permission: rumilance.admin
+  accept:
+    description: Accept a duel request.
+    usage: /accept [player]
+    permission: rumilance.user
+  deny:
+    description: Deny a duel request.
+    usage: /deny [player|all]
+    permission: rumilance.user
+  cancel:
+    description: Cancel your outgoing duel request, or deny the latest incoming one.
+    usage: /cancel
+    aliases: [cansel]
+    permission: rumilance.user
+  rpaccept:
+    description: Accept a practice duel request (chat-button safe; not Essentials TPA).
+    usage: /rpaccept [player]
+    permission: rumilance.user
+  rpdeny:
+    description: Deny a practice duel request (chat-button safe).
+    usage: /rpdeny [player|all]
+    permission: rumilance.user
+  rpcancel:
+    description: Cancel your outgoing practice duel request (chat-button safe).
+    usage: /rpcancel
+    permission: rumilance.user
+  queue:
+    description: Leave the current matchmaking queue.
+    usage: /queue leave
+    permission: rumilance.user
+  players:
+    description: Open online players duel picker.
+    usage: /players
+    aliases: [dplayers]
+    permission: rumilance.user
+  spec:
+    description: Spectate a player's match.
+    usage: /spec <player>
+    permission: rumilance.user
+  specgui:
+    description: Open active matches spectate GUI.
+    usage: /specgui
+    permission: rumilance.user
+  setting:
+    description: Open personal settings GUI.
+    usage: /setting
+    permission: rumilance.user
+  stats:
+    description: View ranked kit statistics.
+    usage: /stats [player]
+    permission: rumilance.user
+  kdr:
+    description: View ranked K/D (overall or for a kit).
+    usage: /kdr [player] [kit]
+    permission: rumilance.user
+  profile:
+    description: View ranked profile summary.
+    usage: /profile [player]
+    permission: rumilance.user
+  ranking:
+    description: View ranked leaderboards.
+    usage: /ranking <elo|streak|kills>
+    permission: rumilance.user
+  ffa:
+    description: Open FFA list GUI or manage FFA arenas.
+    usage: /ffa [draft|pos1|pos2|selection|spawn|deletespawn|kit|save|enable|disable|delete|reset|resettime|leave]
+    permission: rumilance.user
+  prac:
+    description: Join or leave a practice room.
+    usage: /prac <name>|leave
+    permission: rumilance.user
+  practice:
+    description: Manage practice rooms (admin).
+    usage: /practice <draft|pos1|selection|p1|save|enable|disable|delete|list|info|tp>
+    permission: rumilance.admin
+  team:
+    description: Owner-invite style teams with public/private visibility and red-blue team battles.
+    usage: /team <gui|create|invite|join|decline|leave|kick|public|list|info|side|autosplit|clearsides|start|disband>
+    aliases: [party, p]
+    permission: rumilance.user
+  title:
+    description: Open the kill/win title selector.
+    usage: /title
+    permission: rumilance.user
+  ekit:
+    description: Edit official kit layout.
+    usage: /ekit
+    permission: rumilance.user
+  leave:
+    description: Leave a match during the pre-match countdown.
+    usage: /leave
+    aliases: [le]
+    permission: rumilance.user
+  lobby:
+    description: Return to the practice lobby.
+    usage: /lobby
+    aliases: [spawn, hub]
+    permission: rumilance.user
+  spawn:
+    description: Return to the practice lobby.
+    usage: /spawn
+    permission: rumilance.user
+  hub:
+    description: Return to the practice lobby.
+    usage: /hub
+    permission: rumilance.user
+  ping:
+    description: Show ping.
+    usage: /ping [player]
+    permission: rumilance.user
+  matchhistory:
+    description: Show recent ranked matches.
+    usage: /matchhistory [player]
+    permission: rumilance.user
+  objection:
+    description: Submit a ChatBan objection.
+    usage: /objection <reason>
+    permission: rumilance.user
+  arroweffect:
+    description: Select arrow trail effect.
+    usage: /arroweffect
+    permission: rumilance.user.mem
+  originalkit:
+    description: Open original kit editor.
+    usage: /originalkit
+    aliases: [okit]
+    permission: rumilance.user
+  admin:
+    description: Reset rating points and statistics.
+    usage: /admin reset point [player] | /admin orkit <open|close>
+    permission: rumilance.admin
+  practiceadmin:
+    description: Practice administration.
+    usage: /practiceadmin <tool|reload|status|matches|cleanup|maintenance>
+    permission: rumilance.admin
+  slobby:
+    description: Configure lobby region/spawn.
+    usage: /slobby <pos1|pos2|spawn|info|validate>
+    permission: rumilance.admin
+  setlobbyitem:
+    description: Save current inventory as lobby inventory.
+    usage: /setlobbyitem
+    permission: rumilance.admin
+  setfunc:
+    description: Mark held item as a functional lobby item.
+    usage: /setfunc <ranked|unranked|ffa|ekit|settings|spectate|titles|party|menu|battle|leavequeue>
+    permission: rumilance.admin
+  setrank:
+    description: Set a player's donor/staff rank (OP).
+    usage: /setrank <player> <norm|VIP|VIP+|admin|owner>
+    aliases: [rank]
+    permission: rumilance.admin
+  arena:
+    description: Manage arena templates and paste pool.
+    usage: /arena <subcommand>
+    permission: rumilance.admin
+  kit:
+    description: Manage official kits (no args opens the Kit Management GUI).
+    usage: /kit [gui|help|create <name>|rename <now> <new>|arena <kit> <arena|any>|order <name> <up|down>|list|info <name>|enable|disable|delete <name>|timeout <name> <sec>|startcmd <kit> add|list|clear|adventure <name> <on|off>|flag <name> <on|off>]
+    permission: rumilance.admin
+  ban:
+    description: Ban a player (overrides /minecraft:ban).
+    usage: /ban <player> <reason> [duration|auto]
+    permission: rumilance.admin
+  kick:
+    description: Kick a player.
+    usage: /kick <player> [reason]
+    permission: rumilance.admin
+  testban:
+    description: Broadcast a fake BAN line for TestPlayer (not stored).
+    usage: /testban
+    permission: rumilance.admin
+  testkick:
+    description: Broadcast a fake KICK line for TestPlayer (not stored).
+    usage: /testkick
+    permission: rumilance.admin
+  checkid:
+    description: Look up who fought in a duel by public ID.
+    usage: /checkid <id>
+    permission: rumilance.admin
+  banlist:
+    description: Open the ban list GUI.
+    usage: /banlist
+    permission: rumilance.admin
+  unban:
+    description: Remove an active ban.
+    usage: /unban <player>
+    permission: rumilance.admin
+  toggle:
+    description: Enable/disable queues or maps.
+    usage: /toggle <queue|map> <enable|disable> <id>
+    permission: rumilance.admin
+  chatban:
+    description: Manually chatban a player (only the target is notified).
+    usage: /chatban <player> <reason> [duration] [blocktell] | /chatban blocktell <player> <on|off>
+    permission: rumilance.admin
+  chatunban:
+    description: Remove a chatban.
+    usage: /chatunban <player|chatban_id>
+    permission: rumilance.admin
+  ekitadmin:
+    description: Manage original-kit item categories.
+    usage: /ekitadmin
+    permission: rumilance.admin
+  giveitem:
+    description: Operator-only utility to receive special items (golden head, etc.).
+    usage: /giveitem <ghead>
+    permission: rumilance.admin
+  matchinv:
+    description: Open end-of-match inventories for a duel (used by kill-feed clicks).
+    usage: /matchinv <matchId>
+    permission: rumilance.user
+  lang:
+    description: Switch practice language (Japanese or English).
+    usage: /lang <ja|en>
+    aliases: [language, locale]
+    permission: rumilance.user
+  matchreport:
+    description: View the combat report card for your most recent match.
+    usage: /matchreport [toggle]
+    permission: rumilance.user
+  walltext:
+    description: Place wall-mounted text labels (TextDisplay) on the block face in sight.
+    usage: /walltext <set|scale|remove|list|reload> ...
+    permission: rumilance.admin
+  kb:
+    description: Apply an operator knockback preset from plugins/RumilancePractice/kb/.
+    usage: /kb off | /kb set <file.json>
+    permission: rumilance.admin
+
+permissions:
+  rumilance.user:
+    description: Base practice player permission.
+    default: true
+  rumilance.duel.use:
+    description: Allow duel/queue commands.
+    default: true
+  rumilance.admin:
+    description: Full practice administration.
+    default: op
+    children:
+      rumilance.user: true
+      rumilance.lobby.bypass: true
+      rumilance.punishment.bypass: true
+      rumilance.report.kick: true
+  rumilance.report.kick:
+    description: Open the report removal menu and remove a reported player.
+    default: op
+  rumilance.lobby.bypass:
+    description: Bypass lobby region restrictions.
+    default: op
+  rumilance.punishment.bypass:
+    description: Bypass disconnect ChatBan.
+    default: op
+  rumilance.sign.bypass:
+    description: Bypass the sign translation-key anti-cheat guard.
+    default: op
+  rumilance.user.def:
+    description: Default original-kit plan.
+    default: true
+  rumilance.user.mem:
+    description: Member plan.
+    default: false
+  rumilance.user.vip:
+    description: VIP plan.
+    default: false
+  rumilance.user.vip_plus:
+    description: VIP+ plan.
+    default: false

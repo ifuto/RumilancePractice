@@ -1,0 +1,14 @@
+---
+description: コードを変えたら必ず ./gradlew test shadowJar を実行する
+alwaysApply: true
+---
+
+# 毎回ビルドして JAR を出す
+
+Java / Gradle / YAML / リソースを変更したら、そのターンの最後に必ず次を実行する。失敗したら直して再ビルドする。コンパイルや test だけで終わらせない。サーバーに置く fat JAR は `shadowJar` が出す。
+
+```
+./gradlew test shadowJar
+```
+
+完了後、`build/libs/RumilancePractice-<version>.jar` が今回のバージョンで存在することを確認する。`version` は `gradle.properties` が正。`build.gradle.kts` にバージョンを直書きしない。

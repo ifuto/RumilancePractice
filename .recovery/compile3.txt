@@ -1,0 +1,19 @@
+﻿.\gradlew.bat : Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Dfile.encoding=UTF-8
+発生場所 C:\Users\Junji\AppData\Local\Temp\ps-script-242a6103-51eb-4e13-9336-bdddc9f7dab6.ps1:78 文字:68
++ ... ing=UTF-8"; .\gradlew.bat compileJava --no-configuration-cache 2>&1 | ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnam
+ed module (file:/C:/Users/Junji/.gradle/wrapper/dists/gradle-9.6.1-bin/4ticwg1pgcbps2hj28r8so764/gradle-9.6.1/lib/nativ
+e-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+Starting a Gradle Daemon, 1 busy and 1 stopped Daemons could not be reused, use --status for details
+> Task :compileJava UP-TO-DATE
+
+BUILD SUCCESSFUL in 41s
+1 actionable task: 1 up-to-date
