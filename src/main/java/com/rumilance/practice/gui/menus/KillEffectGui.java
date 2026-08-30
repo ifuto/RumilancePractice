@@ -1,6 +1,7 @@
 package com.rumilance.practice.gui.menus;
 
 import com.rumilance.practice.cosmetic.kill.KillEffect;
+import com.rumilance.practice.cosmetic.kill.KillEffectService;
 import com.rumilance.practice.gui.AbstractGui;
 import com.rumilance.practice.gui.GuiSession;
 import com.rumilance.practice.gui.GuiSessionRegistry;
@@ -23,7 +24,7 @@ import java.util.List;
 /**
  * Picker for the paid kill-effect cosmetics. The free "None" option is always available; every
  * actual effect is VIP+ only and is shown locked for non-donors. Paging follows the standard
- * 28-slot content grid.
+ * 28-slot content grid. Effects are loaded from {@code kill-effects.yml}.
  */
 public final class KillEffectGui extends AbstractGui {
 
@@ -31,12 +32,15 @@ public final class KillEffectGui extends AbstractGui {
 
     private final SettingsService settingsService;
     private final RankService rankService;
+    private final KillEffectService killEffectService;
 
     public KillEffectGui(GuiSessionRegistry registry, SoundService sounds,
-                         SettingsService settingsService, RankService rankService) {
+                         SettingsService settingsService, RankService rankService,
+                         KillEffectService killEffectService) {
         super(registry, sounds, GuiType.KILL_EFFECT, 6, true);
         this.settingsService = settingsService;
         this.rankService = rankService;
+        this.killEffectService = killEffectService;
     }
 
     @Override
@@ -49,7 +53,7 @@ public final class KillEffectGui extends AbstractGui {
         MenuScaffold.chrome(inventory);
         MenuScaffold.header(inventory, 0, title(player, session));
 
-        List<KillEffect> effects = KillEffect.all();
+        List<KillEffect> effects = killEffectService.registry().all();
         int pages = Math.max(1, (effects.size() + PAGE_SIZE - 1) / PAGE_SIZE);
         if (session.page() >= pages) {
             session.setPage(pages - 1);
@@ -126,13 +130,13 @@ public final class KillEffectGui extends AbstractGui {
         }
         if (action.startsWith("fx:")) {
             String id = action.substring(3);
-            KillEffect effect = KillEffect.byId(id);
+            KillEffect effect = killEffectService.registry().byId(id);
             if (!effect.isNone() && (rankService == null || !rankService.isVipPlusOrAbove(player))) {
                 sounds.play(player, "gui-back");
                 player.sendMessage(t(player, "gui.kill-effect-denied"));
                 return;
             }
-            settingsService.update(settingsService.get(player).withKillEffect(id));
+            settingsService.update(settingsService.get(player).withKillEffect(effect.id()));
             sounds.play(player, "select");
             player.sendMessage(t(player, "gui.kill-effect-set",
                     com.rumilance.practice.locale.MessageService.tags("id", id)));
