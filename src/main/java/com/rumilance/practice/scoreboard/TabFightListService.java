@@ -25,8 +25,12 @@ import java.util.List;
  */
 public final class TabFightListService {
 
-    /** Orders after this mark begin the right (spectator) column. */
-    private static final int RIGHT_COLUMN_BASE = 80;
+    /**
+     * Orders from this mark land in the right (spectator) column: with the left fight
+     * column capped at 20 entries, any order &ge; 20 is rendered in the second column,
+     * so spectators read on the right.
+     */
+    private static final int RIGHT_COLUMN_BASE = 20;
 
     public TabFightListService(org.bukkit.plugin.Plugin plugin) {
         // No ProtocolLib dependency: ordering only.
