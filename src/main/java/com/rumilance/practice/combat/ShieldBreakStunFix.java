@@ -43,12 +43,13 @@ public final class ShieldBreakStunFix {
         // shield-disable tick, so a single reset can be overwritten before the next swing.
         for (int delay = 1; delay <= WINDOW_TICKS; delay++) {
             final UUID id = victim.getUniqueId();
+            final boolean last = delay == WINDOW_TICKS;
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 Player online = Bukkit.getPlayer(id);
                 if (online != null && online.isOnline()) {
                     online.setNoDamageTicks(0);
                 }
-                if (delay == WINDOW_TICKS) {
+                if (last) {
                     RECENT_BREAKS.remove(id);
                 }
             }, delay);
