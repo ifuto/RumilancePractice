@@ -6,7 +6,6 @@ import com.rumilance.practice.state.PlayerState;
 import com.rumilance.practice.util.ItemKeys;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
-import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
@@ -14,7 +13,6 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -61,19 +59,13 @@ public final class LobbyCompassListener implements Listener {
         return stack;
     }
 
-    @EventHandler
-    public void onJoin(PlayerJoinEvent event) {
-        Player player = event.getPlayer();
-        // Defer one tick so /setlobbyitem inventories and other join handlers finish first.
-        org.bukkit.plugin.Plugin plugin = org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(LobbyCompassListener.class);
-        if (plugin != null && plugin.isEnabled()) {
-            Bukkit.getScheduler().runTask(plugin, () -> giveIfMissing(player));
-        }
-    }
-
     /**
      * Adds the compass to the player's hotbar if they are in the lobby state and do not already
      * have one. Safe to call repeatedly (e.g. on lobby return).
+     *
+     * <p>Not called on join anymore: the Game Menu compass is no longer auto-handed out when a
+     * player joins. It still works when present (e.g. placed in the lobby via {@code /setlobbyitem}),
+     * and right-clicking it still opens the menu.</p>
      */
     public void giveIfMissing(Player player) {
         if (stateManager.getState(player.getUniqueId()) != PlayerState.LOBBY) {
