@@ -727,12 +727,10 @@ public final class MatchService {
                 if (entity instanceof org.bukkit.entity.AbstractArrow
                         || entity instanceof org.bukkit.entity.EnderCrystal
                         || entity instanceof org.bukkit.entity.TNTPrimed
-                        || entity instanceof org.bukkit.entity.ExplosiveMinecart
+                        || entity instanceof org.bukkit.entity.minecart.ExplosiveMinecart
                         || entity instanceof org.bukkit.entity.FallingBlock
                         || entity instanceof org.bukkit.entity.Item
-                        || entity instanceof org.bukkit.entity.Projectile
-                        || entity instanceof org.bukkit.entity.EnderSignal
-                        || entity instanceof org.bukkit.entity.Firework) {
+                        || entity instanceof org.bukkit.entity.Projectile) {
                     entity.remove();
                 }
             }
