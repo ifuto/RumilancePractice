@@ -225,7 +225,7 @@ public final class LobbyService {
             return;
         }
         for (int i = 0; i < Math.min(36, lobbyInventory.length); i++) {
-            if (lobbyInventory[i] != null) {
+            if (lobbyInventory[i] != null && !isGameMenuItem(lobbyInventory[i])) {
                 player.getInventory().setItem(i, lobbyInventory[i].clone());
             }
         }
@@ -236,9 +236,24 @@ public final class LobbyService {
             }
             player.getInventory().setArmorContents(armor);
         }
-        if (lobbyInventory.length > 40 && lobbyInventory[40] != null) {
+        if (lobbyInventory.length > 40 && lobbyInventory[40] != null && !isGameMenuItem(lobbyInventory[40])) {
             player.getInventory().setItemInOffHand(lobbyInventory[40].clone());
         }
+    }
+
+    /**
+     * The Game Menu compass is intentionally never handed out on join. Old saved lobby
+     * inventories ({@code /setlobbyitem}) may still contain one baked in by a previous build;
+     * skip it so it is not restored on join / lobby return.
+     */
+    private static boolean isGameMenuItem(ItemStack stack) {
+        if (stack == null || !stack.hasItemMeta()) {
+            return false;
+        }
+        String value = stack.getItemMeta().getPersistentDataContainer()
+                .get(com.rumilance.practice.util.ItemKeys.functionType(),
+                        org.bukkit.persistence.PersistentDataType.STRING);
+        return "menu".equalsIgnoreCase(value);
     }
 
     public boolean isConfigured() {

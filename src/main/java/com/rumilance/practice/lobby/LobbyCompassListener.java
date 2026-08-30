@@ -7,8 +7,6 @@ import com.rumilance.practice.util.ItemKeys;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
-import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
@@ -21,22 +19,21 @@ import org.bukkit.persistence.PersistentDataType;
 import java.util.function.Consumer;
 
 /**
- * Gives every lobby player a "Game Menu" compass in their hotbar that opens a fast-jump menu
- * (ranked / unranked / FFA / kit editor / spectate). Right-clicking the compass (in either
- * hand) opens the supplied menu opener; if a lobby inventory has been saved with
- * {@code /setlobbyitem}, the compass is only added when it is not already present so admin-set
- * inventories are never overwritten.
+ * Handles interaction with the "Game Menu" compass. Right-clicking the compass (in either hand)
+ * while in the lobby opens the fast-jump menu (ranked / unranked / FFA / kit editor / spectate).
+ *
+ * <p>This listener <strong>never hands out the compass</strong>. It is no longer given on join
+ * nor restored on lobby return. It only responds to a compass a player already holds — e.g. one
+ * an admin placed in the lobby via {@code /setfunc menu} / {@code /setlobbyitem}.</p>
  */
 public final class LobbyCompassListener implements Listener {
 
-    /** Hotbar slot the compass occupies when auto-given (centre of the hotbar). */
-    public static final int COMPASS_SLOT = 4;
-
     private final PlayerStateManager stateManager;
     private final SoundService soundService;
-    private final Consumer<Player> openMenu;
+    private final Consumer<org.bukkit.entity.Player> openMenu;
 
-    public LobbyCompassListener(PlayerStateManager stateManager, SoundService soundService, Consumer<Player> openMenu) {
+    public LobbyCompassListener(PlayerStateManager stateManager, SoundService soundService,
+                                Consumer<org.bukkit.entity.Player> openMenu) {
         this.stateManager = stateManager;
         this.soundService = soundService;
         this.openMenu = openMenu;
@@ -57,43 +54,6 @@ public final class LobbyCompassListener implements Listener {
         meta.getPersistentDataContainer().set(ItemKeys.functionType(), PersistentDataType.STRING, "menu");
         stack.setItemMeta(meta);
         return stack;
-    }
-
-    /**
-     * Adds the compass to the player's hotbar if they are in the lobby state and do not already
-     * have one. Safe to call repeatedly (e.g. on lobby return).
-     *
-     * <p>Not called on join anymore: the Game Menu compass is no longer auto-handed out when a
-     * player joins. It still works when present (e.g. placed in the lobby via {@code /setlobbyitem}),
-     * and right-clicking it still opens the menu.</p>
-     */
-    public void giveIfMissing(Player player) {
-        if (stateManager.getState(player.getUniqueId()) != PlayerState.LOBBY) {
-            return;
-        }
-        if (hasCompass(player)) {
-            return;
-        }
-        // Avoid overwriting a meaningful item: prefer an empty slot, fall back to the centre slot.
-        int target = player.getInventory().firstEmpty();
-        if (target < 0 || target > 8) {
-            target = COMPASS_SLOT;
-        }
-        player.getInventory().setItem(target, compassItem());
-    }
-
-    private boolean hasCompass(Player player) {
-        NamespacedKey key = ItemKeys.functionType();
-        for (ItemStack item : player.getInventory().getContents()) {
-            if (item == null || !item.hasItemMeta()) {
-                continue;
-            }
-            String value = item.getItemMeta().getPersistentDataContainer().get(key, PersistentDataType.STRING);
-            if ("menu".equals(value)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /**
@@ -122,7 +82,7 @@ public final class LobbyCompassListener implements Listener {
         // navigation-wand (/thru, /jumpto) handling entirely.
         event.setUseItemInHand(org.bukkit.event.Event.Result.DENY);
         event.setUseInteractedBlock(org.bukkit.event.Event.Result.DENY);
-        Player player = event.getPlayer();
+        org.bukkit.entity.Player player = event.getPlayer();
         if (stateManager.getState(player.getUniqueId()) != PlayerState.LOBBY) {
             return;
         }
