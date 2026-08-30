@@ -986,9 +986,19 @@ public final class MatchService {
                         double offset = (withinTeam - (side.size() - 1) / 2.0) * 1.2;
                         spawn = spawn.clone().add(offset, 0, 0);
                     }
-                    SafeTeleport.teleport(player, LocationUtil.safeTeleportLocation(spawn));
+                    SafeTeleport.teleport(player, LocationUtil.safeTeleportLocation(spawn))
+                            .whenComplete((ok, err) -> {
+                                if (Boolean.TRUE.equals(ok)) {
+                                    // Re-apply THIS match arena's per-player border/view only
+                                    // AFTER the teleport landed, so it can never clamp the
+                                    // player while they are still being moved (the source of
+                                    // the "rematch snaps to a border corner" bug).
+                                    applySight(player, session);
+                                }
+                            });
+                } else {
+                    applySight(player, session);
                 }
-                applySight(player, session);
                 if (kit != null) {
                     applyStartEffects(player, kit);
                     runStartCommands(player, kit);

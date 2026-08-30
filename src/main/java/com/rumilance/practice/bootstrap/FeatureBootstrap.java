@@ -814,7 +814,9 @@ public final class FeatureBootstrap {
         });
         functionalItemListener.setOpenPartyInvite(partyInviteGui::openFor);
         functionalItemListener.setOpenPartyStart(teamKitSelectGui::open);
-        functionalItemListener.setOpenPartyMap(partyMapSelectGui::open);
+        // The party-map hotkey routes through kit selection: a map can only be chosen for
+        // a specific kit (kit -> that kit's party maps -> pick to start).
+        functionalItemListener.setOpenPartyMap(teamKitSelectGui::open);
         functionalItemListener.setPartyLeave(player -> {
             TeamService.Result r = teamService.leave(player);
             if (r != TeamService.Result.OK) {

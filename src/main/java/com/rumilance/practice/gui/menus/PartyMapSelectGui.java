@@ -65,21 +65,7 @@ public final class PartyMapSelectGui extends AbstractGui {
      */
     public void openForKit(Player player, String kitId) {
         this.pendingKitId = kitId;
-        super.open(player);
-    }
-
-    @Override
-    public void open(Player player) {
-        // Opened without a chosen kit (e.g. a stale hotkey): route through kit selection.
-        if (pendingKitId == null) {
-            if (teamKitSelectGui != null) {
-                teamKitSelectGui.open(player);
-            } else {
-                player.closeInventory();
-            }
-            return;
-        }
-        super.open(player);
+        open(player);
     }
 
     @Override
