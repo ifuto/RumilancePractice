@@ -891,6 +891,19 @@ public final class FeatureBootstrap {
         pm.registerEvents(new PracticePearlListener(matchService, ffaService, arenaService, sightSettings), plugin);
         pm.registerEvents(combatSync, plugin);
         combatSync.start();
+        // Paper PvP regression workarounds (shield stun i-frames, blocked-hit knockback,
+        // trident jab reconnect, bow draw-force arrow damage). Combatant-only predicate.
+        java.util.function.Predicate<java.util.UUID> combatant = id -> {
+            com.rumilance.practice.session.MatchSession s = matchService.registry().byPlayer(id).orElse(null);
+            if (s != null) {
+                com.rumilance.practice.state.MatchState st = s.state();
+                return st == com.rumilance.practice.state.MatchState.ACTIVE
+                        || st == com.rumilance.practice.state.MatchState.COUNTDOWN
+                        || st == com.rumilance.practice.state.MatchState.ENDING;
+            }
+            return ffaService.isInFfa(id);
+        };
+        pm.registerEvents(new com.rumilance.practice.combat.PaperCombatCompatListener(plugin, combatant), plugin);
         pm.registerEvents(new GoldenHeadListener(plugin, matchRegistry), plugin);
         pm.registerEvents(new TotemPickupListener(), plugin);
         pm.registerEvents(guiListener, plugin);
