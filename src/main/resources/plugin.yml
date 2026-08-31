@@ -179,6 +179,10 @@ commands:
     description: Practice administration.
     usage: /practiceadmin <tool|reload|status|matches|cleanup|maintenance>
     permission: rumilance.admin
+  rumireload:
+    description: Reload every YAML configuration (kits, arenas, ffa, sounds, scoreboard, locales, effects).
+    usage: /rumireload
+    permission: rumilance.admin
   slobby:
     description: Configure lobby region/spawn.
     usage: /slobby <pos1|pos2|spawn|info|validate>

@@ -42,6 +42,7 @@ import com.rumilance.practice.command.MatchReportCommand;
 import com.rumilance.practice.command.PlayerCommands;
 import com.rumilance.practice.command.PracCommand;
 import com.rumilance.practice.command.PracticeAdminCommand;
+import com.rumilance.practice.command.RumilanceReloadCommand;
 import com.rumilance.practice.command.PracticeCommand;
 import com.rumilance.practice.command.QueueLeaveCommand;
 import com.rumilance.practice.command.ReplayCommand;
@@ -539,6 +540,7 @@ public final class FeatureBootstrap {
                         plugin, settingsService, rankService, killEffectRegistry);
         killEffectService.start();
         services.register(com.rumilance.practice.cosmetic.kill.KillEffectService.class, killEffectService);
+        services.register(com.rumilance.practice.cosmetic.kill.KillEffectRegistry.class, killEffectRegistry);
         com.rumilance.practice.combat.KillFeed.setKillEffectPlayer(killEffectService::playOnKill);
 
         // When a player drops below VIP+, reset smithing trims to default: strip premium
@@ -1049,6 +1051,7 @@ public final class FeatureBootstrap {
         bind("practiceadmin", practiceAdmin);
         bind("slobby", practiceAdmin);
         bind("setlobbyitem", practiceAdmin);
+        bind("rumireload", new RumilanceReloadCommand(services));
         bind("arena", arenaKitAdmin);
         bind("kit", arenaKitAdmin);
         bind("toggle", arenaKitAdmin);
