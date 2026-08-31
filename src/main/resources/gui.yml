@@ -1,6 +1,6 @@
 # GUI layout configuration. Slot numbers are 0-based within the inventory.
 main-menu:
-  title: "<aqua><bold>N Arena"
+  title: "<dark_purple>Rumilance Practice"
   size: 27
   slots:
     kits: 10

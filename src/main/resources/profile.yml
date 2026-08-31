@@ -15,7 +15,7 @@ defaults:
 scoreboard:
   enabled: true
   update-interval-ticks: 20
-  title: "<aqua><bold>N Arena"
+  title: "<dark_purple><bold>RUMILANCE"
 
 statistics:
   track-unranked: true
