@@ -168,6 +168,12 @@ public final class MatchService {
         this.spectatorService = spectatorService;
     }
 
+    private com.rumilance.practice.practice.PracticeService practiceService;
+
+    public void setPracticeService(com.rumilance.practice.practice.PracticeService practiceService) {
+        this.practiceService = practiceService;
+    }
+
     public void setChatBanService(com.rumilance.practice.punishment.ChatBanService chatBanService) {
         this.chatBanService = chatBanService;
     }
@@ -365,6 +371,10 @@ public final class MatchService {
 
         duelRequestService.invalidateForPlayer(playerA);
         duelRequestService.invalidateForPlayer(playerB);
+        // Pull both players out of FFA / spectate / practice / queue / kit-editor without
+        // teleporting, so the arena teleport below is the only move and can't be raced.
+        evictFromAnyActivity(onlineA);
+        evictFromAnyActivity(onlineB);
         onlineA.closeInventory();
         onlineB.closeInventory();
         boolean okA = tryTransition(playerA, PlayerState.PREPARING_MATCH);
@@ -541,6 +551,7 @@ public final class MatchService {
             duelRequestService.invalidateForPlayer(id);
             Player online = Bukkit.getPlayer(id);
             if (online != null) {
+                evictFromAnyActivity(online);
                 online.closeInventory();
             }
             if (!tryTransition(id, PlayerState.PREPARING_MATCH)) {
@@ -1837,6 +1848,74 @@ public final class MatchService {
             }
         }
         return ok;
+    }
+
+    /**
+     * Pulls a player out of whatever non-match activity they are in so a duel/team match can take
+     * over cleanly, regardless of how the match was started (queue pairing, a duel invite accepted
+     * while in FFA / spectating / a practice room / editing a kit, rematch...).
+     *
+     * <p>Every eviction is <strong>bookkeeping-only — never teleports</strong>. The match flow
+     * performs the one and only teleport (to the arena spawn) and applies the kit / vitals / sight
+     * only AFTER that teleport lands, so there is never a lobby-vs-arena teleport race and the
+     * player always arrives in the arena fully kitted.</p>
+     */
+    private void evictFromAnyActivity(Player player) {
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+        UUID id = player.getUniqueId();
+        PlayerState state = stateManager.getState(id);
+        try {
+            if (queueCoordinator != null) {
+                queueCoordinator.leave(player);
+            }
+        } catch (RuntimeException ignored) {
+        }
+        try {
+            if (ffaService != null && (state == PlayerState.FFA || ffaService.isInFfa(id))) {
+                ffaService.leaveSilentlyForMatch(player);
+            }
+        } catch (RuntimeException ignored) {
+        }
+        try {
+            if (spectatorService != null && spectatorService.isSpectating(id)) {
+                spectatorService.leave(player, false);
+            }
+        } catch (RuntimeException ignored) {
+        }
+        // A pulled-out spectator may still be hidden from (or hiding) others; restore full
+        // visibility before the match re-applies its own sight rules.
+        try {
+            if (tabVisibilityService != null) {
+                tabVisibilityService.showAll(player);
+            }
+        } catch (RuntimeException ignored) {
+        }
+        try {
+            if (spectatorService != null) {
+                spectatorService.revealInWorld(player);
+            }
+        } catch (RuntimeException ignored) {
+        }
+        try {
+            if (practiceService != null
+                    && (state == PlayerState.PRACTICE_WAIT || state == PlayerState.PRACTICE_ACTIVE
+                    || practiceService.isInPractice(id))) {
+                practiceService.leaveSilentlyForMatch(player);
+            }
+        } catch (RuntimeException ignored) {
+        }
+        try {
+            player.closeInventory();
+        } catch (RuntimeException ignored) {
+        }
+        // Ensure the state flag is LOBBY so the later PREPARING_MATCH transition always succeeds
+        // even if the activity-specific reset above missed a state.
+        PlayerState now = stateManager.getState(id);
+        if (now != PlayerState.LOBBY && now != PlayerState.PREPARING_MATCH) {
+            stateManager.resetToLobby(id);
+        }
     }
 
     private boolean tryTransition(UUID playerId, PlayerState target) {

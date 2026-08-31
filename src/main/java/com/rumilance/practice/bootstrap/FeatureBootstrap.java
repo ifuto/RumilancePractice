@@ -515,6 +515,9 @@ public final class FeatureBootstrap {
         queueCoordinator.start();
         matchService.setQueueCoordinator(queueCoordinator);
         matchService.setFfaService(ffaService);
+        if (practiceService != null) {
+            matchService.setPracticeService(practiceService);
+        }
         queueCoordinator.setFfaService(ffaService);
         ffaService.setQueueService(queueService);
 

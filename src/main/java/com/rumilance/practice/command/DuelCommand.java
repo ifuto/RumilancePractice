@@ -262,35 +262,50 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
 
     /** States that cannot be interrupted even after closing GUIs / leaving FFA. */
     private boolean isHardBusyForDuel(UUID playerId) {
+        // Only an ACTIVE match blocks accepting a duel. FFA, spectating, practice rooms, queues,
+        // kit editing and ENDING are all soft states: preparePlayersForDuel + MatchService pull
+        // the player out of them (bookkeeping-only, then one teleport into the arena) so an invite
+        // can be accepted from anywhere.
         PlayerState state = stateManager.getState(playerId);
         return state == PlayerState.FIGHTING
                 || state == PlayerState.COUNTDOWN
-                || state == PlayerState.PREPARING_MATCH
-                || state == PlayerState.PRACTICE_WAIT
-                || state == PlayerState.PRACTICE_ACTIVE;
+                || state == PlayerState.PREPARING_MATCH;
     }
 
     private void preparePlayersForDuel(Player player) {
         if (player == null) {
             return;
         }
+        // Bookkeeping-only exits (no teleport): MatchService.evictFromAnyActivity performs the same
+        // cleanup defensively and then runs the single arena teleport, so we must NOT teleport to
+        // the lobby here (that would race the arena teleport and strand the player).
         try {
             queueCoordinator.leave(player);
         } catch (Exception ignored) {
         }
-        if (ffaService != null && stateManager.getState(player.getUniqueId()) == PlayerState.FFA) {
-            ffaService.leave(player);
+        try {
+            if (ffaService != null && ffaService.isInFfa(player.getUniqueId())) {
+                ffaService.leaveSilentlyForMatch(player);
+            }
+        } catch (Exception ignored) {
         }
-        if (spectatorService != null && stateManager.getState(player.getUniqueId()) == PlayerState.SPECTATING) {
-            spectatorService.leave(player);
+        try {
+            if (spectatorService != null && spectatorService.isSpectating(player.getUniqueId())) {
+                spectatorService.leave(player, false);
+            }
+        } catch (Exception ignored) {
         }
         if (guiSessions != null) {
             guiSessions.close(player.getUniqueId());
         }
-        player.closeInventory();
+        try {
+            player.closeInventory();
+        } catch (Exception ignored) {
+        }
         PlayerState state = stateManager.getState(player.getUniqueId());
         if (state == PlayerState.EDITING_KIT || state == PlayerState.OPENING_GUI
-                || state == PlayerState.ENDING) {
+                || state == PlayerState.ENDING || state == PlayerState.PRACTICE_WAIT
+                || state == PlayerState.PRACTICE_ACTIVE) {
             stateManager.resetToLobby(player.getUniqueId());
         }
     }

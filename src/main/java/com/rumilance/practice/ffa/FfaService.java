@@ -390,6 +390,14 @@ public final class FfaService {
         leave(player, false);
     }
 
+    /** Bookkeeping-only removal when a player is being pulled into a match. Drops the FFA maps
+     *  WITHOUT teleporting them to the lobby or scheduling a hub return: the match flow is about
+     *  to teleport them to an arena, so a lobby teleport here would race it and strand the
+     *  player between worlds. The state is reset to LOBBY so the match transition succeeds. */
+    public void leaveSilentlyForMatch(Player player) {
+        leave(player, false);
+    }
+
     private void leave(Player player, boolean returnToLobby) {
         UUID id = player.getUniqueId();
         playerArena.remove(id);
@@ -623,19 +631,17 @@ public final class FfaService {
             return;
         }
         KitDefinition kit = kitService.get(arena.kitId()).orElse(null);
-        // Wipe the previous life's items BEFORE re-applying the kit. Without this reset,
-        // the fake-death flow (damage cancelled, no vanilla death screen) leaves the old
-        // kit on the player and KitLoadout#give was the only thing clearing it — a window
-        // in which looted/dropped items from the arena floor survived the respawn into
-        // the next life (and could later be carried back to the lobby).
+        // Wipe the previous life's items BEFORE the teleport. The kit is handed out only AFTER
+        // the teleport lands (see teleportIntoArena) so the player never briefly holds the new
+        // kit at the old death spot, and arrives at spawn fully kitted — the same order the
+        // duel flow uses. Without this reset, the fake-death flow (damage cancelled, no vanilla
+        // death screen) leaves the old kit on the player and looted/dropped items would survive
+        // into the next life (and could later be carried back to the lobby).
         com.rumilance.practice.util.PlayerVitals.fakeDeathReset(player);
         player.setHealth(player.getMaxHealth());
         player.setFireTicks(0);
         player.setCanPickupItems(true);
-        if (kit != null) {
-            applyKit(player, kit);
-        }
-        teleportIntoArena(player, arena);
+        teleportIntoArena(player, arena, kit);
         player.setCanPickupItems(true);
     }
 
@@ -653,6 +659,10 @@ public final class FfaService {
     }
 
     private void teleportIntoArena(Player player, FfaArena arena) {
+        teleportIntoArena(player, arena, null);
+    }
+
+    private void teleportIntoArena(Player player, FfaArena arena, KitDefinition kitForRespawn) {
         Location dest = pickSpawn(arena, player.getUniqueId());
         if (dest == null || dest.getWorld() == null) {
             return;
@@ -662,9 +672,20 @@ public final class FfaService {
         // never leave the FFA player with no (or the lobby's) wall.
         SafeTeleport.teleport(player, LocationUtil.safeTeleportLocation(dest))
                 .whenComplete((ok, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
-                    if (player.isOnline() && isInFfa(player.getUniqueId())) {
-                        applySight(player);
+                    if (!player.isOnline() || !isInFfa(player.getUniqueId())) {
+                        return;
                     }
+                    // Hand out the kit ONLY after the teleport actually landed, so the player
+                    // arrives at spawn fully kitted rather than briefly holding the new kit at
+                    // the previous location. On a failed teleport fall back to a local apply so
+                    // they are never left with an empty inventory.
+                    if (Boolean.TRUE.equals(ok) && kitForRespawn != null) {
+                        applyKit(player, kitForRespawn);
+                    } else if (kitForRespawn != null) {
+                        applyKit(player, kitForRespawn);
+                    }
+                    player.setCanPickupItems(true);
+                    applySight(player);
                 }));
     }
 

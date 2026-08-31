@@ -491,6 +491,19 @@ public final class PracticeService {
     }
 
     public void leave(Player player, boolean announce) {
+        leave(player, announce, true);
+    }
+
+    /**
+     * Bookkeeping-only leave used when a player is pulled straight into a match: tears down the
+     * practice room (timer / mace bot / clone) and resets state, but does NOT teleport to the
+     * lobby — the match flow teleports them to an arena next, so a lobby teleport would race it.
+     */
+    public void leaveSilentlyForMatch(Player player) {
+        leave(player, false, false);
+    }
+
+    private void leave(Player player, boolean announce, boolean returnToLobby) {
         PracticeSession session = sessions.remove(player.getUniqueId());
         joinGraceUntilMs.remove(player.getUniqueId());
         if (session == null) {
@@ -504,7 +517,9 @@ public final class PracticeService {
         removeMaceBot(session);
         UUID cloneId = session.cloneInstanceId();
         stateManager.resetToLobby(player.getUniqueId());
-        lobbyService.sendToLobby(player);
+        if (returnToLobby && player.isOnline()) {
+            lobbyService.sendToLobby(player);
+        }
         if (cloneId != null && cloneService != null) {
             cloneService.release(cloneId);
         }
