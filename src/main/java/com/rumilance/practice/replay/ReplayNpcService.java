@@ -214,14 +214,12 @@ public final class ReplayNpcService {
         Player online = Bukkit.getPlayer(profileId);
         if (online != null) {
             // Copy the real, skin-bearing profile of the live participant.
-            WrappedGameProfile live = WrappedGameProfile.fromPlayer(online);
-            if (live.getProperties().containsKey("textures")) {
-                return live;
-            }
-            return live;
+            return WrappedGameProfile.fromPlayer(online);
         }
         // Offline: a profile with the real UUID + name but default skin (no fetched texture).
-        return WrappedGameProfile.fromHandle(new com.mojang.authlib.GameProfile(profileId, name));
+        // Use ProtocolLib's own wrapper (no direct authlib dependency, which is not on the
+        // compile classpath).
+        return new WrappedGameProfile(profileId, name == null ? "Replay" : name);
     }
 
     private static byte angleToByte(float angle) {
