@@ -105,6 +105,10 @@ public final class ReplayCommand implements CommandExecutor, TabCompleter {
                     NamedTextColor.RED));
             return;
         }
+        if (archive == null) {
+            player.sendMessage(Component.text("Replays are unavailable.", NamedTextColor.RED));
+            return;
+        }
         List<ReplayArchive.RecordedMatch> recent = archive.recent(player.getUniqueId(), true);
         if (recent.isEmpty()) {
             player.sendMessage(Component.text("リプレイがありません。直近の試合が2日間保存されます。", NamedTextColor.GRAY));
@@ -138,6 +142,10 @@ public final class ReplayCommand implements CommandExecutor, TabCompleter {
             player.sendMessage(Component.text("番号を指定してください。", NamedTextColor.RED));
             return;
         }
+        if (archive == null) {
+            player.sendMessage(Component.text("Replays are unavailable.", NamedTextColor.RED));
+            return;
+        }
         List<ReplayArchive.RecordedMatch> recent =
                 new ArrayList<>(archive.recent(player.getUniqueId(), true));
         if (index < 1 || index > recent.size()) {
@@ -153,7 +161,8 @@ public final class ReplayCommand implements CommandExecutor, TabCompleter {
         if (args.length == 1) {
             return TabCompletions.filter(TabCompletions.current(args), SUBS);
         }
-        if (args.length == 2 && args[0].equalsIgnoreCase("watch") && sender instanceof Player player) {
+        if (args.length == 2 && args[0].equalsIgnoreCase("watch")
+                && sender instanceof Player player && archive != null) {
             int count = archive.recent(player.getUniqueId(),
                     rankService != null && rankService.isVipPlusOrAbove(player)).size();
             List<String> nums = new ArrayList<>();
