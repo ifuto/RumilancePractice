@@ -226,6 +226,17 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
                     MessageService.tags("target", senderName(request.sender())));
             return;
         }
+        // Hard reject parties and active/eliminated fighters BEFORE any eviction/state reset so we
+        // never tear a party member out of a team match or spectating a party fight.
+        if (inParty(sender.getUniqueId()) || inParty(target.getUniqueId())) {
+            messageService.send(player, "party.solo-only");
+            return;
+        }
+        if (matchService.isBusyForSoloDuel(sender.getUniqueId())
+                || matchService.isBusyForSoloDuel(target.getUniqueId())) {
+            messageService.send(player, "duel.already-in-match");
+            return;
+        }
         preparePlayersForDuel(sender);
         preparePlayersForDuel(target);
         if (isHardBusyForDuel(sender.getUniqueId()) || isHardBusyForDuel(target.getUniqueId())) {
@@ -348,10 +359,24 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
         if (partyBlocksSolo(sender)) {
             return;
         }
+        // Target must also be party-free: inviting a party member to a 1v1 can never be honoured.
+        if (inParty(target.getUniqueId())) {
+            messageService.send(sender, "party.solo-only");
+            return;
+        }
         int cooldown = duelRequestService.remainingCooldownSeconds(sender.getUniqueId(), target.getUniqueId());
         if (cooldown > 0) {
             messageService.send(sender, "duel.request-cooldown",
                     MessageService.tags("secs", String.valueOf(cooldown)));
+            return;
+        }
+        if (matchService.isBusyForSoloDuel(sender.getUniqueId())) {
+            messageService.send(sender, "duel.already-in-match");
+            return;
+        }
+        if (matchService.isBusyForSoloDuel(target.getUniqueId())) {
+            messageService.send(sender, "duel.target-already-in-match",
+                    MessageService.tags("target", target.getName()));
             return;
         }
         if (!PracticeGuards.canSendOrAcceptDuel(stateManager.getState(sender.getUniqueId()))) {

@@ -37,6 +37,7 @@ public final class DuelRequestGui extends AbstractGui {
     private final MessageService messageService;
     private DuelMapSelectGui mapSelectGui;
     private com.rumilance.practice.team.TeamService teamService;
+    private com.rumilance.practice.match.MatchService matchService;
 
     public DuelRequestGui(
             GuiSessionRegistry registry,
@@ -63,6 +64,10 @@ public final class DuelRequestGui extends AbstractGui {
 
     public void setTeamService(com.rumilance.practice.team.TeamService teamService) {
         this.teamService = teamService;
+    }
+
+    public void setMatchService(com.rumilance.practice.match.MatchService matchService) {
+        this.matchService = matchService;
     }
 
     public DuelMapSelectGui mapSelectGui() {
@@ -197,10 +202,28 @@ public final class DuelRequestGui extends AbstractGui {
             messageService.send(player, "party.solo-only");
             return;
         }
+        if (matchService != null && matchService.isBusyForSoloDuel(player.getUniqueId())) {
+            sounds.play(player, "error");
+            messageService.send(player, "duel.already-in-match");
+            return;
+        }
         UUID targetId = session.targetPlayer();
         Player target = targetId == null ? null : Bukkit.getPlayer(targetId);
         if (target == null) {
             sounds.play(player, "error");
+            return;
+        }
+        // A 1v1 request can never be honoured against a party member, or against someone committed
+        // to a fight — including a teammate eliminated from the party match (watching it).
+        if (teamService != null && teamService.teamOf(targetId).isPresent()) {
+            sounds.play(player, "error");
+            messageService.send(player, "party.solo-only");
+            return;
+        }
+        if (matchService != null && matchService.isBusyForSoloDuel(targetId)) {
+            sounds.play(player, "error");
+            messageService.send(player, "duel.target-already-in-match",
+                    MessageService.tags("target", target.getName()));
             return;
         }
         if (!settingsService.get(target).acceptDuelRequests()) {

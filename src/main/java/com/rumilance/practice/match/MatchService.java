@@ -296,6 +296,64 @@ public final class MatchService {
         return registry;
     }
 
+    /**
+     * True when the player is eliminated from an ongoing TEAM match — i.e. they died in the party
+     * fight and are now watching the rest of it as a spectator (GameMode SPECTATOR) while their
+     * team is still playing. Such a player must never be allowed to send/accept a solo duel.
+     * Distinct from a free-roaming lobby spectator (PlayerState.SPECTATING, not in a match).
+     */
+    public boolean isEliminatedInTeamMatch(UUID playerId) {
+        MatchSession session = registry.byPlayer(playerId).orElse(null);
+        if (session == null || !session.isTeamMatch()) {
+            return false;
+        }
+        MatchState state = session.state();
+        if (state != MatchState.ACTIVE && state != MatchState.COUNTDOWN) {
+            return false;
+        }
+        Player player = Bukkit.getPlayer(playerId);
+        return player != null && player.getGameMode() == org.bukkit.GameMode.SPECTATOR;
+    }
+
+    /**
+     * Hard block on entering a solo duel: currently committed to an active match
+     * (FIGHTING/COUNTDOWN/PREPARING) or eliminated from a team match (watching the rest of it).
+     */
+    public boolean isBusyForSoloDuel(UUID playerId) {
+        PlayerState state = stateManager.getState(playerId);
+        if (state == PlayerState.FIGHTING
+                || state == PlayerState.COUNTDOWN
+                || state == PlayerState.PREPARING_MATCH) {
+            return true;
+        }
+        return isEliminatedInTeamMatch(playerId);
+    }
+
+    private boolean inParty(UUID playerId) {
+        return teamService != null && teamService.teamOf(playerId).isPresent();
+    }
+
+    private void denyDuel(UUID playerA, UUID playerB) {
+        if (messageService != null) {
+            for (UUID id : List.of(playerA, playerB)) {
+                Player p = Bukkit.getPlayer(id);
+                if (p != null) {
+                    messageService.send(p, "party.solo-only");
+                }
+            }
+        } else {
+            for (UUID id : List.of(playerA, playerB)) {
+                Player p = Bukkit.getPlayer(id);
+                if (p != null) {
+                    p.sendMessage(net.kyori.adventure.text.Component.text(
+                            "Leave your party to duel solo.",
+                            net.kyori.adventure.text.format.NamedTextColor.RED));
+                }
+            }
+        }
+    }
+
+
     public MatchCombatTracker combatTracker() {
         return combatTracker;
     }
@@ -340,6 +398,18 @@ public final class MatchService {
     public void startDuel(UUID playerA, UUID playerB, String kitId, MatchMode mode,
                           int bestOf, Map<UUID, Integer> carrySeriesWins, String preferredArena,
                           UUID carryArenaInstanceId) {
+        // Hard gates before anything is reserved: a solo duel must never start for a player who
+        // is in a party (parties fight together as a team, never 1v1), and never for a player
+        // committed to a fight — including someone ELIMINATED from a team match (watching the
+        // rest of it). Rematch carries the same party-less context as the duel that spawned it.
+        if (inParty(playerA) || inParty(playerB)) {
+            denyDuel(playerA, playerB);
+            return;
+        }
+        if (isBusyForSoloDuel(playerA) || isBusyForSoloDuel(playerB)) {
+            messageAlreadyInMatch(playerA, playerB);
+            return;
+        }
         if (registry.isPlayerInMatch(playerA) || registry.isPlayerInMatch(playerB)) {
             messageAlreadyInMatch(playerA, playerB);
             return;

@@ -989,6 +989,7 @@ public final class FeatureBootstrap {
         unrankedDuel.setGuiSessions(guiSessions);
         unrankedDuel.setTeamService(teamService);
         duelRequestGui.setTeamService(teamService);
+        duelRequestGui.setMatchService(matchService);
         queueCoordinator.setTeamService(teamService);
         AcceptDenyCommand acceptDeny = new AcceptDenyCommand(rankedDuel, duelRequestService);
         pm.registerEvents(new DuelChatInterceptListener(rankedDuel, duelRequestService), plugin);
