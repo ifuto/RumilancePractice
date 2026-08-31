@@ -16,6 +16,7 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scoreboard.Criteria;
 import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.scoreboard.Objective;
+import org.bukkit.scoreboard.RenderType;
 import org.bukkit.scoreboard.Scoreboard;
 
 import java.util.UUID;
@@ -24,11 +25,12 @@ import java.util.UUID;
  * Opponent HP rendered as the vanilla <strong>below-the-namename</strong> score (the same
  * slot the built-in health objective uses), NOT as text appended to the nametag suffix.
  *
- * <p>A per-viewer {@link DisplaySlot#BELOW_NAME} objective ({@code rp_hp}) carries a score of
- * {@code 0..10} hearts for every opponent they fight. Because it is the native health slot,
- * the number rides the player entity in the same way as a nametag (position, movement,
- * tracking, hide/show rules) but is drawn on its own line beneath the name instead of being
- * crammed into the name column. It never appears as nametag suffix text or in the TAB list.</p>
+ * <p>A per-viewer {@link DisplaySlot#BELOW_NAME} objective ({@code rp_hp}) rendered with
+ * {@link RenderType#HEARTS} draws the vanilla heart row under every opponent's nametag — red
+ * hearts for health, gold hearts for absorption — driven by the real (health + absorption)
+ * value. Because it is the native health slot, it rides the player entity like a nametag
+ * (position, movement, hide/show rules) but sits on its own line beneath the name and never
+ * appears in the TAB list.</p>
  */
 public final class OpponentHealthNametagService implements Listener {
 
@@ -100,8 +102,7 @@ public final class OpponentHealthNametagService implements Listener {
                 objective.getScore(target.getName()).setScore(0);
                 continue;
             }
-            int hearts = hearts(target);
-            objective.getScore(target.getName()).setScore(hearts);
+            objective.getScore(target.getName()).setScore(healthScore(target));
         }
     }
 
@@ -118,7 +119,7 @@ public final class OpponentHealthNametagService implements Listener {
             if (changed.getGameMode() == GameMode.SPECTATOR) {
                 objective.getScore(changed.getName()).setScore(0);
             } else {
-                objective.getScore(changed.getName()).setScore(hearts(changed));
+                objective.getScore(changed.getName()).setScore(healthScore(changed));
             }
         }
     }
@@ -127,10 +128,12 @@ public final class OpponentHealthNametagService implements Listener {
     private Objective belowNameObjective(Scoreboard board) {
         Objective objective = board.getObjective(OBJECTIVE);
         if (objective == null) {
+            // RenderType.HEARTS draws the vanilla heart row under the nametag: each point of
+            // score is half a heart, so we feed the real (health + absorption) value. Red hearts
+            // normally, gold hearts automatically appear for the absorption portion.
             objective = board.registerNewObjective(OBJECTIVE, Criteria.DUMMY,
-                    net.kyori.adventure.text.Component.text("hp"));
+                    net.kyori.adventure.text.Component.empty(), RenderType.HEARTS);
             objective.setDisplaySlot(DisplaySlot.BELOW_NAME);
-            // DUMMY renders in red by default; vanilla health uses red numbers.
         }
         return objective;
     }
@@ -148,10 +151,15 @@ public final class OpponentHealthNametagService implements Listener {
         }
     }
 
-    private static int hearts(Player player) {
-        double max = Math.max(1.0d, player.getMaxHealth());
+    /**
+     * Heart value for the below-name objective: real health plus absorption, rounded to half
+     * hearts. Vanilla caps the rendered heart row at ~20 (10 full hearts) but shows gold hearts
+     * for the absorption portion; a higher kit max-health simply shows more hearts.
+     */
+    private static int healthScore(Player player) {
         double current = player.getHealth() + player.getAbsorptionAmount();
-        int hearts = (int) Math.round((current / max) * 10.0d);
-        return Math.max(0, Math.min(14, hearts));
+        double max = Math.max(current, player.getMaxHealth() + player.getAbsorptionAmount());
+        int score = (int) Math.round(current);
+        return Math.max(0, (int) Math.min(Math.ceil(max), score));
     }
 }
