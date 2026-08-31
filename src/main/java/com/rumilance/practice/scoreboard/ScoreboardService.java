@@ -734,17 +734,29 @@ public final class ScoreboardService {
         return team;
     }
 
+    /**
+     * Heart indicator used by the {@code {hearts}} placeholder. Renders as
+     * {@code <white>number<colored>♥} — the count in white and a red heart, turning yellow when
+     * the player has absorption (gold hearts) or is under a Health Boost (raised max health).
+     * Returns MiniMessage tags; the scoreboard renderer parses MiniMessage after substituting
+     * placeholders.
+     */
     private static String heartsOf(UUID playerId) {
         Player player = Bukkit.getPlayer(playerId);
         if (player == null || !player.isOnline()) {
-            return "-/-";
+            return "<gray>- <red>♥</red>";
         }
         double maxHp = 20.0d;
         AttributeInstance attr = player.getAttribute(Attribute.MAX_HEALTH);
         if (attr != null) {
             maxHp = attr.getValue();
         }
-        return formatHearts(player.getHealth() / 2.0d) + "/" + formatHearts(maxHp / 2.0d);
+        double hearts = player.getHealth() / 2.0d;
+        // Yellow heart for bonus health: absorption (vanilla gold hearts) or Health Boost, which
+        // raises the maximum above the base 20 HP.
+        boolean boosted = player.getAbsorptionAmount() > 0.0d || maxHp > 20.0d + 0.01d;
+        String heartColor = boosted ? "yellow" : "red";
+        return "<white>" + formatHearts(hearts) + "</white> <" + heartColor + ">♥</" + heartColor + ">";
     }
 
     private static int totemsOf(UUID playerId) {
