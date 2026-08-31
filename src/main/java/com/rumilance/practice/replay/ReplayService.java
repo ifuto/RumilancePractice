@@ -160,7 +160,7 @@ public final class ReplayService {
             s.setArms(true);
             s.setPersistent(false);
             s.setMarker(false);
-            s.setVisible(true);
+            s.setInvisible(false);
             // Make it look like a real player: full player skin on the head, no base plate, arms
             // out. The skin comes from the participant's own account head.
             s.setCustomNameVisible(true);
