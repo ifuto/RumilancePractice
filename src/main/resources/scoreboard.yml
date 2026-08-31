@@ -85,6 +85,12 @@ lists:
     empty: ""
     more: "<blue>+{extra} more"
     entry: "<blue>{name} <white>{hearts} <yellow>T:{totems}"
+  # チーム戦スコアボード: 自分の味方一覧
+  ally_list:
+    max: 5
+    empty: ""
+    more: "<gray>+{extra} more"
+    entry: "<white>{name} <white>{hearts} <yellow>T:{totems}"
 
 # ---------------------------------------------------------------------------
 # TAB リスト
@@ -168,6 +174,7 @@ layouts:
     lines:
       - "<aqua>Team Match"
       - "{my_color}Ally <white>{ally_alive}<aqua>/{ally_size}"
+      - "@ally_list"
       - "{opp_color}Enemy <white>{enemy_alive}<aqua>/{enemy_size}"
       - "<white>Kit <aqua>{kit}"
       - "<white>Kills <aqua>{my_kills}"

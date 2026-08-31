@@ -890,6 +890,7 @@ public final class FeatureBootstrap {
         pm.registerEvents(new MatchListener(matchService, kitService, combatNet, practiceTnt, playerPlacedBlockTracker), plugin);
         pm.registerEvents(new MatchCommandGuardListener(stateManager, messageService), plugin);
         pm.registerEvents(new MatchCountdownLockListener(stateManager), plugin);
+        pm.registerEvents(new com.rumilance.practice.match.MatchChatListener(matchRegistry, spectatorService), plugin);
         pm.registerEvents(new TeamColoredArmorListener(teamColoredArmor, settingsService), plugin);
         pm.registerEvents(new ArenaBoundsListener(matchService, arenaService), plugin);
         pm.registerEvents(new SpectatorBoundsListener(

@@ -1340,6 +1340,9 @@ public final class MatchService {
         if (attacker != null && downed != null) {
             KillFeed.broadcast(attacker, downed, session.teamColor(attackerId), session.id());
         }
+        // Tell EVERYONE in the party fight who just went down (both teams + spectators), so the
+        // surviving teammates know they are down a player.
+        broadcastElimination(session, victimId, attackerId);
         TeamColor victimTeam = session.teamColor(victimId);
         boolean teamAlive = false;
         for (UUID member : session.team(victimTeam)) {
@@ -1364,6 +1367,38 @@ public final class MatchService {
             // endMatch() records the winner and (via MatchSession.end) the winning team colour.
             // Do NOT pre-set ENDING here: endMatch's idempotency guard would then no-op.
             endMatch(session, winnerUuid, false);
+        }
+    }
+
+    /** Sends an "X was eliminated (by Y)" line to every participant and spectator of the match. */
+    private void broadcastElimination(MatchSession session, UUID victimId, UUID attackerId) {
+        String victimName = StatsService.nameOf(victimId);
+        TeamColor victimColor = session.teamColor(victimId);
+        NamedTextColor victimTextColor = victimColor == TeamColor.RED ? NamedTextColor.RED : NamedTextColor.AQUA;
+        Component line;
+        if (attackerId != null && !attackerId.equals(victimId)) {
+            String attackerName = StatsService.nameOf(attackerId);
+            TeamColor attackerColor = session.teamColor(attackerId);
+            NamedTextColor attackerTextColor = attackerColor == TeamColor.RED ? NamedTextColor.RED : NamedTextColor.AQUA;
+            line = Component.text("✖ ", NamedTextColor.DARK_GRAY)
+                    .append(Component.text(victimName, victimTextColor).decoration(TextDecoration.BOLD, true))
+                    .append(Component.text(" was eliminated by ", NamedTextColor.GRAY))
+                    .append(Component.text(attackerName, attackerTextColor).decoration(TextDecoration.BOLD, true));
+        } else {
+            line = Component.text("✖ ", NamedTextColor.DARK_GRAY)
+                    .append(Component.text(victimName, victimTextColor).decoration(TextDecoration.BOLD, true))
+                    .append(Component.text(" was eliminated", NamedTextColor.GRAY));
+        }
+        java.util.Set<UUID> recipients = new java.util.HashSet<>(session.participants());
+        if (spectatorService != null) {
+            recipients.addAll(spectatorService.spectatorsWatching(session.id()));
+        }
+        for (UUID id : recipients) {
+            Player p = Bukkit.getPlayer(id);
+            if (p != null && p.isOnline()) {
+                p.sendMessage(line);
+                soundService.play(p, "match-end-anvil");
+            }
         }
     }
 

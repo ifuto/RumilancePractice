@@ -558,6 +558,11 @@ public final class ScoreboardService {
                 .put("mode", modeLabel(session.mode(), cfg))
                 .put("my_kills", session.killsOf(me))
                 .put("duel_id", session.publicDuelId() == null ? "" : session.publicDuelId());
+        // Roster of the player's own team (allies) for the scoreboard @ally_list directive.
+        ctx.directive("ally_list", c -> ScoreboardContext.renderSpecList(
+                c.list("ally_list"),
+                toSpecEntries(mySide),
+                ctx.vars()));
         if (session.startedAt() != null) {
             long secs = Instant.now().getEpochSecond() - session.startedAt().getEpochSecond();
             ctx.put("time", cfg.formatTime(secs));

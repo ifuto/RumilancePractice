@@ -450,6 +450,23 @@ public final class TeamService {
         if (red.isEmpty() || blue.isEmpty()) return Result.UNBALANCED;
         if (red.size() > MAX_SIDE_SIZE || blue.size() > MAX_SIDE_SIZE) return Result.UNBALANCED;
 
+        // Never start a party fight while ANY member is committed elsewhere: a solo duel, queue
+        // battle, FFA, spectating, or an active/eliminated match would conflict with the team
+        // teleport and leave state inconsistent (a personal match could have a party fight
+        // start on top of it). Require everyone to be free in the lobby.
+        for (UUID memberId : team.members()) {
+            // Reject a party fight while ANY member is already committed to something else: a
+            // solo duel / queue battle / active or eliminated match. Starting a team fight on top
+            // of a personal match would leave state inconsistent. Everyone must be lobby-free.
+            if (matchService.isBusyForSoloDuel(memberId)
+                    || matchService.registry().byPlayer(memberId).isPresent()) {
+                owner.sendMessage(Component.text(
+                        "A party member is currently in a fight or match. Wait until everyone is in the lobby.",
+                        NamedTextColor.RED));
+                return Result.UNBALANCED;
+            }
+        }
+
         String arenaName = team.selectedArena();
         boolean ff = team.friendlyFire();
         Bukkit.getScheduler().runTask(plugin, () ->
