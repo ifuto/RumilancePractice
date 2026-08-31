@@ -897,6 +897,10 @@ public final class FeatureBootstrap {
                 layoutCache, settingsService, asyncExecutor, plugin, messageService, rankService, chatBanService), plugin);
         pm.registerEvents(new LobbyListener(lobbyService, stateManager, guiSessions, ffaService), plugin);
         pm.registerEvents(new MotdListener(), plugin);
+        com.rumilance.practice.world.WorldOptimizer worldOptimizer =
+                new com.rumilance.practice.world.WorldOptimizer(plugin);
+        pm.registerEvents(worldOptimizer, plugin);
+        worldOptimizer.optimizeLoadedWorlds();
         pm.registerEvents(new MatchListener(matchService, kitService, combatNet, practiceTnt, playerPlacedBlockTracker), plugin);
         pm.registerEvents(new MatchCommandGuardListener(stateManager, messageService), plugin);
         pm.registerEvents(new MatchCountdownLockListener(stateManager), plugin);

@@ -5,7 +5,7 @@ prefix: NARENA
 main: com.rumilance.practice.RumilancePractice
 version: ${version}
 api-version: '1.21'
-author: Rumilance
+author: N Arena
 description: N Arena practice PvP plugin for Paper (ranked/unranked duels, FFA, kits, arenas).
 folia-supported: false
 softdepend:
