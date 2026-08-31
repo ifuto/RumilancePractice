@@ -359,7 +359,6 @@ public final class FeatureBootstrap {
                 new com.rumilance.practice.replay.ReplayArchive();
         services.register(com.rumilance.practice.replay.ReplayArchive.class, replayArchive);
         matchService.setReplayArchive(replayArchive);
-        pm.registerEvents(new com.rumilance.practice.replay.ReplayControlListener(replayService), plugin);
 
         banService = new BanService(plugin);
         services.register(BanService.class, banService);
@@ -885,6 +884,7 @@ public final class FeatureBootstrap {
         services.register(ScoreboardService.class, scoreboardService);
 
         PluginManager pm = plugin.getServer().getPluginManager();
+        pm.registerEvents(new com.rumilance.practice.replay.ReplayControlListener(replayService), plugin);
         pm.registerEvents(new BanLoginListener(banService), plugin);
         pm.registerEvents(new com.rumilance.practice.listener.ChatBanGuardListener(chatBanService), plugin);
         pm.registerEvents(new SessionBootstrapListener(

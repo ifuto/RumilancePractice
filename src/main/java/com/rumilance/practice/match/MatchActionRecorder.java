@@ -95,47 +95,19 @@ public final class MatchActionRecorder {
      * frames stay retrievable for {@link #RETAIN_MILLIS}. Team/FFA matches are ignored (reports
      * target a single opponent only).
      */
-    public void completeMatch(MatchSession session) {
-        if (session == null || session.isTeamMatch()) {
-            return;
-        }
-        long now = System.currentTimeMillis();
-        String world = null;
-        var arenaId = session.arenaInstanceId();
-        for (UUID id : session.participants()) {
-            UUID opponent = session.opponentOf(id);
-            Trace trace = traces.computeIfAbsent(id, ignored -> new Trace());
-            trace.activeMatch = session.id();
-            trace.opponentId = opponent;
-            trace.kit = session.kitName();
-            trace.mode = session.mode().name();
-            Player p = Bukkit.getPlayer(id);
-            if (p != null) {
-                trace.world = p.getWorld().getName();
-                if (world == null) {
-                    world = p.getWorld().getName();
-                }
-            }
-            trace.expiresAt = now + RETAIN_MILLIS;
-        }
-    }
-
     /**
      * Marks every participant's trace for {@code session} as completed so it stays readable
      * (rather than being cleared on the next sample) while the replay archive / report code
-     * pulls it. Called by MatchService when a match ends.
+     * pulls it. Called by MatchService when a match ends. Team matches are also retained so
+     * party fights can be replayed; only 1v1 traces carry an opponent id.
      */
     public void completeMatch(MatchSession session) {
         if (session == null) {
             return;
         }
         long now = System.currentTimeMillis();
-        String world = null;
         for (UUID id : session.participants()) {
-            Trace trace = traces.get(id);
-            if (trace == null) {
-                continue;
-            }
+            Trace trace = traces.computeIfAbsent(id, ignored -> new Trace());
             trace.activeMatch = session.id();
             trace.opponentId = session.isTeamMatch() ? null : session.opponentOf(id);
             trace.kit = session.kitName();
@@ -143,9 +115,6 @@ public final class MatchActionRecorder {
             Player p = Bukkit.getPlayer(id);
             if (p != null) {
                 trace.world = p.getWorld().getName();
-                if (world == null) {
-                    world = trace.world;
-                }
             }
             // Keep the trace alive long enough for endMatch -> ReplayArchive.record (same tick)
             // plus the report window.
