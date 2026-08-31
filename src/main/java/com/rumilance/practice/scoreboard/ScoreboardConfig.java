@@ -169,8 +169,17 @@ public final class ScoreboardConfig {
             specBlue = new ListStyle(specBlue.max(), specBlue.empty(), specBlue.entry(),
                     Objects.toString(s.getString("more", "<blue>+{extra} more"), ""));
         }
+        ListStyle allyList = ListStyle.of(
+                listsSec == null ? null : listsSec.getConfigurationSection("ally_list"),
+                5, "", "<white>{name} <white>{hearts} <yellow>T:{totems}");
+        if (listsSec != null && listsSec.getConfigurationSection("ally_list") != null) {
+            ConfigurationSection s = listsSec.getConfigurationSection("ally_list");
+            allyList = new ListStyle(allyList.max(), allyList.empty(), allyList.entry(),
+                    Objects.toString(s.getString("more", "<gray>+{extra} more"), ""));
+        }
         listMap.put("spec_red", specRed);
         listMap.put("spec_blue", specBlue);
+        listMap.put("ally_list", allyList);
         this.lists = Map.copyOf(listMap);
 
         String defaultTitle = "<aqua><bold>" + serverName;

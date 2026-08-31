@@ -47,8 +47,7 @@ public final class MatchChatListener implements Listener {
         }
         MatchState state = session.state();
         if (state != MatchState.ACTIVE && state != MatchState.COUNTDOWN
-                && state != MatchState.PREPARING_MATCH && state != MatchState.WAITING_FOR_PLAYERS
-                && state != MatchState.ENDING) {
+                && state != MatchState.WAITING_FOR_PLAYERS && state != MatchState.ENDING) {
             return;
         }
         Set<UUID> allowed = new HashSet<>(session.participants());
