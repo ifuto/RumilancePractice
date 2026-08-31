@@ -120,6 +120,39 @@ public final class MatchActionRecorder {
         }
     }
 
+    /**
+     * Marks every participant's trace for {@code session} as completed so it stays readable
+     * (rather than being cleared on the next sample) while the replay archive / report code
+     * pulls it. Called by MatchService when a match ends.
+     */
+    public void completeMatch(MatchSession session) {
+        if (session == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        String world = null;
+        for (UUID id : session.participants()) {
+            Trace trace = traces.get(id);
+            if (trace == null) {
+                continue;
+            }
+            trace.activeMatch = session.id();
+            trace.opponentId = session.isTeamMatch() ? null : session.opponentOf(id);
+            trace.kit = session.kitName();
+            trace.mode = session.mode().name();
+            Player p = Bukkit.getPlayer(id);
+            if (p != null) {
+                trace.world = p.getWorld().getName();
+                if (world == null) {
+                    world = trace.world;
+                }
+            }
+            // Keep the trace alive long enough for endMatch -> ReplayArchive.record (same tick)
+            // plus the report window.
+            trace.expiresAt = now + RETAIN_MILLIS;
+        }
+    }
+
     public void stop() {
         if (task != null) {
             task.cancel();

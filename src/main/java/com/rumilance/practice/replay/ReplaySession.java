@@ -3,24 +3,38 @@ package com.rumilance.practice.replay;
 import com.rumilance.practice.match.MatchActionRecorder.Frame;
 import org.bukkit.entity.ArmorStand;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
-/** Mutable playback state for one operator viewing one report's replay. */
+/** Mutable playback state for one operator viewing one recorded match's replay. */
 public final class ReplaySession {
 
     private static final double[] SPEEDS = {0.25, 0.5, 1.0, 2.0, 4.0};
 
     final UUID operator;
-    final UUID reportId;
+    final UUID matchId;
     final String world;
-    final String reporterName;
-    final String targetName;
-    final List<Frame> reporterFrames;
-    final List<Frame> targetFrames;
 
-    ArmorStand reporterAvatar;
-    ArmorStand targetAvatar;
+    /** Avatar state per recorded participant (player id -> frames/name/avatar). */
+    static final class Avatar {
+        final UUID playerId;
+        final String name;
+        final List<Frame> frames;
+        ArmorStand stand;
+
+        Avatar(UUID playerId, String name, List<Frame> frames) {
+            this.playerId = playerId;
+            this.name = name;
+            this.frames = frames;
+        }
+    }
+
+    final List<Avatar> avatars = new ArrayList<>();
+    final Map<UUID, Avatar> byPlayer = new HashMap<>();
+
     int taskId = -1;
 
     final double startTick;
@@ -29,21 +43,18 @@ public final class ReplaySession {
     boolean paused;
     int speedIndex = 2; // 1.0x
 
-    ReplaySession(UUID operator, UUID reportId, String world, String reporterName, String targetName,
-                  List<Frame> reporterFrames, List<Frame> targetFrames) {
+    ReplaySession(UUID operator, UUID matchId, String world, List<Avatar> avatars) {
         this.operator = operator;
-        this.reportId = reportId;
+        this.matchId = matchId;
         this.world = world;
-        this.reporterName = reporterName;
-        this.targetName = targetName;
-        this.reporterFrames = reporterFrames;
-        this.targetFrames = targetFrames;
         double min = Double.MAX_VALUE;
         double max = Double.MIN_VALUE;
-        for (List<Frame> list : List.of(reporterFrames, targetFrames)) {
-            if (!list.isEmpty()) {
-                min = Math.min(min, list.get(0).tick());
-                max = Math.max(max, list.get(list.size() - 1).tick());
+        for (Avatar a : avatars) {
+            this.avatars.add(a);
+            this.byPlayer.put(a.playerId, a);
+            if (!a.frames.isEmpty()) {
+                min = Math.min(min, a.frames.get(0).tick());
+                max = Math.max(max, a.frames.get(a.frames.size() - 1).tick());
             }
         }
         this.startTick = min == Double.MAX_VALUE ? 0 : min;

@@ -355,6 +355,11 @@ public final class FeatureBootstrap {
 
         replayService = new ReplayService(plugin, lobbyService);
         services.register(ReplayService.class, replayService);
+        com.rumilance.practice.replay.ReplayArchive replayArchive =
+                new com.rumilance.practice.replay.ReplayArchive();
+        services.register(com.rumilance.practice.replay.ReplayArchive.class, replayArchive);
+        matchService.setReplayArchive(replayArchive);
+        pm.registerEvents(new com.rumilance.practice.replay.ReplayControlListener(replayService), plugin);
 
         banService = new BanService(plugin);
         services.register(BanService.class, banService);
@@ -1098,7 +1103,9 @@ public final class FeatureBootstrap {
         bind("testkick", banCommand);
         bind("report", new ReportCommand(reportGui));
         bind("reportlist", new ReportListCommand(reportListGui));
-        bind("replay", new ReplayCommand(replayService));
+        bind("replay", new ReplayCommand(replayService,
+                services.find(com.rumilance.practice.replay.ReplayArchive.class).orElse(null),
+                rankService));
         bind("signcheck", new SignCheckCommand(signProbeService));
         bind("checkid", new CheckIdCommand(duelLogStore));
         bind("originalkit", (CommandExecutor) (sender, command, label, args) -> {

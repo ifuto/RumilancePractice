@@ -230,6 +230,11 @@ public final class MatchService {
 
     private com.rumilance.practice.duel.DuelLogStore duelLogStore;
     private MatchActionRecorder actionRecorder;
+    private com.rumilance.practice.replay.ReplayArchive replayArchive;
+
+    public void setReplayArchive(com.rumilance.practice.replay.ReplayArchive replayArchive) {
+        this.replayArchive = replayArchive;
+    }
     private com.rumilance.practice.match.inventory.MatchInventoryStore inventoryStore;
     private com.rumilance.practice.ffa.FfaService ffaService;
     private com.rumilance.practice.combat.CombatNetTracker combatNet;
@@ -1591,6 +1596,19 @@ public final class MatchService {
                 recentMatch.remove(id, endedMatchId);
             }
         }, 60L * 20L);
+
+        // Capture the movement traces for the replay archive BEFORE cleanup clears the
+        // recorder's per-match data. Team fights and duels are both recorded.
+        try {
+            if (actionRecorder != null) {
+                actionRecorder.completeMatch(session);
+            }
+            if (replayArchive != null && actionRecorder != null) {
+                replayArchive.record(actionRecorder, session);
+            }
+        } catch (RuntimeException ignored) {
+            // Replay capture must never break match end.
+        }
 
         MatchResultProcessor processor = switch (session.mode()) {
             case RANKED -> rankedResultProcessor;
