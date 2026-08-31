@@ -142,6 +142,12 @@ performance:
 # Compensation is clamped (max 320ms) and skipped on ping spikes so lag-switches cannot
 # buy extra crit rewind.
 combat:
+  # Random launch spread (0.0 = perfectly on crosshair, 1.0 = vanilla). Lower makes ender-pearl
+  # and wind-charge throws land exactly where aimed, which helps precise techniques such as
+  # pearl-catching. Values in between scale the vanilla random offset.
+  projectile-spread:
+    pearl: 0.0
+    wind-charge: 0.0
   ping-offset-ms: 25
   spike-threshold-ms: 20
   # Paper 1.21.4+ defaults update-equipment-on-player-actions to true, which makes hotbar/F-key

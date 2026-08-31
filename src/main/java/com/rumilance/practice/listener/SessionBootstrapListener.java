@@ -135,6 +135,11 @@ public final class SessionBootstrapListener implements Listener {
         layoutCache.preload(player.getUniqueId());
         if (chatBanService != null) {
             chatBanService.warmCache(player.getUniqueId());
+            // Tell the player if they were chat-banned while offline (or have an active ban they
+            // have not yet been informed about). Delayed a tick so cache warm / repository can
+            // resolve the record.
+            plugin.getServer().getScheduler().runTaskLater(plugin,
+                    () -> chatBanService.notifyOnJoin(player), 20L);
         }
         // Teleporting during PlayerJoinEvent freezes look + movement on the client.
         Runnable lobbyAndWelcome = () -> {

@@ -1,7 +1,6 @@
 package com.rumilance.practice.replay;
 
 import com.rumilance.practice.match.MatchActionRecorder.Frame;
-import org.bukkit.entity.ArmorStand;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -18,12 +17,12 @@ public final class ReplaySession {
     final UUID matchId;
     final String world;
 
-    /** Avatar state per recorded participant (player id -> frames/name/avatar). */
+    /** Avatar state per recorded participant (player id -> frames/name/NPC handle). */
     static final class Avatar {
         final UUID playerId;
         final String name;
         final List<Frame> frames;
-        ArmorStand stand;
+        ReplayNpcService.Avatar npc;
 
         Avatar(UUID playerId, String name, List<Frame> frames) {
             this.playerId = playerId;

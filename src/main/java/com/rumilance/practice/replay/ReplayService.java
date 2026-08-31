@@ -12,11 +12,9 @@ import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
-import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
@@ -28,8 +26,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Plays back recorded movement of a recent match at its original world coordinates. Each
- * participant is represented by an armour stand wearing the player's own head and carrying the
- * player's name, so the avatars read as real players rather than floating items.
+ * participant is rendered as a real player entity (a packet-only fake player with the
+ * participant's own skin and player body), never an armour stand.
  *
  * <p>The operator watches in CREATIVE with a hotbar of transport-control items (restart, rewind,
  * pause/play, fast-forward, speed-cycle, stop) — right-click one to drive playback. Access is
@@ -41,11 +39,13 @@ public final class ReplayService {
     private final Plugin plugin;
     private final LobbyService lobbyService;
     private final Map<UUID, ReplaySession> sessions = new ConcurrentHashMap<>();
+    private final ReplayNpcService npcService;
     private org.bukkit.NamespacedKey controlKey;
 
-    public ReplayService(Plugin plugin, LobbyService lobbyService) {
+    public ReplayService(Plugin plugin, LobbyService lobbyService, ReplayNpcService npcService) {
         this.plugin = plugin;
         this.lobbyService = lobbyService;
+        this.npcService = npcService;
         this.controlKey = new org.bukkit.NamespacedKey(plugin, "replay_control");
     }
 
@@ -125,13 +125,21 @@ public final class ReplayService {
 
     private void begin(Player operator, UUID id, World world,
                        List<ReplaySession.Avatar> avatars, Frame anchor) {
+        if (npcService == null || !npcService.isAvailable()) {
+            operator.sendMessage(Component.text(
+                    "リプレイ表示には ProtocolLib が必要です。", NamedTextColor.RED));
+            return;
+        }
         ReplaySession session = new ReplaySession(operator.getUniqueId(), id, world.getName(), avatars);
         for (ReplaySession.Avatar a : avatars) {
-            a.stand = spawnAvatar(world, a.frames, a.name, a.playerId,
-                    operator.getUniqueId().equals(a.playerId) ? NamedTextColor.GREEN : NamedTextColor.AQUA);
+            if (!a.frames.isEmpty()) {
+                Frame f = a.frames.get(0);
+                Location loc = new Location(world, f.x(), f.y(), f.z(), f.yaw(), 0f);
+                a.npc = npcService.spawn(operator, a.playerId, a.name, loc);
+            }
         }
-        // Creative so the operator can fly around freely; they are not in survival/adventure and
-        // cannot affect the world (avengers are armour stands, terrain is untouched).
+        // Creative so the operator can fly around freely; avatars are packet-only and terrain is
+        // never touched.
         operator.setGameMode(GameMode.CREATIVE);
         operator.setAllowFlight(true);
         operator.setFlying(true);
@@ -141,49 +149,13 @@ public final class ReplayService {
 
         sessions.put(operator.getUniqueId(), session);
         World finalWorld = world;
-        session.taskId = Bukkit.getScheduler().runTaskTimer(plugin, () -> tick(session, finalWorld), 1L, 1L)
+        session.taskId = Bukkit.getScheduler().runTaskTimer(plugin, () -> tick(session, operator, finalWorld), 1L, 1L)
                 .getTaskId();
         operator.sendMessage(Component.text("リプレイ開始 (クリエイティブ: アイテムを右クリックで操作)", NamedTextColor.GREEN));
         sendControls(operator, session);
     }
 
-    private ArmorStand spawnAvatar(World world, List<Frame> frames, String name, UUID owner, NamedTextColor color) {
-        if (frames.isEmpty()) {
-            return null;
-        }
-        Frame first = frames.get(0);
-        Location loc = new Location(world, first.x(), first.y(), first.z(), first.yaw(), 0f);
-        ArmorStand stand = world.spawn(loc, ArmorStand.class, s -> {
-            s.setGravity(false);
-            s.setInvulnerable(true);
-            s.setBasePlate(false);
-            s.setArms(true);
-            s.setPersistent(false);
-            s.setMarker(false);
-            s.setInvisible(false);
-            // Make it look like a real player: full player skin on the head, no base plate, arms
-            // out. The skin comes from the participant's own account head.
-            s.setCustomNameVisible(true);
-            s.customName(Component.text(name, color).decoration(TextDecoration.ITALIC, false));
-            ItemStack head = new ItemStack(Material.PLAYER_HEAD);
-            if (head.getItemMeta() instanceof SkullMeta skull) {
-                skull.setOwningPlayer(Bukkit.getOfflinePlayer(owner));
-                skull.displayName(Component.text(name, color));
-                head.setItemMeta(skull);
-            }
-            if (s.getEquipment() != null) {
-                s.getEquipment().setHelmet(head);
-                // Hide the body armour so only the skin head + name reads as the player.
-                s.getEquipment().setChestplate(new ItemStack(Material.AIR));
-                s.getEquipment().setLeggings(new ItemStack(Material.AIR));
-                s.getEquipment().setBoots(new ItemStack(Material.AIR));
-            }
-        });
-        return stand;
-    }
-
-    private void tick(ReplaySession session, World world) {
-        Player operator = Bukkit.getPlayer(session.operator);
+    private void tick(ReplaySession session, Player operator, World world) {
         if (operator == null || !operator.isOnline()) {
             stopInternal(session, false);
             return;
@@ -197,7 +169,7 @@ public final class ReplayService {
             }
         }
         for (ReplaySession.Avatar a : session.avatars) {
-            applyAvatar(a, session.playheadTick, world);
+            applyAvatar(operator, a, session.playheadTick, world);
         }
         operator.sendActionBar(Component.text(
                 (session.paused ? "⏸ " : "▶ ") + String.format("%.1fx  %d%%",
@@ -205,10 +177,9 @@ public final class ReplayService {
                 NamedTextColor.AQUA));
     }
 
-    private void applyAvatar(ReplaySession.Avatar avatar, double playheadTick, World world) {
-        ArmorStand stand = avatar.stand;
+    private void applyAvatar(Player viewer, ReplaySession.Avatar avatar, double playheadTick, World world) {
         List<Frame> frames = avatar.frames;
-        if (stand == null || stand.isDead() || frames.isEmpty()) {
+        if (avatar.npc == null || frames.isEmpty()) {
             return;
         }
         Frame lower = frames.get(0);
@@ -226,10 +197,7 @@ public final class ReplayService {
         double y = lerp(lower.y(), upper.y(), t);
         double z = lerp(lower.z(), upper.z(), t);
         float yaw = (float) lerp(lower.yaw(), upper.yaw(), t);
-        Location target = new Location(world, x, y, z, yaw, 0f);
-        if (stand.getLocation().distanceSquared(target) > 0.0001) {
-            stand.teleport(target);
-        }
+        npcService.teleport(viewer, avatar.npc, new Location(world, x, y, z, yaw, 0f));
     }
 
     private static double lerp(double a, double b, double t) {
@@ -334,13 +302,15 @@ public final class ReplayService {
         if (session.taskId != -1) {
             Bukkit.getScheduler().cancelTask(session.taskId);
         }
-        for (ReplaySession.Avatar a : session.avatars) {
-            if (a.stand != null && !a.stand.isDead()) {
-                a.stand.remove();
-            }
-        }
         Player operator = Bukkit.getPlayer(session.operator);
         if (operator != null && operator.isOnline()) {
+            if (npcService != null) {
+                for (ReplaySession.Avatar a : session.avatars) {
+                    if (a.npc != null) {
+                        npcService.remove(operator, a.npc);
+                    }
+                }
+            }
             operator.getInventory().clear();
             operator.setGameMode(GameMode.SURVIVAL);
             operator.setFlying(false);
@@ -357,9 +327,12 @@ public final class ReplayService {
             if (session.taskId != -1) {
                 Bukkit.getScheduler().cancelTask(session.taskId);
             }
-            for (ReplaySession.Avatar a : session.avatars) {
-                if (a.stand != null && !a.stand.isDead()) {
-                    a.stand.remove();
+            Player operator = Bukkit.getPlayer(session.operator);
+            if (operator != null && npcService != null) {
+                for (ReplaySession.Avatar a : session.avatars) {
+                    if (a.npc != null) {
+                        npcService.remove(operator, a.npc);
+                    }
                 }
             }
         }

@@ -353,7 +353,10 @@ public final class FeatureBootstrap {
                 plugin.getLogger());
         services.register(ReportService.class, reportService);
 
-        replayService = new ReplayService(plugin, lobbyService);
+        com.rumilance.practice.replay.ReplayNpcService replayNpcService =
+                new com.rumilance.practice.replay.ReplayNpcService(plugin);
+        replayNpcService.init();
+        replayService = new ReplayService(plugin, lobbyService, replayNpcService);
         services.register(ReplayService.class, replayService);
         com.rumilance.practice.replay.ReplayArchive replayArchive =
                 new com.rumilance.practice.replay.ReplayArchive();
@@ -364,7 +367,7 @@ public final class FeatureBootstrap {
         services.register(BanService.class, banService);
 
         chatBanService = new ChatBanService(punishmentRepository, auditLogRepository, objectionRepository,
-                asyncExecutor, plugin.getLogger(), Duration.ofDays(7));
+                asyncExecutor, plugin.getLogger(), Duration.ofDays(7), plugin);
         services.register(ChatBanService.class, chatBanService);
         matchService.setChatBanService(chatBanService);
 
@@ -910,6 +913,7 @@ public final class FeatureBootstrap {
         pm.registerEvents(new PracticePearlListener(matchService, ffaService, arenaService, sightSettings), plugin);
         pm.registerEvents(combatSync, plugin);
         combatSync.start();
+        pm.registerEvents(new com.rumilance.practice.combat.ProjectileSpreadListener(configService), plugin);
         // Paper PvP regression workarounds (shield stun i-frames, blocked-hit knockback,
         // trident jab reconnect, bow draw-force arrow damage). Combatant-only predicate.
         java.util.function.Predicate<java.util.UUID> combatant = id -> {
@@ -1006,7 +1010,7 @@ public final class FeatureBootstrap {
         arenaKitAdmin.setPresetAdminGui(presetAdminGui);
         arenaKitAdmin.setArenaAdminGui(arenaAdminGui);
         arenaKitAdmin.setPartyIconPrompt(partyIconListener::await);
-        ChatBanCommand chatBanCommand = new ChatBanCommand(chatBanService);
+        ChatBanCommand chatBanCommand = new ChatBanCommand(chatBanService, playerRepository);
         FfaCommand ffaCommand = new FfaCommand(ffaListGui, ffaService, kitService);
         PracticeAdminCommand practiceAdmin = new PracticeAdminCommand(
                 plugin, configService, soundService, matchService, lobbyService, runtimeFlags, kitService,
