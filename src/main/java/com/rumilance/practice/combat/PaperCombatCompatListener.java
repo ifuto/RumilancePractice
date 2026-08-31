@@ -115,9 +115,14 @@ public final class PaperCombatCompatListener implements Listener {
     }
 
     /**
-     * Re-derives vanilla arrow damage/crit from the bow draw force so partial pulls deal less
-     * and full pulls fire a critical (1.5-1.75x) arrow, independent of any Paper normalisation
-     * gap (#13680). Only normalises when the projectile is a player-fired arrow in a fight.
+     * Restores the vanilla critical-arrow flag for a full bow draw. Paper's shot damage is left
+     * entirely to vanilla: the final arrow damage is {@code velocity * arrowDamage} (velocity
+     * already encodes the draw force, ~3.0 at full pull) and Power enchants add their bonus into
+     * {@code arrowDamage}. We must NOT write the draw-force-scaled value into {@code setDamage}:
+     * that field is the per-hit base DAMAGE, so setting it to 6.0 at full draw made the on-hit
+     * damage {@code 3.0 * 6.0 = ~18} instead of the vanilla {@code 3.0 * 2.0 = 6} — the bug that
+     * made bows/crossbows hit far too hard. Only the critical flag is aligned (bows can fire a
+     * crit on a full pull; crossbow shots are never critical).
      */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void normalizeArrowDamage(EntityShootBowEvent event) {
@@ -130,17 +135,15 @@ public final class PaperCombatCompatListener implements Listener {
         if (!(event.getProjectile() instanceof AbstractArrow arrow)) {
             return;
         }
+        // Crossbows (and anything not drawing a bow) never produce critical arrows in vanilla.
+        if (event.getBow() != null && event.getBow().getType() == Material.CROSSBOW) {
+            arrow.setCritical(false);
+            return;
+        }
         float force = Math.max(0.0f, Math.min(1.0f, event.getForce()));
-        // Vanilla: base arrow damage 2.0 scaled by draw force, fully-drawn shots are critical.
-        double base = 2.0d * (2.0d * force + force * force);
         boolean full = force >= 0.9f;
-        arrow.setCritical(full);
-        // Preserve Power-enchant bonus already on the arrow; only correct the base scaling when
-        // the arrow is weaker than the draw force implies (partial pull underdamage bug).
-        double current = arrow.getDamage();
-        double minExpected = base;
-        if (current < minExpected) {
-            arrow.setDamage(base);
+        if (full != arrow.isCritical()) {
+            arrow.setCritical(full);
         }
     }
 
