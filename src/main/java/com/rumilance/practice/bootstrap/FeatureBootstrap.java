@@ -684,7 +684,7 @@ public final class FeatureBootstrap {
         originalKitService.setRoomService(originalKitRoomService);
         plugin.getServer().getPluginManager().registerEvents(
                 new com.rumilance.practice.originalkit.OriginalKitRoomListener(
-                        originalKitRoomService, originalKitService), plugin);
+                        originalKitRoomService, originalKitService, plugin), plugin);
         EkitItems ekitItems = new EkitItems(configService);
         services.register(EkitItems.class, ekitItems);
 

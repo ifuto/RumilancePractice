@@ -13,6 +13,9 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.EventHandler;
 import org.bukkit.inventory.ItemStack;
 
 /**
@@ -30,11 +33,14 @@ public final class OriginalKitRoomListener implements Listener {
 
     private final OriginalKitRoomService roomService;
     private final OriginalKitService originalKitService;
+    private final org.bukkit.plugin.Plugin plugin;
 
     public OriginalKitRoomListener(OriginalKitRoomService roomService,
-                                   OriginalKitService originalKitService) {
+                                   OriginalKitService originalKitService,
+                                   org.bukkit.plugin.Plugin plugin) {
         this.roomService = roomService;
         this.originalKitService = originalKitService;
+        this.plugin = plugin;
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -94,6 +100,20 @@ public final class OriginalKitRoomListener implements Listener {
             player.sendActionBar(Component.text(
                     "The save button must be placed and registered by an admin.",
                     NamedTextColor.YELLOW));
+        }
+    }
+
+    @EventHandler
+    public void onJoin(PlayerJoinEvent event) {
+        // Re-run isolation once the new player is present.
+        org.bukkit.Bukkit.getScheduler().runTask(plugin, roomService::refreshVisibility);
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        Player player = event.getPlayer();
+        if (roomService.isEditing(player.getUniqueId())) {
+            roomService.exit(player);
         }
     }
 
