@@ -901,7 +901,10 @@ public final class FeatureBootstrap {
                 new com.rumilance.practice.world.WorldOptimizer(plugin);
         pm.registerEvents(worldOptimizer, plugin);
         worldOptimizer.optimizeLoadedWorlds();
-        pm.registerEvents(new MatchListener(matchService, kitService, combatNet, practiceTnt, playerPlacedBlockTracker), plugin);
+        com.rumilance.practice.combat.ExplosionSourceTracker explosionSources =
+                new com.rumilance.practice.combat.ExplosionSourceTracker(plugin);
+        pm.registerEvents(explosionSources, plugin);
+        pm.registerEvents(new MatchListener(matchService, kitService, combatNet, practiceTnt, playerPlacedBlockTracker, explosionSources), plugin);
         pm.registerEvents(new MatchCommandGuardListener(stateManager, messageService), plugin);
         pm.registerEvents(new MatchCountdownLockListener(stateManager), plugin);
         pm.registerEvents(new com.rumilance.practice.match.MatchChatListener(matchRegistry, spectatorService), plugin);
@@ -909,7 +912,7 @@ public final class FeatureBootstrap {
         pm.registerEvents(new ArenaBoundsListener(matchService, arenaService), plugin);
         pm.registerEvents(new SpectatorBoundsListener(
                 spectatorService, matchRegistry, arenaService, ffaService), plugin);
-        pm.registerEvents(new FfaListener(ffaService, kitService, stateManager, combatNet, practiceTnt, playerPlacedBlockTracker), plugin);
+        pm.registerEvents(new FfaListener(ffaService, kitService, stateManager, combatNet, practiceTnt, playerPlacedBlockTracker, explosionSources), plugin);
         pm.registerEvents(new FfaBlockTracker(ffaService), plugin);
         pm.registerEvents(new ItemFlowGuardListener(stateManager, ffaService), plugin);
         pm.registerEvents(ffaSpawnIndex, plugin);

@@ -43,27 +43,37 @@ public final class FfaListener implements Listener {
     private final com.rumilance.practice.combat.CombatNetTracker combatNet;
     private final com.rumilance.practice.tnt.PracticeTntSettings practiceTnt;
     private final PlayerPlacedBlockTracker playerPlacedBlocks;
+    private final com.rumilance.practice.combat.ExplosionSourceTracker explosionSources;
 
     public FfaListener(FfaService ffaService, KitService kitService, PlayerStateManager stateManager) {
-        this(ffaService, kitService, stateManager, null, null, null);
+        this(ffaService, kitService, stateManager, null, null, null, null);
     }
 
     public FfaListener(FfaService ffaService, KitService kitService, PlayerStateManager stateManager,
                        com.rumilance.practice.combat.CombatNetTracker combatNet,
                        com.rumilance.practice.tnt.PracticeTntSettings practiceTnt) {
-        this(ffaService, kitService, stateManager, combatNet, practiceTnt, null);
+        this(ffaService, kitService, stateManager, combatNet, practiceTnt, null, null);
     }
 
     public FfaListener(FfaService ffaService, KitService kitService, PlayerStateManager stateManager,
                        com.rumilance.practice.combat.CombatNetTracker combatNet,
                        com.rumilance.practice.tnt.PracticeTntSettings practiceTnt,
                        PlayerPlacedBlockTracker playerPlacedBlocks) {
+        this(ffaService, kitService, stateManager, combatNet, practiceTnt, playerPlacedBlocks, null);
+    }
+
+    public FfaListener(FfaService ffaService, KitService kitService, PlayerStateManager stateManager,
+                       com.rumilance.practice.combat.CombatNetTracker combatNet,
+                       com.rumilance.practice.tnt.PracticeTntSettings practiceTnt,
+                       PlayerPlacedBlockTracker playerPlacedBlocks,
+                       com.rumilance.practice.combat.ExplosionSourceTracker explosionSources) {
         this.ffaService = ffaService;
         this.kitService = kitService;
         this.stateManager = stateManager;
         this.combatNet = combatNet;
         this.practiceTnt = practiceTnt;
         this.playerPlacedBlocks = playerPlacedBlocks;
+        this.explosionSources = explosionSources;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -280,7 +290,14 @@ public final class FfaListener implements Listener {
         return material.name().endsWith("_SWORD");
     }
 
-    private static UUID resolveKiller(EntityDamageEvent event) {
+    private UUID resolveKiller(EntityDamageEvent event) {
+        // Crystal / TNT / anchor blasts: attribute to the owning player when known.
+        if (explosionSources != null) {
+            UUID blastOwner = explosionSources.resolveExplosionSource(event);
+            if (blastOwner != null) {
+                return blastOwner;
+            }
+        }
         if (!(event instanceof EntityDamageByEntityEvent byEntity)) {
             return null;
         }

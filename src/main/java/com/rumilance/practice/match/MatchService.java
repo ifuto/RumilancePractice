@@ -107,6 +107,10 @@ public final class MatchService {
      */
     private final Map<UUID, Integer> lastLethalTickByMatch = new ConcurrentHashMap<>();
     private final Map<UUID, java.util.Set<UUID>> lethalPlayersByMatch = new ConcurrentHashMap<>();
+    /** Attacker id recorded for each fighter that went lethal this match. Lets the 1-tick deferred
+     *  ruling tell a true mutual kill (each player died to the OTHER player) apart from a
+     *  suicide/environmental death that merely shares a tick — only the former is a draw. */
+    private final Map<UUID, ConcurrentHashMap<UUID, UUID>> lethalAttackerByMatch = new ConcurrentHashMap<>();
     /** Fighters whose lethal has already been processed this match — guards against a second
      *  lethal event for the same player (double damage events in the 1-tick resolution window). */
     private final Map<UUID, java.util.Set<UUID>> resolvedLethalByMatch = new ConcurrentHashMap<>();
@@ -1282,12 +1286,21 @@ public final class MatchService {
         // the surviving opponent, never a draw.
         int now = Bukkit.getCurrentTick();
         java.util.Set<UUID> lethalSet = lethalPlayersByMatch.computeIfAbsent(session.id(), k -> ConcurrentHashMap.newKeySet());
+        ConcurrentHashMap<UUID, UUID> attackerMap =
+                lethalAttackerByMatch.computeIfAbsent(session.id(), k -> new ConcurrentHashMap<>());
         Integer lastTick = lastLethalTickByMatch.get(session.id());
         if (lastTick == null || lastTick != now) {
             lethalSet.clear();
+            attackerMap.clear();
             lastLethalTickByMatch.put(session.id(), now);
         }
         lethalSet.add(victimId);
+        // Normalise the attacker: a self-inflicted blast (owner == victim) or environmental death
+        // records null so the draw check below cannot mistake a suicide for a kill dealt by the
+        // opponent.
+        UUID killerId = (attackerId != null && !attackerId.equals(victimId)
+                && session.isParticipant(attackerId)) ? attackerId : null;
+        attackerMap.put(victimId, killerId);
         final UUID lethalAttacker = attackerId;
         Bukkit.getScheduler().runTaskLater(plugin, () -> resolveSoloOutcome(session, victimId, lethalAttacker, now), 1L);
     }
@@ -1297,11 +1310,20 @@ public final class MatchService {
             return;
         }
         java.util.Set<UUID> lethalSet = lethalPlayersByMatch.getOrDefault(session.id(), java.util.Set.of());
+        java.util.Map<UUID, UUID> attackerMap =
+                lethalAttackerByMatch.getOrDefault(session.id(), java.util.Map.of());
         boolean sameTick = lastLethalTickByMatch.getOrDefault(session.id(), -1) == lethalTick;
-        // True mutual kill: BOTH participants went lethal on the very same tick.
-        boolean draw = sameTick
+        // A draw requires a TRUE mutual kill: BOTH participants went lethal on the very same tick
+        // AND each was killed by the OTHER player (recorded attacker == their opponent). A
+        // self-inflicted or environmental death (own crystal, pearl fall, void, anchor misfire)
+        // must never be a draw even if it lands in the same tick — the survivor wins.
+        boolean bothLethal = sameTick
                 && session.participants().size() == 2
                 && lethalSet.containsAll(session.participants());
+        boolean draw = bothLethal && session.participants().stream().allMatch(id -> {
+            UUID killer = attackerMap.get(id);
+            return killer != null && !killer.equals(id) && session.isParticipant(killer);
+        });
         UUID winner;
         if (draw) {
             winner = null;
@@ -1881,6 +1903,7 @@ public final class MatchService {
         combatTracker.clear(session.id());
         lastLethalTickByMatch.remove(session.id());
         lethalPlayersByMatch.remove(session.id());
+        lethalAttackerByMatch.remove(session.id());
         resolvedLethalByMatch.remove(session.id());
         if (playerPlacedBlocks != null) {
             playerPlacedBlocks.clearScope(session.id().toString());

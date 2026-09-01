@@ -11,10 +11,8 @@ import com.rumilance.practice.util.KitBlockRules;
 import com.rumilance.practice.util.LocationUtil;
 import com.rumilance.practice.util.PlayerPlacedBlockTracker;
 import org.bukkit.Material;
-import org.bukkit.entity.EnderCrystal;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
-import org.bukkit.entity.TNTPrimed;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -46,26 +44,36 @@ public final class MatchListener implements Listener {
     private final com.rumilance.practice.combat.CombatNetTracker combatNet;
     private final com.rumilance.practice.tnt.PracticeTntSettings practiceTnt;
     private final PlayerPlacedBlockTracker playerPlacedBlocks;
+    private final com.rumilance.practice.combat.ExplosionSourceTracker explosionSources;
 
     public MatchListener(MatchService matchService, KitService kitService) {
-        this(matchService, kitService, null, null, null);
+        this(matchService, kitService, null, null, null, null);
     }
 
     public MatchListener(MatchService matchService, KitService kitService,
                          com.rumilance.practice.combat.CombatNetTracker combatNet,
                          com.rumilance.practice.tnt.PracticeTntSettings practiceTnt) {
-        this(matchService, kitService, combatNet, practiceTnt, null);
+        this(matchService, kitService, combatNet, practiceTnt, null, null);
     }
 
     public MatchListener(MatchService matchService, KitService kitService,
                          com.rumilance.practice.combat.CombatNetTracker combatNet,
                          com.rumilance.practice.tnt.PracticeTntSettings practiceTnt,
                          PlayerPlacedBlockTracker playerPlacedBlocks) {
+        this(matchService, kitService, combatNet, practiceTnt, playerPlacedBlocks, null);
+    }
+
+    public MatchListener(MatchService matchService, KitService kitService,
+                         com.rumilance.practice.combat.CombatNetTracker combatNet,
+                         com.rumilance.practice.tnt.PracticeTntSettings practiceTnt,
+                         PlayerPlacedBlockTracker playerPlacedBlocks,
+                         com.rumilance.practice.combat.ExplosionSourceTracker explosionSources) {
         this.matchService = matchService;
         this.kitService = kitService;
         this.combatNet = combatNet;
         this.practiceTnt = practiceTnt;
         this.playerPlacedBlocks = playerPlacedBlocks;
+        this.explosionSources = explosionSources;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -343,6 +351,16 @@ public final class MatchListener implements Listener {
     }
 
     private UUIDLikeAttacker resolveAttacker(EntityDamageEvent event) {
+        // Explosion (end crystal / TNT / anchor) damage: attribute to the owning player when we
+        // can resolve one. Crystal self-damage still reaches the victim (the owner equals the
+        // victim), and an opponent crystal-bomb now credits the opponent instead of being read
+        // as an environmental/suicide death.
+        if (explosionSources != null) {
+            UUID blastOwner = explosionSources.resolveExplosionSource(event);
+            if (blastOwner != null) {
+                return new UUIDLikeAttacker(blastOwner);
+            }
+        }
         if (!(event instanceof EntityDamageByEntityEvent byEntity)) {
             return new UUIDLikeAttacker(null);
         }
@@ -354,12 +372,6 @@ public final class MatchListener implements Listener {
             if (source instanceof Player player) {
                 return new UUIDLikeAttacker(player.getUniqueId());
             }
-        }
-        if (byEntity.getDamager() instanceof TNTPrimed tnt && tnt.getSource() instanceof Player player) {
-            return new UUIDLikeAttacker(player.getUniqueId());
-        }
-        if (byEntity.getDamager() instanceof EnderCrystal) {
-            return new UUIDLikeAttacker(null);
         }
         return new UUIDLikeAttacker(null);
     }
