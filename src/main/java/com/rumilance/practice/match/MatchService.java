@@ -1286,7 +1286,7 @@ public final class MatchService {
         // the surviving opponent, never a draw.
         int now = Bukkit.getCurrentTick();
         java.util.Set<UUID> lethalSet = lethalPlayersByMatch.computeIfAbsent(session.id(), k -> ConcurrentHashMap.newKeySet());
-        ConcurrentHashMap<UUID, UUID> attackerMap =
+        Map<UUID, UUID> attackerMap =
                 lethalAttackerByMatch.computeIfAbsent(session.id(), k -> new ConcurrentHashMap<>());
         Integer lastTick = lastLethalTickByMatch.get(session.id());
         if (lastTick == null || lastTick != now) {
