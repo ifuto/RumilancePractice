@@ -4,7 +4,10 @@ import com.rumilance.practice.item.SaveSignItem;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.GameMode;
+import org.bukkit.Bukkit;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockState;
+import org.bukkit.block.ShulkerBox;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -12,11 +15,13 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.event.EventHandler;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.BlockStateMeta;
 
 /**
  * Enforces the original-kit room rules:
@@ -77,7 +82,7 @@ public final class OriginalKitRoomListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH)
     public void onInteract(PlayerInteractEvent event) {
-        if (event.getAction() != Action.RIGHT_CLICK_BLOCK || event.getClickedBlock() == null) {
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK && event.getAction() != Action.RIGHT_CLICK_AIR) {
             return;
         }
         Player player = event.getPlayer();
@@ -86,20 +91,79 @@ public final class OriginalKitRoomListener implements Listener {
         }
         Block clicked = event.getClickedBlock();
         ItemStack item = event.getItem();
+
+        // Opening a shulker: never place it; show a virtual 27-slot inventory backed by the item.
+        if (item != null && item.getType().name().endsWith("SHULKER_BOX")) {
+            event.setCancelled(true);
+            openShulker(player, item);
+            return;
+        }
+
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK || clicked == null) {
+            return;
+        }
         // The save triggers only on the room's registered SAVE button block (an oak button).
-        if (clicked != null && clicked.getType().name().equals("OAK_BUTTON")
+        if (clicked.getType().name().equals("OAK_BUTTON")
                 && roomService.inRoom(clicked.getLocation())
                 && roomService.isSaveButton(clicked.getLocation())) {
             event.setCancelled(true);
             save(player);
             return;
         }
+        // Block interaction with room containers (anvil/grindstone are allowed below only for
+        // those explicitly permitted; but an editor placing/using held items in blocks is blocked).
         // Holding the save-sign item does not save — it must be placed/registered in the room.
         if (SaveSignItem.isSaveButton(item) && roomService.inRoom(clicked.getLocation())) {
             event.setCancelled(true);
             player.sendActionBar(Component.text(
                     "The save button must be placed and registered by an admin.",
                     NamedTextColor.YELLOW));
+        }
+    }
+
+    /** Opens a virtual inventory backed by the shulker item's stored contents. */
+    private void openShulker(Player player, ItemStack shulker) {
+        int slot = player.getInventory().getHeldItemSlot();
+        RoomShulkerHolder holder = new RoomShulkerHolder(slot, shulker);
+        Inventory inv = Bukkit.createInventory(holder, 27,
+                Component.text("Shulker Box", net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE));
+        holder.setInventory(inv);
+        if (shulker.getItemMeta() instanceof BlockStateMeta bsm
+                && bsm.getBlockState() instanceof ShulkerBox box) {
+            ItemStack[] stored = box.getInventory().getContents();
+            for (int i = 0; i < Math.min(stored.length, 27); i++) {
+                inv.setItem(i, stored[i] == null ? null : stored[i].clone());
+            }
+        }
+        player.openInventory(inv);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onClose(InventoryCloseEvent event) {
+        if (!(event.getInventory().getHolder() instanceof RoomShulkerHolder holder)) {
+            return;
+        }
+        if (!(event.getPlayer() instanceof Player player)) {
+            return;
+        }
+        // Write the edited contents back into the source shulker item.
+        ItemStack current = player.getInventory().getItem(holder.sourceSlot());
+        ItemStack target = current != null && current.getType().name().endsWith("SHULKER_BOX")
+                ? current : holder.sourceItem();
+        if (target == null) {
+            return;
+        }
+        if (target.getItemMeta() instanceof BlockStateMeta bsm) {
+            BlockState state = bsm.getBlockState();
+            if (state instanceof ShulkerBox box) {
+                box.getInventory().setContents(event.getInventory().getContents());
+                bsm.setBlockState(box);
+                target.setItemMeta(bsm);
+                // If the held item differs (moved), ensure the source slot still holds it.
+                if (current == null || !current.getType().name().endsWith("SHULKER_BOX")) {
+                    player.getInventory().setItem(holder.sourceSlot(), target);
+                }
+            }
         }
     }
 
