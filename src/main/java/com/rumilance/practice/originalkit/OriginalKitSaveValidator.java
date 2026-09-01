@@ -106,6 +106,11 @@ public final class OriginalKitSaveValidator {
             }
             String type = item.getType().name();
 
+            // --- Lingering potions are never allowed in a kit. ---
+            if (type.equals("LINGERING_POTION")) {
+                return new Result(Severity.REJECT, "Lingering potions are not allowed in kits.");
+            }
+
             // --- Hard exploits: kick first (overrides ban list ordering). ---
             if (KICK_ITEMS.contains(type)) {
                 return new Result(Severity.KICK, "Illegal command-block item in kit: " + type);
