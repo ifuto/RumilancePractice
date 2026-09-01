@@ -137,7 +137,7 @@ public final class LobbyService {
         }
         player.setGameMode(GameMode.ADVENTURE);
         com.rumilance.practice.util.PlayerVitals.clearCombatState(player);
-        com.rumilance.practice.util.PlayerVitals.refillHealth(player);
+        com.rumilance.practice.util.PlayerVitals.resetMaxHealth(player);
         player.setFoodLevel(20);
         player.setSaturation(20f);
         player.setAllowFlight(false);

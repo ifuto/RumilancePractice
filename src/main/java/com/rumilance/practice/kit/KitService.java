@@ -254,7 +254,16 @@ public final class KitService {
      */
     public void apply(Player player, KitDefinition kit, ItemStack[] layout) {
         KitLoadout.give(player.getInventory(), KitLoadout.resolve(kit, layout));
-        player.setHealth(Math.min(player.getMaxHealth(), kit.maxHealth()));
+        // Reflect the kit's max-health on the player's MAX_HEALTH attribute; without this the
+        // attribute stays at the vanilla 20 so a >20 HP kit is clamped to 20 and a kit's custom
+        // max never takes effect. Set the base value first, then fill to the (possibly raised) max.
+        double maxHealth = kit.maxHealth() <= 0.0d ? 20.0d : kit.maxHealth();
+        org.bukkit.attribute.AttributeInstance maxAttr =
+                player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH);
+        if (maxAttr != null) {
+            maxAttr.setBaseValue(maxHealth);
+        }
+        player.setHealth(Math.min(player.getMaxHealth(), maxHealth));
         player.setFoodLevel(20);
         player.setSaturation(0f);
         player.setExhaustion(0f);

@@ -1573,6 +1573,7 @@ public final class MatchService {
             }
             // Players stay in the arena during the rematch window — clear arrows/fire/etc.
             PlayerVitals.clearCombatState(player);
+            PlayerVitals.resetMaxHealth(player);
             player.getInventory().clear();
             // Eliminated team players were parked in spectator mode — restore them so they
             // can see and use the rematch/report items during the ENDING window.

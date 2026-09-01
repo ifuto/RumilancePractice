@@ -70,7 +70,7 @@ public final class PlayerVitals {
         player.getInventory().setItemInOffHand(null);
         player.setItemOnCursor(null);
         clearCombatState(player);
-        refillHealth(player);
+        resetMaxHealth(player);
     }
 
     /**
@@ -88,6 +88,22 @@ public final class PlayerVitals {
         }
         double max = Math.max(1.0d, player.getMaxHealth());
         player.setHealth(max);
+    }
+
+    /** Reset a kit-raised MAX_HEALTH attribute back to the vanilla 20 and heal to full. */
+    public static void resetMaxHealth(Player player) {
+        if (player == null) {
+            return;
+        }
+        try {
+            org.bukkit.attribute.AttributeInstance maxAttr =
+                    player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH);
+            if (maxAttr != null) {
+                maxAttr.setBaseValue(20.0d);
+            }
+        } catch (RuntimeException ignored) {
+        }
+        refillHealth(player);
     }
 
     /**
