@@ -68,10 +68,10 @@ public final class OriginalKitEditGui extends AbstractGui implements BottomInven
     }
 
     public void open(Player player, int kitSlot, ItemStack[] layout) {
-        service.beginEdit(player, kitSlot, layout);
-        GuiSession session = registry.open(player.getUniqueId(), type(), rows);
-        PracticeGuiOpen.open(this, player, session);
-        sounds.play(player, "gui-open");
+        // The old chest-GUI editor is retired: editing now happens inside the physical original-kit
+        // room (creative, after teleport). This closes any open GUI and sends the player there.
+        player.closeInventory();
+        service.enterRoomEditor(player, kitSlot, layout);
     }
 
     @Override
