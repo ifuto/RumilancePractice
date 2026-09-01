@@ -75,14 +75,42 @@ public final class DuelRequestGui extends AbstractGui {
     }
 
     public void openFor(Player sender, Player target, boolean ranked) {
+        openFor(sender, target, ranked, null, null, 0);
+    }
+
+    /**
+     * Opens the request GUI carrying the caller's prior choices (kit / map / best-of). The
+     * values MUST be set on the freshly created session BEFORE it renders — otherwise the GUI
+     * is drawn with the default kit and only updated afterwards, which looked like the kit
+     * selection never changed (always showed the first kit, e.g. Sword).
+     */
+    public void openFor(Player sender, Player target, boolean ranked,
+                        String kit, String map, int bestOf) {
         GuiSession session = registry.open(sender.getUniqueId(), type(), rows);
         session.setTargetPlayer(target.getUniqueId());
         session.setRanked(ranked);
-        if (session.bestOf() < 1) {
+        if (bestOf >= 1) {
+            session.setBestOf(bestOf);
+        } else if (session.bestOf() < 1) {
             session.setBestOf(1);
         }
-        if (session.selectedKit() == null) {
+        if (map != null && !map.isBlank()) {
+            session.setSelectedMap(map);
+        }
+        String chosenKit = (kit != null && !kit.isBlank()) ? kit
+                : session.selectedKit();
+        if (chosenKit == null || chosenKit.isBlank()) {
             kitService.enabled().stream().findFirst().ifPresent(k -> session.setSelectedKit(k.name()));
+        } else {
+            // Keep the caller's kit, but fall back if it has since been disabled/removed.
+            String finalChosen = chosenKit;
+            boolean stillEnabled = kitService.enabled().stream()
+                    .anyMatch(k -> k.name().equalsIgnoreCase(finalChosen));
+            if (stillEnabled) {
+                session.setSelectedKit(finalChosen);
+            } else {
+                kitService.enabled().stream().findFirst().ifPresent(k -> session.setSelectedKit(k.name()));
+            }
         }
         PracticeGuiOpen.open(this, sender, session);
         sounds.play(sender, "gui-open");

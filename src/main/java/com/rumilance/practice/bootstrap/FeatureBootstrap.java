@@ -945,6 +945,8 @@ public final class FeatureBootstrap {
         pm.registerEvents(opponentHealthNametagService, plugin);
         pm.registerEvents(functionalItemListener, plugin);
         pm.registerEvents(new LobbyCompassListener(stateManager, soundService, gameMenuGui::open), plugin);
+        pm.registerEvents(new com.rumilance.practice.lobby.DuelRightClickListener(
+                stateManager, duelRequestGui, soundService, messageService), plugin);
         AdminToolListener adminToolListener = new AdminToolListener(soundService);
         adminToolListener.setOpenAdminMenu(adminMenuGui::open);
         pm.registerEvents(adminToolListener, plugin);

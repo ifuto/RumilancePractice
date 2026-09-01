@@ -149,12 +149,12 @@ public final class DuelMapSelectGui extends AbstractGui {
         int bestOf = session.bestOf();
         boolean ranked = session.ranked();
         boolean fromBattle = session.fromBattleMenu();
-        duelRequestGui.openFor(player, target, ranked);
+        // Pass the choices into openFor so they are applied to the new session BEFORE render
+        // (otherwise the GUI paints the default kit/map and the picked selection never shows).
+        duelRequestGui.openFor(player, target, ranked, kit, map, bestOf);
         registry.get(player.getUniqueId()).ifPresent(s -> {
-            s.setSelectedKit(kit);
-            s.setSelectedMap(map);
-            s.setBestOf(bestOf);
             s.setFromBattleMenu(fromBattle);
+            s.setFromGameMenu(session.fromGameMenu());
         });
     }
 

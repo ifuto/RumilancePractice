@@ -113,12 +113,8 @@ public final class KitSelectGui extends AbstractGui {
         boolean ranked = session.ranked();
         boolean fromBattle = session.fromBattleMenu();
         player.closeInventory();
-        duelRequestGui.openFor(player, target, ranked);
-        registry.get(player.getUniqueId()).ifPresent(s -> {
-            s.setSelectedKit(kit);
-            s.setSelectedMap(map);
-            s.setBestOf(bestOf);
-            s.setFromBattleMenu(fromBattle);
-        });
+        // Pass the choices into openFor so they are applied to the new session BEFORE render.
+        duelRequestGui.openFor(player, target, ranked, kit, map, bestOf);
+        registry.get(player.getUniqueId()).ifPresent(s -> s.setFromBattleMenu(fromBattle));
     }
 }
