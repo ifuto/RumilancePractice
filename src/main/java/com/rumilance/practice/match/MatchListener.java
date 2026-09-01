@@ -94,15 +94,21 @@ public final class MatchListener implements Listener {
         }
 
         UUIDLikeAttacker attacker = resolveAttacker(event);
-        if (attacker != null && attacker.playerId() != null
-                && !session.isParticipant(attacker.playerId())) {
+        UUID attackerId = attacker.playerId();
+        UUID victimId = victim.getUniqueId();
+        boolean selfInflicted = attackerId != null && attackerId.equals(victimId);
+
+        if (!selfInflicted && attackerId != null && !session.isParticipant(attackerId)) {
             event.setCancelled(true);
             return;
         }
-        if (PracticeGuards.shouldBlockTeammateDamage(
+        // Friendly fire gate. SELF-damage must NEVER be blocked by this rule: vanilla lets a
+        // player take damage from their own end crystal / TNT / respawn anchor regardless of the
+        // team friendly-fire setting (areTeammates(self,self) is otherwise true, which wrongly
+        // cancelled self-blasts in team matches with friendly fire off).
+        if (!selfInflicted && PracticeGuards.shouldBlockTeammateDamage(
                 session.isTeamMatch(),
-                attacker != null && attacker.playerId() != null
-                        && session.areTeammates(attacker.playerId(), victim.getUniqueId()),
+                attackerId != null && session.areTeammates(attackerId, victimId),
                 session.friendlyFire())) {
             event.setCancelled(true);
             return;
@@ -116,8 +122,8 @@ public final class MatchListener implements Listener {
         // Record non-lethal combat stats for the report card. Lethal hits are recorded by
         // MatchService.handleLethal once the outcome is known, so they still appear in the totals.
         double remaining = PracticeDeath.remainingAfter(victim, event);
-        if (remaining > 0 && attacker != null && attacker.playerId() != null
-                && session.isParticipant(attacker.playerId())
+        if (remaining > 0 && !selfInflicted && attackerId != null
+                && session.isParticipant(attackerId)
                 && event instanceof EntityDamageByEntityEvent byEntity
                 && byEntity.getDamager() instanceof org.bukkit.entity.Player attackerPlayer) {
             recordCombatHit(session, attackerPlayer, victim, byEntity, event.getFinalDamage());
@@ -137,8 +143,7 @@ public final class MatchListener implements Listener {
 
         event.setCancelled(true);
         event.setDamage(0);
-        UUID attackerId = attacker == null ? null : attacker.playerId();
-        matchService.handleLethal(session, victim.getUniqueId(), attackerId);
+        matchService.handleLethal(session, victimId, attackerId);
     }
 
     private void recordCombatHit(MatchSession session, Player attacker, Player victim,
