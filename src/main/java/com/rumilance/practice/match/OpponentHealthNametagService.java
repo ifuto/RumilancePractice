@@ -2,11 +2,10 @@ package com.rumilance.practice.match;
 
 import com.rumilance.practice.session.MatchSession;
 import com.rumilance.practice.state.MatchState;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -16,26 +15,29 @@ import org.bukkit.event.entity.EntityPotionEffectEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.potion.PotionEffectType;
+import org.bukkit.scoreboard.Criteria;
+import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.scoreboard.Objective;
+import org.bukkit.scoreboard.RenderType;
 import org.bukkit.scoreboard.Scoreboard;
-import org.bukkit.scoreboard.Team;
 
 import java.util.UUID;
 
 /**
- * Opponent HP shown next to each fighter's nametag as {@code " <white>N<colored>♥"} — the
- * current health in white followed by a heart that is red normally and gold while the player
- * has absorption (vanilla gold hearts) or a Health Boost.
+ * Opponent HP rendered as the vanilla <strong>heart row under the nametag</strong> (the same
+ * slot/look as the built-in below-name health display).
  *
- * <p>This is written to the per-player fight scoreboard team's SUFFIX (the same teams
- * {@link MatchTeamVisuals} creates for the red/blue nametag colours), so the text rides the
- * player entity like a nametag and only appears to viewers who are watching that match. No
- * below-name numeric/heart objective is used.</p>
+ * <p>A per-viewer {@link DisplaySlot#BELOW_NAME} objective ({@code rp_hp}) uses
+ * {@link RenderType#HEARTS} and carries the fighter's real (health + absorption) value in
+ * half-hearts, so a row of hearts appears directly beneath each opponent's name: red hearts for
+ * current health and gold for absorption. Because it is the native health slot it rides the
+ * player entity like a nametag (position, movement, hide/show rules) but sits on its own line
+ * under the name and never appears in the TAB list.</p>
  */
 public final class OpponentHealthNametagService implements Listener {
 
-    /** Legacy below-name objective name from older builds (unregistered if it lingers). */
-    private static final String LEGACY_OBJECTIVE = "rp_hp";
+    /** Objective name for the per-viewer below-name hearts score. */
+    private static final String OBJECTIVE = "rp_hp";
 
     private final Plugin plugin;
     private final MatchRegistry matchRegistry;
@@ -46,7 +48,8 @@ public final class OpponentHealthNametagService implements Listener {
     }
 
     public void start() {
-        // 0.5s refresh covers respawns / edge cases; damage and heal events refresh instantly.
+        // A 0.5s refresh keeps hearts correct after respawns / edge cases; damage and heal
+        // events refresh instantly in between.
         Bukkit.getScheduler().runTaskTimer(plugin, this::refreshAll, 10L, 10L);
     }
 
@@ -84,27 +87,27 @@ public final class OpponentHealthNametagService implements Listener {
     public void refreshViewer(Player viewer) {
         MatchSession session = matchRegistry.byPlayer(viewer.getUniqueId()).orElse(null);
         Scoreboard board = viewer.getScoreboard();
-        // Drop any old below-name objective so no duplicate HP display remains.
-        Objective legacy = board.getObjective(LEGACY_OBJECTIVE);
-        if (legacy != null) {
-            try {
-                legacy.unregister();
-            } catch (IllegalStateException ignored) {
-            }
-        }
         if (session == null || session.state() != MatchState.ACTIVE) {
+            Objective stale = board.getObjective(OBJECTIVE);
+            if (stale != null) {
+                try {
+                    stale.unregister();
+                } catch (IllegalStateException ignored) {
+                }
+            }
             return;
         }
+        Objective objective = belowNameObjective(board);
         for (UUID id : session.participants()) {
             Player target = Bukkit.getPlayer(id);
             if (target == null || !target.isOnline()) {
                 continue;
             }
-            Team team = MatchTeamVisuals.fightTeamOf(board, target);
-            if (team == null) {
+            if (target.getGameMode() == GameMode.SPECTATOR) {
+                objective.getScore(target.getName()).setScore(0);
                 continue;
             }
-            team.suffix(suffixFor(target));
+            objective.getScore(target.getName()).setScore(healthScore(target));
         }
     }
 
@@ -117,57 +120,59 @@ public final class OpponentHealthNametagService implements Listener {
             if (!session.isParticipant(changed.getUniqueId())) {
                 continue;
             }
-            Team team = MatchTeamVisuals.fightTeamOf(viewer.getScoreboard(), changed);
-            if (team != null) {
-                if (changed.getGameMode() == GameMode.SPECTATOR) {
-                    team.suffix(Component.empty());
-                } else {
-                    team.suffix(suffixFor(changed));
-                }
+            Objective objective = belowNameObjective(viewer.getScoreboard());
+            if (changed.getGameMode() == GameMode.SPECTATOR) {
+                objective.getScore(changed.getName()).setScore(0);
+            } else {
+                objective.getScore(changed.getName()).setScore(healthScore(changed));
             }
         }
     }
 
-    /** Clears the HP suffix for a viewer leaving a fight. */
+    /** Lazily creates (or reuses) the per-viewer below-name hearts objective. */
+    private Objective belowNameObjective(Scoreboard board) {
+        Objective objective = board.getObjective(OBJECTIVE);
+        if (objective == null) {
+            // RenderType.HEARTS draws the vanilla heart row under the nametag. Each score point
+            // is half a heart; we feed the real (health + absorption) value.
+            objective = board.registerNewObjective(OBJECTIVE, Criteria.DUMMY,
+                    net.kyori.adventure.text.Component.empty(), RenderType.HEARTS);
+            objective.setDisplaySlot(DisplaySlot.BELOW_NAME);
+        }
+        return objective;
+    }
+
     public void clearViewer(Player viewer) {
         if (viewer == null) {
             return;
         }
         Scoreboard board = viewer.getScoreboard();
-        Objective objective = board.getObjective(LEGACY_OBJECTIVE);
+        // Remove the below-name objective so no hearts linger over heads (or in the death
+        // screen / TAB) once the viewer leaves the fight.
+        Objective objective = board.getObjective(OBJECTIVE);
         if (objective != null) {
             try {
                 objective.unregister();
             } catch (IllegalStateException ignored) {
             }
         }
-        for (Team team : board.getTeams()) {
-            if (MatchTeamVisuals.isFightTeam(team.getName())) {
-                team.suffix(Component.empty());
-            }
-        }
     }
 
-    /** Builds the nametag suffix: a space, the heart count in white, then a coloured heart. */
-    private static Component suffixFor(Player player) {
-        double max = 20.0d;
-        var attr = player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH);
+    /**
+     * Heart value for the below-name objective: real health plus absorption, rounded to whole
+     * half-hearts. Each point renders as half a heart, capped at the player's (possibly boosted)
+     * maximum so the row never over-fills.
+     */
+    private static int healthScore(Player player) {
+        double maxHp = 20.0d;
+        AttributeInstance attr = player.getAttribute(Attribute.MAX_HEALTH);
         if (attr != null) {
-            max = attr.getValue();
+            maxHp = attr.getValue();
         }
-        double hearts = (player.getHealth() + player.getAbsorptionAmount()) / 2.0d;
-        boolean boosted = player.getAbsorptionAmount() > 0.0d || max > 20.0d + 0.01d;
-        NamedTextColor heartColor = boosted ? NamedTextColor.YELLOW : NamedTextColor.RED;
-        return Component.text(" ", NamedTextColor.GRAY)
-                .append(Component.text(formatHearts(hearts), NamedTextColor.WHITE)
-                        .decoration(TextDecoration.BOLD, false))
-                .append(Component.text(" ♥", heartColor));
-    }
-
-    private static String formatHearts(double hearts) {
-        if (Math.abs(hearts - Math.rint(hearts)) < 0.05d) {
-            return String.valueOf((int) Math.rint(hearts));
-        }
-        return String.format(java.util.Locale.ROOT, "%.1f", hearts);
+        double absorption = player.getAbsorptionAmount();
+        double current = player.getHealth() + absorption;
+        double cap = maxHp + absorption;
+        int score = (int) Math.round(current);
+        return Math.max(0, (int) Math.min(Math.ceil(cap), score));
     }
 }
