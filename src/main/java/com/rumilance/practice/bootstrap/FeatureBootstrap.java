@@ -881,7 +881,8 @@ public final class FeatureBootstrap {
         services.register(OpponentHealthNametagService.class, opponentHealthNametagService);
         scoreboardService.setOpponentHealthNametagService(opponentHealthNametagService);
         opponentHealthNametagService.start();
-        MatchActionBarService matchActionBarService = new MatchActionBarService(plugin, matchRegistry);
+        com.rumilance.practice.match.MatchActionBarService matchActionBarService =
+                new com.rumilance.practice.match.MatchActionBarService(plugin, matchRegistry);
         matchActionBarService.setSpectatorService(spectatorService);
         matchActionBarService.start();
         TabFightListService tabFightListService = new TabFightListService(plugin);
