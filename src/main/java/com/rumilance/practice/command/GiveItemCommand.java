@@ -33,6 +33,8 @@ public final class GiveItemCommand implements CommandExecutor, TabCompleter {
     public GiveItemCommand() {
         items.put("ghead", GoldenHeadItems::create);
         items.put("goldenhead", GoldenHeadItems::create);
+        items.put("save-sign", com.rumilance.practice.item.SaveSignItem::create);
+        items.put("savesign", com.rumilance.practice.item.SaveSignItem::create);
     }
 
     @Override
