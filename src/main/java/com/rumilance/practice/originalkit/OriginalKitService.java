@@ -39,6 +39,7 @@ public final class OriginalKitService {
     private final AsyncExecutor asyncExecutor;
     private final Logger logger;
     private final ConfigService configService;
+    private volatile OriginalKitRoomService roomService;
     private final Map<UUID, Integer> monthlyEdits = new ConcurrentHashMap<>();
     private final Map<UUID, YearMonth> monthKey = new ConcurrentHashMap<>();
     private final Map<UUID, ItemStack[]> pendingInventory = new ConcurrentHashMap<>();
@@ -221,6 +222,37 @@ public final class OriginalKitService {
     }
 
     // ---- editor context ----
+
+    public void setRoomService(OriginalKitRoomService roomService) {
+        this.roomService = roomService;
+    }
+
+    public boolean isEditing(UUID uuid) {
+        return editContexts.containsKey(uuid);
+    }
+
+    /** Opens an edit session for a slot and sends the player into the room (creative after TP). */
+    public void enterRoomEditor(Player player, int slot, ItemStack[] layout) {
+        editContexts.computeIfAbsent(player.getUniqueId(), id -> new EditContext(slot, layout));
+        stashInventory(player);
+        // Restore the existing kit contents for editing.
+        if (layout != null) {
+            ItemStack[] copy = new ItemStack[layout.length];
+            for (int i = 0; i < layout.length; i++) {
+                copy[i] = layout[i] == null ? null : layout[i].clone();
+            }
+            player.getInventory().setContents(pad(copy));
+        }
+        if (roomService != null) {
+            roomService.enter(player);
+        }
+    }
+
+    private ItemStack[] pad(ItemStack[] contents) {
+        ItemStack[] full = new ItemStack[41];
+        System.arraycopy(contents, 0, full, 0, Math.min(contents.length, full.length));
+        return full;
+    }
 
     public void beginEdit(Player player, int slot, ItemStack[] layout) {
         editContexts.computeIfAbsent(player.getUniqueId(), id -> new EditContext(slot, layout));

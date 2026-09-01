@@ -678,6 +678,13 @@ public final class FeatureBootstrap {
         OriginalKitService originalKitService = new OriginalKitService(
                 originalKitRepository, asyncExecutor, plugin.getLogger(), configService);
         services.register(OriginalKitService.class, originalKitService);
+        com.rumilance.practice.originalkit.OriginalKitRoomService originalKitRoomService =
+                new com.rumilance.practice.originalkit.OriginalKitRoomService(configService, plugin);
+        services.register(com.rumilance.practice.originalkit.OriginalKitRoomService.class, originalKitRoomService);
+        originalKitService.setRoomService(originalKitRoomService);
+        plugin.getServer().getPluginManager().registerEvents(
+                new com.rumilance.practice.originalkit.OriginalKitRoomListener(
+                        originalKitRoomService, originalKitService), plugin);
         EkitItems ekitItems = new EkitItems(configService);
         services.register(EkitItems.class, ekitItems);
 
@@ -1071,7 +1078,8 @@ public final class FeatureBootstrap {
         bind("toggle", arenaKitAdmin);
         bind("chatban", chatBanCommand);
         bind("chatunban", chatBanCommand);
-        bind("ekitadmin", new EkitAdminCommand(ekitAdminGui));
+        bind("ekitadmin", new EkitAdminCommand(ekitAdminGui,
+                services.get(com.rumilance.practice.originalkit.OriginalKitRoomService.class)));
         bind("giveitem", new GiveItemCommand());
         bind("matchreport", new MatchReportCommand(matchService, settingsService));
         bind("walltext", new WallTextCommand(wallTextService));

@@ -43,6 +43,21 @@ public final class Cuboid {
         return Cuboid.of(worldA.getName(), a.getBlockX(), a.getBlockY(), a.getBlockZ(), b.getBlockX(), b.getBlockY(), b.getBlockZ());
     }
 
+    /** Reads a cuboid persisted under {@code <prefix>.world / .pos1 / .pos2}, or null if absent. */
+    public static Cuboid fromConfig(org.bukkit.configuration.ConfigurationSection cfg, String prefix) {
+        if (cfg == null || !cfg.contains(prefix + ".world")) {
+            return null;
+        }
+        String world = cfg.getString(prefix + ".world", "world");
+        int x1 = cfg.getInt(prefix + ".pos1.x");
+        int y1 = cfg.getInt(prefix + ".pos1.y");
+        int z1 = cfg.getInt(prefix + ".pos1.z");
+        int x2 = cfg.getInt(prefix + ".pos2.x");
+        int y2 = cfg.getInt(prefix + ".pos2.y");
+        int z2 = cfg.getInt(prefix + ".pos2.z");
+        return Cuboid.of(world, x1, y1, z1, x2, y2, z2);
+    }
+
     public String worldName() {
         return this.worldName;
     }
