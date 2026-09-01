@@ -379,6 +379,7 @@ match:
   lose-title: "<blue><bold>LOSE"
   draw-title: "<yellow><bold>DRAW"
   timeout-draw: "<yellow>The match timed out and ended in a draw."
+  hard-timeout-draw: "<yellow>The match reached the 1-hour limit and was forcibly drawn. Repeated stalls are penalized."
   could-not-start: "<red>The match could not start: <reason>"
   forfeit: "<gray><player> forfeited the match."
   opponent-disconnected: "<gray>Your opponent disconnected - you win by default."

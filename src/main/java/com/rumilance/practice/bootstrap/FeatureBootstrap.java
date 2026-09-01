@@ -881,6 +881,9 @@ public final class FeatureBootstrap {
         services.register(OpponentHealthNametagService.class, opponentHealthNametagService);
         scoreboardService.setOpponentHealthNametagService(opponentHealthNametagService);
         opponentHealthNametagService.start();
+        MatchActionBarService matchActionBarService = new MatchActionBarService(plugin, matchRegistry);
+        matchActionBarService.setSpectatorService(spectatorService);
+        matchActionBarService.start();
         TabFightListService tabFightListService = new TabFightListService(plugin);
         scoreboardService.setTabFightListService(tabFightListService);
         if (scoreboardConfig.enabled()) {
@@ -919,6 +922,7 @@ public final class FeatureBootstrap {
         pm.registerEvents(new InstantExpCollectListener(), plugin);
         pm.registerEvents(new PracticeTntListener(practiceTnt, matchService, ffaService, plugin), plugin);
         pm.registerEvents(new CrystalAnchorPerfListener(matchService, ffaService), plugin);
+        pm.registerEvents(new com.rumilance.practice.combat.PortalBlockListener(matchRegistry, ffaService), plugin);
         pm.registerEvents(new PracticePearlListener(matchService, ffaService, arenaService, sightSettings), plugin);
         pm.registerEvents(combatSync, plugin);
         combatSync.start();

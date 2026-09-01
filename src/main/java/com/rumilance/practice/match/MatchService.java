@@ -111,6 +111,16 @@ public final class MatchService {
      *  ruling tell a true mutual kill (each player died to the OTHER player) apart from a
      *  suicide/environmental death that merely shares a tick — only the former is a draw. */
     private final Map<UUID, Map<UUID, UUID>> lethalAttackerByMatch = new ConcurrentHashMap<>();
+    /** Count of matches that hit the absolute 1-hour hard limit (per player). 3 = 4-day ban. */
+    private final Map<UUID, Integer> hardTimeoutStrikes = new ConcurrentHashMap<>();
+    /** Matches already ruled by the hard 1-hour limit, so it never fires twice. */
+    private final java.util.Set<UUID> hardTimedOut = ConcurrentHashMap.newKeySet();
+    /** Per-match hard-cap task (independent of the normal timeout task keyed in {@link #tasks}). */
+    private final Map<UUID, BukkitTask> hardTimeoutTasks = new ConcurrentHashMap<>();
+    /** Absolute cap that always applies even when no admin timeout is configured. */
+    private static final int HARD_TIMEOUT_SECONDS = 60 * 60;
+    private static final int HARD_TIMEOUT_STRIKES_BAN = 3;
+    private static final java.time.Duration HARD_TIMEOUT_BAN = java.time.Duration.ofDays(4);
     /** Fighters whose lethal has already been processed this match — guards against a second
      *  lethal event for the same player (double damage events in the 1-tick resolution window). */
     private final Map<UUID, java.util.Set<UUID>> resolvedLethalByMatch = new ConcurrentHashMap<>();
@@ -1232,6 +1242,35 @@ public final class MatchService {
             }
         }, seconds * 20L);
         tasks.put(session.id(), timeout);
+
+        // Absolute hard cap: even if no admin/kit timeout is set, a match that runs a full hour
+        // is forcibly drawn. Three such forced draws for a player earn a 4-day ban (anti-stall).
+        BukkitTask hard = Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (session.state() == MatchState.ACTIVE
+                    && hardTimedOut.add(session.id())) {
+                for (UUID id : session.participants()) {
+                    Player player = Bukkit.getPlayer(id);
+                    if (player != null) {
+                        if (messageService != null) {
+                            messageService.send(player, "match.hard-timeout-draw");
+                        } else {
+                            player.sendMessage(Component.text(
+                                    "Match hit the 1 hour limit — forced draw.", NamedTextColor.YELLOW));
+                        }
+                    }
+                    int strikes = hardTimeoutStrikes.merge(id, 1, Integer::sum);
+                    if (strikes >= HARD_TIMEOUT_STRIKES_BAN && chatBanService != null) {
+                        Player online = Bukkit.getPlayer(id);
+                        if (online == null || !online.hasPermission("rumilance.punishment.bypass")) {
+                            chatBanService.issueWithNotice(id, null, "CHATBAN",
+                                    "Repeated 1-hour forced draws (" + strikes + ")", HARD_TIMEOUT_BAN);
+                        }
+                    }
+                }
+                endMatch(session, null, true);
+            }
+        }, HARD_TIMEOUT_SECONDS * 20L);
+        hardTimeoutTasks.put(session.id(), hard);
     }
 
     public void handleLethal(MatchSession session, UUID victimId, UUID attackerId) {
@@ -2097,6 +2136,10 @@ public final class MatchService {
         BukkitTask task = tasks.remove(matchId);
         if (task != null) {
             task.cancel();
+        }
+        BukkitTask hard = hardTimeoutTasks.remove(matchId);
+        if (hard != null) {
+            hard.cancel();
         }
     }
 

@@ -378,6 +378,8 @@ match:
   lose-title: "<blue><bold>LOSE"
   draw-title: "<yellow><bold>引き分け"
   timeout-draw: "<yellow>時間切れにより引き分けとなりました。"
+  hard-timeout-draw: "<yellow>試合が1時間の制限に達したため強制引き分けとなりました。"
+  actionbar-score: "{self}<white> {my} <gray>- <white>{their} {opp}"
   could-not-start: "<red>試合を開始できませんでした: <reason>"
   forfeit: "<gray><player> が試合を放棄しました。"
   opponent-disconnected: "<gray>対戦相手が切断したため、あなたの勝利です。"
