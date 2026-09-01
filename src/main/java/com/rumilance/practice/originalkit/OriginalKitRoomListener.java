@@ -117,6 +117,11 @@ public final class OriginalKitRoomListener implements Listener {
         }
     }
 
+    // NOTE: creative "saved hotbar / toolbar" save & load (C+1..9 / X+1..9) is purely client-side
+    // and never sends a packet, so it cannot be intercepted server-side. The kit contents are taken
+    // from the player's live inventory at save time and validated, so a client-side preset can
+    // never bypass validation; it only pre-fills the creative screen.
+
     private void save(Player player) {
         if (!roomService.hasSaveButton()) {
             player.sendActionBar(Component.text(
