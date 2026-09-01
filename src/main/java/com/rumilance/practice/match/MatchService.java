@@ -110,7 +110,7 @@ public final class MatchService {
     /** Attacker id recorded for each fighter that went lethal this match. Lets the 1-tick deferred
      *  ruling tell a true mutual kill (each player died to the OTHER player) apart from a
      *  suicide/environmental death that merely shares a tick — only the former is a draw. */
-    private final Map<UUID, ConcurrentHashMap<UUID, UUID>> lethalAttackerByMatch = new ConcurrentHashMap<>();
+    private final Map<UUID, Map<UUID, UUID>> lethalAttackerByMatch = new ConcurrentHashMap<>();
     /** Fighters whose lethal has already been processed this match — guards against a second
      *  lethal event for the same player (double damage events in the 1-tick resolution window). */
     private final Map<UUID, java.util.Set<UUID>> resolvedLethalByMatch = new ConcurrentHashMap<>();
