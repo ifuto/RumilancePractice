@@ -62,6 +62,14 @@ public final class MatchSession {
     private final AtomicBoolean rematchStarting = new AtomicBoolean(false);
     /** End-of-life inventory bytes per participant (captured on death or at match end). */
     private final Map<UUID, byte[]> endInventories = new ConcurrentHashMap<>();
+    /**
+     * Explicit elimination ledger (death). The alive-check must never rely on
+     * {@code GameMode.SPECTATOR} alone: a limbo death (e.g. a killing blow swallowed right
+     * after a totem pop) leaves the player in SURVIVAL game mode while effectively out of the
+     * fight, and their side would then never count as wiped. Mid-fight disconnects are covered
+     * separately by the alive-check's online requirement.
+     */
+    private final java.util.Set<UUID> eliminated = ConcurrentHashMap.newKeySet();
 
     /** 1v1 constructor: exactly two participants, index 0 = RED, index 1 = BLUE. */
     public MatchSession(UUID id, MatchMode mode, String kitName, List<UUID> participants,
@@ -193,6 +201,17 @@ public final class MatchSession {
     /** @return the size of the given side. */
     public int teamSize(TeamColor color) {
         return team(color).size();
+    }
+
+    /** Marks a participant out of the fight (death or disconnect) — idempotent. */
+    public void markEliminated(UUID playerId) {
+        if (playerId != null) {
+            eliminated.add(playerId);
+        }
+    }
+
+    public boolean isEliminated(UUID playerId) {
+        return playerId != null && eliminated.contains(playerId);
     }
 
     public boolean isTeamMatch() {

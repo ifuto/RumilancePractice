@@ -15,6 +15,11 @@ import java.util.UUID;
  * Applies red/blue nametag + TAB list colours for everyone watching a match scoreboard.
  * One team per player so HP suffixes do not collide. Names are prefixed so TAB sorts
  * fighters left ({@code 0*}) and spectators right ({@code 1*}).
+ *
+ * <p>Fight teams also carry a name <strong>prefix</strong> resolved by the injected
+ * {@code prefixResolver}: during team fights it renders the RED/BLUE team marker image and,
+ * for staff / donors, the rank badge image — custom-font glyphs from the server resource
+ * pack instead of text tags.</p>
  */
 public final class MatchTeamVisuals {
 
@@ -24,7 +29,17 @@ public final class MatchTeamVisuals {
             "rp_red", "rp_blue", "rp_spec", "glow_red", "glow_blue"
     };
 
+    /** Prefix (team marker / rank badge images) for a fighter's nametag + TAB entry. */
+    private static volatile java.util.function.BiFunction<Player, MatchSession,
+            net.kyori.adventure.text.Component> prefixResolver;
+
     private MatchTeamVisuals() {
+    }
+
+    /** Wires the icon prefix resolver (rank badge + team marker images). */
+    public static void setPrefixResolver(java.util.function.BiFunction<Player, MatchSession,
+            net.kyori.adventure.text.Component> resolver) {
+        prefixResolver = resolver;
     }
 
     public static void apply(Scoreboard board, MatchSession session, Collection<? extends Player> online) {
@@ -40,6 +55,7 @@ public final class MatchTeamVisuals {
             if (spectator) {
                 Team spec = team(board, specName(onlinePlayer.getUniqueId()), NamedTextColor.GRAY, false);
                 spec.addEntry(entry);
+                spec.prefix(net.kyori.adventure.text.Component.empty());
                 spec.suffix(net.kyori.adventure.text.Component.empty());
                 continue;
             }
@@ -50,6 +66,21 @@ public final class MatchTeamVisuals {
             NamedTextColor named = color == TeamColor.RED ? NamedTextColor.RED : NamedTextColor.BLUE;
             Team fight = team(board, fightName(color, onlinePlayer.getUniqueId()), named, ff);
             fight.addEntry(entry);
+            fight.prefix(resolvePrefix(onlinePlayer, session));
+        }
+    }
+
+    private static net.kyori.adventure.text.Component resolvePrefix(Player player, MatchSession session) {
+        java.util.function.BiFunction<Player, MatchSession, net.kyori.adventure.text.Component> resolver =
+                prefixResolver;
+        if (resolver == null) {
+            return net.kyori.adventure.text.Component.empty();
+        }
+        try {
+            net.kyori.adventure.text.Component prefix = resolver.apply(player, session);
+            return prefix == null ? net.kyori.adventure.text.Component.empty() : prefix;
+        } catch (RuntimeException ignored) {
+            return net.kyori.adventure.text.Component.empty();
         }
     }
 

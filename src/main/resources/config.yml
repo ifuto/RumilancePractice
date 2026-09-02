@@ -11,6 +11,24 @@ plugin:
   # Toggle at runtime with /practiceadmin maintenance <on|off>.
   maintenance: false
 
+# Resource-pack icon glyphs rendered in front of player names (TAB list / nametags).
+# The shipped pack (resourcepack/ in the repo) maps these images to unassigned
+# Private-Use-Area codepoints under a custom font. Distribute the pack to players
+# (e.g. Cloudflare Pages) and set require-resource-pack so the glyphs always resolve.
+icons:
+  # Master switch. When false no icons are sent (plain names, as before).
+  enabled: true
+  # The custom font that holds the icon glyphs (namespace:font-name).
+  font: "rumilance:icons"
+  glyphs:
+    # Rank badges (placed before Admin / VIP+ / VIP names). NORM players get none.
+    admin: "\uE001"
+    vip: "\uE002"
+    vip-plus: "\uE003"
+    # Team markers shown during team fights (RED vs BLUE).
+    team-red: "\uE004"
+    team-blue: "\uE005"
+
 executor:
   # Size of the async worker pool used for I/O and heavier computations
   # (database queries, schematic pastes, statistics recalculation, etc.).

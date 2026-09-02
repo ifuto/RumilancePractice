@@ -706,7 +706,11 @@ public final class FfaService {
                 return picked;
             }
         }
-        return arena.spawn();
+        // Fallback to the configured arena spawn, but never raw: correct it onto a standable
+        // surface in its own column so an outdated spawn cannot leave a player floating in the
+        // air or buried underground.
+        Location footing = com.rumilance.practice.util.SpawnFooting.standClear(arena.spawn());
+        return footing != null ? footing : arena.spawn();
     }
 
     public void recordBlockChange(UUID playerId, Location location, String previousData) {
@@ -742,6 +746,11 @@ public final class FfaService {
             if (list.size() < 50_000) {
                 list.add(new BlockChange(location.clone(), previousData));
             }
+        }
+        // Terrain changed inside the arena: refresh the chunk's indexed grass spots so
+        // spawns never land in a blast crater / under a built tower.
+        if (spawnIndex != null && location != null) {
+            spawnIndex.markDirty(arenaId, location);
         }
     }
 
@@ -1005,6 +1014,10 @@ public final class FfaService {
         List<BlockChange> diffs = blockDiffs.remove(arena.id());
         Runnable finish = () -> {
             resetting.put(arena.id(), false);
+            // Terrain was restored: rebuild this arena's spawn spots from the fresh ground.
+            if (spawnIndex != null) {
+                spawnIndex.reindex(arena);
+            }
             if (announceOpen) {
                 announceResetOpen(arena);
             }

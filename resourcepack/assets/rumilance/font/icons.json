@@ -1,0 +1,45 @@
+{
+  "providers": [
+    {
+      "type": "minecraft:bitmap",
+      "file": "rumilance:font/admin.png",
+      "ascent": 8,
+      "height": 9,
+      "chars": ["\uE001"]
+    },
+    {
+      "type": "minecraft:bitmap",
+      "file": "rumilance:font/vip.png",
+      "ascent": 8,
+      "height": 9,
+      "chars": ["\uE002"]
+    },
+    {
+      "type": "minecraft:bitmap",
+      "file": "rumilance:font/vip_plus.png",
+      "ascent": 8,
+      "height": 9,
+      "chars": ["\uE003"]
+    },
+    {
+      "type": "minecraft:bitmap",
+      "file": "rumilance:font/team_red.png",
+      "ascent": 8,
+      "height": 9,
+      "chars": ["\uE004"]
+    },
+    {
+      "type": "minecraft:bitmap",
+      "file": "rumilance:font/team_blue.png",
+      "ascent": 8,
+      "height": 9,
+      "chars": ["\uE005"]
+    },
+    {
+      "type": "minecraft:space",
+      "advances": {
+        "\uE000": 0
+      }
+    }
+  ]
+}

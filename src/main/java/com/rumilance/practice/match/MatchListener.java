@@ -129,9 +129,20 @@ public final class MatchListener implements Listener {
             recordCombatHit(session, attackerPlayer, victim, byEntity, event.getFinalDamage());
         }
 
-        // After a vanilla/manual totem pop, HP frames can look lethal and falsely fake-death
-        // (which re-applies kits at full health).
+        // After a vanilla/manual totem pop, stale HP frames can LOOK lethal; the grace window
+        // shields those frames. A GENUINE killing blow inside the window must still resolve:
+        // skipping it used to let vanilla run a real death that onDeath cancels, leaving a
+        // "dead but alive" player the team alive-check still counts — party fights then never
+        // ended even at 0 opponents.
         if (PracticeDeath.isInResurrectGrace(victim)) {
+            if (PracticeDeath.shouldDeferTotemToVanilla(victim, kit, event)) {
+                return;
+            }
+            if (remaining <= 0) {
+                event.setCancelled(true);
+                event.setDamage(0);
+                matchService.handleLethal(session, victimId, attackerId);
+            }
             return;
         }
         if (PracticeDeath.shouldDeferTotemToVanilla(victim, kit, event)) {

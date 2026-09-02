@@ -17,8 +17,9 @@ import org.bukkit.util.Vector;
  * <p>Vanilla adds a small random offset to the launch direction ({@code Projectile.spread = 1.0F}
  * for both), which makes throws land slightly off the crosshair and makes techniques that need a
  * precise landing — such as "pearl catching" a teammate — feel unreliable. After the launch event
- * we rebuild the velocity vector from the thrower's look direction, blended with the actual launch
- * direction by the configured factor:
+ * we straighten ONLY the thrown part of the velocity (launch velocity minus the thrower's own
+ * motion, which stays intact — important while gliding with an elytra), aiming it at the thrower's
+ * look direction and blending it with the actual launch direction by the configured factor:
  * <ul>
  *   <li>{@code 0}  = perfectly straight at the crosshair (best for pearl-catching),</li>
  *   <li>{@code 50} = exactly vanilla random spread,</li>
@@ -59,15 +60,22 @@ public final class ProjectileSpreadListener implements Listener {
 
         org.bukkit.entity.Player shooter = (org.bukkit.entity.Player) projectile.getShooter();
         Vector velocity = projectile.getVelocity();
-        double speed = velocity.length();
+        // Vanilla adds the thrower's own motion to the launch velocity (that is why pearls /
+        // wind charges thrown mid-elytra fly far ahead). Straighten ONLY the thrown part:
+        // removing the spread from the full vector would keep the huge inherited speed but
+        // snap the direction to the look vector, producing wildly wrong trajectories while
+        // gliding (the "weird behaviour" when throwing during elytra flight).
+        Vector throwerMotion = shooter.getVelocity();
+        Vector thrown = velocity.clone().subtract(throwerMotion);
+        double speed = thrown.length();
         if (speed <= 0.0001D) {
             return;
         }
         Vector look = shooter.getEyeLocation().getDirection().normalize();
         // Perfect direction (spread 0) vs the actual (spread 1). Interpolate between them so the
         // configured value scales the random offset rather than snapping to nothing.
-        Vector currentDir = velocity.clone().normalize();
-        Vector blended = look.clone().multiply(1.0D - spread).add(currentDir.clone().multiply(spread)).normalize();
-        projectile.setVelocity(blended.multiply(speed));
+        Vector currentDir = thrown.normalize();
+        Vector blended = look.clone().multiply(1.0D - spread).add(currentDir.multiply(spread)).normalize();
+        projectile.setVelocity(blended.multiply(speed).add(throwerMotion));
     }
 }

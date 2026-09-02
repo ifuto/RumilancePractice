@@ -39,6 +39,7 @@ public final class PracticeTntListener implements Listener {
     private final FfaService ffaService;
     private final Plugin plugin;
     private final NamespacedKey lockedFuseKey;
+    private volatile com.rumilance.practice.combat.ExplosionSelfDamageListener selfDamage;
 
     public PracticeTntListener(PracticeTntSettings settings, MatchService matchService, FfaService ffaService,
                                Plugin plugin) {
@@ -47,6 +48,11 @@ public final class PracticeTntListener implements Listener {
         this.ffaService = ffaService;
         this.plugin = plugin;
         this.lockedFuseKey = new NamespacedKey(PluginIdentity.PDC_NAMESPACE, "locked_creeper_fuse");
+    }
+
+    /** Blast recorder that restores vanilla self-damage skipped for explosion sources. */
+    public void setSelfDamage(com.rumilance.practice.combat.ExplosionSelfDamageListener selfDamage) {
+        this.selfDamage = selfDamage;
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -151,17 +157,24 @@ public final class PracticeTntListener implements Listener {
             if (creeper.isValid() && !creeper.isDead()) {
                 // Vanilla Hard-difficulty creeper blast. Custom logic is block-only (glass / FFA
                 // restore); entity damage must stay vanilla  EcreateExplosion scales with difficulty.
-                Location at = creeper.getLocation();
-                World world = at.getWorld();
-                Player source = creeper.getIgniter() instanceof Player p ? p : igniter;
-                float power = creeper.isPowered() ? 6.0f : 3.0f;
-                creeper.remove();
-                if (world != null) {
-                    if (world.getDifficulty() != org.bukkit.Difficulty.HARD) {
-                        world.setDifficulty(org.bukkit.Difficulty.HARD);
+                    Location at = creeper.getLocation();
+                    World world = at.getWorld();
+                    Player source = creeper.getIgniter() instanceof Player p ? p : igniter;
+                    float power = creeper.isPowered() ? 6.0f : 3.0f;
+                    creeper.remove();
+                    if (world != null) {
+                        if (world.getDifficulty() != org.bukkit.Difficulty.HARD) {
+                            world.setDifficulty(org.bukkit.Difficulty.HARD);
+                        }
+                        // Vanilla never damages the explosion's source entity (Paper #11167), so
+                        // createExplosion(..., source) alone would leave the igniter unharmed by
+                        // their own creeper. Record the blast so the igniter's skipped share of
+                        // the damage/knockback is restored a tick later.
+                        if (selfDamage != null && source != null) {
+                            selfDamage.rememberPluginBlast(at, power, source.getUniqueId());
+                        }
+                        world.createExplosion(at, power, false, true, source);
                     }
-                    world.createExplosion(at, power, false, true, source);
-                }
             }
         }, delay);
     }

@@ -38,11 +38,17 @@ public final class FfaSpawnIndex implements Listener {
     private record Warmup(String arenaId, String worldName, int chunkX, int chunkZ) {
     }
 
+    /** A chunk whose terrain changed in-fight; its indexed spots need a refresh. */
+    private record DirtyChunk(String arenaId, String worldName, int chunkX, int chunkZ) {
+    }
+
     private final Plugin plugin;
     private final AsyncExecutor asyncExecutor;
     private final FfaService ffaService;
     private final Map<String, ConcurrentHashMap<Long, List<Spot>>> byArena = new ConcurrentHashMap<>();
     private final ConcurrentLinkedQueue<Warmup> warmup = new ConcurrentLinkedQueue<>();
+    private final java.util.Set<DirtyChunk> dirtySet = ConcurrentHashMap.newKeySet();
+    private final ConcurrentLinkedQueue<DirtyChunk> dirtyQueue = new ConcurrentLinkedQueue<>();
     private final AtomicBoolean tickerStarted = new AtomicBoolean();
     private final AtomicInteger inFlight = new AtomicInteger();
 
@@ -85,6 +91,26 @@ public final class FfaSpawnIndex implements Listener {
         if (world == null || chunks == null || chunks.isEmpty()) {
             return null;
         }
+        // The index is a point-in-time snapshot: explosions / placed blocks inside the arena
+        // invalidate spots until the chunk is re-captured. Validate every candidate against
+        // the LIVE world and evict stale entries, so no one spawns floating over a blast
+        // crater or buried under a player-built tower.
+        for (int attempt = 0; attempt < 6; attempt++) {
+            Location picked = pickOnce(arena, world, chunks, occupied);
+            if (picked == null) {
+                return null;
+            }
+            Spot spot = new Spot(picked.getBlockX(), picked.getBlockY(), picked.getBlockZ());
+            if (isLiveValid(world, spot)) {
+                return picked;
+            }
+            evictSpot(arena.id(), spot);
+        }
+        return null;
+    }
+
+    private Location pickOnce(FfaService.FfaArena arena, World world,
+                              ConcurrentHashMap<Long, List<Spot>> chunks, List<Location> occupied) {
         List<Spot> loaded = null;
         int n = 0;
         for (Map.Entry<Long, List<Spot>> entry : chunks.entrySet()) {
@@ -138,9 +164,72 @@ public final class FfaSpawnIndex implements Listener {
             return null;
         }
         Spot spot = loaded.get(pick);
-        Location dest = new Location(world, spot.x() + 0.5d, spot.y(), spot.z() + 0.5d,
+        return new Location(world, spot.x() + 0.5d, spot.y(), spot.z() + 0.5d,
                 ThreadLocalRandom.current().nextFloat() * 360.0f, 0f);
-        return dest;
+    }
+
+    /** Live re-check of an indexed spot: grass below, safe passable feet/head, inside region. */
+    static boolean isLiveValid(World world, Spot spot) {
+        if (world == null || spot == null) {
+            return false;
+        }
+        int x = spot.x();
+        int feetY = spot.y();
+        int z = spot.z();
+        if (feetY <= world.getMinHeight() + 1 || feetY >= world.getMaxHeight() - 2) {
+            return false;
+        }
+        if (world.getBlockAt(x, feetY - 1, z).getType() != org.bukkit.Material.GRASS_BLOCK) {
+            return false;
+        }
+        String feet = world.getBlockAt(x, feetY, z).getType().name();
+        if (FfaSpawnMath.isUnsafeFeet(feet) || !FfaSpawnMath.isPassableSpawnFeet(feet)) {
+            return false;
+        }
+        org.bukkit.block.Block head = world.getBlockAt(x, feetY + 1, z);
+        if (!head.isPassable() || head.isLiquid()) {
+            return false;
+        }
+        return true;
+    }
+
+    private void evictSpot(String arenaId, Spot spot) {
+        ConcurrentHashMap<Long, List<Spot>> chunks = byArena.get(arenaId);
+        if (chunks == null) {
+            return;
+        }
+        long key = chunkKey(spot.x() >> 4, spot.z() >> 4);
+        chunks.computeIfPresent(key, (k, spots) -> {
+            if (spots.stream().noneMatch(s -> s.x() == spot.x() && s.z() == spot.z())) {
+                return spots;
+            }
+            List<Spot> filtered = new ArrayList<>(spots.size());
+            for (Spot s : spots) {
+                if (s.x() != spot.x() || s.z() != spot.z()) {
+                    filtered.add(s);
+                }
+            }
+            return List.copyOf(filtered);
+        });
+    }
+
+    /**
+     * Terrain inside the arena changed at this block (place/break/explosion): mark the chunk
+     * for re-capture so indexed grass spots do not go stale mid-fight.
+     */
+    public void markDirty(String arenaId, org.bukkit.Location at) {
+        if (arenaId == null || at == null || at.getWorld() == null) {
+            return;
+        }
+        if (!byArena.containsKey(arenaId)) {
+            return;
+        }
+        DirtyChunk dirty = new DirtyChunk(arenaId, at.getWorld().getName(),
+                at.getBlockX() >> 4, at.getBlockZ() >> 4);
+        if (dirtySet.add(dirty)) {
+            dirtyQueue.add(dirty);
+            ensureTicker();
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -181,6 +270,7 @@ public final class FfaSpawnIndex implements Listener {
         if (TickHealth.lagging()) {
             return;
         }
+        pumpDirty();
         int budget = LOADS_PER_TICK;
         while (budget-- > 0) {
             Warmup job = warmup.poll();
@@ -207,6 +297,27 @@ public final class FfaSpawnIndex implements Listener {
                 }
                 plugin.getServer().getScheduler().runTask(plugin, () -> capture(job.arenaId(), chunk));
             });
+        }
+    }
+
+    /** Re-captures chunks whose terrain changed so indexed grass spots do not go stale. */
+    private void pumpDirty() {
+        int budget = LOADS_PER_TICK;
+        while (budget-- > 0) {
+            DirtyChunk job = dirtyQueue.poll();
+            if (job == null) {
+                return;
+            }
+            dirtySet.remove(job);
+            if (!byArena.containsKey(job.arenaId())) {
+                continue;
+            }
+            World world = plugin.getServer().getWorld(job.worldName());
+            if (world == null || !world.isChunkLoaded(job.chunkX(), job.chunkZ())) {
+                // Unloaded chunks re-index via the ChunkLoadEvent path anyway.
+                continue;
+            }
+            capture(job.arenaId(), world.getChunkAt(job.chunkX(), job.chunkZ()));
         }
     }
 

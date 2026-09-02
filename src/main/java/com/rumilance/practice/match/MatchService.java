@@ -1391,6 +1391,7 @@ public final class MatchService {
     }
 
     private void handleTeamLethal(MatchSession session, UUID victimId, UUID attackerId) {
+        session.markEliminated(victimId);
         Player downed = Bukkit.getPlayer(victimId);
         if (downed != null) {
             // Freeze end-inventory at death so mid-fight eliminations are not lost / emptied later.
@@ -1413,6 +1414,14 @@ public final class MatchService {
         boolean teamAlive = false;
         for (UUID member : session.team(victimTeam)) {
             if (member.equals(victimId)) {
+                continue;
+            }
+            // A teammate counts as alive only when they are online, NOT on the elimination
+            // ledger, and not parked in spectator mode. The ledger is authoritative: a limbo
+            // death (killing blow swallowed right after a totem pop) can leave a player in
+            // SURVIVAL game mode while effectively out — without the ledger their side never
+            // counts as wiped and the party fight never ends.
+            if (session.isEliminated(member)) {
                 continue;
             }
             Player mate = Bukkit.getPlayer(member);

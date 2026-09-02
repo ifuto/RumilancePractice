@@ -2,6 +2,7 @@ package com.rumilance.practice.combat;
 
 import com.rumilance.practice.PluginIdentity;
 import org.bukkit.NamespacedKey;
+import org.bukkit.entity.Creeper;
 import org.bukkit.entity.EnderCrystal;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
@@ -76,6 +77,9 @@ public final class ExplosionSourceTracker implements Listener {
         }
         if (damager instanceof EnderCrystal crystal) {
             return ownerOf(crystal);
+        }
+        if (damager instanceof Creeper creeper && creeper.getIgniter() instanceof Player igniter) {
+            return igniter.getUniqueId();
         }
         return null;
     }

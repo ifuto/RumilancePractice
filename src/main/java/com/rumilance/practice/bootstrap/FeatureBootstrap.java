@@ -532,6 +532,40 @@ public final class FeatureBootstrap {
         RankService rankService = new RankService(plugin, rankRepository, asyncExecutor);
         services.register(RankService.class, rankService);
 
+        // Resource-pack icon glyphs (rank badges + RED/BLUE team markers) rendered in front of
+        // player names in TAB / nametags via a custom font. The resolver combines the rank badge
+        // (admin / VIP+ / VIP) with the team marker during team fights.
+        final com.rumilance.practice.font.IconFontService iconFontService =
+                new com.rumilance.practice.font.IconFontService(configService);
+        services.register(com.rumilance.practice.font.IconFontService.class, iconFontService);
+        final RankService rankServiceRef = rankService;
+        com.rumilance.practice.match.MatchTeamVisuals.setPrefixResolver((player, session) -> {
+            net.kyori.adventure.text.Component prefix = net.kyori.adventure.text.Component.empty();
+            // Effective rank: stored rank or granted permissions (admin > VIP+ > VIP).
+            com.rumilance.practice.rank.PlayerRank effective;
+            if (rankServiceRef.isAdmin(player)) {
+                effective = com.rumilance.practice.rank.PlayerRank.ADMIN;
+            } else if (rankServiceRef.isVipPlusOrAbove(player)) {
+                effective = com.rumilance.practice.rank.PlayerRank.VIP_PLUS;
+            } else if (rankServiceRef.isVipOrAbove(player)) {
+                effective = com.rumilance.practice.rank.PlayerRank.VIP;
+            } else {
+                effective = com.rumilance.practice.rank.PlayerRank.NORM;
+            }
+            net.kyori.adventure.text.Component rankIcon = iconFontService.rankIcon(effective);
+            if (!rankIcon.equals(net.kyori.adventure.text.Component.empty())) {
+                prefix = prefix.append(rankIcon).append(net.kyori.adventure.text.Component.space());
+            }
+            if (session != null && session.isTeamMatch()) {
+                net.kyori.adventure.text.Component teamIcon =
+                        iconFontService.teamIcon(session.teamColor(player.getUniqueId()));
+                if (!teamIcon.equals(net.kyori.adventure.text.Component.empty())) {
+                    prefix = prefix.append(teamIcon).append(net.kyori.adventure.text.Component.space());
+                }
+            }
+            return prefix;
+        });
+
         // Paid kill-effect cosmetics: played at a victim's death position for VIP+ killers.
         com.rumilance.practice.cosmetic.kill.KillEffectRegistry killEffectRegistry =
                 new com.rumilance.practice.cosmetic.kill.KillEffectRegistry(configService, plugin.getLogger());
@@ -877,6 +911,8 @@ public final class FeatureBootstrap {
                 asyncExecutor);
         scoreboardService.setSpectatorService(spectatorService);
         scoreboardService.setFfaService(ffaService);
+        scoreboardService.setIconFontService(iconFontService);
+        scoreboardService.setRankService(rankService);
         TabVisibilityService tabVisibilityService =
                 new TabVisibilityService(plugin, stateManager, matchRegistry);
         tabVisibilityService.setSpectatorService(spectatorService);
@@ -932,7 +968,17 @@ public final class FeatureBootstrap {
         pm.registerEvents(new ItemFlowGuardListener(stateManager, ffaService), plugin);
         pm.registerEvents(ffaSpawnIndex, plugin);
         pm.registerEvents(new InstantExpCollectListener(), plugin);
-        pm.registerEvents(new PracticeTntListener(practiceTnt, matchService, ffaService, plugin), plugin);
+        PracticeTntListener practiceTntListener =
+                new PracticeTntListener(practiceTnt, matchService, ffaService, plugin);
+        // Vanilla skips explosion damage for the blast's source entity (Paper #11167): on
+        // modern versions that is the crystal detonator / creeper igniter / TNT lighter, so
+        // own-crystal & own-creeper self-damage silently disappears. This listener restores
+        // the skipped share (damage + knockback) without touching anything vanilla applied.
+        com.rumilance.practice.combat.ExplosionSelfDamageListener explosionSelfDamage =
+                new com.rumilance.practice.combat.ExplosionSelfDamageListener(plugin);
+        practiceTntListener.setSelfDamage(explosionSelfDamage);
+        pm.registerEvents(explosionSelfDamage, plugin);
+        pm.registerEvents(practiceTntListener, plugin);
         pm.registerEvents(new CrystalAnchorPerfListener(matchService, ffaService), plugin);
         pm.registerEvents(new com.rumilance.practice.combat.PortalBlockListener(matchRegistry, ffaService), plugin);
         pm.registerEvents(new PracticePearlListener(matchService, ffaService, arenaService, sightSettings), plugin);
