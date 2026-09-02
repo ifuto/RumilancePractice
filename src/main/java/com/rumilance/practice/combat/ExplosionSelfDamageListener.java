@@ -278,8 +278,9 @@ public final class ExplosionSelfDamageListener implements Listener {
                 clear++;
                 continue;
             }
+            Vector direction = target.toVector().subtract(origin.toVector());
             RayTraceResult hit = world.rayTraceBlocks(
-                    origin, target, maxDist + 0.1d, FluidCollisionMode.NEVER, true);
+                    origin, direction, maxDist + 0.1d, FluidCollisionMode.NEVER, true);
             if (hit == null || hit.getHitBlock() == null) {
                 clear++;
             }
