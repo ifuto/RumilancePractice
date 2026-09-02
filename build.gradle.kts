@@ -140,6 +140,26 @@ tasks.shadowJar {
 
 tasks.build {
     dependsOn(tasks.shadowJar)
+    dependsOn(tasks.named("resourcePackZip"))
+}
+
+// Packages resourcepack/ into build/libs/RumilanceResourcePack.zip with pack.mcmeta at the
+// archive root (the layout the Minecraft client expects). The sha1 printed here (also written
+// next to the zip as RumilanceResourcePack.sha1) is what belongs into server.properties'
+// resource-pack-sha1 — recompute it whenever the zip contents change.
+tasks.register<Zip>("resourcePackZip") {
+    group = "build"
+    description = "Zips resourcepack/ (pack.mcmeta at the root) for server distribution."
+    from(layout.projectDirectory.dir("resourcepack"))
+    archiveFileName.set("RumilanceResourcePack.zip")
+    destinationDirectory.set(layout.buildDirectory.dir("libs"))
+    doLast {
+        val zipFile = archiveFile.get().asFile
+        val digest = java.security.MessageDigest.getInstance("SHA-1").digest(zipFile.readBytes())
+        val sha1 = digest.joinToString("") { byte -> "%02x".format(byte) }
+        zipFile.resolveSibling("RumilanceResourcePack.sha1").writeText(sha1 + "\n")
+        logger.lifecycle("[resourcepack] ${zipFile.name} sha1=$sha1")
+    }
 }
 
 tasks.jar {
