@@ -1,6 +1,8 @@
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 
+import java.security.MessageDigest
+
 plugins {
     java
     id("com.gradleup.shadow") version "9.6.0"
@@ -155,8 +157,8 @@ tasks.register<Zip>("resourcePackZip") {
     destinationDirectory.set(layout.buildDirectory.dir("libs"))
     doLast {
         val zipFile = archiveFile.get().asFile
-        val digest = java.security.MessageDigest.getInstance("SHA-1").digest(zipFile.readBytes())
-        val sha1 = digest.joinToString("") { byte -> "%02x".format(byte) }
+        val digest = MessageDigest.getInstance("SHA-1").digest(zipFile.readBytes())
+        val sha1 = digest.joinToString("") { b: Byte -> "%02x".format(b) }
         zipFile.resolveSibling("RumilanceResourcePack.sha1").writeText(sha1 + "\n")
         logger.lifecycle("[resourcepack] ${zipFile.name} sha1=$sha1")
     }
