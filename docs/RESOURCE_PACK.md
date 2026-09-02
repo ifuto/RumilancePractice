@@ -22,8 +22,9 @@ cd resourcepack && zip -qr ../RumilanceResourcePack.zip . && cd ..
 sha1sum RumilanceResourcePack.zip   # server.properties に貼る SHA1
 ```
 
-GitHub Actions（`build.yml`）も毎ビルドで `RumilanceResourcePack` アーティファクト
-（ZIP + ビルドログに SHA1 出力）を生成するので、ローカルで zip しなくても落とせます。
+GitHub Actions の `build.yml` に zip ステップを追加できる権限があるなら、
+`resourcepack/` を zip して artifact として上げるようにすると配布が楽になります
+（現状はローカルで zip する手順で十分です）。
 
 ## 2. 配布先 — Cloudflare Pages（おすすめ）
 
