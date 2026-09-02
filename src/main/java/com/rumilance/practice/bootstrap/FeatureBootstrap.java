@@ -889,9 +889,8 @@ public final class FeatureBootstrap {
         scoreboardService.setOpponentHealthNametagService(opponentHealthNametagService);
         opponentHealthNametagService.start();
         com.rumilance.practice.headfont.HeadFontService headFontService =
-                new com.rumilance.practice.headfont.HeadFontService(plugin);
+                new com.rumilance.practice.headfont.HeadFontService();
         services.register(com.rumilance.practice.headfont.HeadFontService.class, headFontService);
-        headFontService.start();
         com.rumilance.practice.match.MatchActionBarService matchActionBarService =
                 new com.rumilance.practice.match.MatchActionBarService(plugin, matchRegistry);
         matchActionBarService.setSpectatorService(spectatorService);

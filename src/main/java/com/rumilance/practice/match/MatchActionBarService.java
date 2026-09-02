@@ -126,14 +126,9 @@ public final class MatchActionBarService {
         int series = id == null ? 0 : session.seriesWinsOf(id);
 
         Component label = Component.empty();
-        // Render the fighter's real face via the head-font resource pack (loaded async).
+        // Render the fighter's real face via the vanilla player-sprite (<head:uuid>, no resource pack).
         if (id != null && headFontService != null) {
-            Player fighter = Bukkit.getPlayer(id);
-            if (fighter != null) {
-                label = label.append(headFontService.head(fighter));
-            } else {
-                label = label.append(Component.text("   "));
-            }
+            label = label.append(headFontService.head(id));
         }
         label = label.append(Component.text(" " + name + " ", textColor))
                 .append(Component.text(score, NamedTextColor.WHITE, TextDecoration.BOLD))
