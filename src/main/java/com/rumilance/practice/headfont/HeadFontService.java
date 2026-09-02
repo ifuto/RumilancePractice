@@ -121,7 +121,11 @@ public final class HeadFontService implements Listener {
             }
         }
         packBytes = zip.toByteArray();
-        sha1 = sha1Hex(packBytes);
+        try {
+            sha1 = sha1Hex(packBytes);
+        } catch (Exception e) {
+            throw new IOException("Failed to hash resource pack", e);
+        }
 
         Path file = plugin.getDataFolder().toPath().resolve("head-pack.zip");
         Files.createDirectories(file.getParent());
