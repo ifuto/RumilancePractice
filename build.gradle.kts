@@ -74,6 +74,9 @@ dependencies {
 tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
     options.release.set(21)
+    // CI greps the build log for diagnostics; the pre-existing [removal] deprecation
+    // warnings flood the annotation budget and push real errors out of view.
+    options.compilerArgs.add("-nowarn")
 }
 
 tasks.processResources {
