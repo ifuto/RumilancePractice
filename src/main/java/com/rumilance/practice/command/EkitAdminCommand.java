@@ -54,17 +54,6 @@ public final class EkitAdminCommand implements CommandExecutor {
                     player.sendMessage(Component.text("Original-kit room region set.", NamedTextColor.GREEN));
                     return true;
                 }
-                case "savebutton" -> {
-                    Block target = player.getTargetBlockExact(8);
-                    if (target == null) {
-                        player.sendMessage(Component.text("Look at the save button block.", NamedTextColor.RED));
-                        return true;
-                    }
-                    roomService.registerSaveButton(target.getLocation());
-                    player.sendMessage(Component.text("Save button registered at "
-                            + target.getX() + " " + target.getY() + " " + target.getZ(), NamedTextColor.GREEN));
-                    return true;
-                }
                 default -> {
                     // fall through to GUI
                 }

@@ -50,12 +50,18 @@ public final class OriginalKitRoomListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onBreak(BlockBreakEvent event) {
+        Block block = event.getBlock();
+        // Breaking a save-sign button (admin action) un-registers it, then allow the break.
+        if (roomService.isSaveButton(block.getLocation())) {
+            roomService.removeSaveButton(block.getLocation());
+            return;
+        }
         Player player = event.getPlayer();
         if (!roomService.isEditing(player.getUniqueId())) {
             return;
         }
         // The room is permanent; an editor can never break its blocks.
-        if (roomService.inRoom(event.getBlock().getLocation())) {
+        if (roomService.inRoom(block.getLocation())) {
             event.setCancelled(true);
             player.sendActionBar(Component.text("You cannot break blocks in the kit room.",
                     NamedTextColor.RED));
@@ -65,13 +71,23 @@ public final class OriginalKitRoomListener implements Listener {
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onPlace(BlockPlaceEvent event) {
         Player player = event.getPlayer();
+        Block placed = event.getBlockPlaced();
+
+        // An admin placing the save-sign item inside the room auto-registers it as a save button.
+        if (SaveSignItem.isSaveButton(event.getItemInHand())
+                && roomService.inRoom(placed.getLocation())
+                && (player.hasPermission("rumilance.admin") || player.isOp())) {
+            roomService.addSaveButton(placed.getLocation());
+            player.sendMessage(Component.text("Save button registered — editors can press it to save.",
+                    NamedTextColor.GREEN));
+            return;
+        }
+
         if (!roomService.isEditing(player.getUniqueId())) {
             return;
         }
-        Block against = event.getBlockPlaced();
-        // Placing the save button is an admin action (admins are not in an edit session).
         // Editors cannot place any block in the room.
-        if (roomService.inRoom(against.getLocation())) {
+        if (roomService.inRoom(placed.getLocation())) {
             event.setCancelled(true);
             // Creative placement would otherwise consume the client-side ghost; resync.
             player.updateInventory();
@@ -110,13 +126,11 @@ public final class OriginalKitRoomListener implements Listener {
             save(player);
             return;
         }
-        // Block interaction with room containers (anvil/grindstone are allowed below only for
-        // those explicitly permitted; but an editor placing/using held items in blocks is blocked).
-        // Holding the save-sign item does not save — it must be placed/registered in the room.
+        // Holding the save-sign item does not save — press the placed save button in the room.
         if (SaveSignItem.isSaveButton(item) && roomService.inRoom(clicked.getLocation())) {
             event.setCancelled(true);
             player.sendActionBar(Component.text(
-                    "The save button must be placed and registered by an admin.",
+                    "Press the placed SAVE button on the wall/floor to save your kit.",
                     NamedTextColor.YELLOW));
         }
     }

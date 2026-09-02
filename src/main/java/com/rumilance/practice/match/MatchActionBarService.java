@@ -29,6 +29,7 @@ public final class MatchActionBarService {
     private final Plugin plugin;
     private final MatchRegistry matchRegistry;
     private volatile com.rumilance.practice.spectator.SpectatorService spectatorService;
+    private volatile com.rumilance.practice.headfont.HeadFontService headFontService;
     private BukkitTask task;
 
     public MatchActionBarService(Plugin plugin, MatchRegistry matchRegistry) {
@@ -38,6 +39,10 @@ public final class MatchActionBarService {
 
     public void setSpectatorService(com.rumilance.practice.spectator.SpectatorService spectatorService) {
         this.spectatorService = spectatorService;
+    }
+
+    public void setHeadFontService(com.rumilance.practice.headfont.HeadFontService headFontService) {
+        this.headFontService = headFontService;
     }
 
     public void start() {
@@ -119,11 +124,22 @@ public final class MatchActionBarService {
         String name = id == null ? "-" : com.rumilance.practice.stats.StatsService.nameOf(id);
         int score = id == null ? 0 : session.killsOf(id);
         int series = id == null ? 0 : session.seriesWinsOf(id);
-        return Component.text("● ", textColor)
-                .append(Component.text(name + " ", textColor))
+
+        Component label = Component.empty();
+        // Render the fighter's real face via the head-font resource pack (loaded async).
+        if (id != null && headFontService != null) {
+            Player fighter = Bukkit.getPlayer(id);
+            if (fighter != null) {
+                label = label.append(headFontService.head(fighter));
+            } else {
+                label = label.append(Component.text("   "));
+            }
+        }
+        label = label.append(Component.text(" " + name + " ", textColor))
                 .append(Component.text(score, NamedTextColor.WHITE, TextDecoration.BOLD))
                 .append(series > 0
                         ? Component.text(" (" + series + ")", NamedTextColor.GRAY)
                         : Component.empty());
+        return label;
     }
 }

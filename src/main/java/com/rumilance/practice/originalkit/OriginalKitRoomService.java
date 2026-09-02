@@ -35,8 +35,12 @@ public final class OriginalKitRoomService {
     /** Players currently inside an edit session. */
     private final Set<UUID> editors = ConcurrentHashMap.newKeySet();
 
-    /** Configured SAVE button block key ("x;y;z" in the room world). Admin-registered. */
-    private volatile String saveButtonKey;
+    /**
+     * Placed SAVE buttons ("world;x;y;z"). A save-sign item obtained via {@code /giveitem} is
+     * auto-registered the moment an admin places it in the room, and auto-removed when broken —
+     * no {@code /ekitadmin savebutton} step needed.
+     */
+    private final Set<String> saveButtons = ConcurrentHashMap.newKeySet();
 
     public OriginalKitRoomService(ConfigService configService, org.bukkit.plugin.Plugin plugin) {
         this.configService = configService;
@@ -59,28 +63,42 @@ public final class OriginalKitRoomService {
             spawn = null;
         }
         region = Cuboid.fromConfig(lobby, "ekit-room.region");
-        saveButtonKey = lobby.getString("ekit-room.save-button", null);
+        saveButtons.clear();
+        saveButtons.addAll(lobby.getStringList("ekit-room.save-buttons"));
     }
 
-    /** Registers the block the player is looking at (or standing on) as the SAVE button. */
-    public void registerSaveButton(Location location) {
-        this.saveButtonKey = keyOf(location);
+    /** Auto-register a placed save-sign block. */
+    public void addSaveButton(Location location) {
+        if (saveButtons.add(keyOf(location))) {
+            persistSaveButtons();
+        }
+    }
+
+    /** Remove a save-sign block that was broken. */
+    public void removeSaveButton(Location location) {
+        if (saveButtons.remove(keyOf(location))) {
+            persistSaveButtons();
+        }
+    }
+
+    private void persistSaveButtons() {
         FileConfiguration lobby = configService.lobby();
-        lobby.set("ekit-room.save-button", saveButtonKey);
+        lobby.set("ekit-room.save-buttons", new java.util.ArrayList<>(saveButtons));
         configService.save(ConfigService.LOBBY);
     }
 
     public boolean hasSaveButton() {
-        return saveButtonKey != null && !saveButtonKey.isBlank();
+        return !saveButtons.isEmpty();
     }
 
-    /** True only if the room has a save button AND the clicked block is that button. */
+    /** True if the clicked block is one of the room's placed save-sign buttons. */
     public boolean isSaveButton(Location location) {
-        return saveButtonKey != null && saveButtonKey.equals(keyOf(location));
+        return saveButtons.contains(keyOf(location));
     }
 
     private static String keyOf(Location location) {
-        return location.getBlockX() + ";" + location.getBlockY() + ";" + location.getBlockZ();
+        String world = location.getWorld() != null ? location.getWorld().getName() : "world";
+        return world + ";" + location.getBlockX() + ";" + location.getBlockY() + ";" + location.getBlockZ();
     }
 
     public boolean isConfigured() {
