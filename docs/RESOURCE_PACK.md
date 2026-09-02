@@ -1,7 +1,7 @@
 # リソパ（カスタムフォントアイコン）配布ガイド
 
 Team Fight の赤/青マーカーと、Admin / VIP+ / VIP ランクバッジは **リソースパックのカスタムフォント**
-で描画しています（`resourcepack/` ディレクトリがパックのソースです）。
+で描画しています（`resourcepack/` がパックのソース、`dist/RumilanceResourcePack.zip` が配布用ビルド済みパック）。
 
 - フォント: `rumilance:icons`（`resourcepack/assets/rumilance/font/icons.json`）
 - グリフ（未割り当て文字 = Private Use Area）:
@@ -13,24 +13,42 @@ Team Fight の赤/青マーカーと、Admin / VIP+ / VIP ランクバッジは 
 > アイコンの大きさ・位置を調整したい場合は `icons.json` の `height` / `ascent`
 > （現在は 9 / 8）を変更してください。
 
-## 1. ZIP を作る
+## 配布方法その1（おすすめ・手間ゼロ）: リポジトリの配布パックをそのまま使う
 
-リポジトリの `resourcepack/` 内身を**ルートが pack.mcmeta になるように** ZIP 化します。
+ビルド済みパックを `dist/` にコミット済みです。マージ後は **main** の raw URL を
+そのまま `server.properties` に書けます（GitHub が HTTPS でそのまま配信します）:
 
-```bash
-cd resourcepack && zip -qr ../RumilanceResourcePack.zip . && cd ..
-sha1sum RumilanceResourcePack.zip   # server.properties に貼る SHA1
+```properties
+resource-pack=https://raw.githubusercontent.com/ifuto/RumilancePractice/main/dist/RumilanceResourcePack.zip
+resource-pack-sha1=94b37174995766f686fe6e0dae70136d8f5533ee
+require-resource-pack=true
+resource-pack-prompt={"text":"Rumilanceのアイコン表示に必要です","color":"aqua"}
 ```
 
-GitHub Actions の `build.yml` に zip ステップを追加できる権限があるなら、
-`resourcepack/` を zip して artifact として上げるようにすると配布が楽になります
-（現状はローカルで zip する手順で十分です）。
+（マージ前はブランチ指定でも可: `.../arena/01a06257-rumilancepractice/dist/RumilanceResourcePack.zip`）
 
-## 2. 配布先 — Cloudflare Pages（おすすめ）
+### パックの中身を変えたとき
 
-クライアントは **ZIP ファイルそのもの**を URL からダウンロードするので、
-Pages のビルドで ZIP を生成して静的アセットとして置きます。
-HTTPS + CDN + 無料枠で運用できるので Cloudflare Pages が素直です。
+```bash
+./gradlew resourcePackZip     # build/libs/RumilanceResourcePack.zip を再生成し、新しいSHA1を表示
+cp build/libs/RumilanceResourcePack.zip dist/
+cp build/libs/RumilanceResourcePack.sha1 dist/   # ※ sha1 が変わったら server.properties も更新
+```
+
+手動で zip する場合（Gradle なし）:
+
+```bash
+cd resourcepack && zip -qr ../dist/RumilanceResourcePack.zip . && cd ..
+sha1sum dist/RumilanceResourcePack.zip
+```
+
+> ポイント: `pack.mcmeta` が ZIP の**ルート**に来るように圧縮すること
+> （`cd resourcepack && zip -r ... .` の形）。`resourcepack` フォルダごと入れると認識されません。
+
+## 配布方法その2: Cloudflare Pages（自前ホスティングしたい場合）
+
+HTTPS + CDN + 無料枠で運用できるので、独自ドメインや配信元を分けたいならこちらも良いです。
+クライアントは **ZIP ファイルそのもの**を URL からダウンロードします。
 
 1. [Cloudflare Dashboard](https://dash.cloudflare.com/) → **Workers & Pages** → **Create application** → **Pages**
 2. GitHub を連携してこのリポジトリを選択し、次の設定でデプロイ:
@@ -39,9 +57,14 @@ HTTPS + CDN + 無料枠で運用できるので Cloudflare Pages が素直です
      mkdir -p public && cd resourcepack && zip -qr ../public/RumilanceResourcePack.zip .
      ```
    - Output directory: `public`
-3. デプロイ後、配布 URL はこれになります:
-   `https://<プロジェクト名>.pages.dev/RumilanceResourcePack.zip`
+3. 配布 URL: `https://<プロジェクト名>.pages.dev/RumilanceResourcePack.zip`
    ブラウザで開いて ZIP が落ちてくれば OK。
+
+```properties
+resource-pack=https://<プロジェクト名>.pages.dev/RumilanceResourcePack.zip
+resource-pack-sha1=<sha1sum の値>
+require-resource-pack=true
+```
 
 （代替: R2 公開バケット / 既存の Web サーバーに ZIP を置いても同じです。
 要は「HTTPS で ZIP が直接取得できる URL」であれば何でも動きます。）
@@ -49,23 +72,19 @@ HTTPS + CDN + 無料枠で運用できるので Cloudflare Pages が素直です
 > パックの中身を変えたら再デプロイ → サーバーの `resource-pack-sha1` も
 > 新しい ZIP の SHA1 に更新してください（SHA1 が合わないとクライアントが拒否します）。
 
-## 3. サーバー設定（server.properties）
-
-```properties
-resource-pack=https://<プロジェクト名>.pages.dev/RumilanceResourcePack.zip
-resource-pack-sha1=<上で求めたSHA1>
-require-resource-pack=true
-resource-pack-prompt={"text":"Rumilanceのアイコン表示に必要です","color":"aqua"}
-```
+## 補足
 
 - 1.21.9+ の `min_format`/`max_format` 入り `pack.mcmeta` 済み（対象 1.21.11 / pack_format 75）
-- `require-resource-pack=true` にすると、パック未適用のプレイヤーにはグリフが
+- `require-resource-pack=true` にすると、パック未適用のプレイヤーにグリフが
   豆腐（□）に見える問題をそもそも防げます
-
-## 4. プラグイン側
-
-- `config.yml` → `icons.enabled: true`（デフォルト）で有効
-- ランクバッジは **ロビー・FFA・キューでは名前のみ**、**試合中はチームマーカーと併記** で
-  TABリストとネームタグに表示されます（`RankIconNameTags` / `MatchTeamVisuals`）
 - リソースパックを入れていない環境では空白グリフ扱いになるだけなので、
   プラグイン動作自体は壊れません
+
+## プラグイン側の表示ロジック
+
+- `config.yml` → `icons.enabled: true`（デフォルト）で有効
+- ランクバッジは **ロビー・FFA・キューではランクアイコンのみ**、
+  **チーム戦ではチームマーカーと併記** で TABリストとネームタグに表示されます
+  （ロビー系: `RankIconNameTags` / 試合中: `MatchTeamVisuals`）
+- ランク判定は保存ランクと権限（`rumilance.admin` 等）の両方を見て、
+  Admin > VIP+ > VIP の優先順で1つだけ表示します（NORMは何も付きません）
