@@ -68,17 +68,41 @@ public final class TeamKitSelectGui extends AbstractGui {
         MenuScaffold.header(inventory, 0, title(player, session));
 
         Team team = teamService.teamOf(player.getUniqueId()).orElse(null);
-        if (team != null) {
-            int red = team.side(TeamColor.RED).size();
-            int blue = team.side(TeamColor.BLUE).size();
-            inventory.setItem(GuiSlots.slot(5, 1),
-                    ItemBuilder.of(Material.RED_WOOL, Math.max(1, red))
-                            .name(t(player, "party.red-vs-blue", MessageService.tags(
-                                    "red", String.valueOf(red),
-                                    "blue", String.valueOf(blue))).color(UiTheme.VALUE))
-                            .lore(UiTheme.line(line(player, "gui.party-uneven-ok")))
-                            .action("decorate").build());
+        if (team == null || !team.isOwner(player.getUniqueId())) {
+            // Only a split-ready team's owner may launch a battle — everyone else sees a
+            // locked screen instead of a kit grid they must not act on.
+            inventory.setItem(GuiSlots.slot(2, 4),
+                    ItemBuilder.of(Material.BARRIER)
+                            .name(t(player, "gui.party-owner-only"))
+                            .lore(UiTheme.line(line(player, "party.owner-only-lore")))
+                            .action("decorate")
+                            .build());
+            MenuScaffold.returnButton(inventory, t(player, "menu.back"));
+            return;
         }
+        int red = team.side(TeamColor.RED).size();
+        int blue = team.side(TeamColor.BLUE).size();
+        inventory.setItem(GuiSlots.slot(5, 1),
+                ItemBuilder.of(Material.RED_WOOL, Math.max(1, red))
+                        .name(t(player, "party.red-vs-blue", MessageService.tags(
+                                "red", String.valueOf(red),
+                                "blue", String.valueOf(blue))).color(UiTheme.VALUE))
+                        .lore(UiTheme.line(line(player, "gui.party-uneven-ok")))
+                        .action("decorate").build());
+
+        // Live readiness tile: green glow when the battle can start, otherwise the exact
+        // reason (unassigned members, someone queued / in FFA / spectating, ...).
+        TeamService.Result precheck = teamService.preflightStart(player);
+        boolean ready = precheck == TeamService.Result.OK;
+        inventory.setItem(GuiSlots.slot(5, 7),
+                ItemBuilder.of(ready ? Material.LIME_DYE : Material.GRAY_DYE)
+                        .name(t(player, ready ? "party.status-ready" : "party.status-blocked")
+                                .color(ready ? UiTheme.SUCCESS : UiTheme.WARNING))
+                        .lore(ready
+                                ? UiTheme.line(line(player, "party.status-ready-lore"))
+                                : UiTheme.line(teamService.errorMessage(player, precheck)))
+                        .glintIf(ready)
+                        .action("decorate").build());
 
         List<KitDefinition> kits = kitService.enabled();
         int index = 0;

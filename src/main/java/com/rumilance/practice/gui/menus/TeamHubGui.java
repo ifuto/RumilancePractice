@@ -49,6 +49,16 @@ public final class TeamHubGui extends AbstractGui {
     private PartyInviteGui partyInviteGui;
     private PartyMapSelectGui partyMapSelectGui;
     private ArenaTemplateStoreSupplier arenaStoreSupplier;
+    private ConfirmGui confirmGui;
+    private com.rumilance.practice.session.PlayerStateManager stateManager;
+
+    public void setConfirmGui(ConfirmGui confirmGui) {
+        this.confirmGui = confirmGui;
+    }
+
+    public void setStateManager(com.rumilance.practice.session.PlayerStateManager stateManager) {
+        this.stateManager = stateManager;
+    }
 
     @FunctionalInterface
     public interface ArenaTemplateStoreSupplier {
@@ -152,7 +162,10 @@ public final class TeamHubGui extends AbstractGui {
             inventory.setItem(GuiSlots.slot(0, 7),
                     ItemBuilder.of(Material.TNT)
                             .name(t(player, "party.disband").color(UiTheme.DANGER))
-                            .lore(UiTheme.hint(line(player, "party.disband-hint")))
+                            .lore(UiTheme.divider(),
+                                    UiTheme.line(line(player, "party.disband-confirm-lore")),
+                                    UiTheme.blank(),
+                                    UiTheme.hint(line(player, "party.disband-hint")))
                             .action("disband").build());
         } else {
             inventory.setItem(GuiSlots.slot(0, 7),
@@ -207,7 +220,25 @@ public final class TeamHubGui extends AbstractGui {
                             .name(t(player, "party.clear-sides").color(UiTheme.WARNING))
                             .lore(UiTheme.hint(line(player, "party.clear-sides-hint")))
                             .action("clearsides").build());
-            boolean ready = team.isSplitReady();
+            // Start button shows the FULL readiness picture: sides assigned AND every member
+            // free in the lobby (not queued / in FFA / spectating / fighting). Whatever is
+            // missing is named in the lore so the owner knows exactly what to fix.
+            TeamService.Result precheck = teamService.preflightStart(player);
+            boolean ready = precheck == TeamService.Result.OK;
+            Component blockedReason;
+            if (ready) {
+                blockedReason = null;
+            } else if (!team.isSplitReady()) {
+                blockedReason = UiTheme.line(unassigned > 0
+                        ? line(player, "gui.party-unassigned-n")
+                                .replace("<n>", String.valueOf(unassigned))
+                        : line(player, "gui.party-need-both"));
+            } else {
+                blockedReason = UiTheme.line(teamService.errorMessage(player, precheck));
+            }
+            Component blockedHint = !team.isSplitReady()
+                    ? UiTheme.line(line(player, "gui.party-assign-first"))
+                    : UiTheme.line(line(player, "party.start-wait-lobby"));
             inventory.setItem(GuiSlots.slot(5, 5),
                     ItemBuilder.of(Material.DIAMOND_SWORD)
                             .name(t(player, "gui.party-start").color(ready ? UiTheme.SUCCESS : UiTheme.MUTED))
@@ -216,17 +247,50 @@ public final class TeamHubGui extends AbstractGui {
                                             ? UiTheme.line(line(player, "party.start-ready")
                                                     .replace("<red>", String.valueOf(redCount))
                                                     .replace("<blue>", String.valueOf(blueCount)))
-                                            : UiTheme.line(unassigned > 0
-                                                    ? line(player, "gui.party-unassigned-n")
-                                                            .replace("<n>", String.valueOf(unassigned))
-                                                    : line(player, "gui.party-need-both")),
+                                            : blockedReason,
                                     UiTheme.blank(),
                                     ready ? UiTheme.hint(line(player, "gui.party-start-hint"))
-                                            : UiTheme.line(line(player, "gui.party-assign-first")))
+                                            : blockedHint)
                             .glintIf(ready)
                             .action("choose_kit").build());
         }
         MenuScaffold.returnButton(inventory, t(player, "menu.close"));
+    }
+
+    /**
+     * @return the lang key of the member's blocking activity state, or {@code null} when the
+     *         member is free in the lobby (or the state manager is not wired).
+     */
+    private String busyStateKey(UUID member) {
+        if (stateManager == null) {
+            return null;
+        }
+        Player online = Bukkit.getPlayer(member);
+        if (online == null) {
+            return null;
+        }
+        com.rumilance.practice.state.PlayerState state = stateManager.getState(member);
+        return switch (state) {
+            case QUEUED_RANKED -> "menu.state-ranked-queue";
+            case QUEUED_UNRANKED -> "menu.state-unranked-queue";
+            case FIGHTING, PREPARING_MATCH, COUNTDOWN, ENDING -> "menu.state-fighting";
+            case SPECTATING -> "menu.state-spectating";
+            case FFA -> "menu.state-ffa";
+            case EDITING_KIT -> "menu.state-editing";
+            case REQUESTING_DUEL -> "menu.state-dueling";
+            case PRACTICE_WAIT, PRACTICE_ACTIVE -> "menu.state-fighting";
+            default -> null;
+        };
+    }
+
+    private void teamHubReopen(Player player) {
+        org.bukkit.Bukkit.getScheduler().runTask(
+                org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
+                () -> {
+                    if (player.isOnline()) {
+                        open(player);
+                    }
+                });
     }
 
     private ItemStack headerItem(Player viewer, Team team) {
@@ -259,6 +323,12 @@ public final class TeamHubGui extends AbstractGui {
                 .lore(UiTheme.divider(),
                         UiTheme.labelValue(line(viewer, "gui.party-side"),
                                 side == null ? line(viewer, "gui.party-unassigned") : side.name()));
+        // Busy members (queue / FFA / match / spectate) are flagged so the owner sees at a
+        // glance why a battle cannot start.
+        String busyState = busyStateKey(member);
+        if (busyState != null) {
+            b.lore(UiTheme.status(line(viewer, busyState), UiTheme.WARNING));
+        }
         if (team.isOwner(member)) {
             b.lore(UiTheme.status(line(viewer, "gui.party-owner"), UiTheme.SECONDARY));
         }
@@ -298,15 +368,29 @@ public final class TeamHubGui extends AbstractGui {
                 if (!owner) {
                     return;
                 }
-                // Require shift-click so a stray click can't nuke a 30-player team.
-                if (click != ClickType.SHIFT_LEFT && click != ClickType.SHIFT_RIGHT) {
+                sounds.play(player, "gui-click");
+                if (confirmGui != null) {
+                    confirmGui.open(player,
+                            t(player, "party.disband-confirm").color(UiTheme.DANGER),
+                            java.util.List.of(UiTheme.line(line(player, "party.disband-confirm-lore"))),
+                            who -> {
+                                sounds.play(who, "select");
+                                teamService.disband(who);
+                                who.closeInventory();
+                                browser.open(who);
+                            },
+                            who -> {
+                                sounds.play(who, "gui-back");
+                                teamHubReopen(who);
+                            });
+                } else if (click == ClickType.SHIFT_LEFT || click == ClickType.SHIFT_RIGHT) {
+                    sounds.play(player, "select");
+                    teamService.disband(player);
+                    player.closeInventory();
+                    browser.open(player);
+                } else {
                     sounds.play(player, "error");
-                    return;
                 }
-                sounds.play(player, "select");
-                teamService.disband(player);
-                player.closeInventory();
-                browser.open(player);
             }
             case "toggle_public" -> {
                 if (owner) {
@@ -342,9 +426,12 @@ public final class TeamHubGui extends AbstractGui {
                     player.sendMessage(t(player, "gui.party-owner-only"));
                     return;
                 }
-                if (!team.isSplitReady()) {
+                TeamService.Result precheck = teamService.preflightStart(player);
+                if (precheck != TeamService.Result.OK) {
                     sounds.play(player, "error");
-                    player.sendMessage(t(player, "gui.party-assign-all"));
+                    player.sendMessage(Component.text(
+                            teamService.errorMessage(player, precheck), UiTheme.DANGER)
+                            .decoration(TextDecoration.ITALIC, false));
                     refresh(player, session, inventory);
                     return;
                 }

@@ -57,7 +57,18 @@ public final class TeamService {
     public enum Result {
         OK, ALREADY_IN_TEAM, NOT_OWNER, NOT_IN_TEAM, TEAM_FULL, TARGET_OFFLINE,
         TARGET_IN_TEAM, NO_INVITE, INVITE_EXPIRED, INVALID_NAME, TOO_SMALL,
-        UNBALANCED, OWNER_CANNOT_LEAVE, INVALID_SIDE, KIT_NOT_FOUND, NO_ARENA, COOLDOWN
+        UNBALANCED, OWNER_CANNOT_LEAVE, INVALID_SIDE, KIT_NOT_FOUND, NO_ARENA, COOLDOWN,
+        MEMBER_BUSY
+    }
+
+    private volatile com.rumilance.practice.session.PlayerStateManager stateManager;
+    /** Details of the member that last failed the availability check, for error messages. */
+    private volatile String lastBusyName;
+    private volatile String lastBusyStateKey;
+    private volatile boolean lastBusyOffline;
+
+    public void setStateManager(com.rumilance.practice.session.PlayerStateManager stateManager) {
+        this.stateManager = stateManager;
     }
 
     /** Localized / player-facing explanation for a non-{@link Result#OK} result. */
@@ -75,6 +86,17 @@ public final class TeamService {
                 return messageService.raw(player, "party.err-cooldown")
                         .replace("<secs>", String.valueOf(Math.max(1, secs)));
             }
+            if (result == Result.MEMBER_BUSY) {
+                if (lastBusyOffline) {
+                    return messageService.raw(player, "party.err-member-offline")
+                            .replace("<player>", String.valueOf(lastBusyName));
+                }
+                String state = messageService.raw(player,
+                        lastBusyStateKey == null ? "menu.state-fighting" : lastBusyStateKey);
+                return messageService.raw(player, "party.err-member-busy")
+                        .replace("<player>", String.valueOf(lastBusyName))
+                        .replace("<state>", state);
+            }
             String key = switch (result) {
                 case ALREADY_IN_TEAM -> "party.err-already";
                 case NOT_OWNER -> "party.err-not-owner";
@@ -91,7 +113,7 @@ public final class TeamService {
                 case INVALID_SIDE -> "party.err-invalid-side";
                 case KIT_NOT_FOUND -> "party.err-kit";
                 case NO_ARENA -> "party.err-arena";
-                case COOLDOWN, OK -> "";
+                case COOLDOWN, OK, MEMBER_BUSY -> "";
             };
             if (key.isEmpty()) {
                 return "";
@@ -118,6 +140,9 @@ public final class TeamService {
                 int secs = remainingInviteCooldownSeconds(player.getUniqueId(), cooldownTarget);
                 yield "Wait " + Math.max(1, secs) + "s before inviting that player again.";
             }
+            case MEMBER_BUSY -> lastBusyOffline
+                    ? lastBusyName + " is offline — everyone must be online to start."
+                    : lastBusyName + " is busy right now — everyone must be free in the lobby.";
             case OK -> "";
         };
     }
@@ -421,8 +446,8 @@ public final class TeamService {
 
     /**
      * Validates that {@code owner} could start a party battle right now (team, ownership,
-     * size, side balance), without consuming the chosen kit or map. Used to gate the kit →
-     * map selection flow before the player picks an arena.
+     * size, side balance and every member free in the lobby), without consuming the chosen
+     * kit or map. Used to gate the kit → map selection flow before the player picks an arena.
      */
     public Result preflightStart(Player owner) {
         Team team = byMember.get(owner.getUniqueId());
@@ -435,7 +460,55 @@ public final class TeamService {
         List<UUID> blue = new ArrayList<>(team.side(TeamColor.BLUE));
         if (red.isEmpty() || blue.isEmpty()) return Result.UNBALANCED;
         if (red.size() > MAX_SIDE_SIZE || blue.size() > MAX_SIDE_SIZE) return Result.UNBALANCED;
+        Result availability = checkMembersAvailable(team);
+        if (availability != Result.OK) {
+            return availability;
+        }
         return Result.OK;
+    }
+
+    /**
+     * Every member must be online and free in the lobby. Members sitting in a queue, an FFA
+     * arena, a match or the spectate mode would collide with the team teleport and leave
+     * inconsistent state — starting on top of them is refused with a named reason.
+     */
+    private Result checkMembersAvailable(Team team) {
+        for (UUID memberId : team.members()) {
+            Player member = Bukkit.getPlayer(memberId);
+            if (member == null) {
+                lastBusyName = "?";
+                lastBusyStateKey = null;
+                lastBusyOffline = true;
+                return Result.MEMBER_BUSY;
+            }
+            com.rumilance.practice.state.PlayerState state = stateManager == null
+                    ? com.rumilance.practice.state.PlayerState.LOBBY
+                    : stateManager.getState(memberId);
+            boolean free = state == com.rumilance.practice.state.PlayerState.LOBBY
+                    || state == com.rumilance.practice.state.PlayerState.OPENING_GUI
+                    || state == com.rumilance.practice.state.PlayerState.IDLE;
+            if (!free) {
+                lastBusyName = member.getName();
+                lastBusyStateKey = stateKey(state);
+                lastBusyOffline = false;
+                return Result.MEMBER_BUSY;
+            }
+        }
+        return Result.OK;
+    }
+
+    private static String stateKey(com.rumilance.practice.state.PlayerState state) {
+        return switch (state) {
+            case QUEUED_RANKED -> "menu.state-ranked-queue";
+            case QUEUED_UNRANKED -> "menu.state-unranked-queue";
+            case FIGHTING, PREPARING_MATCH, COUNTDOWN, ENDING -> "menu.state-fighting";
+            case SPECTATING -> "menu.state-spectating";
+            case FFA -> "menu.state-ffa";
+            case EDITING_KIT -> "menu.state-editing";
+            case REQUESTING_DUEL -> "menu.state-dueling";
+            case PRACTICE_WAIT, PRACTICE_ACTIVE -> "menu.state-fighting";
+            default -> "menu.state-fighting";
+        };
     }
 
     public Result start(Player owner, String kitId) {
@@ -454,10 +527,13 @@ public final class TeamService {
         // battle, FFA, spectating, or an active/eliminated match would conflict with the team
         // teleport and leave state inconsistent (a personal match could have a party fight
         // start on top of it). Require everyone to be free in the lobby.
+        Result availability = checkMembersAvailable(team);
+        if (availability != Result.OK) {
+            return availability;
+        }
         for (UUID memberId : team.members()) {
-            // Reject a party fight while ANY member is already committed to something else: a
-            // solo duel / queue battle / active or eliminated match. Starting a team fight on top
-            // of a personal match would leave state inconsistent. Everyone must be lobby-free.
+            // Belt-and-braces: the state machine above should already cover matches, but a
+            // session in a transient phase must never get a party fight stacked on top.
             if (matchService.isBusyForSoloDuel(memberId)
                     || matchService.registry().byPlayer(memberId).isPresent()) {
                 owner.sendMessage(Component.text(

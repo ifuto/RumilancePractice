@@ -663,6 +663,7 @@ public final class FeatureBootstrap {
 
         TeamService teamService = new TeamService(plugin, matchService, messageService);
         services.register(TeamService.class, teamService);
+        teamService.setStateManager(stateManager);
         matchService.setTeamService(teamService);
         PartyHotbar partyHotbar = new PartyHotbar(lobbyService);
         teamService.setPartyHotbar(partyHotbar);
@@ -739,6 +740,8 @@ public final class FeatureBootstrap {
 
         ConfirmGui confirmGui = new ConfirmGui(guiSessions, soundService);
         confirmGui.setOriginalKitService(originalKitService);
+        teamHubGui.setConfirmGui(confirmGui);
+        teamHubGui.setStateManager(stateManager);
         OriginalKitEditGui originalKitEditGui =
                 new OriginalKitEditGui(guiSessions, soundService, originalKitService, ekitItems);
         EnchantGui enchantGui =
@@ -898,10 +901,36 @@ public final class FeatureBootstrap {
             }
         });
         functionalItemListener.setOpenPartyInvite(partyInviteGui::openFor);
-        functionalItemListener.setOpenPartyStart(teamKitSelectGui::open);
+        // The party Start/Map hotkeys are gated exactly like the hub button: only a split-ready
+        // team whose members are ALL free in the lobby may enter kit selection. This used to
+        // open the kit chooser unconditionally, letting battles start straight from the hub
+        // while members were queued / in FFA / spectating.
+        java.util.function.Consumer<Player> guardedPartyStart = player -> {
+            var team = teamService.teamOf(player.getUniqueId()).orElse(null);
+            if (team == null) {
+                player.sendMessage(Component.text(
+                        messageService.raw(player, "party.err-not-in"), NamedTextColor.RED));
+                return;
+            }
+            if (!team.isOwner(player.getUniqueId())) {
+                soundService.play(player, "error");
+                player.sendMessage(Component.text(
+                        messageService.raw(player, "party.only-owner-start"), NamedTextColor.RED));
+                return;
+            }
+            TeamService.Result precheck = teamService.preflightStart(player);
+            if (precheck != TeamService.Result.OK) {
+                soundService.play(player, "error");
+                player.sendMessage(Component.text(
+                        teamService.errorMessage(player, precheck), NamedTextColor.RED));
+                return;
+            }
+            teamKitSelectGui.open(player);
+        };
+        functionalItemListener.setOpenPartyStart(guardedPartyStart);
         // The party-map hotkey routes through kit selection: a map can only be chosen for
         // a specific kit (kit -> that kit's party maps -> pick to start).
-        functionalItemListener.setOpenPartyMap(teamKitSelectGui::open);
+        functionalItemListener.setOpenPartyMap(guardedPartyStart);
         functionalItemListener.setPartyLeave(player -> {
             TeamService.Result r = teamService.leave(player);
             if (r != TeamService.Result.OK) {
