@@ -102,6 +102,20 @@ public final class LocationUtil {
         return safeTeleportLocation(desired, null);
     }
 
+    /**
+     * Clamps a teleport destination horizontally INSIDE the given arena region instead of the
+     * world border. The per-player arena border is built from this region, so clamping against
+     * the (often much smaller) world border can otherwise push the destination outside the
+     * arena walls — the classic "teleported outside the border" FFA bug.
+     */
+    public static Location safeTeleportLocation(Location desired, Cuboid region) {
+        Objects.requireNonNull(desired, "desired");
+        if (region == null) {
+            return safeTeleportLocation(desired);
+        }
+        return region.clampHorizontal(desired);
+    }
+
     public static boolean isInsideWorldBorder(Location location, Player viewer) {
         if (location == null || location.getWorld() == null) {
             return false;

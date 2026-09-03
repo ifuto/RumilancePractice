@@ -334,8 +334,7 @@ public final class TeamHubGui extends AbstractGui {
         }
         if (viewerIsOwner) {
             b.lore(UiTheme.blank(),
-                    UiTheme.hint(line(viewer, "gui.party-left-red")),
-                    UiTheme.hint(line(viewer, "gui.party-right-blue")));
+                    UiTheme.hint(line(viewer, "gui.party-click-cycle")));
             if (!team.isOwner(member)) {
                 b.lore(UiTheme.hint(line(viewer, "party.shift-kick")));
             }
@@ -506,10 +505,10 @@ public final class TeamHubGui extends AbstractGui {
                     TeamService.Result r;
                     if (click == ClickType.SHIFT_LEFT || click == ClickType.SHIFT_RIGHT) {
                         r = teamService.kick(player, name);
-                    } else if (click == ClickType.RIGHT) {
-                        r = teamService.assignSide(player, name, "blue");
                     } else {
-                        r = teamService.assignSide(player, name, "red");
+                        // One-button cycling: first click RED, next toggles to BLUE, then
+                        // back to unassigned — no left/right distinction needed.
+                        r = teamService.cycleSide(player, name);
                     }
                     sounds.play(player, r == TeamService.Result.OK ? "gui-click" : "error");
                     refresh(player, session, inventory);

@@ -97,15 +97,17 @@ public final class BattleMenuGui extends AbstractGui {
         QueueService.QueueEntry queueEntry = queueService == null
                 ? null : queueService.get(player.getUniqueId()).orElse(null);
 
-        inventory.setItem(GuiSlots.slot(2, 2), queueTile(player, Material.DIAMOND_SWORD,
+        // Row 1 — the three competitive entries, one clean row.
+        inventory.setItem(GuiSlots.slot(1, 1), queueTile(player, Material.DIAMOND_SWORD,
                 "menu.ranked", UiTheme.PRIMARY, "menu.ranked-lore", "ranked", true,
                 MatchMode.RANKED, state, inParty, queueEntry));
-        inventory.setItem(GuiSlots.slot(2, 4), queueTile(player, Material.IRON_SWORD,
+        inventory.setItem(GuiSlots.slot(1, 4), queueTile(player, Material.GOLDEN_SWORD,
                 "menu.unranked", UiTheme.VALUE, "menu.unranked-lore", "unranked", false,
                 MatchMode.UNRANKED, state, inParty, queueEntry));
-        inventory.setItem(GuiSlots.slot(2, 6), duelTile(player, state, inParty));
+        inventory.setItem(GuiSlots.slot(1, 7), duelTile(player, state, inParty));
 
-        inventory.setItem(GuiSlots.slot(3, 4), ffaTile(player, state));
+        // Row 2 — FFA, centred beneath the row.
+        inventory.setItem(GuiSlots.slot(2, 4), ffaTile(player, state));
 
         paintNav(player, session, inventory);
     }

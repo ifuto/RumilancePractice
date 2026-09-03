@@ -58,6 +58,33 @@ class FfaSpawnMathTest {
     }
 
     @Test
+    void findFeetYWorksOnNonGrassGround() {
+        String[] column = new String[8];
+        java.util.Arrays.fill(column, "AIR");
+        column[3] = "STONE";
+        assertEquals(4, FfaSpawnMath.findGrassFeetY(0, 7,
+                y -> y >= 0 && y < column.length ? column[y] : "AIR"));
+        column[3] = "SAND";
+        assertEquals(4, FfaSpawnMath.findGrassFeetY(0, 7,
+                y -> y >= 0 && y < column.length ? column[y] : "AIR"));
+        column[3] = "SMOOTH_QUARTZ";
+        assertEquals(4, FfaSpawnMath.findGrassFeetY(0, 7,
+                y -> y >= 0 && y < column.length ? column[y] : "AIR"));
+    }
+
+    @Test
+    void spawnGroundWhitelistCoversCommonFloors() {
+        assertTrue(FfaSpawnMath.isSpawnGround("GRASS_BLOCK"));
+        assertTrue(FfaSpawnMath.isSpawnGround("STONE"));
+        assertTrue(FfaSpawnMath.isSpawnGround("OAK_PLANKS"));
+        assertTrue(FfaSpawnMath.isSpawnGround("RED_CONCRETE"));
+        assertTrue(FfaSpawnMath.isSpawnGround("WHITE_TERRACOTTA"));
+        assertFalse(FfaSpawnMath.isSpawnGround("LAVA"));
+        assertFalse(FfaSpawnMath.isSpawnGround("AIR"));
+        assertFalse(FfaSpawnMath.isSpawnGround("GLASS"));
+    }
+
+    @Test
     void grassFeetArePassableAndFireIsUnsafe() {
         assertTrue(FfaSpawnMath.isPassableSpawnFeet("SHORT_GRASS"));
         assertTrue(FfaSpawnMath.isPassableSpawnFeet("AIR"));

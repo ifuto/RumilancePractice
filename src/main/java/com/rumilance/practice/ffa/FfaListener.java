@@ -130,11 +130,14 @@ public final class FfaListener implements Listener {
         }
         // The vanilla respawn path bypasses SafeTeleport, so footing must be applied here:
         // re-seat the player onto a standable surface in the same column (a stale spawn can
-        // otherwise land them floating over a crater or buried under fresh terrain).
+        // otherwise land them floating over a crater or buried under fresh terrain). Clamp
+        // against the ARENA region — the world border can be smaller than the arena, which
+        // used to fling respawned players outside the visible border.
         org.bukkit.Location grounded =
                 com.rumilance.practice.util.SpawnFooting.standClearPearl(dest, 16);
         org.bukkit.Location safe = LocationUtil.safeTeleportLocation(
-                grounded != null ? grounded : dest);
+                grounded != null ? grounded : dest,
+                ffaService.regionOf(event.getPlayer().getUniqueId()));
         event.setRespawnLocation(safe);
         org.bukkit.plugin.Plugin plugin = JavaPlugin.getProvidingPlugin(FfaListener.class);
         if (plugin != null) {

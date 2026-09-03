@@ -179,7 +179,7 @@ public final class FfaSpawnIndex implements Listener {
         if (feetY <= world.getMinHeight() + 1 || feetY >= world.getMaxHeight() - 2) {
             return false;
         }
-        if (world.getBlockAt(x, feetY - 1, z).getType() != org.bukkit.Material.GRASS_BLOCK) {
+        if (!FfaSpawnMath.isSpawnGround(world.getBlockAt(x, feetY - 1, z).getType().name())) {
             return false;
         }
         String feet = world.getBlockAt(x, feetY, z).getType().name();

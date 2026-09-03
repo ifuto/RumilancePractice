@@ -118,7 +118,16 @@ public final class Team {
         if (!members.contains(player)) {
             return;
         }
-        sideAssignment.put(player, color);
+        if (color == null) {
+            sideAssignment.remove(player);
+        } else {
+            sideAssignment.put(player, color);
+        }
+    }
+
+    /** Removes the member's side assignment (back to unassigned). */
+    public void unassignSide(UUID player) {
+        sideAssignment.remove(player);
     }
 
     public void clearSides() {

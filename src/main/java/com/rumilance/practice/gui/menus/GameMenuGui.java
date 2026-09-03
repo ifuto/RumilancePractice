@@ -35,6 +35,7 @@ public final class GameMenuGui extends AbstractGui {
     private java.util.function.Predicate<Player> kitEditBusy = p -> false;
     private com.rumilance.practice.team.TeamService teamService;
     private com.rumilance.practice.session.PlayerStateManager stateManager;
+    private ProfileGui profileGui;
 
     public void setTeamService(com.rumilance.practice.team.TeamService teamService) {
         this.teamService = teamService;
@@ -42,6 +43,10 @@ public final class GameMenuGui extends AbstractGui {
 
     public void setStateManager(com.rumilance.practice.session.PlayerStateManager stateManager) {
         this.stateManager = stateManager;
+    }
+
+    public void setProfileGui(ProfileGui profileGui) {
+        this.profileGui = profileGui;
     }
 
     public GameMenuGui(
@@ -83,22 +88,33 @@ public final class GameMenuGui extends AbstractGui {
         MenuScaffold.header(inventory, 0, title(player, session));
         paintStatusChip(player, inventory);
 
-        inventory.setItem(GuiSlots.slot(2, 4), tile(player, Material.NETHERITE_SWORD,
+        // Row 1 — the four things players do constantly, one row, left to right.
+        inventory.setItem(GuiSlots.slot(1, 1), tile(player, Material.NETHERITE_SWORD,
                 "menu.battle", UiTheme.SUCCESS, "menu.battle-lore", "battle", true));
-
-        inventory.setItem(GuiSlots.slot(3, 2), tile(player, Material.CRAFTING_TABLE,
+        inventory.setItem(GuiSlots.slot(1, 3), tile(player, Material.CRAFTING_TABLE,
                 "menu.kits", UiTheme.PRIMARY, "menu.kits-lore", "ekit", false));
-        // Teams tile adapts to membership: inside a party it becomes the party hub entry.
         boolean inParty = teamService != null && teamService.teamOf(player.getUniqueId()).isPresent();
-        inventory.setItem(GuiSlots.slot(3, 4), tile(player, Material.WHITE_BANNER,
+        inventory.setItem(GuiSlots.slot(1, 5), tile(player,
+                inParty ? Material.BEACON : Material.WHITE_BANNER,
                 inParty ? "menu.teams-in-party" : "menu.teams", UiTheme.HEADER,
                 inParty ? "menu.teams-in-party-lore" : "menu.teams-lore", "teams", inParty));
-        inventory.setItem(GuiSlots.slot(3, 6), tile(player, Material.ENDER_EYE,
+        inventory.setItem(GuiSlots.slot(1, 7), tile(player, Material.SPYGLASS,
                 "menu.spectate", UiTheme.WARNING, "menu.spectate-lore", "spectate", false));
 
-        inventory.setItem(GuiSlots.slot(4, 3), tile(player, Material.COMPARATOR,
+        // Row 2 — personal options.
+        inventory.setItem(GuiSlots.slot(2, 2), tile(player, Material.COMPARATOR,
                 "menu.settings", UiTheme.MUTED, "menu.settings-lore", "settings", false));
-        inventory.setItem(GuiSlots.slot(4, 5), tile(player, Material.NAME_TAG,
+        inventory.setItem(GuiSlots.slot(2, 4),
+                ItemBuilder.of(Material.PLAYER_HEAD)
+                        .name(t(player, "menu.profile").color(UiTheme.VALUE))
+                        .skullOwner(player)
+                        .lore(UiTheme.divider(),
+                                UiTheme.line(line(player, "menu.profile-lore")),
+                                UiTheme.blank(),
+                                UiTheme.hint(line(player, "menu.click")))
+                        .action("profile")
+                        .build());
+        inventory.setItem(GuiSlots.slot(2, 6), tile(player, Material.NAME_TAG,
                 "menu.titles", UiTheme.SECONDARY, "menu.titles-lore", "titles", false));
 
         MenuScaffold.closeButton(inventory, t(player, "menu.close"));
@@ -166,6 +182,11 @@ public final class GameMenuGui extends AbstractGui {
             case "settings" -> openChild(player, settingsGui::open);
             case "titles" -> openChild(player, titleGui::open);
             case "teams" -> openChild(player, openTeams);
+            case "profile" -> {
+                if (profileGui != null) {
+                    openChild(player, profileGui::open);
+                }
+            }
             default -> {
             }
         }

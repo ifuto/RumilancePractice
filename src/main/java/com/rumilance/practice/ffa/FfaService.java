@@ -285,7 +285,7 @@ public final class FfaService {
         if (arena == null || arena.spawn() == null) {
             return null;
         }
-        return LocationUtil.safeTeleportLocation(arena.spawn());
+        return LocationUtil.safeTeleportLocation(arena.spawn(), arena.region());
     }
 
     /** Re-applies per-player border / view distance for the player's current FFA arena. */
@@ -359,7 +359,7 @@ public final class FfaService {
             messageService.send(player, "ffa.unavailable");
             return false;
         }
-        SafeTeleport.teleport(player, LocationUtil.safeTeleportLocation(dest))
+        SafeTeleport.teleport(player, LocationUtil.safeTeleportLocation(dest, arena.region()))
                 .whenComplete((ok, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
                     if (!player.isOnline() || !isInFfa(player.getUniqueId())) {
                         return;
@@ -604,7 +604,13 @@ public final class FfaService {
                 }
             });
         }
-        respawn(victim);
+        // Death ends the FFA run: the player returns to the lobby instead of respawning in
+        // the arena (the old behaviour teleported them back to a spawn spot).
+        com.rumilance.practice.util.PlayerVitals.fakeDeathReset(victim);
+        victim.setHealth(victim.getMaxHealth());
+        victim.setFireTicks(0);
+        victim.setCanPickupItems(true);
+        leave(victim);
     }
 
     public void addKill(UUID killer) {
@@ -658,6 +664,16 @@ public final class FfaService {
         return pickSpawn(arena, player.getUniqueId());
     }
 
+    /** The arena region of the given FFA occupant — used to clamp teleports inside the wall. */
+    public com.rumilance.practice.util.Cuboid regionOf(UUID playerId) {
+        String arenaId = playerArena.get(playerId);
+        if (arenaId == null) {
+            return null;
+        }
+        FfaArena arena = arenas.get(arenaId);
+        return arena == null ? null : arena.region();
+    }
+
     private void teleportIntoArena(Player player, FfaArena arena) {
         teleportIntoArena(player, arena, null);
     }
@@ -669,8 +685,9 @@ public final class FfaService {
         }
         // SafeTeleport clears the stale per-player border before the move; re-apply THIS
         // arena's region border/view only after the teleport landed, so a wiped border can
-        // never leave the FFA player with no (or the lobby's) wall.
-        SafeTeleport.teleport(player, LocationUtil.safeTeleportLocation(dest))
+        // never leave the FFA player with no (or the lobby's) wall. Clamp against the arena
+        // region (not the world border) so the destination can never land outside the wall.
+        SafeTeleport.teleport(player, LocationUtil.safeTeleportLocation(dest, arena.region()))
                 .whenComplete((ok, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
                     if (!player.isOnline() || !isInFfa(player.getUniqueId())) {
                         return;
@@ -703,14 +720,17 @@ public final class FfaService {
         if (spawnIndex != null) {
             Location picked = spawnIndex.pick(arena, occupied);
             if (picked != null) {
-                return picked;
+                // Indexed spots are already inside the region; clamp defensively.
+                return LocationUtil.safeTeleportLocation(picked, arena.region());
             }
         }
         // Fallback to the configured arena spawn, but never raw: correct it onto a standable
         // surface in its own column so an outdated spawn cannot leave a player floating in the
-        // air or buried underground.
+        // air or buried underground, then clamp it inside the arena region so a stale spawn
+        // outside the wall can never place the player beyond the border.
         Location footing = com.rumilance.practice.util.SpawnFooting.standClear(arena.spawn());
-        return footing != null ? footing : arena.spawn();
+        Location base = footing != null ? footing : arena.spawn();
+        return LocationUtil.safeTeleportLocation(base, arena.region());
     }
 
     public void recordBlockChange(UUID playerId, Location location, String previousData) {

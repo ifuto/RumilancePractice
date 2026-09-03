@@ -86,15 +86,18 @@ public final class FfaSpawnMath {
     }
 
     /**
-     * Highest grass standing Y (feet) in a column, or {@link Integer#MIN_VALUE} if none.
+     * Highest standable-surface Y (feet) in a column, or {@link Integer#MIN_VALUE} if none.
      * {@code typeAtY} must accept {@code minY..maxY+1} (head block).
+     *
+     * <p>The surface is any whitelisted ground block — not only grass — so arenas floored
+     * with stone, sand, planks, terracotta etc. still produce indexed spawn spots.</p>
      */
     public static int findGrassFeetY(int minY, int maxY, java.util.function.IntFunction<String> typeAtY) {
         if (typeAtY == null || maxY < minY) {
             return Integer.MIN_VALUE;
         }
         for (int y = maxY; y >= minY; y--) {
-            if (!"GRASS_BLOCK".equals(typeAtY.apply(y))) {
+            if (!isSpawnGround(typeAtY.apply(y))) {
                 continue;
             }
             int feetY = y + 1;
@@ -109,6 +112,29 @@ public final class FfaSpawnMath {
             return feetY;
         }
         return Integer.MIN_VALUE;
+    }
+
+    /** True when {@code materialName} is a solid, safe surface a player can stand on at spawn. */
+    public static boolean isSpawnGround(String materialName) {
+        if (materialName == null) {
+            return false;
+        }
+        return switch (materialName) {
+            case "GRASS_BLOCK", "DIRT", "COARSE_DIRT", "ROOTED_DIRT", "PODZOL", "MYCELIUM",
+                    "MUD", "STONE", "COBBLESTONE", "MOSSY_COBBLESTONE", "ANDESITE", "DIORITE",
+                    "GRANITE", "DEEPSLATE", "COBBLED_DEEPSLATE", "TUFF", "CALCITE",
+                    "DRIPSTONE_BLOCK", "GRAVEL", "SAND", "RED_SAND", "CLAY", "NETHERRACK",
+                    "BASALT", "SMOOTH_BASALT", "BLACKSTONE", "END_STONE", "OBSIDIAN",
+                    "STONE_BRICKS", "MOSSY_STONE_BRICKS", "DEEPSLATE_BRICKS", "BRICKS",
+                    "NETHER_BRICKS", "RED_NETHER_BRICKS", "SANDSTONE", "RED_SANDSTONE",
+                    "CUT_SANDSTONE", "SMOOTH_SANDSTONE", "SMOOTH_RED_SANDSTONE",
+                    "PRISMARINE", "PRISMARINE_BRICKS", "DARK_PRISMARINE",
+                    "QUARTZ_BLOCK", "SMOOTH_QUARTZ", "SNOW_BLOCK", "PACKED_ICE", "BLUE_ICE",
+                    "HONEYCOMB_BLOCK", "AMETHYST_BLOCK", "COPPER_BLOCK" -> true;
+            default -> materialName.endsWith("_PLANKS")
+                    || materialName.endsWith("_CONCRETE")
+                    || materialName.endsWith("_TERRACOTTA");
+        };
     }
 
     public static boolean isPassableSpawnFeet(String materialName) {

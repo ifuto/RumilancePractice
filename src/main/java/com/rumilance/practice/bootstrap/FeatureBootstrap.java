@@ -806,6 +806,7 @@ public final class FeatureBootstrap {
         gameMenuGui.setKitEditBusyCheck(p -> matchService.isBusyForKitEdit(p.getUniqueId()));
         gameMenuGui.setTeamService(teamService);
         gameMenuGui.setStateManager(stateManager);
+        gameMenuGui.setProfileGui(profileGui);
 
         MatchInventoryGui matchInventoryGui =
                 new MatchInventoryGui(guiSessions, soundService, matchInventoryStore);
@@ -992,6 +993,7 @@ public final class FeatureBootstrap {
         matchActionBarService.setConfigService(configService);
         matchActionBarService.start();
         TabFightListService tabFightListService = new TabFightListService(plugin);
+        tabFightListService.setRankService(rankService);
         scoreboardService.setTabFightListService(tabFightListService);
         if (scoreboardConfig.enabled()) {
             scoreboardService.start();

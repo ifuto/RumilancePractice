@@ -1425,6 +1425,10 @@ public final class MatchService {
         if (downed != null) {
             // Freeze end-inventory at death so mid-fight eliminations are not lost / emptied later.
             captureParticipantInventory(session, downed);
+            // Party Fight death: everything the player was carrying drops on the spot — but any
+            // personalisation is stripped first: custom (anvil) names are removed and applied
+            // smithing trims are reset, so dropped loot is always plain vanilla gear.
+            spawnStrippedDrops(downed);
             downed.setGameMode(org.bukkit.GameMode.SPECTATOR);
             downed.sendActionBar(Component.text("You were eliminated!", NamedTextColor.RED)
                     .decorate(TextDecoration.BOLD));
@@ -1471,6 +1475,42 @@ public final class MatchService {
             // endMatch() records the winner and (via MatchSession.end) the winning team colour.
             // Do NOT pre-set ENDING here: endMatch's idempotency guard would then no-op.
             endMatch(session, winnerUuid, false);
+        }
+    }
+
+    /**
+     * Spawns the player's entire carried load as ground items at their position, with custom
+     * display names and applied smithing trims stripped (party-fight death loot must always
+     * be plain vanilla gear).
+     */
+    private void spawnStrippedDrops(Player player) {
+        org.bukkit.World world = player.getWorld();
+        org.bukkit.Location at = player.getLocation();
+        java.util.List<org.bukkit.inventory.ItemStack> loadout = new java.util.ArrayList<>();
+        for (org.bukkit.inventory.ItemStack item : player.getInventory().getStorageContents()) {
+            if (item != null && !item.getType().isAir()) {
+                loadout.add(item.clone());
+            }
+        }
+        for (org.bukkit.inventory.ItemStack item : player.getInventory().getArmorContents()) {
+            if (item != null && !item.getType().isAir()) {
+                loadout.add(item.clone());
+            }
+        }
+        org.bukkit.inventory.ItemStack offhand = player.getInventory().getItemInOffHand();
+        if (offhand != null && !offhand.getType().isAir()) {
+            loadout.add(offhand.clone());
+        }
+        for (org.bukkit.inventory.ItemStack item : loadout) {
+            org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
+            if (meta != null) {
+                meta.displayName(null); // strip any anvil / custom rename
+                if (meta instanceof org.bukkit.inventory.meta.ArmorMeta armorMeta) {
+                    armorMeta.setTrim(null); // strip the applied smithing trim
+                }
+                item.setItemMeta(meta);
+            }
+            world.dropItemNaturally(at, item);
         }
     }
 

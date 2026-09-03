@@ -421,6 +421,12 @@ public final class TeamService {
         Player target = Bukkit.getPlayerExact(targetName);
         if (target == null) return Result.TARGET_OFFLINE;
         if (!team.contains(target.getUniqueId())) return Result.NOT_IN_TEAM;
+        if (side != null && (side.equalsIgnoreCase("none") || side.equalsIgnoreCase("unassign"))) {
+            team.unassignSide(target.getUniqueId());
+            broadcast(team, Component.text(
+                    owner.getName() + " left " + target.getName() + " unassigned.", NamedTextColor.YELLOW));
+            return Result.OK;
+        }
         TeamColor color;
         try {
             color = TeamColor.valueOf(side.toUpperCase(Locale.ROOT));
@@ -433,6 +439,32 @@ public final class TeamService {
         }
         team.assignSide(target.getUniqueId(), color);
         broadcast(team, Component.text(owner.getName() + " set " + target.getName() + " to " + color + ".", NamedTextColor.AQUA));
+        return Result.OK;
+    }
+
+    /**
+     * One-click side cycling: unassigned → RED → BLUE → unassigned. The first click always
+     * lands on RED; every further click toggles the member through the cycle, so the owner
+     * never needs separate left/right controls.
+     */
+    public Result cycleSide(Player owner, String targetName) {
+        Team team = byMember.get(owner.getUniqueId());
+        if (team == null) return Result.NOT_IN_TEAM;
+        if (!team.isOwner(owner.getUniqueId())) return Result.NOT_OWNER;
+        Player target = Bukkit.getPlayerExact(targetName);
+        if (target == null) return Result.TARGET_OFFLINE;
+        if (!team.contains(target.getUniqueId())) return Result.NOT_IN_TEAM;
+        TeamColor current = team.sideOf(target.getUniqueId());
+        TeamColor next = current == null ? TeamColor.RED
+                : current == TeamColor.RED ? TeamColor.BLUE
+                : null;
+        if (next != null && team.side(next).size() >= MAX_SIDE_SIZE) {
+            return Result.TEAM_FULL;
+        }
+        team.assignSide(target.getUniqueId(), next);
+        broadcast(team, Component.text(owner.getName() + " set " + target.getName() + " to "
+                + (next == null ? "UNASSIGNED" : next.name()) + ".",
+                next == null ? NamedTextColor.YELLOW : NamedTextColor.AQUA));
         return Result.OK;
     }
 
