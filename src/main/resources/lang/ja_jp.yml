@@ -41,6 +41,7 @@ menu:
   bot-lore: "一人で練習。Noob → Marlowww。"
   kits: "キット編集"
   kits-lore: "公式キットとオリジナルキット。"
+  kits-busy: "<red>試合・キュー・観戦中はキット編集できません。"
   spectate: "観戦"
   spectate-lore: "進行中の試合を見る。"
   settings: "設定"

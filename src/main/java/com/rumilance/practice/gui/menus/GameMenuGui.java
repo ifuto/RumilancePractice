@@ -156,8 +156,8 @@ public final class GameMenuGui extends AbstractGui {
             case "battle" -> openChild(player, battleMenuGui::open);
             case "ekit" -> {
                 if (kitEditBusy.test(player)) {
-                    player.sendMessage(Component.text(
-                            "試合・キュー・観戦中はキット編集できません。", UiTheme.DANGER));
+                    sounds.play(player, "error");
+                    player.sendMessage(t(player, "menu.kits-busy").color(UiTheme.DANGER));
                     return;
                 }
                 openChild(player, ekitSelectGui::open);

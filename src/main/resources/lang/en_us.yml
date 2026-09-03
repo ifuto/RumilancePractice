@@ -42,6 +42,7 @@ menu:
   bot-lore: "Practice alone. Noob → Marlowww."
   kits: "Kit Editor"
   kits-lore: "Edit official and original kits."
+  kits-busy: "<red>You cannot edit kits while in a match, queue or spectating."
   spectate: "Spectate"
   spectate-lore: "Watch live matches."
   settings: "Settings"
