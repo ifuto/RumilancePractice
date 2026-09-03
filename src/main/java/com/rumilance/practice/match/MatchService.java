@@ -1567,6 +1567,47 @@ public final class MatchService {
         return combatTracker.matchStats(matchId).map(map -> map.get(playerId));
     }
 
+    /**
+     * Operator helper: why this player cannot be forced into a match right now, or {@code null}
+     * when they are free. Feeds the {@code /forcematch} rejection messages.
+     */
+    public String busyReason(UUID playerId) {
+        if (registry.byPlayer(playerId).isPresent() || registry.isPlayerInMatch(playerId)) {
+            return "in-match";
+        }
+        if (inParty(playerId)) {
+            return "in-party";
+        }
+        if (isBusyForSoloDuel(playerId)) {
+            return "busy";
+        }
+        return null;
+    }
+
+    /**
+     * Operator force-end: finishes the target's current match as a DRAW and runs the normal
+     * end flow (screens, lobby return, cleanup). Works from a participant or a spectator of
+     * the match.
+     *
+     * @return {@code false} when the player is not in / watching a live match.
+     */
+    public boolean forceEndMatch(UUID playerId) {
+        MatchSession session = registry.byPlayer(playerId).orElse(null);
+        if (session == null && spectatorService != null) {
+            session = spectatorService.matchOf(playerId)
+                    .flatMap(registry::get).orElse(null);
+        }
+        if (session == null) {
+            return false;
+        }
+        MatchState state = session.state();
+        if (state == MatchState.CLOSED || state == MatchState.ENDING) {
+            return false;
+        }
+        endMatch(session, null, true);
+        return true;
+    }
+
     public void handleDisconnect(UUID playerId) {
         Optional<MatchSession> opt = registry.byPlayer(playerId);
         if (opt.isEmpty()) {

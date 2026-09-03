@@ -1202,6 +1202,10 @@ public final class FeatureBootstrap {
         bind("prac", new PracCommand(practiceService));
         bind("practice", new PracticeCommand(practiceService));
         bind("setrank", new SetRankCommand(rankService, playerRepository));
+        com.rumilance.practice.command.AdminMatchCommand adminMatchCommand =
+                new com.rumilance.practice.command.AdminMatchCommand(matchService, kitService, arenaService);
+        bind("forceend", adminMatchCommand);
+        bind("forcematch", adminMatchCommand);
         bind("title", (CommandExecutor) (sender, command, label, args) -> {
             if (sender instanceof Player player) {
                 titleGui.open(player);

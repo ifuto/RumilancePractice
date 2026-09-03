@@ -204,6 +204,14 @@ commands:
     usage: /rank <player> <norm|VIP|VIP+|admin|owner> [duration e.g. 30d]
     aliases: [rank]
     permission: rumilance.admin
+  forceend:
+    description: Force-end the match a player is in (or spectating) as a draw (OP).
+    usage: /forceend <player>
+    permission: rumilance.admin
+  forcematch:
+    description: Force-start a duel between two free players with a kit and optional arena (OP).
+    usage: /forcematch <player1> <player2> <kit> [arena]
+    permission: rumilance.admin
   arena:
     description: Manage arena templates and paste pool.
     usage: /arena <subcommand>
