@@ -33,6 +33,8 @@ public final class PresetItems {
     public static final String KITS_ROOT = "kits";
     /** One-shot migration marker: set once the legacy global pool has been copied per kit. */
     public static final String MIGRATION_KEY = "_per-kit-migrated";
+    /** One-shot repair marker: set once per-kit overrides were re-synced from the global pool. */
+    public static final String GLOBAL_RESYNC_KEY = "_global-resynced";
 
     private final ConfigService configService;
     private final Map<String, Map<Integer, String>> items = new ConcurrentHashMap<>();
@@ -153,8 +155,66 @@ public final class PresetItems {
             }
             items.putIfAbsent(category, Map.of());
         }
+        // An empty Armor tab is essentially always a migration/config artifact — the armor
+        // candidate pool should never legitimately be empty, and it is the reported "armor not
+        // showing" bug. Seed the default armor list whenever the pool ends up empty, so the
+        // Armor category always has content. (Admins remove individual items, not the category.)
+        if (items.getOrDefault("Armor", Map.of()).isEmpty()) {
+            Map<Integer, String> defaults = new TreeMap<>();
+            for (int i = 0; i < DEFAULT_ARMOR_MATERIALS.length; i++) {
+                defaults.put(i, DEFAULT_ARMOR_MATERIALS[i]);
+            }
+            items.put("Armor", defaults);
+            yamlKeyByCategory.putIfAbsent("Armor", "Armor");
+        }
         reloadKitOverrides(yaml);
+        resyncKitOverridesFromGlobal(yaml);
     }
+
+    /**
+     * One-shot repair (marker: {@code _global-resynced}): per-kit overrides are seeded once by
+     * the per-kit migration and the preset admin GUI only ever edits the global pool, so any
+     * divergence is stale migration-era data. Re-copy every non-empty global category over the
+     * existing per-kit overrides so what the admin sees is exactly what the ekit palette shows.
+     * Kits overriding a category the global pool left empty keep their contents.
+     */
+    private void resyncKitOverridesFromGlobal(FileConfiguration yaml) {
+        if (yaml.getBoolean(GLOBAL_RESYNC_KEY, false) || kitItems.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, Map<String, Map<Integer, String>>> kitEntry : kitItems.entrySet()) {
+            for (Map.Entry<String, Map<Integer, String>> catEntry : kitEntry.getValue().entrySet()) {
+                Map<Integer, String> globalMap = items.get(catEntry.getKey());
+                if (globalMap == null || globalMap.isEmpty()) {
+                    continue;
+                }
+                catEntry.setValue(new TreeMap<>(globalMap));
+                String yamlCat = findKitYamlKey(yaml, kitEntry.getKey(), catEntry.getKey());
+                yaml.set(KITS_ROOT + "." + kitEntry.getKey() + ".categories." + yamlCat + ".slots",
+                        serializeSlots(globalMap));
+            }
+        }
+        // Persist the marker (and any resynced sections) so this repair runs exactly once.
+        yaml.set(GLOBAL_RESYNC_KEY, true);
+        configService.save(ConfigService.PRESET_ITEMS);
+    }
+
+    private static Map<String, Object> serializeSlots(Map<Integer, String> map) {
+        Map<String, Object> serialized = new LinkedHashMap<>();
+        for (Map.Entry<Integer, String> e : new TreeMap<>(map).entrySet()) {
+            serialized.put(String.valueOf(e.getKey()), e.getValue());
+        }
+        return serialized;
+    }
+
+    /** Same armor list as the bundled default preset-items.yml. */
+    private static final String[] DEFAULT_ARMOR_MATERIALS = {
+            "LEATHER_HELMET", "LEATHER_CHESTPLATE", "LEATHER_LEGGINGS", "LEATHER_BOOTS",
+            "CHAINMAIL_HELMET", "CHAINMAIL_CHESTPLATE", "CHAINMAIL_LEGGINGS", "CHAINMAIL_BOOTS",
+            "IRON_HELMET", "IRON_CHESTPLATE", "IRON_LEGGINGS", "IRON_BOOTS",
+            "DIAMOND_HELMET", "DIAMOND_CHESTPLATE", "DIAMOND_LEGGINGS", "DIAMOND_BOOTS",
+            "NETHERITE_HELMET", "NETHERITE_CHESTPLATE", "NETHERITE_LEGGINGS", "NETHERITE_BOOTS"
+    };
 
     /**
      * Loads per-kit preset overrides from {@code kits.<kitId>.categories...}. A kit override
@@ -400,6 +460,63 @@ public final class PresetItems {
             }
         }
         persist(canonical);
+        propagatePageToKitOverrides(canonical, base);
+    }
+
+    /**
+     * The preset admin GUI edits the global pool, but the ekit palette reads per-kit overrides
+     * first — without mirroring, an admin save is never reflected in the kit editors (every kit
+     * received a one-time copy at migration time and would keep showing that stale copy). Kits
+     * that do not override the category fall through to the global pool on their own.
+     */
+    private void propagatePageToKitOverrides(String canonical, int base) {
+        if (kitItems.isEmpty()) {
+            return;
+        }
+        Map<Integer, String> globalMap = items.getOrDefault(canonical, Map.of());
+        FileConfiguration yaml = configService.presetItems();
+        boolean changed = false;
+        for (Map.Entry<String, Map<String, Map<Integer, String>>> kitEntry : kitItems.entrySet()) {
+            Map<Integer, String> kitMap = kitEntry.getValue().get(canonical);
+            if (kitMap == null) {
+                continue;
+            }
+            for (int i = 0; i < SLOTS_PER_PAGE; i++) {
+                kitMap.remove(base + i);
+            }
+            for (Map.Entry<Integer, String> e : globalMap.entrySet()) {
+                if (e.getKey() >= base && e.getKey() < base + SLOTS_PER_PAGE) {
+                    kitMap.put(e.getKey(), e.getValue());
+                }
+            }
+            String yamlCat = findKitYamlKey(yaml, kitEntry.getKey(), canonical);
+            String slotBase = KITS_ROOT + "." + kitEntry.getKey() + ".categories." + yamlCat + ".slots";
+            for (int i = 0; i < SLOTS_PER_PAGE; i++) {
+                yaml.set(slotBase + "." + (base + i), null);
+            }
+            for (Map.Entry<Integer, String> e : kitMap.entrySet()) {
+                if (e.getKey() >= base && e.getKey() < base + SLOTS_PER_PAGE) {
+                    yaml.set(slotBase + "." + e.getKey(), e.getValue());
+                }
+            }
+            changed = true;
+        }
+        if (changed) {
+            configService.save(ConfigService.PRESET_ITEMS);
+        }
+    }
+
+    /** The YAML key a kit's section actually uses for {@code canonical} (Japanese keys allowed). */
+    private static String findKitYamlKey(FileConfiguration yaml, String kitKey, String canonical) {
+        ConfigurationSection categories = yaml.getConfigurationSection(KITS_ROOT + "." + kitKey + ".categories");
+        if (categories != null) {
+            for (String key : categories.getKeys(false)) {
+                if (CategoryKeys.canonicalPreset(key).equals(canonical)) {
+                    return key;
+                }
+            }
+        }
+        return canonical;
     }
 
     public void clearSlot(String category, int slot) {
