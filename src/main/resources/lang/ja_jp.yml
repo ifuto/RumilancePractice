@@ -229,6 +229,7 @@ party:
   err-kit: "キットが見つかりません。"
   err-arena: "空きアリーナがありません。"
   err-cooldown: "その相手への招待は30秒に1回です。あと <secs> 秒待ってください。"
+  err-busy-self: "<red>あなたは <state> のため、パーティを作成・参加できません。先にロビーへ戻ってください。"
   err-member-busy: "<red><player> は <state> のため、パーティ対戦を開始できません。全員がロビーに集まるのを待ってください。"
   err-member-offline: "<red><player> がオフラインのため、パーティ対戦を開始できません。"
   owner-only-lore: "パーティオーナーだけがキットを選んで対戦を開始できます。"

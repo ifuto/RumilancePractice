@@ -173,6 +173,9 @@ public final class TeamsBrowserGui extends AbstractGui {
                     if (r == TeamService.Result.OK) {
                         teamHubGui.open(player);
                     } else {
+                        player.sendMessage(net.kyori.adventure.text.Component.text(
+                                teamService.errorMessage(player, r), UiTheme.DANGER)
+                                .decoration(TextDecoration.ITALIC, false));
                         refresh(player, session, inventory);
                     }
                 }

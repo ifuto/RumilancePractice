@@ -230,6 +230,7 @@ party:
   err-kit: "Kit not found."
   err-arena: "No arena available right now."
   err-cooldown: "Wait <secs>s before inviting that player again."
+  err-busy-self: "<red>You are <state> right now — return to the lobby before creating or joining a party."
   err-member-busy: "<red><player> is <state> right now — the party battle cannot start. Wait until everyone is free in the lobby."
   err-member-offline: "<red><player> is offline — the party battle cannot start."
   owner-only-lore: "Only the party owner picks a kit and starts the battle."

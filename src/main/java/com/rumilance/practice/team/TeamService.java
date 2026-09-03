@@ -58,7 +58,7 @@ public final class TeamService {
         OK, ALREADY_IN_TEAM, NOT_OWNER, NOT_IN_TEAM, TEAM_FULL, TARGET_OFFLINE,
         TARGET_IN_TEAM, NO_INVITE, INVITE_EXPIRED, INVALID_NAME, TOO_SMALL,
         UNBALANCED, OWNER_CANNOT_LEAVE, INVALID_SIDE, KIT_NOT_FOUND, NO_ARENA, COOLDOWN,
-        MEMBER_BUSY
+        MEMBER_BUSY, SELF_BUSY
     }
 
     private volatile com.rumilance.practice.session.PlayerStateManager stateManager;
@@ -66,6 +66,7 @@ public final class TeamService {
     private volatile String lastBusyName;
     private volatile String lastBusyStateKey;
     private volatile boolean lastBusyOffline;
+    private volatile String lastSelfBusyStateKey;
 
     public void setStateManager(com.rumilance.practice.session.PlayerStateManager stateManager) {
         this.stateManager = stateManager;
@@ -97,6 +98,12 @@ public final class TeamService {
                         .replace("<player>", String.valueOf(lastBusyName))
                         .replace("<state>", state);
             }
+            if (result == Result.SELF_BUSY) {
+                String state = messageService.raw(player,
+                        lastSelfBusyStateKey == null ? "menu.state-fighting" : lastSelfBusyStateKey);
+                return messageService.raw(player, "party.err-busy-self")
+                        .replace("<state>", state);
+            }
             String key = switch (result) {
                 case ALREADY_IN_TEAM -> "party.err-already";
                 case NOT_OWNER -> "party.err-not-owner";
@@ -113,7 +120,7 @@ public final class TeamService {
                 case INVALID_SIDE -> "party.err-invalid-side";
                 case KIT_NOT_FOUND -> "party.err-kit";
                 case NO_ARENA -> "party.err-arena";
-                case COOLDOWN, OK, MEMBER_BUSY -> "";
+                case COOLDOWN, OK, MEMBER_BUSY, SELF_BUSY -> "";
             };
             if (key.isEmpty()) {
                 return "";
@@ -143,7 +150,24 @@ public final class TeamService {
             case MEMBER_BUSY -> lastBusyOffline
                     ? lastBusyName + " is offline — everyone must be online to start."
                     : lastBusyName + " is busy right now — everyone must be free in the lobby.";
+            case SELF_BUSY -> "You are busy right now — return to the lobby first.";
             case OK -> "";
+        };
+    }
+
+    /**
+     * @return the lang key of the player's blocking activity state, or {@code null} when they
+     *         are free in the lobby. Joining or creating a party while committed (match, queue,
+     *         FFA, spectate, ...) would instantly swap their hotbar mid-activity.
+     */
+    private String selfBusyKey(Player player) {
+        if (stateManager == null || player == null) {
+            return null;
+        }
+        com.rumilance.practice.state.PlayerState state = stateManager.getState(player.getUniqueId());
+        return switch (state) {
+            case LOBBY, OPENING_GUI, IDLE -> null;
+            default -> stateKey(state);
         };
     }
 
@@ -199,6 +223,11 @@ public final class TeamService {
     public Result create(Player owner, String name, boolean isPublic) {
         if (byMember.containsKey(owner.getUniqueId())) {
             return Result.ALREADY_IN_TEAM;
+        }
+        String busy = selfBusyKey(owner);
+        if (busy != null) {
+            lastSelfBusyStateKey = busy;
+            return Result.SELF_BUSY;
         }
         if (name != null && name.length() > 24) {
             return Result.INVALID_NAME;
@@ -286,6 +315,11 @@ public final class TeamService {
     public Result join(Player player, String teamName) {
         if (byMember.containsKey(player.getUniqueId())) {
             return Result.ALREADY_IN_TEAM;
+        }
+        String busy = selfBusyKey(player);
+        if (busy != null) {
+            lastSelfBusyStateKey = busy;
+            return Result.SELF_BUSY;
         }
         Team team = findByName(teamName).orElse(null);
         if (team == null) {
