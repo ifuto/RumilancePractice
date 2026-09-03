@@ -1638,9 +1638,20 @@ public final class MatchService {
                     Component.text(draw ? "DRAW" : (win ? "WIN" : "LOSE"))
                             .color(draw ? NamedTextColor.YELLOW : (win ? NamedTextColor.GREEN : NamedTextColor.RED))
                             .decorate(TextDecoration.BOLD));
+            // Duels (party fights excluded) put the series score in the subtitle with the
+            // viewer's own side on the left — addSeriesWin() above already counts this round.
+            Component resultSubtitle = Component.empty();
+            if (!draw && !session.isTeamMatch() && session.participants().size() == 2) {
+                UUID opp = session.opponentOf(id);
+                if (opp != null) {
+                    resultSubtitle = Component.text(session.seriesWinsOf(id), NamedTextColor.WHITE)
+                            .append(Component.text(" - ", NamedTextColor.GRAY))
+                            .append(Component.text(session.seriesWinsOf(opp), NamedTextColor.WHITE));
+                }
+            }
             player.showTitle(Title.title(
                     resultTitle,
-                    Component.empty(),
+                    resultSubtitle,
                     Title.Times.times(Duration.ZERO, Duration.ofSeconds(2), Duration.ofMillis(400))
             ));
             // Distinct end sting by outcome: winner hears the celebratory level-up jingle,

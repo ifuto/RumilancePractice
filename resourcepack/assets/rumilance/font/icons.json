@@ -22,20 +22,6 @@
       "chars": ["\uE003"]
     },
     {
-      "type": "minecraft:bitmap",
-      "file": "rumilance:font/team_red.png",
-      "ascent": 8,
-      "height": 9,
-      "chars": ["\uE004"]
-    },
-    {
-      "type": "minecraft:bitmap",
-      "file": "rumilance:font/team_blue.png",
-      "ascent": 8,
-      "height": 9,
-      "chars": ["\uE005"]
-    },
-    {
       "type": "minecraft:space",
       "advances": {
         "\uE000": 0

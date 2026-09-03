@@ -16,7 +16,9 @@ plugin:
 # Private-Use-Area codepoints under a custom font. Distribute the pack to players
 # (e.g. Cloudflare Pages) and set require-resource-pack so the glyphs always resolve.
 icons:
-  # Master switch. When false no icons are sent (plain names, as before).
+  # Master switch. When false no rank icons are sent (plain names, as before).
+  # Only the Admin / VIP+ / VIP rank badges come from the resource pack. Team
+  # identification during team fights is a plain coloured ● (no pack needed).
   enabled: true
   # The custom font that holds the icon glyphs (namespace:font-name).
   font: "rumilance:icons"
@@ -25,9 +27,6 @@ icons:
     admin: "\uE001"
     vip: "\uE002"
     vip-plus: "\uE003"
-    # Team markers shown during team fights (RED vs BLUE).
-    team-red: "\uE004"
-    team-blue: "\uE005"
 
 executor:
   # Size of the async worker pool used for I/O and heavier computations
@@ -49,6 +48,10 @@ match:
   regenerate-arena: true
   # Countdown after match end before players/spectators are teleported back to the lobby.
   end-teleport-delay-seconds: 5
+  # In-match action bar content.
+  #   score = the pinned scoreline (names + kills / alive counts)  [default]
+  #   time  = the elapsed match time in min:sec (e.g. 04:09)
+  action-bar-mode: score
 
 queue:
   # Maximum time, in seconds, a player may wait in a ranked queue before being notified.

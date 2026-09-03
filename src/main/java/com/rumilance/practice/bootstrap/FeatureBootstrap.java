@@ -557,11 +557,16 @@ public final class FeatureBootstrap {
                 prefix = prefix.append(rankIcon).append(net.kyori.adventure.text.Component.space());
             }
             if (session != null && session.isTeamMatch()) {
-                net.kyori.adventure.text.Component teamIcon =
-                        iconFontService.teamIcon(session.teamColor(player.getUniqueId()));
-                if (!teamIcon.equals(net.kyori.adventure.text.Component.empty())) {
-                    prefix = prefix.append(teamIcon).append(net.kyori.adventure.text.Component.space());
-                }
+                // Team marker: a plain coloured ● in the team colour (no resource pack needed).
+                com.rumilance.practice.state.TeamColor teamColor =
+                        session.teamColor(player.getUniqueId());
+                net.kyori.adventure.text.format.NamedTextColor dotColor =
+                        teamColor == com.rumilance.practice.state.TeamColor.RED
+                                ? net.kyori.adventure.text.format.NamedTextColor.RED
+                                : net.kyori.adventure.text.format.NamedTextColor.AQUA;
+                prefix = prefix
+                        .append(net.kyori.adventure.text.Component.text("\u25CF", dotColor))
+                        .append(net.kyori.adventure.text.Component.space());
             }
             return prefix;
         });
@@ -931,6 +936,7 @@ public final class FeatureBootstrap {
                 new com.rumilance.practice.match.MatchActionBarService(plugin, matchRegistry);
         matchActionBarService.setSpectatorService(spectatorService);
         matchActionBarService.setHeadFontService(headFontService);
+        matchActionBarService.setConfigService(configService);
         matchActionBarService.start();
         TabFightListService tabFightListService = new TabFightListService(plugin);
         scoreboardService.setTabFightListService(tabFightListService);

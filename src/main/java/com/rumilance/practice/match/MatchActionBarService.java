@@ -12,9 +12,15 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
 
 /**
- * Pinned action-bar scoreline shown to every fighter and spectator during a match:
+ * Pinned action-bar line shown to every fighter and spectator during a match. What it shows is
+ * configured by {@code match.action-bar-mode} in config.yml:
  *
- * <pre>{@code <self name> <self score> - <opponent score> <opponent name>}</pre>
+ * <ul>
+ *   <li>{@code score} (default) — the scoreline:
+ *       {@code <self name> <self score> - <opponent score> <opponent name>}</li>
+ *   <li>{@code time} — the elapsed match time in {@code min:sec} (e.g. {@code 04:09}),
+ *       counted from the moment the fight went ACTIVE.</li>
+ * </ul>
  *
  * <p>Names are coloured by the fighter's team colour (red for {@link TeamColor#RED}, aqua/blue
  * for {@link TeamColor#BLUE}). The score is the current game's kills (deaths) — the value that
@@ -30,6 +36,7 @@ public final class MatchActionBarService {
     private final MatchRegistry matchRegistry;
     private volatile com.rumilance.practice.spectator.SpectatorService spectatorService;
     private volatile com.rumilance.practice.headfont.HeadFontService headFontService;
+    private volatile com.rumilance.practice.config.ConfigService configService;
     private BukkitTask task;
 
     public MatchActionBarService(Plugin plugin, MatchRegistry matchRegistry) {
@@ -43,6 +50,10 @@ public final class MatchActionBarService {
 
     public void setHeadFontService(com.rumilance.practice.headfont.HeadFontService headFontService) {
         this.headFontService = headFontService;
+    }
+
+    public void setConfigService(com.rumilance.practice.config.ConfigService configService) {
+        this.configService = configService;
     }
 
     public void start() {
@@ -60,6 +71,7 @@ public final class MatchActionBarService {
     }
 
     private void tick() {
+        boolean timeMode = isTimeMode();
         for (Player viewer : Bukkit.getOnlinePlayers()) {
             MatchSession session = matchRegistry.byPlayer(viewer.getUniqueId()).orElse(null);
             if (session == null && spectatorService != null) {
@@ -70,8 +82,27 @@ public final class MatchActionBarService {
             if (session == null || session.state() != MatchState.ACTIVE) {
                 continue;
             }
-            viewer.sendActionBar(buildLine(viewer, session));
+            viewer.sendActionBar(timeMode ? buildElapsed(viewer, session) : buildLine(viewer, session));
         }
+    }
+
+    /** {@code match.action-bar-mode: time} shows the elapsed fight time instead of the score. */
+    private boolean isTimeMode() {
+        com.rumilance.practice.config.ConfigService cfg = configService;
+        if (cfg == null) {
+            return false;
+        }
+        return "time".equalsIgnoreCase(cfg.config().getString("match.action-bar-mode", "score"));
+    }
+
+    /** Elapsed time since the fight went ACTIVE, rendered as {@code min:sec}. */
+    private Component buildElapsed(Player viewer, MatchSession session) {
+        java.time.Instant started = session.startedAt();
+        long seconds = started == null
+                ? 0L
+                : Math.max(0L, java.time.Duration.between(started, java.time.Instant.now()).getSeconds());
+        String mmss = String.format(java.util.Locale.ROOT, "%02d:%02d", seconds / 60, seconds % 60);
+        return Component.text(mmss, NamedTextColor.WHITE, TextDecoration.BOLD);
     }
 
     private Component buildLine(Player viewer, MatchSession session) {
