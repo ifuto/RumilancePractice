@@ -6,7 +6,7 @@ Admin / VIP+ / VIP の **ランクバッジ** はリソースパックのカス�
 - フォント: `rumilance:icons`（`resourcepack/assets/rumilance/font/icons.json`）
 - グリフ（未割り当て文字 = Private Use Area）:
   - `\uE001` admin / `\uE002` VIP / `\uE003` VIP+
-- グリフ文字・フォントIDは `config.yml` の `icons.*` で変更可能（`/rpadmin reload` 対応）
+- グリフ文字・フォントIDは `config.yml` の `icons.*` で変更可能（`/rumireload` 対応）
 
 > **チーム判別はリソパ不要です**: チーム戦では名前の前にチーム色の `●`（赤=RED / 青=AQUA）が
 > 付きます。通常のテキストなのでパック未適用のプレイヤーにもそのまま見えます。
@@ -16,10 +16,37 @@ Admin / VIP+ / VIP の **ランクバッジ** はリソースパックのカス�
 > ランクアイコンの大きさ・位置を調整したい場合は `icons.json` の `height` / `ascent`
 > （現在は 9 / 8）を変更して再ZIP化してください。
 
-## 配布方法（本命）: Cloudflare Pages
+## 配布方法（本命・既定でON）: プラグインが直接プレイヤーに送る
 
-HTTPS + CDN + 無料枠で配信できます。クライアントは **ZIP ファイルそのもの**を URL から
-ダウンロードします。
+このプラグインは **join 時にプラグイン自身からパックを送信** します
+（`server.properties` の設定は一切不要）。`required: true` のときは
+**パックを拒否・ダウンロード失敗したプレイヤーはキック** されます
+（アイコン表示にパックが必須のため）。
+
+`config.yml` → `resource-pack.*`（`/rumireload` で再読込＋オンライン全員へ再送）:
+
+```yaml
+resource-pack:
+  enabled: true          # false でプラグインからの配布を無効化
+  url: "https://…/RumilanceResourcePack.zip"   # パックの直接ダウンロードURL
+  sha1: "730f0e2399135601333404476b5053ab51c483d9"   # ZIP の SHA1（40桁hex）
+  required: true         # true = 拒否/失敗でキック
+  prompt: "…"            # クライアントのパック適用ダイアログに出す文
+  kick-message: "…"      # キック時の表示文（\n で改行可）
+```
+
+既定値はリポジトリの `dist/` パック（上記の GitHub raw URL）になっているので、
+**何も設定しなくてもこのまま動きます**。自前のホスティングを用意したら
+`url`（と、中身を変えた場合は `sha1`）だけ書き換えて `/rumireload` してください。
+
+> **⚠ `server.properties` の `resource-pack=` 系を使っていた場合は削除してください。**
+> 両方が有効だと、クライアントにパックが二重に要求されることがあります。
+> （代替手段として server.properties 配布を使いたい場合は下の「代替」節へ）
+
+### パックの置き場所（ホスティング）: Cloudflare Pages
+
+HTTPS + CDN + 無料枠で配信できます。クライアントは **ZIP ファイルそのもの**を
+URL からダウンロードします。
 
 1. [Cloudflare Dashboard](https://dash.cloudflare.com/) → **Workers & Pages** →
    **Create application** → **Pages** → **Connect to Git**
@@ -34,20 +61,14 @@ HTTPS + CDN + 無料枠で配信できます。クライアントは **ZIP フ�
    > `.zip` ファイルをデプロイ時に自動展開してしまいます（中身がバラで置かれ、
    > ダウンロードできなくなる）。`.mczip` など別拡張子ならそのまま配信されます。
    > Minecraft クライアントは拡張子ではなく中身（ZIP構造）で判定するので、
-   > `resource-pack=` に `.mczip` のURLをそのまま指定して問題ありません。
+   > `resource-pack.url` に `.mczip` のURLをそのまま指定して問題ありません。
    > （ファイル内容が変わらないので **SHA1 もそのまま使えます**）
 
 3. デプロイ後の配布 URL:
    `https://<プロジェクト名>.pages.dev/RumilanceResourcePack.mczip`
    ブラウザで開いてファイルが落ちてくれば OK（落ちたファイルを `.zip` に
    リネームして開ける＝正常なZIP、と確認できます）。
-4. サーバー設定:
-   ```properties
-   resource-pack=https://<プロジェクト名>.pages.dev/RumilanceResourcePack.mczip
-   resource-pack-sha1=<zip の SHA1>
-   require-resource-pack=true
-   resource-pack-prompt={"text":"Rumilanceのアイコン表示に必要です","color":"aqua"}
-   ```
+4. `config.yml` → `resource-pack.url` に上記 URL を設定して `/rumireload`。
 
 現在コミット済みパック（チーム画像削除済み版）の SHA1:
 
@@ -55,22 +76,29 @@ HTTPS + CDN + 無料枠で配信できます。クライアントは **ZIP フ�
 730f0e2399135601333404476b5053ab51c483d9
 ```
 
-> パックの中身を変えたら再デプロイ（push すれば自動）→ サーバーの
-> `resource-pack-sha1` も新しい ZIP の SHA1 に更新してください
-> （SHA1 が合わないとクライアントが拒否します）。
+> パックの中身を変えたら再デプロイ（push すれば自動）→ `resource-pack.sha1` も
+> 新しい ZIP の SHA1 に更新してください（SHA1 が合わないとクライアントが拒否します）。
 
-### フォールバック: リポジトリの配布パックを直接使う
+### 代替: server.properties で配布（プラグイン配布を無効化する場合のみ）
 
-Cloudflare を用意する前は、`dist/` にコミット済みのパックを GitHub raw URL で
-そのまま配信することもできます:
+プラグイン配布を使わず従来どおり server.properties で配布したい場合は
+`resource-pack.enabled: false` にした上で、次のように設定します:
 
 ```properties
+# Cloudflare Pages 利用時
+resource-pack=https://<プロジェクト名>.pages.dev/RumilanceResourcePack.mczip
+resource-pack-sha1=730f0e2399135601333404476b5053ab51c483d9
+require-resource-pack=true
+resource-pack-prompt={"text":"Rumilanceのアイコン表示に必要です","color":"aqua"}
+
+# またはリポジトリの dist パック直接指定（マージ後は .../main/...）
 resource-pack=https://raw.githubusercontent.com/ifuto/RumilancePractice/main/dist/RumilanceResourcePack.zip
 resource-pack-sha1=730f0e2399135601333404476b5053ab51c483d9
 require-resource-pack=true
 ```
 
-（マージ前はブランチ指定でも可: `.../arena/01a06257-rumilancepractice/dist/RumilanceResourcePack.zip`）
+ただしこの場合、拒否したプレイヤーのキックはサーバー本体の仕様に依存します。
+**こだわりがなければプラグイン配布（既定）を推奨します。**
 
 ### パックの中身を変えたとき
 
@@ -93,8 +121,9 @@ sha1sum dist/RumilanceResourcePack.zip
 ## 補足
 
 - 1.21.9+ の `min_format`/`max_format` 入り `pack.mcmeta` 済み（対象 1.21.11 / pack_format 75）
-- `require-resource-pack=true` にすると、パック未適用のプレイヤーにグリフが
-  豆腐（□）に見える問題をそもそも防げます
+- パック未適用のプレイヤーにグリフが豆腐（□）に見える問題は、プラグイン配布の
+  `resource-pack.required: true`（拒否/失敗でキック）でそもそも防げます
+  （server.properties 方式なら `require-resource-pack=true` が相当）
 - リソースパックを入れていない環境では空白グリフ扱いになるだけなので、
   プラグイン動作自体は壊れません（チームの `●` はテキストなので常に表示されます）
 

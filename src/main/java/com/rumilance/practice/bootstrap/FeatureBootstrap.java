@@ -538,6 +538,15 @@ public final class FeatureBootstrap {
         final com.rumilance.practice.font.IconFontService iconFontService =
                 new com.rumilance.practice.font.IconFontService(configService);
         services.register(com.rumilance.practice.font.IconFontService.class, iconFontService);
+
+        // Plugin-side resource pack distribution: pushes the pack to every player on join
+        // and kicks players who decline it (config.yml resource-pack.*). Replaces the
+        // server.properties resource-pack entries entirely.
+        final com.rumilance.practice.resourcepack.ResourcePackService resourcePackService =
+                new com.rumilance.practice.resourcepack.ResourcePackService(plugin, configService);
+        services.register(com.rumilance.practice.resourcepack.ResourcePackService.class,
+                resourcePackService);
+        plugin.getServer().getPluginManager().registerEvents(resourcePackService, plugin);
         final RankService rankServiceRef = rankService;
         com.rumilance.practice.match.MatchTeamVisuals.setPrefixResolver((player, session) -> {
             net.kyori.adventure.text.Component prefix = net.kyori.adventure.text.Component.empty();

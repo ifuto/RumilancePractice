@@ -1,5 +1,5 @@
 # RumilancePractice main configuration file.
-# Most values here can be reloaded at runtime with /rpadmin reload.
+# Most values here can be reloaded at runtime with /rumireload.
 
 plugin:
   # Locale used when a player has not selected one, and as the ultimate fallback
@@ -27,6 +27,30 @@ icons:
     admin: "\uE001"
     vip: "\uE002"
     vip-plus: "\uE003"
+
+# Resource-pack distribution BY THE PLUGIN — no server.properties entries needed.
+# The pack is pushed to every player shortly after joining, and players who decline
+# it (or whose download fails) are kicked when required: true, because the rank-badge
+# glyphs above only render with the pack installed.
+# IMPORTANT: if you previously set resource-pack= / require-resource-pack= in
+# server.properties, remove those lines when this is enabled, or clients may be
+# asked to apply the pack twice.
+resource-pack:
+  # Master switch. When false the plugin does not send any resource pack.
+  enabled: true
+  # Direct download URL of the pack zip. Defaults to the repository's dist/ zip
+  # (update the branch to main after the pull request is merged, or point this at
+  # your own hosting such as Cloudflare Pages).
+  url: "https://raw.githubusercontent.com/ifuto/RumilancePractice/arena/01a06257-rumilancepractice/dist/RumilanceResourcePack.zip"
+  # SHA-1 of the zip as 40 hex characters (must match the file exactly; see
+  # dist/RumilanceResourcePack.sha1). The client rejects a hash mismatch.
+  sha1: "730f0e2399135601333404476b5053ab51c483d9"
+  # Kick players who decline the pack or fail to download it.
+  required: true
+  # Prompt shown in the client's resource-pack dialog.
+  prompt: "Rumilance Practice のアイコン表示に必要なリソースパックです"
+  # Kick message shown to players who declined / failed the pack.
+  kick-message: "Rumilance をプレイするにはリソースパックの適用が必要です。\n適用を拒否、またはダウンロードに失敗したため切断されました。"
 
 executor:
   # Size of the async worker pool used for I/O and heavier computations

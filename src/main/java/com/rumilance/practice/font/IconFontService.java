@@ -18,8 +18,9 @@ import net.kyori.adventure.text.Component;
  * coloured {@code ●} (see the MatchTeamVisuals prefix resolver), so it works for everyone even
  * without the resource pack. Everything here is config-driven ({@code icons.*} in config.yml)
  * so glyphs can be remapped or the whole feature disabled without touching code. Players
- * without the resource pack see a missing-glyph box; enable {@code require-resource-pack}
- * server-side to avoid that.</p>
+ * without the resource pack see a missing-glyph box; the plugin pushes the pack on join and
+ * kicks players who decline it ({@code resource-pack.*} in config.yml,
+ * {@link com.rumilance.practice.resourcepack.ResourcePackService}) to avoid that.</p>
  */
 public final class IconFontService {
 

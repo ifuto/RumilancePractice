@@ -13,6 +13,7 @@ import com.rumilance.practice.kit.PresetItems;
 import com.rumilance.practice.lobby.LobbyService;
 import com.rumilance.practice.locale.LocaleService;
 import com.rumilance.practice.practice.PracticeService;
+import com.rumilance.practice.resourcepack.ResourcePackService;
 import com.rumilance.practice.scoreboard.ScoreboardConfig;
 import com.rumilance.practice.scoreboard.ScoreboardService;
 import com.rumilance.practice.sound.SoundService;
@@ -82,6 +83,8 @@ public final class RumilanceReloadCommand implements CommandExecutor, TabComplet
                 .ifPresent(EkitItems::reload));
         safe(done, failed, "preset-items", () -> services.find(PresetItems.class)
                 .ifPresent(PresetItems::reload));
+        safe(done, failed, "resource-pack", () -> services.find(ResourcePackService.class)
+                .ifPresent(ResourcePackService::reload));
         safe(done, failed, "scoreboard", () -> services.find(ScoreboardService.class)
                 .ifPresent(s -> s.reload(new ScoreboardConfig(services.get(ConfigService.class).scoreboard()))));
 
