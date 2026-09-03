@@ -1502,16 +1502,32 @@ public final class MatchService {
             loadout.add(offhand.clone());
         }
         for (org.bukkit.inventory.ItemStack item : loadout) {
-            org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
-            if (meta != null) {
-                meta.displayName(null); // strip any anvil / custom rename
-                if (meta instanceof org.bukkit.inventory.meta.ArmorMeta armorMeta) {
-                    armorMeta.setTrim(null); // strip the applied smithing trim
-                }
-                item.setItemMeta(meta);
-            }
+            stripPersonalisation(item);
             world.dropItemNaturally(at, item);
         }
+    }
+
+    /**
+     * Removes personalisation from a dropped item: custom (anvil) display names, applied
+     * smithing trims, and shield custom-model artwork all revert to vanilla. Durability and
+     * enchantments stay exactly as they were.
+     */
+    public static void stripPersonalisation(org.bukkit.inventory.ItemStack item) {
+        if (item == null || item.getType().isAir() || !item.hasItemMeta()) {
+            return;
+        }
+        org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
+        if (meta == null) {
+            return;
+        }
+        meta.displayName(null); // strip any anvil / custom rename
+        if (meta instanceof org.bukkit.inventory.meta.ArmorMeta armorMeta) {
+            armorMeta.setTrim(null); // strip the applied smithing trim
+        }
+        if (item.getType() == org.bukkit.Material.SHIELD && meta.hasCustomModelData()) {
+            meta.setCustomModelData(null); // custom shield artwork never survives as a drop
+        }
+        item.setItemMeta(meta);
     }
 
     /** Sends an "X was eliminated (by Y)" line to every participant and spectator of the match. */
@@ -1570,6 +1586,9 @@ public final class MatchService {
         if (shuttingDown || session.isShuttingDown()) {
             return;
         }
+        // The match is decided by a forfeit: the opponent who is still here must NOT be
+        // offered rematch items / flow (the other side is gone anyway).
+        session.markDisconnectForfeit();
         if (session.isTeamMatch()) {
             // A team-battle leaver counts as an elimination: if their whole side is now
             // offline/eliminated the other side wins, otherwise the fight continues.
@@ -1733,7 +1752,10 @@ public final class MatchService {
             } else {
                 soundService.play(player, "match-end-anvil");
             }
-            giveRematchItems(player, session);
+            // Disconnect forfeits skip the rematch offer entirely — the opponent is gone.
+            if (!session.isDisconnectForfeit()) {
+                giveRematchItems(player, session);
+            }
             recentMatch.put(id, session.id());
             sendEndSummary(player, session, id, win);
         }
@@ -1789,6 +1811,10 @@ public final class MatchService {
                 return;
             }
             if (session.rematchStarting()) {
+                return;
+            }
+            if (session.isDisconnectForfeit()) {
+                // A forfeit win never offers a rematch: the loser left the server.
                 return;
             }
             if (session.isTeamMatch()) {

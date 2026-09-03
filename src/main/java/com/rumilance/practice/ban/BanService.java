@@ -45,6 +45,7 @@ public final class BanService {
         persist();
         Player online = Bukkit.getPlayer(playerId);
         if (online != null && online.isOnline()) {
+            com.rumilance.practice.join.JoinQuitMessages.suppressQuit(playerId);
             online.kick(BanScreens.banned(reason, label));
         }
         Bukkit.broadcast(BanAnnounce.ban(playerName, reason, label));
@@ -58,6 +59,7 @@ public final class BanService {
     public void kick(Player target, String staffName, String reason) {
         String kickReason = reason == null || reason.isBlank() ? "Kicked" : reason;
         Bukkit.broadcast(BanAnnounce.kick(target.getName()));
+        com.rumilance.practice.join.JoinQuitMessages.suppressQuit(target.getUniqueId());
         target.kick(BanScreens.kicked(kickReason));
         plugin.getLogger().info("Kicked " + target.getName() + " by " + staffName);
     }

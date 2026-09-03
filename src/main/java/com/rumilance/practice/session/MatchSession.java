@@ -42,6 +42,8 @@ public final class MatchSession {
     private final Map<UUID, Integer> roundWins = new ConcurrentHashMap<>();
     private final AtomicBoolean resultApplied = new AtomicBoolean(false);
     private final AtomicBoolean disconnectPenaltyIssued = new AtomicBoolean(false);
+    /** Set when the match was decided by a disconnect forfeit — rematch offers are skipped. */
+    private final AtomicBoolean disconnectForfeit = new AtomicBoolean(false);
     private volatile MatchState state;
     private volatile Instant startedAt;
     private volatile Instant endedAt;
@@ -362,6 +364,16 @@ public final class MatchSession {
 
     public boolean tryMarkDisconnectPenalty() {
         return disconnectPenaltyIssued.compareAndSet(false, true);
+    }
+
+    /** Marks the match as decided by a disconnect forfeit (idempotent). */
+    public void markDisconnectForfeit() {
+        disconnectForfeit.set(true);
+    }
+
+    /** True when the outcome came from a disconnect — rematch offers are then pointless. */
+    public boolean isDisconnectForfeit() {
+        return disconnectForfeit.get();
     }
 
     public void setRematchRequested(UUID uuid, boolean value) {

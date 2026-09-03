@@ -175,6 +175,12 @@ public final class SessionBootstrapListener implements Listener {
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
+    public void onKick(org.bukkit.event.player.PlayerKickEvent event) {
+        // Kicked / banned players leave silently: no "[-] name" line follows the kick screen.
+        JoinQuitMessages.apply(event);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent event) {
         JoinQuitMessages.apply(event);
         Player player = event.getPlayer();
