@@ -103,15 +103,8 @@ public final class TeamsBrowserGui extends AbstractGui {
                             .action("decorate").build());
         }
 
-        // Paging.
-        if (page > 0) {
-            inventory.setItem(GuiSlots.slot(5, 2), ItemBuilder.of(Material.ARROW)
-                    .name(t(player, "menu.page-prev")).action("page_prev").build());
-        }
-        if (to < publicTeams.size()) {
-            inventory.setItem(GuiSlots.slot(5, 6), ItemBuilder.of(Material.ARROW)
-                    .name(t(player, "menu.page-next")).action("page_next").build());
-        }
+        // Paging (standard chrome buttons + page indicator).
+        paintPaging(player, inventory, page, Math.max(publicTeams.size(), 1));
 
         MenuScaffold.closeButton(inventory, t(player, "menu.close"));
     }
@@ -151,12 +144,12 @@ public final class TeamsBrowserGui extends AbstractGui {
                 teamService.create(player, player.getName() + "'s Team", false);
                 teamHubGui.open(player);
             }
-            case "page_prev" -> {
+            case "page:prev" -> {
                 session.setPage(session.page() - 1);
                 sounds.play(player, "gui-click");
                 refresh(player, session, inventory);
             }
-            case "page_next" -> {
+            case "page:next" -> {
                 session.setPage(session.page() + 1);
                 sounds.play(player, "gui-click");
                 refresh(player, session, inventory);

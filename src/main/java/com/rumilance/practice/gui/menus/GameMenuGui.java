@@ -33,6 +33,16 @@ public final class GameMenuGui extends AbstractGui {
     private java.util.function.Consumer<Player> openTeams = p -> { };
     /** Gates the kit editor entry while the player is committed to a match/queue/activity. */
     private java.util.function.Predicate<Player> kitEditBusy = p -> false;
+    private com.rumilance.practice.team.TeamService teamService;
+    private com.rumilance.practice.session.PlayerStateManager stateManager;
+
+    public void setTeamService(com.rumilance.practice.team.TeamService teamService) {
+        this.teamService = teamService;
+    }
+
+    public void setStateManager(com.rumilance.practice.session.PlayerStateManager stateManager) {
+        this.stateManager = stateManager;
+    }
 
     public GameMenuGui(
             GuiSessionRegistry registry,
@@ -71,14 +81,18 @@ public final class GameMenuGui extends AbstractGui {
     protected void render(Player player, GuiSession session, Inventory inventory) {
         MenuScaffold.chrome(inventory);
         MenuScaffold.header(inventory, 0, title(player, session));
+        paintStatusChip(player, inventory);
 
         inventory.setItem(GuiSlots.slot(2, 4), tile(player, Material.NETHERITE_SWORD,
                 "menu.battle", UiTheme.SUCCESS, "menu.battle-lore", "battle", true));
 
         inventory.setItem(GuiSlots.slot(3, 2), tile(player, Material.CRAFTING_TABLE,
                 "menu.kits", UiTheme.PRIMARY, "menu.kits-lore", "ekit", false));
+        // Teams tile adapts to membership: inside a party it becomes the party hub entry.
+        boolean inParty = teamService != null && teamService.teamOf(player.getUniqueId()).isPresent();
         inventory.setItem(GuiSlots.slot(3, 4), tile(player, Material.WHITE_BANNER,
-                "menu.teams", UiTheme.HEADER, "menu.teams-lore", "teams", false));
+                inParty ? "menu.teams-in-party" : "menu.teams", UiTheme.HEADER,
+                inParty ? "menu.teams-in-party-lore" : "menu.teams-lore", "teams", inParty));
         inventory.setItem(GuiSlots.slot(3, 6), tile(player, Material.ENDER_EYE,
                 "menu.spectate", UiTheme.WARNING, "menu.spectate-lore", "spectate", false));
 
@@ -88,6 +102,34 @@ public final class GameMenuGui extends AbstractGui {
                 "menu.titles", UiTheme.SECONDARY, "menu.titles-lore", "titles", false));
 
         MenuScaffold.closeButton(inventory, t(player, "menu.close"));
+    }
+
+    /** Top-left chip: the viewer's own head and their current activity state. */
+    private void paintStatusChip(Player player, Inventory inventory) {
+        if (stateManager == null) {
+            return;
+        }
+        com.rumilance.practice.state.PlayerState state = stateManager.getState(player.getUniqueId());
+        String stateKey = switch (state) {
+            case QUEUED_RANKED -> "menu.state-ranked-queue";
+            case QUEUED_UNRANKED -> "menu.state-unranked-queue";
+            case FIGHTING, PREPARING_MATCH, COUNTDOWN, ENDING -> "menu.state-fighting";
+            case SPECTATING -> "menu.state-spectating";
+            case FFA -> "menu.state-ffa";
+            case EDITING_KIT -> "menu.state-editing";
+            case REQUESTING_DUEL -> "menu.state-dueling";
+            case PRACTICE_WAIT, PRACTICE_ACTIVE -> "menu.state-fighting";
+            default -> "menu.state-lobby";
+        };
+        inventory.setItem(GuiSlots.slot(0, 1),
+                ItemBuilder.of(Material.PLAYER_HEAD)
+                        .name(Component.text(player.getName(), UiTheme.VALUE))
+                        .skullOwner(player)
+                        .lore(UiTheme.divider(),
+                                UiTheme.labelValue(line(player, "menu.status"),
+                                        line(player, stateKey)))
+                        .action("decorate")
+                        .build());
     }
 
     private org.bukkit.inventory.ItemStack tile(Player player, Material material,

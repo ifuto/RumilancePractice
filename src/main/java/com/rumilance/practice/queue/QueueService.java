@@ -95,6 +95,17 @@ public final class QueueService {
         return byPlayer.size();
     }
 
+    /** Total waiters in one mode across all kits, for the given client platform. */
+    public int totalWaiting(MatchMode mode, PlayerPlatform platform) {
+        int count = 0;
+        for (QueueEntry entry : byPlayer.values()) {
+            if (entry.mode() == mode && entry.platform() == platform) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     public synchronized void clearAll() {
         byPlayer.clear();
         byQueue.clear();

@@ -795,10 +795,16 @@ public final class FeatureBootstrap {
         BattleMenuGui battleMenuGui = new BattleMenuGui(
                 guiSessions, soundService, rankedGui, unrankedGui, playersGui, ffaListGui,
                 messageService);
+        battleMenuGui.setQueueServices(queueService, queueCoordinator);
+        battleMenuGui.setStateManager(stateManager);
+        battleMenuGui.setTeamService(teamService);
+        battleMenuGui.setFfaOccupants(() -> ffaService.occupantIds().size());
         GameMenuGui gameMenuGui = new GameMenuGui(
                 guiSessions, soundService, battleMenuGui, ekitSelectGui, spectateListGui, settingsGui,
                 titleGui, messageService);
         gameMenuGui.setKitEditBusyCheck(p -> matchService.isBusyForKitEdit(p.getUniqueId()));
+        gameMenuGui.setTeamService(teamService);
+        gameMenuGui.setStateManager(stateManager);
 
         MatchInventoryGui matchInventoryGui =
                 new MatchInventoryGui(guiSessions, soundService, matchInventoryStore);
