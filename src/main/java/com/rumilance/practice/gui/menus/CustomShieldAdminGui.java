@@ -80,9 +80,9 @@ public final class CustomShieldAdminGui extends AbstractGui {
         ItemStack shield = ItemBuilder.of(Material.SHIELD)
                 .name(Component.text(hiddenRanks.lastName(holder), NamedTextColor.AQUA))
                 .lore(UiTheme.divider(),
-                        UiTheme.line(Component.text("Custom Model Data: ", NamedTextColor.GRAY)
+                        Component.text("Custom Model Data: ", NamedTextColor.GRAY)
                                 .append(Component.text(cmd == 0 ? "not set" : String.valueOf(cmd),
-                                        cmd == 0 ? NamedTextColor.RED : NamedTextColor.GOLD))),
+                                        cmd == 0 ? NamedTextColor.RED : NamedTextColor.GOLD)),
                         UiTheme.blank(),
                         UiTheme.hint("Click: +1 | Right: -1"),
                         UiTheme.hint("Shift: ±100 | Q: remove rank"))

@@ -126,7 +126,7 @@ public final class ResourcePackService implements Listener {
         // recognised by the stable pack id and never re-trigger this (no loop).
         UUID ourId = this.packId;
         if (this.request != null && ourId != null
-                && event.getStatus() == PlayerResourcePackStatusEvent.Status.SUCCESS
+                && event.getStatus() == PlayerResourcePackStatusEvent.Status.SUCCESSFULLY_LOADED
                 && !ourId.equals(event.getID())) {
             Bukkit.getScheduler().runTask(plugin, () -> {
                 if (player.isOnline()) {

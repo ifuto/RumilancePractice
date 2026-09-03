@@ -189,7 +189,7 @@ public final class ShieldPatternGui extends AbstractGui implements GuiCloseHandl
             // Regular patterns render as a banner showing the shape in the selected dye.
             ItemStack banner = new ItemStack(Material.WHITE_BANNER);
             if (banner.getItemMeta() instanceof BannerMeta bannerMeta) {
-                bannerMeta.setPatterns(List.of(new Pattern(patternType, dye)));
+                bannerMeta.setPatterns(List.of(new Pattern(dye, patternType)));
                 banner.setItemMeta(bannerMeta);
             }
             b = ItemBuilder.of(banner);
@@ -248,7 +248,7 @@ public final class ShieldPatternGui extends AbstractGui implements GuiCloseHandl
                 return;
             }
             PatternType patternType = PatternType.valueOf(action.substring(8));
-            layers.add(new Pattern(patternType, dye(session)));
+            layers.add(new Pattern(dye(session), patternType));
             session.put("layers", new java.util.ArrayList<>(layers));
             sounds.play(player, "gui-click");
             refresh(player, session, inventory);
@@ -348,8 +348,16 @@ public final class ShieldPatternGui extends AbstractGui implements GuiCloseHandl
         };
     }
 
-    private static String prettyName(Object enumValue) {
-        String name = ((Enum<?>) enumValue).name().toLowerCase(Locale.ROOT).replace('_', ' ');
+    private static String prettyName(PatternType patternType) {
+        return prettify(patternType.name());
+    }
+
+    private static String prettyName(DyeColor dyeColor) {
+        return prettify(dyeColor.name());
+    }
+
+    private static String prettify(String enumName) {
+        String name = enumName.toLowerCase(Locale.ROOT).replace('_', ' ');
         StringBuilder out = new StringBuilder(name.length());
         boolean upper = true;
         for (char c : name.toCharArray()) {

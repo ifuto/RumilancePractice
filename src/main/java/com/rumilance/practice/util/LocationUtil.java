@@ -99,7 +99,7 @@ public final class LocationUtil {
     }
 
     public static Location safeTeleportLocation(Location desired) {
-        return safeTeleportLocation(desired, null);
+        return safeTeleportLocation(desired, (Player) null);
     }
 
     /**
