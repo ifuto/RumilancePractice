@@ -252,6 +252,11 @@ public final class MatchService {
     private com.rumilance.practice.match.inventory.MatchInventoryStore inventoryStore;
     private com.rumilance.practice.ffa.FfaService ffaService;
     private com.rumilance.practice.combat.CombatNetTracker combatNet;
+    private com.rumilance.practice.originalkit.OriginalKitService originalKitService;
+
+    public void setOriginalKitService(com.rumilance.practice.originalkit.OriginalKitService originalKitService) {
+        this.originalKitService = originalKitService;
+    }
 
     public void setDuelLogStore(com.rumilance.practice.duel.DuelLogStore duelLogStore) {
         this.duelLogStore = duelLogStore;
@@ -346,6 +351,24 @@ public final class MatchService {
             return true;
         }
         return isEliminatedInTeamMatch(playerId);
+    }
+
+    /**
+     * Hard block on opening the kit editors (/ekit, /originalkit): the player is committed to
+     * any match lifecycle, queue, spectating, FFA or practice. Editing mid-fight used to reset
+     * the player to lobby items on GUI close and strand their real inventory in the kit room.
+     */
+    public boolean isBusyForKitEdit(UUID playerId) {
+        if (registry().byPlayer(playerId).isPresent()) {
+            return true;
+        }
+        PlayerState state = stateManager.getState(playerId);
+        return switch (state) {
+            case QUEUED_RANKED, QUEUED_UNRANKED, REQUESTING_DUEL,
+                 PREPARING_MATCH, COUNTDOWN, FIGHTING, ENDING,
+                 SPECTATING, FFA, PRACTICE_WAIT, PRACTICE_ACTIVE -> true;
+            default -> false;
+        };
     }
 
     private boolean inParty(UUID playerId) {
@@ -2071,6 +2094,14 @@ public final class MatchService {
             return;
         }
         UUID id = player.getUniqueId();
+        // Pulled into a match while editing an original kit: force-save the draft and leave the
+        // room FIRST — while the inventory still holds the kit — before anything else touches it.
+        try {
+            if (originalKitService != null) {
+                originalKitService.forceSaveAndExitForMatch(player);
+            }
+        } catch (RuntimeException ignored) {
+        }
         PlayerState state = stateManager.getState(id);
         try {
             if (queueCoordinator != null) {

@@ -721,6 +721,7 @@ public final class FeatureBootstrap {
                 new com.rumilance.practice.originalkit.OriginalKitRoomService(configService, plugin);
         services.register(com.rumilance.practice.originalkit.OriginalKitRoomService.class, originalKitRoomService);
         originalKitService.setRoomService(originalKitRoomService);
+        matchService.setOriginalKitService(originalKitService);
         plugin.getServer().getPluginManager().registerEvents(
                 new com.rumilance.practice.originalkit.OriginalKitRoomListener(
                         originalKitRoomService, originalKitService, plugin), plugin);
@@ -785,6 +786,7 @@ public final class FeatureBootstrap {
         GameMenuGui gameMenuGui = new GameMenuGui(
                 guiSessions, soundService, battleMenuGui, ekitSelectGui, spectateListGui, settingsGui,
                 titleGui, messageService);
+        gameMenuGui.setKitEditBusyCheck(p -> matchService.isBusyForKitEdit(p.getUniqueId()));
 
         MatchInventoryGui matchInventoryGui =
                 new MatchInventoryGui(guiSessions, soundService, matchInventoryStore);
@@ -868,7 +870,13 @@ public final class FeatureBootstrap {
                 new FunctionalItemListener(soundService, queueCoordinator, rankedGui, unrankedGui);
         functionalItemListener.setOpenSettings(settingsGui::open);
         functionalItemListener.setOpenFfa(ffaListGui::open);
-        functionalItemListener.setOpenEkit(ekitSelectGui::open);
+        functionalItemListener.setOpenEkit(p -> {
+            if (matchService.isBusyForKitEdit(p.getUniqueId())) {
+                p.sendMessage(Component.text("You can't edit kits during a match.", NamedTextColor.RED));
+                return;
+            }
+            ekitSelectGui.open(p);
+        });
         functionalItemListener.setOpenSpectate(spectateListGui::open);
         functionalItemListener.setOpenMenu(gameMenuGui::open);
         functionalItemListener.setOpenBattle(battleMenuGui::open);
@@ -1173,10 +1181,12 @@ public final class FeatureBootstrap {
                 case KDR -> "kdr";
                 case OBJECTION -> "objection";
             };
-            bind(cmd, new PlayerCommands(
+            PlayerCommands commands = new PlayerCommands(
                     type, plugin, asyncExecutor, statsService, kitService, statsKitGui, profileGui,
                     settingsGui, ekitSelectGui, playersGui, spectateListGui, spectatorService, ffaListGui,
-                    editKitGui, arrowEffectGui, chatBanService));
+                    editKitGui, arrowEffectGui, chatBanService);
+            commands.setKitEditBusyCheck(p -> matchService.isBusyForKitEdit(p.getUniqueId()));
+            bind(cmd, commands);
         }
 
         BanCommand banCommand = new BanCommand(banService, banListGui, playerRepository);
@@ -1195,6 +1205,11 @@ public final class FeatureBootstrap {
         bind("checkid", new CheckIdCommand(duelLogStore));
         bind("originalkit", (CommandExecutor) (sender, command, label, args) -> {
             if (sender instanceof Player player) {
+                if (matchService.isBusyForKitEdit(player.getUniqueId())) {
+                    player.sendMessage(net.kyori.adventure.text.Component.text(
+                            "You can't edit kits during a match.", net.kyori.adventure.text.format.NamedTextColor.RED));
+                    return true;
+                }
                 originalKitGui.open(player);
             }
             return true;

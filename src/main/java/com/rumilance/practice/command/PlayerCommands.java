@@ -55,6 +55,8 @@ public final class PlayerCommands implements CommandExecutor, TabCompleter {
     private final EditKitGui editKitGui;
     private final ArrowEffectGui arrowEffectGui;
     private final ChatBanService chatBanService;
+    /** Blocks /ekit while the player is committed to a match/queue/other activity. */
+    private java.util.function.Predicate<org.bukkit.entity.Player> kitEditBusyCheck;
 
     public PlayerCommands(
             Type type,
@@ -90,6 +92,10 @@ public final class PlayerCommands implements CommandExecutor, TabCompleter {
         this.editKitGui = editKitGui;
         this.arrowEffectGui = arrowEffectGui;
         this.chatBanService = chatBanService;
+    }
+
+    public void setKitEditBusyCheck(java.util.function.Predicate<org.bukkit.entity.Player> busyCheck) {
+        this.kitEditBusyCheck = busyCheck;
     }
 
     @Override
@@ -147,7 +153,14 @@ public final class PlayerCommands implements CommandExecutor, TabCompleter {
             case SPECGUI -> spectateListGui.open(player);
             case SETTING -> settingsGui.open(player);
             case FFA -> ffaListGui.open(player);
-            case EKIT -> ekitSelectGui.open(player);
+            case EKIT -> {
+                if (kitEditBusyCheck != null && kitEditBusyCheck.test(player)) {
+                    player.sendMessage(Component.text(
+                            "試合・キュー・観戦中はキット編集できません。", NamedTextColor.RED));
+                    return true;
+                }
+                ekitSelectGui.open(player);
+            }
             case ARROW -> {
                 if (!player.hasPermission("rumilance.user.mem")
                         && !player.hasPermission("rumilance.user.vip")

@@ -23,6 +23,9 @@ public final class PlayerVitals {
         if (player == null) {
             return;
         }
+        // Safety net: a player pulled out of the original-kit room (or any isolated context)
+        // may still have collision disabled, which makes melee attacks pass right through them.
+        player.setCollidable(true);
         player.setFireTicks(0);
         player.setFreezeTicks(0);
         player.setFallDistance(0f);

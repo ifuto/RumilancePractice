@@ -31,6 +31,8 @@ public final class GameMenuGui extends AbstractGui {
     private final MessageService messageService;
     /** Opens the team hub/browser — wired via setter because the team GUIs are built later. */
     private java.util.function.Consumer<Player> openTeams = p -> { };
+    /** Gates the kit editor entry while the player is committed to a match/queue/activity. */
+    private java.util.function.Predicate<Player> kitEditBusy = p -> false;
 
     public GameMenuGui(
             GuiSessionRegistry registry,
@@ -53,6 +55,10 @@ public final class GameMenuGui extends AbstractGui {
 
     public void setOpenTeams(java.util.function.Consumer<Player> openTeams) {
         this.openTeams = openTeams == null ? p -> { } : openTeams;
+    }
+
+    public void setKitEditBusyCheck(java.util.function.Predicate<Player> busyCheck) {
+        this.kitEditBusy = busyCheck == null ? p -> false : busyCheck;
     }
 
     @Override
@@ -106,7 +112,14 @@ public final class GameMenuGui extends AbstractGui {
                 player.closeInventory();
             }
             case "battle" -> openChild(player, battleMenuGui::open);
-            case "ekit" -> openChild(player, ekitSelectGui::open);
+            case "ekit" -> {
+                if (kitEditBusy.test(player)) {
+                    player.sendMessage(Component.text(
+                            "試合・キュー・観戦中はキット編集できません。", UiTheme.DANGER));
+                    return;
+                }
+                openChild(player, ekitSelectGui::open);
+            }
             case "spectate" -> openChild(player, spectateListGui::open);
             case "settings" -> openChild(player, settingsGui::open);
             case "titles" -> openChild(player, titleGui::open);

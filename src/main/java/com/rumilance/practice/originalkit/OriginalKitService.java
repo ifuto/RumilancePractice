@@ -267,6 +267,65 @@ public final class OriginalKitService {
         restoreInventory(player);
     }
 
+    /**
+     * Emergency teardown when a match starts while the player is still editing an original kit:
+     * force-save the in-progress kit (bypassing the monthly limit — the edit already happened,
+     * losing it would punish the player for a match they did not choose), then clear the edit
+     * session and leave the room so room isolation (no-collision, hidden) never leaks into the
+     * fight — a leftover {@code collidable=false} makes melee attacks pass straight through.
+     */
+    public void forceSaveAndExitForMatch(Player player) {
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+        UUID id = player.getUniqueId();
+        boolean inRoom = roomService != null && roomService.isEditing(id);
+        EditContext ctx = editContexts.remove(id);
+        navigating.remove(id);
+        // The stashed pre-edit inventory (lobby contents) is superseded: the match applies a
+        // kit now and hands lobby items back afterwards.
+        pendingInventory.remove(id);
+        if (!inRoom && ctx == null) {
+            return;
+        }
+        // Room editors build the kit in their live inventory; GUI editors in the layout array.
+        ItemStack[] layout = inRoom ? player.getInventory().getContents() : ctx.layout;
+        int slot = ctx != null ? ctx.slot : 22;
+        if (layout != null && layout.length > 0) {
+            OriginalKitSaveValidator.Result result =
+                    OriginalKitSaveValidator.validate(java.util.Arrays.asList(layout));
+            if (result.severity() == OriginalKitSaveValidator.Severity.OK) {
+                forceSaveLayout(player, slot, layout);
+            } else {
+                // Never kick here — the match is about to start. Just drop the invalid draft.
+                player.sendMessage(Component.text(
+                        "試合開始のためキット編集を中断しました。編集内容に不正なアイテムがあったため保存されませんでした: "
+                                + result.reason(), NamedTextColor.RED));
+            }
+        }
+        if (inRoom) {
+            player.setGameMode(org.bukkit.GameMode.SURVIVAL);
+            roomService.exit(player);
+        }
+    }
+
+    /** Saves a kit layout ignoring the monthly edit cap (still counts as one edit). */
+    public void forceSaveLayout(Player player, int slot, ItemStack[] layout) {
+        String items = ItemSerializer.toBase64(layout);
+        OriginalKitSnapshot snapshot = new OriginalKitSnapshot(player.getUniqueId(), slot, items, null, Instant.now());
+        monthlyEdits.merge(player.getUniqueId(), 1, Integer::sum);
+        monthKey.put(player.getUniqueId(), YearMonth.now());
+        asyncExecutor.execute(() -> {
+            try {
+                repository.upsert(snapshot);
+            } catch (Exception e) {
+                logger.log(Level.WARNING, "Failed force-saving original kit", e);
+            }
+        });
+        player.sendMessage(Component.text("試合が始まるため、編集中のオリジナルキットを強制保存しました。",
+                NamedTextColor.GREEN));
+    }
+
     public boolean isStashed(UUID uuid) {
         return pendingInventory.containsKey(uuid);
     }
