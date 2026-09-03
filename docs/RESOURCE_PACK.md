@@ -26,15 +26,24 @@ HTTPS + CDN + 無料枠で配信できます。クライアントは **ZIP フ�
 2. GitHub を連携して `ifuto/RumilancePractice` を選択し、次の設定でデプロイ:
    - Build command:
      ```bash
-     mkdir -p public && cd resourcepack && zip -qr ../public/RumilanceResourcePack.zip .
+     mkdir -p public && cd resourcepack && zip -qr ../public/RumilanceResourcePack.mczip .
      ```
    - Output directory: `public`
+
+   > **⚠ 拡張子は `.zip` にしないこと**: Cloudflare Pages は出力ディレクトリの
+   > `.zip` ファイルをデプロイ時に自動展開してしまいます（中身がバラで置かれ、
+   > ダウンロードできなくなる）。`.mczip` など別拡張子ならそのまま配信されます。
+   > Minecraft クライアントは拡張子ではなく中身（ZIP構造）で判定するので、
+   > `resource-pack=` に `.mczip` のURLをそのまま指定して問題ありません。
+   > （ファイル内容が変わらないので **SHA1 もそのまま使えます**）
+
 3. デプロイ後の配布 URL:
-   `https://<プロジェクト名>.pages.dev/RumilanceResourcePack.zip`
-   ブラウザで開いて ZIP が落ちてくれば OK。
+   `https://<プロジェクト名>.pages.dev/RumilanceResourcePack.mczip`
+   ブラウザで開いてファイルが落ちてくれば OK（落ちたファイルを `.zip` に
+   リネームして開ける＝正常なZIP、と確認できます）。
 4. サーバー設定:
    ```properties
-   resource-pack=https://<プロジェクト名>.pages.dev/RumilanceResourcePack.zip
+   resource-pack=https://<プロジェクト名>.pages.dev/RumilanceResourcePack.mczip
    resource-pack-sha1=<zip の SHA1>
    require-resource-pack=true
    resource-pack-prompt={"text":"Rumilanceのアイコン表示に必要です","color":"aqua"}
