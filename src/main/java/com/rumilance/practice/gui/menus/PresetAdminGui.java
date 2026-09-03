@@ -139,7 +139,9 @@ public final class PresetAdminGui extends AbstractGui implements FreeInventoryEd
     }
 
     private void renderChest(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
+        // Bottom bar only: rows 0-3 are ALL free-edit slots — the standard chrome top bar
+        // used to cover the first nine of them with uneditable black panes.
+        MenuScaffold.bottomChrome(inventory);
         String cat = session.get(CAT, String.class);
         if (cat == null) {
             return;

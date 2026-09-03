@@ -1,12 +1,14 @@
 package com.rumilance.practice.kit;
 
 import com.rumilance.practice.config.ConfigService;
+import com.rumilance.practice.util.ItemKeys;
 import com.rumilance.practice.util.ItemSerializer;
 import com.rumilance.practice.util.PotionRules;
 import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.persistence.PersistentDataType;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -591,6 +593,14 @@ public final class PresetItems {
 
     public static String encodeItem(ItemStack item) {
         if (item == null || item.getType().isAir()) {
+            return null;
+        }
+        // Never persist GUI chrome (black filler panes etc.): every decorative scaffold item
+        // carries guiAction="decorate". Before this guard, panes bleeding into free-edit
+        // slots were silently saved as preset candidates.
+        if (item.hasItemMeta()
+                && "decorate".equals(item.getItemMeta().getPersistentDataContainer()
+                        .get(ItemKeys.guiAction(), PersistentDataType.STRING))) {
             return null;
         }
         ItemStack one = item.clone();

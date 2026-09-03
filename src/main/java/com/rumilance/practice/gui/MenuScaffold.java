@@ -94,6 +94,19 @@ public final class MenuScaffold {
         return inventory;
     }
 
+    /** Bottom bar only — for free-edit screens whose top rows are content slots. */
+    public static Inventory bottomChrome(Inventory inventory) {
+        int rows = rowCount(inventory);
+        if (rows < 2) {
+            return inventory;
+        }
+        ItemStack fill = ItemBuilder.hiddenFill();
+        for (int col = 0; col < GuiSlots.ROW_SIZE; col++) {
+            inventory.setItem(GuiSlots.slot(rows - 1, col), fill);
+        }
+        return inventory;
+    }
+
     /** Places a titled section header in the middle of an accent bar row. */
     public static Inventory header(Inventory inventory, int row, Component title) {
         inventory.setItem(GuiSlots.slot(row, 4),
