@@ -225,6 +225,8 @@ import java.util.concurrent.TimeUnit;
 public final class FeatureBootstrap {
 
     private final RumilancePractice plugin;
+    /** Periodic re-render of open GUIs whose data can change while viewed (party/queue/FFA). */
+    private org.bukkit.scheduler.BukkitTask liveGuiTask;
     private final ServiceRegistry services;
     private QueueCoordinator queueCoordinator;
     private MatchService matchService;
@@ -899,6 +901,17 @@ public final class FeatureBootstrap {
                 originalKitEditGui.open(player, ctx.slot, ctx.layout);
             }
         });
+        // Keep open party/queue/FFA/menu GUIs visually in sync while they are on screen:
+        // re-render once per second so toggles, counts and rosters never go stale.
+        liveGuiTask = org.bukkit.Bukkit.getScheduler().runTaskTimer(plugin,
+                () -> {
+                    try {
+                        guiListener.tickLiveGuis(guiSessions);
+                    } catch (RuntimeException e) {
+                        plugin.getLogger().log(java.util.logging.Level.WARNING,
+                                "Live GUI refresh failed", e);
+                    }
+                }, 20L, 20L);
 
         FunctionalItemListener functionalItemListener =
                 new FunctionalItemListener(soundService, queueCoordinator, rankedGui, unrankedGui);
@@ -1331,6 +1344,10 @@ public final class FeatureBootstrap {
         }
         if (teamGlowLosService != null) {
             teamGlowLosService.stop();
+        }
+        if (liveGuiTask != null) {
+            liveGuiTask.cancel();
+            liveGuiTask = null;
         }
     }
 

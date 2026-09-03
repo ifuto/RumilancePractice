@@ -43,6 +43,11 @@ public final class GuiSessionRegistry {
         return Optional.ofNullable(sessions.get(playerId));
     }
 
+    /** Snapshot of every open session (for periodic live re-renders). */
+    public java.util.Collection<GuiSession> sessions() {
+        return java.util.List.copyOf(sessions.values());
+    }
+
     public boolean isCurrent(UUID playerId, UUID sessionId) {
         GuiSession session = sessions.get(playerId);
         return session != null && session.sessionId().equals(sessionId);

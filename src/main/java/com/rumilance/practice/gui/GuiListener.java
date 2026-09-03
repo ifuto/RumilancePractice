@@ -37,6 +37,17 @@ public final class GuiListener implements Listener {
     private final OriginalKitService originalKitService;
     private final MessageService messages;
     private final Map<GuiType, AbstractGui> handlers = new EnumMap<>(GuiType.class);
+
+    /**
+     * GUIs whose underlying data can change WHILE the player is looking at them (other
+     * players toggling party settings, queue counts moving, arenas filling up...). These get
+     * re-rendered periodically by {@link #tickLiveGuis} so the displayed state never drifts
+     * from reality — no stale friendly-fire icons, party counts or queue numbers.
+     */
+    private static final java.util.Set<GuiType> LIVE_REFRESH_TYPES = java.util.EnumSet.of(
+            GuiType.TEAM_HUB, GuiType.TEAMS_BROWSER, GuiType.TEAM_KIT_SELECT, GuiType.PARTY_MAP,
+            GuiType.RANKED_QUEUE, GuiType.UNRANKED_QUEUE, GuiType.FFA_LIST,
+            GuiType.GAME_MENU, GuiType.BATTLE_MENU);
     /** Opens the Game Menu; wired from bootstrap (null = feature disabled). */
     private java.util.function.Consumer<Player> menuReturn;
     /** Opens the Battle Menu for screens marked {@link GuiSession#fromBattleMenu()}. */
@@ -65,6 +76,34 @@ public final class GuiListener implements Listener {
         gui.setStateManager(stateManager);
         if (messages != null) {
             gui.setMessages(messages);
+        }
+    }
+
+    /**
+     * Re-renders every open "live" GUI whose backing data may have changed while it was open.
+     * Only touches inventories whose holder still matches the registered session, so foreign
+     * inventories (anvils, other plugins) are never redrawn.
+     */
+    public void tickLiveGuis(GuiSessionRegistry registry) {
+        for (GuiSession session : registry.sessions()) {
+            GuiType type = session.type();
+            if (!LIVE_REFRESH_TYPES.contains(type)) {
+                continue;
+            }
+            AbstractGui gui = handlers.get(type);
+            if (gui == null) {
+                continue;
+            }
+            Player player = org.bukkit.Bukkit.getPlayer(session.playerId());
+            if (player == null || !player.isOnline()) {
+                continue;
+            }
+            Inventory top = player.getOpenInventory().getTopInventory();
+            if (top.getHolder() instanceof PracticeGuiHolder holder
+                    && holder.sessionId().equals(session.sessionId())
+                    && holder.type() == type) {
+                gui.renderPublic(player, session, top);
+            }
         }
     }
 
