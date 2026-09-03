@@ -38,7 +38,7 @@ public final class ShieldPatternGui extends AbstractGui implements GuiCloseHandl
     private static final int MAX_LAYERS = 6;
     private static final int PATTERNS_PER_PAGE = 27;
 
-    /** Every usable pattern type in a stable, display-friendly order. */
+    /** Every usable pattern type in a stable, display-friendly order (1.21+ constant names). */
     private static final List<PatternType> PATTERNS = List.of(
             PatternType.BASE,
             PatternType.SQUARE_BOTTOM_LEFT, PatternType.SQUARE_BOTTOM_RIGHT,
@@ -47,19 +47,18 @@ public final class ShieldPatternGui extends AbstractGui implements GuiCloseHandl
             PatternType.STRIPE_LEFT, PatternType.STRIPE_RIGHT,
             PatternType.STRIPE_CENTER, PatternType.STRIPE_MIDDLE,
             PatternType.STRIPE_DOWNRIGHT, PatternType.STRIPE_DOWNLEFT,
-            PatternType.STRIPE_SMALL, PatternType.CROSS, PatternType.STRAIGHT_CROSS,
+            PatternType.SMALL_STRIPES, PatternType.CROSS, PatternType.STRAIGHT_CROSS,
             PatternType.TRIANGLE_BOTTOM, PatternType.TRIANGLE_TOP,
             PatternType.TRIANGLES_BOTTOM, PatternType.TRIANGLES_TOP,
             PatternType.DIAGONAL_LEFT, PatternType.DIAGONAL_RIGHT,
-            PatternType.DIAGONAL_LEFT_MIRROR, PatternType.DIAGONAL_RIGHT_MIRROR,
-            PatternType.CIRCLE_MIDDLE, PatternType.RHOMBUS_MIDDLE,
+            PatternType.DIAGONAL_UP_LEFT, PatternType.DIAGONAL_UP_RIGHT,
+            PatternType.CIRCLE, PatternType.RHOMBUS,
             PatternType.HALF_VERTICAL, PatternType.HALF_HORIZONTAL,
-            PatternType.HALF_VERTICAL_MIRROR, PatternType.HALF_HORIZONTAL_MIRROR,
+            PatternType.HALF_VERTICAL_RIGHT, PatternType.HALF_HORIZONTAL_BOTTOM,
             PatternType.BORDER, PatternType.CURLY_BORDER,
             PatternType.GRADIENT, PatternType.GRADIENT_UP, PatternType.BRICKS,
             PatternType.CREEPER, PatternType.SKULL, PatternType.FLOWER, PatternType.MOJANG,
-            PatternType.GLOBE, PatternType.PIGLIN, PatternType.FIELD_MASONED,
-            PatternType.BORDURE_INDENTED, PatternType.FLOW, PatternType.GUSTER
+            PatternType.GLOBE, PatternType.PIGLIN, PatternType.FLOW, PatternType.GUSTER
     );
 
     private static final DyeColor[] DYES = {
@@ -77,8 +76,6 @@ public final class ShieldPatternGui extends AbstractGui implements GuiCloseHandl
             Map.entry(PatternType.MOJANG, Material.MOJANG_BANNER_PATTERN),
             Map.entry(PatternType.GLOBE, Material.GLOBE_BANNER_PATTERN),
             Map.entry(PatternType.PIGLIN, Material.PIGLIN_BANNER_PATTERN),
-            Map.entry(PatternType.FIELD_MASONED, Material.FIELD_MASONED_BANNER_PATTERN),
-            Map.entry(PatternType.BORDURE_INDENTED, Material.BORDURE_INDENTED_BANNER_PATTERN),
             Map.entry(PatternType.FLOW, Material.FLOW_BANNER_PATTERN),
             Map.entry(PatternType.GUSTER, Material.GUSTER_BANNER_PATTERN)
     );
