@@ -34,25 +34,15 @@ public final class PartyHotbar {
         if (player == null) {
             return;
         }
+        // Deliberately minimal: every party control (invite, visibility, friendly fire,
+        // map select, start battle, side assignment...) lives inside the Party Hub GUI, so
+        // the hotbar only keeps things the hub cannot do — open the hub, edit your kit,
+        // and leave. (The extra party_* functions stay supported by the item listener for
+        // legacy / custom lobby items.)
         player.getInventory().clear();
         player.getInventory().setItem(0, tagged(HUB, Material.NETHER_STAR,
-                UiTheme.menuTitle("Party Hub"), UiTheme.hint("設定・メンバー管理")));
-        player.getInventory().setItem(1, tagged(INVITE, Material.PLAYER_HEAD,
-                Component.text("Invite", UiTheme.SUCCESS), UiTheme.hint("オンライン招待")));
-        if (owner) {
-            player.getInventory().setItem(2, tagged(START, Material.DIAMOND_SWORD,
-                    Component.text("Start Battle", UiTheme.WARNING), UiTheme.hint("キット選択へ")));
-            player.getInventory().setItem(3, tagged(PUBLIC, Material.ENDER_EYE,
-                    Component.text("Visibility", UiTheme.SECONDARY), UiTheme.hint("公開/非公開切替")));
-            player.getInventory().setItem(4, tagged(FF, friendlyFire ? Material.TNT : Material.SHIELD,
-                    Component.text("Friendly Fire", friendlyFire ? UiTheme.DANGER : UiTheme.SUCCESS),
-                    UiTheme.line(friendlyFire ? "ON — 味方に当たる" : "OFF — 味方に当たらない")));
-            if (hasPartyMaps) {
-                player.getInventory().setItem(5, tagged(MAP, Material.FILLED_MAP,
-                        Component.text("Map", UiTheme.PRIMARY), UiTheme.hint("パーティーマップ選択")));
-            }
-        }
-        player.getInventory().setItem(7, tagged("ekit", Material.CHEST,
+                UiTheme.menuTitle("Party Hub"), UiTheme.hint("メンバー・設定・対戦開始")));
+        player.getInventory().setItem(1, tagged("ekit", Material.CHEST,
                 Component.text("Kit Edit", UiTheme.PRIMARY), UiTheme.hint("Edit your kit layouts")));
         player.getInventory().setItem(8, tagged(LEAVE, Material.OAK_DOOR,
                 Component.text("Leave Party", UiTheme.DANGER), UiTheme.hint("パーティー退出")));
