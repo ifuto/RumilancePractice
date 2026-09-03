@@ -157,7 +157,7 @@ public final class BattleMenuGui extends AbstractGui {
         if (busyLocked) {
             builder.lore(UiTheme.blank(),
                     UiTheme.status(raw(player, "menu.battle-locked")
-                            .replace("<state>", line(player, stateKey(state))), UiTheme.WARNING),
+                            .replace("<state>", raw(player, stateKey(state))), UiTheme.WARNING),
                     UiTheme.line(raw(player, "menu.battle-locked-hint")));
         } else if (partyLocked && inParty) {
             builder.lore(UiTheme.blank(), UiTheme.status(raw(player, "menu.party-only"), UiTheme.WARNING));
@@ -262,7 +262,7 @@ public final class BattleMenuGui extends AbstractGui {
                     if (isBusy(state)) {
                         player.sendMessage(Component.text(
                                 raw(player, "menu.battle-locked")
-                                        .replace("<state>", line(player, stateKey(state))),
+                                        .replace("<state>", raw(player, stateKey(state))),
                                 UiTheme.WARNING));
                     } else if (inParty) {
                         player.sendMessage(Component.text(raw(player, "menu.party-only"), UiTheme.WARNING));
@@ -283,10 +283,6 @@ public final class BattleMenuGui extends AbstractGui {
     }
 
     private String raw(Player player, String key) {
-        return messageService.localeService().rawMessage(messageService.resolveLocale(player), key);
-    }
-
-    private String line(Player player, String key) {
         return messageService.localeService().rawMessage(messageService.resolveLocale(player), key);
     }
 }
