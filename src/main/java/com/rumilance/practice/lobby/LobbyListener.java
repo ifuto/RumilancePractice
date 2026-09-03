@@ -41,6 +41,17 @@ public final class LobbyListener implements Listener {
         if (state == PlayerState.FFA) {
             return false;
         }
+        // Match lifecycle states own their damage rules (MatchListener cancels pre/post-fight
+        // hits and allows ACTIVE combat). They must NEVER fall under lobby protection: a GUI
+        // session that is open — or lingers — during a fight would otherwise make the player
+        // invulnerable ("cannot hit the enemy in Party Fight").
+        switch (state) {
+            case PREPARING_MATCH, COUNTDOWN, FIGHTING, ENDING -> {
+                return false;
+            }
+            default -> {
+            }
+        }
         if (guiSessions.get(player.getUniqueId()).isPresent()) {
             return true;
         }
