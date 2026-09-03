@@ -183,6 +183,10 @@ commands:
     description: Reload every YAML configuration (kits, arenas, ffa, sounds, scoreboard, locales, effects).
     usage: /rumireload
     permission: rumilance.admin
+  rankicon:
+    description: Diagnose resource-pack rank icons (client pack state, icon render test).
+    usage: /rankicon [test]
+    permission: rumilance.admin
   slobby:
     description: Configure lobby region/spawn.
     usage: /slobby <pos1|pos2|spawn|info|validate>

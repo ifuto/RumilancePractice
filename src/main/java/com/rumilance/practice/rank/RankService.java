@@ -196,22 +196,17 @@ public final class RankService {
         player.setCustomNameVisible(false);
     }
 
+    /**
+     * Styled display name: plain white for NORM, aqua→blue gradient for ranks. The legacy
+     * text badges (N / N+ / OWNER) are gone — rank badges come from the resource-pack icon
+     * font prefix (see IconFontService / RankIconNameTags).
+     */
     static Component styledName(String name, PlayerRank rank) {
         Objects.requireNonNull(name, "name");
         return switch (rank == null ? PlayerRank.NORM : rank) {
             case NORM -> Component.text(name, NamedTextColor.WHITE);
-            case VIP -> Component.text()
-                    .append(Component.text("N ", AQUA, TextDecoration.BOLD))
-                    .append(gradientName(name, false))
-                    .build();
-            case VIP_PLUS -> Component.text()
-                    .append(Component.text("N+ ", AQUA, TextDecoration.BOLD))
-                    .append(gradientName(name, true))
-                    .build();
-            case ADMIN -> Component.text()
-                    .append(Component.text("OWNER ", BLUE, TextDecoration.BOLD))
-                    .append(gradientName(name, true))
-                    .build();
+            case VIP -> gradientName(name, false);
+            case VIP_PLUS, ADMIN -> gradientName(name, true);
         };
     }
 

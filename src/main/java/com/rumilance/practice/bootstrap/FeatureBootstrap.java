@@ -1146,6 +1146,7 @@ public final class FeatureBootstrap {
         bind("slobby", practiceAdmin);
         bind("setlobbyitem", practiceAdmin);
         bind("rumireload", new RumilanceReloadCommand(services));
+        bind("rankicon", new com.rumilance.practice.command.RankIconCommand(services));
         bind("arena", arenaKitAdmin);
         bind("kit", arenaKitAdmin);
         bind("toggle", arenaKitAdmin);
