@@ -569,6 +569,8 @@ gui:
   queue-random: "Random"
   queue-left-join: "Left-click to join queue"
   queue-right-preview: "Right-click to preview"
+  queue-now: "You are queued here"
+  queue-leave-click: "Click to leave the queue"
   ranked-queue: "Ranked Queue"
   unranked-queue: "Unranked Queue"
   ranked: "Ranked"

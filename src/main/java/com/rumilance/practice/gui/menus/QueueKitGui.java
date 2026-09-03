@@ -138,6 +138,12 @@ public final class QueueKitGui extends AbstractGui {
                     .build();
         }
 
+        // The kit this player is already queued in gets a bright "you are here" marker and
+        // its hint flips to leave-queue (the coordinator's join toggles leave when queued).
+        QueueService.QueueEntry mine = queueService.get(player.getUniqueId()).orElse(null);
+        boolean queuedHere = mine != null && mine.mode() == mode()
+                && kit.name().equalsIgnoreCase(mine.kitId());
+
         Material icon = ItemBuilder.materialOr(kit.icon(), Material.DIAMOND_SWORD);
         ItemBuilder builder = ItemBuilder.of(icon)
                 .nameMini(kit.prettyDisplayName())
@@ -154,13 +160,21 @@ public final class QueueKitGui extends AbstractGui {
                             : line(player, "gui.queue-random"))
             );
         }
-        builder.lore(
-                UiTheme.blank(),
-                UiTheme.hint(line(player, "gui.queue-left-join")),
-                UiTheme.hint(line(player, "gui.queue-right-preview"))
-        );
+        if (queuedHere) {
+            builder.lore(
+                    UiTheme.blank(),
+                    UiTheme.status(line(player, "gui.queue-now"), UiTheme.SUCCESS),
+                    UiTheme.hint(line(player, "gui.queue-leave-click"))
+            );
+        } else {
+            builder.lore(
+                    UiTheme.blank(),
+                    UiTheme.hint(line(player, "gui.queue-left-join")),
+                    UiTheme.hint(line(player, "gui.queue-right-preview"))
+            );
+        }
         return builder
-                .glint(waiting > 0)
+                .glint(queuedHere || waiting > 0)
                 .action("kit:" + kit.name())
                 .tag(ItemKeys.kitName(), kit.name())
                 .build();

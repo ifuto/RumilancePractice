@@ -569,6 +569,8 @@ gui:
   queue-random: "ランダム"
   queue-left-join: "左クリックでキュー参加"
   queue-right-preview: "右クリックでプレビュー"
+  queue-now: "キュー参加中"
+  queue-leave-click: "クリックでキューから抜ける"
   ranked-queue: "ランクキュー"
   unranked-queue: "アンランクキュー"
   ranked: "ランク"

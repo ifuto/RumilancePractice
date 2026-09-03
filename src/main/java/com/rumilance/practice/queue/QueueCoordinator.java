@@ -142,13 +142,25 @@ public final class QueueCoordinator {
             messageService.send(player, "queue.cannot-join");
             return;
         }
+        // Handle "already queued" BEFORE the state check below (a queued player sits in
+        // QUEUED_* which would otherwise be rejected): clicking the same queue leaves it,
+        // clicking another kit/mode switches queues.
+        if (queueService.isQueued(player.getUniqueId())) {
+            boolean sameQueue = queueService.get(player.getUniqueId())
+                    .map(e -> e.mode() == mode && e.kitId().equalsIgnoreCase(kitId))
+                    .orElse(false);
+            if (sameQueue) {
+                leave(player);
+                return;
+            }
+            // Switching queues: drop the old entry and fall through into a fresh join for the
+            // new kit/mode (QUEUED->QUEUED is not a legal state transition, so reset first).
+            queueService.leave(player.getUniqueId());
+            stateManager.resetToLobby(player.getUniqueId());
+        }
         PlayerState state = stateManager.getState(player.getUniqueId());
         if (state != PlayerState.LOBBY && state != PlayerState.OPENING_GUI) {
             messageService.send(player, "queue.cannot-join");
-            return;
-        }
-        if (queueService.isQueued(player.getUniqueId())) {
-            leave(player);
             return;
         }
 
