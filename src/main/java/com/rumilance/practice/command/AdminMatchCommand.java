@@ -3,7 +3,7 @@ package com.rumilance.practice.command;
 import com.rumilance.practice.arena.ArenaService;
 import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.match.MatchService;
-import com.rumilance.practice.session.MatchMode;
+import com.rumilance.practice.state.MatchMode;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;

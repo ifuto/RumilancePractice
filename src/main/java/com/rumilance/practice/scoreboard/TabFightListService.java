@@ -1,8 +1,8 @@
 package com.rumilance.practice.scoreboard;
 
 import com.rumilance.practice.session.MatchSession;
-import com.rumilance.practice.session.MatchState;
-import com.rumilance.practice.team.TeamColor;
+import com.rumilance.practice.state.MatchState;
+import com.rumilance.practice.state.TeamColor;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.entity.Player;
@@ -56,7 +56,10 @@ public final class TabFightListService {
         List<Player> spectators = new ArrayList<>();
 
         for (Player p : online) {
-            if (session.isFighter(p.getUniqueId())) {
+            boolean fighting = session.isParticipant(p.getUniqueId())
+                    && !session.isEliminated(p.getUniqueId())
+                    && p.getGameMode() != org.bukkit.GameMode.SPECTATOR;
+            if (fighting) {
                 fighters.add(p);
                 TeamColor color = session.teamColor(p.getUniqueId());
                 if (color == TeamColor.RED) {
