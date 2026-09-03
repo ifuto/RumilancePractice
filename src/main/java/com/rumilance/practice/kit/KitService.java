@@ -301,6 +301,11 @@ public final class KitService {
                 org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
                 if (meta != null) {
                     meta.setCustomModelData(cmd);
+                    if (meta instanceof org.bukkit.inventory.meta.BannerMeta bannerMeta) {
+                        // The exclusive artwork is the shield's only look: drop any loom
+                        // patterns a VIP+ editor session may have left on the layout shield.
+                        bannerMeta.setPatterns(java.util.List.of());
+                    }
                     item.setItemMeta(meta);
                 }
             }
