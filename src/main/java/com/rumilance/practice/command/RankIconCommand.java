@@ -125,6 +125,19 @@ public final class RankIconCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("ADMIN   ", NamedTextColor.GRAY).append(admin).append(Component.text("  icon")));
         sender.sendMessage(Component.text("VIP+    ", NamedTextColor.GRAY).append(vipPlus).append(Component.text("  icon")));
         sender.sendMessage(Component.text("VIP     ", NamedTextColor.GRAY).append(vip).append(Component.text("  icon")));
+        // Diagnostic probes — distinguish "font not loaded on the client" from
+        // "font loaded but glyph providers missing".
+        net.kyori.adventure.key.Key iconFont = net.kyori.adventure.key.Key.key("rumilance", "icons");
+        String pua = new String(Character.toChars(0xE001));
+        sender.sendMessage(Component.text("Probe A ", NamedTextColor.DARK_GRAY)
+                .append(Component.text(pua).style(s -> s.font(iconFont)))
+                .append(Component.text("  = icons font + U+E001 (expected: admin badge)", NamedTextColor.DARK_GRAY)));
+        sender.sendMessage(Component.text("Probe B ", NamedTextColor.DARK_GRAY)
+                .append(Component.text("ABC").style(s -> s.font(iconFont)))
+                .append(Component.text("  = icons font + ABC (normal letters = font MISSING on client; squares = font loaded, glyphs broken)", NamedTextColor.DARK_GRAY)));
+        sender.sendMessage(Component.text("Probe C ", NamedTextColor.DARK_GRAY)
+                .append(Component.text(pua))
+                .append(Component.text("  = default font + U+E001 (control: another font pack mapping this char shows here)", NamedTextColor.DARK_GRAY)));
         if (sender instanceof Player player) {
             player.sendActionBar(Component.empty()
                     .append(admin)
