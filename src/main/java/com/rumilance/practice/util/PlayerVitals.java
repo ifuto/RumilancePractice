@@ -26,6 +26,10 @@ public final class PlayerVitals {
         // Safety net: a player pulled out of the original-kit room (or any isolated context)
         // may still have collision disabled, which makes melee attacks pass right through them.
         player.setCollidable(true);
+        // Re-enable gravity: a void death parks the player with gravity OFF during the ENDING
+        // window (see MatchService.endMatch); every kit apply / lobby return / rematch must
+        // restore normal physics.
+        player.setGravity(true);
         player.setFireTicks(0);
         player.setFreezeTicks(0);
         player.setFallDistance(0f);

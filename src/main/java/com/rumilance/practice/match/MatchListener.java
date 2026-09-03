@@ -257,9 +257,36 @@ public final class MatchListener implements Listener {
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onDrop(PlayerDropItemEvent event) {
         MatchSession session = matchService.registry().byPlayer(event.getPlayer().getUniqueId()).orElse(null);
-        if (session != null && (session.state() == MatchState.COUNTDOWN || session.state() == MatchState.ENDING)) {
-            event.setCancelled(true);
+        if (session == null) {
+            return;
         }
+        if (session.state() == MatchState.COUNTDOWN || session.state() == MatchState.ENDING) {
+            event.setCancelled(true);
+            return;
+        }
+        if (session.state() == MatchState.ACTIVE) {
+            // Hidden-rank custom shields may be dropped (party fights loot them), but the
+            // assigned custom-model artwork must NEVER survive as a ground item.
+            stripCustomShieldModel(event.getItemDrop());
+        }
+    }
+
+    /** Removes the hidden-rank custom model data from a dropped shield, if present. */
+    public static void stripCustomShieldModel(org.bukkit.entity.Item drop) {
+        if (drop == null) {
+            return;
+        }
+        org.bukkit.inventory.ItemStack stack = drop.getItemStack();
+        if (stack.getType() != org.bukkit.Material.SHIELD || !stack.hasItemMeta()) {
+            return;
+        }
+        org.bukkit.inventory.meta.ItemMeta meta = stack.getItemMeta();
+        if (meta == null || !meta.hasCustomModelData()) {
+            return;
+        }
+        meta.setCustomModelData(null);
+        stack.setItemMeta(meta);
+        drop.setItemStack(stack);
     }
 
     /** Countdown: walk + rearrange kit only — no bows / crossbows / eggs / pearls as projectiles. */

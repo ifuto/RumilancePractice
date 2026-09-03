@@ -22,6 +22,7 @@ import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -92,9 +93,19 @@ public final class FfaListener implements Listener {
                 ffaService.tagCombat(victim.getUniqueId(), attackerId);
             }
         }
+        // After a vanilla/manual totem pop, stale HP frames can LOOK lethal; the grace window
+        // shields those frames. A GENUINE killing blow inside the window must still resolve —
+        // cancelling it unconditionally (the old behaviour) made the hit vanish entirely, so the
+        // victim got one free "invincible" hit after every totem pop. Mirrors MatchListener.
         if (PracticeDeath.isInResurrectGrace(victim)) {
-            event.setCancelled(true);
-            event.setDamage(0);
+            if (PracticeDeath.shouldDeferTotemToVanilla(victim, kit, event)) {
+                return;
+            }
+            if (PracticeDeath.remainingAfter(victim, event) <= 0) {
+                event.setCancelled(true);
+                event.setDamage(0);
+                ffaService.handleLethal(victim, resolveKiller(event));
+            }
             return;
         }
         if (PracticeDeath.shouldDeferTotemToVanilla(victim, kit, event)) {

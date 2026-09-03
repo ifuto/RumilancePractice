@@ -70,7 +70,18 @@ public final class SpectatorBoundsListener implements Listener {
     private Cuboid regionFor(Player player) {
         UUID matchId = spectatorService.spectatedMatch(player.getUniqueId()).orElse(null);
         if (matchId == null) {
-            return null;
+            // Not a duel/team camera: an FFA spectator has no match entry — the per-player
+            // border alone is client-side only, so it needs the same server-side backstop.
+            if (ffaService == null) {
+                return null;
+            }
+            String ffaArenaId = spectatorService.ffaArenaOf(player.getUniqueId()).orElse(null);
+            if (ffaArenaId == null) {
+                return null;
+            }
+            return ffaService.get(ffaArenaId)
+                    .map(com.rumilance.practice.ffa.FfaService.FfaArena::region)
+                    .orElse(null);
         }
         MatchSession session = matchRegistry.get(matchId).orElse(null);
         if (session == null || session.arenaInstanceId() == null) {

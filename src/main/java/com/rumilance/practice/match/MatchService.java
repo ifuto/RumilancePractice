@@ -1752,6 +1752,17 @@ public final class MatchService {
             PlayerVitals.clearCombatState(player);
             PlayerVitals.resetMaxHealth(player);
             player.getInventory().clear();
+            // A fighter who died in the void keeps falling forever during the ENDING window
+            // (post-match damage is cancelled, so nothing stops them). Park them just above
+            // the world floor — gravity off is reverted by clearCombatState (lobby return /
+            // rematch start both run it).
+            if (player.getLocation().getY() < player.getWorld().getMinHeight() - 2.0) {
+                org.bukkit.Location parked = player.getLocation().clone();
+                parked.setY(player.getWorld().getMinHeight() + 1.0);
+                player.setVelocity(new org.bukkit.util.Vector());
+                player.teleport(parked);
+                player.setGravity(false);
+            }
             // Eliminated team players were parked in spectator mode — restore them so they
             // can see and use the rematch/report items during the ENDING window.
             if (session.isTeamMatch() && player.getGameMode() == org.bukkit.GameMode.SPECTATOR) {
@@ -1892,6 +1903,27 @@ public final class MatchService {
                 }
             }
             if (session.bothRematchRequested()) {
+                boolean teamMatch = session.isTeamMatch();
+                // The session roster is FROZEN at match start; during the ENDING window members
+                // can leave or get kicked from their party (or disconnect). Drafting them into
+                // the rematch would teleport them against their will, and offline members make
+                // startTeamMatch reject AFTER the old session is cleaned up — stranding everyone
+                // in ENDING state with no match. Filter to online, still-in-party members.
+                List<UUID> redTeam = teamMatch
+                        ? currentTeamRoster(session.team(TeamColor.RED)) : List.of();
+                List<UUID> blueTeam = teamMatch
+                        ? currentTeamRoster(session.team(TeamColor.BLUE)) : List.of();
+                if (teamMatch && (redTeam.isEmpty() || blueTeam.isEmpty())) {
+                    for (UUID id : session.participants()) {
+                        Player member = Bukkit.getPlayer(id);
+                        if (member != null && messageService != null) {
+                            messageService.send(member, "match.could-not-start",
+                                    MessageService.tags("reason", "a team lost its members"));
+                        }
+                    }
+                    returnPlayersToLobby(session);
+                    return;
+                }
                 if (!session.tryBeginRematch()) {
                     return;
                 }
@@ -1912,12 +1944,7 @@ public final class MatchService {
                 Map<UUID, Integer> carrySeries = session.seriesWinsSnapshot();
                 String preferredArena = session.preferredArenaName();
                 UUID carryArena = session.arenaInstanceId();
-                boolean teamMatch = session.isTeamMatch();
                 boolean friendlyFire = session.friendlyFire();
-                List<UUID> redTeam = teamMatch
-                        ? new ArrayList<>(session.team(TeamColor.RED)) : List.of();
-                List<UUID> blueTeam = teamMatch
-                        ? new ArrayList<>(session.team(TeamColor.BLUE)) : List.of();
                 // Spectators follow the rematch: capture them before cleanup detaches the old
                 // match id, and register the hand-off BEFORE starting the new match — with a
                 // carried arena the countdown can begin synchronously inside startDuel.
@@ -1940,6 +1967,26 @@ public final class MatchService {
                 }
             }
         });
+    }
+
+    /**
+     * Filters a frozen match roster down to players who can legitimately rematch right now:
+     * online AND still a member of their party. Members who left / were kicked during the
+     * ENDING window must never be pulled into the follow-up fight.
+     */
+    private List<UUID> currentTeamRoster(List<UUID> frozenRoster) {
+        List<UUID> current = new ArrayList<>();
+        for (UUID id : frozenRoster) {
+            if (Bukkit.getPlayer(id) == null) {
+                continue;
+            }
+            if (teamService != null
+                    && teamService.teamOf(id).map(team -> team.members().contains(id)).orElse(false) == false) {
+                continue;
+            }
+            current.add(id);
+        }
+        return current;
     }
 
     private void clearRematchItems(MatchSession session) {

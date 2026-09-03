@@ -114,6 +114,15 @@ public final class FfaService {
 
     private static final long COMBAT_MS = 30_000L;
 
+    /** Invoked with the arena id right after a reset evicts the fighters — lets the spectator
+     *  service bail cameras that were watching this FFA (otherwise they'd float over the
+     *  terrain while it is being restored). */
+    private volatile java.util.function.Consumer<String> arenaResetHook;
+
+    public void setArenaResetHook(java.util.function.Consumer<String> hook) {
+        this.arenaResetHook = hook;
+    }
+
     private final Plugin plugin;
     private final ConfigService configService;
     private final KitService kitService;
@@ -1030,6 +1039,11 @@ public final class FfaService {
                         Title.Times.times(Duration.ZERO, Duration.ofSeconds(2), Duration.ofMillis(200))));
                 leave(player);
             }
+        }
+        // Bail any spectator cameras watching this arena BEFORE the terrain restore runs.
+        java.util.function.Consumer<String> resetHook = arenaResetHook;
+        if (resetHook != null) {
+            resetHook.accept(arena.id());
         }
         List<BlockChange> diffs = blockDiffs.remove(arena.id());
         Runnable finish = () -> {

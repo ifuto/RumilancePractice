@@ -417,6 +417,9 @@ public final class FeatureBootstrap {
                 ffaStatsRepository, asyncExecutor, runtimeFlags, messageService, soundService);
         services.register(FfaService.class, ffaService);
         spectatorService.setFfaService(ffaService);
+        // When an FFA arena resets, bail the spectator cameras watching it (they are not in
+        // FfaService's occupant map, so the reset's own sweep never reaches them).
+        ffaService.setArenaResetHook(spectatorService::clearFfaArena);
 
         PracticeCloneService practiceCloneService = new PracticeCloneService(
                 plugin, faweBridge, new File(PluginIdentity.dataFolder(plugin), "schematics"),
