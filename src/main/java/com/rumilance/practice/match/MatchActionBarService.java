@@ -16,17 +16,19 @@ import org.bukkit.scheduler.BukkitTask;
  * configured by {@code match.action-bar-mode} in config.yml:
  *
  * <ul>
- *   <li>{@code score} (default) — the scoreline:
- *       {@code <self name> <self score> - <opponent score> <opponent name>}</li>
+ *   <li>{@code score} (default) — the duel scoreline:
+ *       {@code <red face><red score> - <blue score><blue face>} — names are intentionally
+ *       omitted; the vanilla player sprite identifies each fighter. Team battles show the
+ *       alive count per side instead ({@code ●n - ●n}).</li>
  *   <li>{@code time} — the elapsed match time in {@code min:sec} (e.g. {@code 04:09}),
  *       counted from the moment the fight went ACTIVE.</li>
  * </ul>
  *
- * <p>Names are coloured by the fighter's team colour (red for {@link TeamColor#RED}, aqua/blue
- * for {@link TeamColor#BLUE}). The score is the current game's kills (deaths) — the value that
- * moves during the fight — prefixed by the running series/round wins so the Best-of count is
- * visible too. A player head cannot be rendered inside an action bar, so the coloured name with
- * a small marker stands in for the requested "face".</p>
+ * <p>Colours follow team colours (red for {@link TeamColor#RED}, aqua/blue for
+ * {@link TeamColor#BLUE}), rendered non-bold ("thin"). The score is the current game's kills.
+ * Spectators see the same red-vs-blue line as the fighters (their own name never appears —
+ * spectating is detected via {@link MatchSession#isParticipant(java.util.UUID)}, because
+ * {@code teamColor()} defaults non-participants to RED).</p>
  */
 public final class MatchActionBarService {
 
@@ -106,8 +108,10 @@ public final class MatchActionBarService {
     }
 
     private Component buildLine(Player viewer, MatchSession session) {
-        TeamColor viewerColor = session.teamColor(viewer.getUniqueId());
-        TeamColor selfColor = viewerColor != null ? viewerColor : TeamColor.RED;
+        // Spectator detection must use isParticipant(): teamColor() defaults non-participants
+        // to RED (never null), which used to leak the spectator's own name into the bar.
+        boolean fighter = session.isParticipant(viewer.getUniqueId());
+        TeamColor selfColor = fighter ? session.teamColor(viewer.getUniqueId()) : TeamColor.RED;
         TeamColor oppColor = selfColor.opposite();
 
         Component left;
@@ -117,23 +121,23 @@ public final class MatchActionBarService {
             right = sideLabel(session, oppColor);
         } else {
             java.util.List<java.util.UUID> parts = session.participants();
-            java.util.UUID me = viewerColor != null ? viewer.getUniqueId()
-                    : (parts.isEmpty() ? null : parts.get(0));
-            java.util.UUID opp = me == null ? null : session.opponentOf(me);
-            // For a pure spectator (no colour) show the two fighters as red/blue.
-            if (viewerColor == null) {
+            java.util.UUID me;
+            java.util.UUID opp;
+            if (fighter) {
+                me = viewer.getUniqueId();
+                opp = session.opponentOf(me);
+            } else {
+                // Pure spectator: show the two fighters, index 0 = RED, index 1 = BLUE.
                 me = parts.isEmpty() ? null : parts.get(0);
                 opp = parts.size() < 2 ? null : parts.get(1);
             }
-            left = playerLabel(session, me, selfColor);
-            right = playerLabel(session, opp, oppColor);
+            left = playerLabel(session, me, selfColor, true);
+            right = playerLabel(session, opp, oppColor, false);
         }
 
         return Component.empty()
                 .append(left)
-                .append(Component.text("   ", NamedTextColor.DARK_GRAY))
-                .append(Component.text("-", NamedTextColor.GRAY, TextDecoration.BOLD))
-                .append(Component.text("   ", NamedTextColor.DARK_GRAY))
+                .append(Component.text(" - ", NamedTextColor.GRAY))
                 .append(right);
     }
 
@@ -150,22 +154,19 @@ public final class MatchActionBarService {
                 .append(Component.text(String.valueOf(alive), textColor, TextDecoration.BOLD));
     }
 
-    private Component playerLabel(MatchSession session, java.util.UUID id, TeamColor color) {
+    /**
+     * One side of the duel scoreline: {@code {face}{score}} when {@code faceFirst},
+     * otherwise {@code {score}{face}}. The score is non-bold ("thin") in the fighter's team
+     * colour; no name — the vanilla player sprite identifies the fighter.
+     */
+    private Component playerLabel(MatchSession session, java.util.UUID id, TeamColor color,
+                                  boolean faceFirst) {
         NamedTextColor textColor = color == TeamColor.RED ? NamedTextColor.RED : NamedTextColor.AQUA;
-        String name = id == null ? "-" : com.rumilance.practice.stats.StatsService.nameOf(id);
         int score = id == null ? 0 : session.killsOf(id);
-        int series = id == null ? 0 : session.seriesWinsOf(id);
-
-        Component label = Component.empty();
-        // Render the fighter's real face via the vanilla player-sprite (<head:uuid>, no resource pack).
-        if (id != null && headFontService != null) {
-            label = label.append(headFontService.head(id));
-        }
-        label = label.append(Component.text(" " + name + " ", textColor))
-                .append(Component.text(score, NamedTextColor.WHITE, TextDecoration.BOLD))
-                .append(series > 0
-                        ? Component.text(" (" + series + ")", NamedTextColor.GRAY)
-                        : Component.empty());
-        return label;
+        Component face = (id != null && headFontService != null)
+                ? headFontService.head(id)
+                : Component.empty();
+        Component scoreText = Component.text(" " + score + " ", textColor);
+        return faceFirst ? face.append(scoreText) : scoreText.append(face);
     }
 }

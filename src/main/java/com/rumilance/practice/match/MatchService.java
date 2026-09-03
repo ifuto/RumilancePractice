@@ -61,6 +61,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -1020,6 +1021,11 @@ public final class MatchService {
             failMatch(session, "Could not start countdown");
             return;
         }
+        // Rematch hand-off: fighters are now placed on their spawns, so carried-over
+        // spectators of the previous match can be bound to this one and moved in.
+        if (spectatorService != null) {
+            spectatorService.attachCarried(session);
+        }
         final int[] remaining = {countdownSeconds};
         BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             if (session.state() != MatchState.COUNTDOWN) {
@@ -1805,7 +1811,20 @@ public final class MatchService {
                         ? new ArrayList<>(session.team(TeamColor.RED)) : List.of();
                 List<UUID> blueTeam = teamMatch
                         ? new ArrayList<>(session.team(TeamColor.BLUE)) : List.of();
-                cleanupSession(session, false);
+                // Spectators follow the rematch: capture them before cleanup detaches the old
+                // match id, and register the hand-off BEFORE starting the new match — with a
+                // carried arena the countdown can begin synchronously inside startDuel.
+                Set<UUID> watching = spectatorService == null
+                        ? Set.of() : spectatorService.spectatorsWatching(session.id());
+                List<UUID> carried = new ArrayList<>(redTeam);
+                carried.addAll(blueTeam);
+                if (carried.isEmpty()) {
+                    carried = List.of(a, b);
+                }
+                if (spectatorService != null && !watching.isEmpty()) {
+                    spectatorService.scheduleCarry(carried, watching);
+                }
+                cleanupSession(session, false, !watching.isEmpty());
                 if (teamMatch) {
                     startTeamMatch(redTeam, blueTeam, kit, mode, bestOf, preferredArena,
                             friendlyFire, carrySeries, carryArena);
@@ -1973,9 +1992,22 @@ public final class MatchService {
     }
 
     private void cleanupSession(MatchSession session, boolean releaseArena) {
+        cleanupSession(session, releaseArena, false);
+    }
+
+    /**
+     * @param preserveSpectators when true (rematch path) spectators are detached from the old
+     *                           match id but left in the arena — they follow the new match via
+     *                           {@link com.rumilance.practice.spectator.SpectatorService#attachCarried}.
+     */
+    private void cleanupSession(MatchSession session, boolean releaseArena, boolean preserveSpectators) {
         cancelTask(session.id());
         if (spectatorService != null) {
-            spectatorService.clearMatch(session.id());
+            if (preserveSpectators) {
+                spectatorService.detachForRematch(session.id());
+            } else {
+                spectatorService.clearMatch(session.id());
+            }
         }
         UUID arenaId = session.arenaInstanceId();
         registry.unregister(session.id());

@@ -86,9 +86,15 @@ public final class SpectateListGui extends AbstractGui {
         MenuScaffold.chrome(inventory);
         MenuScaffold.header(inventory, 0, title(player, session));
 
+        // Spectatable from "match found" (arena reservation) onwards — not only once the
+        // fight is ACTIVE — so the entry shows up the moment the match is made.
         List<MatchSession> active = new ArrayList<>();
         for (MatchSession match : matchRegistry.all()) {
-            if (match.state() == MatchState.ACTIVE) {
+            MatchState state = match.state();
+            if (state == MatchState.RESERVING_ARENA
+                    || state == MatchState.PASTING_ARENA
+                    || state == MatchState.COUNTDOWN
+                    || state == MatchState.ACTIVE) {
                 active.add(match);
             }
         }
@@ -184,7 +190,8 @@ public final class SpectateListGui extends AbstractGui {
         UUID a = match.participants().get(0);
         UUID b = match.participants().size() > 1 ? match.participants().get(1) : a;
 
-        String elapsed = "live";
+        boolean live = match.state() == MatchState.ACTIVE;
+        String elapsed = live ? "live" : "starting";
         if (match.startedAt() != null) {
             long seconds = Duration.between(match.startedAt(), Instant.now()).getSeconds();
             elapsed = String.format("%d:%02d", seconds / 60, seconds % 60);
@@ -216,7 +223,9 @@ public final class SpectateListGui extends AbstractGui {
             lore.add(UiTheme.labelValue("BLUE", joinNames(match.team(TeamColor.BLUE))));
         }
         lore.add(UiTheme.blank());
-        lore.add(UiTheme.status("LIVE", UiTheme.SUCCESS));
+        lore.add(live
+                ? UiTheme.status("LIVE", UiTheme.SUCCESS)
+                : UiTheme.status("STARTING", UiTheme.WARNING));
         lore.add(UiTheme.hint(line(viewer, "gui.spectate-hint")));
 
         return ItemBuilder.of(iconMat)

@@ -37,6 +37,14 @@ public final class SpectatorService {
     private final Map<UUID, Set<UUID>> matchSpectators = new ConcurrentHashMap<>();
     /** Spectators currently inside an FFA arena: spectator -> FFA arena id. */
     private final Map<UUID, String> spectatorToFfa = new ConcurrentHashMap<>();
+    /**
+     * Rematch hand-off: spectators of a match that just went into a rematch, keyed by any of
+     * the (carried-over) participant UUIDs. Consumed by {@link #attachCarried(MatchSession)}
+     * the moment the new match's countdown begins; a timeout bails them to the lobby if the
+     * new match never starts (e.g. a fighter went offline during the rematch window).
+     */
+    private final Map<UUID, Set<UUID>> pendingCarry = new ConcurrentHashMap<>();
+    private static final long CARRY_TIMEOUT_TICKS = 30L * 20L;
     /** Optional per-player border/view-distance control (null = feature off). */
     private volatile com.rumilance.practice.sight.ViewControlService viewControl;
     private volatile com.rumilance.practice.ffa.FfaService ffaService;
@@ -87,7 +95,9 @@ public final class SpectatorService {
             return false;
         }
         Optional<MatchSession> matchOpt = matchRegistry.byPlayer(target.getUniqueId());
-        boolean inMatch = matchOpt.isPresent() && matchOpt.get().state() == MatchState.ACTIVE;
+        // Spectatable from "match found" (arena reservation) through the live fight, so the
+        // spectator camera can already move to the arena during the countdown.
+        boolean inMatch = matchOpt.isPresent() && isSpectatable(matchOpt.get().state());
 
         if (inMatch) {
             return spectateMatch(spectator, target, matchOpt.get());
@@ -126,8 +136,39 @@ public final class SpectatorService {
             viewControl.applyForMatch(spectator, match);
         }
         hideInWorld(spectator);
-        spectator.sendMessage(Component.text("Spectating " + target.getName(), NamedTextColor.AQUA));
+        spectator.sendMessage(spectatingLine(match));
         return true;
+    }
+
+    /** {@code Spectating <red> vs <blue>} — colours, not a single player's name. */
+    private Component spectatingLine(MatchSession match) {
+        java.util.List<UUID> red = match.team(com.rumilance.practice.state.TeamColor.RED);
+        java.util.List<UUID> blue = match.team(com.rumilance.practice.state.TeamColor.BLUE);
+        Component redPart = sideText(red, NamedTextColor.RED);
+        Component bluePart = sideText(blue, NamedTextColor.AQUA);
+        return Component.text("Spectating ", NamedTextColor.GRAY)
+                .append(redPart)
+                .append(Component.text(" vs ", NamedTextColor.DARK_GRAY))
+                .append(bluePart);
+    }
+
+    /** A side's label: one name in a duel, {@code NxN} member count in a team battle. */
+    private Component sideText(java.util.List<UUID> members, NamedTextColor color) {
+        if (members.size() == 1) {
+            Player p = Bukkit.getPlayer(members.get(0));
+            String name = p != null ? p.getName()
+                    : com.rumilance.practice.stats.StatsService.nameOf(members.get(0));
+            return Component.text(name, color);
+        }
+        return Component.text(members.size() + " players", color);
+    }
+
+    /** Matches are spectatable from arena reservation through the live fight. */
+    private boolean isSpectatable(MatchState state) {
+        return state == MatchState.RESERVING_ARENA
+                || state == MatchState.PASTING_ARENA
+                || state == MatchState.COUNTDOWN
+                || state == MatchState.ACTIVE;
     }
 
     private boolean spectateFfa(Player spectator, Player target) {
@@ -168,6 +209,109 @@ public final class SpectatorService {
                 .teleport(spectator, LocationUtil.safeTeleportLocation(at));
     }
 
+    /**
+     * Drops the match bookkeeping for a rematch WITHOUT sending spectators back to the lobby
+     * (their camera stays in the arena, which the rematch reuses). The bookkeeping is
+     * re-established by {@link #attachCarried(MatchSession)} once the new countdown starts.
+     */
+    public void detachForRematch(UUID matchId) {
+        Set<UUID> specs = matchSpectators.remove(matchId);
+        if (specs != null) {
+            for (UUID id : specs) {
+                spectatorToMatch.remove(id);
+            }
+        }
+    }
+
+    /**
+     * Registers the spectators of a match that is rematching, so they follow the new match.
+     * Keyed by every (carried-over) participant UUID: whichever match starts with one of them
+     * consumes the set. A safety timeout bails leftovers to the lobby.
+     */
+    public void scheduleCarry(java.util.Collection<UUID> newMatchParticipants, Set<UUID> spectators) {
+        if (spectators == null || spectators.isEmpty()) {
+            return;
+        }
+        Set<UUID> copy = ConcurrentHashMap.newKeySet();
+        copy.addAll(spectators);
+        for (UUID participant : newMatchParticipants) {
+            pendingCarry.put(participant, copy);
+        }
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            for (UUID participant : newMatchParticipants) {
+                Set<UUID> leftover = pendingCarry.remove(participant);
+                if (leftover == null) {
+                    continue;
+                }
+                for (UUID id : leftover) {
+                    // Only bail spectators still stuck in limbo (already attached / left = skip).
+                    if (!spectatorToMatch.containsKey(id) && stateManager.getState(id) == PlayerState.SPECTATING) {
+                        Player player = Bukkit.getPlayer(id);
+                        if (player != null) {
+                            leave(player);
+                        } else {
+                            stateManager.resetToLobby(id);
+                        }
+                    }
+                }
+            }
+        }, CARRY_TIMEOUT_TICKS);
+    }
+
+    /**
+     * Settles spectators the moment a match's countdown begins (fighters are already standing
+     * on their spawns): carried-over rematch spectators get re-bound to the new match id, and
+     * every spectator bound to this match — including players who started spectating during
+     * the reservation/countdown window while the fighters were still in the lobby — is moved
+     * into the arena.
+     */
+    public void attachCarried(MatchSession session) {
+        Set<UUID> carried = null;
+        for (UUID participant : session.participants()) {
+            carried = pendingCarry.remove(participant);
+            if (carried != null) {
+                break;
+            }
+        }
+        for (UUID participant : session.participants()) {
+            pendingCarry.remove(participant);
+        }
+        if (carried != null) {
+            for (UUID id : carried) {
+                Player spectator = Bukkit.getPlayer(id);
+                if (spectator == null || !spectator.isOnline()
+                        || stateManager.getState(id) != PlayerState.SPECTATING) {
+                    continue;
+                }
+                spectatorToMatch.put(id, session.id());
+                matchSpectators.computeIfAbsent(session.id(), matchId -> ConcurrentHashMap.newKeySet())
+                        .add(id);
+            }
+        }
+        Set<UUID> bound = matchSpectators.get(session.id());
+        if (bound == null || bound.isEmpty()) {
+            return;
+        }
+        UUID first = session.participants().isEmpty() ? null : session.participants().get(0);
+        Player anchor = first == null ? null : Bukkit.getPlayer(first);
+        for (UUID id : Set.copyOf(bound)) {
+            Player spectator = Bukkit.getPlayer(id);
+            if (spectator == null || !spectator.isOnline()
+                    || stateManager.getState(id) != PlayerState.SPECTATING) {
+                continue;
+            }
+            if (viewControl != null) {
+                viewControl.applyForMatch(spectator, session);
+            }
+            if (anchor != null) {
+                moveSpectatorTo(spectator, anchor.getLocation());
+            }
+            if (carried != null && carried.contains(id)) {
+                spectator.sendMessage(spectatingLine(session));
+            }
+        }
+    }
+
     public void leave(Player spectator) {
         leave(spectator, true);
     }
@@ -185,6 +329,11 @@ public final class SpectatorService {
             if (set != null) {
                 set.remove(spectator.getUniqueId());
             }
+        }
+        // Also drop them from any pending rematch hand-off, so a later countdown
+        // never re-attaches someone who already left.
+        for (Set<UUID> carried : pendingCarry.values()) {
+            carried.remove(spectator.getUniqueId());
         }
         stateManager.resetToLobby(spectator.getUniqueId());
         if (!returnToLobby || !spectator.isOnline()) {
