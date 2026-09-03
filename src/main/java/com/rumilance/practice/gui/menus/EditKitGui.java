@@ -398,13 +398,20 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             session.put("preset_category", category);
         }
         int page = presetPage(session);
-        setPresetPage(session, page);
 
         PlayerInventory inv = player.getInventory();
         inv.clear();
         String kitId = session.selectedKit();
-        int start = page * PRESET_ITEMS_PER_PAGE;
         java.util.Map<Integer, String> slotMap = presetItems.slots(kitId, category);
+        // Never strand the player on an empty page: clamp to the last page with content
+        // (covers stale pages left over from kit/category switches or emptied categories).
+        int maxSlot = slotMap.keySet().stream().mapToInt(Integer::intValue).max().orElse(-1);
+        int lastPage = maxSlot < 0 ? 0 : maxSlot / PRESET_ITEMS_PER_PAGE;
+        if (page > lastPage) {
+            page = lastPage;
+        }
+        setPresetPage(session, page);
+        int start = page * PRESET_ITEMS_PER_PAGE;
         for (int i = 0; i < PRESET_ITEMS_PER_PAGE; i++) {
             int absSlot = start + i;
             String entry = slotMap.get(absSlot);
@@ -425,8 +432,7 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         if (page > 0) {
             inv.setItem(7, pageButton(line(player, "gui.page-prev"), "preset-prev"));
         }
-        int maxSlot = slotMap.keySet().stream().mapToInt(Integer::intValue).max().orElse(-1);
-        if (start + PRESET_ITEMS_PER_PAGE <= maxSlot) {
+        if (page < lastPage) {
             inv.setItem(8, pageButton(line(player, "gui.page-next"), "preset-next"));
         }
     }

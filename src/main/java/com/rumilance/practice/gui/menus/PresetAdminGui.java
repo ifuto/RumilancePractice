@@ -80,10 +80,40 @@ public final class PresetAdminGui extends AbstractGui implements FreeInventoryEd
                     com.rumilance.practice.locale.MessageService.tags(
                             "cat", catName,
                             "page", String.valueOf(page + 1),
-                            "pages", String.valueOf(PresetItems.MAX_PAGES)))
+                            "pages", String.valueOf(effectivePages(session))))
                     .color(UiTheme.PRIMARY);
         }
         return t(player, "gui.preset-admin-title").color(UiTheme.PRIMARY);
+    }
+
+    /** Highest page index holding at least one entry, or -1 when the category is empty. */
+    private int lastContentPage(String category) {
+        if (category == null) {
+            return -1;
+        }
+        Map<Integer, String> slots = presetItems.slots(category);
+        int maxSlot = slots.keySet().stream().mapToInt(Integer::intValue).max().orElse(-1);
+        return maxSlot < 0 ? -1 : maxSlot / PresetItems.SLOTS_PER_PAGE;
+    }
+
+    /**
+     * Pages reachable from the GUI: everything that has content, plus (when the current page
+     * has content) the next empty page so items can be added there. Empty categories stay on
+     * a single page instead of offering five empty ones.
+     */
+    private boolean canGoNext(GuiSession session) {
+        int page = pageOf(session);
+        if (page >= PresetItems.MAX_PAGES - 1) {
+            return false;
+        }
+        int last = lastContentPage(session.get(CAT, String.class));
+        return page <= last;
+    }
+
+    private int effectivePages(GuiSession session) {
+        int page = pageOf(session);
+        int last = lastContentPage(session.get(CAT, String.class));
+        return Math.min(PresetItems.MAX_PAGES, Math.max(page + 1, last + 1));
     }
 
     @Override
@@ -132,9 +162,9 @@ public final class PresetAdminGui extends AbstractGui implements FreeInventoryEd
         inventory.setItem(PAGE_SLOT, GuiDecorator.button(Material.PAPER,
                 t(player, "menu.page-of", com.rumilance.practice.locale.MessageService.tags(
                         "page", String.valueOf(page + 1),
-                        "pages", String.valueOf(PresetItems.MAX_PAGES))),
+                        "pages", String.valueOf(effectivePages(session)))),
                 "noop"));
-        if (page < PresetItems.MAX_PAGES - 1) {
+        if (canGoNext(session)) {
             inventory.setItem(NEXT_SLOT, GuiDecorator.button(Material.LIME_STAINED_GLASS_PANE,
                     t(player, "gui.page-next"), "next"));
         }
@@ -239,6 +269,10 @@ public final class PresetAdminGui extends AbstractGui implements FreeInventoryEd
         }
         if ("next".equals(action)) {
             persistFreeEdit(player, session, inventory);
+            if (!canGoNext(session)) {
+                refresh(player, session, inventory);
+                return;
+            }
             session.put(PAGE, Math.min(PresetItems.MAX_PAGES - 1, pageOf(session) + 1));
             sounds.play(player, "gui-click");
             refresh(player, session, inventory);

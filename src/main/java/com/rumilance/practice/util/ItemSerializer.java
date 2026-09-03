@@ -92,7 +92,7 @@ public final class ItemSerializer {
         }
         try {
             return deserializeSingle(Base64.getDecoder().decode(encoded));
-        } catch (IllegalArgumentException e) {
+        } catch (RuntimeException e) {
             return null;
         }
     }

@@ -43,7 +43,7 @@ HTTPS + CDN + 無料枠で配信できます。クライアントは **ZIP フ�
 現在コミット済みパック（チーム画像削除済み版）の SHA1:
 
 ```
-d2305f86808ea3b44e085276341f24991d6f64a0
+730f0e2399135601333404476b5053ab51c483d9
 ```
 
 > パックの中身を変えたら再デプロイ（push すれば自動）→ サーバーの
@@ -57,7 +57,7 @@ Cloudflare を用意する前は、`dist/` にコミット済みのパックを 
 
 ```properties
 resource-pack=https://raw.githubusercontent.com/ifuto/RumilancePractice/main/dist/RumilanceResourcePack.zip
-resource-pack-sha1=d2305f86808ea3b44e085276341f24991d6f64a0
+resource-pack-sha1=730f0e2399135601333404476b5053ab51c483d9
 require-resource-pack=true
 ```
 

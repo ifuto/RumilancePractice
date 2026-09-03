@@ -127,6 +127,19 @@ public final class PresetItems {
                 yamlKeyByCategory.putIfAbsent(canonical, yamlKey);
             }
         }
+        // Old files merged weapons and armor into one combined key (武器/防具 / Weapons/Armor),
+        // which canonicalPreset leaves as an orphan pool no preset tab ever reads — so the
+        // Armor tab renders empty. Pull those entries into Armor/Gear where they belong.
+        if (normalizeCombinedPools(items)) {
+            for (String yamlKey : root == null ? List.<String>of() : root.getKeys(false)) {
+                if (!CategoryKeys.PRESET.contains(CategoryKeys.canonicalPreset(yamlKey))
+                        && !CategoryKeys.PRESET.contains(yamlKey)) {
+                    yaml.set("categories." + yamlKey, null);
+                }
+            }
+            yamlKeyByCategory.keySet().removeIf(key -> !CategoryKeys.PRESET.contains(key));
+            configService.save(ConfigService.PRESET_ITEMS);
+        }
         for (String category : CATEGORIES) {
             if (!items.containsKey(category) || items.get(category).isEmpty()) {
                 for (String key : CategoryKeys.presetLoadKeys(category)) {
@@ -165,10 +178,78 @@ public final class PresetItems {
                     byCategory.put(CategoryKeys.canonicalPreset(yamlKey), loaded);
                 }
             }
+            // Same combined-key normalization as the global pool (see reload()).
+            if (normalizeCombinedPools(byCategory)) {
+                for (String yamlKey : categories.getKeys(false)) {
+                    if (!CategoryKeys.PRESET.contains(CategoryKeys.canonicalPreset(yamlKey))
+                            && !CategoryKeys.PRESET.contains(yamlKey)) {
+                        yaml.set(KITS_ROOT + "." + kitId + ".categories." + yamlKey, null);
+                    }
+                }
+                configService.save(ConfigService.PRESET_ITEMS);
+            }
             if (!byCategory.isEmpty()) {
                 kitItems.put(kitId.toLowerCase(java.util.Locale.ROOT), byCategory);
             }
         }
+    }
+
+    /**
+     * Repairs pools loaded from files that predate the Armor/Gear split: entries sitting in a
+     * non-canonical (orphaned) pool — typically the old combined {@code 武器/防具} /
+     * {@code Weapons/Armor} key — are merged into {@code Gear}, with armor pieces split off into
+     * {@code Armor} when the Armor pool is empty. Returns true when the map was modified.
+     */
+    static boolean normalizeCombinedPools(Map<String, Map<Integer, String>> pools) {
+        boolean changed = false;
+        java.util.List<String> orphans = new java.util.ArrayList<>();
+        for (String key : pools.keySet()) {
+            if (!CategoryKeys.PRESET.contains(key)) {
+                orphans.add(key);
+            }
+        }
+        if (orphans.isEmpty()) {
+            return false;
+        }
+        Map<Integer, String> armor = pools.computeIfAbsent("Armor", c -> new java.util.TreeMap<>());
+        boolean armorEmpty = armor.isEmpty();
+        Map<Integer, String> gear = pools.computeIfAbsent("Gear", c -> new java.util.TreeMap<>());
+        for (String orphan : orphans) {
+            Map<Integer, String> map = pools.remove(orphan);
+            changed = true;
+            if (map == null) {
+                continue;
+            }
+            for (Map.Entry<Integer, String> e : map.entrySet()) {
+                if (armorEmpty && isArmorEntry(e.getValue())) {
+                    armor.putIfAbsent(e.getKey(), e.getValue());
+                } else {
+                    gear.putIfAbsent(e.getKey(), e.getValue());
+                }
+            }
+        }
+        return changed;
+    }
+
+    /** True when the entry resolves to an armor piece (helmet/chestplate/leggings/boots). */
+    static boolean isArmorEntry(String entry) {
+        if (entry == null || entry.isBlank()) {
+            return false;
+        }
+        if (entry.startsWith(DATA_PREFIX)) {
+            ItemStack decoded = ItemSerializer.singleFromBase64(entry.substring(DATA_PREFIX.length()));
+            return decoded != null && isArmorMaterial(decoded.getType());
+        }
+        return isArmorMaterial(Material.matchMaterial(entry));
+    }
+
+    static boolean isArmorMaterial(Material material) {
+        if (material == null) {
+            return false;
+        }
+        String name = material.name();
+        return name.endsWith("_HELMET") || name.endsWith("_CHESTPLATE")
+                || name.endsWith("_LEGGINGS") || name.endsWith("_BOOTS");
     }
 
     private Map<Integer, String> load(FileConfiguration yaml, String category) {
