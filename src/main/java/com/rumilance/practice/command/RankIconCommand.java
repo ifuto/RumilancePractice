@@ -89,7 +89,7 @@ public final class RankIconCommand implements CommandExecutor, TabCompleter {
     private Component sample(String label, String glyph, IconFontService icons) {
         Component icon = icons.rankIcon(rankFor(label));
         // Exact JSON the client receives: proves which font id and which glyph codepoint
-        // the server actually sends (expected: {"font":"rumilance:icons","text":"\uE00X"}).
+        // the server actually sends (expected: font "rumilance:icons", text = the U+E00X char).
         String json = GsonComponentSerializer.gson().serialize(icon);
         return Component.text(label + ": ", NamedTextColor.GRAY)
                 .append(icon)
