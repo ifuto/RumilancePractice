@@ -8,6 +8,7 @@ import com.rumilance.practice.resourcepack.ResourcePackService;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -87,9 +88,14 @@ public final class RankIconCommand implements CommandExecutor, TabCompleter {
 
     private Component sample(String label, String glyph, IconFontService icons) {
         Component icon = icons.rankIcon(rankFor(label));
+        // Exact JSON the client receives: proves which font id and which glyph codepoint
+        // the server actually sends (expected: {"font":"rumilance:icons","text":"\uE00X"}).
+        String json = GsonComponentSerializer.gson().serialize(icon);
         return Component.text(label + ": ", NamedTextColor.GRAY)
                 .append(icon)
-                .append(Component.text(" (U+" + Integer.toHexString(codepoint(glyph)).toUpperCase(Locale.ROOT) + ")",
+                .append(Component.text("  U+"
+                                + Integer.toHexString(codepoint(glyph)).toUpperCase(Locale.ROOT)
+                                + "  " + json,
                         NamedTextColor.DARK_GRAY));
     }
 
