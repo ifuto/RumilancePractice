@@ -689,6 +689,7 @@ public final class FeatureBootstrap {
         PartyInviteGui partyInviteGui = new PartyInviteGui(
                 guiSessions, soundService, teamService, messageService);
         partyInviteGui.setTeamHubGui(teamHubGui);
+        partyInviteGui.setStateManager(stateManager);
         teamHubGui.setPartyInviteGui(partyInviteGui);
         PartyMapSelectGui partyMapSelectGui = new PartyMapSelectGui(
                 guiSessions, soundService, teamService, arenaStore, kitService);

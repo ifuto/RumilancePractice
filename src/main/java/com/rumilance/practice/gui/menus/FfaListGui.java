@@ -76,18 +76,32 @@ public final class FfaListGui extends AbstractGui {
                     .action("decorate")
                     .build();
         }
+        int live = occupantsIn(arena.id());
         return ItemBuilder.of(resolveIcon(arena))
                 .name(Component.text(com.rumilance.practice.util.NameDisplay.pretty(arena.id()), UiTheme.SECONDARY))
                 .lore(
                         UiTheme.divider(),
                         UiTheme.labelValue(line(viewer, "gui.ffa-kit"), arena.kitId()),
+                        UiTheme.labelValue(line(viewer, "gui.ffa-count"),
+                                line(viewer, "gui.ffa-players").replace("<n>", String.valueOf(live))),
                         UiTheme.status(line(viewer, "gui.ffa-open"), UiTheme.SUCCESS),
                         UiTheme.blank(),
                         UiTheme.hint(line(viewer, "gui.ffa-join-hint"))
                 )
-                .glint(true)
+                .glint(live > 0)
                 .action("ffa:" + arena.id())
                 .build();
+    }
+
+    /** Number of players currently inside the given FFA arena. */
+    private int occupantsIn(String arenaId) {
+        int count = 0;
+        for (java.util.UUID occupant : ffaService.occupantIds()) {
+            if (ffaService.arenaOf(occupant).map(id -> id.equalsIgnoreCase(arenaId)).orElse(false)) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private static Material resolveIcon(FfaService.FfaArena arena) {

@@ -32,6 +32,7 @@ public final class PartyInviteGui extends AbstractGui {
     private final TeamService teamService;
     private final MessageService messageService;
     private TeamHubGui teamHubGui;
+    private com.rumilance.practice.session.PlayerStateManager stateManager;
 
     public PartyInviteGui(GuiSessionRegistry registry, SoundService sounds,
                           TeamService teamService, MessageService messageService) {
@@ -42,6 +43,10 @@ public final class PartyInviteGui extends AbstractGui {
 
     public void setTeamHubGui(TeamHubGui teamHubGui) {
         this.teamHubGui = teamHubGui;
+    }
+
+    public void setStateManager(com.rumilance.practice.session.PlayerStateManager stateManager) {
+        this.stateManager = stateManager;
     }
 
     public void openFor(Player owner) {
@@ -100,14 +105,34 @@ public final class PartyInviteGui extends AbstractGui {
     }
 
     private ItemStack skull(Player viewer, Player target) {
-        return ItemBuilder.of(Material.PLAYER_HEAD)
-                .name(Component.text(target.getName(), UiTheme.VALUE)
+        // Busy targets (match/queue/FFA/spectate) are flagged — they cannot join a party
+        // until they are back in the lobby, so the owner sees it before inviting.
+        String busyKey = null;
+        if (stateManager != null) {
+            busyKey = switch (stateManager.getState(target.getUniqueId())) {
+                case QUEUED_RANKED -> "menu.state-ranked-queue";
+                case QUEUED_UNRANKED -> "menu.state-unranked-queue";
+                case FIGHTING, PREPARING_MATCH, COUNTDOWN, ENDING -> "menu.state-fighting";
+                case SPECTATING -> "menu.state-spectating";
+                case FFA -> "menu.state-ffa";
+                case EDITING_KIT -> "menu.state-editing";
+                case REQUESTING_DUEL -> "menu.state-dueling";
+                case PRACTICE_WAIT, PRACTICE_ACTIVE -> "menu.state-fighting";
+                default -> null;
+            };
+        }
+        ItemBuilder builder = ItemBuilder.of(Material.PLAYER_HEAD)
+                .name(Component.text(target.getName(), busyKey == null ? UiTheme.VALUE : UiTheme.MUTED)
                         .decoration(TextDecoration.ITALIC, false))
                 .skullOwner(target)
-                .lore(
-                        UiTheme.divider(),
-                        UiTheme.hint(line(viewer, "party.invite-click"))
-                )
+                .lore(UiTheme.divider());
+        if (busyKey != null) {
+            builder.lore(UiTheme.status(line(viewer, busyKey), UiTheme.WARNING));
+        }
+        return builder
+                .lore(busyKey == null
+                        ? UiTheme.hint(line(viewer, "party.invite-click"))
+                        : UiTheme.line(line(viewer, "party.invite-busy-note")))
                 .action("invite:" + target.getUniqueId())
                 .build();
     }
