@@ -13,6 +13,7 @@ import com.rumilance.practice.team.Team;
 import com.rumilance.practice.team.TeamService;
 import com.rumilance.practice.util.GuiSlots;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
@@ -160,7 +161,7 @@ public final class TeamHubGui extends AbstractGui {
                                     UiTheme.hint(line(player, "gui.toggle-hint")))
                             .action("toggle_ff").build());
             inventory.setItem(GuiSlots.slot(0, 7),
-                    ItemBuilder.of(Material.TNT)
+                    ItemBuilder.of(Material.BARRIER)
                             .name(t(player, "party.disband").color(UiTheme.DANGER))
                             .lore(UiTheme.divider(),
                                     UiTheme.line(line(player, "party.disband-confirm-lore")),
@@ -203,6 +204,15 @@ public final class TeamHubGui extends AbstractGui {
                                 .replace("<n>", String.valueOf(blueCount)), BLUE))
                         .lore(UiTheme.line(line(player, "party.blue-hint")))
                         .action("decorate").build());
+        // Centre chip: how many members still need a side (0 = ready to split).
+        inventory.setItem(GuiSlots.slot(5, 4),
+                ItemBuilder.of(unassigned > 0 ? Material.GRAY_WOOL : Material.LIME_DYE,
+                                Math.max(1, unassigned))
+                        .name(Component.text(line(player, "party.unassigned-count")
+                                .replace("<n>", String.valueOf(unassigned)),
+                                unassigned > 0 ? NamedTextColor.GRAY : UiTheme.SUCCESS))
+                        .lore(UiTheme.hint(line(player, "party.click-cycle")))
+                        .action("decorate").build());
 
         if (owner) {
             inventory.setItem(GuiSlots.slot(5, 1),
@@ -216,7 +226,7 @@ public final class TeamHubGui extends AbstractGui {
                                     UiTheme.hint(line(player, "party.autosplit-hint")))
                             .action("autosplit").build());
             inventory.setItem(GuiSlots.slot(5, 3),
-                    ItemBuilder.of(Material.WET_SPONGE)
+                    ItemBuilder.of(Material.WATER_BUCKET)
                             .name(t(player, "party.clear-sides").color(UiTheme.WARNING))
                             .lore(UiTheme.hint(line(player, "party.clear-sides-hint")))
                             .action("clearsides").build());

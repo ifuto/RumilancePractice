@@ -59,7 +59,7 @@ public final class TeamsBrowserGui extends AbstractGui {
 
         // Create buttons (top of content area).
         inventory.setItem(GuiSlots.slot(1, 2),
-                ItemBuilder.of(Material.LIME_DYE)
+                ItemBuilder.of(Material.WHITE_BANNER)
                         .name(t(player, "party.create-public").color(UiTheme.SUCCESS))
                         .lore(UiTheme.divider(),
                                 UiTheme.line(line(player, "party.create-public-lore")),
@@ -67,7 +67,7 @@ public final class TeamsBrowserGui extends AbstractGui {
                                 UiTheme.hint(line(player, "menu.click")))
                         .action("create_public").build());
         inventory.setItem(GuiSlots.slot(1, 4),
-                ItemBuilder.of(Material.GRAY_DYE)
+                ItemBuilder.of(Material.LIGHT_GRAY_BANNER)
                         .name(t(player, "party.create-private").color(UiTheme.MUTED))
                         .lore(UiTheme.divider(),
                                 UiTheme.line(line(player, "party.create-private-lore")),
@@ -75,7 +75,7 @@ public final class TeamsBrowserGui extends AbstractGui {
                                 UiTheme.hint(line(player, "menu.click")))
                         .action("create_private").build());
         inventory.setItem(GuiSlots.slot(1, 6),
-                ItemBuilder.of(Material.PAPER)
+                ItemBuilder.of(Material.WRITABLE_BOOK)
                         .name(t(player, "party.how-title").color(UiTheme.SECONDARY))
                         .lore(
                                 UiTheme.line(line(player, "gui.party-how-1")),
