@@ -33,9 +33,9 @@ import java.util.List;
 public final class TabFightListService {
 
     /** Start order of the second column (20 rows per column). */
-    private static final int COL_2_BASE = 20;
+    private static final int RIGHT_COLUMN_BASE = 20;
     /** Start order of the third column (spectators in team fights). */
-    private static final int COL_3_BASE = 40;
+    private static final int THIRD_COLUMN_BASE = 40;
 
     private final org.bukkit.plugin.Plugin plugin;
     private com.rumilance.practice.rank.RankService rankService;
@@ -50,6 +50,9 @@ public final class TabFightListService {
 
     /** Applies the fight layout to the tablist of every online player. */
     public void apply(MatchSession session, Collection<? extends Player> online) {
+        if (session == null) {
+            return;
+        }
         List<Player> fighters = new ArrayList<>();
         List<Player> red = new ArrayList<>();
         List<Player> blue = new ArrayList<>();
@@ -88,12 +91,12 @@ public final class TabFightListService {
                 p.setPlayerListOrder(order++);
                 p.playerListName(Component.text(p.getName(), NamedTextColor.RED));
             }
-            order = COL_2_BASE;
+            order = RIGHT_COLUMN_BASE;
             for (Player p : blue) {
                 p.setPlayerListOrder(order++);
                 p.playerListName(Component.text(p.getName(), NamedTextColor.BLUE));
             }
-            order = COL_3_BASE;
+            order = THIRD_COLUMN_BASE;
             for (Player p : spectators) {
                 p.setPlayerListOrder(order++);
                 p.playerListName(Component.text(p.getName(), NamedTextColor.DARK_GRAY));
@@ -109,7 +112,7 @@ public final class TabFightListService {
                             color == TeamColor.RED ? NamedTextColor.RED : NamedTextColor.BLUE));
                 }
             }
-            order = COL_2_BASE;
+            order = RIGHT_COLUMN_BASE;
             for (Player p : spectators) {
                 p.setPlayerListOrder(order++);
                 p.playerListName(Component.text(p.getName(), NamedTextColor.DARK_GRAY));
