@@ -34,12 +34,22 @@ public final class IconFontService {
         return configService.config().getBoolean("icons.enabled", true);
     }
 
-    /** The custom font holding the icon glyphs ({@code rumilance:icons} by default). */
+    /**
+     * The font the icon glyphs render with. {@code default} / {@code minecraft:default} /
+     * blank = no font attribute — the pack merges the glyph providers into
+     * {@code minecraft:default} (and {@code minecraft:uniform}), so rendering never depends
+     * on a custom font id resolving. Any other value (e.g. {@code rumilance:icons}, still
+     * shipped in the pack) attaches that font explicitly.
+     */
     public Key font() {
-        String raw = configService.config().getString("icons.font", "rumilance:icons");
-        String[] parts = raw == null ? new String[0] : raw.split(":", 2);
+        String raw = configService.config().getString("icons.font", "default");
+        if (raw == null || raw.isBlank() || "default".equalsIgnoreCase(raw.trim())
+                || "minecraft:default".equalsIgnoreCase(raw.trim())) {
+            return null;
+        }
+        String[] parts = raw.split(":", 2);
         if (parts.length != 2 || parts[0].isBlank() || parts[1].isBlank()) {
-            return Key.key("rumilance", "icons");
+            return null;
         }
         return Key.key(parts[0], parts[1]);
     }
@@ -66,6 +76,13 @@ public final class IconFontService {
     }
 
     private Component icon(String glyph) {
-        return Component.text(glyph).style(style -> style.font(font()));
+        Key font = font();
+        if (font == null) {
+            // Default font: the pack merges the glyph providers into minecraft:default,
+            // so this renders on every client that applied the pack — no custom-font
+            // resolution involved.
+            return Component.text(glyph);
+        }
+        return Component.text(glyph).style(style -> style.font(font));
     }
 }

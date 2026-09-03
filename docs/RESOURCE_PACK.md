@@ -29,7 +29,7 @@ Admin / VIP+ / VIP の **ランクバッジ** はリソースパックのカス�
 resource-pack:
   enabled: true          # false でプラグインからの配布を無効化
   url: "https://…/RumilanceResourcePack.zip"   # パックの直接ダウンロードURL
-  sha1: "730f0e2399135601333404476b5053ab51c483d9"   # ZIP の SHA1（40桁hex）
+  sha1: "176f255319657e37c3b9ee54d7a72c43d71c2cf3"   # ZIP の SHA1（40桁hex）
   required: true         # true = 拒否/失敗でキック
   prompt: "…"            # クライアントのパック適用ダイアログに出す文
   kick-message: "…"      # キック時の表示文（\n で改行可）
@@ -70,11 +70,18 @@ URL からダウンロードします。
    リネームして開ける＝正常なZIP、と確認できます）。
 4. `config.yml` → `resource-pack.url` に上記 URL を設定して `/rumireload`。
 
-現在コミット済みパック（チーム画像削除済み版）の SHA1:
+現在コミット済みパックの SHA1:
 
 ```
-730f0e2399135601333404476b5053ab51c483d9
+176f255319657e37c3b9ee54d7a72c43d71c2cf3
 ```
+
+> **グリフの描画について（1.21.6+ 対策）**: このパックはアイコンのグリフプロバイダーを
+> `rumilance:icons` だけでなく `minecraft:default` と `minecraft:uniform` にも
+> マージしています（フォントは同じID間でパック同士マージされるため、既存フォントを
+> 壊しません）。`config.yml` → `icons.font: "default"`（既定）ならサーバーは
+> フォント属性を付けずにグリフを送るため、クライアントがカスタムフォントを解決
+> できない環境でもアイコンが表示されます。
 
 > パックの中身を変えたら再デプロイ（push すれば自動）→ `resource-pack.sha1` も
 > 新しい ZIP の SHA1 に更新してください（SHA1 が合わないとクライアントが拒否します）。
@@ -87,13 +94,13 @@ URL からダウンロードします。
 ```properties
 # Cloudflare Pages 利用時
 resource-pack=https://<プロジェクト名>.pages.dev/RumilanceResourcePack.mczip
-resource-pack-sha1=730f0e2399135601333404476b5053ab51c483d9
+resource-pack-sha1=176f255319657e37c3b9ee54d7a72c43d71c2cf3
 require-resource-pack=true
 resource-pack-prompt={"text":"Rumilanceのアイコン表示に必要です","color":"aqua"}
 
 # またはリポジトリの dist パック直接指定（マージ後は .../main/...）
 resource-pack=https://raw.githubusercontent.com/ifuto/RumilancePractice/main/dist/RumilanceResourcePack.zip
-resource-pack-sha1=730f0e2399135601333404476b5053ab51c483d9
+resource-pack-sha1=176f255319657e37c3b9ee54d7a72c43d71c2cf3
 require-resource-pack=true
 ```
 

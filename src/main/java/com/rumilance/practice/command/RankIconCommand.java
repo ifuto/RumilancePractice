@@ -63,8 +63,11 @@ public final class RankIconCommand implements CommandExecutor, TabCompleter {
         if (icons == null) {
             sender.sendMessage(Component.text("IconFontService not registered.", NamedTextColor.RED));
         } else {
+            String configured = config.config().getString("icons.font", "default");
             sender.sendMessage(Component.text("icons.enabled: " + icons.enabled(), NamedTextColor.GRAY));
-            sender.sendMessage(Component.text("font: " + icons.font().asString(), NamedTextColor.GRAY));
+            sender.sendMessage(Component.text("icons.font: " + configured
+                    + (icons.font() == null ? "  (glyphs merged into minecraft:default by the pack)" : ""),
+                    NamedTextColor.GRAY));
             sender.sendMessage(sample("admin", config.config().getString("icons.glyphs.admin", "\uE001"), icons));
             sender.sendMessage(sample("vip", config.config().getString("icons.glyphs.vip", "\uE002"), icons));
             sender.sendMessage(sample("vip+", config.config().getString("icons.glyphs.vip-plus", "\uE003"), icons));
@@ -137,7 +140,7 @@ public final class RankIconCommand implements CommandExecutor, TabCompleter {
                 .append(Component.text("  = icons font + ABC (normal letters = font MISSING on client; squares = font loaded, glyphs broken)", NamedTextColor.DARK_GRAY)));
         sender.sendMessage(Component.text("Probe C ", NamedTextColor.DARK_GRAY)
                 .append(Component.text(pua))
-                .append(Component.text("  = default font + U+E001 (control: another font pack mapping this char shows here)", NamedTextColor.DARK_GRAY)));
+                .append(Component.text("  = default font + U+E001 (with the merged pack this shows the admin badge)", NamedTextColor.DARK_GRAY)));
         if (sender instanceof Player player) {
             player.sendActionBar(Component.empty()
                     .append(admin)

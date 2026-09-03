@@ -20,8 +20,12 @@ icons:
   # Only the Admin / VIP+ / VIP rank badges come from the resource pack. Team
   # identification during team fights is a plain coloured ● (no pack needed).
   enabled: true
-  # The custom font that holds the icon glyphs (namespace:font-name).
-  font: "rumilance:icons"
+  # Font used to render the glyphs. "default" (recommended) = render with the standard
+  # game font — the resource pack merges the glyph providers into minecraft:default and
+  # minecraft:uniform, so this works even on clients where custom font ids fail to
+  # resolve. Set to a custom font id (e.g. "rumilance:icons", still shipped in the pack)
+  # only if you know you need it.
+  font: "default"
   glyphs:
     # Rank badges (placed before Admin / VIP+ / VIP names). NORM players get none.
     admin: "\uE001"
@@ -44,7 +48,7 @@ resource-pack:
   url: "https://raw.githubusercontent.com/ifuto/RumilancePractice/arena/01a06257-rumilancepractice/dist/RumilanceResourcePack.zip"
   # SHA-1 of the zip as 40 hex characters (must match the file exactly; see
   # dist/RumilanceResourcePack.sha1). The client rejects a hash mismatch.
-  sha1: "730f0e2399135601333404476b5053ab51c483d9"
+  sha1: "176f255319657e37c3b9ee54d7a72c43d71c2cf3"
   # Kick players who decline the pack or fail to download it.
   required: true
   # Prompt shown in the client's resource-pack dialog.

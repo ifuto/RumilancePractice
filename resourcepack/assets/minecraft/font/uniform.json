@@ -1,0 +1,25 @@
+{
+  "providers": [
+    {
+      "type": "minecraft:bitmap",
+      "file": "rumilance:font/admin.png",
+      "ascent": 8,
+      "height": 9,
+      "chars": ["\uE001"]
+    },
+    {
+      "type": "minecraft:bitmap",
+      "file": "rumilance:font/vip.png",
+      "ascent": 8,
+      "height": 9,
+      "chars": ["\uE002"]
+    },
+    {
+      "type": "minecraft:bitmap",
+      "file": "rumilance:font/vip_plus.png",
+      "ascent": 8,
+      "height": 9,
+      "chars": ["\uE003"]
+    }
+  ]
+}
