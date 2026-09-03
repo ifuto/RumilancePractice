@@ -33,9 +33,19 @@ public final class ItemBuilder {
         this.meta = stack.getItemMeta();
     }
 
+    private ItemBuilder(ItemStack existing) {
+        this.stack = existing.clone();
+        this.meta = stack.getItemMeta();
+    }
+
     /** Starts a plain item with no name or lore. */
     public static ItemBuilder of(Material material) {
         return new ItemBuilder(material, 1);
+    }
+
+    /** Wraps an existing stack (e.g. a player's shield) for GUI display. */
+    public static ItemBuilder of(ItemStack existing) {
+        return new ItemBuilder(existing);
     }
 
     public static ItemBuilder of(Material material, int amount) {

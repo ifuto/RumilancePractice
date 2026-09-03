@@ -288,6 +288,10 @@ public final class FeatureBootstrap {
         KitService kitService = new KitService(configService);
         services.register(KitService.class, kitService);
 
+        com.rumilance.practice.hiddenrank.HiddenRankService hiddenRankService =
+                new com.rumilance.practice.hiddenrank.HiddenRankService(plugin);
+        kitService.setHiddenRanks(hiddenRankService);
+
         KitLayoutCache layoutCache = new KitLayoutCache(kitLayoutRepository, asyncExecutor, plugin.getLogger());
         services.register(KitLayoutCache.class, layoutCache);
 
@@ -818,6 +822,14 @@ public final class FeatureBootstrap {
         SmithingTrimGui smithingTrimGui = new SmithingTrimGui(guiSessions, soundService, rankService);
         smithingTrimGui.setEditKitGui(editKitGui);
         editKitGui.setSmithingTrimGui(smithingTrimGui);
+        com.rumilance.practice.gui.menus.ShieldPatternGui shieldPatternGui =
+                new com.rumilance.practice.gui.menus.ShieldPatternGui(guiSessions, soundService);
+        shieldPatternGui.setEditKitGui(editKitGui);
+        editKitGui.setShieldPatternGui(shieldPatternGui);
+        editKitGui.setRankService(rankService);
+        com.rumilance.practice.gui.menus.CustomShieldAdminGui customShieldAdminGui =
+                new com.rumilance.practice.gui.menus.CustomShieldAdminGui(guiSessions, soundService, hiddenRankService);
+        editKitGui.setHiddenRankService(hiddenRankService);
 
         PracticeLayoutGui practiceLayoutGui =
                 new PracticeLayoutGui(guiSessions, soundService, practiceService);
@@ -877,6 +889,8 @@ public final class FeatureBootstrap {
         guiListener.register(practiceMaceGui);
         guiListener.register(practiceBotGui);
         guiListener.register(smithingTrimGui);
+        guiListener.register(shieldPatternGui);
+        guiListener.register(customShieldAdminGui);
         guiListener.setMenuReturn(gameMenuGui::open);
         guiListener.setBattleMenuReturn(battleMenuGui::open);
         guiListener.setReopenOriginalEditor(player -> {
@@ -1202,6 +1216,7 @@ public final class FeatureBootstrap {
         bind("prac", new PracCommand(practiceService));
         bind("practice", new PracticeCommand(practiceService));
         bind("setrank", new SetRankCommand(rankService, playerRepository));
+        bind("urank", new com.rumilance.practice.command.HiddenRankCommand(hiddenRankService, customShieldAdminGui));
         com.rumilance.practice.command.AdminMatchCommand adminMatchCommand =
                 new com.rumilance.practice.command.AdminMatchCommand(matchService, kitService, arenaService);
         bind("forceend", adminMatchCommand);

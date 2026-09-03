@@ -144,3 +144,45 @@ sha1sum dist/RumilanceResourcePack.zip
   Admin > VIP+ > VIP の優先順で1つだけ表示します（NORMは何も付きません）
 - 試合中のアクションバーは `config.yml` → `match.action-bar-mode`（`score`=点数〔既定〕/
   `time`=経過時間 `min:sec`）で切り替え可能
+
+## カスタム盾（裏ランク `custom_shield`）
+
+表には一切表示されない「裏ランク」`custom_shield` を持つプレイヤーは、試合中に
+OP が割り当てた **Custom Model Data** を付与された盾を受け取ります。リソースパック側で
+その Model Data に高精細な盾イラストを割り当てておくと、そのプレイヤーの盾だけが
+特別な見た目になります。
+
+### 1. プレイヤーに裏ランクと Model Data を割り当てる（ゲーム内・OP）
+
+```
+/urank custom_shield <player>     # 裏ランクを付与
+/urank shield <player> <cmd>      # 盾の Custom Model Data を指定（例: 90001）
+/urank gui                        # 一覧からクリックで増減できる管理画面
+/urank list                       # 保有者一覧
+/urank remove <player>            # 裏ランクを剥奪
+```
+
+- 裏ランクはどの表示（ネームタグ・TAB・アイコン）にも出ません
+- `custom_shield` 保有者は VIP+ の盾模様エディタを使えなくなります
+  （専属イラストの盾のため）。耐久・エンチャントなどは通常通りです
+- 割り当てた盾の Custom Model Data は**ドロップした瞬間に消え**、ただの盾になります
+
+### 2. リソースパックに盾イラストを登録する（運営）
+
+盾のテクスチャ（バニラ盾の UV 配置、推奨 512x512）を用意して:
+
+```bash
+python3 tools/add_custom_shield.py <cmd> <image.png> [--pack-root resourcepack]
+```
+
+例: `python3 tools/add_custom_shield.py 90001 art/my_shield.png`
+
+実行内容:
+
+1. `assets/rumilance/textures/shield/shield_<cmd>.png` に画像をコピー
+2. `assets/rumilance/models/item/shield_<cmd>.json`（+ `_blocking` 版）を生成
+   （バニラ盾の表示トランスフォームをそのまま使用）
+3. `assets/minecraft/models/item/shield.json` に `custom_model_data` override を追加
+   （既存の登録は `_rumilance_shields` キーに記録され、何度実行してもマージされます）
+
+その後パック zip を再ビルドして再アップロードすれば完了です。

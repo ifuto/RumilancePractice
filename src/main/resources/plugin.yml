@@ -204,6 +204,10 @@ commands:
     usage: /rank <player> <norm|VIP|VIP+|admin|owner> [duration e.g. 30d]
     aliases: [rank]
     permission: rumilance.admin
+  urank:
+    description: Manage hidden ranks that never display (OP). Currently custom_shield.
+    usage: /urank <custom_shield|remove|shield|gui|list>
+    permission: rumilance.admin
   forceend:
     description: Force-end the match a player is in (or spectating) as a draw (OP).
     usage: /forceend <player>

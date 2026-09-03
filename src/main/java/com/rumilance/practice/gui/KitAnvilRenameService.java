@@ -26,10 +26,13 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * VIP+ anvil rename for tools inside {@link EditKitGui}. Persists the renamed item back into the
- * edit-kit layout and reopens the editor.
+ * Donor anvil rename for tools inside {@link EditKitGui}: VIP may rename up to 5 characters,
+ * VIP+ up to 15. Persists the renamed item back into the edit-kit layout and reopens the editor.
  */
 public final class KitAnvilRenameService implements Listener {
+
+    private static final int VIP_MAX_LENGTH = 5;
+    private static final int VIP_PLUS_MAX_LENGTH = 15;
 
     public record PendingRename(
             String kitId,
@@ -64,9 +67,26 @@ public final class KitAnvilRenameService implements Listener {
         return pending.containsKey(playerId);
     }
 
+    /** Max rename length for this player's rank: VIP = 5, VIP+ / above = 15. */
+    public int maxRenameLength(Player player) {
+        return rankService.isVipPlusOrAbove(player) ? VIP_PLUS_MAX_LENGTH : VIP_MAX_LENGTH;
+    }
+
+    private static String plainName(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) {
+            return "";
+        }
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null || !meta.hasDisplayName()) {
+            return "";
+        }
+        return net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                .serialize(meta.displayName());
+    }
+
     public boolean tryOpenRename(Player player, ItemStack item, int layoutSlot,
                                  String kitId, String preset, ItemStack[] layoutSnapshot) {
-        if (!rankService.isVipPlusOrAbove(player)) {
+        if (!rankService.isVipOrAbove(player)) {
             return false;
         }
         if (item == null || item.getType().isAir() || !isRenameableTool(item.getType())) {
@@ -95,11 +115,16 @@ public final class KitAnvilRenameService implements Listener {
             AnvilInventory anvil = (AnvilInventory) view.getTopInventory();
             anvil.setItem(0, item.clone());
             anvil.setRepairCost(0);
+            int maxLen = maxRenameLength(player);
             if (messages != null) {
                 player.sendMessage(messages.render(player, "gui.anvil-hint"));
+                player.sendMessage(messages.render(player, "gui.anvil-limit",
+                        net.kyori.adventure.text.minimessage.tag.resolver.Placeholder
+                                .parsed("max", String.valueOf(maxLen))));
             } else {
                 player.sendMessage(Component.text(
-                        "Rename the item, then take the result from the right slot.", NamedTextColor.YELLOW));
+                        "Rename the item (max " + maxLen + " chars), then take the result.",
+                        NamedTextColor.YELLOW));
             }
         });
         return true;
@@ -119,6 +144,10 @@ public final class KitAnvilRenameService implements Listener {
         }
         ItemStack result = event.getCurrentItem();
         if (result == null || result.getType().isAir()) {
+            return;
+        }
+        // Defence-in-depth: onPrepare already blanks over-long names, but never accept here.
+        if (plainName(result).length() > maxRenameLength(player)) {
             return;
         }
         event.setCancelled(true);
@@ -150,6 +179,12 @@ public final class KitAnvilRenameService implements Listener {
         event.getInventory().setRepairCost(0);
         ItemStack result = event.getResult();
         if (result != null && !result.getType().isAir()) {
+            // Enforce the rank-based rename length: over-long names produce no result, so the
+            // player cannot grab them (the anvil hint shows the limit).
+            if (plainName(result).length() > maxRenameLength(player)) {
+                event.setResult(null);
+                return;
+            }
             event.setResult(result);
         }
     }

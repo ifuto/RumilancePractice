@@ -54,6 +54,8 @@ public final class ResourcePackService implements Listener {
 
     /** Cached request; rebuilt by {@link #reload()} (null = disabled or misconfigured). */
     private volatile ResourcePackRequest request;
+    /** Id of our pack — used to recognise our own status events (and keep us on top). */
+    private volatile UUID packId;
 
     public ResourcePackService(Plugin plugin, ConfigService configService) {
         this.plugin = plugin;
@@ -117,6 +119,21 @@ public final class ResourcePackService implements Listener {
      */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPackStatus(PlayerResourcePackStatusEvent event) {
+        Player player = event.getPlayer();
+        // Keep OUR pack pinned to the top of the client's Selected list: whenever some other
+        // pack (another plugin, a /pack command...) finishes applying, re-send ours so it is
+        // the most recent pack again and therefore stays on top. Our own SUCCESS events are
+        // recognised by the stable pack id and never re-trigger this (no loop).
+        UUID ourId = this.packId;
+        if (this.request != null && ourId != null
+                && event.getStatus() == PlayerResourcePackStatusEvent.Status.SUCCESS
+                && !ourId.equals(event.getID())) {
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (player.isOnline()) {
+                    applyTo(player);
+                }
+            });
+        }
         if (this.request == null || !required()) {
             return;
         }
@@ -124,7 +141,6 @@ public final class ResourcePackService implements Listener {
         if (status == PlayerResourcePackStatusEvent.Status.DECLINED
                 || status == PlayerResourcePackStatusEvent.Status.FAILED_DOWNLOAD
                 || status == PlayerResourcePackStatusEvent.Status.INVALID_URL) {
-            Player player = event.getPlayer();
             String message = configService.config().getString("resource-pack.kick-message",
                     "This server requires the Rumilance resource pack.");
             logger.info(() -> "Kicking " + player.getName()
@@ -166,6 +182,7 @@ public final class ResourcePackService implements Listener {
         UUID packId = UUID.nameUUIDFromBytes(
                 (url.trim() + "|" + sha1Hex.toLowerCase(java.util.Locale.ROOT))
                         .getBytes(StandardCharsets.UTF_8));
+        this.packId = packId;
         ResourcePackInfo info = ResourcePackInfo.resourcePackInfo()
                 .id(packId)
                 .uri(uri)

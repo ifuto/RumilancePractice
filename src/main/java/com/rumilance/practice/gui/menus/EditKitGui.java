@@ -60,6 +60,13 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
     private com.rumilance.practice.gui.KitAnvilRenameService kitAnvilRenameService;
     private com.rumilance.practice.gui.KitEditStash kitEditStash;
     private SmithingTrimGui smithingTrimGui;
+    private ShieldPatternGui shieldPatternGui;
+    private com.rumilance.practice.hiddenrank.HiddenRankService hiddenRankService;
+    private com.rumilance.practice.rank.RankService rankService;
+
+    public void setRankService(com.rumilance.practice.rank.RankService rankService) {
+        this.rankService = rankService;
+    }
     private EkitSelectGui ekitSelectGui;
 
     public void setEkitSelectGui(EkitSelectGui ekitSelectGui) {
@@ -76,6 +83,14 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
 
     public void setSmithingTrimGui(SmithingTrimGui smithingTrimGui) {
         this.smithingTrimGui = smithingTrimGui;
+    }
+
+    public void setShieldPatternGui(ShieldPatternGui shieldPatternGui) {
+        this.shieldPatternGui = shieldPatternGui;
+    }
+
+    public void setHiddenRankService(com.rumilance.practice.hiddenrank.HiddenRankService hiddenRankService) {
+        this.hiddenRankService = hiddenRankService;
     }
 
     public void setKitEditStash(com.rumilance.practice.gui.KitEditStash kitEditStash) {
@@ -553,6 +568,22 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
                 ItemStack item = layout[layoutIndex];
                 String kitId = session.selectedKit();
                 String preset = session.get("preset", String.class);
+                // Shield: VIP+ opens the banner-pattern editor (hidden custom_shield holders
+                // keep their operator artwork and cannot restyle it). Right-click still opens
+                // the anvil rename via the tool path below when the editor does not apply.
+                if (item != null && item.getType() == org.bukkit.Material.SHIELD && kitId != null) {
+                    if (hiddenRankService != null && hiddenRankService.hasCustomShield(player.getUniqueId())) {
+                        player.sendMessage(line(player, "gui.shield-custom-locked"));
+                        sounds.play(player, "error");
+                        return;
+                    }
+                    if (shieldPatternGui != null && rankService != null
+                            && rankService.isVipPlusOrAbove(player)) {
+                        stashCurrentLayout(player, session);
+                        shieldPatternGui.openForLayoutSlot(player, item, layoutIndex, kitId, preset, layout);
+                        return;
+                    }
+                }
                 stashCurrentLayout(player, session);
                 if (item != null && kitAnvilRenameService != null
                         && com.rumilance.practice.gui.KitAnvilRenameService.isRenameableTool(item.getType())

@@ -254,6 +254,7 @@ public final class KitService {
      */
     public void apply(Player player, KitDefinition kit, ItemStack[] layout) {
         KitLoadout.give(player.getInventory(), KitLoadout.resolve(kit, layout));
+        applyCustomShield(player);
         // Reflect the kit's max-health on the player's MAX_HEALTH attribute; without this the
         // attribute stays at the vanilla 20 so a >20 HP kit is clamped to 20 and a kit's custom
         // max never takes effect. Set the base value first, then fill to the (possibly raised) max.
@@ -273,6 +274,37 @@ public final class KitService {
         // Default to SURVIVAL so PvP kits behave normally; kits flagged adventure force ADVENTURE
         // (e.g. kits where block interaction should be fully disabled).
         player.setGameMode(kit.forceAdventure() ? GameMode.ADVENTURE : GameMode.SURVIVAL);
+    }
+
+    /** Hidden custom_shield rank holders (OP-assigned model data) — never displayed. */
+    private com.rumilance.practice.hiddenrank.HiddenRankService hiddenRanks;
+
+    public void setHiddenRanks(com.rumilance.practice.hiddenrank.HiddenRankService hiddenRanks) {
+        this.hiddenRanks = hiddenRanks;
+    }
+
+    /**
+     * Gives the hidden-rank custom shield: every shield the kit handed out receives the
+     * operator-assigned Custom Model Data, which the resource pack renders as the holder's
+     * high-resolution artwork. No-op for players without the hidden rank / model data.
+     */
+    private void applyCustomShield(Player player) {
+        if (hiddenRanks == null || !hiddenRanks.hasCustomShield(player.getUniqueId())) {
+            return;
+        }
+        int cmd = hiddenRanks.shieldModelData(player.getUniqueId());
+        if (cmd <= 0) {
+            return;
+        }
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (item != null && item.getType() == org.bukkit.Material.SHIELD) {
+                org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
+                if (meta != null) {
+                    meta.setCustomModelData(cmd);
+                    item.setItemMeta(meta);
+                }
+            }
+        }
     }
 
     /**
