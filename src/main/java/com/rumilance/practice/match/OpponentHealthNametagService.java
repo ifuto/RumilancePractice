@@ -136,15 +136,15 @@ public final class OpponentHealthNametagService implements Listener {
         double absorption = Math.max(0.0d, target.getAbsorptionAmount());
         double health = Math.min(target.getHealth(), HEALTH_CAP);
         double value = Math.max(0.0d, health) + absorption;
-        // Truncate (not round) to two decimals so the readout never overstates remaining HP.
-        double shown = Math.floor(value * 100.0d + 1e-9) / 100.0d;
+        // Truncate (not round) to one decimal so the readout never overstates remaining HP.
+        double shown = Math.floor(value * 10.0d + 1e-9) / 10.0d;
         // The integer score itself is never rendered (the fixed format replaces it); keep it
         // close to the shown value anyway so sorting/debugging matches what players see.
         score.setScore((int) Math.ceil(value));
         Component heart = Component.text("\u2665",
                 absorption > 0.0d ? NamedTextColor.YELLOW : NamedTextColor.RED);
         score.numberFormat(NumberFormat.fixed(
-                Component.text(String.format(java.util.Locale.ROOT, "%.2f", shown), NamedTextColor.WHITE)
+                Component.text(String.format(java.util.Locale.ROOT, "%.1f", shown), NamedTextColor.WHITE)
                         .append(heart)));
     }
 
