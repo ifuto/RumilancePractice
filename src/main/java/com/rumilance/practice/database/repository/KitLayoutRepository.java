@@ -65,6 +65,25 @@ public final class KitLayoutRepository {
         }
     }
 
+    /** Deletes every saved layout for one player. @return rows removed. */
+    public int deleteAllForPlayer(UUID uuid) throws SQLException {
+        String sql = "DELETE FROM " + databaseService.table("kit_layouts") + " WHERE uuid = ?";
+        try (Connection connection = databaseService.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, uuid.toString());
+            return statement.executeUpdate();
+        }
+    }
+
+    /** Deletes every saved layout of every player. @return rows removed. */
+    public int deleteAll() throws SQLException {
+        String sql = "DELETE FROM " + databaseService.table("kit_layouts");
+        try (Connection connection = databaseService.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            return statement.executeUpdate();
+        }
+    }
+
     public List<KitLayoutSnapshot> findAllForPlayer(UUID uuid) throws SQLException {
         String sql = "SELECT id, uuid, kit, item_data, updated_at FROM "
                 + databaseService.table("kit_layouts") + " WHERE uuid = ?";

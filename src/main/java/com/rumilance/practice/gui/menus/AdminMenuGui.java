@@ -98,6 +98,18 @@ public final class AdminMenuGui extends AbstractGui {
                 .action("ekitadmin")
                 .build());
 
+        inventory.setItem(GuiSlots.slot(4, 2), ItemBuilder.of(Material.PLAYER_HEAD)
+                .name(t(player, "gui.admin-player-data").color(NamedTextColor.LIGHT_PURPLE))
+                .lore(
+                        UiTheme.divider(),
+                        UiTheme.line(line(player, "gui.admin-player-data-lore-1")),
+                        UiTheme.line(line(player, "gui.admin-player-data-lore-2")),
+                        UiTheme.blank(),
+                        UiTheme.hint(line(player, "menu.click"))
+                )
+                .action("playerdata")
+                .build());
+
         inventory.setItem(GuiSlots.slot(4, 4), ItemBuilder.of(Material.BLAZE_ROD)
                 .name(t(player, "gui.admin-wand").color(NamedTextColor.GOLD))
                 .lore(
@@ -133,6 +145,15 @@ public final class AdminMenuGui extends AbstractGui {
             case "ekitadmin" -> {
                 sounds.play(player, "gui-click");
                 openEkitAdmin.accept(player);
+            }
+            case "playerdata" -> {
+                sounds.play(player, "gui-click");
+                session.put(com.rumilance.practice.admin.AdminPlayerLookupListener.AWAIT_LOOKUP,
+                        Boolean.TRUE);
+                player.closeInventory();
+                player.sendMessage(Component.text(
+                        "Type a UUID or MCID (player name) in chat to inspect their data.",
+                        NamedTextColor.LIGHT_PURPLE));
             }
             default -> { }
         }

@@ -87,6 +87,8 @@ import com.rumilance.practice.gui.KitEditStash;
 import com.rumilance.practice.gui.GuiListener;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.menus.AdminMenuGui;
+import com.rumilance.practice.gui.menus.AdminPlayerDataGui;
+import com.rumilance.practice.admin.AdminPlayerLookupListener;
 import com.rumilance.practice.gui.menus.ArenaAdminGui;
 import com.rumilance.practice.gui.menus.ArrowEffectGui;
 import com.rumilance.practice.gui.menus.BanListGui;
@@ -819,6 +821,14 @@ public final class FeatureBootstrap {
             presetAdminGui.openAdmin(player);
         });
         adminMenuGui.setOpenEkitAdmin(ekitAdminGui::openAdmin);
+        AdminPlayerDataGui adminPlayerDataGui = new AdminPlayerDataGui(
+                guiSessions, soundService, playerRepository, rankService, settingsService,
+                kitLayoutRepository, layoutCache, originalKitService, nameColorService,
+                punishmentRepository, statsService);
+        adminPlayerDataGui.setBackToAdminMenu(adminMenuGui::open);
+        AdminPlayerLookupListener adminPlayerLookupListener = new AdminPlayerLookupListener(
+                plugin, guiSessions, playerRepository);
+        adminPlayerLookupListener.setDataGui(adminPlayerDataGui);
         kitAdminGui.setOpenPresetAdmin(player -> {
             presetAdminGui.setReturnTo(kitAdminGui::open);
             presetAdminGui.openAdmin(player);
@@ -898,6 +908,7 @@ public final class FeatureBootstrap {
         guiListener.register(ekitAdminGui);
         guiListener.register(presetAdminGui);
         guiListener.register(adminMenuGui);
+        guiListener.register(adminPlayerDataGui);
         guiListener.register(spectateListGui);
         guiListener.register(ffaListGui);
         guiListener.register(editKitGui);
@@ -1136,6 +1147,7 @@ public final class FeatureBootstrap {
         adminToolListener.setOpenAdminMenu(adminMenuGui::open);
         pm.registerEvents(adminToolListener, plugin);
         pm.registerEvents(new TeamListener(teamService), plugin);
+        pm.registerEvents(adminPlayerLookupListener, plugin);
         pm.registerEvents(partyIconListener, plugin);
         pm.registerEvents(new SpamFilterListener(spamFilterService), plugin);
         pm.registerEvents(new SignChangeGuardListener(signGuardService), plugin);

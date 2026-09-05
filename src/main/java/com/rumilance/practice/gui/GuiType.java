@@ -55,5 +55,6 @@ public enum GuiType {
     CUSTOM_SHIELD_ADMIN,
     SHIELD_PATTERN,
     LOCALE_SELECT,
-    NAME_COLOR
+    NAME_COLOR,
+    ADMIN_PLAYER_DATA
 }
