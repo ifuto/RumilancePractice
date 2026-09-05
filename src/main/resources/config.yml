@@ -48,7 +48,7 @@ resource-pack:
   url: "https://raw.githubusercontent.com/ifuto/RumilancePractice/arena/01a06257-rumilancepractice/dist/RumilanceResourcePack.zip"
   # SHA-1 of the zip as 40 hex characters (must match the file exactly; see
   # dist/RumilanceResourcePack.sha1). The client rejects a hash mismatch.
-  sha1: "176f255319657e37c3b9ee54d7a72c43d71c2cf3"
+  sha1: "c4cf82d41ba0564aaac4752cb6a95225e768b2e2"
   # Kick players who decline the pack or fail to download it.
   required: true
   # Prompt shown in the client's resource-pack dialog.

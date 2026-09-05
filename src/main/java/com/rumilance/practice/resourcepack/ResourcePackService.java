@@ -10,12 +10,15 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerResourcePackStatusEvent;
 import org.bukkit.plugin.Plugin;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -43,10 +46,19 @@ public final class ResourcePackService implements Listener {
     private static final String DEFAULT_URL =
             "https://raw.githubusercontent.com/ifuto/RumilancePractice/"
                     + "arena/01a06257-rumilancepractice/dist/RumilanceResourcePack.zip";
-    private static final String DEFAULT_SHA1 = "730f0e2399135601333404476b5053ab51c483d9";
+    private static final String DEFAULT_SHA1 = "c4cf82d41ba0564aaac4752cb6a95225e768b2e2";
 
     /** Small delay after join so login-time packets settle before the pack prompt. */
     private static final long APPLY_DELAY_TICKS = 10L;
+    /**
+     * Failed downloads are retried this many times before a player is kicked. Pack
+     * downloads occasionally fail once because of transient network hiccups (a new
+     * match can start while the client is still downloading), and an instant kick for
+     * a single FAILED_DOWNLOAD felt like a random disconnect from the player's side.
+     */
+    private static final int MAX_DOWNLOAD_RETRIES = 2;
+    /** Delay before a failed download is retried. */
+    private static final long RETRY_DELAY_TICKS = 40L;
 
     private final Plugin plugin;
     private final ConfigService configService;
@@ -56,6 +68,8 @@ public final class ResourcePackService implements Listener {
     private volatile ResourcePackRequest request;
     /** Id of our pack — used to recognise our own status events (and keep us on top). */
     private volatile UUID packId;
+    /** Per-player count of failed download attempts since the last successful apply. */
+    private final Map<UUID, Integer> failedAttempts = new ConcurrentHashMap<>();
 
     public ResourcePackService(Plugin plugin, ConfigService configService) {
         this.plugin = plugin;
@@ -112,41 +126,75 @@ public final class ResourcePackService implements Listener {
         }, APPLY_DELAY_TICKS);
     }
 
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        failedAttempts.remove(event.getPlayer().getUniqueId());
+    }
+
     /**
      * Kicks players who refuse or fail the pack when it is required. DECLINED = the player
-     * pressed "No" in the pack dialog; FAILED_DOWNLOAD / INVALID_URL = the client never got
-     * the pack, which is equally unusable for this server.
+     * pressed "No" in the pack dialog (immediate kick); FAILED_DOWNLOAD / INVALID_URL /
+     * FAILED_RELOAD = the client never got the pack, which is retried a couple of times
+     * first — only when every attempt fails is the player kicked. Players whose client
+     * already applied the pack are NEVER kicked: a late failure status for a re-send must
+     * not disconnect someone who is playing with the pack active.
      */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPackStatus(PlayerResourcePackStatusEvent event) {
         Player player = event.getPlayer();
-        // Keep OUR pack pinned to the top of the client's Selected list: whenever some other
-        // pack (another plugin, a /pack command...) finishes applying, re-send ours so it is
-        // the most recent pack again and therefore stays on top. Our own SUCCESS events are
-        // recognised by the stable pack id and never re-trigger this (no loop).
+        PlayerResourcePackStatusEvent.Status status = event.getStatus();
         UUID ourId = this.packId;
-        if (this.request != null && ourId != null
-                && event.getStatus() == PlayerResourcePackStatusEvent.Status.SUCCESSFULLY_LOADED
-                && !ourId.equals(event.getID())) {
-            Bukkit.getScheduler().runTask(plugin, () -> {
-                if (player.isOnline()) {
-                    applyTo(player);
-                }
-            });
+        if (status == PlayerResourcePackStatusEvent.Status.SUCCESSFULLY_LOADED) {
+            if (ourId != null && ourId.equals(event.getID())) {
+                failedAttempts.remove(player.getUniqueId());
+            } else if (this.request != null && ourId != null) {
+                // Keep OUR pack pinned to the top of the client's Selected list: whenever some
+                // other pack (another plugin, a /pack command...) finishes applying, re-send
+                // ours so it is the most recent pack again and therefore stays on top. Our own
+                // SUCCESS events are recognised by the stable pack id and never re-trigger
+                // this (no loop).
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (player.isOnline()) {
+                        applyTo(player);
+                    }
+                });
+            }
+            return;
         }
         if (this.request == null || !required()) {
             return;
         }
-        PlayerResourcePackStatusEvent.Status status = event.getStatus();
-        if (status == PlayerResourcePackStatusEvent.Status.DECLINED
-                || status == PlayerResourcePackStatusEvent.Status.FAILED_DOWNLOAD
-                || status == PlayerResourcePackStatusEvent.Status.INVALID_URL) {
-            String message = configService.config().getString("resource-pack.kick-message",
-                    "This server requires the Rumilance resource pack.");
-            logger.info(() -> "Kicking " + player.getName()
-                    + " — resource pack " + status.name().toLowerCase(java.util.Locale.ROOT));
-            player.kick(Component.text(message));
+        boolean downloadFailure =
+                status == PlayerResourcePackStatusEvent.Status.FAILED_DOWNLOAD
+                        || status == PlayerResourcePackStatusEvent.Status.INVALID_URL
+                        || status == PlayerResourcePackStatusEvent.Status.FAILED_RELOAD;
+        if (status != PlayerResourcePackStatusEvent.Status.DECLINED && !downloadFailure) {
+            return;
         }
+        // The pack is already applied — any failure status is stale/duplicate noise.
+        if (player.hasResourcePack()) {
+            return;
+        }
+        if (downloadFailure) {
+            int attempts = failedAttempts.merge(player.getUniqueId(), 1, Integer::sum);
+            if (attempts <= MAX_DOWNLOAD_RETRIES) {
+                logger.info("Resource pack " + status.name().toLowerCase(java.util.Locale.ROOT)
+                        + " for " + player.getName() + " — retrying ("
+                        + attempts + "/" + MAX_DOWNLOAD_RETRIES + ")");
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (player.isOnline()) {
+                        applyTo(player);
+                    }
+                }, RETRY_DELAY_TICKS);
+                return;
+            }
+        }
+        failedAttempts.remove(player.getUniqueId());
+        String message = configService.config().getString("resource-pack.kick-message",
+                "This server requires the Rumilance resource pack.");
+        logger.info(() -> "Kicking " + player.getName()
+                + " — resource pack " + status.name().toLowerCase(java.util.Locale.ROOT));
+        player.kick(Component.text(message));
     }
 
     /**

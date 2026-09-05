@@ -29,7 +29,7 @@ Admin / VIP+ / VIP の **ランクバッジ** はリソースパックのカス�
 resource-pack:
   enabled: true          # false でプラグインからの配布を無効化
   url: "https://…/RumilanceResourcePack.zip"   # パックの直接ダウンロードURL
-  sha1: "176f255319657e37c3b9ee54d7a72c43d71c2cf3"   # ZIP の SHA1（40桁hex）
+  sha1: "c4cf82d41ba0564aaac4752cb6a95225e768b2e2"   # ZIP の SHA1（40桁hex）
   required: true         # true = 拒否/失敗でキック
   prompt: "…"            # クライアントのパック適用ダイアログに出す文
   kick-message: "…"      # キック時の表示文（\n で改行可）
@@ -43,9 +43,14 @@ resource-pack:
 > 両方が有効だと、クライアントにパックが二重に要求されることがあります。
 > （代替手段として server.properties 配布を使いたい場合は下の「代替」節へ）
 
-### パックの置き場所（ホスティング）: Cloudflare Pages
+### パックの置き場所（ホスティング）
 
-HTTPS + CDN + 無料枠で配信できます。クライアントは **ZIP ファイルそのもの**を
+**既定はリポジトリの `dist/` を GitHub raw で直接配信**（`config.yml` の
+`resource-pack.url` 初期値がそれ）。`dist/RumilanceResourcePack.zip` と
+`dist/RumilanceResourcePack.sha1` を更新して push するだけで配信も更新されます。
+
+自前の CDN が欲しい場合の代替として、HTTPS + CDN + 無料枠の **Cloudflare Pages**
+でも配信できます。クライアントは **ZIP ファイルそのもの**を
 URL からダウンロードします。
 
 1. [Cloudflare Dashboard](https://dash.cloudflare.com/) → **Workers & Pages** →
@@ -73,7 +78,7 @@ URL からダウンロードします。
 現在コミット済みパックの SHA1:
 
 ```
-176f255319657e37c3b9ee54d7a72c43d71c2cf3
+c4cf82d41ba0564aaac4752cb6a95225e768b2e2
 ```
 
 > **グリフの描画について（1.21.6+ 対策）**: このパックはアイコンのグリフプロバイダーを
@@ -94,13 +99,13 @@ URL からダウンロードします。
 ```properties
 # Cloudflare Pages 利用時
 resource-pack=https://<プロジェクト名>.pages.dev/RumilanceResourcePack.mczip
-resource-pack-sha1=176f255319657e37c3b9ee54d7a72c43d71c2cf3
+resource-pack-sha1=c4cf82d41ba0564aaac4752cb6a95225e768b2e2
 require-resource-pack=true
 resource-pack-prompt={"text":"Rumilanceのアイコン表示に必要です","color":"aqua"}
 
 # またはリポジトリの dist パック直接指定（マージ後は .../main/...）
 resource-pack=https://raw.githubusercontent.com/ifuto/RumilancePractice/main/dist/RumilanceResourcePack.zip
-resource-pack-sha1=176f255319657e37c3b9ee54d7a72c43d71c2cf3
+resource-pack-sha1=c4cf82d41ba0564aaac4752cb6a95225e768b2e2
 require-resource-pack=true
 ```
 
