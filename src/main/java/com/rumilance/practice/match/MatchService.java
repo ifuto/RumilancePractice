@@ -254,9 +254,32 @@ public final class MatchService {
     private com.rumilance.practice.ffa.FfaService ffaService;
     private com.rumilance.practice.combat.CombatNetTracker combatNet;
     private com.rumilance.practice.originalkit.OriginalKitService originalKitService;
+    private com.rumilance.practice.database.repository.DailyRankedStatsRepository dailyStatsRepository;
 
     public void setOriginalKitService(com.rumilance.practice.originalkit.OriginalKitService originalKitService) {
         this.originalKitService = originalKitService;
+    }
+
+    public void setDailyStatsRepository(
+            com.rumilance.practice.database.repository.DailyRankedStatsRepository dailyStatsRepository) {
+        this.dailyStatsRepository = dailyStatsRepository;
+    }
+
+    /**
+     * Monthly kill leaderboard accounting: one kill for the attacker, one death for the
+     * victim. Failures only log at FINE — stat bookkeeping must never break a lethal.
+     */
+    private void recordMonthlyKillDeath(UUID attackerId, UUID victimId) {
+        var repository = dailyStatsRepository;
+        if (repository == null) {
+            return;
+        }
+        try {
+            repository.increment(attackerId, 1, 0, 0);
+            repository.increment(victimId, 0, 0, 1);
+        } catch (Throwable t) {
+            plugin.getLogger().log(java.util.logging.Level.FINE, "[KillLB] daily stat increment failed", t);
+        }
     }
 
     public void setDuelLogStore(com.rumilance.practice.duel.DuelLogStore duelLogStore) {
@@ -1412,6 +1435,7 @@ public final class MatchService {
         // Count a kill for the attacker (skip self-inflicted / environmental deaths).
         if (attackerId != null && !attackerId.equals(victimId)) {
             session.addKill(attackerId);
+            recordMonthlyKillDeath(attackerId, victimId);
             combatTracker.forParticipant(session.id(), attackerId).hits.incrementAndGet();
             if (titleService != null) {
                 Player killer = Bukkit.getPlayer(attackerId);

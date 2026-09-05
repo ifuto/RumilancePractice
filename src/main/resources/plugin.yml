@@ -289,6 +289,10 @@ commands:
     description: Place wall-mounted text labels (TextDisplay) on the block face in sight.
     usage: /walltext <set|scale|remove|list|reload> ...
     permission: rumilance.admin
+  lbspawn:
+    description: Place (or remove) the floating monthly kill leaderboard at your feet.
+    usage: /lbspawn <kill|remove>
+    permission: rumilance.admin
   killeffect:
     description: Open the paid kill-effect cosmetic picker.
     usage: /killeffect

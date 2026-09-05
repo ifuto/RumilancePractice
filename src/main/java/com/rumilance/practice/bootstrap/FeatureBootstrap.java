@@ -486,8 +486,18 @@ public final class FeatureBootstrap {
 
         WallTextService wallTextService = new WallTextService(plugin);
         services.register(WallTextService.class, wallTextService);
+        com.rumilance.practice.leaderboard.KillLeaderboardService killLeaderboardService =
+                new com.rumilance.practice.leaderboard.KillLeaderboardService(
+                        plugin, dailyRankedStatsRepository, playerRepository, lobbyService::spawn);
+        services.register(com.rumilance.practice.leaderboard.KillLeaderboardService.class,
+                killLeaderboardService);
+        matchService.setDailyStatsRepository(dailyRankedStatsRepository);
+        plugin.getServer().getPluginManager().registerEvents(killLeaderboardService, plugin);
+        Bukkit.getScheduler().runTaskTimer(plugin, killLeaderboardService::tick, 20L, 3L);
+        bind("lbspawn", new com.rumilance.practice.leaderboard.LbSpawnCommand(killLeaderboardService));
         Bukkit.getScheduler().runTask(plugin, () -> {
             wallTextService.load();
+            killLeaderboardService.load();
             wallTextService.clearAutoLabels();
             if (!(arenaService instanceof DisposableArenaService)) {
                 for (ArenaTemplate template : arenaStore.templates()) {
@@ -1382,6 +1392,8 @@ public final class FeatureBootstrap {
             scoreboardService.stop();
         }
         services.find(FfaService.class).ifPresent(FfaService::shutdown);
+        services.find(com.rumilance.practice.leaderboard.KillLeaderboardService.class)
+                .ifPresent(com.rumilance.practice.leaderboard.KillLeaderboardService::disable);
         services.find(LunarRichPresenceService.class).ifPresent(LunarRichPresenceService::shutdown);
         if (arrowEffectService != null) {
             arrowEffectService.stop();

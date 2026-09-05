@@ -26,29 +26,66 @@ public final class DailyRankedStatsRepository {
     }
 
     public void increment(UUID playerId, int killDelta, int matchDelta) throws SQLException {
+        increment(playerId, killDelta, matchDelta, 0);
+    }
+
+    /** Adds kill/match/death deltas to today's row for one player. */
+    public void increment(UUID playerId, int killDelta, int matchDelta, int deathDelta) throws SQLException {
         String date = LocalDate.now().toString();
         try (Connection connection = databaseService.getConnection()) {
             try (PreparedStatement insert = connection.prepareStatement(
                     "INSERT INTO " + databaseService.table("daily_ranked_stats")
-                            + " (player_uuid, stat_date, kills, matches) VALUES (?, ?, ?, ?)")) {
+                            + " (player_uuid, stat_date, kills, matches, deaths) VALUES (?, ?, ?, ?, ?)")) {
                 insert.setString(1, playerId.toString());
                 insert.setString(2, date);
                 insert.setInt(3, Math.max(0, killDelta));
                 insert.setInt(4, Math.max(0, matchDelta));
+                insert.setInt(5, Math.max(0, deathDelta));
                 insert.executeUpdate();
             } catch (SQLException duplicate) {
                 try (PreparedStatement update = connection.prepareStatement(
                         "UPDATE " + databaseService.table("daily_ranked_stats")
-                                + " SET kills = kills + ?, matches = matches + ? "
+                                + " SET kills = kills + ?, matches = matches + ?, deaths = deaths + ? "
                                 + "WHERE player_uuid = ? AND stat_date = ?")) {
                     update.setInt(1, Math.max(0, killDelta));
                     update.setInt(2, Math.max(0, matchDelta));
-                    update.setString(3, playerId.toString());
-                    update.setString(4, date);
+                    update.setInt(3, Math.max(0, deathDelta));
+                    update.setString(4, playerId.toString());
+                    update.setString(5, date);
                     update.executeUpdate();
                 }
             }
         }
+    }
+
+    /** Aggregated kills/deaths for one calendar month, best killers first. */
+    public record MonthlyEntry(UUID playerId, int kills, int deaths) {
+    }
+
+    /** @param monthPrefix {@code yyyy-MM} selecting the month */
+    public List<MonthlyEntry> topKillsOfMonth(String monthPrefix, int limit) throws SQLException {
+        String sql = "SELECT player_uuid, SUM(kills) AS kills, SUM(deaths) AS deaths FROM "
+                + databaseService.table("daily_ranked_stats")
+                + " WHERE stat_date LIKE ? GROUP BY player_uuid ORDER BY kills DESC LIMIT ?";
+        List<MonthlyEntry> result = new java.util.ArrayList<>();
+        try (Connection connection = databaseService.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, monthPrefix + "%");
+            statement.setInt(2, Math.max(1, limit));
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    UUID uuid;
+                    try {
+                        uuid = UUID.fromString(resultSet.getString("player_uuid"));
+                    } catch (IllegalArgumentException e) {
+                        continue;
+                    }
+                    result.add(new MonthlyEntry(uuid,
+                            resultSet.getInt("kills"), resultSet.getInt("deaths")));
+                }
+            }
+        }
+        return result;
     }
 
     public List<DailyEntry> topKillsToday(int limit) throws SQLException {

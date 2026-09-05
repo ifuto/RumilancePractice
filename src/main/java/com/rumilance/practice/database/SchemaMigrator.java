@@ -399,6 +399,12 @@ public final class SchemaMigrator {
                         + ")"
         )));
 
+        migrations.add(new Migration(29, "add deaths column to daily_ranked_stats", connection -> {
+            String table = databaseService.table("daily_ranked_stats");
+            databaseService.ensureColumn(connection, table, "deaths",
+                    "INTEGER NOT NULL DEFAULT 0");
+        }));
+
         return migrations;
     }
 }
