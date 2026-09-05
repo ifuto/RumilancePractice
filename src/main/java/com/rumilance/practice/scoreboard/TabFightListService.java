@@ -3,21 +3,29 @@ package com.rumilance.practice.scoreboard;
 import com.rumilance.practice.session.MatchSession;
 import com.rumilance.practice.state.MatchState;
 import com.rumilance.practice.state.TeamColor;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 /**
  * Controls the TAB (player list) layout for an active fight, keeping the roster readable at
  * a glance. Purely a sort-order service on top of vanilla packets — no fake players, so it
  * stays fully compatible with any tablist plugin the server may add later.
  *
- * <p>Layout rules (max 20 rows per column, columns are 20-order wide):</p>
+ * <p>Ordering uses the vanilla list-order index added in 1.21.2 (snapshot 24w33a:
+ * "a non-negative ordering index that is sorted highest to lowest", exposed by Paper as
+ * {@link Player#setPlayerListOrder(int)}). Higher values are therefore listed FIRST: the
+ * first sort group gets the highest priorities, and the client wraps entries into the next
+ * column every 20 rows automatically. Within a group players are listed alphabetically by
+ * assigning descending priorities in name order.</p>
+ *
+ * <p>Layout rules:</p>
  * <ul>
  *   <li><b>Team fights</b> — column 1 is the RED roster, column 2 the BLUE roster, column 3
  *   spectators. RED members are rendered with red names, BLUE with blue names and spectators
@@ -32,14 +40,16 @@ import java.util.List;
  */
 public final class TabFightListService {
 
-    /** Start order of the second column (20 rows per column). */
-    private static final int RIGHT_COLUMN_BASE = 20;
-    /** Start order of the third column (spectators in team fights). */
-    private static final int THIRD_COLUMN_BASE = 40;
+    /** Priority bases — higher groups are listed first (vanilla sorts highest to lowest). */
+    private static final int FIRST_COLUMN_BASE = 3000;
+    private static final int SECOND_COLUMN_BASE = 2000;
+    private static final int THIRD_COLUMN_BASE = 1000;
 
     private final org.bukkit.plugin.Plugin plugin;
     private com.rumilance.practice.rank.RankService rankService;
     private volatile com.rumilance.practice.config.ConfigService configService;
+    /** Players whose custom tab-list display name was cleared for the fight layout. */
+    private final Set<UUID> layoutApplied = new HashSet<>();
 
     public TabFightListService(org.bukkit.plugin.Plugin plugin) {
         this.plugin = plugin;
@@ -68,9 +78,6 @@ public final class TabFightListService {
 
     /** Applies the fight layout to the tablist of every online player. */
     public void apply(MatchSession session, Collection<? extends Player> online) {
-        if (!columnsEnabled()) {
-            return;
-        }
         if (session == null) {
             return;
         }
@@ -105,48 +112,62 @@ public final class TabFightListService {
             return;
         }
 
+        layoutApplied.removeIf(id -> org.bukkit.Bukkit.getPlayer(id) == null);
+        boolean ordering = columnsEnabled();
         if (session.isTeamMatch()) {
-            // Column 1 = RED, column 2 = BLUE, column 3 = spectators.
-            int order = 0;
+            // Column 1 = RED, column 2 = BLUE, column 3 = spectators. Vanilla sorts the list
+            // order index highest to lowest, so the first column gets the highest values and
+            // descending values within a group yield alphabetical top-to-bottom rosters.
+            int order = FIRST_COLUMN_BASE;
             for (Player p : red) {
-                p.setPlayerListOrder(order++);
-                p.playerListName(Component.text(p.getName(), NamedTextColor.RED));
+                applyListEntry(p, ordering, order--);
             }
-            order = RIGHT_COLUMN_BASE;
+            order = SECOND_COLUMN_BASE;
             for (Player p : blue) {
-                p.setPlayerListOrder(order++);
-                p.playerListName(Component.text(p.getName(), NamedTextColor.BLUE));
+                applyListEntry(p, ordering, order--);
             }
             order = THIRD_COLUMN_BASE;
             for (Player p : spectators) {
-                p.setPlayerListOrder(order++);
-                p.playerListName(Component.text(p.getName(), NamedTextColor.DARK_GRAY));
+                applyListEntry(p, ordering, order--);
             }
         } else {
-            // Column 1 = fighters (their RED/BLUE team colour), column 2 = spectators.
-            int order = 0;
+            // Column 1 = fighters, column 2 = spectators.
+            int order = FIRST_COLUMN_BASE;
             for (Player p : fighters) {
-                p.setPlayerListOrder(order++);
-                TeamColor color = session.teamColor(p.getUniqueId());
-                if (color != null) {
-                    p.playerListName(Component.text(p.getName(),
-                            color == TeamColor.RED ? NamedTextColor.RED : NamedTextColor.BLUE));
-                }
+                applyListEntry(p, ordering, order--);
             }
-            order = RIGHT_COLUMN_BASE;
+            order = SECOND_COLUMN_BASE;
             for (Player p : spectators) {
-                p.setPlayerListOrder(order++);
-                p.playerListName(Component.text(p.getName(), NamedTextColor.DARK_GRAY));
+                applyListEntry(p, ordering, order--);
             }
+        }
+    }
+
+    /**
+     * Applies one tablist entry. Ordering packets are only sent when enabled and changed
+     * (this runs on the periodic scoreboard refresh and must not re-broadcast identical
+     * player-info updates every cycle). The custom list name is cleared once on entering
+     * the layout: the client renders a set display name verbatim and only falls back to
+     * "scoreboard team prefix + team-coloured name" when no display name is set, so a custom
+     * name would hide the MatchTeamVisuals badge/marker/colour in the tab list.
+     */
+    private void applyListEntry(Player player, boolean ordering, int order) {
+        if (ordering && player.getPlayerListOrder() != order) {
+            player.setPlayerListOrder(order);
+        }
+        if (layoutApplied.add(player.getUniqueId())) {
+            player.playerListName(null);
         }
     }
 
     /** Restores vanilla ordering and the rank-styled list name for one player. */
     public void clear(Player player) {
-        if (!columnsEnabled()) {
+        if (!layoutApplied.remove(player.getUniqueId())) {
             return;
         }
-        player.setPlayerListOrder(0);
+        if (player.getPlayerListOrder() != 0) {
+            player.setPlayerListOrder(0);
+        }
         if (rankService != null) {
             rankService.applyNametag(player);
         }
