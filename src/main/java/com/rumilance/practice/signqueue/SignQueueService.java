@@ -28,6 +28,7 @@ import org.bukkit.Tag;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.Sign;
+import org.bukkit.block.sign.Side;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -394,11 +395,11 @@ public final class SignQueueService implements Listener {
         String kitLabel = kitService.get(kitId)
                 .map(KitDefinition::prettyDisplayName).orElse(kitId);
         int count = waitingCount(kitId);
-        sign.getSide(Sign.Side.FRONT).line(0, Component.text("Unranked Queue",
+        sign.getSide(Side.FRONT).line(0, Component.text("Unranked Queue",
                 NamedTextColor.GOLD).decoration(TextDecoration.BOLD, true));
-        sign.getSide(Sign.Side.FRONT).line(1, Component.text(kitLabel, NamedTextColor.AQUA));
-        sign.getSide(Sign.Side.FRONT).line(2, Component.empty());
-        sign.getSide(Sign.Side.FRONT).line(3, Component.text(
+        sign.getSide(Side.FRONT).line(1, Component.text(kitLabel, NamedTextColor.AQUA));
+        sign.getSide(Side.FRONT).line(2, Component.empty());
+        sign.getSide(Side.FRONT).line(3, Component.text(
                 "\u25B6 " + count + " / " + CAPACITY,
                 count >= CAPACITY ? NamedTextColor.RED : NamedTextColor.GREEN));
     }
