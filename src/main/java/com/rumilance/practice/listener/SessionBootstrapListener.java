@@ -43,6 +43,12 @@ public final class SessionBootstrapListener implements Listener {
     private final MessageService messageService;
     private final RankService rankService;
     private final ChatBanService chatBanService;
+    /** Opens the language picker (wired from bootstrap; null = picker disabled). */
+    private volatile java.util.function.Consumer<org.bukkit.entity.Player> languagePicker;
+
+    public void setLanguagePicker(java.util.function.Consumer<org.bukkit.entity.Player> languagePicker) {
+        this.languagePicker = languagePicker;
+    }
 
     public SessionBootstrapListener(
             SessionManager sessionManager,
@@ -123,9 +129,15 @@ public final class SessionBootstrapListener implements Listener {
     public void onJoin(PlayerJoinEvent event) {
         JoinQuitMessages.apply(event);
         Player player = event.getPlayer();
-        String locale = player.locale() != null ? player.locale().toString().toLowerCase(Locale.ROOT) : defaultLocale;
-        PlayerSession session = sessionManager.createSession(player.getUniqueId(), locale);
+        String clientLocale = player.locale() != null ? player.locale().toString().toLowerCase(Locale.ROOT) : defaultLocale;
         var settings = settingsService.get(player.getUniqueId());
+        // A previously chosen language wins over the client locale; first-timers (LOCALE_AUTO)
+        // keep the client locale until they pick one in the language GUI below.
+        boolean localeUnset = com.rumilance.practice.model.PlayerSettings.isLocaleUnset(settings.locale());
+        String locale = localeUnset
+                ? clientLocale
+                : com.rumilance.practice.locale.LocaleService.normalize(settings.locale());
+        PlayerSession session = sessionManager.createSession(player.getUniqueId(), locale);
         session.setSoundsEnabled(settings.soundsEnabled());
         session.setScoreboardEnabled(settings.scoreboardEnabled());
         playerStateManager.initialize(player.getUniqueId());
@@ -155,6 +167,15 @@ public final class SessionBootstrapListener implements Listener {
                 } catch (Exception e) {
                     WelcomeTitle.play(plugin, player);
                 }
+            }
+            // First-timers / players without a language choice get the picker right after the
+            // lobby teleport settles (delayed a few ticks so the teleport + welcome title land first).
+            if (localeUnset && languagePicker != null && plugin != null) {
+                plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+                    if (player.isOnline()) {
+                        languagePicker.accept(player);
+                    }
+                }, 12L);
             }
         };
         if (plugin != null) {

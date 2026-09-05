@@ -52,6 +52,10 @@ arena:
   created: "<green>Arena <arena> created."
 
 gui:
+  language-title: "Select Language"
+  language-current: "Currently selected"
+  language-select-hint: "Click to select this language"
+  language-partial: "Partial translation - missing lines fall back to English"
   save: "Save"
   save-failed: "<red>Save failed."
   kit-saved: "<green>Kit layout saved."

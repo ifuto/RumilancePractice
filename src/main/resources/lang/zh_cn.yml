@@ -1,0 +1,68 @@
+# Simplified Chinese (core subset). Any key not present here falls back to en_us
+# via LocaleService's three-tier fallback, so this file only needs the most
+# player-visible strings.
+welcome:
+  subtitle: "<yellow>欢迎"
+  record-tip: "<yellow>录制你的对局。录像是举报作弊者最有力的证据。"
+
+general:
+  prefix: ""
+  maintenance: "<red>练习场正在维护中。"
+  no-permission: "<red>你没有权限这样做。"
+  player-only: "<red>只有玩家可以使用这个命令。"
+  player-not-found: "<red>找不到玩家 '<target>'。"
+  invalid-usage: "<red>用法：<usage>"
+  reload-success: "<green>配置已成功重载。"
+  unknown-error: "<red>发生了意外错误，请联系管理员。"
+  feature-disabled: "<red>此功能当前已禁用。"
+  loading: "<gray>加载中，请稍候……"
+  mode-ranked: "排位"
+  mode-unranked: "休闲"
+
+lobby:
+  spawn-set: "<green>大厅出生点已更新。"
+  teleported: "<gray>已传送到大厅。"
+
+queue:
+  maintenance: "<red>练习场正在维护中。"
+  kit-disabled: "<red>该套件队列当前已禁用。"
+  cannot-join: "<red>你现在无法加入队列。"
+  already-queued: "<red>你已经在一个队列中。"
+  high-ping: "<red>你的延迟 (<ping>ms) 过高，无法排位（上限 <max>ms）。"
+  joined: "<green>已加入 <yellow><kit></yellow> 的 <mode> 队列。"
+  left: "<gray>已离开队列。"
+
+match:
+  countdown: "<yellow>比赛将在 <seconds> 秒后开始……"
+  found-title: "<gold><bold>找到对手"
+  found-subtitle: "<dark_gray>· · ·"
+  start-title: "<yellow><bold>⚔ 开始 ⚔"
+  win-title: "<yellow><bold>🏆 胜利 🏆"
+  lose-title: "<blue><bold>失败"
+  draw-title: "<yellow><bold>平局"
+  timeout-draw: "<yellow>比赛超时，以平局结束。"
+  ended: "<gray>比赛已结束。"
+  rematch-requested: "<yellow><player> 想要再战一场！"
+
+spectator:
+  now-spectating: "<gray>你正在观战 <yellow><player></yellow>。"
+  stopped-spectating: "<gray>你已停止观战。"
+  cannot-spectate: "<red>你现在无法观战这场比赛。"
+  no-active-match: "<red><player> 当前没有在进行比赛。"
+
+settings:
+  updated: "<green>已将 <key> 更新为 <value>。"
+  locale-changed: "<green>语言已切换为 <locale>。"
+  invalid-value: "<red>'<value>' 不是 <key> 的有效值。"
+
+menu:
+  close: "关闭"
+  back: "返回"
+
+gui:
+  language-title: "选择语言"
+  language-current: "当前选择"
+  language-select-hint: "点击选择此语言"
+  language-partial: "部分翻译 - 缺失内容将以英文显示"
+  toggle-on: "开启"
+  toggle-off: "关闭"

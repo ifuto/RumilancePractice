@@ -34,13 +34,19 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class LocaleService {
 
     /**
-     * Locales bundled with the plugin. Only Japanese, English (US/UK) and Korean ship full
-     * translations; any other client locale falls back to {@code en_us} (see
-     * {@link #rawMessage(String, String)}). Server owners may still add their own
-     * {@code lang/<locale>.yml} files in the plugin data folder to override or extend these.
+     * Locales bundled with the plugin. Japanese, English (US/UK) and Korean ship full
+     * translations; Simplified Chinese, Spanish and French ship a core subset (anything
+     * missing falls back to {@code en_us}, see {@link #rawMessage(String, String)}). Server
+     * owners may still add their own {@code lang/<locale>.yml} files in the plugin data
+     * folder to override or extend these.
      */
     public static final List<String> BUILT_IN_LOCALES = List.of(
-            "en_us", "ja_jp", "en_gb", "ko_kr"
+            "en_us", "ja_jp", "en_gb", "ko_kr", "zh_cn", "es_es", "fr_fr"
+    );
+
+    /** Human-facing option list for the language picker, in display order. */
+    public static final List<String> PICKER_LOCALES = List.of(
+            "en_us", "en_gb", "ja_jp", "ko_kr", "zh_cn", "es_es", "fr_fr"
     );
 
     private final String defaultLocale;

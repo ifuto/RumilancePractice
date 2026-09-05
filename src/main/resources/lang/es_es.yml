@@ -1,0 +1,68 @@
+# Spanish (core subset). Any key not present here falls back to en_us via
+# LocaleService's three-tier fallback, so this file only needs the most
+# player-visible strings.
+welcome:
+  subtitle: "<yellow>Bienvenido"
+  record-tip: "<yellow>Graba tus combates. Los clips son la mejor prueba contra los tramposos."
+
+general:
+  prefix: ""
+  maintenance: "<red>La práctica está en mantenimiento."
+  no-permission: "<red>No tienes permiso para hacer eso."
+  player-only: "<red>Solo los jugadores pueden usar este comando."
+  player-not-found: "<red>No se encontró al jugador '<target>'."
+  invalid-usage: "<red>Uso: <usage>"
+  reload-success: "<green>Configuración recargada correctamente."
+  unknown-error: "<red>Ocurrió un error inesperado. Contacta a un administrador."
+  feature-disabled: "<red>Esta función está desactivada."
+  loading: "<gray>Cargando, por favor espera..."
+  mode-ranked: "ranked"
+  mode-unranked: "unranked"
+
+lobby:
+  spawn-set: "<green>Punto de aparición del lobby actualizado."
+  teleported: "<gray>Teletransportado al lobby."
+
+queue:
+  maintenance: "<red>La práctica está en mantenimiento."
+  kit-disabled: "<red>La cola de ese kit está desactivada."
+  cannot-join: "<red>No puedes unirte a una cola ahora."
+  already-queued: "<red>Ya estás en una cola."
+  high-ping: "<red>Tu ping (<ping>ms) es demasiado alto para ranked (máx <max>ms)."
+  joined: "<green>Te uniste a la cola <mode> de <yellow><kit></yellow>."
+  left: "<gray>Saliste de la cola."
+
+match:
+  countdown: "<yellow>La partida empieza en <seconds>..."
+  found-title: "<gold><bold>Partida encontrada"
+  found-subtitle: "<dark_gray>· · ·"
+  start-title: "<yellow><bold>⚔ START ⚔"
+  win-title: "<yellow><bold>🏆 WIN 🏆"
+  lose-title: "<blue><bold>LOSE"
+  draw-title: "<yellow><bold>DRAW"
+  timeout-draw: "<yellow>La partida agotó el tiempo y terminó en empate."
+  ended: "<gray>La partida ha terminado."
+  rematch-requested: "<yellow>¡<player> quiere una revancha!"
+
+spectator:
+  now-spectating: "<gray>Ahora espectas a <yellow><player></yellow>."
+  stopped-spectating: "<gray>Dejaste de espectar."
+  cannot-spectate: "<red>No puedes espectar esa partida ahora."
+  no-active-match: "<red><player> no está en una partida ahora."
+
+settings:
+  updated: "<green><key> actualizado a <value>."
+  locale-changed: "<green>Idioma cambiado a <locale>."
+  invalid-value: "<red>'<value>' no es un valor válido para <key>."
+
+menu:
+  close: "Cerrar"
+  back: "Atrás"
+
+gui:
+  language-title: "Seleccionar idioma"
+  language-current: "Seleccionado actualmente"
+  language-select-hint: "Haz clic para elegir este idioma"
+  language-partial: "Traducción parcial - lo que falte se muestra en inglés"
+  toggle-on: "Sí"
+  toggle-off: "No"

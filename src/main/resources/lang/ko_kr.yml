@@ -106,6 +106,10 @@ match:
   leave-ban-reason: "시작 전 카운트다운 중 연속 퇴장"
 
 gui:
+  language-title: "언어 선택"
+  language-current: "현재 선택됨"
+  language-select-hint: "클릭하여 이 언어를 선택하세요"
+  language-partial: "부분 번역 - 일부는 영어로 표시됩니다"
   save: "Save"
   save-failed: "<red>Save failed."
   kit-saved: "<green>Kit layout saved."

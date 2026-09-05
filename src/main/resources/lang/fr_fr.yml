@@ -1,0 +1,68 @@
+# French (core subset). Any key not present here falls back to en_us via
+# LocaleService's three-tier fallback, so this file only needs the most
+# player-visible strings.
+welcome:
+  subtitle: "<yellow>Bienvenue"
+  record-tip: "<yellow>Enregistre tes combats. Les clips sont la meilleure preuve contre les tricheurs."
+
+general:
+  prefix: ""
+  maintenance: "<red>L'entraînement est en maintenance."
+  no-permission: "<red>Tu n'as pas la permission de faire ça."
+  player-only: "<red>Seuls les joueurs peuvent utiliser cette commande."
+  player-not-found: "<red>Le joueur '<target>' est introuvable."
+  invalid-usage: "<red>Utilisation : <usage>"
+  reload-success: "<green>Configuration rechargée avec succès."
+  unknown-error: "<red>Une erreur inattendue est survenue. Contacte un administrateur."
+  feature-disabled: "<red>Cette fonctionnalité est désactivée."
+  loading: "<gray>Chargement, patiente..."
+  mode-ranked: "ranked"
+  mode-unranked: "unranked"
+
+lobby:
+  spawn-set: "<green>Point d'apparition du lobby mis à jour."
+  teleported: "<gray>Téléporté au lobby."
+
+queue:
+  maintenance: "<red>L'entraînement est en maintenance."
+  kit-disabled: "<red>La file de ce kit est désactivée."
+  cannot-join: "<red>Tu ne peux pas rejoindre une file maintenant."
+  already-queued: "<red>Tu es déjà dans une file."
+  high-ping: "<red>Ton ping (<ping>ms) est trop élevé pour le ranked (max <max>ms)."
+  joined: "<green>Tu as rejoint la file <mode> de <yellow><kit></yellow>."
+  left: "<gray>Tu as quitté la file."
+
+match:
+  countdown: "<yellow>Le match commence dans <seconds>..."
+  found-title: "<gold><bold>Match trouvé"
+  found-subtitle: "<dark_gray>· · ·"
+  start-title: "<yellow><bold>⚔ START ⚔"
+  win-title: "<yellow><bold>🏆 WIN 🏆"
+  lose-title: "<blue><bold>LOSE"
+  draw-title: "<yellow><bold>DRAW"
+  timeout-draw: "<yellow>Le match a expiré et se termine par une égalité."
+  ended: "<gray>Le match est terminé."
+  rematch-requested: "<yellow><player> veut une revanche !"
+
+spectator:
+  now-spectating: "<gray>Tu observes <yellow><player></yellow>."
+  stopped-spectating: "<gray>Tu as arrêté d'observer."
+  cannot-spectate: "<red>Tu ne peux pas observer ce match maintenant."
+  no-active-match: "<red><player> n'est pas en match actuellement."
+
+settings:
+  updated: "<green><key> mis à jour : <value>."
+  locale-changed: "<green>Langue changée en <locale>."
+  invalid-value: "<red>'<value>' n'est pas une valeur valide pour <key>."
+
+menu:
+  close: "Fermer"
+  back: "Retour"
+
+gui:
+  language-title: "Choisir la langue"
+  language-current: "Actuellement sélectionné"
+  language-select-hint: "Clique pour choisir cette langue"
+  language-partial: "Traduction partielle - le reste s'affiche en anglais"
+  toggle-on: "Oui"
+  toggle-off: "Non"

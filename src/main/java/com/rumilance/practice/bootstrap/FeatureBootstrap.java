@@ -652,6 +652,9 @@ public final class FeatureBootstrap {
         SettingsGui settingsGui = new SettingsGui(guiSessions, soundService, settingsService);
         settingsGui.setToggleCooldownSeconds(configService.config().getInt("gui.toggle-cooldown-seconds", 2));
         settingsGui.setTeamColoredArmorService(teamColoredArmor);
+        com.rumilance.practice.gui.menus.LocaleSelectGui localeSelectGui =
+                new com.rumilance.practice.gui.menus.LocaleSelectGui(
+                        guiSessions, soundService, sessionManager, settingsService, messageService);
         StatsKitGui statsKitGui = new StatsKitGui(guiSessions, soundService, kitService, statsService);
         ProfileGui profileGui = new ProfileGui(guiSessions, soundService, kitService, statsService);
         PlayersGui playersGui = new PlayersGui(
@@ -896,6 +899,7 @@ public final class FeatureBootstrap {
         guiListener.register(smithingTrimGui);
         guiListener.register(shieldPatternGui);
         guiListener.register(customShieldAdminGui);
+        guiListener.register(localeSelectGui);
         guiListener.setMenuReturn(gameMenuGui::open);
         guiListener.setBattleMenuReturn(battleMenuGui::open);
         guiListener.setReopenOriginalEditor(player -> {
@@ -1034,9 +1038,11 @@ public final class FeatureBootstrap {
         pm.registerEvents(new com.rumilance.practice.replay.ReplayControlListener(replayService), plugin);
         pm.registerEvents(new BanLoginListener(banService), plugin);
         pm.registerEvents(new com.rumilance.practice.listener.ChatBanGuardListener(chatBanService), plugin);
-        pm.registerEvents(new SessionBootstrapListener(
+        SessionBootstrapListener sessionBootstrapListener = new SessionBootstrapListener(
                 sessionManager, stateManager, lobbyService, settings.defaultLocale(), playerRepository,
-                layoutCache, settingsService, asyncExecutor, plugin, messageService, rankService, chatBanService), plugin);
+                layoutCache, settingsService, asyncExecutor, plugin, messageService, rankService, chatBanService);
+        sessionBootstrapListener.setLanguagePicker(localeSelectGui::open);
+        pm.registerEvents(sessionBootstrapListener, plugin);
         pm.registerEvents(new LobbyListener(lobbyService, stateManager, guiSessions, ffaService), plugin);
         pm.registerEvents(new MotdListener(), plugin);
         com.rumilance.practice.world.WorldOptimizer worldOptimizer =
@@ -1206,7 +1212,9 @@ public final class FeatureBootstrap {
         bind("lobby", lobbyCommand);
         bind("spawn", lobbyCommand);
         bind("hub", lobbyCommand);
-        bind("lang", new LangCommand(sessionManager, settingsService, messageService));
+        LangCommand langCommand = new LangCommand(sessionManager, settingsService, messageService);
+        langCommand.setPickerOpener(localeSelectGui::open);
+        bind("lang", langCommand);
         bind("matchinv", new MatchInvCommand(matchInventoryGui));
         bind("setfunc", new SetFuncCommand());
         bind("admin", adminCommand);

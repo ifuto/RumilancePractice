@@ -486,6 +486,10 @@ admin-gui:
   click-hint: "下のトグルをクリックして設定を変更します"
 
 gui:
+  language-title: "言語を選択"
+  language-current: "現在選択中"
+  language-select-hint: "クリックしてこの言語を選択"
+  language-partial: "部分的な翻訳 - 一部は英語で表示されます"
   save: "保存"
   save-failed: "<red>保存に失敗しました。"
   kit-saved: "<green>キットレイアウトを保存しました。"

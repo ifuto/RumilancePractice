@@ -28,6 +28,19 @@ public record PlayerSettings(
         String killEffect
 ) {
 
+    /**
+     * Sentinel locale value meaning "the player has never explicitly chosen a language".
+     * Fresh settings rows carry it; on join the language picker opens for such players and
+     * the runtime locale falls back to the client locale until a choice is made. Message
+     * lookups for {@code auto} fall through to the default locale, so it is safe anywhere.
+     */
+    public static final String LOCALE_AUTO = "auto";
+
+    /** True when the stored locale means "not chosen yet". */
+    public static boolean isLocaleUnset(String locale) {
+        return locale == null || locale.isBlank() || LOCALE_AUTO.equalsIgnoreCase(locale.trim());
+    }
+
     public PlayerSettings {
         Objects.requireNonNull(uuid, "uuid");
         Objects.requireNonNull(arrowEffect, "arrowEffect");
@@ -61,8 +74,10 @@ public record PlayerSettings(
     }
 
     public static PlayerSettings defaultsFor(UUID uuid, String defaultLocale) {
+        // Locale starts as the LOCALE_AUTO sentinel: the join flow shows the language picker
+        // to players who never chose one. The parameter stays for signature compatibility.
         return new PlayerSettings(uuid, true, true, "none", true, true, false, false,
-                Set.of(), defaultLocale, "none", false, true, true, "none");
+                Set.of(), LOCALE_AUTO, "none", false, true, true, "none");
     }
 
     private PlayerSettings copy(
