@@ -26,6 +26,8 @@ public final class AdminMenuGui extends AbstractGui {
     private Consumer<Player> openKitAdmin = p -> { };
     private Consumer<Player> openPresetAdmin = p -> { };
     private Consumer<Player> openEkitAdmin = p -> { };
+    private java.util.function.Supplier<Boolean> packRequired = () -> false;
+    private Consumer<Player> togglePackPolicy = p -> { };
 
     public AdminMenuGui(GuiSessionRegistry registry, SoundService sounds) {
         super(registry, sounds, GuiType.ADMIN_MENU, 6, false);
@@ -41,6 +43,13 @@ public final class AdminMenuGui extends AbstractGui {
 
     public void setOpenEkitAdmin(Consumer<Player> openEkitAdmin) {
         this.openEkitAdmin = openEkitAdmin == null ? p -> { } : openEkitAdmin;
+    }
+
+    /** Resource-pack policy controls (required = kick on decline / recommended = join anyway). */
+    public void setPackPolicy(java.util.function.Supplier<Boolean> packRequired,
+                              Consumer<Player> togglePackPolicy) {
+        this.packRequired = packRequired == null ? () -> false : packRequired;
+        this.togglePackPolicy = togglePackPolicy == null ? p -> { } : togglePackPolicy;
     }
 
     @Override
@@ -121,6 +130,28 @@ public final class AdminMenuGui extends AbstractGui {
                 .action("noop")
                 .build());
 
+        boolean required = packRequired.get();
+        inventory.setItem(GuiSlots.slot(4, 6), ItemBuilder.of(required
+                        ? Material.REDSTONE_TORCH : Material.LEVER)
+                .name(t(player, "gui.admin-pack-policy").color(required
+                        ? NamedTextColor.RED : NamedTextColor.GREEN))
+                .lore(
+                        UiTheme.divider(),
+                        UiTheme.line(line(player, required
+                                ? "gui.admin-pack-policy-now-required"
+                                : "gui.admin-pack-policy-now-recommended")
+                                .color(required ? NamedTextColor.RED : NamedTextColor.GREEN)),
+                        UiTheme.blank(),
+                        UiTheme.line(line(player, "gui.admin-pack-policy-lore-1")),
+                        UiTheme.line(line(player, "gui.admin-pack-policy-lore-2")),
+                        UiTheme.line(line(player, "gui.admin-pack-policy-lore-3")),
+                        UiTheme.blank(),
+                        UiTheme.hint(line(player, "menu.click"))
+                )
+                .glint(required)
+                .action("packpolicy")
+                .build());
+
         inventory.setItem(GuiSlots.slot(5, 4), ItemBuilder.of(Material.BARRIER)
                 .name(t(player, "menu.close").color(NamedTextColor.RED))
                 .action("close")
@@ -145,6 +176,10 @@ public final class AdminMenuGui extends AbstractGui {
             case "ekitadmin" -> {
                 sounds.play(player, "gui-click");
                 openEkitAdmin.accept(player);
+            }
+            case "packpolicy" -> {
+                sounds.play(player, "gui-click");
+                togglePackPolicy.accept(player);
             }
             case "playerdata" -> {
                 sounds.play(player, "gui-click");

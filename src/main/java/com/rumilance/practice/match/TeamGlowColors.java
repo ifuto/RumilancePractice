@@ -48,7 +48,7 @@ public final class TeamGlowColors {
                     online.add(p);
                 }
             }
-            MatchTeamVisuals.apply(board, session, online);
+            MatchTeamVisuals.apply(board, viewer, session, online);
             return;
         }
         // No sidebar / fight teams yet — attach dedicated glow colour teams only.

@@ -81,10 +81,11 @@ public final class RankIconCommand implements CommandExecutor, TabCompleter {
         }
         sender.sendMessage(Component.text("— Client pack state —", NamedTextColor.GOLD));
         for (Player online : Bukkit.getOnlinePlayers()) {
-            boolean has = online.hasResourcePack();
+            boolean has = packs != null ? packs.hasPack(online) : online.hasResourcePack();
             String state = has ? "LOADED" : String.valueOf(online.getResourcePackStatus());
             sender.sendMessage(Component.text(online.getName(), has ? NamedTextColor.GREEN : NamedTextColor.RED)
-                    .append(Component.text("  " + (has ? "pack applied" : "pack not applied (" + state + ")"),
+                    .append(Component.text("  " + (has ? "pack applied" : "pack not applied (" + state
+                                    + ") — text rank badges"),
                             has ? NamedTextColor.GREEN : NamedTextColor.RED)));
         }
     }

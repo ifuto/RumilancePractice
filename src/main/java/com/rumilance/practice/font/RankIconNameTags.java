@@ -12,24 +12,30 @@ import java.util.Set;
 
 /**
  * Lobby / FFA nametag + TAB prefixes: the resource-pack rank badge (admin / VIP+ / VIP) is
- * rendered in front of the player name via the custom icon font. Match contexts use
- * {@code MatchTeamVisuals} fight teams instead (one entry may only belong to one team, so the
- * two layers clear each other's teams when switching contexts).
+ * rendered in front of the player name via the custom icon font. Viewers who declined or
+ * failed the resource pack see the plain-text badges (N / N+ / OWNER) instead of the font
+ * glyphs, which would otherwise render as missing-glyph boxes on their client. Match
+ * contexts use {@code MatchTeamVisuals} fight teams instead (one entry may only belong to
+ * one team, so the two layers clear each other's teams when switching contexts).
  */
 public final class RankIconNameTags {
 
     private RankIconNameTags() {
     }
 
-    /** Applies the rank-icon prefix for every online ranked player on {@code board}. */
+    /**
+     * Applies the rank-icon prefix for every online ranked player on {@code board}.
+     * {@code viewerHasPack} decides whether the owner of this scoreboard sees the
+     * resource-pack glyphs or the text fallback badges.
+     */
     public static void apply(Scoreboard board, IconFontService icons, RankService ranks,
-                             Collection<? extends Player> online) {
+                             Collection<? extends Player> online, boolean viewerHasPack) {
         if (board == null || icons == null || ranks == null || !icons.enabled()) {
             return;
         }
         for (Player other : online) {
             PlayerRank effective = effectiveRank(ranks, other);
-            Component icon = icons.rankIcon(effective);
+            Component icon = icons.rankIcon(effective, viewerHasPack);
             String entry = other.getName();
             String name = teamName(other.getUniqueId());
             if (icon.equals(Component.empty())) {

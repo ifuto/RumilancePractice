@@ -197,9 +197,9 @@ public final class RankService {
     }
 
     /**
-     * Styled display name: plain white for NORM, aqua→blue gradient for ranks. The legacy
-     * text badges (N / N+ / OWNER) are gone — rank badges come from the resource-pack icon
-     * font prefix (see IconFontService / RankIconNameTags).
+     * Styled display name: plain white for NORM, aqua→blue gradient for ranks. Rank badges
+     * come from the resource-pack icon font prefix (see IconFontService / RankIconNameTags);
+     * players without the pack see the plain-text badges (N / N+ / OWNER) instead.
      */
     static Component styledName(String name, PlayerRank rank) {
         Objects.requireNonNull(name, "name");

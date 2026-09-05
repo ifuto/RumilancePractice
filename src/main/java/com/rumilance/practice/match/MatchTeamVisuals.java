@@ -24,9 +24,10 @@ import java.util.Collection;
  * plugins that choke on the 1.21.2 list-order action.</p>
  *
  * <p>Fight teams also carry a name <strong>prefix</strong> resolved by the injected
- * {@code prefixResolver}: during team fights it renders the RED/BLUE team marker image and,
- * for staff / donors, the rank badge image — custom-font glyphs from the server resource
- * pack instead of text tags.</p>
+ * {@code prefixResolver}: during team fights it renders the RED/BLUE team marker and, for
+ * staff / donors, the rank badge — custom-font glyphs from the server resource pack for
+ * viewers who applied the pack, or the plain-text badges (N / N+ / OWNER) for viewers who
+ * declined or failed it. The resolver therefore receives the viewing player as well.</p>
  */
 public final class MatchTeamVisuals {
 
@@ -40,19 +41,28 @@ public final class MatchTeamVisuals {
     private static final String SPEC_TEAM = "9_spec";
 
     /** Prefix (team marker / rank badge images) for a fighter's nametag + TAB entry. */
-    private static volatile java.util.function.BiFunction<Player, MatchSession,
-            net.kyori.adventure.text.Component> prefixResolver;
+    private static volatile PrefixResolver prefixResolver;
 
     private MatchTeamVisuals() {
     }
 
+    /**
+     * Resolves the nametag / TAB prefix of {@code target} as seen by {@code viewer}.
+     * Viewer-dependent because the rank badge is a resource-pack glyph: viewers without the
+     * pack get the plain-text badge (N / N+ / OWNER) instead.
+     */
+    @FunctionalInterface
+    public interface PrefixResolver {
+        net.kyori.adventure.text.Component resolve(Player viewer, Player target, MatchSession session);
+    }
+
     /** Wires the icon prefix resolver (rank badge + team marker images). */
-    public static void setPrefixResolver(java.util.function.BiFunction<Player, MatchSession,
-            net.kyori.adventure.text.Component> resolver) {
+    public static void setPrefixResolver(PrefixResolver resolver) {
         prefixResolver = resolver;
     }
 
-    public static void apply(Scoreboard board, MatchSession session, Collection<? extends Player> online) {
+    public static void apply(Scoreboard board, Player viewer, MatchSession session,
+                             Collection<? extends Player> online) {
         if (board == null || session == null) {
             return;
         }
@@ -80,18 +90,18 @@ public final class MatchTeamVisuals {
                     : color.textColor();
             Team fight = team(board, fightName(color, onlinePlayer.getName()), named, ff);
             fight.addEntry(entry);
-            fight.prefix(resolvePrefix(onlinePlayer, session));
+            fight.prefix(resolvePrefix(viewer, onlinePlayer, session));
         }
     }
 
-    private static net.kyori.adventure.text.Component resolvePrefix(Player player, MatchSession session) {
-        java.util.function.BiFunction<Player, MatchSession, net.kyori.adventure.text.Component> resolver =
-                prefixResolver;
+    private static net.kyori.adventure.text.Component resolvePrefix(Player viewer, Player player,
+                                                                    MatchSession session) {
+        PrefixResolver resolver = prefixResolver;
         if (resolver == null) {
             return net.kyori.adventure.text.Component.empty();
         }
         try {
-            net.kyori.adventure.text.Component prefix = resolver.apply(player, session);
+            net.kyori.adventure.text.Component prefix = resolver.resolve(viewer, player, session);
             return prefix == null ? net.kyori.adventure.text.Component.empty() : prefix;
         } catch (RuntimeException ignored) {
             return net.kyori.adventure.text.Component.empty();

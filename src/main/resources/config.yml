@@ -33,9 +33,10 @@ icons:
     vip-plus: "\uE003"
 
 # Resource-pack distribution BY THE PLUGIN — no server.properties entries needed.
-# The pack is pushed to every player shortly after joining, and players who decline
-# it (or whose download fails) are kicked when required: true, because the rank-badge
-# glyphs above only render with the pack installed.
+# The pack is pushed to every player shortly after joining. Policy (also switchable in
+# the admin GUI, persisted to pack-policy.yml): required: true kicks players who decline
+# the pack or fail to download it; required: false (recommended) lets them join anyway —
+# their nametag/TAB rank badge then falls back to the text prefixes N / N+ / OWNER.
 # IMPORTANT: if you previously set resource-pack= / require-resource-pack= in
 # server.properties, remove those lines when this is enabled, or clients may be
 # asked to apply the pack twice.
@@ -49,8 +50,11 @@ resource-pack:
   # SHA-1 of the zip as 40 hex characters (must match the file exactly; see
   # dist/RumilanceResourcePack.sha1). The client rejects a hash mismatch.
   sha1: "c4cf82d41ba0564aaac4752cb6a95225e768b2e2"
-  # Kick players who decline the pack or fail to download it.
-  required: true
+  # true  = REQUIRED: kick players who decline the pack or fail to download it.
+  # false = RECOMMENDED: they may decline and keep playing (text rank badges instead of
+  #         the icon glyphs). Switchable at runtime from the admin GUI; that choice is
+  #         stored in pack-policy.yml and wins over this value.
+  required: false
   # Prompt shown in the client's resource-pack dialog.
   prompt: "Rumilance Practice のアイコン表示に必要なリソースパックです"
   # Kick message shown to players who declined / failed the pack.

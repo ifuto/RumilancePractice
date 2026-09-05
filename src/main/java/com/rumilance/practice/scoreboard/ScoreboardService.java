@@ -89,6 +89,7 @@ public final class ScoreboardService {
     private volatile TabFightListService tabFightListService;
     private volatile com.rumilance.practice.font.IconFontService iconFontService;
     private volatile com.rumilance.practice.rank.RankService rankService;
+    private volatile com.rumilance.practice.resourcepack.ResourcePackService resourcePackService;
     private final ConcurrentMap<UUID, CachedStats> statsCache = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, Long> statsCacheAt = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, BoardHandle> boards = new ConcurrentHashMap<>();
@@ -157,6 +158,12 @@ public final class ScoreboardService {
 
     public void setRankService(com.rumilance.practice.rank.RankService rankService) {
         this.rankService = rankService;
+    }
+
+    /** Pack-state lookup used to pick glyphs vs. text rank badges per viewer. */
+    public void setResourcePackService(
+            com.rumilance.practice.resourcepack.ResourcePackService resourcePackService) {
+        this.resourcePackService = resourcePackService;
     }
 
     /** Hot-swap {@code scoreboard.yml} without restarting the tick task. */
@@ -492,10 +499,14 @@ public final class ScoreboardService {
 
         MatchSession visualSession = match.orElseGet(() -> spectated.flatMap(matchRegistry::get).orElse(null));
         BoardHandle handle = boards.get(player.getUniqueId());
+        // Pack-less viewers get the text rank badges (N / N+ / OWNER) — glyphs would render
+        // as missing-glyph boxes on their client.
+        boolean viewerHasPack = resourcePackService == null || resourcePackService.hasPack(player);
         if (handle != null && visualSession != null) {
             // In a match / spectating: fight teams carry the rank badge + RED/BLUE marker.
             com.rumilance.practice.font.RankIconNameTags.clear(handle.board);
-            com.rumilance.practice.match.MatchTeamVisuals.apply(handle.board, visualSession, Bukkit.getOnlinePlayers());
+            com.rumilance.practice.match.MatchTeamVisuals.apply(
+                    handle.board, player, visualSession, Bukkit.getOnlinePlayers());
         } else if (handle != null) {
             com.rumilance.practice.match.MatchTeamVisuals.clear(handle.board);
             if (tabFightListService != null) {
@@ -504,7 +515,8 @@ public final class ScoreboardService {
             // Lobby / FFA / queue: rank badge (admin / VIP+ / VIP) in front of each name.
             if (iconFontService != null && rankService != null && iconFontService.enabled()) {
                 com.rumilance.practice.font.RankIconNameTags.apply(
-                        handle.board, iconFontService, rankService, Bukkit.getOnlinePlayers());
+                        handle.board, iconFontService, rankService,
+                        Bukkit.getOnlinePlayers(), viewerHasPack);
             } else {
                 com.rumilance.practice.font.RankIconNameTags.clear(handle.board);
             }

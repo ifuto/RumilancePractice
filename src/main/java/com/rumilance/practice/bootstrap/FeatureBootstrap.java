@@ -587,8 +587,9 @@ public final class FeatureBootstrap {
                 new com.rumilance.practice.font.IconFontService(configService);
         services.register(com.rumilance.practice.font.IconFontService.class, iconFontService);
 
-        // Plugin-side resource pack distribution: pushes the pack to every player on join
-        // and kicks players who decline it (config.yml resource-pack.*). Replaces the
+        // Plugin-side resource pack distribution: pushes the pack to every player on join.
+        // Policy is REQUIRED (kick on decline) or RECOMMENDED (join without, text rank
+        // badges) — switchable in the admin GUI, persisted to pack-policy.yml. Replaces the
         // server.properties resource-pack entries entirely.
         final com.rumilance.practice.resourcepack.ResourcePackService resourcePackService =
                 new com.rumilance.practice.resourcepack.ResourcePackService(plugin, configService);
@@ -596,7 +597,9 @@ public final class FeatureBootstrap {
                 resourcePackService);
         plugin.getServer().getPluginManager().registerEvents(resourcePackService, plugin);
         final RankService rankServiceRef = rankService;
-        com.rumilance.practice.match.MatchTeamVisuals.setPrefixResolver((player, session) -> {
+        final com.rumilance.practice.resourcepack.ResourcePackService packServiceRef =
+                resourcePackService;
+        com.rumilance.practice.match.MatchTeamVisuals.setPrefixResolver((viewer, player, session) -> {
             net.kyori.adventure.text.Component prefix = net.kyori.adventure.text.Component.empty();
             // Effective rank: stored rank or granted permissions (admin > VIP+ > VIP).
             com.rumilance.practice.rank.PlayerRank effective;
@@ -609,7 +612,10 @@ public final class FeatureBootstrap {
             } else {
                 effective = com.rumilance.practice.rank.PlayerRank.NORM;
             }
-            net.kyori.adventure.text.Component rankIcon = iconFontService.rankIcon(effective);
+            // Glyphs only render on clients that applied the pack; pack-less viewers get the
+            // text badges (N / N+ / OWNER) instead.
+            net.kyori.adventure.text.Component rankIcon = iconFontService.rankIcon(effective,
+                    packServiceRef == null || packServiceRef.hasPack(viewer));
             if (!rankIcon.equals(net.kyori.adventure.text.Component.empty())) {
                 prefix = prefix.append(rankIcon).append(net.kyori.adventure.text.Component.space());
             }
@@ -849,6 +855,17 @@ public final class FeatureBootstrap {
             presetAdminGui.openAdmin(player);
         });
         adminMenuGui.setOpenEkitAdmin(ekitAdminGui::openAdmin);
+        adminMenuGui.setPackPolicy(resourcePackService::required, player -> {
+            resourcePackService.setRequired(!resourcePackService.required());
+            String key = resourcePackService.required()
+                    ? "gui.admin-pack-policy-changed-required"
+                    : "gui.admin-pack-policy-changed-recommended";
+            player.sendMessage(messageService.render(player, key)
+                    .color(resourcePackService.required()
+                            ? net.kyori.adventure.text.format.NamedTextColor.RED
+                            : net.kyori.adventure.text.format.NamedTextColor.GREEN));
+            adminMenuGui.open(player);
+        });
         AdminPlayerDataGui adminPlayerDataGui = new AdminPlayerDataGui(
                 guiSessions, soundService, playerRepository, rankService, settingsService,
                 kitLayoutRepository, layoutCache, originalKitService, nameColorService,
@@ -1074,6 +1091,7 @@ public final class FeatureBootstrap {
         scoreboardService.setSpectatorService(spectatorService);
         scoreboardService.setFfaService(ffaService);
         scoreboardService.setIconFontService(iconFontService);
+        scoreboardService.setResourcePackService(resourcePackService);
         scoreboardService.setRankService(rankService);
         TabVisibilityService tabVisibilityService =
                 new TabVisibilityService(plugin, stateManager, matchRegistry);
