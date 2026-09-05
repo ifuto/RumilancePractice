@@ -15,13 +15,13 @@ import java.util.List;
  * AQUA, PURPLE, GOLD.</p>
  */
 public enum TeamColor {
-    RED(NamedTextColor.RED, Material.RED_WOOL, Color.fromRGB(0xC62828), "r"),
-    BLUE(NamedTextColor.AQUA, Material.LIGHT_BLUE_WOOL, Color.fromRGB(0x1565C0), "b"),
-    GREEN(NamedTextColor.GREEN, Material.LIME_WOOL, Color.fromRGB(0x2E7D32), "g"),
-    YELLOW(NamedTextColor.YELLOW, Material.YELLOW_WOOL, Color.fromRGB(0xF9A825), "y"),
-    AQUA(NamedTextColor.DARK_AQUA, Material.CYAN_WOOL, Color.fromRGB(0x00838F), "a"),
-    PURPLE(NamedTextColor.LIGHT_PURPLE, Material.PURPLE_WOOL, Color.fromRGB(0x6A1B9A), "p"),
-    GOLD(NamedTextColor.GOLD, Material.ORANGE_WOOL, Color.fromRGB(0xEF6C00), "o");
+    RED(NamedTextColor.RED, Material.RED_WOOL, Color.fromRGB(0xC62828), "1"),
+    BLUE(NamedTextColor.AQUA, Material.LIGHT_BLUE_WOOL, Color.fromRGB(0x1565C0), "2"),
+    GREEN(NamedTextColor.GREEN, Material.LIME_WOOL, Color.fromRGB(0x2E7D32), "3"),
+    YELLOW(NamedTextColor.YELLOW, Material.YELLOW_WOOL, Color.fromRGB(0xF9A825), "4"),
+    AQUA(NamedTextColor.DARK_AQUA, Material.CYAN_WOOL, Color.fromRGB(0x00838F), "5"),
+    PURPLE(NamedTextColor.LIGHT_PURPLE, Material.PURPLE_WOOL, Color.fromRGB(0x6A1B9A), "6"),
+    GOLD(NamedTextColor.GOLD, Material.ORANGE_WOOL, Color.fromRGB(0xEF6C00), "7");
 
     /** Canonical battle order: the first N entries are the teams of an N-team battle. */
     private static final List<TeamColor> CANONICAL = List.of(values());
@@ -61,7 +61,11 @@ public enum TeamColor {
         return leatherColor;
     }
 
-    /** One-char key used to build unique, sorted scoreboard team names. */
+    /**
+     * One-char key used to build unique, sorted scoreboard team names. The digits follow
+     * canonical battle order, so the client's team-name tab sorting groups RED first, then
+     * BLUE, then the remaining party-battle colours.
+     */
     public String sortKey() {
         return sortKey;
     }

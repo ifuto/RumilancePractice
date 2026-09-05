@@ -9,12 +9,19 @@ import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
 
 import java.util.Collection;
-import java.util.UUID;
 
 /**
  * Applies red/blue nametag + TAB list colours for everyone watching a match scoreboard.
- * One team per player so HP suffixes do not collide. Names are prefixed so TAB sorts
- * fighters left ({@code 0*}) and spectators right ({@code 1*}).
+ * One team per fighter so HP suffixes and rank-badge prefixes do not collide.
+ *
+ * <p><b>TAB grouping without any player-info packets:</b> the client sorts tab entries with
+ * equal list order by team name (case-sensitive, ascending — vanilla behaviour, verified
+ * against the protocol wiki), so the team names encode the layout: {@code 0<sortKey><name>}
+ * for fighters, where the digit sort key follows canonical battle order (RED, BLUE, GREEN,
+ * YELLOW, AQUA, PURPLE, GOLD) and the lowercased player name yields alphabetical rosters
+ * inside each column. Spectators share one {@code 9_spec} team and therefore always sort
+ * last. This works on every client and is unaffected by packet-patching (NBT-injector)
+ * plugins that choke on the 1.21.2 list-order action.</p>
  *
  * <p>Fight teams also carry a name <strong>prefix</strong> resolved by the injected
  * {@code prefixResolver}: during team fights it renders the RED/BLUE team marker image and,
@@ -28,6 +35,9 @@ public final class MatchTeamVisuals {
             "0_fight_red", "0_fight_blue", "1_spec",
             "rp_red", "rp_blue", "rp_spec", "glow_red", "glow_blue"
     };
+
+    /** Shared team holding every match spectator; the {@code 9} prefix sorts them last. */
+    private static final String SPEC_TEAM = "9_spec";
 
     /** Prefix (team marker / rank badge images) for a fighter's nametag + TAB entry. */
     private static volatile java.util.function.BiFunction<Player, MatchSession,
@@ -53,7 +63,7 @@ public final class MatchTeamVisuals {
             boolean spectator = onlinePlayer.getGameMode() == GameMode.SPECTATOR;
             boolean participant = session.participants().contains(onlinePlayer.getUniqueId());
             if (spectator) {
-                Team spec = team(board, specName(onlinePlayer.getUniqueId()), NamedTextColor.GRAY, false);
+                Team spec = team(board, SPEC_TEAM, NamedTextColor.GRAY, false);
                 spec.addEntry(entry);
                 spec.prefix(net.kyori.adventure.text.Component.empty());
                 spec.suffix(net.kyori.adventure.text.Component.empty());
@@ -68,7 +78,7 @@ public final class MatchTeamVisuals {
             NamedTextColor named = color == TeamColor.RED ? NamedTextColor.RED
                     : color == TeamColor.BLUE ? NamedTextColor.BLUE
                     : color.textColor();
-            Team fight = team(board, fightName(color, onlinePlayer.getUniqueId()), named, ff);
+            Team fight = team(board, fightName(color, onlinePlayer.getName()), named, ff);
             fight.addEntry(entry);
             fight.prefix(resolvePrefix(onlinePlayer, session));
         }
@@ -89,7 +99,7 @@ public final class MatchTeamVisuals {
     }
 
     public static boolean isFightTeam(String name) {
-        // All fight teams are "0<colorKey><uuid>"; legacy builds also used 0_fight_*.
+        // All fight teams are "0<sortKey><name>"; legacy builds also used 0_fight_*.
         return name != null && (name.startsWith("0") || name.startsWith("0_fight"));
     }
 
@@ -111,7 +121,8 @@ public final class MatchTeamVisuals {
         }
         for (Team team : java.util.Set.copyOf(board.getTeams())) {
             String name = team.getName();
-            if (name.startsWith("0") || name.startsWith("1s") || name.startsWith("rp_hp_")) {
+            if (name.startsWith("0") || name.startsWith("1s") || name.equals(SPEC_TEAM)
+                    || name.startsWith("rp_hp_")) {
                 unregister(board, name);
             }
         }
@@ -120,22 +131,27 @@ public final class MatchTeamVisuals {
         }
     }
 
-    private static String fightName(TeamColor color, UUID id) {
-        String hex = id.toString().replace("-", "");
-        return "0" + color.sortKey() + hex.substring(0, Math.min(8, hex.length()));
-    }
-
-    private static String specName(UUID id) {
-        String hex = id.toString().replace("-", "");
-        return "1s" + hex.substring(0, Math.min(8, hex.length()));
+    /**
+     * Fight team name encoding the TAB layout: {@code 0} marks fighters (sorted before the
+     * {@code 9} spectator team), the digit sort key orders the groups in canonical battle
+     * order, and the lowercased player name sorts each roster alphabetically. Team names are
+     * limited to 16 characters by the protocol, so the name part is capped at 14 chars.
+     */
+    private static String fightName(TeamColor color, String playerName) {
+        String key = playerName.toLowerCase(java.util.Locale.ROOT);
+        if (key.length() > 14) {
+            key = key.substring(0, 14);
+        }
+        return "0" + color.sortKey() + key;
     }
 
     private static void removeFromManaged(Scoreboard board, String entry) {
         Team current = board.getEntryTeam(entry);
         if (current != null) {
             String name = current.getName();
-            if (isFightTeam(name) || name.startsWith("1s") || name.startsWith("rp_hp_")
-                    || name.startsWith("0_fight") || name.equals("1_spec")) {
+            if (isFightTeam(name) || name.startsWith("1s") || name.equals(SPEC_TEAM)
+                    || name.startsWith("rp_hp_") || name.startsWith("0_fight")
+                    || name.equals("1_spec")) {
                 current.removeEntry(entry);
             }
         }
