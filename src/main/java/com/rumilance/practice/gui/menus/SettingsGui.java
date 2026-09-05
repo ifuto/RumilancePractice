@@ -32,10 +32,21 @@ public final class SettingsGui extends AbstractGui {
     /** Minimum millis between toggle clicks; configured via gui.toggle-cooldown-seconds. */
     private volatile long toggleCooldownMillis = 2000L;
     private com.rumilance.practice.match.TeamColoredArmorService teamColoredArmorService;
+    private com.rumilance.practice.cosmetic.namecolor.NameColorService nameColorService;
+    private NameColorGui nameColorGui;
 
     public SettingsGui(GuiSessionRegistry registry, SoundService sounds, SettingsService settingsService) {
         super(registry, sounds, GuiType.SETTINGS, 6, true);
         this.settingsService = settingsService;
+    }
+
+    public void setNameColorService(
+            com.rumilance.practice.cosmetic.namecolor.NameColorService nameColorService) {
+        this.nameColorService = nameColorService;
+    }
+
+    public void setNameColorGui(NameColorGui nameColorGui) {
+        this.nameColorGui = nameColorGui;
     }
 
     public void setToggleCooldownSeconds(int seconds) {
@@ -86,6 +97,7 @@ public final class SettingsGui extends AbstractGui {
         inventory.setItem(GuiSlots.slot(4, 3), toggle(player, Material.LEATHER_CHESTPLATE, "gui.team-leather",
                 s.teamColoredArmor(), "team_armor",
                 "gui.team-leather-lore"));
+        renderNameColorEntry(player, inventory);
         inventory.setItem(GuiSlots.slot(4, 5),
                 ItemBuilder.of(Material.OAK_SIGN)
                         .name(t(player, "gui.chat-whitelist").color(UiTheme.SECONDARY))
@@ -100,6 +112,44 @@ public final class SettingsGui extends AbstractGui {
                         .build());
 
         paintNav(player, session, inventory);
+    }
+
+    /**
+     * VIP+ name-color entry. Shows the current style (or "locked" for lower ranks); clicking
+     * opens the color studio.
+     */
+    private void renderNameColorEntry(Player player, Inventory inventory) {
+        boolean vipPlus = nameColorService != null
+                && nameColorService.isVipPlus(player.getUniqueId());
+        if (!vipPlus) {
+            inventory.setItem(GuiSlots.slot(4, 1),
+                    ItemBuilder.of(Material.GRAY_DYE)
+                            .name(t(player, "gui.namecolor-locked").color(UiTheme.MUTED))
+                            .lore(UiTheme.line(line(player, "gui.namecolor-locked-lore")))
+                            .action("decorate")
+                            .build());
+            return;
+        }
+        com.rumilance.practice.cosmetic.namecolor.NameColorSelection selection =
+                nameColorService.selection(player.getUniqueId());
+        String stateKey = switch (selection.mode()) {
+            case NONE -> "gui.namecolor-mode-off";
+            case SOLID -> "gui.namecolor-mode-solid";
+            case GRADIENT -> "gui.namecolor-mode-gradient";
+        };
+        inventory.setItem(GuiSlots.slot(4, 1),
+                ItemBuilder.of(Material.NAME_TAG)
+                        .name(t(player, "gui.namecolor-settings-entry").color(UiTheme.HEADER))
+                        .lore(
+                                UiTheme.divider(),
+                                UiTheme.labelValue(line(player, "gui.namecolor-mode"),
+                                        line(player, stateKey)),
+                                UiTheme.blank(),
+                                UiTheme.hint(line(player, "gui.namecolor-open-hint"))
+                        )
+                        .glintIf(selection.active())
+                        .action("name_color")
+                        .build());
     }
 
     private ItemStack toggle(Player player, Material material, String nameKey, boolean enabled,
@@ -123,6 +173,22 @@ public final class SettingsGui extends AbstractGui {
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot, String action) {
         if ("close".equals(action)) {
             player.closeInventory();
+            return;
+        }
+        if ("name_color".equals(action)) {
+            if (nameColorGui == null || nameColorService == null
+                    || !nameColorService.isVipPlus(player.getUniqueId())) {
+                sounds.play(player, "error");
+                return;
+            }
+            sounds.play(player, "gui-click");
+            org.bukkit.Bukkit.getScheduler().runTask(
+                    org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
+                    () -> {
+                        if (player.isOnline()) {
+                            nameColorGui.open(player);
+                        }
+                    });
             return;
         }
         if ("whitelist".equals(action)) {

@@ -331,42 +331,6 @@ public final class KitAdminGui extends AbstractGui {
         }
     }
 
-    @Override
-    public void handleClick(Player player, GuiSession session, Inventory inventory, int slot,
-                            String action, org.bukkit.event.inventory.ClickType clickType) {
-        if ("canbreak:edit".equals(action) && session.selectedKit() != null) {
-            KitDefinition kit = kitService.get(session.selectedKit()).orElse(null);
-            if (kit == null) {
-                return;
-            }
-            Material held = player.getInventory().getItemInMainHand().getType();
-            boolean shift = clickType == org.bukkit.event.inventory.ClickType.SHIFT_LEFT
-                    || clickType == org.bukkit.event.inventory.ClickType.SHIFT_RIGHT;
-            List<String> list = new ArrayList<>(kit.canBreak());
-            if (shift) {
-                list.clear();
-            } else if (held == null || held.isAir() || !held.isBlock()) {
-                sounds.play(player, "error");
-                player.sendMessage(Component.text(
-                        "Hold a block in your hand to add/remove it from the break list.",
-                        net.kyori.adventure.text.format.NamedTextColor.RED));
-                return;
-            } else if (clickType == org.bukkit.event.inventory.ClickType.RIGHT) {
-                list.removeIf(m -> m.equalsIgnoreCase(held.name()));
-            } else {
-                boolean present = list.stream().anyMatch(m -> m.equalsIgnoreCase(held.name()));
-                if (!present) {
-                    list.add(held.name());
-                }
-            }
-            kitService.save(kit.toBuilder().canBreak(list).build());
-            sounds.play(player, "select");
-            refresh(player, session, inventory);
-            return;
-        }
-        handleClick(player, session, inventory, slot, action);
-    }
-
     private KitDefinition applyConfigChange(KitDefinition kit, String action) {
         KitDefinition.Builder b = kit.toBuilder();
         return switch (action) {
@@ -434,6 +398,35 @@ public final class KitAdminGui extends AbstractGui {
             boolean moved = kitService.move(kitName,
                     click == org.bukkit.event.inventory.ClickType.SHIFT_LEFT);
             sounds.play(player, moved ? "gui-click" : "error");
+            refresh(player, session, inventory);
+            return;
+        }
+        if ("canbreak:edit".equals(action) && session.selectedKit() != null) {
+            KitDefinition kit = kitService.get(session.selectedKit()).orElse(null);
+            if (kit == null) {
+                return;
+            }
+            Material held = player.getInventory().getItemInMainHand().getType();
+            boolean shift = click.isShiftClick();
+            List<String> list = new ArrayList<>(kit.canBreak());
+            if (shift) {
+                list.clear();
+            } else if (held == null || held.isAir() || !held.isBlock()) {
+                sounds.play(player, "error");
+                player.sendMessage(Component.text(
+                        "Hold a block in your hand to add/remove it from the break list.",
+                        net.kyori.adventure.text.format.NamedTextColor.RED));
+                return;
+            } else if (click == org.bukkit.event.inventory.ClickType.RIGHT) {
+                list.removeIf(m -> m.equalsIgnoreCase(held.name()));
+            } else {
+                boolean present = list.stream().anyMatch(m -> m.equalsIgnoreCase(held.name()));
+                if (!present) {
+                    list.add(held.name());
+                }
+            }
+            kitService.save(kit.toBuilder().canBreak(list).build());
+            sounds.play(player, "select");
             refresh(player, session, inventory);
             return;
         }

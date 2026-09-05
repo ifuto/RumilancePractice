@@ -389,6 +389,16 @@ public final class SchemaMigrator {
                     "VARCHAR(64) NOT NULL DEFAULT 'none'");
         }));
 
+        migrations.add(new Migration(28, "create player_name_colors table (VIP+ name colors)", List.of(
+                "CREATE TABLE IF NOT EXISTS " + databaseService.table("player_name_colors") + " ("
+                        + "uuid CHAR(36) PRIMARY KEY, "
+                        + "mode VARCHAR(16) NOT NULL DEFAULT 'none', "
+                        + "primary_color VARCHAR(8) NOT NULL DEFAULT '', "
+                        + "secondary_color VARCHAR(8) NOT NULL DEFAULT '', "
+                        + "changed_at BIGINT NOT NULL DEFAULT 0"
+                        + ")"
+        )));
+
         return migrations;
     }
 }

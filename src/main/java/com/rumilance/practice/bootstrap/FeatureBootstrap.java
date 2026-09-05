@@ -109,6 +109,7 @@ import com.rumilance.practice.gui.menus.KitPreviewGui;
 import com.rumilance.practice.gui.menus.KitSelectGui;
 import com.rumilance.practice.gui.menus.MatchInventoryGui;
 import com.rumilance.practice.gui.menus.MatchReportGui;
+import com.rumilance.practice.gui.menus.NameColorGui;
 import com.rumilance.practice.gui.menus.OriginalKitEditGui;
 import com.rumilance.practice.gui.menus.OriginalKitGui;
 import com.rumilance.practice.gui.menus.PartyInviteGui;
@@ -542,6 +543,17 @@ public final class FeatureBootstrap {
         RankService rankService = new RankService(plugin, rankRepository, asyncExecutor);
         services.register(RankService.class, rankService);
 
+        // VIP+ custom name colors: single color or two-color gradient, editable in the
+        // settings GUI, rate-limited to one change per three days.
+        com.rumilance.practice.cosmetic.namecolor.NameColorRepository nameColorRepository =
+                new com.rumilance.practice.cosmetic.namecolor.NameColorRepository(
+                        services.get(com.rumilance.practice.database.DatabaseService.class));
+        com.rumilance.practice.cosmetic.namecolor.NameColorService nameColorService =
+                new com.rumilance.practice.cosmetic.namecolor.NameColorService(
+                        nameColorRepository, rankService, plugin.getLogger());
+        services.register(com.rumilance.practice.cosmetic.namecolor.NameColorService.class,
+                nameColorService);
+
         // Resource-pack icon glyphs (rank badges + RED/BLUE team markers) rendered in front of
         // player names in TAB / nametags via a custom font. The resolver combines the rank badge
         // (admin / VIP+ / VIP) with the team marker during team fights.
@@ -653,6 +665,10 @@ public final class FeatureBootstrap {
         SettingsGui settingsGui = new SettingsGui(guiSessions, soundService, settingsService);
         settingsGui.setToggleCooldownSeconds(configService.config().getInt("gui.toggle-cooldown-seconds", 2));
         settingsGui.setTeamColoredArmorService(teamColoredArmor);
+        NameColorGui nameColorGui = new NameColorGui(guiSessions, soundService, nameColorService);
+        nameColorGui.setSettingsGui(settingsGui);
+        settingsGui.setNameColorService(nameColorService);
+        settingsGui.setNameColorGui(nameColorGui);
         com.rumilance.practice.gui.menus.LocaleSelectGui localeSelectGui =
                 new com.rumilance.practice.gui.menus.LocaleSelectGui(
                         guiSessions, soundService, sessionManager, settingsService, messageService);
@@ -864,6 +880,7 @@ public final class FeatureBootstrap {
         guiListener.register(duelRequestGui);
         guiListener.register(duelMapSelectGui);
         guiListener.register(settingsGui);
+        guiListener.register(nameColorGui);
         guiListener.register(statsKitGui);
         guiListener.register(profileGui);
         guiListener.register(banListGui);
@@ -1154,6 +1171,10 @@ public final class FeatureBootstrap {
         pm.registerEvents(new PracticeSideListener(
                 chatBanService, settingsService, guiSessions, arrowEffectService, spectatorService,
                 ffaService, originalKitService), plugin);
+        pm.registerEvents(new com.rumilance.practice.cosmetic.namecolor.NameColorJoinListener(
+                plugin, nameColorService), plugin);
+        pm.registerEvents(new com.rumilance.practice.cosmetic.namecolor.NameColorChatListener(
+                nameColorService), plugin);
         pm.registerEvents(new PracticeListener(practiceService), plugin);
         pm.registerEvents(new BedrockJoinListener(plugin), plugin);
         pm.registerEvents(new SmithingTrimListener(rankService, smithingTrimGui, stateManager, messageService), plugin);
