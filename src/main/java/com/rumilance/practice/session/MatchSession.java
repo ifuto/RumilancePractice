@@ -173,6 +173,17 @@ public final class MatchSession {
     /** Per-team battle configs (health / size / effects); absent = defaults. */
     private final Map<TeamColor, com.rumilance.practice.team.TeamConfig> teamConfigs =
             new ConcurrentHashMap<>();
+    /** Party battles only: the owner's original kit used as everyone's loadout. */
+    private volatile com.rumilance.practice.team.OriginalKitRef originalKitRef;
+
+    /** Original-kit loadout reference for party battles (null = normal kits). */
+    public com.rumilance.practice.team.OriginalKitRef originalKitRef() {
+        return originalKitRef;
+    }
+
+    public void setOriginalKitRef(com.rumilance.practice.team.OriginalKitRef ref) {
+        this.originalKitRef = ref;
+    }
 
     /**
      * Kit id for a participant. Team battles may assign one team a different loadout kit;

@@ -127,6 +127,7 @@ import com.rumilance.practice.gui.menus.SettingsGui;
 import com.rumilance.practice.gui.menus.SmithingTrimGui;
 import com.rumilance.practice.gui.menus.SpectateListGui;
 import com.rumilance.practice.gui.menus.StatsKitGui;
+import com.rumilance.practice.gui.menus.TeamConfigGui;
 import com.rumilance.practice.gui.menus.TeamHubGui;
 import com.rumilance.practice.gui.menus.TeamKitSelectGui;
 import com.rumilance.practice.gui.menus.TeamsBrowserGui;
@@ -676,6 +677,7 @@ public final class FeatureBootstrap {
         TeamService teamService = new TeamService(plugin, matchService, messageService);
         services.register(TeamService.class, teamService);
         teamService.setStateManager(stateManager);
+        teamService.setRankService(rankService);
         matchService.setTeamService(teamService);
         PartyHotbar partyHotbar = new PartyHotbar(lobbyService);
         teamService.setPartyHotbar(partyHotbar);
@@ -697,6 +699,10 @@ public final class FeatureBootstrap {
                 new TeamKitSelectGui(guiSessions, soundService, teamService, kitService, messageService);
         TeamHubGui teamHubGui = new TeamHubGui(
                 guiSessions, soundService, teamService, teamsBrowserGui, teamKitSelectGui, messageService);
+        TeamConfigGui teamConfigGui =
+                new TeamConfigGui(guiSessions, soundService, teamService, kitService);
+        teamConfigGui.setTeamHubGui(teamHubGui);
+        teamHubGui.setTeamConfigGui(teamConfigGui);
         teamsBrowserGui.setHub(teamHubGui);
         PartyInviteGui partyInviteGui = new PartyInviteGui(
                 guiSessions, soundService, teamService, messageService);
@@ -745,6 +751,8 @@ public final class FeatureBootstrap {
         services.register(com.rumilance.practice.originalkit.OriginalKitRoomService.class, originalKitRoomService);
         originalKitService.setRoomService(originalKitRoomService);
         matchService.setOriginalKitService(originalKitService);
+        // Party battles may fight with the owner's original kit as the shared loadout.
+        teamKitSelectGui.setOriginalKitService(originalKitService);
         plugin.getServer().getPluginManager().registerEvents(
                 new com.rumilance.practice.originalkit.OriginalKitRoomListener(
                         originalKitRoomService, originalKitService, plugin), plugin);
@@ -886,6 +894,7 @@ public final class FeatureBootstrap {
         guiListener.register(matchReportGui);
         guiListener.register(teamsBrowserGui);
         guiListener.register(teamHubGui);
+        guiListener.register(teamConfigGui);
         guiListener.register(teamKitSelectGui);
         guiListener.register(partyInviteGui);
         guiListener.register(partyMapSelectGui);

@@ -62,6 +62,29 @@ public final class TeamService {
     }
 
     private volatile com.rumilance.practice.session.PlayerStateManager stateManager;
+    private volatile com.rumilance.practice.rank.RankService rankService;
+
+    public void setRankService(com.rumilance.practice.rank.RankService rankService) {
+        this.rankService = rankService;
+    }
+
+    /**
+     * How many team slots the host may use in a party battle, by rank:
+     * NORM 3, VIP 5, VIP+ / ADMIN 7 (the classic 2-team fight is always available).
+     */
+    public int maxTeamsFor(UUID hostId) {
+        com.rumilance.practice.rank.PlayerRank rank = rankService == null
+                ? com.rumilance.practice.rank.PlayerRank.NORM
+                : rankService.get(hostId);
+        if (rank.isVipPlusOrAbove()) {
+            return 7;
+        }
+        if (rank == com.rumilance.practice.rank.PlayerRank.VIP) {
+            return 5;
+        }
+        return 3;
+    }
+
     /** Details of the member that last failed the availability check, for error messages. */
     private volatile String lastBusyName;
     private volatile String lastBusyStateKey;
@@ -433,6 +456,10 @@ public final class TeamService {
         } catch (IllegalArgumentException e) {
             return Result.INVALID_SIDE;
         }
+        // Only the team's currently-active slots are assignable (multi-team mode).
+        if (!team.activeColors().contains(color)) {
+            return Result.INVALID_SIDE;
+        }
         // Enforce the 15-per-side cap (moving within the same side is always fine).
         if (team.sideOf(target.getUniqueId()) != color && team.side(color).size() >= MAX_SIDE_SIZE) {
             return Result.TEAM_FULL;
@@ -443,9 +470,9 @@ public final class TeamService {
     }
 
     /**
-     * One-click side cycling: unassigned → RED → BLUE → unassigned. The first click always
-     * lands on RED; every further click toggles the member through the cycle, so the owner
-     * never needs separate left/right controls.
+     * One-click side cycling: unassigned → team 1 → team 2 → ... → unassigned, through every
+     * ACTIVE team slot (2..7 depending on the configured team count). The first click always
+     * lands on the first slot; the owner never needs separate left/right controls.
      */
     public Result cycleSide(Player owner, String targetName) {
         Team team = byMember.get(owner.getUniqueId());
@@ -454,9 +481,11 @@ public final class TeamService {
         Player target = Bukkit.getPlayerExact(targetName);
         if (target == null) return Result.TARGET_OFFLINE;
         if (!team.contains(target.getUniqueId())) return Result.NOT_IN_TEAM;
+        List<TeamColor> slots = team.activeColors();
         TeamColor current = team.sideOf(target.getUniqueId());
-        TeamColor next = current == null ? TeamColor.RED
-                : current == TeamColor.RED ? TeamColor.BLUE
+        int index = current == null ? -1 : slots.indexOf(current);
+        TeamColor next = index < 0 ? slots.get(0)
+                : index + 1 < slots.size() ? slots.get(index + 1)
                 : null;
         if (next != null && team.side(next).size() >= MAX_SIDE_SIZE) {
             return Result.TEAM_FULL;
@@ -468,7 +497,7 @@ public final class TeamService {
         return Result.OK;
     }
 
-    /** Evenly shuffles every member into RED/BLUE using a stable-ish random split. */
+    /** Evenly shuffles every member across every active team slot (round-robin). */
     public Result autoAssign(Player owner) {
         Team team = byMember.get(owner.getUniqueId());
         if (team == null) return Result.NOT_IN_TEAM;
@@ -477,9 +506,42 @@ public final class TeamService {
         List<UUID> shuffled = new ArrayList<>(team.members());
         Collections.shuffle(shuffled);
         team.clearSides();
+        List<TeamColor> slots = team.activeColors();
         for (int i = 0; i < shuffled.size(); i++) {
-            team.assignSide(shuffled.get(i), i % 2 == 0 ? TeamColor.RED : TeamColor.BLUE);
+            team.assignSide(shuffled.get(i), slots.get(i % slots.size()));
         }
+        return Result.OK;
+    }
+
+    /** Owner sets how many teams this party fights with (rank-clamped, 2..max). */
+    public Result setTeamCount(Player owner, int count) {
+        Team team = byMember.get(owner.getUniqueId());
+        if (team == null) return Result.NOT_IN_TEAM;
+        if (!team.isOwner(owner.getUniqueId())) return Result.NOT_OWNER;
+        int max = maxTeamsFor(owner.getUniqueId());
+        if (count < 2 || count > max) {
+            return Result.INVALID_SIDE;
+        }
+        team.setTeamCount(count, max);
+        refreshAllHotbars(team);
+        return Result.OK;
+    }
+
+    /**
+     * Wool-toggle in the team settings GUI: cycles the color of one team slot to the next
+     * active color, swapping rosters with the slot that owned it.
+     */
+    public Result cycleTeamColor(Player owner, TeamColor color) {
+        Team team = byMember.get(owner.getUniqueId());
+        if (team == null) return Result.NOT_IN_TEAM;
+        if (!team.isOwner(owner.getUniqueId())) return Result.NOT_OWNER;
+        List<TeamColor> active = team.activeColors();
+        if (!active.contains(color)) return Result.INVALID_SIDE;
+        int index = active.indexOf(color);
+        TeamColor next = active.get((index + 1) % active.size());
+        if (next == color) return Result.OK;
+        team.swapColors(color, next);
+        refreshAllHotbars(team);
         return Result.OK;
     }
 
@@ -522,15 +584,28 @@ public final class TeamService {
         if (team.size() < MIN_TEAM_SIZE) return Result.TOO_SMALL;
         if (!team.isSplitReady()) return Result.UNBALANCED;
 
-        List<UUID> red = new ArrayList<>(team.side(TeamColor.RED));
-        List<UUID> blue = new ArrayList<>(team.side(TeamColor.BLUE));
-        if (red.isEmpty() || blue.isEmpty()) return Result.UNBALANCED;
-        if (red.size() > MAX_SIDE_SIZE || blue.size() > MAX_SIDE_SIZE) return Result.UNBALANCED;
+        List<List<UUID>> rosters = battleRosters(team);
+        if (rosters.size() < 2) return Result.UNBALANCED;
+        for (List<UUID> roster : rosters) {
+            if (roster.isEmpty() || roster.size() > MAX_SIDE_SIZE) return Result.UNBALANCED;
+        }
         Result availability = checkMembersAvailable(team);
         if (availability != Result.OK) {
             return availability;
         }
         return Result.OK;
+    }
+
+    /** Rosters of every populated team slot, in canonical color order. */
+    private List<List<UUID>> battleRosters(Team team) {
+        List<List<UUID>> rosters = new ArrayList<>();
+        for (TeamColor color : team.activeColors()) {
+            List<UUID> roster = new ArrayList<>(team.side(color));
+            if (!roster.isEmpty()) {
+                rosters.add(roster);
+            }
+        }
+        return rosters;
     }
 
     /**
@@ -584,10 +659,11 @@ public final class TeamService {
         if (team.size() < MIN_TEAM_SIZE) return Result.TOO_SMALL;
         if (!team.isSplitReady()) return Result.UNBALANCED;
 
-        List<UUID> red = new ArrayList<>(team.side(TeamColor.RED));
-        List<UUID> blue = new ArrayList<>(team.side(TeamColor.BLUE));
-        if (red.isEmpty() || blue.isEmpty()) return Result.UNBALANCED;
-        if (red.size() > MAX_SIDE_SIZE || blue.size() > MAX_SIDE_SIZE) return Result.UNBALANCED;
+        List<List<UUID>> rosters = battleRosters(team);
+        if (rosters.size() < 2) return Result.UNBALANCED;
+        for (List<UUID> roster : rosters) {
+            if (roster.isEmpty() || roster.size() > MAX_SIDE_SIZE) return Result.UNBALANCED;
+        }
 
         // Never start a party fight while ANY member is committed elsewhere: a solo duel, queue
         // battle, FFA, spectating, or an active/eliminated match would conflict with the team
@@ -611,8 +687,23 @@ public final class TeamService {
 
         String arenaName = team.selectedArena();
         boolean ff = team.friendlyFire();
+        // Per-team battle settings: HP / body size / effects live in TeamConfig; an optional
+        // per-team loadout kit rides along as a teamKits override (map rules keep following
+        // the shared kit chosen here).
+        java.util.Map<TeamColor, TeamConfig> configs = team.customConfigs();
+        java.util.Map<TeamColor, String> teamKits = new java.util.HashMap<>();
+        for (Map.Entry<TeamColor, TeamConfig> entry : configs.entrySet()) {
+            if (entry.getValue().customKitId() != null) {
+                teamKits.put(entry.getKey(), entry.getValue().customKitId());
+            }
+        }
+        Integer originalSlot = team.originalKitSlot();
+        com.rumilance.practice.team.OriginalKitRef originalKit = originalSlot == null
+                ? null
+                : new com.rumilance.practice.team.OriginalKitRef(owner.getUniqueId(), originalSlot);
         Bukkit.getScheduler().runTask(plugin, () ->
-                matchService.startTeamMatch(red, blue, kitId, MatchMode.TEAM, 1, arenaName, ff));
+                matchService.startTeamMatch(rosters, kitId, MatchMode.TEAM, 1, arenaName, ff,
+                        Map.of(), null, teamKits, configs, originalKit));
         broadcast(team, Component.text("Team battle starting!", NamedTextColor.GOLD));
         return Result.OK;
     }

@@ -37,6 +37,7 @@ public enum GuiType {
     MATCH_INVENTORY,
     TEAMS_BROWSER,
     TEAM_HUB,
+    TEAM_CONFIG,
     TEAM_KIT_SELECT,
     PARTY_INVITE,
     PARTY_MAP,

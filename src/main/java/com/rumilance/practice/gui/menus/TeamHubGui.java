@@ -52,6 +52,11 @@ public final class TeamHubGui extends AbstractGui {
     private ArenaTemplateStoreSupplier arenaStoreSupplier;
     private ConfirmGui confirmGui;
     private com.rumilance.practice.session.PlayerStateManager stateManager;
+    private TeamConfigGui teamConfigGui;
+
+    public void setTeamConfigGui(TeamConfigGui teamConfigGui) {
+        this.teamConfigGui = teamConfigGui;
+    }
 
     public void setConfirmGui(ConfirmGui confirmGui) {
         this.confirmGui = confirmGui;
@@ -117,6 +122,14 @@ public final class TeamHubGui extends AbstractGui {
         // --- top bar: team info + owner controls ---
         inventory.setItem(GuiSlots.slot(0, 4), headerItem(player, team));
         if (owner) {
+            inventory.setItem(GuiSlots.slot(0, 0),
+                    ItemBuilder.of(Material.COMMAND_BLOCK)
+                            .name(t(player, "gui.team-config-open").color(UiTheme.PRIMARY))
+                            .lore(UiTheme.divider(),
+                                    UiTheme.line(line(player, "gui.team-config-open-lore")),
+                                    UiTheme.blank(),
+                                    UiTheme.hint(line(player, "gui.toggle-hint")))
+                            .action("open_team_config").build());
             inventory.setItem(GuiSlots.slot(0, 1),
                     ItemBuilder.of(Material.PLAYER_HEAD)
                             .name(t(player, "party.invite").color(UiTheme.SUCCESS))
@@ -189,21 +202,26 @@ public final class TeamHubGui extends AbstractGui {
         paintPaging(player, inventory, page, members.size());
 
         // --- bottom bar: side counters + owner controls ---
-        int redCount = team.side(TeamColor.RED).size();
-        int blueCount = team.side(TeamColor.BLUE).size();
-        int unassigned = team.size() - redCount - blueCount;
-        inventory.setItem(GuiSlots.slot(5, 0),
-                ItemBuilder.of(Material.RED_WOOL, Math.max(1, redCount))
-                        .name(Component.text(line(player, "party.red-count")
-                                .replace("<n>", String.valueOf(redCount)), UiTheme.DANGER))
-                        .lore(UiTheme.line(line(player, "party.red-hint")))
-                        .action("decorate").build());
-        inventory.setItem(GuiSlots.slot(5, 8),
-                ItemBuilder.of(Material.BLUE_WOOL, Math.max(1, blueCount))
-                        .name(Component.text(line(player, "party.blue-count")
-                                .replace("<n>", String.valueOf(blueCount)), BLUE))
-                        .lore(UiTheme.line(line(player, "party.blue-hint")))
-                        .action("decorate").build());
+        List<TeamColor> activeColors = team.activeColors();
+        int assigned = 0;
+        for (TeamColor color : activeColors) {
+            assigned += team.side(color).size();
+        }
+        int unassigned = team.size() - assigned;
+        // Team counters: first two colors flank the bottom bar, extra teams fill the free
+        // slots (multi-team parties only).
+        int[][] counterSlots = {{5, 0}, {5, 8}, {5, 2}, {5, 6}, {5, 7}, {0, 5}, {0, 8}};
+        for (int i = 0; i < activeColors.size() && i < counterSlots.length; i++) {
+            TeamColor color = activeColors.get(i);
+            int count = team.side(color).size();
+            inventory.setItem(GuiSlots.slot(counterSlots[i][0], counterSlots[i][1]),
+                    ItemBuilder.of(color.wool(), Math.max(1, count))
+                            .name(Component.text(line(player, "party.team-count-chip")
+                                    .replace("<team>", color.label())
+                                    .replace("<n>", String.valueOf(count)), color.textColor()))
+                            .lore(UiTheme.line(line(player, "party.click-cycle")))
+                            .action("decorate").build());
+        }
         // Centre chip: how many members still need a side (0 = ready to split).
         inventory.setItem(GuiSlots.slot(5, 4),
                 ItemBuilder.of(unassigned > 0 ? Material.GRAY_WOOL : Material.LIME_DYE,
@@ -255,8 +273,10 @@ public final class TeamHubGui extends AbstractGui {
                             .lore(UiTheme.divider(),
                                     ready
                                             ? UiTheme.line(line(player, "party.start-ready")
-                                                    .replace("<red>", String.valueOf(redCount))
-                                                    .replace("<blue>", String.valueOf(blueCount)))
+                                                    .replace("<red>", String.valueOf(
+                                                            team.side(activeColors.get(0)).size()))
+                                                    .replace("<blue>", String.valueOf(
+                                                            team.side(activeColors.get(1)).size())))
                                             : blockedReason,
                                     UiTheme.blank(),
                                     ready ? UiTheme.hint(line(player, "gui.party-start-hint"))
@@ -326,8 +346,7 @@ public final class TeamHubGui extends AbstractGui {
         OfflinePlayer p = Bukkit.getOfflinePlayer(member);
         TeamColor side = team.sideOf(member);
         String name = p.getName() == null ? "?" : p.getName();
-        TextColor nameColor = side == TeamColor.RED ? UiTheme.DANGER
-                : side == TeamColor.BLUE ? BLUE : UiTheme.MUTED;
+        TextColor nameColor = side == null ? UiTheme.MUTED : side.textColor();
         ItemBuilder b = ItemBuilder.of(Material.PLAYER_HEAD)
                 .name(Component.text((team.isOwner(member) ? "★ " : "") + name, nameColor))
                 .lore(UiTheme.divider(),
@@ -428,6 +447,19 @@ public final class TeamHubGui extends AbstractGui {
                     sounds.play(player, "gui-click");
                     refresh(player, session, inventory);
                 }
+            }
+            case "open_team_config" -> {
+                if (!owner || teamConfigGui == null) {
+                    return;
+                }
+                sounds.play(player, "gui-open");
+                org.bukkit.Bukkit.getScheduler().runTask(
+                        org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
+                        () -> {
+                            if (player.isOnline()) {
+                                teamConfigGui.open(player);
+                            }
+                        });
             }
             case "choose_kit" -> {
                 if (!owner) {

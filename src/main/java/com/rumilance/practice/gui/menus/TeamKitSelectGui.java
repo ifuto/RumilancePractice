@@ -34,6 +34,19 @@ public final class TeamKitSelectGui extends AbstractGui {
     private final KitService kitService;
     private final com.rumilance.practice.locale.MessageService messageService;
     private PartyMapSelectGui partyMapSelectGui;
+    /** Owner's original-kit store (null = original kits unavailable here). */
+    private com.rumilance.practice.originalkit.OriginalKitService originalKitService;
+    /** Rules kit used when fighting with an original kit (config, falls back to first kit). */
+    private volatile String originalKitRulesKitId;
+
+    public void setOriginalKitService(
+            com.rumilance.practice.originalkit.OriginalKitService originalKitService) {
+        this.originalKitService = originalKitService;
+    }
+
+    public void setOriginalKitRulesKitId(String kitId) {
+        this.originalKitRulesKitId = kitId;
+    }
 
     public TeamKitSelectGui(GuiSessionRegistry registry, SoundService sounds,
                             TeamService teamService, KitService kitService) {
@@ -123,6 +136,31 @@ public final class TeamKitSelectGui extends AbstractGui {
                             .build());
         }
 
+        // The owner's own original kits are also selectable for the party battle: everyone
+        // fights with the owner's saved layout, while the match rules come from the shared
+        // rules kit.
+        if (originalKitService != null && index < MenuScaffold.gridPageSize()) {
+            com.rumilance.practice.originalkit.OriginalKitService.Plan plan =
+                    originalKitService.planOf(player);
+            for (int slot = 0; slot < 9 && index < MenuScaffold.gridPageSize(); slot++) {
+                if (!originalKitService.isSlotUnlocked(plan, slot)
+                        || !originalKitService.hasSaved(player.getUniqueId(), slot)) {
+                    continue;
+                }
+                inventory.setItem(MenuScaffold.gridSlot(index++),
+                        ItemBuilder.of(Material.NETHER_STAR)
+                                .name(Component.text("Original Kit #" + (slot + 1), UiTheme.HEADER)
+                                        .decoration(TextDecoration.ITALIC, false))
+                                .lore(UiTheme.divider(),
+                                        UiTheme.line(line(player, "gui.party-original-kit-lore")),
+                                        UiTheme.blank(),
+                                        UiTheme.hint(line(player, "gui.party-start-click")))
+                                .glint(true)
+                                .action("origkit:" + slot)
+                                .build());
+            }
+        }
+
         MenuScaffold.returnButton(inventory, t(player, "menu.back"));
     }
 
@@ -136,36 +174,65 @@ public final class TeamKitSelectGui extends AbstractGui {
             }
             default -> {
                 if (action.startsWith("kit:")) {
-                    String kitId = action.substring("kit:".length());
-                    // Validate split readiness BEFORE entering map selection so the owner
-                    // gets the same errors as before.
-                    TeamService.Result precheck = teamService.preflightStart(player);
-                    if (precheck != TeamService.Result.OK) {
-                        sounds.play(player, "error");
-                        player.sendMessage(Component.text(teamService.errorMessage(player, precheck), UiTheme.DANGER)
-                                .decoration(TextDecoration.ITALIC, false));
+                    teamService.teamOf(player.getUniqueId())
+                            .ifPresent(team -> team.setOriginalKitSlot(null));
+                    proceedWithKit(player, action.substring("kit:".length()));
+                } else if (action.startsWith("origkit:")) {
+                    // Original kit selected: remember the owner's slot and fight under the
+                    // shared rules kit's map rules.
+                    int slot;
+                    try {
+                        slot = Integer.parseInt(action.substring("origkit:".length()));
+                    } catch (NumberFormatException e) {
                         return;
                     }
-                    sounds.play(player, "gui-click");
-                    if (partyMapSelectGui != null) {
-                        final String chosenKit = kitId;
-                        org.bukkit.Bukkit.getScheduler().runTask(
-                                org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
-                                () -> {
-                                    if (player.isOnline()) {
-                                        partyMapSelectGui.openForKit(player, chosenKit);
-                                    }
-                                });
-                    } else {
-                        player.closeInventory();
-                        TeamService.Result r = teamService.start(player, kitId);
-                        sounds.play(player, r == TeamService.Result.OK ? "match-found" : "error");
-                        if (r != TeamService.Result.OK) {
-                            player.sendMessage(Component.text(teamService.errorMessage(player, r), UiTheme.DANGER)
-                                    .decoration(TextDecoration.ITALIC, false));
-                        }
-                    }
+                    teamService.teamOf(player.getUniqueId())
+                            .ifPresent(team -> team.setOriginalKitSlot(slot));
+                    proceedWithKit(player, resolveOriginalRulesKit());
                 }
+            }
+        }
+    }
+
+    /** The kit whose RULES govern an original-kit battle (config override or first enabled). */
+    private String resolveOriginalRulesKit() {
+        String configured = originalKitRulesKitId;
+        if (configured != null && !configured.isBlank()
+                && kitService.get(configured).map(KitDefinition::enabled).orElse(false)) {
+            return configured;
+        }
+        List<KitDefinition> enabled = kitService.enabled();
+        return enabled.isEmpty() ? "nodebuff" : enabled.get(0).name();
+    }
+
+    /** Validates readiness, then enters the map-select flow (or starts directly without it). */
+    private void proceedWithKit(Player player, String kitId) {
+        // Validate split readiness BEFORE entering map selection so the owner
+        // gets the same errors as before.
+        TeamService.Result precheck = teamService.preflightStart(player);
+        if (precheck != TeamService.Result.OK) {
+            sounds.play(player, "error");
+            player.sendMessage(Component.text(teamService.errorMessage(player, precheck), UiTheme.DANGER)
+                    .decoration(TextDecoration.ITALIC, false));
+            return;
+        }
+        sounds.play(player, "gui-click");
+        if (partyMapSelectGui != null) {
+            final String chosenKit = kitId;
+            org.bukkit.Bukkit.getScheduler().runTask(
+                    org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
+                    () -> {
+                        if (player.isOnline()) {
+                            partyMapSelectGui.openForKit(player, chosenKit);
+                        }
+                    });
+        } else {
+            player.closeInventory();
+            TeamService.Result r = teamService.start(player, kitId);
+            sounds.play(player, r == TeamService.Result.OK ? "match-found" : "error");
+            if (r != TeamService.Result.OK) {
+                player.sendMessage(Component.text(teamService.errorMessage(player, r), UiTheme.DANGER)
+                        .decoration(TextDecoration.ITALIC, false));
             }
         }
     }

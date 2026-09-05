@@ -640,6 +640,17 @@ public final class MatchService {
                                Map<UUID, Integer> carrySeriesWins, UUID carryArenaInstanceId,
                                Map<TeamColor, String> teamKits,
                                Map<TeamColor, com.rumilance.practice.team.TeamConfig> teamConfigs) {
+        startTeamMatch(rosters, kitId, mode, bestOf, partyArenaName, friendlyFire,
+                carrySeriesWins, carryArenaInstanceId, teamKits, teamConfigs, null);
+    }
+
+    /** Roster start with an optional owner original-kit loadout for the whole party. */
+    public void startTeamMatch(List<List<UUID>> rosters, String kitId, MatchMode mode, int bestOf,
+                               String partyArenaName, boolean friendlyFire,
+                               Map<UUID, Integer> carrySeriesWins, UUID carryArenaInstanceId,
+                               Map<TeamColor, String> teamKits,
+                               Map<TeamColor, com.rumilance.practice.team.TeamConfig> teamConfigs,
+                               com.rumilance.practice.team.OriginalKitRef originalKit) {
         if (rosters == null || rosters.size() < 2 || rosters.size() > TeamColor.MAX_TEAMS) {
             return;
         }
@@ -677,6 +688,7 @@ public final class MatchService {
         if (teamConfigs != null) {
             teamConfigs.forEach(session::setTeamConfig);
         }
+        session.setOriginalKitRef(originalKit);
         if (partyArenaName != null && !partyArenaName.isBlank()
                 && !"random".equalsIgnoreCase(partyArenaName)) {
             session.setPreferredArenaName(partyArenaName);
@@ -770,11 +782,24 @@ public final class MatchService {
                     return;
                 }
             }
+            com.rumilance.practice.team.OriginalKitRef originalKit = session.originalKitRef();
+            ItemStack[] originalLayout = null;
+            if (originalKit != null && originalKitService != null) {
+                originalLayout = originalKitService.loadLayout(originalKit.owner(), originalKit.slot());
+            }
             for (UUID id : session.participants()) {
                 Player player = Bukkit.getPlayer(id);
                 if (player != null) {
                     PlayerVitals.clearCombatState(player);
-                    applyKit(player, kitService.get(session.kitFor(id)).orElse(kit));
+                    boolean ownKitOverride = !session.kitFor(id).equals(session.kitName());
+                    KitDefinition playerKit = kitService.get(session.kitFor(id)).orElse(kit);
+                    // Owner's original kit supplies the loadout for everyone who does not run
+                    // a per-team kit override; rules always stay with the shared match kit.
+                    if (originalLayout != null && !ownKitOverride) {
+                        applyKit(player, kit, originalLayout);
+                    } else {
+                        applyKit(player, playerKit);
+                    }
                     applySight(player, session);
                 }
             }
@@ -1053,6 +1078,12 @@ public final class MatchService {
     private void applyKit(Player player, KitDefinition kit) {
         layoutCache.loadSyncIfAbsent(player.getUniqueId(), kit.name());
         ItemStack[] layout = layoutCache.get(player.getUniqueId(), kit.name()).orElse(null);
+        kitService.apply(player, kit, layout);
+        PlayerVitals.applyCombatStart(player, kit.maxHealth());
+    }
+
+    /** Applies a kit with an explicit shared layout (party owner's original kit). */
+    private void applyKit(Player player, KitDefinition kit, ItemStack[] layout) {
         kitService.apply(player, kit, layout);
         PlayerVitals.applyCombatStart(player, kit.maxHealth());
     }
@@ -2028,13 +2059,15 @@ public final class MatchService {
                 Map<TeamColor, String> carryTeamKits = session.teamKitsSnapshot();
                 Map<TeamColor, com.rumilance.practice.team.TeamConfig> carryTeamConfigs =
                         session.teamConfigsSnapshot();
+                com.rumilance.practice.team.OriginalKitRef carryOriginalKit = session.originalKitRef();
                 if (spectatorService != null && !watching.isEmpty()) {
                     spectatorService.scheduleCarry(carried, watching);
                 }
                 cleanupSession(session, false, !watching.isEmpty());
                 if (teamMatch) {
                     startTeamMatch(rosters, kit, mode, bestOf, preferredArena,
-                            friendlyFire, carrySeries, carryArena, carryTeamKits, carryTeamConfigs);
+                            friendlyFire, carrySeries, carryArena, carryTeamKits, carryTeamConfigs,
+                            carryOriginalKit);
                 } else {
                     startDuel(a, b, kit, mode, bestOf, carrySeries, preferredArena, carryArena);
                 }

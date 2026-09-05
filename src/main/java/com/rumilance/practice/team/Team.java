@@ -30,6 +30,24 @@ public final class Team {
     private volatile String selectedArena;
     /** When true, teammates can damage each other in party battles. */
     private volatile boolean friendlyFire;
+    /**
+     * Number of active team slots (2 = classic RED/BLUE). Upper bound depends on the host's
+     * rank (3 norm / 5 VIP / 7 VIP+); enforced by TeamService, clamped here defensively.
+     */
+    private volatile int teamCount = 2;
+    /** Per-team battle config edits (health / size / effects / own kit). */
+    private final java.util.Map<TeamColor, TeamConfig> teamConfigs = new java.util.HashMap<>();
+    /** Owner's original-kit slot to fight with (null = normal kit loadouts). */
+    private volatile Integer originalKitSlot;
+
+    /** Original-kit slot the owner picked for the next battle, or null for regular kits. */
+    public Integer originalKitSlot() {
+        return originalKitSlot;
+    }
+
+    public void setOriginalKitSlot(Integer slot) {
+        this.originalKitSlot = slot;
+    }
 
     public Team(UUID id, UUID owner, String name, boolean isPublic) {
         this.id = Objects.requireNonNull(id, "id");
@@ -38,6 +56,71 @@ public final class Team {
         this.isPublic = isPublic;
         this.createdAt = Instant.now();
         this.members.add(owner);
+    }
+
+    // ---- multi-team slots + per-team battle config ----
+
+    /** Active team colors in canonical order (first {@link #teamCount} colors). */
+    public java.util.List<TeamColor> activeColors() {
+        return TeamColor.canonical(teamCount);
+    }
+
+    public int teamCount() {
+        return teamCount;
+    }
+
+    /** Clamps into 2..{@code maxAllowed}; members assigned to removed slots lose their side. */
+    public void setTeamCount(int count, int maxAllowed) {
+        int clamped = Math.max(2, Math.min(TeamColor.MAX_TEAMS, Math.min(count, maxAllowed)));
+        if (clamped == teamCount) {
+            return;
+        }
+        java.util.Set<TeamColor> kept = new java.util.HashSet<>(TeamColor.canonical(clamped));
+        sideAssignment.values().removeIf(color -> !kept.contains(color));
+        teamConfigs.keySet().removeIf(color -> !kept.contains(color));
+        this.teamCount = clamped;
+    }
+
+    /** Battle config of a team slot (never null — defaults when unedited). */
+    public TeamConfig configOf(TeamColor color) {
+        TeamConfig config = teamConfigs.get(color);
+        return config == null ? TeamConfig.defaults() : config;
+    }
+
+    /** Stores a battle config for a team slot (null/default removes the override). */
+    public void setConfig(TeamColor color, TeamConfig config) {
+        if (color == null) {
+            return;
+        }
+        if (config == null || config.isDefault()) {
+            teamConfigs.remove(color);
+        } else {
+            teamConfigs.put(color, config);
+        }
+    }
+
+    /** Snapshot of every non-default team config (for starting a battle). */
+    public java.util.Map<TeamColor, TeamConfig> customConfigs() {
+        return java.util.Map.copyOf(teamConfigs);
+    }
+
+    /**
+     * Swaps the rosters (and battle configs) of two team slots — the wool "color toggle"
+     * in the team settings GUI. Members keep their slot; only the colors exchange places.
+     */
+    public void swapColors(TeamColor a, TeamColor b) {
+        if (a == null || b == null || a == b) {
+            return;
+        }
+        sideAssignment.replaceAll((u, color) -> {
+            if (color == a) return b;
+            if (color == b) return a;
+            return color;
+        });
+        TeamConfig configA = teamConfigs.remove(a);
+        TeamConfig configB = teamConfigs.remove(b);
+        if (configA != null) teamConfigs.put(b, configA);
+        if (configB != null) teamConfigs.put(a, configB);
     }
 
     public UUID id() {
@@ -144,21 +227,17 @@ public final class Team {
         return out;
     }
 
-    /** @return true when every member has a side and both sides are non-empty. */
+    /** @return true when every member has a side and at least two sides are non-empty. */
     public boolean isSplitReady() {
-        boolean red = false, blue = false;
+        java.util.Set<TeamColor> populated = new java.util.HashSet<>();
         for (UUID member : members) {
             TeamColor color = sideAssignment.get(member);
             if (color == null) {
                 return false;
             }
-            if (color == TeamColor.RED) {
-                red = true;
-            } else {
-                blue = true;
-            }
+            populated.add(color);
         }
-        return red && blue;
+        return populated.size() >= 2;
     }
 
     public Instant createdAt() {

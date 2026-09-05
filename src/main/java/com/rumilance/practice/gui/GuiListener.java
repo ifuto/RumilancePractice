@@ -45,7 +45,8 @@ public final class GuiListener implements Listener {
      * from reality — no stale friendly-fire icons, party counts or queue numbers.
      */
     private static final java.util.Set<GuiType> LIVE_REFRESH_TYPES = java.util.EnumSet.of(
-            GuiType.TEAM_HUB, GuiType.TEAMS_BROWSER, GuiType.TEAM_KIT_SELECT, GuiType.PARTY_MAP,
+            GuiType.TEAM_HUB, GuiType.TEAMS_BROWSER, GuiType.TEAM_CONFIG,
+            GuiType.TEAM_KIT_SELECT, GuiType.PARTY_MAP,
             GuiType.RANKED_QUEUE, GuiType.UNRANKED_QUEUE, GuiType.FFA_LIST,
             GuiType.GAME_MENU, GuiType.BATTLE_MENU);
     /** Opens the Game Menu; wired from bootstrap (null = feature disabled). */

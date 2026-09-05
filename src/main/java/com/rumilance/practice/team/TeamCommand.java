@@ -125,6 +125,30 @@ public final class TeamCommand implements CommandExecutor, TabCompleter {
                 } else player.sendMessage(err(r));
             }
             case "clearsides" -> teamService.clearSides(player);
+            case "teamcount" -> {
+                if (args.length < 2) {
+                    player.sendMessage(Component.text(
+                            "Usage: /team teamcount <2-" + teamService.maxTeamsFor(player.getUniqueId()) + ">",
+                            NamedTextColor.YELLOW));
+                    return true;
+                }
+                int count;
+                try {
+                    count = Integer.parseInt(args[1]);
+                } catch (NumberFormatException e) {
+                    player.sendMessage(Component.text("Usage: /team teamcount <number>", NamedTextColor.YELLOW));
+                    return true;
+                }
+                TeamService.Result r = teamService.setTeamCount(player, count);
+                if (r != TeamService.Result.OK) {
+                    player.sendMessage(err(r));
+                } else {
+                    player.sendMessage(Component.text(
+                            "Team battle now uses " + teamService.teamOf(player.getUniqueId())
+                                    .map(t -> t.teamCount()).orElse(2) + " teams.",
+                            NamedTextColor.GREEN));
+                }
+            }
             case "start" -> {
                 if (args.length < 2) {
                     player.sendMessage(Component.text("Usage: /team start <kit>", NamedTextColor.YELLOW));
@@ -200,7 +224,7 @@ public final class TeamCommand implements CommandExecutor, TabCompleter {
                 subs.addAll(List.of("info", "leave"));
                 if (teamOpt.get().isOwner(player.getUniqueId())) {
                     subs.addAll(List.of("invite", "kick", "public", "side",
-                            "autosplit", "clearsides", "start", "disband"));
+                            "autosplit", "clearsides", "teamcount", "start", "disband"));
                 }
             }
             return filter(args[0], subs);
@@ -240,8 +264,22 @@ public final class TeamCommand implements CommandExecutor, TabCompleter {
         if (args.length == 2 && sub.equals("start")) {
             return filter(args[1], kitService.enabled().stream().map(k -> k.name()).toList());
         }
+        if (args.length == 2 && sub.equals("teamcount")) {
+            int max = teamService.maxTeamsFor(player.getUniqueId());
+            List<String> counts = new ArrayList<>();
+            for (int i = 2; i <= max; i++) {
+                counts.add(String.valueOf(i));
+            }
+            return filter(args[1], counts);
+        }
         if (args.length == 3 && sub.equals("side")) {
-            return filter(args[2], List.of("red", "blue"));
+            List<String> colors = new ArrayList<>();
+            teamService.teamOf(player.getUniqueId()).ifPresent(t ->
+                    t.activeColors().forEach(c -> colors.add(c.name().toLowerCase(Locale.ROOT))));
+            if (colors.isEmpty()) {
+                colors.addAll(List.of("red", "blue"));
+            }
+            return filter(args[2], colors);
         }
         if (args.length == 2 && (sub.equals("side"))) {
             List<String> names = new ArrayList<>();
