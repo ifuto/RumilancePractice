@@ -139,8 +139,8 @@ public final class AdminMenuGui extends AbstractGui {
                         UiTheme.divider(),
                         UiTheme.line(line(player, required
                                 ? "gui.admin-pack-policy-now-required"
-                                : "gui.admin-pack-policy-now-recommended")
-                                .color(required ? NamedTextColor.RED : NamedTextColor.GREEN)),
+                                : "gui.admin-pack-policy-now-recommended"))
+                                .color(required ? NamedTextColor.RED : NamedTextColor.GREEN),
                         UiTheme.blank(),
                         UiTheme.line(line(player, "gui.admin-pack-policy-lore-1")),
                         UiTheme.line(line(player, "gui.admin-pack-policy-lore-2")),
