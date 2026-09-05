@@ -553,3 +553,9 @@ gui:
   stats-unavailable: "통계를 불러올 수 없음"
   profile-best-elo: "Best Elo"
 
+lb:
+  kill-title: "<gold><b>월간 킬 랭킹</b></gold>"
+  streak-title: "<gold><b>연간 최다 연승 랭킹</b></gold>"
+  no-records: "<gray>아직 기록이 없습니다</gray>"
+  kill-row: "<white>{name}</white> <gold>{kills}킬</gold> <gray>KD {kd}</gray>"
+  streak-row: "<white>{name}</white> <gold>{streak}연승</gold>"

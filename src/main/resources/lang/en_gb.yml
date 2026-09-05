@@ -499,3 +499,9 @@ gui:
   stats-unavailable: "Stats unavailable"
   profile-best-elo: "Best Elo"
 
+lb:
+  kill-title: "<gold><b>Monthly Kill Ranking</b></gold>"
+  streak-title: "<gold><b>Annual Win Streak Ranking</b></gold>"
+  no-records: "<gray>No records yet</gray>"
+  kill-row: "<white>{name}</white> <gold>{kills} kills</gold> <gray>KD {kd}</gray>"
+  streak-row: "<white>{name}</white> <gold>{streak} win streak</gold>"

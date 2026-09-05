@@ -942,3 +942,9 @@ gui:
   profile-best-elo: "Best Elo"
 
 
+lb:
+  kill-title: "<gold><b>月間キルランキング</b></gold>"
+  streak-title: "<gold><b>年間最大連勝ランキング</b></gold>"
+  no-records: "<gray>まだ記録がありません</gray>"
+  kill-row: "<white>{name}</white> <gold>{kills}キル</gold> <gray>KD {kd}</gray>"
+  streak-row: "<white>{name}</white> <gold>{streak}連勝</gold>"

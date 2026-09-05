@@ -486,12 +486,16 @@ public final class FeatureBootstrap {
 
         WallTextService wallTextService = new WallTextService(plugin);
         services.register(WallTextService.class, wallTextService);
+        com.rumilance.practice.database.repository.AnnualStreakRepository annualStreakRepository =
+                services.get(com.rumilance.practice.database.repository.AnnualStreakRepository.class);
         com.rumilance.practice.leaderboard.KillLeaderboardService killLeaderboardService =
                 new com.rumilance.practice.leaderboard.KillLeaderboardService(
-                        plugin, dailyRankedStatsRepository, playerRepository, lobbyService::spawn);
+                        plugin, dailyRankedStatsRepository, annualStreakRepository, playerRepository,
+                        messageService, lobbyService::spawn);
         services.register(com.rumilance.practice.leaderboard.KillLeaderboardService.class,
                 killLeaderboardService);
         matchService.setDailyStatsRepository(dailyRankedStatsRepository);
+        rankedResultProcessor.setAnnualStreakRepository(annualStreakRepository);
         plugin.getServer().getPluginManager().registerEvents(killLeaderboardService, plugin);
         Bukkit.getScheduler().runTaskTimer(plugin, killLeaderboardService::tick, 20L, 3L);
         bind("lbspawn", new com.rumilance.practice.leaderboard.LbSpawnCommand(killLeaderboardService));

@@ -13,8 +13,9 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * {@code /lbspawn kill} — places the monthly kill leaderboard at the executor's feet,
- * yawed toward the lobby spawn (no pitch). {@code /lbspawn remove} deletes it.
+ * {@code /lbspawn <kill|streak>} — places the floating monthly-kill or annual-win-streak
+ * leaderboard at the executor's feet, yawed toward the lobby spawn (no pitch).
+ * {@code /lbspawn remove <kill|streak|all>} deletes boards.
  */
 public final class LbSpawnCommand implements CommandExecutor, TabCompleter {
 
@@ -34,20 +35,34 @@ public final class LbSpawnCommand implements CommandExecutor, TabCompleter {
         String sub = args.length == 0 ? "kill" : args[0].toLowerCase(Locale.ROOT);
         switch (sub) {
             case "kill" -> {
-                leaderboardService.placeKillBoard(player.getLocation());
+                leaderboardService.place("kill", player.getLocation());
                 player.sendMessage(Component.text(
                         "月間キルリーダーボードを足元に設置しました(ロビースポーン向き)。",
                         NamedTextColor.GREEN));
             }
+            case "streak" -> {
+                leaderboardService.place("streak", player.getLocation());
+                player.sendMessage(Component.text(
+                        "年間最大連勝リーダーボードを足元に設置しました(ロビースポーン向き)。",
+                        NamedTextColor.GREEN));
+            }
             case "remove" -> {
-                if (leaderboardService.remove()) {
+                String what = args.length > 1 ? args[1].toLowerCase(Locale.ROOT) : "all";
+                boolean removed = false;
+                if ("all".equals(what)) {
+                    removed |= leaderboardService.remove("kill");
+                    removed |= leaderboardService.remove("streak");
+                } else {
+                    removed = leaderboardService.remove(what);
+                }
+                if (removed) {
                     player.sendMessage(Component.text("リーダーボードを削除しました。", NamedTextColor.YELLOW));
                 } else {
                     player.sendMessage(Component.text("設置済みのリーダーボードがありません。", NamedTextColor.RED));
                 }
             }
             default -> player.sendMessage(Component.text(
-                    "Usage: /lbspawn <kill|remove>", NamedTextColor.YELLOW));
+                    "Usage: /lbspawn <kill|streak|remove <kill|streak|all>>", NamedTextColor.YELLOW));
         }
         return true;
     }
@@ -55,10 +70,16 @@ public final class LbSpawnCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command,
                                       @NotNull String alias, @NotNull String[] args) {
+        String prefix = args[0].toLowerCase(Locale.ROOT);
         if (args.length == 1) {
-            String prefix = args[0].toLowerCase(Locale.ROOT);
-            return List.of("kill", "remove").stream()
+            return List.of("kill", "streak", "remove").stream()
                     .filter(s -> s.startsWith(prefix))
+                    .toList();
+        }
+        if (args.length == 2 && "remove".equals(args[0].toLowerCase(Locale.ROOT))) {
+            String p2 = args[1].toLowerCase(Locale.ROOT);
+            return List.of("kill", "streak", "all").stream()
+                    .filter(s -> s.startsWith(p2))
                     .toList();
         }
         return List.of();

@@ -29,6 +29,12 @@ public final class RankedResultProcessor implements MatchResultProcessor {
     private final EloCalculator eloCalculator;
     private final PluginSettings settings;
     private final boolean drawCountsAsLoss;
+    private com.rumilance.practice.database.repository.AnnualStreakRepository annualStreakRepository;
+
+    public void setAnnualStreakRepository(
+            com.rumilance.practice.database.repository.AnnualStreakRepository annualStreakRepository) {
+        this.annualStreakRepository = annualStreakRepository;
+    }
 
     public RankedResultProcessor(
             RankedStatsRepository rankedStatsRepository,
@@ -105,6 +111,27 @@ public final class RankedResultProcessor implements MatchResultProcessor {
         ));
         dailyRankedStatsRepository.increment(playerA, (!draw && winnerId != null && winnerId.equals(playerA)) ? 1 : 0, 1);
         dailyRankedStatsRepository.increment(playerB, (!draw && winnerId != null && winnerId.equals(playerB)) ? 1 : 0, 1);
+        recordAnnualStreaks(winnerId, playerA, playerB, draw);
+    }
+
+    /**
+     * Annual max-win-streak bookkeeping: winner extends the streak, loser resets theirs.
+     * Draws touch nothing. Stat failures must never break result processing.
+     */
+    private void recordAnnualStreaks(UUID winnerId, UUID playerA, UUID playerB, boolean draw) {
+        var streaks = annualStreakRepository;
+        if (streaks == null || draw || winnerId == null) {
+            return;
+        }
+        UUID loserId = winnerId.equals(playerA) ? playerB : playerA;
+        try {
+            streaks.recordWin(winnerId);
+        } catch (Throwable ignored) {
+        }
+        try {
+            streaks.recordLoss(loserId);
+        } catch (Throwable ignored) {
+        }
     }
 
     private boolean isTopPercent(RankedKitStats stats) throws Exception {

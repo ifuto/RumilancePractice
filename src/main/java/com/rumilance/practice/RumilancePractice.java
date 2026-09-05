@@ -140,6 +140,8 @@ public final class RumilancePractice extends JavaPlugin {
             serviceRegistry.register(KitLayoutRepository.class, new KitLayoutRepository(databaseService));
             serviceRegistry.register(OriginalKitRepository.class, new OriginalKitRepository(databaseService));
             serviceRegistry.register(DailyRankedStatsRepository.class, new DailyRankedStatsRepository(databaseService));
+            serviceRegistry.register(com.rumilance.practice.database.repository.AnnualStreakRepository.class,
+                    new com.rumilance.practice.database.repository.AnnualStreakRepository(databaseService));
             serviceRegistry.register(FfaStatsRepository.class, new FfaStatsRepository(databaseService));
             serviceRegistry.register(ObjectionRepository.class, new ObjectionRepository(databaseService));
             serviceRegistry.register(com.rumilance.practice.database.repository.PracticeLayoutRepository.class,

@@ -290,8 +290,8 @@ commands:
     usage: /walltext <set|scale|remove|list|reload> ...
     permission: rumilance.admin
   lbspawn:
-    description: Place (or remove) the floating monthly kill leaderboard at your feet.
-    usage: /lbspawn <kill|remove>
+    description: Place (or remove) floating leaderboards (monthly kills / annual win streak).
+    usage: /lbspawn <kill|streak|remove <kill|streak|all>>
     permission: rumilance.admin
   killeffect:
     description: Open the paid kill-effect cosmetic picker.

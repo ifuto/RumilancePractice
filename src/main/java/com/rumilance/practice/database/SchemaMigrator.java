@@ -405,6 +405,16 @@ public final class SchemaMigrator {
                     "INTEGER NOT NULL DEFAULT 0");
         }));
 
+        migrations.add(new Migration(30, "create annual_streak_stats table", List.of(
+                "CREATE TABLE IF NOT EXISTS " + databaseService.table("annual_streak_stats") + " ("
+                        + "player_uuid CHAR(36) NOT NULL, "
+                        + "stat_year CHAR(4) NOT NULL, "
+                        + "current_streak INTEGER NOT NULL DEFAULT 0, "
+                        + "best_streak INTEGER NOT NULL DEFAULT 0, "
+                        + "PRIMARY KEY (player_uuid, stat_year)"
+                        + ")"
+        )));
+
         return migrations;
     }
 }
