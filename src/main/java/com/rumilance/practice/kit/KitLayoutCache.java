@@ -2,7 +2,7 @@ package com.rumilance.practice.kit;
 
 import com.rumilance.practice.database.repository.KitLayoutRepository;
 import com.rumilance.practice.util.AsyncExecutor;
-import com.rumilance.practice.util.ItemSerializer;
+
 import org.bukkit.inventory.ItemStack;
 
 import java.util.Map;
@@ -21,11 +21,29 @@ public final class KitLayoutCache {
     private final AsyncExecutor asyncExecutor;
     private final Logger logger;
     private final Map<String, ItemStack[]> cache = new ConcurrentHashMap<>();
+    /** Resolves kit definitions so delta-encoded layouts can be decoded; wired at bootstrap. */
+    private volatile java.util.function.Function<String,
+            java.util.Optional<com.rumilance.practice.model.KitDefinition>> kitResolver;
 
     public KitLayoutCache(KitLayoutRepository repository, AsyncExecutor asyncExecutor, Logger logger) {
         this.repository = repository;
         this.asyncExecutor = asyncExecutor;
         this.logger = logger;
+    }
+
+    public void setKitResolver(java.util.function.Function<String,
+            java.util.Optional<com.rumilance.practice.model.KitDefinition>> kitResolver) {
+        this.kitResolver = kitResolver;
+    }
+
+    /** Decodes a stored layout (delta format or legacy full base64). */
+    private ItemStack[] decode(String stored, String kitName) {
+        com.rumilance.practice.model.KitDefinition kit = null;
+        var resolver = kitResolver;
+        if (resolver != null) {
+            kit = resolver.apply(kitName).orElse(null);
+        }
+        return com.rumilance.practice.util.KitLayoutDelta.decode(stored, kit);
     }
 
     private static String key(UUID uuid, String kit) {
@@ -54,7 +72,7 @@ public final class KitLayoutCache {
             try {
                 repository.findAllForPlayer(uuid).forEach(snap -> {
                     try {
-                        cache.put(key(uuid, snap.kit()), ItemSerializer.fromBase64(snap.itemDataBase64()));
+                        cache.put(key(uuid, snap.kit()), decode(snap.itemDataBase64(), snap.kit()));
                     } catch (Exception e) {
                         logger.log(Level.WARNING, "Bad kit layout for " + uuid + "/" + snap.kit(), e);
                     }
@@ -71,7 +89,7 @@ public final class KitLayoutCache {
         }
         try {
             repository.find(uuid, kit).ifPresent(snap ->
-                    cache.put(key(uuid, kit), ItemSerializer.fromBase64(snap.itemDataBase64())));
+                    cache.put(key(uuid, kit), decode(snap.itemDataBase64(), kit)));
         } catch (Exception e) {
             logger.log(Level.WARNING, "Failed loading kit layout " + uuid + "/" + kit, e);
         }

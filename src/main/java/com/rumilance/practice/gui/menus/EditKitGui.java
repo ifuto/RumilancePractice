@@ -26,6 +26,7 @@ import com.rumilance.practice.util.AsyncExecutor;
 import com.rumilance.practice.util.GuiSlots;
 import com.rumilance.practice.util.ItemKeys;
 import com.rumilance.practice.util.ItemSerializer;
+import com.rumilance.practice.util.KitLayoutDelta;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
@@ -479,7 +480,7 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         try {
             var snap = layoutRepository.find(uuid, kit.name());
             if (snap.isPresent()) {
-                return ItemSerializer.fromBase64(snap.get().itemDataBase64());
+                return KitLayoutDelta.decode(snap.get().itemDataBase64(), kit);
             }
         } catch (Exception ignored) {
             // fall through
@@ -724,7 +725,9 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         if (kit == null || layout == null) {
             return;
         }
-        String base64 = ItemSerializer.toBase64(layout);
+        // Delta storage: only the differences from the kit's official layout are persisted,
+        // which keeps the DB rows tiny (legacy full base64 still decodes fine).
+        String base64 = KitLayoutDelta.encode(layout, kit);
         KitLayoutSnapshot snap = KitLayoutSnapshot.create(player.getUniqueId(), kitId, base64);
         layoutCache.put(player.getUniqueId(), kitId, layout);
         asyncExecutor.execute(() -> {

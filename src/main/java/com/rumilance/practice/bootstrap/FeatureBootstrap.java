@@ -299,6 +299,7 @@ public final class FeatureBootstrap {
         kitService.setHiddenRanks(hiddenRankService);
 
         KitLayoutCache layoutCache = new KitLayoutCache(kitLayoutRepository, asyncExecutor, plugin.getLogger());
+        layoutCache.setKitResolver(kitService::get);
         services.register(KitLayoutCache.class, layoutCache);
 
         ArenaTemplateStore arenaStore = new ArenaTemplateStore(configService);
@@ -631,18 +632,22 @@ public final class FeatureBootstrap {
                 trimLogger.warn("Failed to reset worn trims on rank downgrade", e);
             }
             final java.util.UUID pid = player.getUniqueId();
+            final KitService kitServiceRef = kitService;
             asyncExecutorRef.runAsync(() -> {
                 try {
                     for (var snap : kitLayoutRepositoryRef.findAllForPlayer(pid)) {
+                        com.rumilance.practice.model.KitDefinition kitDef =
+                                kitServiceRef.get(snap.kit()).orElse(null);
                         org.bukkit.inventory.ItemStack[] items =
-                                com.rumilance.practice.util.ItemSerializer.fromBase64(snap.itemDataBase64());
+                                com.rumilance.practice.util.KitLayoutDelta.decode(
+                                        snap.itemDataBase64(), kitDef);
                         if (items == null) {
                             continue;
                         }
                         if (com.rumilance.practice.cosmetic.ArmorTrimReset.stripPremiumTrims(java.util.Arrays.asList(items)) > 0) {
                             kitLayoutRepositoryRef.upsert(com.rumilance.practice.model.KitLayoutSnapshot.create(
                                     snap.uuid(), snap.kit(),
-                                    com.rumilance.practice.util.ItemSerializer.toBase64(items)));
+                                    com.rumilance.practice.util.KitLayoutDelta.encode(items, kitDef)));
                         }
                     }
                 } catch (RuntimeException | java.sql.SQLException e) {
