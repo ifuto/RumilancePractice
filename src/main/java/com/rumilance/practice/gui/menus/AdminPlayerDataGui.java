@@ -182,13 +182,14 @@ public final class AdminPlayerDataGui extends AbstractGui {
 
         // --- ekit layouts ---
         List<KitLayoutSnapshot> layouts = safeList(() -> kitLayoutRepository.findAllForPlayer(target));
+        List<Component> ekitLore = new ArrayList<>(List.of(layoutLore(layouts)));
+        ekitLore.add(UiTheme.blank());
+        ekitLore.add(UiTheme.hint("Click: reset THIS player's ekits"));
+        ekitLore.add(UiTheme.hint("Shift-click: reset EVERY player's ekits"));
         inventory.setItem(GuiSlots.slot(1, 5),
                 ItemBuilder.of(Material.ENDER_CHEST, Math.max(1, layouts.size()))
                         .name(Component.text("Ekit layouts: " + layouts.size(), UiTheme.PRIMARY))
-                        .lore(layoutLore(layouts),
-                                UiTheme.blank(),
-                                UiTheme.hint("Click: reset THIS player's ekits"),
-                                UiTheme.hint("Shift-click: reset EVERY player's ekits"))
+                        .lore(ekitLore.toArray(new Component[0]))
                         .action("act:reset_ekits").build());
 
         // --- original kits ---
@@ -237,13 +238,15 @@ public final class AdminPlayerDataGui extends AbstractGui {
         List<RankedKitStats> stats = safeList(() -> statsService.allKits(target));
         long wins = stats.stream().mapToLong(RankedKitStats::wins).sum();
         long losses = stats.stream().mapToLong(RankedKitStats::losses).sum();
+        List<Component> statsLore = new ArrayList<>();
+        statsLore.add(UiTheme.labelValue("Kits played", String.valueOf(stats.size())));
+        statsLore.add(UiTheme.labelValue("Wins / Losses", wins + " / " + losses));
+        statsLore.add(UiTheme.blank());
+        statsLore.addAll(List.of(topEloLines(stats)));
         inventory.setItem(GuiSlots.slot(3, 5),
                 ItemBuilder.of(Material.IRON_SWORD)
                         .name(Component.text("Ranked stats", UiTheme.PRIMARY))
-                        .lore(UiTheme.labelValue("Kits played", String.valueOf(stats.size())),
-                                UiTheme.labelValue("Wins / Losses", wins + " / " + losses),
-                                UiTheme.blank(),
-                                topEloLines(stats))
+                        .lore(statsLore.toArray(new Component[0]))
                         .action("decorate").build());
 
         // --- bulk tools ---
