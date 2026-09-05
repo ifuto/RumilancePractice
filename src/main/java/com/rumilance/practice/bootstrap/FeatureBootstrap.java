@@ -486,6 +486,7 @@ public final class FeatureBootstrap {
 
         WallTextService wallTextService = new WallTextService(plugin);
         services.register(WallTextService.class, wallTextService);
+        plugin.getServer().getPluginManager().registerEvents(wallTextService, plugin);
         com.rumilance.practice.database.repository.AnnualStreakRepository annualStreakRepository =
                 services.get(com.rumilance.practice.database.repository.AnnualStreakRepository.class);
         com.rumilance.practice.leaderboard.KillLeaderboardService killLeaderboardService =

@@ -20,6 +20,7 @@ import org.bukkit.entity.TextDisplay;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.world.EntitiesLoadEvent;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.util.Transformation;
@@ -245,6 +246,37 @@ public final class KillLeaderboardService implements Listener {
             ViewerState state = viewers.remove(viewerKey(board, id));
             if (state != null) {
                 removeEntities(state.displays);
+            }
+        }
+    }
+
+    /**
+     * Deduplicates boards. Displays are persistent, so the server also saves them into the
+     * chunk and respawns them on chunk load — independently of this service respawning the
+     * same board from {@code leaderboards.yml}. Depending on load ordering that leaves two
+     * overlapping boards at one spot. Whenever a chunk's entities become available, drop any
+     * managed display this service is not currently tracking.
+     */
+    @EventHandler
+    public void onEntitiesLoad(EntitiesLoadEvent event) {
+        NamespacedKey sharedKey = markerKey(MARKER);
+        NamespacedKey personalKey = markerKey(PERSONAL_MARKER);
+        Set<UUID> tracked = new HashSet<>();
+        for (Board board : boards.values()) {
+            tracked.addAll(board.sharedDisplays);
+        }
+        for (ViewerState state : viewers.values()) {
+            tracked.addAll(state.displays);
+        }
+        for (Entity entity : event.getEntities()) {
+            if (!(entity instanceof TextDisplay display)) {
+                continue;
+            }
+            var pdc = display.getPersistentDataContainer();
+            boolean ours = pdc.has(sharedKey, PersistentDataType.STRING)
+                    || pdc.has(personalKey, PersistentDataType.STRING);
+            if (ours && !tracked.contains(display.getUniqueId())) {
+                display.remove();
             }
         }
     }

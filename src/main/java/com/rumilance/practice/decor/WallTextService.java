@@ -14,6 +14,9 @@ import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.TextDisplay;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.world.EntitiesLoadEvent;
 import org.bukkit.persistence.PersistentDataType;
 import com.rumilance.practice.PluginIdentity;
 import org.bukkit.plugin.Plugin;
@@ -38,7 +41,7 @@ import java.util.UUID;
  * <p>Text supports MiniMessage ({@code <aqua>N Arena</aqua>} etc.); the default styling is
  * the plugin's aqua accent. Scale is configurable per label.</p>
  */
-public final class WallTextService {
+public final class WallTextService implements Listener {
 
     private static final String FILE = "walltext.yml";
     /** PDC marker key name; presence = managed by this service. */
@@ -58,6 +61,31 @@ public final class WallTextService {
 
     public NamespacedKey markerKey() {
         return new NamespacedKey(PluginIdentity.PDC_NAMESPACE, MARKER);
+    }
+
+    /**
+     * Deduplicates wall labels. Displays are {@code setPersistent(true)}, so the server also
+     * saves them into the chunk and respawns them on chunk load — independent of this service
+     * respawning the same label from {@code walltext.yml}. Depending on load ordering that can
+     * leave two overlapping copies at one spot. Whenever a chunk's entities become available,
+     * drop any managed display that is NOT the one this service currently tracks for its id.
+     */
+    @EventHandler
+    public void onEntitiesLoad(EntitiesLoadEvent event) {
+        NamespacedKey key = markerKey();
+        for (Entity entity : event.getEntities()) {
+            if (!(entity instanceof TextDisplay display)) {
+                continue;
+            }
+            String labelId = display.getPersistentDataContainer().get(key, PersistentDataType.STRING);
+            if (labelId == null) {
+                continue;
+            }
+            UUID tracked = spawned.get(labelId.toLowerCase(Locale.ROOT));
+            if (tracked == null || !tracked.equals(display.getUniqueId())) {
+                display.remove();
+            }
+        }
     }
 
     /** Loads walltext.yml and (re)spawns every stored label. Call once on enable. */
