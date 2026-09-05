@@ -173,19 +173,21 @@ public final class KitAdminGui extends AbstractGui {
         inventory.setItem(GuiSlots.slot(1, 7), ItemBuilder.action(Material.GRASS_BLOCK,
                 Component.text(rawGui(locale, "gui.kit-admin-arenas"), UiTheme.PRIMARY)
                         .decoration(TextDecoration.ITALIC, false), "open:arenas"));
-        inventory.setItem(GuiSlots.slot(2, 7), toggle(rawGui(locale, "gui.kit-admin-preset"), kit.presetEnabled(), "toggle:preset",
-                Material.CHEST, locale));
 
         inventory.setItem(GuiSlots.slot(2, 1), toggle(t(locale, "health-regen"), kit.naturalHealthRegen(), "toggle:autoregen",
                 Material.GOLDEN_APPLE, locale));
         inventory.setItem(GuiSlots.slot(2, 3), toggle(t(locale, "auto-food"), kit.autoFood(), "toggle:autofood",
                 Material.COOKED_BEEF, locale));
+        // --- consolidated block-change rules (one cluster: exceptions, place, break modes) ---
+        inventory.setItem(GuiSlots.slot(2, 4), canBreakItem(kit, locale));
         inventory.setItem(GuiSlots.slot(2, 5), toggle(t(locale, "block-place"), kit.blockPlace(), "toggle:blockplace",
                 Material.BRICKS, locale));
         inventory.setItem(GuiSlots.slot(2, 6), toggle(t(locale, "break-player-placed"), kit.breakPlayerPlacedOnly(),
                 "toggle:breakplayerplaced", Material.OAK_PLANKS, locale));
         inventory.setItem(GuiSlots.slot(2, 7), toggle(t(locale, "block-break"), kit.blockBreak(), "toggle:blockbreak",
                 Material.IRON_PICKAXE, locale));
+        inventory.setItem(GuiSlots.slot(4, 6), toggle(rawGui(locale, "gui.kit-admin-preset"), kit.presetEnabled(), "toggle:preset",
+                Material.CHEST, locale));
 
         inventory.setItem(GuiSlots.slot(3, 1), toggle(t(locale, "ender-pearl"), kit.pearl(), "toggle:pearl",
                 Material.ENDER_PEARL, locale));
@@ -235,6 +237,43 @@ public final class KitAdminGui extends AbstractGui {
                 .append(Component.text(state ? t(locale, "on") : t(locale, "off"),
                         state ? UiTheme.SUCCESS : UiTheme.DANGER))
                 .decoration(TextDecoration.ITALIC, false);
+    }
+
+    /**
+     * The explicit "can break" exception list, edited with the block held in hand:
+     * left-click adds it, right-click removes it, shift-click clears the whole list.
+     */
+    private ItemStack canBreakItem(KitDefinition kit, String locale) {
+        List<Component> lore = new ArrayList<>();
+        if (kit.canBreak().isEmpty()) {
+            lore.add(Component.text(rawGui(locale, "gui.kit-admin-canbreak-empty"), UiTheme.MUTED)
+                    .decoration(TextDecoration.ITALIC, false));
+        } else {
+            int shown = 0;
+            for (String material : kit.canBreak()) {
+                if (shown++ >= 8) {
+                    lore.add(Component.text("+ " + (kit.canBreak().size() - shown + 1) + " ...", UiTheme.MUTED)
+                            .decoration(TextDecoration.ITALIC, false));
+                    break;
+                }
+                lore.add(Component.text("- " + material, UiTheme.PRIMARY)
+                        .decoration(TextDecoration.ITALIC, false));
+            }
+        }
+        lore.add(Component.text("", UiTheme.MUTED));
+        lore.add(Component.text(rawGui(locale, "gui.kit-admin-canbreak-hint-1"), UiTheme.MUTED)
+                .decoration(TextDecoration.ITALIC, false));
+        lore.add(Component.text(rawGui(locale, "gui.kit-admin-canbreak-hint-2"), UiTheme.MUTED)
+                .decoration(TextDecoration.ITALIC, false));
+        lore.add(Component.text(rawGui(locale, "gui.kit-admin-canbreak-hint-3"), UiTheme.MUTED)
+                .decoration(TextDecoration.ITALIC, false));
+        return ItemBuilder.of(Material.STONE_PICKAXE)
+                .name(Component.text(rawGui(locale, "gui.kit-admin-canbreak")
+                        + (kit.canBreak().isEmpty() ? "" : " (" + kit.canBreak().size() + ")"),
+                        UiTheme.SECONDARY).decoration(TextDecoration.ITALIC, false))
+                .lore(lore.toArray(new Component[0]))
+                .action("canbreak:edit")
+                .build();
     }
 
     @Override
@@ -290,6 +329,42 @@ public final class KitAdminGui extends AbstractGui {
             sounds.play(player, updated.equals(current) ? "gui-click" : "select");
             refresh(player, session, inventory);
         }
+    }
+
+    @Override
+    public void handleClick(Player player, GuiSession session, Inventory inventory, int slot,
+                            String action, org.bukkit.event.inventory.ClickType clickType) {
+        if ("canbreak:edit".equals(action) && session.selectedKit() != null) {
+            KitDefinition kit = kitService.get(session.selectedKit()).orElse(null);
+            if (kit == null) {
+                return;
+            }
+            Material held = player.getInventory().getItemInMainHand().getType();
+            boolean shift = clickType == org.bukkit.event.inventory.ClickType.SHIFT_LEFT
+                    || clickType == org.bukkit.event.inventory.ClickType.SHIFT_RIGHT;
+            List<String> list = new ArrayList<>(kit.canBreak());
+            if (shift) {
+                list.clear();
+            } else if (held == null || held.isAir() || !held.isBlock()) {
+                sounds.play(player, "error");
+                player.sendMessage(Component.text(
+                        "Hold a block in your hand to add/remove it from the break list.",
+                        net.kyori.adventure.text.format.NamedTextColor.RED));
+                return;
+            } else if (clickType == org.bukkit.event.inventory.ClickType.RIGHT) {
+                list.removeIf(m -> m.equalsIgnoreCase(held.name()));
+            } else {
+                boolean present = list.stream().anyMatch(m -> m.equalsIgnoreCase(held.name()));
+                if (!present) {
+                    list.add(held.name());
+                }
+            }
+            kitService.save(kit.toBuilder().canBreak(list).build());
+            sounds.play(player, "select");
+            refresh(player, session, inventory);
+            return;
+        }
+        handleClick(player, session, inventory, slot, action);
     }
 
     private KitDefinition applyConfigChange(KitDefinition kit, String action) {

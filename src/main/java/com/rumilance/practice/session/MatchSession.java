@@ -106,7 +106,7 @@ public final class MatchSession {
                         UUID arenaInstanceId, int bestOf) {
         this(id, mode, kitName, List.of(
                 Objects.requireNonNull(redTeam, "redTeam"),
-                Objects.requireNonNull(blueTeam, "blueTeam")), arenaInstanceId, bestOf);
+                Objects.requireNonNull(blueTeam, "blueTeam")), arenaInstanceId, bestOf, true);
     }
 
     /**

@@ -180,14 +180,14 @@ public final class TeamKitSelectGui extends AbstractGui {
                 } else if (action.startsWith("origkit:")) {
                     // Original kit selected: remember the owner's slot and fight under the
                     // shared rules kit's map rules.
-                    int slot;
+                    int origSlot;
                     try {
-                        slot = Integer.parseInt(action.substring("origkit:".length()));
+                        origSlot = Integer.parseInt(action.substring("origkit:".length()));
                     } catch (NumberFormatException e) {
                         return;
                     }
                     teamService.teamOf(player.getUniqueId())
-                            .ifPresent(team -> team.setOriginalKitSlot(slot));
+                            .ifPresent(team -> team.setOriginalKitSlot(origSlot));
                     proceedWithKit(player, resolveOriginalRulesKit());
                 }
             }

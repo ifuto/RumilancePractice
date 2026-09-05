@@ -156,6 +156,7 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                 player.sendMessage(Component.text("/kit delete <name> | timeout <name> <sec>", NamedTextColor.GRAY));
                 player.sendMessage(Component.text("/kit adventure <name> <on|off> - force Adventure mode", NamedTextColor.GRAY));
                 player.sendMessage(Component.text("/kit <flag> <name> <on|off> - regen/food/place/break/pearl/totem/shield", NamedTextColor.GRAY));
+                player.sendMessage(Component.text("/kit canbreak <name> <add|remove|clear|list> [material] - 破壊可能ブロック例外リスト", NamedTextColor.GRAY));
                 player.sendMessage(Component.text("/kit order <name> <up|down> - GUI表示順を移動 (GUIでShift+クリックでも可)", NamedTextColor.GRAY));
                 player.sendMessage(Component.text("/kit rename <nowname> <newname> - 改名 (入力した大文字小文字がそのまま表示名に)", NamedTextColor.GRAY));
                 player.sendMessage(Component.text("/kit arena <kit> add|remove|list|clear [arena] - デュエル用アリーナプール", NamedTextColor.GRAY));
@@ -273,7 +274,7 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                 });
                 yield true;
             }
-            case "autoregen", "autofood", "blockplace", "blockbreak", "breakplayerplaced", "canbreak", "pearl", "totem", "swordshieldbreak" -> {
+            case "autoregen", "autofood", "blockplace", "blockbreak", "breakplayerplaced", "pearl", "totem", "swordshieldbreak" -> {
                 if (args.length < 3) {
                     yield true;
                 }
@@ -286,7 +287,7 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                         case "autoregen" -> b.naturalHealthRegen(value);
                         case "autofood" -> b.autoFood(value);
                         case "blockplace" -> b.blockPlace(value);
-                        case "blockbreak", "canbreak" -> b.blockBreak(value).breakPlayerPlacedOnly(false);
+                        case "blockbreak" -> b.blockBreak(value).breakPlayerPlacedOnly(false);
                         case "breakplayerplaced" -> b.breakPlayerPlacedOnly(value).blockBreak(false);
                         case "pearl" -> b.pearl(value);
                         case "totem" -> b.totem(value);
@@ -297,6 +298,56 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                     kitService.save(b.build());
                     player.sendMessage(Component.text("Updated " + sub, NamedTextColor.GREEN));
                 });
+                yield true;
+            }
+            case "canbreak" -> {
+                // Consolidated management of the explicit breakable-block list:
+                //   /kit canbreak <kit> add <material>   add one block
+                //   /kit canbreak <kit> remove <material> remove one block
+                //   /kit canbreak <kit> clear            empty the list
+                //   /kit canbreak <kit> list             show the list
+                if (args.length < 3) {
+                    player.sendMessage(Component.text(
+                            "Usage: /kit canbreak <kit> <add|remove|clear|list> [material]",
+                            NamedTextColor.YELLOW));
+                    yield true;
+                }
+                String op = args[2].toLowerCase(Locale.ROOT);
+                kitService.get(args[1]).ifPresentOrElse(k -> {
+                    if ("list".equals(op)) {
+                        player.sendMessage(Component.text(
+                                "can-break for " + k.name() + ": "
+                                        + (k.canBreak().isEmpty() ? "(empty)" : String.join(", ", k.canBreak())),
+                                NamedTextColor.AQUA));
+                        return;
+                    }
+                    java.util.List<String> list = new java.util.ArrayList<>(k.canBreak());
+                    if ("clear".equals(op)) {
+                        list.clear();
+                    } else if (("add".equals(op) || "remove".equals(op)) && args.length >= 4) {
+                        org.bukkit.Material material = org.bukkit.Material.matchMaterial(args[3]);
+                        if (material == null || !material.isBlock()) {
+                            player.sendMessage(Component.text("Not a block: " + args[3], NamedTextColor.RED));
+                            return;
+                        }
+                        if ("add".equals(op)) {
+                            if (list.stream().noneMatch(m -> m.equalsIgnoreCase(material.name()))) {
+                                list.add(material.name());
+                            }
+                        } else {
+                            list.removeIf(m -> m.equalsIgnoreCase(material.name()));
+                        }
+                    } else {
+                        player.sendMessage(Component.text(
+                                "Usage: /kit canbreak <kit> <add|remove|clear|list> [material]",
+                                NamedTextColor.YELLOW));
+                        return;
+                    }
+                    kitService.save(k.toBuilder().canBreak(list).build());
+                    player.sendMessage(Component.text(
+                            "Updated can-break for " + k.name() + " (" + list.size() + " entries).",
+                            NamedTextColor.GREEN));
+                }, () -> player.sendMessage(Component.text("Unknown kit: " + args[1], NamedTextColor.RED)));
                 yield true;
             }
             default -> {
