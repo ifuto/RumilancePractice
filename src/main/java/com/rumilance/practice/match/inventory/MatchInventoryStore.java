@@ -313,8 +313,8 @@ public final class MatchInventoryStore {
                         String name = readString(in);
                         String teamColor = null;
                         if (hasColor) {
-                            String raw = readString(in);
-                            teamColor = raw.isEmpty() ? null : raw;
+                            String rawColor = readString(in);
+                            teamColor = rawColor.isEmpty() ? null : rawColor;
                         }
                         byte[] inv = readBytes(in);
                         if (gzipped) {
