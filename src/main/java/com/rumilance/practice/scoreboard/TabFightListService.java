@@ -39,6 +39,7 @@ public final class TabFightListService {
 
     private final org.bukkit.plugin.Plugin plugin;
     private com.rumilance.practice.rank.RankService rankService;
+    private volatile com.rumilance.practice.config.ConfigService configService;
 
     public TabFightListService(org.bukkit.plugin.Plugin plugin) {
         this.plugin = plugin;
@@ -48,8 +49,28 @@ public final class TabFightListService {
         this.rankService = rankService;
     }
 
+    public void setConfigService(com.rumilance.practice.config.ConfigService configService) {
+        this.configService = configService;
+    }
+
+    /**
+     * Whether the column layout may be applied via player-list-order packets. Some servers run
+     * NBT-injector style plugins (NBTAPI/Triton and similar) that rewrite
+     * {@code ClientboundPlayerInfoUpdatePacket} with a writer predating the 1.21.2
+     * UPDATE_LIST_ORDER action; sending it there throws inside their patched packet class and
+     * disconnects the receiving players the moment a match starts. On such servers this stays
+     * off — the tab keeps vanilla ordering while name colours still work.
+     */
+    private boolean columnsEnabled() {
+        com.rumilance.practice.config.ConfigService service = configService;
+        return service != null && service.config().getBoolean("match.tab-columns-enabled", false);
+    }
+
     /** Applies the fight layout to the tablist of every online player. */
     public void apply(MatchSession session, Collection<? extends Player> online) {
+        if (!columnsEnabled()) {
+            return;
+        }
         if (session == null) {
             return;
         }
@@ -122,6 +143,9 @@ public final class TabFightListService {
 
     /** Restores vanilla ordering and the rank-styled list name for one player. */
     public void clear(Player player) {
+        if (!columnsEnabled()) {
+            return;
+        }
         player.setPlayerListOrder(0);
         if (rankService != null) {
             rankService.applyNametag(player);

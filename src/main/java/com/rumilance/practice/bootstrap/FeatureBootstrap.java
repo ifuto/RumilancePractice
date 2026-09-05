@@ -1084,6 +1084,7 @@ public final class FeatureBootstrap {
         matchActionBarService.start();
         TabFightListService tabFightListService = new TabFightListService(plugin);
         tabFightListService.setRankService(rankService);
+        tabFightListService.setConfigService(configService);
         scoreboardService.setTabFightListService(tabFightListService);
         if (scoreboardConfig.enabled()) {
             scoreboardService.start();

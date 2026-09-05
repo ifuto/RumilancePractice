@@ -76,6 +76,14 @@ match:
   regenerate-arena: true
   # Countdown after match end before players/spectators are teleported back to the lobby.
   end-teleport-delay-seconds: 5
+  # Column layout of the TAB list during a match (RED column / BLUE column / spectators).
+  # Uses the player-list-order packet (UPDATE_LIST_ORDER, MC 1.21.2+). Servers running an
+  # NBT-injector style plugin that rewrites packet classes (NBTAPI / NBTInjector and
+  # similar) crash on that action: their patched writer does not know it, the send fails
+  # with an ArrayIndexOutOfBounds and the receiving players are kicked the moment a match
+  # starts. Keep this off on such servers; set it to true only when no packet-patching
+  # plugin is installed.
+  tab-columns-enabled: false
   # In-match action bar content.
   #   score = the pinned scoreline (names + kills / alive counts)  [default]
   #   time  = the elapsed match time in min:sec (e.g. 04:09)
