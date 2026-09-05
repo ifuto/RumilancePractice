@@ -47,16 +47,18 @@ public final class ReplayArchive {
         private final String world;
         private final long endedAtEpochMs;
         private final long durationTicks;
+        private final ReplayArenaSnapshot arena;
         private final Map<UUID, Player> players = new LinkedHashMap<>();
 
         RecordedMatch(UUID matchId, String kit, String mode, String world,
-                      long endedAtEpochMs, long durationTicks) {
+                      long endedAtEpochMs, long durationTicks, ReplayArenaSnapshot arena) {
             this.matchId = matchId;
             this.kit = kit;
             this.mode = mode;
             this.world = world;
             this.endedAtEpochMs = endedAtEpochMs;
             this.durationTicks = durationTicks;
+            this.arena = arena;
         }
 
         public UUID matchId() {
@@ -87,6 +89,11 @@ public final class ReplayArchive {
             return endedAtEpochMs;
         }
 
+        /** @return the arena placement snapshot (nullable for legacy / arena-less records). */
+        public ReplayArenaSnapshot arena() {
+            return arena;
+        }
+
         public List<Player> players() {
             return new ArrayList<>(players.values());
         }
@@ -95,13 +102,19 @@ public final class ReplayArchive {
     /** Per-viewer list of recent matches, newest first, keyed by the viewer's UUID. */
     private final Map<UUID, LinkedHashMap<UUID, RecordedMatch>> byViewer = new ConcurrentHashMap<>();
 
+    /** Backward-compatible overload (no arena snapshot). */
+    public void record(MatchActionRecorder recorder, MatchSession session) {
+        record(recorder, session, null);
+    }
+
     /**
      * Records a finished match for each participant.
      *
      * @param recorder the action recorder holding the participants' traces
      * @param session  the just-ended session
+     * @param arena    placement snapshot so the replay can re-paste the arena (nullable)
      */
-    public void record(MatchActionRecorder recorder, MatchSession session) {
+    public void record(MatchActionRecorder recorder, MatchSession session, ReplayArenaSnapshot arena) {
         if (recorder == null || session == null) {
             return;
         }
@@ -122,7 +135,7 @@ public final class ReplayArchive {
             }
         }
         RecordedMatch match = new RecordedMatch(
-                session.id(), session.kitName(), session.mode().name(), world, now, durationTicks);
+                session.id(), session.kitName(), session.mode().name(), world, now, durationTicks, arena);
         boolean anyFrames = false;
         for (UUID id : session.participants()) {
             List<MatchActionRecorder.Frame> frames = recorder.framesOf(id, session.id());

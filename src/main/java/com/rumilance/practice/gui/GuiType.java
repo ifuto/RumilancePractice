@@ -35,6 +35,7 @@ public enum GuiType {
     KIT_PREVIEW,
     MATCH_REPORT,
     MATCH_INVENTORY,
+    MATCH_HISTORY,
     TEAMS_BROWSER,
     TEAM_HUB,
     TEAM_CONFIG,

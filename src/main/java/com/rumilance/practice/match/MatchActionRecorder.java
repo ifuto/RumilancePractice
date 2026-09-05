@@ -36,7 +36,8 @@ public final class MatchActionRecorder {
     }
 
     private static final int SAMPLE_PERIOD_TICKS = 5;
-    private static final int MAX_FRAMES = 720;
+    /** 5 minutes of movement per player (was 60s — replays of longer matches lost the start). */
+    private static final int MAX_FRAMES = 3600;
     private static final long RETAIN_MILLIS = 60_000L;
 
     private static final class Trace {

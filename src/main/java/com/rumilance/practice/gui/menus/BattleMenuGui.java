@@ -44,6 +44,7 @@ public final class BattleMenuGui extends AbstractGui {
     private PlayerStateManager stateManager;
     private TeamService teamService;
     private java.util.function.IntSupplier ffaOccupants = () -> 0;
+    private MatchHistoryGui matchHistoryGui;
 
     public BattleMenuGui(
             GuiSessionRegistry registry,
@@ -80,6 +81,11 @@ public final class BattleMenuGui extends AbstractGui {
         this.ffaOccupants = ffaOccupants == null ? () -> 0 : ffaOccupants;
     }
 
+    /** Battle-menu match history (recent results, scores, end inventories). */
+    public void setMatchHistoryGui(MatchHistoryGui matchHistoryGui) {
+        this.matchHistoryGui = matchHistoryGui;
+    }
+
     @Override
     protected Component title(Player player, GuiSession session) {
         return text(player, "menu.battle-title").color(UiTheme.PRIMARY)
@@ -106,8 +112,11 @@ public final class BattleMenuGui extends AbstractGui {
                 MatchMode.UNRANKED, state, inParty, queueEntry));
         inventory.setItem(GuiSlots.slot(1, 7), duelTile(player, state, inParty));
 
-        // Row 2 — FFA, centred beneath the row.
+        // Row 2 — FFA centred, match history to its right.
         inventory.setItem(GuiSlots.slot(2, 4), ffaTile(player, state));
+        if (matchHistoryGui != null) {
+            inventory.setItem(GuiSlots.slot(2, 6), historyTile(player, state));
+        }
 
         paintNav(player, session, inventory);
     }
@@ -204,6 +213,16 @@ public final class BattleMenuGui extends AbstractGui {
                 "menu.ffa-lore", "ffa", false, state, false, false, live);
     }
 
+    /** Review-only tile: never busy/party locked, so results stay reachable right after a fight. */
+    private ItemStack historyTile(Player player, PlayerState state) {
+        return ItemBuilder.of(Material.BOOK)
+                .name(text(player, "menu.history").color(UiTheme.SECONDARY))
+                .lore(UiTheme.line(raw(player, "menu.history-lore")),
+                        UiTheme.blank(), UiTheme.hint(raw(player, "menu.click")))
+                .action("history")
+                .build();
+    }
+
     private int totalWaiting(Player player, MatchMode mode) {
         if (queueService == null) {
             return 0;
@@ -255,6 +274,11 @@ public final class BattleMenuGui extends AbstractGui {
             case "unranked" -> openChild(player, unrankedGui::open);
             case "player-duel" -> openChild(player, playersGui::open);
             case "ffa" -> openChild(player, ffaListGui::open);
+            case "history" -> {
+                if (matchHistoryGui != null) {
+                    openChild(player, matchHistoryGui::open);
+                }
+            }
             default -> {
                 if (action.startsWith("locked:")) {
                     sounds.play(player, "error");

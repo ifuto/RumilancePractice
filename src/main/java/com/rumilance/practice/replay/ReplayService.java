@@ -1,5 +1,7 @@
 package com.rumilance.practice.replay;
 
+import com.rumilance.practice.arena.ArenaService;
+import com.rumilance.practice.arena.fawe.FaweBridge;
 import com.rumilance.practice.lobby.LobbyService;
 import com.rumilance.practice.match.MatchActionRecorder.Frame;
 import com.rumilance.practice.report.ReportEvidence;
@@ -18,16 +20,25 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
 
 /**
  * Plays back recorded movement of a recent match at its original world coordinates. Each
  * participant is rendered as a real player entity (a packet-only fake player with the
  * participant's own skin and player body), never an armour stand.
+ *
+ * <p>Arena reproduction: disposable arena copies are filled with air when the match releases
+ * them, so the viewer would replay into an empty void. When the recording carries an arena
+ * snapshot, the template schematic is re-pasted at the recorded origin for the duration of the
+ * replay and cleared again when it stops.</p>
  *
  * <p>The operator watches in CREATIVE with a hotbar of transport-control items (restart, rewind,
  * pause/play, fast-forward, speed-cycle, stop) — right-click one to drive playback. Access is
@@ -39,14 +50,29 @@ public final class ReplayService {
     private final Plugin plugin;
     private final LobbyService lobbyService;
     private final Map<UUID, ReplaySession> sessions = new ConcurrentHashMap<>();
+    /** Start generation per operator: only the newest async start may finish initialising. */
+    private final Map<UUID, Long> startSequence = new ConcurrentHashMap<>();
     private final ReplayNpcService npcService;
     private org.bukkit.NamespacedKey controlKey;
+
+    // Optional arena-reproduction support (wired from bootstrap when available).
+    private FaweBridge faweBridge;
+    private File schematicRoot;
 
     public ReplayService(Plugin plugin, LobbyService lobbyService, ReplayNpcService npcService) {
         this.plugin = plugin;
         this.lobbyService = lobbyService;
         this.npcService = npcService;
         this.controlKey = new org.bukkit.NamespacedKey(plugin, "replay_control");
+    }
+
+    /**
+     * Wires arena re-paste support; without it replays play over whatever blocks exist.
+     * {@code arenaService} is accepted for future collision checks and kept for callers.
+     */
+    public void setArenaSupport(ArenaService arenaService, FaweBridge faweBridge, File schematicRoot) {
+        this.faweBridge = faweBridge;
+        this.schematicRoot = schematicRoot;
     }
 
     public boolean isReplaying(UUID operator) {
@@ -71,6 +97,8 @@ public final class ReplayService {
 
     private void startFromEvidence(Player operator, UUID id, ReportEvidence evidence) {
         stop(operator);
+        // Supersede any still-initialising archive replay start.
+        startSequence.merge(operator.getUniqueId(), 1L, Long::sum);
         if (evidence == null) {
             operator.sendMessage(Component.text("証跡データがありません。", NamedTextColor.RED));
             return;
@@ -109,9 +137,11 @@ public final class ReplayService {
         }
         List<ReplaySession.Avatar> avatars = new ArrayList<>();
         Frame anchor = null;
+        int totalFrames = 0;
         for (ReplayArchive.Player rp : recorded.players()) {
             List<Frame> frames = rp.frames();
             avatars.add(new ReplaySession.Avatar(rp.id(), rp.name(), frames));
+            totalFrames += frames.size();
             if (anchor == null && !frames.isEmpty()) {
                 anchor = frames.get(0);
             }
@@ -120,7 +150,95 @@ public final class ReplayService {
             operator.sendMessage(Component.text("録画フレームが空です。", NamedTextColor.RED));
             return;
         }
-        begin(operator, recorded.matchId(), world, avatars, anchor);
+        plugin.getLogger().info("[Replay] Starting replay of match " + recorded.matchId()
+                + ": " + avatars.size() + " avatar(s), " + totalFrames + " frame(s), world=" + world.getName());
+
+        // Re-paste the arena (it was air-cleared on release) BEFORE teleporting the operator,
+        // so they arrive on solid ground instead of floating in a void. The paste is async;
+        // playback begins on completion (or immediately if there is nothing to paste), and a
+        // 10s timeout guarantees a hung paste can never block the replay from starting.
+        java.util.concurrent.CompletableFuture<Boolean> paste = pasteArena(recorded.arena())
+                .orTimeout(10, java.util.concurrent.TimeUnit.SECONDS);
+        final World startWorld = world;
+        final Frame startAnchor = anchor;
+        final long seq = startSequence.merge(operator.getUniqueId(), 1L, Long::sum);
+        paste.whenComplete((ok, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
+            if (!operator.isOnline()
+                    || !Long.valueOf(seq).equals(startSequence.get(operator.getUniqueId()))) {
+                // A newer replay start (or stop) superseded this one while the arena pasted.
+                return;
+            }
+            begin(operator, recorded.matchId(), startWorld, avatars, startAnchor);
+            ReplaySession session = sessions.get(operator.getUniqueId());
+            // Clear only what THIS replay pasted: a relocated copy's region is normally air
+            // after release, so removing it again is harmless. In-place arenas are shared and
+            // must never be cleared here.
+            if (session != null && pasteAttempted(recorded.arena())) {
+                ReplayArenaSnapshot a = recorded.arena();
+                World pasteWorld = Bukkit.getWorld(a.world());
+                if (pasteWorld != null && faweBridge != null) {
+                    session.cleanup = () -> faweBridge.clearRegion(pasteWorld,
+                            a.minX(), a.minY(), a.minZ(), a.maxX(), a.maxY(), a.maxZ());
+                }
+            }
+        }));
+    }
+
+    private boolean pasteAttempted(ReplayArenaSnapshot arena) {
+        if (arena == null || !arena.relocated() || !arena.hasSchematic()) {
+            return false;
+        }
+        if (faweBridge == null || !faweBridge.isAvailable()) {
+            return false;
+        }
+        Path schematic = resolveSchematic(arena.schematicPath());
+        return schematic != null && Files.isRegularFile(schematic)
+                && Bukkit.getWorld(arena.world()) != null;
+    }
+
+    /**
+     * Re-pastes the recorded arena copy and reports whether it happened. Disposable copies are
+     * air after release; in-place arenas are skipped (they still exist in the world). Any
+     * failure only degrades the visuals and completes the future with {@code false}.
+     */
+    private java.util.concurrent.CompletableFuture<Boolean> pasteArena(ReplayArenaSnapshot arena) {
+        if (arena == null || !arena.relocated() || !arena.hasSchematic()) {
+            return java.util.concurrent.CompletableFuture.completedFuture(false);
+        }
+        if (faweBridge == null || !faweBridge.isAvailable()) {
+            plugin.getLogger().info("[Replay] No WorldEdit bridge - replay arena not reproduced.");
+            return java.util.concurrent.CompletableFuture.completedFuture(false);
+        }
+        Path schematic = resolveSchematic(arena.schematicPath());
+        if (schematic == null || !Files.isRegularFile(schematic)) {
+            plugin.getLogger().warning("[Replay] Schematic missing for replay arena: " + arena.schematicPath());
+            return java.util.concurrent.CompletableFuture.completedFuture(false);
+        }
+        World world = Bukkit.getWorld(arena.world());
+        if (world == null) {
+            return java.util.concurrent.CompletableFuture.completedFuture(false);
+        }
+        try {
+            Location pasteAnchor = new Location(world, arena.minX(), arena.minY(), arena.minZ());
+            return faweBridge.regenerate(schematic, pasteAnchor).handle((ok, error) -> {
+                if (error != null || !Boolean.TRUE.equals(ok)) {
+                    plugin.getLogger().log(Level.WARNING,
+                            "[Replay] Failed to re-paste arena '" + arena.templateName() + "'", error);
+                    return false;
+                }
+                plugin.getLogger().info("[Replay] Re-pasted arena '" + arena.templateName()
+                        + "' at " + arena.minX() + "," + arena.minY() + "," + arena.minZ());
+                return true;
+            });
+        } catch (Throwable t) {
+            plugin.getLogger().log(Level.WARNING, "[Replay] Arena paste threw", t);
+            return java.util.concurrent.CompletableFuture.completedFuture(false);
+        }
+    }
+
+    private Path resolveSchematic(String schematicPath) {
+        File file = new File(schematicPath);
+        return (file.isAbsolute() ? file : new File(schematicRoot, schematicPath)).toPath();
     }
 
     private void begin(Player operator, UUID id, World world,
@@ -149,8 +267,15 @@ public final class ReplayService {
 
         sessions.put(operator.getUniqueId(), session);
         World finalWorld = world;
-        session.taskId = Bukkit.getScheduler().runTaskTimer(plugin, () -> tick(session, operator, finalWorld), 1L, 1L)
-                .getTaskId();
+        session.taskId = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            try {
+                tick(session, operator, finalWorld);
+            } catch (Throwable t) {
+                // A single bad tick must never kill the playback task (the scheduler cancels
+                // repeating tasks that throw, which looks like the replay "ending" on its own).
+                plugin.getLogger().log(Level.WARNING, "[Replay] tick failed", t);
+            }
+        }, 1L, 1L).getTaskId();
         operator.sendMessage(Component.text("リプレイ開始 (クリエイティブ: アイテムを右クリックで操作)", NamedTextColor.GREEN));
         sendControls(operator, session);
     }
@@ -162,7 +287,7 @@ public final class ReplayService {
         }
         if (!session.paused) {
             session.playheadTick += session.speed();
-            if (session.playheadTick > session.endTick) {
+            if (session.playheadTick >= session.endTick) {
                 session.playheadTick = session.endTick;
                 session.paused = true;
                 operator.sendMessage(Component.text("リプレイ終了（[⟲]で最初から再生）", NamedTextColor.YELLOW));
@@ -182,14 +307,25 @@ public final class ReplayService {
         if (avatar.npc == null || frames.isEmpty()) {
             return;
         }
+        // Binary-search the bracketing frames instead of scanning from the start every tick:
+        // long recordings (hundreds of frames x several avatars x 20Hz) were a hot loop.
+        int lo = 0;
+        int hi = frames.size() - 1;
         Frame lower = frames.get(0);
-        Frame upper = frames.get(frames.size() - 1);
-        for (int i = 0; i < frames.size() - 1; i++) {
-            if (frames.get(i).tick() <= playheadTick && frames.get(i + 1).tick() >= playheadTick) {
-                lower = frames.get(i);
-                upper = frames.get(i + 1);
-                break;
+        Frame upper = frames.get(hi);
+        if (playheadTick >= upper.tick()) {
+            lower = upper;
+        } else if (playheadTick > lower.tick()) {
+            while (hi - lo > 1) {
+                int mid = (lo + hi) >>> 1;
+                if (frames.get(mid).tick() <= playheadTick) {
+                    lo = mid;
+                } else {
+                    hi = mid;
+                }
             }
+            lower = frames.get(lo);
+            upper = frames.get(hi);
         }
         double span = upper.tick() - lower.tick();
         double t = span <= 0 ? 0 : Math.max(0, Math.min(1, (playheadTick - lower.tick()) / span));
@@ -291,6 +427,8 @@ public final class ReplayService {
     }
 
     public void stop(Player operator) {
+        // Invalidates any still-initialising (async arena-paste) start as well.
+        startSequence.merge(operator.getUniqueId(), 1L, Long::sum);
         ReplaySession session = sessions.get(operator.getUniqueId());
         if (session != null) {
             stopInternal(session, true);
@@ -301,6 +439,15 @@ public final class ReplayService {
         sessions.remove(session.operator);
         if (session.taskId != -1) {
             Bukkit.getScheduler().cancelTask(session.taskId);
+        }
+        // Remove the re-pasted arena copy (async, best effort) before anything else reuses us.
+        Runnable cleanup = session.cleanup;
+        if (cleanup != null) {
+            try {
+                cleanup.run();
+            } catch (Throwable t) {
+                plugin.getLogger().log(Level.WARNING, "[Replay] arena cleanup failed", t);
+            }
         }
         Player operator = Bukkit.getPlayer(session.operator);
         if (operator != null && operator.isOnline()) {
@@ -326,6 +473,14 @@ public final class ReplayService {
         for (ReplaySession session : List.copyOf(sessions.values())) {
             if (session.taskId != -1) {
                 Bukkit.getScheduler().cancelTask(session.taskId);
+            }
+            // Best effort: the pasted replay arena should not survive a restart.
+            Runnable cleanup = session.cleanup;
+            if (cleanup != null) {
+                try {
+                    cleanup.run();
+                } catch (Throwable ignored) {
+                }
             }
             Player operator = Bukkit.getPlayer(session.operator);
             if (operator != null && npcService != null) {

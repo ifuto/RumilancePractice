@@ -161,37 +161,74 @@ public final class ReplayNpcService {
     // ---- packets ----
 
     private void sendAddPlayer(Player viewer, WrappedGameProfile profile, String name) {
-        com.comphenix.protocol.events.PacketContainer packet =
-                protocol.createPacket(PacketType.Play.Server.PLAYER_INFO);
-        packet.getPlayerInfoAction().write(0, EnumWrappers.PlayerInfoAction.ADD_PLAYER);
         PlayerInfoData data = new PlayerInfoData(profile, 0,
                 EnumWrappers.NativeGameMode.SURVIVAL, WrappedChatComponent.fromText(name));
         List<PlayerInfoData> list = new ArrayList<>();
         list.add(data);
-        packet.getPlayerInfoDataLists().write(0, list);
-        send(viewer, packet);
+        sendPlayerInfo(viewer, EnumWrappers.PlayerInfoAction.ADD_PLAYER, list);
     }
 
     private void sendRemovePlayer(Player viewer, WrappedGameProfile profile) {
-        com.comphenix.protocol.events.PacketContainer packet =
-                protocol.createPacket(PacketType.Play.Server.PLAYER_INFO);
-        packet.getPlayerInfoAction().write(0, EnumWrappers.PlayerInfoAction.REMOVE_PLAYER);
         PlayerInfoData data = new PlayerInfoData(profile, 0,
                 EnumWrappers.NativeGameMode.SURVIVAL, null);
         List<PlayerInfoData> list = new ArrayList<>();
         list.add(data);
-        packet.getPlayerInfoDataLists().write(0, list);
+        sendPlayerInfo(viewer, EnumWrappers.PlayerInfoAction.REMOVE_PLAYER, list);
+    }
+
+    /**
+     * 1.20.5+ carries an EnumSet of actions on the Player Info Update packet; older servers
+     * have a single action field. Try the modern accessor first, fall back to the legacy one.
+     */
+    private void sendPlayerInfo(Player viewer, EnumWrappers.PlayerInfoAction action,
+                                List<PlayerInfoData> list) {
+        com.comphenix.protocol.events.PacketContainer packet =
+                protocol.createPacket(PacketType.Play.Server.PLAYER_INFO);
+        try {
+            packet.getPlayerInfoActions().write(0, java.util.EnumSet.of(action));
+        } catch (Throwable legacy) {
+            packet.getPlayerInfoAction().write(0, action);
+        }
+        try {
+            packet.getPlayerInfoDataLists().write(0, list);
+        } catch (Throwable alternateIndex) {
+            // Some ProtocolLib revisions expose the data list at index 1 behind the action set.
+            packet.getPlayerInfoDataLists().write(1, list);
+        }
         send(viewer, packet);
     }
 
+    /**
+     * Spawns the player entity. Since 1.20.2 the dedicated Spawn Player packet was merged into
+     * Spawn Entity ({@code NAMED_ENTITY_SPAWN} no longer exists in the protocol), so the modern
+     * packet is sent first with the player entity type; the legacy packet remains as a fallback
+     * for older server/ProtocolLib combinations.
+     */
     private void sendSpawn(Player viewer, int entityId, UUID profileUuid, Location loc) {
-        com.comphenix.protocol.events.PacketContainer packet =
-                protocol.createPacket(PacketType.Play.Server.NAMED_ENTITY_SPAWN);
-        packet.getIntegers().write(0, entityId);
-        packet.getUUIDs().write(0, profileUuid);
-        packet.getDoubles().write(0, loc.getX()).write(1, loc.getY()).write(2, loc.getZ());
-        packet.getBytes().write(0, angleToByte(loc.getYaw())).write(1, angleToByte(loc.getPitch()));
-        send(viewer, packet);
+        try {
+            com.comphenix.protocol.events.PacketContainer packet =
+                    protocol.createPacket(PacketType.Play.Server.SPAWN_ENTITY);
+            packet.getIntegers().write(0, entityId);
+            packet.getUUIDs().write(0, profileUuid);
+            packet.getEntityTypeModifier().write(0, org.bukkit.entity.EntityType.PLAYER);
+            packet.getDoubles().write(0, loc.getX()).write(1, loc.getY()).write(2, loc.getZ());
+            // Rotations are packed angles: pitch, yaw, head yaw.
+            packet.getBytes().write(0, angleToByte(loc.getPitch()))
+                    .write(1, angleToByte(loc.getYaw()))
+                    .write(2, angleToByte(loc.getYaw()));
+            // Data field: 0 for players. Velocity shorts default to zero already.
+            packet.getIntegers().writeSafely(1, 0);
+            send(viewer, packet);
+        } catch (Throwable modernFailed) {
+            logger.log(Level.FINE, "[Replay] SPAWN_ENTITY failed, trying legacy spawn", modernFailed);
+            com.comphenix.protocol.events.PacketContainer packet =
+                    protocol.createPacket(PacketType.Play.Server.NAMED_ENTITY_SPAWN);
+            packet.getIntegers().write(0, entityId);
+            packet.getUUIDs().write(0, profileUuid);
+            packet.getDoubles().write(0, loc.getX()).write(1, loc.getY()).write(2, loc.getZ());
+            packet.getBytes().write(0, angleToByte(loc.getYaw())).write(1, angleToByte(loc.getPitch()));
+            send(viewer, packet);
+        }
     }
 
     private void sendHeadRotation(Player viewer, int entityId, float yaw) {

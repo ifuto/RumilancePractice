@@ -250,6 +250,17 @@ public final class MatchService {
     public void setReplayArchive(com.rumilance.practice.replay.ReplayArchive replayArchive) {
         this.replayArchive = replayArchive;
     }
+
+    private com.rumilance.practice.replay.ReplayService replayService;
+    private com.rumilance.practice.match.history.MatchHistoryStore historyStore;
+
+    public void setReplayService(com.rumilance.practice.replay.ReplayService replayService) {
+        this.replayService = replayService;
+    }
+
+    public void setHistoryStore(com.rumilance.practice.match.history.MatchHistoryStore historyStore) {
+        this.historyStore = historyStore;
+    }
     private com.rumilance.practice.match.inventory.MatchInventoryStore inventoryStore;
     private com.rumilance.practice.ffa.FfaService ffaService;
     private com.rumilance.practice.combat.CombatNetTracker combatNet;
@@ -1429,7 +1440,8 @@ public final class MatchService {
             session.rememberEndInventory(victimId, inv);
             if (inventoryStore != null) {
                 inventoryStore.captureIfAbsent(
-                        session.id(), victimId, StatsService.nameOf(victimId), inv);
+                        session.id(), victimId, StatsService.nameOf(victimId), inv,
+                        teamColorName(session, victimId));
             }
         }
         // Count a kill for the attacker (skip self-inflicted / environmental deaths).
@@ -1936,17 +1948,20 @@ public final class MatchService {
         }, 60L * 20L);
 
         // Capture the movement traces for the replay archive BEFORE cleanup clears the
-        // recorder's per-match data. Team fights and duels are both recorded.
+        // recorder's per-match data. Team fights and duels are both recorded. The arena
+        // snapshot lets the replay viewer re-paste the (disposable, already air-cleared on
+        // release) arena copy at its original coordinates.
         try {
             if (actionRecorder != null) {
                 actionRecorder.completeMatch(session);
             }
             if (replayArchive != null && actionRecorder != null) {
-                replayArchive.record(actionRecorder, session);
+                replayArchive.record(actionRecorder, session, arenaSnapshot(session));
             }
         } catch (RuntimeException ignored) {
             // Replay capture must never break match end.
         }
+        recordHistory(session);
 
         MatchResultProcessor processor = switch (session.mode()) {
             case RANKED -> rankedResultProcessor;
@@ -1968,6 +1983,64 @@ public final class MatchService {
             returnPlayersToLobby(session);
         }, rematchSeconds * 20L);
         tasks.put(session.id(), rematchTimeout);
+    }
+
+    /**
+     * Captures the arena placement of {@code session} (if still resolvable) so the replay
+     * viewer can re-paste disposable arena copies that have since been cleared to air.
+     */
+    private com.rumilance.practice.replay.ReplayArenaSnapshot arenaSnapshot(MatchSession session) {
+        if (session == null || session.arenaInstanceId() == null || arenaService == null) {
+            return null;
+        }
+        com.rumilance.practice.model.ArenaInstance instance =
+                arenaService.get(session.arenaInstanceId()).orElse(null);
+        if (instance == null) {
+            return null;
+        }
+        return new com.rumilance.practice.replay.ReplayArenaSnapshot(
+                instance.template().name(),
+                instance.template().world(),
+                instance.template().schematicPath(),
+                instance.minX(), instance.minY(), instance.minZ(),
+                instance.maxX(), instance.maxY(), instance.maxZ(),
+                instance.isRelocated());
+    }
+
+    /** Persists the finished match for the Battle-menu history (outcome, score, participants). */
+    private void recordHistory(MatchSession session) {
+        if (historyStore == null || session == null) {
+            return;
+        }
+        try {
+            boolean draw = session.isDraw();
+            UUID winner = session.winner();
+            com.rumilance.practice.state.TeamColor winningTeam = session.winningTeam();
+            boolean teamMatch = session.isTeamMatch();
+            List<com.rumilance.practice.match.history.MatchHistoryStore.Participant> participants =
+                    new ArrayList<>();
+            for (UUID id : session.participants()) {
+                // teamColor() defaults to RED in non-team sessions; only real teams carry one.
+                com.rumilance.practice.state.TeamColor color = teamMatch ? session.teamColor(id) : null;
+                boolean win = !draw && (winner != null
+                        ? winner.equals(id)
+                        : winningTeam != null && color == winningTeam);
+                participants.add(new com.rumilance.practice.match.history.MatchHistoryStore.Participant(
+                        id, StatsService.nameOf(id),
+                        color == null ? null : color.name(),
+                        session.killsOf(id), win));
+            }
+            long durationMs = 0L;
+            if (session.startedAt() != null && session.endedAt() != null) {
+                durationMs = Math.max(0L,
+                        java.time.Duration.between(session.startedAt(), session.endedAt()).toMillis());
+            }
+            historyStore.record(new com.rumilance.practice.match.history.MatchHistoryStore.Entry(
+                    session.id(), session.mode().name(), session.kitName(),
+                    System.currentTimeMillis(), durationMs, draw, participants));
+        } catch (RuntimeException ignored) {
+            // History is a convenience feature; it must never break match end.
+        }
     }
 
     public void requestRematch(Player player) {
@@ -2181,6 +2254,14 @@ public final class MatchService {
         for (UUID id : session.participants()) {
             Player player = Bukkit.getPlayer(id);
             if (player != null) {
+                if (replayService != null && replayService.isReplaying(id)) {
+                    // The player is watching this match's replay in creative flight at the
+                    // arena: do NOT teleport them home or wipe the control hotbar. The replay
+                    // viewer returns them to the lobby on stop. State is still reset so
+                    // queue/match guards behave afterwards.
+                    stateManager.resetToLobby(id);
+                    continue;
+                }
                 if (teamColoredArmorService != null) {
                     teamColoredArmorService.clearForPlayer(player);
                 }
@@ -2206,6 +2287,10 @@ public final class MatchService {
             for (UUID id : session.participants()) {
                 Player player = Bukkit.getPlayer(id);
                 if (player == null) {
+                    continue;
+                }
+                if (replayService != null && replayService.isReplaying(id)) {
+                    // Never yank a replay viewer into a fresh queue mid-playback.
                     continue;
                 }
                 PlayerSettings settings = settingsService.get(id);
@@ -2240,8 +2325,19 @@ public final class MatchService {
                 session.id(),
                 player.getUniqueId(),
                 StatsService.nameOf(player.getUniqueId()),
-                serializePlayerInventory(player)
+                serializePlayerInventory(player),
+                teamColorName(session, player.getUniqueId())
         );
+    }
+
+    private static String teamColorName(MatchSession session, UUID playerId) {
+        // teamColor() defaults to RED for non-team sessions — only team fights carry a real
+        // colour worth persisting.
+        if (session == null || !session.isTeamMatch()) {
+            return null;
+        }
+        TeamColor color = session.teamColor(playerId);
+        return color == null ? null : color.name();
     }
 
     private static byte[] serializePlayerInventory(Player player) {

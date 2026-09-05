@@ -95,21 +95,24 @@ public final class MatchInventoryGui extends AbstractGui {
             int local = i - 9;
             inventory.setItem(GuiSlots.slot(1 + local / 9, local % 9), copyOrAir(contents[i]));
         }
-        // Armor row matches EditKitGui: helmet, chest, legs, boots, offhand.
+        // Armor row matches EditKitGui: helmet, chest, legs, boots, offhand. In team fights the
+        // preview re-dyes leather pieces with the saved team colour, reproducing what the
+        // fighter's armour looked like during the match (colours are stored per fighter).
+        String teamColor = fighter.teamColor();
         if (contents.length > 36) {
-            inventory.setItem(GuiSlots.slot(0, 1), armorOr(player, contents[36], Material.LEATHER_HELMET));
+            inventory.setItem(GuiSlots.slot(0, 1), armorOr(player, contents[36], Material.LEATHER_HELMET, teamColor));
         }
         if (contents.length > 37) {
-            inventory.setItem(GuiSlots.slot(0, 2), armorOr(player, contents[37], Material.LEATHER_CHESTPLATE));
+            inventory.setItem(GuiSlots.slot(0, 2), armorOr(player, contents[37], Material.LEATHER_CHESTPLATE, teamColor));
         }
         if (contents.length > 38) {
-            inventory.setItem(GuiSlots.slot(0, 3), armorOr(player, contents[38], Material.LEATHER_LEGGINGS));
+            inventory.setItem(GuiSlots.slot(0, 3), armorOr(player, contents[38], Material.LEATHER_LEGGINGS, teamColor));
         }
         if (contents.length > 39) {
-            inventory.setItem(GuiSlots.slot(0, 4), armorOr(player, contents[39], Material.LEATHER_BOOTS));
+            inventory.setItem(GuiSlots.slot(0, 4), armorOr(player, contents[39], Material.LEATHER_BOOTS, teamColor));
         }
         if (contents.length > 40) {
-            inventory.setItem(GuiSlots.slot(0, 6), armorOr(player, contents[40], Material.SHIELD));
+            inventory.setItem(GuiSlots.slot(0, 6), armorOr(player, contents[40], Material.SHIELD, teamColor));
         }
 
         if (snap.fighters().size() > 1) {
@@ -192,12 +195,31 @@ public final class MatchInventoryGui extends AbstractGui {
         return stack.clone();
     }
 
-    private ItemStack armorOr(Player viewer, ItemStack stack, Material emptyIcon) {
+    private ItemStack armorOr(Player viewer, ItemStack stack, Material emptyIcon, String teamColorName) {
         if (stack == null || stack.getType().isAir()) {
             return ItemBuilder.of(emptyIcon)
                     .name(t(viewer, "gui.inv-empty").color(UiTheme.MUTED))
                     .action("decorate").build();
         }
-        return stack.clone();
+        return applyTeamColor(stack.clone(), teamColorName);
+    }
+
+    /**
+     * Re-dyes leather armour with the fighter's saved team colour for the preview only (the
+     * stored bytes are never modified). Non-leather pieces keep their real appearance.
+     */
+    private static ItemStack applyTeamColor(ItemStack stack, String teamColorName) {
+        if (teamColorName == null || !(stack.getItemMeta() instanceof org.bukkit.inventory.meta.LeatherArmorMeta meta)) {
+            return stack;
+        }
+        try {
+            com.rumilance.practice.state.TeamColor color =
+                    com.rumilance.practice.state.TeamColor.valueOf(teamColorName);
+            meta.setColor(color.leatherColor());
+            stack.setItemMeta(meta);
+        } catch (IllegalArgumentException ignored) {
+            // Unknown colour name from an old record: show the item as saved.
+        }
+        return stack;
     }
 }

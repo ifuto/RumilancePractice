@@ -109,6 +109,7 @@ import com.rumilance.practice.gui.menus.KitArenaSelectGui;
 import com.rumilance.practice.gui.menus.KitStartEffectsGui;
 import com.rumilance.practice.gui.menus.KitPreviewGui;
 import com.rumilance.practice.gui.menus.KitSelectGui;
+import com.rumilance.practice.gui.menus.MatchHistoryGui;
 import com.rumilance.practice.gui.menus.MatchInventoryGui;
 import com.rumilance.practice.gui.menus.MatchReportGui;
 import com.rumilance.practice.gui.menus.NameColorGui;
@@ -374,6 +375,13 @@ public final class FeatureBootstrap {
                 new com.rumilance.practice.replay.ReplayArchive();
         services.register(com.rumilance.practice.replay.ReplayArchive.class, replayArchive);
         matchService.setReplayArchive(replayArchive);
+        matchService.setReplayService(replayService);
+        replayService.setArenaSupport(arenaService, faweBridge,
+                new File(PluginIdentity.dataFolder(plugin), "schematics"));
+        com.rumilance.practice.match.history.MatchHistoryStore matchHistoryStore =
+                new com.rumilance.practice.match.history.MatchHistoryStore(plugin);
+        matchService.setHistoryStore(matchHistoryStore);
+        services.register(com.rumilance.practice.match.history.MatchHistoryStore.class, matchHistoryStore);
 
         banService = new BanService(plugin);
         services.register(BanService.class, banService);
@@ -877,6 +885,9 @@ public final class FeatureBootstrap {
         MatchInventoryGui matchInventoryGui =
                 new MatchInventoryGui(guiSessions, soundService, matchInventoryStore);
         KillFeed.setInventoryOpener(matchInventoryGui::open);
+        MatchHistoryGui matchHistoryGui = new MatchHistoryGui(
+                guiSessions, soundService, matchHistoryStore, matchInventoryGui);
+        battleMenuGui.setMatchHistoryGui(matchHistoryGui);
         BanListGui banListGui = new BanListGui(guiSessions, soundService, banService);
         ReportGui reportGui = new ReportGui(guiSessions, soundService, reportService);
         ReportListGui reportListGui =
@@ -950,6 +961,7 @@ public final class FeatureBootstrap {
         guiListener.register(gameMenuGui);
         guiListener.register(battleMenuGui);
         guiListener.register(matchInventoryGui);
+        guiListener.register(matchHistoryGui);
         guiListener.register(practiceLayoutGui);
         guiListener.register(practiceMaceGui);
         guiListener.register(practiceBotGui);

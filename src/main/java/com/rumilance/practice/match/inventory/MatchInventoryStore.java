@@ -35,10 +35,15 @@ public final class MatchInventoryStore {
     public static final int MAX_MATCHES = 10_000;
     public static final long TTL_MS = 12L * 60L * 60L * 1000L;
     private static final int FORMAT_MAGIC_V2 = 0x4D493032; // "MI02"
-    private static final int FORMAT_MAGIC = 0x4D493033; // "MI03" gzipped inventories
+    private static final int FORMAT_MAGIC_V3 = 0x4D493033; // "MI03" gzipped inventories
+    private static final int FORMAT_MAGIC = 0x4D493034; // "MI04" + team colour per fighter
 
-    /** One fighter's end inventory (at death or match end). */
-    public record Fighter(UUID playerId, String name, byte[] inventory) {
+    /** One fighter's end inventory (at death or match end) with their team colour, if any. */
+    public record Fighter(UUID playerId, String name, byte[] inventory, String teamColor) {
+        public Fighter(UUID playerId, String name, byte[] inventory) {
+            this(playerId, name, inventory, null);
+        }
+
         public ItemStack[] contents() {
             return ItemSerializer.deserialize(inventory);
         }
@@ -167,9 +172,9 @@ public final class MatchInventoryStore {
     private static long peekEndedAt(Path file) {
         try (DataInputStream in = new DataInputStream(Files.newInputStream(file))) {
             int maybeMagic = in.readInt();
-            if (maybeMagic == FORMAT_MAGIC || maybeMagic == FORMAT_MAGIC_V2) {
+            if (maybeMagic == FORMAT_MAGIC || maybeMagic == FORMAT_MAGIC_V3 || maybeMagic == FORMAT_MAGIC_V2) {
                 int version = in.readInt();
-                if (version != 2 && version != 3) {
+                if (version < 2 || version > 4) {
                     return 0L;
                 }
                 return in.readLong();
@@ -187,12 +192,17 @@ public final class MatchInventoryStore {
      * same match/player are ignored so death kits are not overwritten by empty/spectator state.
      */
     public void captureIfAbsent(UUID matchId, UUID playerId, String name, byte[] inventory) {
+        captureIfAbsent(matchId, playerId, name, inventory, null);
+    }
+
+    /** Variant that also stores the fighter's team colour (for party-fight previews). */
+    public void captureIfAbsent(UUID matchId, UUID playerId, String name, byte[] inventory, String teamColor) {
         if (matchId == null || playerId == null || inventory == null) {
             return;
         }
         String safeName = name == null ? "" : name;
         pending.computeIfAbsent(matchId, id -> new ConcurrentHashMap<>())
-                .putIfAbsent(playerId, new Fighter(playerId, safeName, inventory));
+                .putIfAbsent(playerId, new Fighter(playerId, safeName, inventory, teamColor));
     }
 
     public boolean hasCapture(UUID matchId, UUID playerId) {
@@ -257,13 +267,14 @@ public final class MatchInventoryStore {
             Path file = folder.resolve(snapshot.matchId() + ".bin");
             try (DataOutputStream out = new DataOutputStream(Files.newOutputStream(file))) {
                 out.writeInt(FORMAT_MAGIC);
-                out.writeInt(3);
+                out.writeInt(4);
                 out.writeLong(snapshot.endedAtEpochMs());
                 writeUuid(out, snapshot.matchId());
                 out.writeInt(snapshot.fighters().size());
                 for (Fighter f : snapshot.fighters()) {
                     writeUuid(out, f.playerId());
                     writeString(out, f.name());
+                    writeString(out, f.teamColor() == null ? "" : f.teamColor());
                     writeBytes(out, gzip(f.inventory()));
                 }
             } catch (IOException e) {
@@ -282,12 +293,14 @@ public final class MatchInventoryStore {
             try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(raw))) {
                 int maybeMagic = in.readInt();
                 Snapshot snap;
-                if (maybeMagic == FORMAT_MAGIC || maybeMagic == FORMAT_MAGIC_V2) {
+                if (maybeMagic == FORMAT_MAGIC || maybeMagic == FORMAT_MAGIC_V3
+                        || maybeMagic == FORMAT_MAGIC_V2) {
                     int version = in.readInt();
-                    if (version != 2 && version != 3) {
+                    if (version < 2 || version > 4) {
                         return Optional.empty();
                     }
-                    boolean gzipped = maybeMagic == FORMAT_MAGIC && version == 3;
+                    boolean gzipped = version >= 3;
+                    boolean hasColor = version >= 4;
                     long ended = in.readLong();
                     UUID mid = readUuid(in);
                     int count = in.readInt();
@@ -298,11 +311,16 @@ public final class MatchInventoryStore {
                     for (int i = 0; i < count; i++) {
                         UUID pid = readUuid(in);
                         String name = readString(in);
+                        String teamColor = null;
+                        if (hasColor) {
+                            String raw = readString(in);
+                            teamColor = raw.isEmpty() ? null : raw;
+                        }
                         byte[] inv = readBytes(in);
                         if (gzipped) {
                             inv = gunzip(inv);
                         }
-                        fighters.add(new Fighter(pid, name, inv));
+                        fighters.add(new Fighter(pid, name, inv, teamColor));
                     }
                     snap = new Snapshot(mid, fighters, ended);
                 } else {

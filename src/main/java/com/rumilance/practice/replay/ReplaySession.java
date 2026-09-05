@@ -35,6 +35,8 @@ public final class ReplaySession {
     final Map<UUID, Avatar> byPlayer = new HashMap<>();
 
     int taskId = -1;
+    /** Optional arena cleanup (removes the re-pasted arena copy) run when the session stops. */
+    Runnable cleanup;
 
     final double startTick;
     final double endTick;
@@ -57,7 +59,14 @@ public final class ReplaySession {
             }
         }
         this.startTick = min == Double.MAX_VALUE ? 0 : min;
-        this.endTick = max == Double.MIN_VALUE ? 0 : max;
+        double end = max == Double.MIN_VALUE ? 0 : max;
+        // Degenerate recordings (a single sampled frame, e.g. an instant forfeit) used to end
+        // the playback on the very first tick; guarantee at least one second so the operator
+        // lands on the final scene instead of an immediate "replay over".
+        if (end < this.startTick + 20.0) {
+            end = this.startTick + 20.0;
+        }
+        this.endTick = end;
         this.playheadTick = this.startTick;
     }
 
