@@ -230,7 +230,7 @@ public final class TeamColoredArmorService {
     }
 
     static Map<EquipmentSlot, ItemStack> dyedArmor(TeamColor color) {
-        Color dye = color == TeamColor.BLUE ? BLUE : RED;
+        Color dye = color.leatherColor();
         Map<EquipmentSlot, ItemStack> map = new EnumMap<>(EquipmentSlot.class);
         map.put(EquipmentSlot.HEAD, leather(Material.LEATHER_HELMET, dye));
         map.put(EquipmentSlot.CHEST, leather(Material.LEATHER_CHESTPLATE, dye));

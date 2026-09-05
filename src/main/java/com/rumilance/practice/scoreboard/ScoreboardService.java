@@ -421,7 +421,21 @@ public final class ScoreboardService {
     }
 
     private String teamColorTag(TeamColor color, ScoreboardConfig cfg) {
-        return color == TeamColor.RED ? cfg.colorRed() : cfg.colorBlue();
+        if (color == TeamColor.RED) {
+            return cfg.colorRed();
+        }
+        if (color == TeamColor.BLUE) {
+            return cfg.colorBlue();
+        }
+        // Extra team colors of multi-team party battles: use their vanilla colour name.
+        return switch (color) {
+            case GREEN -> "green";
+            case YELLOW -> "yellow";
+            case AQUA -> "dark_aqua";
+            case PURPLE -> "light_purple";
+            case GOLD -> "gold";
+            default -> "white";
+        };
     }
 
     private void update(Player player, int onlineCount, ScoreboardConfig cfg) {

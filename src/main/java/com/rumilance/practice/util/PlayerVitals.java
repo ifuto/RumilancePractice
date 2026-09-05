@@ -110,7 +110,24 @@ public final class PlayerVitals {
             }
         } catch (RuntimeException ignored) {
         }
+        resetScale(player);
         refillHealth(player);
+    }
+
+    /** Reset a team-config body-size SCALE attribute back to the vanilla 1.0. */
+    public static void resetScale(Player player) {
+        if (player == null) {
+            return;
+        }
+        try {
+            org.bukkit.attribute.AttributeInstance scaleAttr =
+                    player.getAttribute(org.bukkit.attribute.Attribute.SCALE);
+            if (scaleAttr != null) {
+                scaleAttr.setBaseValue(1.0d);
+            }
+        } catch (RuntimeException | NoSuchFieldError | NoClassDefFoundError ignored) {
+            // Pre-1.20.5 servers have no SCALE attribute.
+        }
     }
 
     /**

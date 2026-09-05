@@ -625,15 +625,31 @@ public final class MatchService {
                                MatchMode mode, int bestOf, String partyArenaName,
                                boolean friendlyFire, Map<UUID, Integer> carrySeriesWins,
                                UUID carryArenaInstanceId) {
-        if (redTeam == null || blueTeam == null
-                || redTeam.isEmpty() || blueTeam.isEmpty()
-                || redTeam.size() > MatchSession.MAX_SIDE_SIZE
-                || blueTeam.size() > MatchSession.MAX_SIDE_SIZE) {
+        startTeamMatch(redTeam == null || blueTeam == null
+                        ? List.of() : List.of(redTeam, blueTeam),
+                kitId, mode, bestOf, partyArenaName, friendlyFire,
+                carrySeriesWins, carryArenaInstanceId, Map.of(), Map.of());
+    }
+
+    /**
+     * Starts a party battle with 2..7 team rosters (canonical color order). Per-team kit
+     * overrides and battle configs (health / size / effects) ride along with the session.
+     */
+    public void startTeamMatch(List<List<UUID>> rosters, String kitId, MatchMode mode, int bestOf,
+                               String partyArenaName, boolean friendlyFire,
+                               Map<UUID, Integer> carrySeriesWins, UUID carryArenaInstanceId,
+                               Map<TeamColor, String> teamKits,
+                               Map<TeamColor, com.rumilance.practice.team.TeamConfig> teamConfigs) {
+        if (rosters == null || rosters.size() < 2 || rosters.size() > TeamColor.MAX_TEAMS) {
             return;
         }
         List<UUID> all = new ArrayList<>();
-        all.addAll(redTeam);
-        all.addAll(blueTeam);
+        for (List<UUID> roster : rosters) {
+            if (roster == null || roster.isEmpty() || roster.size() > MatchSession.MAX_SIDE_SIZE) {
+                return;
+            }
+            all.addAll(roster);
+        }
         if (all.stream().distinct().count() != all.size()) {
             return;
         }
@@ -647,10 +663,20 @@ public final class MatchService {
             return;
         }
 
-        MatchSession session = new MatchSession(
-                UUID.randomUUID(), mode, kitId, redTeam, blueTeam, null, bestOf);
+        MatchSession session;
+        try {
+            session = new MatchSession(UUID.randomUUID(), mode, kitId, rosters, null, bestOf);
+        } catch (IllegalArgumentException e) {
+            return;
+        }
         session.setFriendlyFire(friendlyFire);
         session.applySeries(carrySeriesWins);
+        if (teamKits != null) {
+            teamKits.forEach(session::setTeamKit);
+        }
+        if (teamConfigs != null) {
+            teamConfigs.forEach(session::setTeamConfig);
+        }
         if (partyArenaName != null && !partyArenaName.isBlank()
                 && !"random".equalsIgnoreCase(partyArenaName)) {
             session.setPreferredArenaName(partyArenaName);
@@ -713,8 +739,6 @@ public final class MatchService {
 
     private void teleportAndPrepareTeam(MatchSession session, KitDefinition kit, ArenaInstance instance,
                                          boolean arenaRetried) {
-        Location spawnA = LocationUtil.safeTeleportLocation(arenaService.spawnA(instance));
-        Location spawnB = LocationUtil.safeTeleportLocation(arenaService.spawnB(instance));
         sweepLeftoverEntities(instance);
         List<java.util.concurrent.CompletableFuture<Boolean>> teleports = new ArrayList<>();
         for (UUID id : session.participants()) {
@@ -724,7 +748,7 @@ public final class MatchService {
                 return;
             }
             TeamColor color = session.teamColor(id);
-            Location base = color == TeamColor.RED ? spawnA : spawnB;
+            Location base = teamSpawnBase(session, instance, color);
             List<UUID> side = session.team(color);
             int withinTeam = side.indexOf(id);
             double offset = (withinTeam - (side.size() - 1) / 2.0) * 1.2;
@@ -750,7 +774,7 @@ public final class MatchService {
                 Player player = Bukkit.getPlayer(id);
                 if (player != null) {
                     PlayerVitals.clearCombatState(player);
-                    applyKit(player, kit);
+                    applyKit(player, kitService.get(session.kitFor(id)).orElse(kit));
                     applySight(player, session);
                 }
             }
@@ -764,6 +788,32 @@ public final class MatchService {
                 startCountdown(session);
             }, 20L);
         }));
+    }
+
+    /**
+     * Team spawn for a color: RED anchors at spawn A, BLUE at spawn B, and any further teams
+     * spread evenly along the A→B line, so multi-team battles work on every duel arena.
+     * With the classic two teams this is exactly spawnA / spawnB as before.
+     */
+    private Location teamSpawnBase(MatchSession session, ArenaInstance instance, TeamColor color) {
+        Location a = LocationUtil.safeTeleportLocation(arenaService.spawnA(instance));
+        Location b = LocationUtil.safeTeleportLocation(arenaService.spawnB(instance));
+        List<TeamColor> colors = session.distinctTeamColors();
+        int index = colors.indexOf(color);
+        if (index <= 0) {
+            return a;
+        }
+        if (index >= colors.size() - 1) {
+            return b;
+        }
+        double t = (double) index / Math.max(1, colors.size() - 1);
+        Location mid = a.clone();
+        mid.setX(a.getX() + (b.getX() - a.getX()) * t);
+        mid.setY(a.getY() + (b.getY() - a.getY()) * t);
+        mid.setZ(a.getZ() + (b.getZ() - a.getZ()) * t);
+        mid.setYaw(t < 0.5 ? a.getYaw() : b.getYaw());
+        mid.setPitch(t < 0.5 ? a.getPitch() : b.getPitch());
+        return mid;
     }
 
     private void teleportAndPrepare(MatchSession session, KitDefinition kit, ArenaInstance instance) {
@@ -1080,14 +1130,14 @@ public final class MatchService {
                 continue;
             }
             TeamColor color = session.teamColor(id);
-            Location spawn = color == TeamColor.RED ? spawnABase : spawnBBase;
+            Location spawn = teamSpawnBase(session, instance, color);
             if (session.isTeamMatch()) {
                 List<UUID> side = session.team(color);
                 int withinTeam = side.indexOf(id);
                 double offset = (withinTeam - (side.size() - 1) / 2.0) * 1.2;
                 spawn = spawn.clone().add(offset, 0, 0);
-                spawn.setYaw(spawnABase.getYaw());
-                spawn.setPitch(spawnABase.getPitch());
+                spawn.setYaw(spawn.getYaw());
+                spawn.setPitch(spawn.getPitch());
             }
             teleports.add(SafeTeleport.teleport(player, LocationUtil.safeTeleportLocation(spawn)));
         }
@@ -1161,9 +1211,7 @@ public final class MatchService {
                         : arenaService.get(session.arenaInstanceId()).orElse(null);
                 if (instance != null) {
                     TeamColor color = session.teamColor(id);
-                    Location spawn = color == TeamColor.RED
-                            ? arenaService.spawnA(instance)
-                            : arenaService.spawnB(instance);
+                    Location spawn = teamSpawnBase(session, instance, color);
                     if (session.isTeamMatch()) {
                         // Keep the per-teammate line offset so a full side doesn't stack.
                         List<UUID> side = session.team(color);
@@ -1187,6 +1235,11 @@ public final class MatchService {
                 if (kit != null) {
                     applyStartEffects(player, kit);
                     runStartCommands(player, kit);
+                }
+                if (session.isTeamMatch()) {
+                    // Team config (max HP / body scale / always-on effects). HP + scale are
+                    // attribute-based and reliably reset by PlayerVitals when the fight ends.
+                    session.teamConfigOf(id).apply(player);
                 }
                 soundService.play(player, "match-start");
                 player.showTitle(Title.title(
@@ -1443,28 +1496,30 @@ public final class MatchService {
         // Tell EVERYONE in the party fight who just went down (both teams + spectators), so the
         // surviving teammates know they are down a player.
         broadcastElimination(session, victimId, attackerId);
-        TeamColor victimTeam = session.teamColor(victimId);
-        boolean teamAlive = false;
-        for (UUID member : session.team(victimTeam)) {
-            if (member.equals(victimId)) {
-                continue;
+        // A fighter counts as alive only when they are online, NOT on the elimination
+        // ledger, and not parked in spectator mode. The ledger is authoritative: a limbo
+        // death (killing blow swallowed right after a totem pop) can leave a player in
+        // SURVIVAL game mode while effectively out — without the ledger their team never
+        // counts as wiped and the party fight never ends. Works for 2..7 teams alike.
+        List<TeamColor> aliveTeams = new ArrayList<>();
+        for (TeamColor color : session.distinctTeamColors()) {
+            boolean teamAlive = false;
+            for (UUID member : session.team(color)) {
+                if (session.isEliminated(member)) {
+                    continue;
+                }
+                Player mate = Bukkit.getPlayer(member);
+                if (mate != null && mate.getGameMode() != org.bukkit.GameMode.SPECTATOR) {
+                    teamAlive = true;
+                    break;
+                }
             }
-            // A teammate counts as alive only when they are online, NOT on the elimination
-            // ledger, and not parked in spectator mode. The ledger is authoritative: a limbo
-            // death (killing blow swallowed right after a totem pop) can leave a player in
-            // SURVIVAL game mode while effectively out — without the ledger their side never
-            // counts as wiped and the party fight never ends.
-            if (session.isEliminated(member)) {
-                continue;
-            }
-            Player mate = Bukkit.getPlayer(member);
-            if (mate != null && mate.getGameMode() != org.bukkit.GameMode.SPECTATOR) {
-                teamAlive = true;
-                break;
+            if (teamAlive) {
+                aliveTeams.add(color);
             }
         }
-        if (!teamAlive) {
-            TeamColor winnerTeam = victimTeam.opposite();
+        if (aliveTeams.size() == 1) {
+            TeamColor winnerTeam = aliveTeams.get(0);
             UUID winnerUuid = session.team(winnerTeam).stream()
                     .filter(u -> {
                         Player p = Bukkit.getPlayer(u);
@@ -1475,6 +1530,9 @@ public final class MatchService {
             // endMatch() records the winner and (via MatchSession.end) the winning team colour.
             // Do NOT pre-set ENDING here: endMatch's idempotency guard would then no-op.
             endMatch(session, winnerUuid, false);
+        } else if (aliveTeams.isEmpty()) {
+            // Last fighters of every remaining team went down together: a draw.
+            endMatch(session, null, true);
         }
     }
 
@@ -1884,11 +1942,18 @@ public final class MatchService {
                 return;
             }
             session.setRematchRequested(player.getUniqueId(), true);
-            // Notify the other side: the 1v1 opponent, or every enemy-team member in a team battle.
-            List<UUID> others = session.isTeamMatch()
-                    ? session.team(session.teamColor(player.getUniqueId()).opposite())
-                    : (session.opponentOf(player.getUniqueId()) == null
-                            ? List.of() : List.of(session.opponentOf(player.getUniqueId())));
+            // Notify the other side: the 1v1 opponent, or every other team's members in a
+            // team battle (any number of teams).
+            List<UUID> others;
+            if (session.isTeamMatch()) {
+                TeamColor mine = session.teamColor(player.getUniqueId());
+                others = session.participants().stream()
+                        .filter(otherId -> session.teamColor(otherId) != mine)
+                        .toList();
+            } else {
+                others = session.opponentOf(player.getUniqueId()) == null
+                        ? List.of() : List.of(session.opponentOf(player.getUniqueId()));
+            }
             for (UUID otherId : others) {
                 Player opponent = Bukkit.getPlayer(otherId);
                 if (opponent == null) {
@@ -1909,11 +1974,14 @@ public final class MatchService {
                 // the rematch would teleport them against their will, and offline members make
                 // startTeamMatch reject AFTER the old session is cleaned up — stranding everyone
                 // in ENDING state with no match. Filter to online, still-in-party members.
-                List<UUID> redTeam = teamMatch
-                        ? currentTeamRoster(session.team(TeamColor.RED)) : List.of();
-                List<UUID> blueTeam = teamMatch
-                        ? currentTeamRoster(session.team(TeamColor.BLUE)) : List.of();
-                if (teamMatch && (redTeam.isEmpty() || blueTeam.isEmpty())) {
+                List<List<UUID>> rosters = new ArrayList<>();
+                if (teamMatch) {
+                    for (TeamColor color : session.distinctTeamColors()) {
+                        rosters.add(currentTeamRoster(session.team(color)));
+                    }
+                }
+                if (teamMatch && (rosters.size() < 2
+                        || rosters.stream().anyMatch(List::isEmpty))) {
                     for (UUID id : session.participants()) {
                         Player member = Bukkit.getPlayer(id);
                         if (member != null && messageService != null) {
@@ -1950,18 +2018,23 @@ public final class MatchService {
                 // carried arena the countdown can begin synchronously inside startDuel.
                 Set<UUID> watching = spectatorService == null
                         ? Set.of() : spectatorService.spectatorsWatching(session.id());
-                List<UUID> carried = new ArrayList<>(redTeam);
-                carried.addAll(blueTeam);
+                List<UUID> carried = new ArrayList<>();
+                for (List<UUID> roster : rosters) {
+                    carried.addAll(roster);
+                }
                 if (carried.isEmpty()) {
                     carried = List.of(a, b);
                 }
+                Map<TeamColor, String> carryTeamKits = session.teamKitsSnapshot();
+                Map<TeamColor, com.rumilance.practice.team.TeamConfig> carryTeamConfigs =
+                        session.teamConfigsSnapshot();
                 if (spectatorService != null && !watching.isEmpty()) {
                     spectatorService.scheduleCarry(carried, watching);
                 }
                 cleanupSession(session, false, !watching.isEmpty());
                 if (teamMatch) {
-                    startTeamMatch(redTeam, blueTeam, kit, mode, bestOf, preferredArena,
-                            friendlyFire, carrySeries, carryArena);
+                    startTeamMatch(rosters, kit, mode, bestOf, preferredArena,
+                            friendlyFire, carrySeries, carryArena, carryTeamKits, carryTeamConfigs);
                 } else {
                     startDuel(a, b, kit, mode, bestOf, carrySeries, preferredArena, carryArena);
                 }

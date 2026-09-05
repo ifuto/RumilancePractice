@@ -104,22 +104,39 @@ public final class MatchSession {
     public MatchSession(UUID id, MatchMode mode, String kitName,
                         List<UUID> redTeam, List<UUID> blueTeam,
                         UUID arenaInstanceId, int bestOf) {
+        this(id, mode, kitName, List.of(
+                Objects.requireNonNull(redTeam, "redTeam"),
+                Objects.requireNonNull(blueTeam, "blueTeam")), arenaInstanceId, bestOf);
+    }
+
+    /**
+     * Multi-team battle constructor: one roster per team, in canonical color order
+     * (index 0 = RED, 1 = BLUE, 2 = GREEN, ...). Every roster must hold 1..15 players.
+     */
+    public MatchSession(UUID id, MatchMode mode, String kitName,
+                        List<List<UUID>> teamRosters, UUID arenaInstanceId, int bestOf) {
         this.id = Objects.requireNonNull(id, "id");
         this.mode = Objects.requireNonNull(mode, "mode");
         this.kitName = Objects.requireNonNull(kitName, "kitName");
-        List<UUID> red = new ArrayList<>(Objects.requireNonNull(redTeam, "redTeam"));
-        List<UUID> blue = new ArrayList<>(Objects.requireNonNull(blueTeam, "blueTeam"));
-        if (red.isEmpty() || blue.isEmpty()) {
-            throw new IllegalArgumentException("Both teams need at least one player");
+        List<List<UUID>> rosters = Objects.requireNonNull(teamRosters, "teamRosters");
+        if (rosters.size() < 2) {
+            throw new IllegalArgumentException("A team battle needs at least 2 teams");
         }
-        if (red.size() > MAX_SIDE_SIZE || blue.size() > MAX_SIDE_SIZE) {
-            throw new IllegalArgumentException("A side may hold at most " + MAX_SIDE_SIZE + " players");
+        if (rosters.size() > TeamColor.MAX_TEAMS) {
+            throw new IllegalArgumentException("At most " + TeamColor.MAX_TEAMS + " teams are supported");
         }
-        List<UUID> ordered = new ArrayList<>(red.size() + blue.size());
-        ordered.addAll(red);
-        ordered.addAll(blue);
+        List<UUID> ordered = new ArrayList<>();
+        for (List<UUID> roster : rosters) {
+            if (roster == null || roster.isEmpty()) {
+                throw new IllegalArgumentException("Every team needs at least one player");
+            }
+            if (roster.size() > MAX_SIDE_SIZE) {
+                throw new IllegalArgumentException("A team may hold at most " + MAX_SIDE_SIZE + " players");
+            }
+            ordered.addAll(roster);
+        }
         if (ordered.stream().distinct().count() != ordered.size()) {
-            throw new IllegalArgumentException("A player cannot be on both teams");
+            throw new IllegalArgumentException("A player cannot be on two teams");
         }
         this.participants = List.copyOf(ordered);
         this.teamMatch = true;
@@ -131,11 +148,11 @@ public final class MatchSession {
             // seriesWins intentionally starts empty: a fresh match snapshot must be empty
             // (rematch chains seed it via applySeries; seriesWinsOf defaults to 0).
         }
-        for (UUID p : red) {
-            teamColors.put(p, TeamColor.RED);
-        }
-        for (UUID p : blue) {
-            teamColors.put(p, TeamColor.BLUE);
+        for (int i = 0; i < rosters.size(); i++) {
+            TeamColor color = TeamColor.byIndex(i);
+            for (UUID p : rosters.get(i)) {
+                teamColors.put(p, color);
+            }
         }
     }
 
@@ -151,9 +168,96 @@ public final class MatchSession {
         return kitName;
     }
 
-    /** Kit id for a participant (matches share one kit). */
+    /** Per-team kit overrides (owner-configured); empty = everyone uses the shared kit. */
+    private final Map<TeamColor, String> teamKits = new ConcurrentHashMap<>();
+    /** Per-team battle configs (health / size / effects); absent = defaults. */
+    private final Map<TeamColor, com.rumilance.practice.team.TeamConfig> teamConfigs =
+            new ConcurrentHashMap<>();
+
+    /**
+     * Kit id for a participant. Team battles may assign one team a different loadout kit;
+     * map-level rules (block place/break etc.) always follow the shared match kit.
+     */
     public String kitFor(UUID playerId) {
+        if (teamMatch && playerId != null) {
+            String override = teamKits.get(teamColor(playerId));
+            if (override != null && !override.isBlank()) {
+                return override;
+            }
+        }
         return kitName;
+    }
+
+    /** Assigns (or clears with null/blank) a team-specific loadout kit. */
+    public void setTeamKit(TeamColor color, String kitId) {
+        if (color == null) {
+            return;
+        }
+        if (kitId == null || kitId.isBlank()) {
+            teamKits.remove(color);
+        } else {
+            teamKits.put(color, kitId);
+        }
+    }
+
+    /** Snapshot of the per-team kit overrides. */
+    public Map<TeamColor, String> teamKitsSnapshot() {
+        return Map.copyOf(teamKits);
+    }
+
+    /** Restores per-team kit overrides (rematch chains). */
+    public void applyTeamKits(Map<TeamColor, String> overrides) {
+        if (overrides != null) {
+            teamKits.putAll(overrides);
+        }
+    }
+
+    /** Sets the battle config for one team (null removes any override). */
+    public void setTeamConfig(TeamColor color, com.rumilance.practice.team.TeamConfig config) {
+        if (color == null) {
+            return;
+        }
+        if (config == null || config.isDefault()) {
+            teamConfigs.remove(color);
+        } else {
+            teamConfigs.put(color, config);
+        }
+    }
+
+    /** Battle config for a participant's team (never null — defaults when unset). */
+    public com.rumilance.practice.team.TeamConfig teamConfigOf(UUID playerId) {
+        if (playerId == null) {
+            return com.rumilance.practice.team.TeamConfig.defaults();
+        }
+        com.rumilance.practice.team.TeamConfig config = teamConfigs.get(teamColor(playerId));
+        return config == null ? com.rumilance.practice.team.TeamConfig.defaults() : config;
+    }
+
+    /** Snapshot of the non-default per-team battle configs. */
+    public Map<TeamColor, com.rumilance.practice.team.TeamConfig> teamConfigsSnapshot() {
+        return Map.copyOf(teamConfigs);
+    }
+
+    /** Restores per-team battle configs (rematch chains). */
+    public void applyTeamConfigs(
+            Map<TeamColor, com.rumilance.practice.team.TeamConfig> overrides) {
+        if (overrides != null) {
+            teamConfigs.putAll(overrides);
+        }
+    }
+
+    /** Distinct team colors present in this session, in canonical order. */
+    public List<TeamColor> distinctTeamColors() {
+        List<TeamColor> out = new ArrayList<>();
+        for (TeamColor color : TeamColor.values()) {
+            for (UUID participant : participants) {
+                if (teamColors.get(participant) == color) {
+                    out.add(color);
+                    break;
+                }
+            }
+        }
+        return out;
     }
 
     /**
@@ -376,13 +480,21 @@ public final class MatchSession {
         return disconnectForfeit.get();
     }
 
+    /** Per-team rematch votes for multi-team battles (2-team fights use the A/B flags). */
+    private final java.util.Set<TeamColor> rematchVotes = ConcurrentHashMap.newKeySet();
+
     public void setRematchRequested(UUID uuid, boolean value) {
         if (uuid == null) {
             return;
         }
         // In 1v1, A=index0 B=index1. In a team battle, either member of a side requesting
-        // counts as that side's vote.
+        // counts as that side's vote; with 3+ teams every distinct team must vote.
         TeamColor color = teamColor(uuid);
+        if (value) {
+            rematchVotes.add(color);
+        } else {
+            rematchVotes.remove(color);
+        }
         if (color == TeamColor.RED) {
             rematchRequestedA = value;
         } else {
@@ -391,11 +503,14 @@ public final class MatchSession {
     }
 
     public boolean bothRematchRequested() {
+        if (teamMatch && distinctTeamColors().size() > 2) {
+            return rematchVotes.containsAll(distinctTeamColors());
+        }
         return rematchRequestedA && rematchRequestedB;
     }
 
     public boolean isRematchRequested(UUID uuid) {
-        return teamColor(uuid) == TeamColor.RED ? rematchRequestedA : rematchRequestedB;
+        return rematchVotes.contains(teamColor(uuid));
     }
 
     public void setShuttingDown(boolean shuttingDown) {
@@ -434,6 +549,7 @@ public final class MatchSession {
     public void clearRematchRequests() {
         rematchRequestedA = false;
         rematchRequestedB = false;
+        rematchVotes.clear();
     }
 
     /** Remember a fighter's inventory once (first write wins — typically at death). */

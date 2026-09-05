@@ -63,7 +63,11 @@ public final class MatchTeamVisuals {
                 continue;
             }
             TeamColor color = session.teamColor(onlinePlayer.getUniqueId());
-            NamedTextColor named = color == TeamColor.RED ? NamedTextColor.RED : NamedTextColor.BLUE;
+            // Classic two-side fights keep their exact red/blue shades; extra team colors
+            // use their own team colour.
+            NamedTextColor named = color == TeamColor.RED ? NamedTextColor.RED
+                    : color == TeamColor.BLUE ? NamedTextColor.BLUE
+                    : color.textColor();
             Team fight = team(board, fightName(color, onlinePlayer.getUniqueId()), named, ff);
             fight.addEntry(entry);
             fight.prefix(resolvePrefix(onlinePlayer, session));
@@ -85,7 +89,8 @@ public final class MatchTeamVisuals {
     }
 
     public static boolean isFightTeam(String name) {
-        return name != null && (name.startsWith("0r") || name.startsWith("0b") || name.startsWith("0_fight"));
+        // All fight teams are "0<colorKey><uuid>"; legacy builds also used 0_fight_*.
+        return name != null && (name.startsWith("0") || name.startsWith("0_fight"));
     }
 
     public static Team fightTeamOf(Scoreboard board, Player player) {
@@ -106,8 +111,7 @@ public final class MatchTeamVisuals {
         }
         for (Team team : java.util.Set.copyOf(board.getTeams())) {
             String name = team.getName();
-            if (name.startsWith("0r") || name.startsWith("0b") || name.startsWith("1s")
-                    || name.startsWith("rp_hp_")) {
+            if (name.startsWith("0") || name.startsWith("1s") || name.startsWith("rp_hp_")) {
                 unregister(board, name);
             }
         }
@@ -118,7 +122,7 @@ public final class MatchTeamVisuals {
 
     private static String fightName(TeamColor color, UUID id) {
         String hex = id.toString().replace("-", "");
-        return (color == TeamColor.RED ? "0r" : "0b") + hex.substring(0, Math.min(8, hex.length()));
+        return "0" + color.sortKey() + hex.substring(0, Math.min(8, hex.length()));
     }
 
     private static String specName(UUID id) {

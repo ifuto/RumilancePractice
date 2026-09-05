@@ -118,7 +118,26 @@ public final class MatchActionBarService {
         Component right;
         if (session.isTeamMatch()) {
             left = sideLabel(session, selfColor);
-            right = sideLabel(session, oppColor);
+            if (session.distinctTeamColors().size() > 2) {
+                // Multi-team battle: there is no single enemy side — show how many teams
+                // (including ours) are still standing.
+                int aliveTeams = 0;
+                for (TeamColor color : session.distinctTeamColors()) {
+                    for (java.util.UUID id : session.team(color)) {
+                        if (session.isEliminated(id)) {
+                            continue;
+                        }
+                        Player p = Bukkit.getPlayer(id);
+                        if (p != null && p.getGameMode() != org.bukkit.GameMode.SPECTATOR) {
+                            aliveTeams++;
+                            break;
+                        }
+                    }
+                }
+                right = Component.text("⚑ " + aliveTeams, NamedTextColor.GRAY, TextDecoration.BOLD);
+            } else {
+                right = sideLabel(session, oppColor);
+            }
         } else {
             java.util.List<java.util.UUID> parts = session.participants();
             java.util.UUID me;
@@ -142,7 +161,7 @@ public final class MatchActionBarService {
     }
 
     private Component sideLabel(MatchSession session, TeamColor color) {
-        NamedTextColor textColor = color == TeamColor.RED ? NamedTextColor.RED : NamedTextColor.AQUA;
+        NamedTextColor textColor = color.textColor();
         int alive = 0;
         for (java.util.UUID id : session.team(color)) {
             Player p = Bukkit.getPlayer(id);
@@ -161,7 +180,7 @@ public final class MatchActionBarService {
      */
     private Component playerLabel(MatchSession session, java.util.UUID id, TeamColor color,
                                   boolean faceFirst) {
-        NamedTextColor textColor = color == TeamColor.RED ? NamedTextColor.RED : NamedTextColor.AQUA;
+        NamedTextColor textColor = color.textColor();
         int score = id == null ? 0 : session.killsOf(id);
         Component face = (id != null && headFontService != null)
                 ? headFontService.head(id)
