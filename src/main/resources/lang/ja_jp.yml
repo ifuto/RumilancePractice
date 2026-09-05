@@ -399,6 +399,16 @@ queue:
   high-ping: "<red>あなたのPing（<ping>ms）が高すぎるためランク戦に参加できません（上限 <max>ms）。"
   joined: "<green><yellow><kit></yellow> の<mode>キューに参加しました。"
   left: "<gray>キューから抜けました。"
+  sign-full: "<red>そのキューはいっぱいです (2/2)。"
+
+tell:
+  usage: "<gray>使い方:</gray> <yellow>/tell \\<player> \\<message></yellow>"
+  usage-reply: "<gray>使い方:</gray> <yellow>/reply \\<message></yellow>"
+  no-reply: "<red>返信相手がいません。"
+  offline: "<red>プレイヤー <target> が見つかりません。"
+  self: "<red>自分自身には送れません。"
+  to: "<gold>To <target></gold> <gray>»</gray> <white><message></white>"
+  from: "<aqua>From <target></aqua> <gray>»</gray> <white><message></white>"
 
 match:
   countdown: "<yellow>試合開始まで <seconds> 秒..."
@@ -780,6 +790,13 @@ gui:
   admin-pack-policy-lore-3: "ランクバッジが N / N+ / OWNER テキスト表示に。"
   admin-pack-policy-changed-required: "リソースパック: 必須 に変更しました (拒否するとキック)"
   admin-pack-policy-changed-recommended: "リソースパック: 推奨 に変更しました (拒否しても参加可)"
+  admin-sign: "キュー看板"
+  admin-sign-lore-1: "Unranked Queue 看板を取り出す。"
+  admin-sign-lore-2: "キットを選ぶと看板アイテムを入手 (無限)。"
+  sign-kit-title: "キュー看板のキット選択"
+  sign-kit-give-lore: "このキットのキュー看板を受け取る"
+  sign-kit-item-lore: "置くと Unranked Queue 看板になる"
+  sign-kit-item-hint: "置くとキュー看板になります"
   saved: "保存済み"
   unsaved: "未作成"
   original-edit-title: "オリジナルキット編集"

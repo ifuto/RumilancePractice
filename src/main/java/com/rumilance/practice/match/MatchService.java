@@ -475,6 +475,19 @@ public final class MatchService {
     public void startDuel(UUID playerA, UUID playerB, String kitId, MatchMode mode,
                           int bestOf, Map<UUID, Integer> carrySeriesWins, String preferredArena,
                           UUID carryArenaInstanceId) {
+        startDuel(playerA, playerB, kitId, mode, bestOf, carrySeriesWins, preferredArena,
+                carryArenaInstanceId, null);
+    }
+
+    /**
+     * Duel start with an optional owner original-kit loadout ({@code originalKit}): when set,
+     * BOTH fighters receive the owner's saved original-kit layout as their loadout while all
+     * rules stay with {@code kitId} — the sign-queue "fight with the first waiter's kit" mode.
+     */
+    public void startDuel(UUID playerA, UUID playerB, String kitId, MatchMode mode,
+                          int bestOf, Map<UUID, Integer> carrySeriesWins, String preferredArena,
+                          UUID carryArenaInstanceId,
+                          com.rumilance.practice.team.OriginalKitRef originalKit) {
         // Hard gates before anything is reserved: a solo duel must never start for a player who
         // is in a party (parties fight together as a team, never 1v1), and never for a player
         // committed to a fight — including someone ELIMINATED from a team match (watching the
@@ -506,6 +519,7 @@ public final class MatchService {
         MatchSession session = new MatchSession(
                 UUID.randomUUID(), mode, kitId, List.of(playerA, playerB), null, bestOf);
         session.applySeries(carrySeriesWins);
+        session.setOriginalKitRef(originalKit);
         if (preferredArena != null && !preferredArena.isBlank()
                 && !"random".equalsIgnoreCase(preferredArena)) {
             session.setPreferredArenaName(preferredArena);

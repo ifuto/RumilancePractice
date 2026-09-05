@@ -163,6 +163,17 @@ public final class OriginalKitService {
         }
     }
 
+    /** The player's most recently saved original kit (any paper slot), if any. */
+    public Optional<OriginalKitSnapshot> latestSaved(UUID uuid) {
+        try {
+            return repository.findAllForPlayer(uuid).stream()
+                    .max(java.util.Comparator.comparing(OriginalKitSnapshot::savedAt));
+        } catch (Exception e) {
+            logger.log(Level.WARNING, "Failed listing original kits for " + uuid, e);
+            return Optional.empty();
+        }
+    }
+
     public ItemStack[] loadLayout(UUID uuid, int slot) {
         try {
             Optional<OriginalKitSnapshot> snapshot = repository.find(uuid, slot);

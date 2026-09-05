@@ -28,6 +28,7 @@ public final class ItemKeys {
     public static final String MATCH_REPORT = "match_report";
     public static final String TRIM_NOTE = "trim_note";
     public static final String EDITOR_HINT_COUNT = "editor_hint_count";
+    public static final String QUEUE_SIGN_KIT = "queue_sign_kit";
 
     private static volatile Plugin plugin;
 
@@ -72,6 +73,10 @@ public final class ItemKeys {
 
     public static NamespacedKey rematch() {
         return key(REMATCH);
+    }
+
+    public static NamespacedKey queueSignKit() {
+        return key(QUEUE_SIGN_KIT);
     }
 
     public static NamespacedKey returnLobby() {

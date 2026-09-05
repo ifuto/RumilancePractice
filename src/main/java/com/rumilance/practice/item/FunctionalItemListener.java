@@ -30,6 +30,7 @@ public final class FunctionalItemListener implements Listener {
     private final QueueCoordinator queueCoordinator;
     private final QueueKitGui rankedGui;
     private final QueueKitGui unrankedGui;
+    private volatile com.rumilance.practice.signqueue.SignQueueService signQueueService;
     private Consumer<Player> openSettings = p -> {
     };
     private Consumer<Player> openFfa = p -> {
@@ -69,6 +70,10 @@ public final class FunctionalItemListener implements Listener {
         this.queueCoordinator = queueCoordinator;
         this.rankedGui = rankedGui;
         this.unrankedGui = unrankedGui;
+    }
+
+    public void setSignQueueService(com.rumilance.practice.signqueue.SignQueueService signQueueService) {
+        this.signQueueService = signQueueService;
     }
 
     public void setOpenSettings(Consumer<Player> openSettings) {
@@ -156,6 +161,9 @@ public final class FunctionalItemListener implements Listener {
 
     @EventHandler
     public void onInteract(PlayerInteractEvent event) {
+        if (event.isCancelled()) {
+            return;
+        }
         if (event.getHand() != EquipmentSlot.HAND) {
             return;
         }
@@ -169,7 +177,14 @@ public final class FunctionalItemListener implements Listener {
         var pdc = item.getItemMeta().getPersistentDataContainer();
         if (pdc.has(ItemKeys.leaveQueue(), PersistentDataType.BYTE)) {
             event.setCancelled(true);
-            queueCoordinator.leave(event.getPlayer());
+            // The same leave item serves both the regular queue and the sign queue.
+            var signQueue = signQueueService;
+            Player player = event.getPlayer();
+            if (signQueue != null && signQueue.isQueued(player.getUniqueId())) {
+                signQueue.leave(player);
+            } else {
+                queueCoordinator.leave(player);
+            }
             return;
         }
         String function = pdc.get(ItemKeys.functionType(), PersistentDataType.STRING);

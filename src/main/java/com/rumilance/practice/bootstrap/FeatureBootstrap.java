@@ -805,6 +805,26 @@ public final class FeatureBootstrap {
         matchService.setOriginalKitService(originalKitService);
         // Party battles may fight with the owner's original kit as the shared loadout.
         teamKitSelectGui.setOriginalKitService(originalKitService);
+
+        // Sign queue: Unranked 1v1 queue joined from placed queue signs (the kit is fixed
+        // per sign; the match fights with the first waiter's custom/original kit).
+        final com.rumilance.practice.signqueue.SignQueueService signQueueService =
+                new com.rumilance.practice.signqueue.SignQueueService(plugin, kitService,
+                        queueService, matchService, stateManager, lobbyService, soundService,
+                        messageService, originalKitService, runtimeFlags);
+        signQueueService.setFfaService(ffaService);
+        signQueueService.setTeamService(teamService);
+        signQueueService.start();
+        services.register(com.rumilance.practice.signqueue.SignQueueService.class, signQueueService);
+        plugin.getServer().getPluginManager().registerEvents(signQueueService, plugin);
+        queueCoordinator.setSignQueueService(signQueueService);
+
+        // GSit-style lobby seats: right-click the top of bottom stairs / bottom slabs.
+        final com.rumilance.practice.sit.SitService sitService =
+                new com.rumilance.practice.sit.SitService(plugin, stateManager);
+        sitService.start();
+        services.register(com.rumilance.practice.sit.SitService.class, sitService);
+        plugin.getServer().getPluginManager().registerEvents(sitService, plugin);
         plugin.getServer().getPluginManager().registerEvents(
                 new com.rumilance.practice.originalkit.OriginalKitRoomListener(
                         originalKitRoomService, originalKitService, plugin), plugin);
@@ -866,6 +886,10 @@ public final class FeatureBootstrap {
                             : net.kyori.adventure.text.format.NamedTextColor.GREEN));
             adminMenuGui.open(player);
         });
+        com.rumilance.practice.gui.menus.SignKitSelectGui signKitSelectGui =
+                new com.rumilance.practice.gui.menus.SignKitSelectGui(guiSessions, soundService, kitService);
+        signKitSelectGui.setSignQueueService(signQueueService);
+        adminMenuGui.setOpenSignKitSelect(signKitSelectGui::open);
         AdminPlayerDataGui adminPlayerDataGui = new AdminPlayerDataGui(
                 guiSessions, soundService, playerRepository, rankService, settingsService,
                 kitLayoutRepository, layoutCache, originalKitService, nameColorService,
@@ -956,6 +980,7 @@ public final class FeatureBootstrap {
         guiListener.register(ekitAdminGui);
         guiListener.register(presetAdminGui);
         guiListener.register(adminMenuGui);
+        guiListener.register(signKitSelectGui);
         guiListener.register(adminPlayerDataGui);
         guiListener.register(spectateListGui);
         guiListener.register(ffaListGui);
@@ -1008,6 +1033,7 @@ public final class FeatureBootstrap {
 
         FunctionalItemListener functionalItemListener =
                 new FunctionalItemListener(soundService, queueCoordinator, rankedGui, unrankedGui);
+        functionalItemListener.setSignQueueService(signQueueService);
         functionalItemListener.setOpenSettings(settingsGui::open);
         functionalItemListener.setOpenFfa(ffaListGui::open);
         functionalItemListener.setOpenEkit(p -> {
@@ -1321,6 +1347,12 @@ public final class FeatureBootstrap {
         bind("toggle", arenaKitAdmin);
         bind("chatban", chatBanCommand);
         bind("chatunban", chatBanCommand);
+        bind("packpolicy", new com.rumilance.practice.command.PackPolicyCommand(resourcePackService));
+        com.rumilance.practice.command.TellCommand tellCommand =
+                new com.rumilance.practice.command.TellCommand(messageService, chatBanService);
+        plugin.getServer().getPluginManager().registerEvents(tellCommand, plugin);
+        bind("tell", tellCommand);
+        bind("reply", tellCommand);
         bind("ekitadmin", new EkitAdminCommand(ekitAdminGui,
                 services.get(com.rumilance.practice.originalkit.OriginalKitRoomService.class)));
         bind("giveitem", new GiveItemCommand());
@@ -1451,6 +1483,10 @@ public final class FeatureBootstrap {
         if (teamGlowLosService != null) {
             teamGlowLosService.stop();
         }
+        services.find(com.rumilance.practice.signqueue.SignQueueService.class)
+                .ifPresent(com.rumilance.practice.signqueue.SignQueueService::shutdown);
+        services.find(com.rumilance.practice.sit.SitService.class)
+                .ifPresent(com.rumilance.practice.sit.SitService::shutdown);
         if (liveGuiTask != null) {
             liveGuiTask.cancel();
             liveGuiTask = null;

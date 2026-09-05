@@ -297,6 +297,20 @@ commands:
     description: Open the paid kill-effect cosmetic picker.
     usage: /killeffect
     aliases: [killeffects, killeffects, kefx]
+  packpolicy:
+    description: Switch the resource-pack policy (required kicks on decline, recommended does not).
+    usage: /packpolicy [required|recommended|status]
+    permission: rumilance.admin
+  tell:
+    description: Send a private message to a player.
+    usage: /tell <player> <message>
+    aliases: [msg, w, whisper]
+    permission: rumilance.user
+  reply:
+    description: Reply to the last private message.
+    usage: /reply <message>
+    aliases: [r]
+    permission: rumilance.user
 
 permissions:
   rumilance.user:

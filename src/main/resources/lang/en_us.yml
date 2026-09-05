@@ -400,6 +400,16 @@ queue:
   high-ping: "<red>Your ping (<ping>ms) is too high for ranked (max <max>ms)."
   joined: "<green>Joined the <mode> queue for <yellow><kit></yellow>."
   left: "<gray>Left the queue."
+  sign-full: "<red>That queue is full (2/2)."
+
+tell:
+  usage: "<gray>Usage:</gray> <yellow>/tell \\<player> \\<message></yellow>"
+  usage-reply: "<gray>Usage:</gray> <yellow>/reply \\<message></yellow>"
+  no-reply: "<red>Nobody to reply to."
+  offline: "<red>Player <target> not found."
+  self: "<red>You cannot message yourself."
+  to: "<gold>To <target></gold> <gray>»</gray> <white><message></white>"
+  from: "<aqua>From <target></aqua> <gray>»</gray> <white><message></white>"
 
 match:
   countdown: "<yellow>Match starting in <seconds>..."
@@ -780,6 +790,13 @@ gui:
   admin-pack-policy-lore-3: "Recommended lets them join — badges become N / N+ / OWNER text."
   admin-pack-policy-changed-required: "Resource pack: REQUIRED — declining players are kicked."
   admin-pack-policy-changed-recommended: "Resource pack: RECOMMENDED — players may decline and keep playing."
+  admin-sign: "Queue Sign"
+  admin-sign-lore-1: "Take an Unranked Queue sign."
+  admin-sign-lore-2: "Pick the kit; unlimited supply."
+  sign-kit-title: "Queue Sign Kit"
+  sign-kit-give-lore: "Receive the queue sign for this kit"
+  sign-kit-item-lore: "Place to create an Unranked Queue sign"
+  sign-kit-item-hint: "Place to create a queue sign"
   saved: "Saved"
   unsaved: "Empty"
   original-edit-title: "Edit original kit"

@@ -57,6 +57,7 @@ public final class QueueCoordinator {
     private BukkitTask actionBarTask;
     private com.rumilance.practice.ffa.FfaService ffaService;
     private com.rumilance.practice.team.TeamService teamService;
+    private volatile com.rumilance.practice.signqueue.SignQueueService signQueueService;
 
     public QueueCoordinator(
             Plugin plugin,
@@ -113,6 +114,10 @@ public final class QueueCoordinator {
         this.teamService = teamService;
     }
 
+    public void setSignQueueService(com.rumilance.practice.signqueue.SignQueueService signQueueService) {
+        this.signQueueService = signQueueService;
+    }
+
     public void join(Player player, String kitId, MatchMode mode) {
         if (teamService != null && teamService.teamOf(player.getUniqueId()).isPresent()) {
             messageService.send(player, "party.solo-only");
@@ -141,6 +146,11 @@ public final class QueueCoordinator {
         if (ffaService != null && ffaService.isInFfa(player.getUniqueId())) {
             messageService.send(player, "queue.cannot-join");
             return;
+        }
+        // Joining the regular queue pulls the player out of the sign queue if they were
+        // waiting there (one queue at a time).
+        if (signQueueService != null) {
+            signQueueService.leaveIfQueued(player);
         }
         // Handle "already queued" BEFORE the state check below (a queued player sits in
         // QUEUED_* which would otherwise be rejected): clicking the same queue leaves it,

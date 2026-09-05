@@ -28,6 +28,7 @@ public final class AdminMenuGui extends AbstractGui {
     private Consumer<Player> openEkitAdmin = p -> { };
     private java.util.function.Supplier<Boolean> packRequired = () -> false;
     private Consumer<Player> togglePackPolicy = p -> { };
+    private Consumer<Player> openSignKitSelect = p -> { };
 
     public AdminMenuGui(GuiSessionRegistry registry, SoundService sounds) {
         super(registry, sounds, GuiType.ADMIN_MENU, 6, false);
@@ -50,6 +51,11 @@ public final class AdminMenuGui extends AbstractGui {
                               Consumer<Player> togglePackPolicy) {
         this.packRequired = packRequired == null ? () -> false : packRequired;
         this.togglePackPolicy = togglePackPolicy == null ? p -> { } : togglePackPolicy;
+    }
+
+    /** Opens the queue-sign kit picker (unlimited queue-sign supply). */
+    public void setOpenSignKitSelect(Consumer<Player> openSignKitSelect) {
+        this.openSignKitSelect = openSignKitSelect == null ? p -> { } : openSignKitSelect;
     }
 
     @Override
@@ -152,6 +158,18 @@ public final class AdminMenuGui extends AbstractGui {
                 .action("packpolicy")
                 .build());
 
+        inventory.setItem(GuiSlots.slot(2, 7), ItemBuilder.of(Material.OAK_SIGN)
+                .name(t(player, "gui.admin-sign").color(NamedTextColor.YELLOW))
+                .lore(
+                        UiTheme.divider(),
+                        UiTheme.line(line(player, "gui.admin-sign-lore-1")),
+                        UiTheme.line(line(player, "gui.admin-sign-lore-2")),
+                        UiTheme.blank(),
+                        UiTheme.hint(line(player, "menu.click"))
+                )
+                .action("signkit")
+                .build());
+
         inventory.setItem(GuiSlots.slot(5, 4), ItemBuilder.of(Material.BARRIER)
                 .name(t(player, "menu.close").color(NamedTextColor.RED))
                 .action("close")
@@ -180,6 +198,10 @@ public final class AdminMenuGui extends AbstractGui {
             case "packpolicy" -> {
                 sounds.play(player, "gui-click");
                 togglePackPolicy.accept(player);
+            }
+            case "signkit" -> {
+                sounds.play(player, "gui-click");
+                openSignKitSelect.accept(player);
             }
             case "playerdata" -> {
                 sounds.play(player, "gui-click");
