@@ -23,7 +23,9 @@ class LocaleServiceTest {
 
     @Test
     void bundlesEveryDocumentedLocale() {
-        assertEquals(4, LocaleService.BUILT_IN_LOCALES.size());
+        // en_us, ja_jp, en_gb, ko_kr + the zh_cn/es_es/fr_FR subsets added with the
+        // first-join language picker.
+        assertEquals(7, LocaleService.BUILT_IN_LOCALES.size());
         for (String locale : LocaleService.BUILT_IN_LOCALES) {
             assertTrue(localeService.isSupported(locale), "expected " + locale + " to be loaded");
         }

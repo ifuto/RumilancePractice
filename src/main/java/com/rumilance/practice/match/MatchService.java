@@ -676,7 +676,7 @@ public final class MatchService {
 
         MatchSession session;
         try {
-            session = new MatchSession(UUID.randomUUID(), mode, kitId, rosters, null, bestOf);
+            session = MatchSession.forTeams(UUID.randomUUID(), mode, kitId, rosters, null, bestOf);
         } catch (IllegalArgumentException e) {
             return;
         }

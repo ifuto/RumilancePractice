@@ -110,11 +110,19 @@ public final class MatchSession {
     }
 
     /**
-     * Multi-team battle constructor: one roster per team, in canonical color order
+     * Multi-team battle factory: one roster per team, in canonical color order
      * (index 0 = RED, 1 = BLUE, 2 = GREEN, ...). Every roster must hold 1..15 players.
+     * A static factory (not a constructor) because {@code List<List<UUID>>} and the duel
+     * constructor's {@code List<UUID>} parameters erase to the same signature.
      */
-    public MatchSession(UUID id, MatchMode mode, String kitName,
-                        List<List<UUID>> teamRosters, UUID arenaInstanceId, int bestOf) {
+    public static MatchSession forTeams(UUID id, MatchMode mode, String kitName,
+                                        List<List<UUID>> teamRosters, UUID arenaInstanceId, int bestOf) {
+        return new MatchSession(id, mode, kitName, teamRosters, arenaInstanceId, bestOf, true);
+    }
+
+    private MatchSession(UUID id, MatchMode mode, String kitName,
+                         List<List<UUID>> teamRosters, UUID arenaInstanceId, int bestOf,
+                         boolean multiTeamMarker) {
         this.id = Objects.requireNonNull(id, "id");
         this.mode = Objects.requireNonNull(mode, "mode");
         this.kitName = Objects.requireNonNull(kitName, "kitName");
