@@ -84,26 +84,24 @@ public final class GameMenuGui extends AbstractGui {
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
-        MenuScaffold.header(inventory, 0, title(player, session));
+        com.rumilance.practice.gui.GuiFrame.frame(inventory,
+                com.rumilance.practice.gui.GuiFrame.Theme.WHITE);
+        com.rumilance.practice.gui.GuiFrame.title(inventory, Material.COMPASS,
+                t(player, "menu.game-title"));
         paintStatusChip(player, inventory);
 
-        // Row 1 — the four things players do constantly, one row, left to right.
-        inventory.setItem(GuiSlots.slot(1, 1), tile(player, Material.NETHERITE_SWORD,
-                "menu.battle", UiTheme.SUCCESS, "menu.battle-lore", "battle", true));
-        inventory.setItem(GuiSlots.slot(1, 3), tile(player, Material.CRAFTING_TABLE,
-                "menu.kits", UiTheme.PRIMARY, "menu.kits-lore", "ekit", false));
+        // Sparse, centred diamond layout — the things players reach for constantly.
         boolean inParty = teamService != null && teamService.teamOf(player.getUniqueId()).isPresent();
-        inventory.setItem(GuiSlots.slot(1, 5), tile(player,
+        inventory.setItem(GuiSlots.slot(1, 2), tile(player, Material.NETHERITE_SWORD,
+                "menu.battle", UiTheme.SUCCESS, "menu.battle-lore", "battle", true));
+        inventory.setItem(GuiSlots.slot(1, 4), tile(player, Material.CRAFTING_TABLE,
+                "menu.kits", UiTheme.PRIMARY, "menu.kits-lore", "ekit", false));
+        inventory.setItem(GuiSlots.slot(1, 6), tile(player,
                 inParty ? Material.BEACON : Material.WHITE_BANNER,
                 inParty ? "menu.teams-in-party" : "menu.teams", UiTheme.HEADER,
                 inParty ? "menu.teams-in-party-lore" : "menu.teams-lore", "teams", inParty));
-        inventory.setItem(GuiSlots.slot(1, 7), tile(player, Material.SPYGLASS,
+        inventory.setItem(GuiSlots.slot(2, 2), tile(player, Material.SPYGLASS,
                 "menu.spectate", UiTheme.WARNING, "menu.spectate-lore", "spectate", false));
-
-        // Row 2 — personal options.
-        inventory.setItem(GuiSlots.slot(2, 2), tile(player, Material.COMPARATOR,
-                "menu.settings", UiTheme.MUTED, "menu.settings-lore", "settings", false));
         inventory.setItem(GuiSlots.slot(2, 4),
                 ItemBuilder.of(Material.PLAYER_HEAD)
                         .name(t(player, "menu.profile").color(UiTheme.VALUE))
@@ -114,7 +112,9 @@ public final class GameMenuGui extends AbstractGui {
                                 UiTheme.hint(line(player, "menu.click")))
                         .action("profile")
                         .build());
-        inventory.setItem(GuiSlots.slot(2, 6), tile(player, Material.NAME_TAG,
+        inventory.setItem(GuiSlots.slot(2, 6), tile(player, Material.COMPARATOR,
+                "menu.settings", UiTheme.MUTED, "menu.settings-lore", "settings", false));
+        inventory.setItem(GuiSlots.slot(3, 4), tile(player, Material.NAME_TAG,
                 "menu.titles", UiTheme.SECONDARY, "menu.titles-lore", "titles", false));
 
         MenuScaffold.closeButton(inventory, t(player, "menu.close"));
