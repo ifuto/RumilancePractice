@@ -106,6 +106,8 @@ import com.rumilance.practice.gui.menus.FfaListGui;
 import com.rumilance.practice.gui.menus.GameMenuGui;
 import com.rumilance.practice.gui.menus.KitAdminGui;
 import com.rumilance.practice.gui.menus.KitArenaSelectGui;
+import com.rumilance.practice.gui.menus.KitBlockRulesGui;
+import com.rumilance.practice.gui.menus.KitItemRulesGui;
 import com.rumilance.practice.gui.menus.KitStartEffectsGui;
 import com.rumilance.practice.gui.menus.KitPreviewGui;
 import com.rumilance.practice.gui.menus.KitSelectGui;
@@ -882,6 +884,12 @@ public final class FeatureBootstrap {
         KitStartEffectsGui kitStartEffectsGui = new KitStartEffectsGui(guiSessions, soundService, kitService);
         kitAdminGui.setOpenStartEffects(kitStartEffectsGui::open);
         kitStartEffectsGui.setReturnTo(kitAdminGui::openConfig);
+        KitBlockRulesGui kitBlockRulesGui = new KitBlockRulesGui(guiSessions, soundService, kitService);
+        kitBlockRulesGui.setReturnTo(kitAdminGui::openConfig);
+        kitAdminGui.setOpenBlockRules(kitBlockRulesGui::open);
+        KitItemRulesGui kitItemRulesGui = new KitItemRulesGui(guiSessions, soundService, kitService);
+        kitItemRulesGui.setReturnTo(kitAdminGui::openConfig);
+        kitAdminGui.setOpenItemRules(kitItemRulesGui::open);
 
         AdminMenuGui adminMenuGui = new AdminMenuGui(guiSessions, soundService);
         adminMenuGui.setOpenKitAdmin(kitAdminGui::open);
@@ -1005,6 +1013,8 @@ public final class FeatureBootstrap {
         guiListener.register(kitAdminGui);
         guiListener.register(kitArenaSelectGui);
         guiListener.register(kitStartEffectsGui);
+        guiListener.register(kitBlockRulesGui);
+        guiListener.register(kitItemRulesGui);
         guiListener.register(kitPreviewGui);
         guiListener.register(titleGui);
         guiListener.register(matchReportGui);

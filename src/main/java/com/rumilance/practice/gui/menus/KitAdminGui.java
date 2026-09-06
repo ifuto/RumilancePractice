@@ -47,6 +47,8 @@ public final class KitAdminGui extends AbstractGui {
     private java.util.function.Consumer<Player> openPresetAdmin = p -> { };
     private java.util.function.BiConsumer<Player, String> openStartEffects = (p, kit) -> { };
     private java.util.function.BiConsumer<Player, String> openArenaSelect = (p, kit) -> { };
+    private java.util.function.BiConsumer<Player, String> openBlockRules = (p, kit) -> { };
+    private java.util.function.BiConsumer<Player, String> openItemRules = (p, kit) -> { };
 
     public KitAdminGui(GuiSessionRegistry registry, SoundService sounds, KitService kitService, MessageService messageService) {
         super(registry, sounds, GuiType.KIT_ADMIN, 6, false);
@@ -68,6 +70,14 @@ public final class KitAdminGui extends AbstractGui {
 
     public void setOpenArenaSelect(java.util.function.BiConsumer<Player, String> openArenaSelect) {
         this.openArenaSelect = openArenaSelect == null ? (p, kit) -> { } : openArenaSelect;
+    }
+
+    public void setOpenBlockRules(java.util.function.BiConsumer<Player, String> openBlockRules) {
+        this.openBlockRules = openBlockRules == null ? (p, kit) -> { } : openBlockRules;
+    }
+
+    public void setOpenItemRules(java.util.function.BiConsumer<Player, String> openItemRules) {
+        this.openItemRules = openItemRules == null ? (p, kit) -> { } : openItemRules;
     }
 
     /** Reopens the config panel for a kit (used when returning from Start Effects GUI). */
@@ -170,42 +180,26 @@ public final class KitAdminGui extends AbstractGui {
                 kit.forceAdventure() ? Material.LIME_DYE : Material.GRAY_DYE, locale));
         inventory.setItem(GuiSlots.slot(1, 5), toggle(t(locale, "ranked"), kit.ranked(), "toggle:ranked",
                 kit.ranked() ? Material.LIME_DYE : Material.GRAY_DYE, locale));
-        inventory.setItem(GuiSlots.slot(1, 7), ItemBuilder.action(Material.GRASS_BLOCK,
+        // --- row 3: rule groups live in dedicated sub-GUIs so nothing is crowded ---
+        inventory.setItem(GuiSlots.slot(3, 2), entry(Material.STONE_PICKAXE,
+                rawGui(locale, "gui.kit-admin-block-rules"),
+                rawGui(locale, "gui.kit-admin-block-rules-lore"), UiTheme.PRIMARY, "open:block-rules", locale));
+        inventory.setItem(GuiSlots.slot(3, 4), ItemBuilder.action(Material.GRASS_BLOCK,
                 Component.text(rawGui(locale, "gui.kit-admin-arenas"), UiTheme.PRIMARY)
                         .decoration(TextDecoration.ITALIC, false), "open:arenas"));
+        inventory.setItem(GuiSlots.slot(3, 6), entry(Material.GOLDEN_APPLE,
+                rawGui(locale, "gui.kit-admin-item-rules"),
+                rawGui(locale, "gui.kit-admin-item-rules-lore"), UiTheme.WARNING, "open:item-rules", locale));
 
-        inventory.setItem(GuiSlots.slot(2, 1), toggle(t(locale, "health-regen"), kit.naturalHealthRegen(), "toggle:autoregen",
-                Material.GOLDEN_APPLE, locale));
-        inventory.setItem(GuiSlots.slot(2, 3), toggle(t(locale, "auto-food"), kit.autoFood(), "toggle:autofood",
-                Material.COOKED_BEEF, locale));
-        // --- consolidated block-change rules (one cluster: exceptions, place, break modes) ---
-        inventory.setItem(GuiSlots.slot(2, 4), canBreakItem(kit, locale));
-        inventory.setItem(GuiSlots.slot(2, 5), toggle(t(locale, "block-place"), kit.blockPlace(), "toggle:blockplace",
-                Material.BRICKS, locale));
-        inventory.setItem(GuiSlots.slot(2, 6), toggle(t(locale, "break-player-placed"), kit.breakPlayerPlacedOnly(),
-                "toggle:breakplayerplaced", Material.OAK_PLANKS, locale));
-        inventory.setItem(GuiSlots.slot(2, 7), toggle(t(locale, "block-break"), kit.blockBreak(), "toggle:blockbreak",
-                Material.IRON_PICKAXE, locale));
-        inventory.setItem(GuiSlots.slot(4, 6), toggle(rawGui(locale, "gui.kit-admin-preset"), kit.presetEnabled(), "toggle:preset",
-                Material.CHEST, locale));
-
-        inventory.setItem(GuiSlots.slot(3, 1), toggle(t(locale, "ender-pearl"), kit.pearl(), "toggle:pearl",
-                Material.ENDER_PEARL, locale));
-        inventory.setItem(GuiSlots.slot(3, 3), toggle(t(locale, "totem"), kit.totem(), "toggle:totem",
-                Material.TOTEM_OF_UNDYING, locale));
-        inventory.setItem(GuiSlots.slot(3, 5), toggle(t(locale, "shield-break"), kit.swordShieldBreak(), "toggle:swordshieldbreak",
-                Material.SHIELD, locale));
-        inventory.setItem(GuiSlots.slot(3, 7), GuiDecorator.button(Material.CLOCK,
-                Component.text(t(locale, "timeout") + ": " + kit.timeoutSeconds() + "s", UiTheme.WARNING)
-                        .decoration(TextDecoration.ITALIC, false), "noop"));
-
+        // --- row 4: preset & start effects ---
+        inventory.setItem(GuiSlots.slot(4, 2), toggle(rawGui(locale, "gui.kit-admin-preset"), kit.presetEnabled(),
+                "toggle:preset", Material.CHEST, locale));
         inventory.setItem(GuiSlots.slot(4, 4), GuiDecorator.button(Material.SPLASH_POTION,
                 Component.text(t(locale, "start-effects")
                                 + (kit.startEffects().isEmpty() ? "" : " (" + kit.startEffects().size() + ")"),
                         UiTheme.SECONDARY)
                         .decoration(TextDecoration.ITALIC, false), "open:start-effects"));
-
-        inventory.setItem(GuiSlots.slot(4, 2), ItemBuilder.action(Material.NETHER_STAR,
+        inventory.setItem(GuiSlots.slot(4, 6), ItemBuilder.action(Material.NETHER_STAR,
                 Component.text(rawGui(locale, "gui.kit-admin-preset-open"), UiTheme.SECONDARY), "open:preset"));
 
         inventory.setItem(GuiSlots.slot(5, 4), ItemBuilder.action(UiTheme.BACK,
@@ -230,6 +224,19 @@ public final class KitAdminGui extends AbstractGui {
                                 state ? UiTheme.SUCCESS : UiTheme.DANGER))
                         .decoration(TextDecoration.ITALIC, false),
                 action);
+    }
+
+    /** Spaced sub-GUI entry tile with a divider + hint lore. */
+    private ItemStack entry(Material material, String name, String loreLine, net.kyori.adventure.text.format.TextColor color,
+                            String action, String locale) {
+        return ItemBuilder.of(material)
+                .name(Component.text(name, color).decoration(TextDecoration.ITALIC, false))
+                .lore(UiTheme.divider(),
+                        UiTheme.line(loreLine),
+                        UiTheme.blank(),
+                        UiTheme.hint(rawGui(locale, "menu.click")))
+                .action(action)
+                .build();
     }
 
     private Component stateLine(String label, boolean state, String locale) {
@@ -313,6 +320,20 @@ public final class KitAdminGui extends AbstractGui {
             }
             return;
         }
+        if (action.equals("open:block-rules")) {
+            if (session.selectedKit() != null) {
+                sounds.play(player, "gui-click");
+                openBlockRules.accept(player, session.selectedKit());
+            }
+            return;
+        }
+        if (action.equals("open:item-rules")) {
+            if (session.selectedKit() != null) {
+                sounds.play(player, "gui-click");
+                openItemRules.accept(player, session.selectedKit());
+            }
+            return;
+        }
         if (action.equals("open:preset")) {
             sounds.play(player, "gui-click");
             openPresetAdmin.accept(player);
@@ -331,7 +352,8 @@ public final class KitAdminGui extends AbstractGui {
         }
     }
 
-    private KitDefinition applyConfigChange(KitDefinition kit, String action) {
+    /** Toggles a single kit rule; shared with the block/item rule sub-GUIs. */
+    public static KitDefinition applyConfigChange(KitDefinition kit, String action) {
         KitDefinition.Builder b = kit.toBuilder();
         return switch (action) {
             case "toggle:enabled" -> b.enabled(!kit.enabled()).build();
@@ -413,9 +435,8 @@ public final class KitAdminGui extends AbstractGui {
                 list.clear();
             } else if (held == null || held.isAir() || !held.isBlock()) {
                 sounds.play(player, "error");
-                player.sendMessage(Component.text(
-                        "Hold a block in your hand to add/remove it from the break list.",
-                        net.kyori.adventure.text.format.NamedTextColor.RED));
+                player.sendMessage(messageService.render(player, "gui.kit-admin-canbreak-hold")
+                        .color(net.kyori.adventure.text.format.NamedTextColor.RED));
                 return;
             } else if (click == org.bukkit.event.inventory.ClickType.RIGHT) {
                 list.removeIf(m -> m.equalsIgnoreCase(held.name()));
