@@ -102,10 +102,8 @@ public final class PracticeListener implements Listener {
             return;
         }
         PracticeSession session = sessionOpt.get();
-        if (event.getDamager() instanceof Mannequin bot
-                && session.combatBot() != null
-                && bot.getUniqueId().equals(session.combatBot().getUniqueId())) {
-            return;
+        if (session.type() == PracticeType.SWORD && session.combatBot() != null) {
+            return; // only the sparring bot can hurt sword-practice players; let it shove them
         }
         event.setCancelled(true);
         event.setKnockback(new Vector());
