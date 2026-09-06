@@ -4,6 +4,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import com.rumilance.practice.PluginIdentity;
+import com.rumilance.practice.locale.MessageService;
 import org.bukkit.plugin.Plugin;
 
 import java.io.IOException;
@@ -17,9 +18,11 @@ public final class BanService {
 
     private final Plugin plugin;
     private final BanStore store;
+    private final MessageService messages;
 
-    public BanService(Plugin plugin) {
+    public BanService(Plugin plugin, MessageService messages) {
         this.plugin = plugin;
+        this.messages = messages;
         this.store = new BanStore(Path.of(PluginIdentity.dataFolder(plugin).getPath(), "bans.rpb"));
         try {
             store.load();
@@ -48,7 +51,7 @@ public final class BanService {
             com.rumilance.practice.join.JoinQuitMessages.suppressQuit(playerId);
             online.kick(BanScreens.banned(reason, label));
         }
-        Bukkit.broadcast(BanAnnounce.ban(playerName, reason, label));
+        broadcastBan(playerName, reason, label);
         return record;
     }
 
@@ -58,10 +61,30 @@ public final class BanService {
 
     public void kick(Player target, String staffName, String reason) {
         String kickReason = reason == null || reason.isBlank() ? "Kicked" : reason;
-        Bukkit.broadcast(BanAnnounce.kick(target.getName()));
+        broadcastKick(target.getName());
         com.rumilance.practice.join.JoinQuitMessages.suppressQuit(target.getUniqueId());
         target.kick(BanScreens.kicked(kickReason));
         plugin.getLogger().info("Kicked " + target.getName() + " by " + staffName);
+    }
+
+    private void broadcastBan(String playerName, String reason, String label) {
+        if (messages == null) {
+            Bukkit.broadcast(BanAnnounce.ban(playerName, reason, label));
+            return;
+        }
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            viewer.sendMessage(BanAnnounce.ban(messages, viewer, playerName, reason, label));
+        }
+    }
+
+    private void broadcastKick(String playerName) {
+        if (messages == null) {
+            Bukkit.broadcast(BanAnnounce.kick(playerName));
+            return;
+        }
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            viewer.sendMessage(BanAnnounce.kick(messages, viewer, playerName));
+        }
     }
 
     public boolean unban(UUID playerId) {

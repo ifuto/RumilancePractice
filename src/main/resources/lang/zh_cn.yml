@@ -265,6 +265,12 @@ party:
   help-start: "<gray>/team start <kit> | /team disband"
   info-line: "<aqua><visibility> 队伍 '<name>' (<size>/<max>)<sides>"
   info-sides: "  RED=<red> BLUE=<blue>"
+  hotbar-hub: "<aqua>队伍中心"
+  hotbar-hub-hint: "<gray>成员·设置·开始对战"
+  hotbar-kit-edit: "<aqua>编辑套件"
+  hotbar-kit-edit-hint: "<gray>编辑你的套件布局"
+  hotbar-leave: "<red>离开队伍"
+  hotbar-leave-hint: "<gray>离开当前队伍"
 
 general:
   prefix: ""
@@ -345,6 +351,9 @@ ffa:
   left: "<gray>你离开了 FFA 竞技场。"
   killed-by: "<red>你被 <yellow><killer></yellow> 击杀。"
   repairing-title: "<red>FFA 维护中"
+  kills-bar: "<gold>击杀: <kills>  死亡: <deaths>"
+  kill-streak: "<gold><n>连杀!"
+  combat-bar: "<red>战斗中: <secs>秒"
 
 kit:
   created: "<green>Kit <kit> created."
@@ -380,6 +389,8 @@ arena:
 lobby:
   spawn-set: "<green>大厅出生点已更新。"
   teleported: "<gray>已传送到大厅。"
+  compass-title: "<aqua>游戏菜单"
+  compass-lore: "<gray>右键打开练习菜单。"
 
 ranking:
   stats-header: "<gray>--- Ranked Stats: <player> (<kit>) ---"
@@ -439,12 +450,30 @@ match:
   opponent-left-countdown: "<gray>Your opponent left during the countdown - the match was cancelled."
   leave-banned: "<red>You left during the countdown too many times in a row - chat restricted for 3 days."
   leave-ban-reason: "Left during the pre-match countdown too many times in a row"
+  item-rematch: "<green>再战"
+  item-report: "<aqua>比赛报告"
+  item-lobby: "<red>返回大厅"
+  result-win: "<green>胜利"
+  result-draw: "<yellow>平局"
+  result-loss: "<red>失败"
+  summary-no-stats: "<gray> (无战斗数据)"
+  summary-stats: "<aqua>  伤害 <dealt> / <taken>  •  命中 <hits>  •  最高连击 <combo>"
+  summary-prefix: "<gray>比赛: "
+  summary-report-btn: "报告"
+  summary-report-hover: "打开完整比赛报告"
+  eliminated: "<red>你被淘汰了!"
 
 spectator:
   now-spectating: "<gray>你正在观战 <yellow><player></yellow>。"
   stopped-spectating: "<gray>你已停止观战。"
   cannot-spectate: "<red>你现在无法观战这场比赛。"
   no-active-match: "<red><player> 当前没有在进行比赛。"
+  not-fighting: "<red>该玩家当前不在战斗中。"
+  disabled-by-participant: "<red>参赛者已关闭观战。"
+  cannot-enter-state: "<red>无法进入观战状态。"
+  spectating-line: "<gray>正在观战: </gray><side_red><dark_gray> vs </dark_gray><side_blue>"
+  players-count: "<n>人"
+  spectating-ffa: "<aqua>正在观战FFA: <player>"
 
 settings:
   updated: "<green>已将 <key> 更新为 <value>。"
@@ -989,6 +1018,8 @@ gui:
   stats-title: "<name> — 数据"
   stats-unavailable: "数据不可用"
   profile-best-elo: "最高分"
+  practice-layout-order-anchor: "重生锚 → 萤石"
+  practice-layout-order-glow: "萤石 → 重生锚"
 
 lb:
   kill-title: "<gold><b>月度击杀榜</b></gold>"
@@ -996,3 +1027,60 @@ lb:
   no-records: "<gray>暂无记录</gray>"
   kill-row: "<white>{name}</white> <gold>{kills} 次击杀</gold> <gray>KD {kd}</gray>"
   streak-row: "<white>{name}</white> <gold>{streak} 连胜</gold>"
+
+practice:
+  preparing-room: "<gray>正在准备练习室..."
+  copy-failed: "<red>无法准备练习副本,请重试。"
+  spawn-invalid: "<red>练习室出生点无效。"
+  teleport-unsafe: "<red>无法传送到练习室(出生点不安全)。"
+  joined: "<green>已加入练习: <name>"
+  joined-mace: "<green>已加入重锤练习: <name>"
+  room-not-found: "<red>练习室不存在或已禁用。"
+  already-in: "<red>你已在练习室中。/prac leave"
+  join-from-lobby: "<red>请从大厅加入练习。"
+  world-not-loaded: "<red>练习世界未加载。"
+  cannot-enter: "<red>现在无法进入练习。"
+  not-in-room: "<red>你不在练习室中。"
+  left: "<yellow>已退出练习。"
+  duration-bar: "<gold>时长: <secs>秒"
+  time-bar: "<aqua>剩余时间: <secs>秒"
+  countdown-sub: "<gray>做好准备"
+  start-title: "<green><bold>开始</bold>"
+  room-missing: "<red>练习室不存在。"
+  resetting-terrain: "<gray>正在重置地形..."
+  reset-failed: "<red>无法重置练习地形,返回等待。"
+  layout-saved: "<green>布局已保存: <key>"
+  done-title: "<gold><bold>完成</bold>"
+  check-book: "<gray>请查看你的书"
+  book-title: "练习结果"
+  book-clicks: "点击次数"
+  book-avg-cps: "平均CPS"
+  book-explode-place: "爆炸→放置"
+  book-place-charge: "放置→充能"
+  book-charge-explode: "充能→爆炸"
+  mace-bot-name: "<gold><bold>重锤Bot</bold>"
+  item-duration: "<gold>时长: <secs>秒"
+  item-duration-lore: "<gray>右键切换 5/10/15/30"
+  item-layout: "<aqua>编辑布局"
+  item-layout-lore: "<gray>锚优先 / 萤石优先"
+  item-start: "<green><bold>开始练习</bold>"
+  item-start-lore: "<gray>右键开始(5秒倒计时)"
+  item-mace-settings: "<light_purple>重锤设置"
+  item-mace-settings-lore: "<gray>密度 / 破甲 / 风爆"
+  item-bot-settings: "<yellow>Bot设置"
+  item-bot-shield: "<gray>盾牌: <state>"
+  item-shield-up: "举起"
+  item-shield-down: "放下"
+  item-mace-name: "<light_purple>练习重锤"
+
+killfeed:
+  view-inventory-hover: "<yellow>点击查看最终物品栏"
+
+chat:
+  spam-blocked: "<red>消息被判定为垃圾信息,无法发送。"
+
+ban:
+  announce-banned: "<white><bold><player></bold></white> <#94A3B8>已被封禁</#94A3B8>"
+  announce-kicked: "<white><bold><player></bold></white> <#94A3B8>已被踢出</#94A3B8>"
+  announce-reason: "原因"
+  announce-duration: "时长"

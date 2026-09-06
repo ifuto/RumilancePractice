@@ -265,6 +265,12 @@ party:
   help-start: "<gray>/team start <kit> | /team disband"
   info-line: "<aqua>Équipe <visibility> '<name>' (<size>/<max>)<sides>"
   info-sides: "  RED=<red> BLUE=<blue>"
+  hotbar-hub: "<aqua>Hub d'équipe"
+  hotbar-hub-hint: "<gray>Membres, réglages, lancer la bataille"
+  hotbar-kit-edit: "<aqua>Modifier le kit"
+  hotbar-kit-edit-hint: "<gray>Modifie les dispositions de ton kit"
+  hotbar-leave: "<red>Quitter l'équipe"
+  hotbar-leave-hint: "<gray>Quitter l'équipe"
 
 general:
   prefix: ""
@@ -345,6 +351,9 @@ ffa:
   left: "<gray>Tu as quitté l'arène FFA."
   killed-by: "<red>Tu as été tué par <yellow><killer></yellow>."
   repairing-title: "<red>FFA en réparation"
+  kills-bar: "<gold>Éliminations : <kills>  Morts : <deaths>"
+  kill-streak: "<gold>Série de <n> éliminations !"
+  combat-bar: "<red>Combat : <secs>s"
 
 kit:
   created: "<green>Kit <kit> créé."
@@ -380,6 +389,8 @@ arena:
 lobby:
   spawn-set: "<green>Point d'apparition du lobby mis à jour."
   teleported: "<gray>Téléporté au lobby."
+  compass-title: "<aqua>Menu de jeu"
+  compass-lore: "<gray>Clic droit pour ouvrir le menu d'entraînement."
 
 ranking:
   stats-header: "<gray>--- Stats ranked : <player> (<kit>) ---"
@@ -439,12 +450,30 @@ match:
   opponent-left-countdown: "<gray>Ton adversaire est parti pendant le compte à rebours - le match a été annulé."
   leave-banned: "<red>Tu es parti trop de fois de suite pendant le compte à rebours - chat restreint pendant 3 jours."
   leave-ban-reason: "Départs répétés pendant le compte à rebours d'avant-match"
+  item-rematch: "<green>Revanche"
+  item-report: "<aqua>Rapport de match"
+  item-lobby: "<red>Retour au lobby"
+  result-win: "<green>VICTOIRE"
+  result-draw: "<yellow>ÉGALITÉ"
+  result-loss: "<red>DÉFAITE"
+  summary-no-stats: "<gray> (pas de stats de combat)"
+  summary-stats: "<aqua>  DÉGÂTS <dealt> / <taken>  •  Coups <hits>  •  Meilleur combo <combo>"
+  summary-prefix: "<gray>Match : "
+  summary-report-btn: "Rapport"
+  summary-report-hover: "Ouvrir le rapport de match complet"
+  eliminated: "<red>Tu as été éliminé !"
 
 spectator:
   now-spectating: "<gray>Tu observes <yellow><player></yellow>."
   stopped-spectating: "<gray>Tu as arrêté d'observer."
   cannot-spectate: "<red>Tu ne peux pas observer ce match maintenant."
   no-active-match: "<red><player> n'est pas en match actuellement."
+  not-fighting: "<red>Ce joueur n'est pas en combat actif."
+  disabled-by-participant: "<red>Le spectate est désactivé par un participant."
+  cannot-enter-state: "<red>Impossible d'entrer en mode spectateur."
+  spectating-line: "<gray>Tu regardes </gray><side_red><dark_gray> vs </dark_gray><side_blue>"
+  players-count: "<n> joueurs"
+  spectating-ffa: "<aqua>Tu regardes le FFA : <player>"
 
 settings:
   updated: "<green><key> mis à jour : <value>."
@@ -989,6 +1018,8 @@ gui:
   stats-title: "<name> — Statistiques"
   stats-unavailable: "Statistiques indisponibles"
   profile-best-elo: "Meilleur Elo"
+  practice-layout-order-anchor: "ANCRE DE RÉAPPARITION puis PIERRE LUMINEUSE"
+  practice-layout-order-glow: "PIERRE LUMINEUSE puis ANCRE DE RÉAPPARITION"
 
 lb:
   kill-title: "<gold><b>Classement mensuel des éliminations</b></gold>"
@@ -996,3 +1027,60 @@ lb:
   no-records: "<gray>Aucun record pour l'instant</gray>"
   kill-row: "<white>{name}</white> <gold>{kills} éliminations</gold> <gray>KD {kd}</gray>"
   streak-row: "<white>{name}</white> <gold>série de {streak}</gold>"
+
+practice:
+  preparing-room: "<gray>Préparation de la salle d'entraînement..."
+  copy-failed: "<red>Impossible de préparer la copie d'entraînement. Réessaie."
+  spawn-invalid: "<red>Le point d'apparition de la salle est invalide."
+  teleport-unsafe: "<red>Impossible de te téléporter dans la salle (apparition dangereuse)."
+  joined: "<green>Tu as rejoint l'entraînement : <name>"
+  joined-mace: "<green>Tu as rejoint l'entraînement de masse : <name>"
+  room-not-found: "<red>Salle d'entraînement introuvable ou désactivée."
+  already-in: "<red>Tu es déjà dans une salle d'entraînement. /prac leave"
+  join-from-lobby: "<red>Rejoins l'entraînement depuis le lobby."
+  world-not-loaded: "<red>Le monde d'entraînement n'est pas chargé."
+  cannot-enter: "<red>Impossible d'entrer en entraînement actuellement."
+  not-in-room: "<red>Tu n'es pas dans une salle d'entraînement."
+  left: "<yellow>Tu as quitté l'entraînement."
+  duration-bar: "<gold>Durée : <secs>s"
+  time-bar: "<aqua>Temps : <secs>s"
+  countdown-sub: "<gray>Prépare-toi"
+  start-title: "<green><bold>DÉPART</bold>"
+  room-missing: "<red>Salle d'entraînement introuvable."
+  resetting-terrain: "<gray>Réinitialisation du terrain..."
+  reset-failed: "<red>Impossible de réinitialiser le terrain. Retour à l'attente."
+  layout-saved: "<green>Disposition enregistrée : <key>"
+  done-title: "<gold><bold>TERMINÉ</bold>"
+  check-book: "<gray>Consulte ton livre"
+  book-title: "Résultats d'entraînement"
+  book-clicks: "Clics"
+  book-avg-cps: "CPS moyen"
+  book-explode-place: "Explosion→Pose"
+  book-place-charge: "Pose→Charge"
+  book-charge-explode: "Charge→Explosion"
+  mace-bot-name: "<gold><bold>Bot de masse</bold>"
+  item-duration: "<gold>Durée : <secs>s"
+  item-duration-lore: "<gray>Clic droit pour alterner 5/10/15/30"
+  item-layout: "<aqua>Modifier la disposition"
+  item-layout-lore: "<gray>Ancre d'abord / Pierre lumineuse d'abord"
+  item-start: "<green><bold>Lancer l'entraînement</bold>"
+  item-start-lore: "<gray>Clic droit pour lancer (compte à rebours 5s)"
+  item-mace-settings: "<light_purple>Réglages de masse"
+  item-mace-settings-lore: "<gray>Densité / Brèche / Rafale"
+  item-bot-settings: "<yellow>Réglages du bot"
+  item-bot-shield: "<gray>Bouclier : <state>"
+  item-shield-up: "LEVÉ"
+  item-shield-down: "BAISSÉ"
+  item-mace-name: "<light_purple>Masse d'entraînement"
+
+killfeed:
+  view-inventory-hover: "<yellow>Clic pour voir l'inventaire final"
+
+chat:
+  spam-blocked: "<red>Message bloqué : détecté comme spam."
+
+ban:
+  announce-banned: "<white><bold><player></bold></white> <#94A3B8>a été banni</#94A3B8>"
+  announce-kicked: "<white><bold><player></bold></white> <#94A3B8>a été expulsé</#94A3B8>"
+  announce-reason: "Motif"
+  announce-duration: "Durée"

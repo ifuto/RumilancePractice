@@ -383,7 +383,7 @@ public final class FeatureBootstrap {
         matchService.setHistoryStore(matchHistoryStore);
         services.register(com.rumilance.practice.match.history.MatchHistoryStore.class, matchHistoryStore);
 
-        banService = new BanService(plugin);
+        banService = new BanService(plugin, services.get(MessageService.class));
         services.register(BanService.class, banService);
 
         chatBanService = new ChatBanService(punishmentRepository, auditLogRepository, objectionRepository,
@@ -397,7 +397,8 @@ public final class FeatureBootstrap {
         matchService.setPlayerPlacedBlockTracker(playerPlacedBlockTracker);
 
         SpamFilterService spamFilterService = new SpamFilterService(
-                configService, spamDetectionRepository, chatBanService, asyncExecutor, plugin.getLogger());
+                configService, spamDetectionRepository, chatBanService, asyncExecutor, plugin.getLogger(),
+                services.get(MessageService.class));
         services.register(SpamFilterService.class, spamFilterService);
 
         SignGuardService signGuardService = new SignGuardService(
@@ -451,7 +452,7 @@ public final class FeatureBootstrap {
 
         practiceService = new PracticeService(
                 plugin, configService, stateManager, lobbyService, practiceLayoutRepository,
-                asyncExecutor, practiceCloneService);
+                asyncExecutor, practiceCloneService, services.get(MessageService.class));
         practiceService.start();
         services.register(PracticeService.class, practiceService);
 
@@ -460,6 +461,7 @@ public final class FeatureBootstrap {
         ViewControlService viewControl = new ViewControlService(arenaService, sightSettings);
         services.register(ViewControlService.class, viewControl);
         matchService.setViewControl(viewControl);
+        spectatorService.setMessageService(services.get(MessageService.class));
         spectatorService.setViewControl(viewControl);
         ffaService.setViewControl(viewControl);
 
@@ -644,6 +646,7 @@ public final class FeatureBootstrap {
         services.register(com.rumilance.practice.cosmetic.kill.KillEffectService.class, killEffectService);
         services.register(com.rumilance.practice.cosmetic.kill.KillEffectRegistry.class, killEffectRegistry);
         com.rumilance.practice.combat.KillFeed.setKillEffectPlayer(killEffectService::playOnKill);
+        com.rumilance.practice.combat.KillFeed.setMessageService(services.get(MessageService.class));
 
         // When a player drops below VIP+, reset smithing trims to default: strip premium
         // materials/patterns from everything worn/held, and scrub saved kit layouts.
@@ -732,6 +735,7 @@ public final class FeatureBootstrap {
         teamService.setRankService(rankService);
         matchService.setTeamService(teamService);
         PartyHotbar partyHotbar = new PartyHotbar(lobbyService);
+        partyHotbar.setMessageService(services.get(MessageService.class));
         teamService.setPartyHotbar(partyHotbar);
         teamService.setHasPartyMaps(() -> !arenaStore.partyArenas().isEmpty());
         ffaService.setTeamService(teamService);
@@ -1038,7 +1042,7 @@ public final class FeatureBootstrap {
         functionalItemListener.setOpenFfa(ffaListGui::open);
         functionalItemListener.setOpenEkit(p -> {
             if (matchService.isBusyForKitEdit(p.getUniqueId())) {
-                p.sendMessage(Component.text("You can't edit kits during a match.", NamedTextColor.RED));
+                p.sendMessage(services.get(MessageService.class).render(p, "menu.kits-busy"));
                 return;
             }
             ekitSelectGui.open(p);

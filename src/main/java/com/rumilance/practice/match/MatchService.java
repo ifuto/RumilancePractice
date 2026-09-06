@@ -1564,7 +1564,8 @@ public final class MatchService {
             // smithing trims are reset, so dropped loot is always plain vanilla gear.
             spawnStrippedDrops(downed);
             downed.setGameMode(org.bukkit.GameMode.SPECTATOR);
-            downed.sendActionBar(Component.text("You were eliminated!", NamedTextColor.RED)
+            downed.sendActionBar(title(downed, "match.eliminated",
+                    Component.text("You were eliminated!", NamedTextColor.RED))
                     .decorate(TextDecoration.BOLD));
             if (spectatorService != null) {
                 spectatorService.hideInWorld(downed);
@@ -2428,7 +2429,8 @@ public final class MatchService {
         }
         ItemStack rematch = new ItemStack(Material.LIME_DYE);
         ItemMeta rematchMeta = rematch.getItemMeta();
-        rematchMeta.displayName(Component.text("Rematch", NamedTextColor.GREEN)
+        rematchMeta.displayName(title(player, "match.item-rematch",
+                Component.text("Rematch", NamedTextColor.GREEN))
                 .decoration(TextDecoration.ITALIC, false));
         rematchMeta.getPersistentDataContainer().set(ItemKeys.rematch(), PersistentDataType.BYTE, (byte) 1);
         rematch.setItemMeta(rematchMeta);
@@ -2439,7 +2441,8 @@ public final class MatchService {
         if (settingsService != null && settingsService.get(player).showMatchReport()) {
             ItemStack report = new ItemStack(Material.WRITABLE_BOOK);
             ItemMeta reportMeta = report.getItemMeta();
-            reportMeta.displayName(Component.text("Match Report", NamedTextColor.AQUA)
+            reportMeta.displayName(title(player, "match.item-report",
+                    Component.text("Match Report", NamedTextColor.AQUA))
                     .decoration(TextDecoration.ITALIC, false));
             reportMeta.getPersistentDataContainer().set(ItemKeys.matchReport(), PersistentDataType.BYTE, (byte) 1);
             report.setItemMeta(reportMeta);
@@ -2448,7 +2451,8 @@ public final class MatchService {
 
         ItemStack lobby = new ItemStack(Material.RED_DYE);
         ItemMeta lobbyMeta = lobby.getItemMeta();
-        lobbyMeta.displayName(Component.text("Return to Lobby", NamedTextColor.RED)
+        lobbyMeta.displayName(title(player, "match.item-lobby",
+                Component.text("Return to Lobby", NamedTextColor.RED))
                 .decoration(TextDecoration.ITALIC, false));
         lobbyMeta.getPersistentDataContainer().set(ItemKeys.returnLobby(), PersistentDataType.BYTE, (byte) 1);
         lobby.setItemMeta(lobbyMeta);
@@ -2463,20 +2467,35 @@ public final class MatchService {
         MatchCombatTracker.CombatStats stats = combatTracker
                 .matchStats(session.id()).map(m -> m.get(playerId)).orElse(null);
         Component outcome = won
-                ? Component.text("WIN", NamedTextColor.GREEN)
-                : (session.isDraw() ? Component.text("DRAW", NamedTextColor.YELLOW)
-                        : Component.text("LOSS", NamedTextColor.RED));
+                ? title(player, "match.result-win", Component.text("WIN", NamedTextColor.GREEN))
+                : (session.isDraw()
+                        ? title(player, "match.result-draw", Component.text("DRAW", NamedTextColor.YELLOW))
+                        : title(player, "match.result-loss", Component.text("LOSS", NamedTextColor.RED)));
         Component body = stats == null
-                ? Component.text(" (no combat stats)", NamedTextColor.GRAY)
-                : Component.text("  DMG " + stats.damageDealt() + " / " + stats.damageTaken()
-                        + "  •  Hits " + stats.hits() + "  •  Best Combo " + stats.bestCombo(),
-                        NamedTextColor.AQUA);
-        player.sendMessage(Component.text("Match: ", NamedTextColor.GRAY)
+                ? title(player, "match.summary-no-stats", Component.text(" (no combat stats)", NamedTextColor.GRAY))
+                : title(player, "match.summary-stats",
+                        Component.text("  DMG " + stats.damageDealt() + " / " + stats.damageTaken()
+                                + "  •  Hits " + stats.hits() + "  •  Best Combo " + stats.bestCombo(),
+                                NamedTextColor.AQUA),
+                        MessageService.tags(
+                                "dealt", String.valueOf(stats.damageDealt()),
+                                "taken", String.valueOf(stats.damageTaken()),
+                                "hits", String.valueOf(stats.hits()),
+                                "combo", String.valueOf(stats.bestCombo())));
+        String reportLabel = "Report";
+        String reportHover = "Open the full match report";
+        if (messageService != null) {
+            reportLabel = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
+                    .plainText().serialize(messageService.render(player, "match.summary-report-btn"));
+            reportHover = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
+                    .plainText().serialize(messageService.render(player, "match.summary-report-hover"));
+        }
+        player.sendMessage(title(player, "match.summary-prefix", Component.text("Match: ", NamedTextColor.GRAY))
                 .append(outcome)
                 .append(body)
                 .append(Component.text("  "))
                 .append(com.rumilance.practice.chat.ChatButtons.subtle(
-                        "Report", "/matchreport", "Open the full match report"))
+                        reportLabel, "/matchreport", reportHover))
                 .decoration(TextDecoration.ITALIC, false));
     }
 
@@ -2490,6 +2509,18 @@ public final class MatchService {
         }
         try {
             return messageService.render(messageService.resolveLocale(player), key);
+        } catch (Exception ignored) {
+            return fallback;
+        }
+    }
+
+    private Component title(Player player, String key, Component fallback,
+                            net.kyori.adventure.text.minimessage.tag.resolver.TagResolver... resolvers) {
+        if (messageService == null) {
+            return fallback;
+        }
+        try {
+            return messageService.render(messageService.resolveLocale(player), key, resolvers);
         } catch (Exception ignored) {
             return fallback;
         }

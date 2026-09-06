@@ -25,9 +25,26 @@ public final class PartyHotbar {
     public static final String FF = "party_ff";
 
     private final LobbyService lobbyService;
+    private volatile com.rumilance.practice.locale.MessageService messages;
 
     public PartyHotbar(LobbyService lobbyService) {
         this.lobbyService = lobbyService;
+    }
+
+    public void setMessageService(com.rumilance.practice.locale.MessageService messages) {
+        this.messages = messages;
+    }
+
+    private Component name(Player player, String key, Component fallback) {
+        com.rumilance.practice.locale.MessageService ms = messages;
+        if (ms == null) {
+            return fallback;
+        }
+        try {
+            return ms.render(player, key);
+        } catch (Exception ignored) {
+            return fallback;
+        }
     }
 
     public void give(Player player, boolean owner, boolean hasPartyMaps, boolean friendlyFire) {
@@ -41,11 +58,14 @@ public final class PartyHotbar {
         // legacy / custom lobby items.)
         player.getInventory().clear();
         player.getInventory().setItem(0, tagged(HUB, Material.NETHER_STAR,
-                UiTheme.menuTitle("Party Hub"), UiTheme.hint("メンバー・設定・対戦開始")));
+                name(player, "party.hotbar-hub", UiTheme.menuTitle("Party Hub")),
+                name(player, "party.hotbar-hub-hint", UiTheme.hint("Members, settings, start battle"))));
         player.getInventory().setItem(1, tagged("ekit", Material.CHEST,
-                Component.text("Kit Edit", UiTheme.PRIMARY), UiTheme.hint("Edit your kit layouts")));
+                name(player, "party.hotbar-kit-edit", Component.text("Kit Edit", UiTheme.PRIMARY)),
+                name(player, "party.hotbar-kit-edit-hint", UiTheme.hint("Edit your kit layouts"))));
         player.getInventory().setItem(8, tagged(LEAVE, Material.OAK_DOOR,
-                Component.text("Leave Party", UiTheme.DANGER), UiTheme.hint("パーティー退出")));
+                name(player, "party.hotbar-leave", Component.text("Leave Party", UiTheme.DANGER)),
+                name(player, "party.hotbar-leave-hint", UiTheme.hint("Leave the party"))));
     }
 
     public void restoreLobby(Player player) {

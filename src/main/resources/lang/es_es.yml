@@ -265,6 +265,12 @@ party:
   help-start: "<gray>/team start <kit> | /team disband"
   info-line: "<aqua>Equipo <visibility> '<name>' (<size>/<max>)<sides>"
   info-sides: "  RED=<red> BLUE=<blue>"
+  hotbar-hub: "<aqua>Centro de equipo"
+  hotbar-hub-hint: "<gray>Miembros, ajustes, iniciar batalla"
+  hotbar-kit-edit: "<aqua>Editar kit"
+  hotbar-kit-edit-hint: "<gray>Edita los diseños de tu kit"
+  hotbar-leave: "<red>Salir del equipo"
+  hotbar-leave-hint: "<gray>Salir del equipo"
 
 general:
   prefix: ""
@@ -345,6 +351,9 @@ ffa:
   left: "<gray>Saliste de la arena FFA."
   killed-by: "<red>Te mató <yellow><killer></yellow>."
   repairing-title: "<red>FFA en reparación"
+  kills-bar: "<gold>Bajas: <kills>  Muertes: <deaths>"
+  kill-streak: "<gold>¡Racha de <n> bajas!"
+  combat-bar: "<red>Combate: <secs>s"
 
 kit:
   created: "<green>Kit <kit> creado."
@@ -380,6 +389,8 @@ arena:
 lobby:
   spawn-set: "<green>Punto de aparición del lobby actualizado."
   teleported: "<gray>Teletransportado al lobby."
+  compass-title: "<aqua>Menú de juego"
+  compass-lore: "<gray>Clic derecho para abrir el menú de práctica."
 
 ranking:
   stats-header: "<gray>--- Estadísticas ranked: <player> (<kit>) ---"
@@ -439,12 +450,30 @@ match:
   opponent-left-countdown: "<gray>Tu oponente salió durante la cuenta atrás - la partida fue cancelada."
   leave-banned: "<red>Saliste demasiado seguido durante la cuenta atrás - chat restringido por 3 días."
   leave-ban-reason: "Salir repetidamente durante la cuenta atrás previa"
+  item-rematch: "<green>Revancha"
+  item-report: "<aqua>Informe de partida"
+  item-lobby: "<red>Volver al lobby"
+  result-win: "<green>VICTORIA"
+  result-draw: "<yellow>EMPATE"
+  result-loss: "<red>DERROTA"
+  summary-no-stats: "<gray> (sin estadísticas de combate)"
+  summary-stats: "<aqua>  DAÑO <dealt> / <taken>  •  Golpes <hits>  •  Mejor combo <combo>"
+  summary-prefix: "<gray>Partida: "
+  summary-report-btn: "Informe"
+  summary-report-hover: "Abrir el informe completo de la partida"
+  eliminated: "<red>¡Fuiste eliminado!"
 
 spectator:
   now-spectating: "<gray>Ahora espectas a <yellow><player></yellow>."
   stopped-spectating: "<gray>Dejaste de espectar."
   cannot-spectate: "<red>No puedes espectar esa partida ahora."
   no-active-match: "<red><player> no está en una partida ahora."
+  not-fighting: "<red>Ese jugador no está en una pelea activa."
+  disabled-by-participant: "<red>Un participante desactivó el espectado."
+  cannot-enter-state: "<red>No se puede entrar en estado de espectador."
+  spectating-line: "<gray>Espectando </gray><side_red><dark_gray> vs </dark_gray><side_blue>"
+  players-count: "<n> jugadores"
+  spectating-ffa: "<aqua>Espectando FFA: <player>"
 
 settings:
   updated: "<green><key> actualizado a <value>."
@@ -989,6 +1018,8 @@ gui:
   stats-title: "<name> — Estadísticas"
   stats-unavailable: "Estadísticas no disponibles"
   profile-best-elo: "Mejor Elo"
+  practice-layout-order-anchor: "ANCLA DE REAPARICIÓN y luego PIEDRA LUMINOSA"
+  practice-layout-order-glow: "PIEDRA LUMINOSA y luego ANCLA DE REAPARICIÓN"
 
 lb:
   kill-title: "<gold><b>Ranking mensual de bajas</b></gold>"
@@ -996,3 +1027,60 @@ lb:
   no-records: "<gray>Aún no hay registros</gray>"
   kill-row: "<white>{name}</white> <gold>{kills} bajas</gold> <gray>KD {kd}</gray>"
   streak-row: "<white>{name}</white> <gold>racha de {streak}</gold>"
+
+practice:
+  preparing-room: "<gray>Preparando sala de práctica..."
+  copy-failed: "<red>No se pudo preparar la copia de práctica. Inténtalo de nuevo."
+  spawn-invalid: "<red>El punto de aparición de la sala es inválido."
+  teleport-unsafe: "<red>No se pudo teletransportarte a la sala (aparición insegura)."
+  joined: "<green>Entraste a la práctica: <name>"
+  joined-mace: "<green>Entraste a la práctica de maza: <name>"
+  room-not-found: "<red>Sala de práctica no encontrada o desactivada."
+  already-in: "<red>Ya estás en una sala de práctica. /prac leave"
+  join-from-lobby: "<red>Únete a la práctica desde el lobby."
+  world-not-loaded: "<red>El mundo de práctica no está cargado."
+  cannot-enter: "<red>No puedes entrar a la práctica ahora."
+  not-in-room: "<red>No estás en una sala de práctica."
+  left: "<yellow>Saliste de la práctica."
+  duration-bar: "<gold>Duración: <secs>s"
+  time-bar: "<aqua>Tiempo: <secs>s"
+  countdown-sub: "<gray>Prepárate"
+  start-title: "<green><bold>EMPEZAR</bold>"
+  room-missing: "<red>Falta la sala de práctica."
+  resetting-terrain: "<gray>Restableciendo el terreno..."
+  reset-failed: "<red>No se pudo restablecer el terreno. Volviendo a la espera."
+  layout-saved: "<green>Diseño guardado: <key>"
+  done-title: "<gold><bold>LISTO</bold>"
+  check-book: "<gray>Revisa tu libro"
+  book-title: "Resultados de práctica"
+  book-clicks: "Clics"
+  book-avg-cps: "CPS medio"
+  book-explode-place: "Explosión→Colocar"
+  book-place-charge: "Colocar→Cargar"
+  book-charge-explode: "Carga→Explosión"
+  mace-bot-name: "<gold><bold>Bot de maza</bold>"
+  item-duration: "<gold>Duración: <secs>s"
+  item-duration-lore: "<gray>Clic derecho para alternar 5/10/15/30"
+  item-layout: "<aqua>Editar diseño"
+  item-layout-lore: "<gray>Ancla primero / Piedra luminosa primero"
+  item-start: "<green><bold>Iniciar práctica</bold>"
+  item-start-lore: "<gray>Clic derecho para iniciar (cuenta de 5s)"
+  item-mace-settings: "<light_purple>Ajustes de maza"
+  item-mace-settings-lore: "<gray>Densidad / Brecha / Ráfaga"
+  item-bot-settings: "<yellow>Ajustes del bot"
+  item-bot-shield: "<gray>Escudo: <state>"
+  item-shield-up: "ARRIBA"
+  item-shield-down: "ABAJO"
+  item-mace-name: "<light_purple>Maza de práctica"
+
+killfeed:
+  view-inventory-hover: "<yellow>Clic para ver el inventario final"
+
+chat:
+  spam-blocked: "<red>No puedes enviar el mensaje: detectado como spam."
+
+ban:
+  announce-banned: "<white><bold><player></bold></white> <#94A3B8>ha sido baneado</#94A3B8>"
+  announce-kicked: "<white><bold><player></bold></white> <#94A3B8>ha sido expulsado</#94A3B8>"
+  announce-reason: "Motivo"
+  announce-duration: "Duración"

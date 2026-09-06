@@ -50,6 +50,19 @@ public final class SpectatorService {
     private volatile com.rumilance.practice.ffa.FfaService ffaService;
     private volatile com.rumilance.practice.match.TeamColoredArmorService teamColoredArmorService;
 
+    private volatile com.rumilance.practice.locale.MessageService messages;
+
+    public void setMessageService(com.rumilance.practice.locale.MessageService messages) {
+        this.messages = messages;
+    }
+
+    private void send(Player player, String key, net.kyori.adventure.text.minimessage.tag.resolver.TagResolver... tags) {
+        com.rumilance.practice.locale.MessageService ms = messages;
+        if (ms != null) {
+            player.sendMessage(ms.render(player, key, tags));
+        }
+    }
+
     public void setViewControl(com.rumilance.practice.sight.ViewControlService viewControl) {
         this.viewControl = viewControl;
     }
@@ -91,7 +104,7 @@ public final class SpectatorService {
     public boolean trySpectate(Player spectator, Player target) {
         PlayerState state = stateManager.getState(spectator.getUniqueId());
         if (state != PlayerState.LOBBY && state != PlayerState.OPENING_GUI) {
-            spectator.sendMessage(Component.text("You cannot spectate right now.", NamedTextColor.RED));
+            send(spectator, "spectator.cannot-spectate");
             return false;
         }
         Optional<MatchSession> matchOpt = matchRegistry.byPlayer(target.getUniqueId());
@@ -107,21 +120,21 @@ public final class SpectatorService {
         if (ffaService != null && ffaService.isInFfa(target.getUniqueId())) {
             return spectateFfa(spectator, target);
         }
-        spectator.sendMessage(Component.text("That player is not in an active fight.", NamedTextColor.RED));
+        send(spectator, "spectator.not-fighting");
         return false;
     }
 
     private boolean spectateMatch(Player spectator, Player target, MatchSession match) {
         for (UUID participant : match.participants()) {
             if (!settingsService.get(participant).spectateVisible()) {
-                spectator.sendMessage(Component.text("Spectating is disabled by a participant.", NamedTextColor.RED));
+                send(spectator, "spectator.disabled-by-participant");
                 return false;
             }
         }
         try {
             stateManager.transition(spectator.getUniqueId(), PlayerState.SPECTATING);
         } catch (Exception e) {
-            spectator.sendMessage(Component.text("Cannot enter spectate state.", NamedTextColor.RED));
+            send(spectator, "spectator.cannot-enter-state");
             return false;
         }
         spectatorToFfa.remove(spectator.getUniqueId());
@@ -136,16 +149,22 @@ public final class SpectatorService {
             viewControl.applyForMatch(spectator, match);
         }
         hideInWorld(spectator);
-        spectator.sendMessage(spectatingLine(match));
+        spectator.sendMessage(spectatingLine(spectator, match));
         return true;
     }
 
     /** {@code Spectating <red> vs <blue>} — colours, not a single player's name. */
-    private Component spectatingLine(MatchSession match) {
+    private Component spectatingLine(Player spectator, MatchSession match) {
         java.util.List<UUID> red = match.team(com.rumilance.practice.state.TeamColor.RED);
         java.util.List<UUID> blue = match.team(com.rumilance.practice.state.TeamColor.BLUE);
-        Component redPart = sideText(red, NamedTextColor.RED);
-        Component bluePart = sideText(blue, NamedTextColor.AQUA);
+        Component redPart = sideText(spectator, red, NamedTextColor.RED);
+        Component bluePart = sideText(spectator, blue, NamedTextColor.AQUA);
+        com.rumilance.practice.locale.MessageService ms = messages;
+        if (ms != null) {
+            return ms.render(spectator, "spectator.spectating-line",
+                    net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.component("side_red", redPart),
+                    net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.component("side_blue", bluePart));
+        }
         return Component.text("Spectating ", NamedTextColor.GRAY)
                 .append(redPart)
                 .append(Component.text(" vs ", NamedTextColor.DARK_GRAY))
@@ -153,12 +172,19 @@ public final class SpectatorService {
     }
 
     /** A side's label: one name in a duel, {@code NxN} member count in a team battle. */
-    private Component sideText(java.util.List<UUID> members, NamedTextColor color) {
+    private Component sideText(Player viewer, java.util.List<UUID> members, NamedTextColor color) {
         if (members.size() == 1) {
             Player p = Bukkit.getPlayer(members.get(0));
             String name = p != null ? p.getName()
                     : com.rumilance.practice.stats.StatsService.nameOf(members.get(0));
             return Component.text(name, color);
+        }
+        com.rumilance.practice.locale.MessageService ms = messages;
+        if (ms != null) {
+            return ms.render(viewer, "spectator.players-count",
+                    net.kyori.adventure.text.minimessage.tag.resolver.Placeholder
+                            .unparsed("n", String.valueOf(members.size())))
+                    .color(color);
         }
         return Component.text(members.size() + " players", color);
     }
@@ -182,7 +208,7 @@ public final class SpectatorService {
         try {
             stateManager.transition(spectator.getUniqueId(), PlayerState.SPECTATING);
         } catch (Exception e) {
-            spectator.sendMessage(Component.text("Cannot enter spectate state.", NamedTextColor.RED));
+            send(spectator, "spectator.cannot-enter-state");
             return false;
         }
         spectatorToMatch.remove(spectator.getUniqueId());
@@ -195,7 +221,8 @@ public final class SpectatorService {
             viewControl.applyRegion(spectator, arena.region());
         }
         hideInWorld(spectator);
-        spectator.sendMessage(Component.text("Spectating FFA: " + target.getName(), NamedTextColor.AQUA));
+        send(spectator, "spectator.spectating-ffa",
+                com.rumilance.practice.locale.MessageService.tags("player", target.getName()));
         return true;
     }
 
@@ -307,7 +334,7 @@ public final class SpectatorService {
                 moveSpectatorTo(spectator, anchor.getLocation());
             }
             if (carried != null && carried.contains(id)) {
-                spectator.sendMessage(spectatingLine(session));
+                spectator.sendMessage(spectatingLine(spectator, session));
             }
         }
     }

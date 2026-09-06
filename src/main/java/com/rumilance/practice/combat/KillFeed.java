@@ -1,5 +1,6 @@
 package com.rumilance.practice.combat;
 
+import com.rumilance.practice.locale.MessageService;
 import com.rumilance.practice.state.TeamColor;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
@@ -34,6 +35,8 @@ public final class KillFeed {
 
     private static volatile KillEffectPlayer killEffectPlayer;
 
+    private static volatile MessageService messageService;
+
     private KillFeed() {
     }
 
@@ -43,6 +46,10 @@ public final class KillFeed {
 
     public static void setKillEffectPlayer(KillEffectPlayer player) {
         killEffectPlayer = player;
+    }
+
+    public static void setMessageService(MessageService messages) {
+        messageService = messages;
     }
 
     public static void broadcast(Player killer, Player victim, TeamColor killerTeam) {
@@ -69,21 +76,6 @@ public final class KillFeed {
         if (killer == null || victim == null) {
             return;
         }
-        NamedTextColor killerColor = color(killerTeam, true);
-        NamedTextColor victimColor = color(killerTeam, false);
-        Bukkit.broadcast(line(killer, victim, killerColor, victimColor, killerHealth, killerMax, matchId));
-    }
-
-    public static Component line(Player killer, Player victim,
-                                 NamedTextColor killerColor, NamedTextColor victimColor) {
-        return line(killer, victim, killerColor, victimColor, killer.getHealth(), maxHealth(killer), null);
-    }
-
-    public static Component line(Player killer, Player victim,
-                                 NamedTextColor killerColor, NamedTextColor victimColor,
-                                 double killerHealth, double killerMax, UUID matchId) {
-        Component killerName = clickableName(killer.getName(), killerColor, true, matchId, killer.getUniqueId());
-        Component victimName = clickableName(victim.getName(), victimColor, false, matchId, victim.getUniqueId());
         // Fire the killer's selected paid kill effect at the victim's position. All kill paths
         // (solo/team match, FFA) funnel through this broadcast, so this is the single hook.
         KillEffectPlayer fx = killEffectPlayer;
@@ -94,6 +86,40 @@ public final class KillFeed {
                 // Cosmetics must never interfere with the kill flow.
             }
         }
+        NamedTextColor killerColor = color(killerTeam, true);
+        NamedTextColor victimColor = color(killerTeam, false);
+        MessageService ms = messageService;
+        if (ms == null) {
+            Bukkit.broadcast(line(killer, victim, killerColor, victimColor,
+                    killerHealth, killerMax, matchId, null));
+            return;
+        }
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            viewer.sendMessage(line(killer, victim, killerColor, victimColor,
+                    killerHealth, killerMax, matchId,
+                    ms.render(viewer, "killfeed.view-inventory-hover")));
+        }
+    }
+
+    public static Component line(Player killer, Player victim,
+                                 NamedTextColor killerColor, NamedTextColor victimColor) {
+        return line(killer, victim, killerColor, victimColor, killer.getHealth(), maxHealth(killer), null, null);
+    }
+
+    public static Component line(Player killer, Player victim,
+                                 NamedTextColor killerColor, NamedTextColor victimColor,
+                                 double killerHealth, double killerMax, UUID matchId) {
+        return line(killer, victim, killerColor, victimColor, killerHealth, killerMax, matchId, null);
+    }
+
+    public static Component line(Player killer, Player victim,
+                                 NamedTextColor killerColor, NamedTextColor victimColor,
+                                 double killerHealth, double killerMax, UUID matchId,
+                                 Component inventoryHover) {
+        Component killerName = clickableName(killer.getName(), killerColor, true, matchId,
+                killer.getUniqueId(), inventoryHover);
+        Component victimName = clickableName(victim.getName(), victimColor, false, matchId,
+                victim.getUniqueId(), inventoryHover);
         double scaled = scaledToTen(killerHealth, killerMax);
         return Component.text("⚔ ", NamedTextColor.WHITE)
                 .append(killerName)
@@ -108,7 +134,7 @@ public final class KillFeed {
     }
 
     private static Component clickableName(String name, NamedTextColor color, boolean bold,
-                                           UUID matchId, UUID playerId) {
+                                           UUID matchId, UUID playerId, Component inventoryHover) {
         Component base = Component.text(name, color);
         if (bold) {
             base = base.decorate(TextDecoration.BOLD);
@@ -116,9 +142,12 @@ public final class KillFeed {
         if (matchId == null || playerId == null) {
             return base;
         }
+        Component hover = inventoryHover != null
+                ? inventoryHover
+                : Component.text("Click to view end inventory", NamedTextColor.YELLOW);
         return base
                 .clickEvent(ClickEvent.runCommand("/matchinv " + matchId + " " + playerId))
-                .hoverEvent(HoverEvent.showText(Component.text("Click to view end inventory", NamedTextColor.YELLOW)));
+                .hoverEvent(HoverEvent.showText(hover));
     }
 
     private static NamedTextColor color(TeamColor team, boolean killer) {

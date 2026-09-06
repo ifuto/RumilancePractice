@@ -266,6 +266,12 @@ party:
   help-start: "<gray>/team start <kit> | /team disband"
   info-line: "<aqua><visibility>パーティ「<name>」(<size>/<max>)<sides>"
   info-sides: "  赤=<red> 青=<blue>"
+  hotbar-hub: "<aqua>パーティーハブ"
+  hotbar-hub-hint: "<gray>メンバー・設定・対戦開始"
+  hotbar-kit-edit: "<aqua>キット編集"
+  hotbar-kit-edit-hint: "<gray>キットのレイアウトを編集"
+  hotbar-leave: "<red>パーティー退出"
+  hotbar-leave-hint: "<gray>パーティーから退出"
 
 general:
   prefix: ""
@@ -346,6 +352,9 @@ ffa:
   left: "<gray>FFAから退出しました。"
   killed-by: "<red><yellow><killer></yellow> に討伐されました。"
   repairing-title: "<red>FFAは修復中です"
+  kills-bar: "<gold>キル: <kills>  デス: <deaths>"
+  kill-streak: "<gold><n>キルストリーク!"
+  combat-bar: "<red>戦闘中: <secs>秒"
 
 kit:
   created: "<green>キット <kit> を作成しました。"
@@ -381,6 +390,8 @@ arena:
 lobby:
   spawn-set: "<green>ロビーのスポーン地点を更新しました。"
   teleported: "<gray>ロビーにテレポートしました。"
+  compass-title: "<aqua>ゲームメニュー"
+  compass-lore: "<gray>右クリックでプラクティスメニューを開きます。"
 
 ranking:
   stats-header: "<gray>--- ランク戦統計: <player> (<kit>) ---"
@@ -429,7 +440,6 @@ match:
   draw-title: "<yellow><bold>引き分け"
   timeout-draw: "<yellow>時間切れにより引き分けとなりました。"
   hard-timeout-draw: "<yellow>試合が1時間の制限に達したため強制引き分けとなりました。"
-  actionbar-score: "{self}<white> {my} <gray>- <white>{their} {opp}"
   could-not-start: "<red>試合を開始できませんでした: <reason>"
   forfeit: "<gray><player> が試合を放棄しました。"
   opponent-disconnected: "<gray>対戦相手が切断したため、あなたの勝利です。"
@@ -441,12 +451,30 @@ match:
   opponent-left-countdown: "<gray>対戦相手がカウントダウン中に退出したため、試合はキャンセルされました。"
   leave-banned: "<red>カウントダウン中の連続退出が多いため、3日間チャットBANが適用されました。"
   leave-ban-reason: "開始前カウントダウン中の連続退出"
+  item-rematch: "<green>再戦"
+  item-report: "<aqua>マッチレポート"
+  item-lobby: "<red>ロビーに戻る"
+  result-win: "<green>勝利"
+  result-draw: "<yellow>引き分け"
+  result-loss: "<red>敗北"
+  summary-no-stats: "<gray> (戦闘統計なし)"
+  summary-stats: "<aqua>  ダメージ <dealt> / <taken>  •  ヒット <hits>  •  最大コンボ <combo>"
+  summary-prefix: "<gray>試合: "
+  summary-report-btn: "レポート"
+  summary-report-hover: "完全な試合レポートを開く"
+  eliminated: "<red>脱落しました!"
 
 spectator:
   now-spectating: "<gray><yellow><player></yellow> の観戦を開始しました。"
   stopped-spectating: "<gray>観戦を終了しました。"
   cannot-spectate: "<red>現在その試合は観戦できません。"
   no-active-match: "<red><player> は現在試合中ではありません。"
+  not-fighting: "<red>そのプレイヤーは戦闘中ではありません。"
+  disabled-by-participant: "<red>参加者によって観戦が無効になっています。"
+  cannot-enter-state: "<red>観戦状態に入れません。"
+  spectating-line: "<gray>観戦中: </gray><side_red><dark_gray> vs </dark_gray><side_blue>"
+  players-count: "<n>人"
+  spectating-ffa: "<aqua>FFA観戦中: <player>"
 
 settings:
   updated: "<green>設定 <key> を <value> に更新しました。"
@@ -991,6 +1019,8 @@ gui:
   stats-title: "<name> — 統計"
   stats-unavailable: "統計を取得できません"
   profile-best-elo: "Best Elo"
+  practice-layout-order-anchor: "リスポーンアンカー → グロウストーン"
+  practice-layout-order-glow: "グロウストーン → リスポーンアンカー"
 
 
 lb:
@@ -999,3 +1029,60 @@ lb:
   no-records: "<gray>まだ記録がありません</gray>"
   kill-row: "<white>{name}</white> <gold>{kills}キル</gold> <gray>KD {kd}</gray>"
   streak-row: "<white>{name}</white> <gold>{streak}連勝</gold>"
+
+practice:
+  preparing-room: "<gray>練習ルームを準備中..."
+  copy-failed: "<red>練習用のコピーを準備できませんでした。もう一度お試しください。"
+  spawn-invalid: "<red>練習ルームのスポーンが無効です。"
+  teleport-unsafe: "<red>練習ルームへテレポートできませんでした(危険なスポーン)。"
+  joined: "<green>練習に参加しました: <name>"
+  joined-mace: "<green>メイス練習に参加しました: <name>"
+  room-not-found: "<red>練習ルームが見つからないか無効です。"
+  already-in: "<red>すでに練習ルームにいます。/prac leave"
+  join-from-lobby: "<red>練習にはロビーから参加してください。"
+  world-not-loaded: "<red>練習ワールドが読み込まれていません。"
+  cannot-enter: "<red>今は練習に参加できません。"
+  not-in-room: "<red>練習ルームにいません。"
+  left: "<yellow>練習から退出しました。"
+  duration-bar: "<gold>時間: <secs>秒"
+  time-bar: "<aqua>残り時間: <secs>秒"
+  countdown-sub: "<gray>準備して"
+  start-title: "<green><bold>スタート</bold>"
+  room-missing: "<red>練習ルームが見つかりません。"
+  resetting-terrain: "<gray>地形をリセット中..."
+  reset-failed: "<red>地形をリセットできませんでした。待機に戻ります。"
+  layout-saved: "<green>レイアウトを保存しました: <key>"
+  done-title: "<gold><bold>完了</bold>"
+  check-book: "<gray>本を確認してください"
+  book-title: "練習リザルト"
+  book-clicks: "クリック数"
+  book-avg-cps: "平均CPS"
+  book-explode-place: "爆発→設置"
+  book-place-charge: "設置→チャージ"
+  book-charge-explode: "チャージ→爆発"
+  mace-bot-name: "<gold><bold>メイスBot</bold>"
+  item-duration: "<gold>時間: <secs>秒"
+  item-duration-lore: "<gray>右クリックで5/10/15/30を切り替え"
+  item-layout: "<aqua>レイアウト編集"
+  item-layout-lore: "<gray>アンカー優先 / グロウストーン優先"
+  item-start: "<green><bold>練習を開始</bold>"
+  item-start-lore: "<gray>右クリックで開始(5秒カウントダウン)"
+  item-mace-settings: "<light_purple>メイス設定"
+  item-mace-settings-lore: "<gray>密度 / 貫通 / ウインドバースト"
+  item-bot-settings: "<yellow>Bot設定"
+  item-bot-shield: "<gray>シールド: <state>"
+  item-shield-up: "上げ"
+  item-shield-down: "下げ"
+  item-mace-name: "<light_purple>練習用メイス"
+
+killfeed:
+  view-inventory-hover: "<yellow>クリックで最終インベントリを表示"
+
+chat:
+  spam-blocked: "<red>スパムと判定されたためメッセージを送信できません。"
+
+ban:
+  announce-banned: "<white><bold><player></bold></white> <#94A3B8>がBANされました</#94A3B8>"
+  announce-kicked: "<white><bold><player></bold></white> <#94A3B8>がキックされました</#94A3B8>"
+  announce-reason: "理由"
+  announce-duration: "期間"

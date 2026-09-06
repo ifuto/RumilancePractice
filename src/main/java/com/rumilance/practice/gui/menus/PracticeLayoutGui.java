@@ -48,13 +48,13 @@ public final class PracticeLayoutGui extends AbstractGui {
         MenuScaffold.chrome(inventory);
         inventory.setItem(11, ItemBuilder.of(Material.RESPAWN_ANCHOR)
                 .name(t(player, "gui.practice-anchor-first").color(NamedTextColor.AQUA))
-                .lore(UiTheme.line("RESPAWN_ANCHOR then GLOWSTONE"),
+                .lore(UiTheme.line(line(player, "gui.practice-layout-order-anchor")),
                         UiTheme.hint(line(player, "gui.practice-layout-save")))
                 .action("layout:" + PracticeItems.LAYOUT_ANCHOR_FIRST)
                 .build());
         inventory.setItem(15, ItemBuilder.of(Material.GLOWSTONE)
                 .name(t(player, "gui.practice-glow-first").color(NamedTextColor.YELLOW))
-                .lore(UiTheme.line("GLOWSTONE then RESPAWN_ANCHOR"),
+                .lore(UiTheme.line(line(player, "gui.practice-layout-order-glow")),
                         UiTheme.hint(line(player, "gui.practice-layout-save")))
                 .action("layout:" + PracticeItems.LAYOUT_GLOW_FIRST)
                 .build());

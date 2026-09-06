@@ -528,10 +528,12 @@ public final class FfaService {
                 // Full kit refill on a confirmed kill (someone other than yourself).
                 restoreKit(killer);
                 FfaStats s = stats(killerId);
-                killer.sendActionBar(Component.text("Kills: " + s.kills() + " Deaths: " + s.deaths(),
-                        NamedTextColor.GOLD));
+                killer.sendActionBar(messageService.render(killer, "ffa.kills-bar",
+                        MessageService.tags("kills", String.valueOf(s.kills()),
+                                "deaths", String.valueOf(s.deaths()))));
                 if (streak > 0 && streak % 5 == 0) {
-                    killer.sendMessage(Component.text(streak + " kill streak!", NamedTextColor.GOLD));
+                    killer.sendMessage(messageService.render(killer, "ffa.kill-streak",
+                            MessageService.tags("n", String.valueOf(streak))));
                 }
             }
             asyncExecutor.execute(() -> {
@@ -561,7 +563,8 @@ public final class FfaService {
                 continue;
             }
             int seconds = (int) Math.max(1L, (tag.untilMillis() - now + 999L) / 1000L);
-            online.sendActionBar(Component.text("Combat : " + seconds + "s", NamedTextColor.RED));
+            online.sendActionBar(messageService.render(online, "ffa.combat-bar",
+                    MessageService.tags("secs", String.valueOf(seconds))));
         }
     }
 
@@ -599,10 +602,12 @@ public final class FfaService {
                 FfaStats s = stats(killerId);
                 restoreKit(killer);
                 com.rumilance.practice.combat.KillFeed.broadcast(killer, victim, null, hp, max, null);
-                killer.sendActionBar(Component.text("Kills: " + s.kills() + " Deaths: " + s.deaths(),
-                        NamedTextColor.GOLD));
+                killer.sendActionBar(messageService.render(killer, "ffa.kills-bar",
+                        MessageService.tags("kills", String.valueOf(s.kills()),
+                                "deaths", String.valueOf(s.deaths()))));
                 if (streak > 0 && streak % 5 == 0) {
-                    killer.sendMessage(Component.text(streak + " kill streak!", NamedTextColor.GOLD));
+                    killer.sendMessage(messageService.render(killer, "ffa.kill-streak",
+                            MessageService.tags("n", String.valueOf(streak))));
                 }
             }
             asyncExecutor.execute(() -> {

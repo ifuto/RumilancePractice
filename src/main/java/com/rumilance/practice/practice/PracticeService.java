@@ -2,6 +2,7 @@ package com.rumilance.practice.practice;
 
 import com.rumilance.practice.config.ConfigService;
 import com.rumilance.practice.database.repository.PracticeLayoutRepository;
+import com.rumilance.practice.locale.MessageService;
 import com.rumilance.practice.lobby.LobbyService;
 import com.rumilance.practice.model.PracticeRoom;
 import com.rumilance.practice.session.PlayerStateManager;
@@ -58,6 +59,7 @@ public final class PracticeService {
     private final PracticeLayoutRepository layoutRepository;
     private final AsyncExecutor asyncExecutor;
     private final PracticeCloneService cloneService;
+    private final MessageService messages;
 
     private final Map<String, PracticeRoom> rooms = new LinkedHashMap<>();
     private final Map<String, PracticeDraft> drafts = new ConcurrentHashMap<>();
@@ -75,7 +77,8 @@ public final class PracticeService {
 
     public PracticeService(Plugin plugin, ConfigService configService, PlayerStateManager stateManager,
                            LobbyService lobbyService, PracticeLayoutRepository layoutRepository,
-                           AsyncExecutor asyncExecutor, PracticeCloneService cloneService) {
+                           AsyncExecutor asyncExecutor, PracticeCloneService cloneService,
+                           MessageService messages) {
         this.plugin = plugin;
         this.configService = configService;
         this.stateManager = stateManager;
@@ -83,6 +86,7 @@ public final class PracticeService {
         this.layoutRepository = layoutRepository;
         this.asyncExecutor = asyncExecutor;
         this.cloneService = cloneService;
+        this.messages = messages;
         reload();
     }
 
@@ -337,23 +341,23 @@ public final class PracticeService {
     public void join(Player player, String practiceId) {
         PracticeRoom room = rooms.get(practiceId);
         if (room == null || !room.enabled()) {
-            player.sendMessage(Component.text("Practice room not found or disabled.", NamedTextColor.RED));
+            player.sendMessage(messages.render(player, "practice.room-not-found"));
             return;
         }
         if (sessions.containsKey(player.getUniqueId())) {
-            player.sendMessage(Component.text("Already in a practice room. /prac leave", NamedTextColor.RED));
+            player.sendMessage(messages.render(player, "practice.already-in"));
             return;
         }
         PlayerState state = stateManager.getState(player.getUniqueId());
         if (state != PlayerState.LOBBY && state != PlayerState.OPENING_GUI) {
-            player.sendMessage(Component.text("Join practice from the lobby.", NamedTextColor.RED));
+            player.sendMessage(messages.render(player, "practice.join-from-lobby"));
             return;
         }
         Location spawn = LocationUtil.deserialize(room.serializedSpawn());
         if (spawn.getWorld() == null) {
             World world = Bukkit.getWorld(room.world());
             if (world == null) {
-                player.sendMessage(Component.text("Practice world is not loaded.", NamedTextColor.RED));
+                player.sendMessage(messages.render(player, "practice.world-not-loaded"));
                 return;
             }
             spawn.setWorld(world);
@@ -378,7 +382,7 @@ public final class PracticeService {
                     : PlayerState.PRACTICE_WAIT;
             stateManager.transition(player.getUniqueId(), target);
         } catch (Exception e) {
-            player.sendMessage(Component.text("Cannot enter practice right now.", NamedTextColor.RED));
+            player.sendMessage(messages.render(player, "practice.cannot-enter"));
             return;
         }
 
@@ -394,7 +398,7 @@ public final class PracticeService {
 
         final PracticeRoom joinedRoom = room;
         if (cloneService != null && cloneService.isAvailable()) {
-            player.sendMessage(Component.text("Preparing practice room...", NamedTextColor.GRAY));
+            player.sendMessage(messages.render(player, "practice.preparing-room"));
             cloneService.pasteCopy(joinedRoom, all()).whenComplete((opt, err) ->
                     Bukkit.getScheduler().runTask(plugin, () -> {
                         if (!player.isOnline()) {
@@ -418,9 +422,7 @@ public final class PracticeService {
                             } catch (Exception ignored) {
                             }
                             lobbyService.sendToLobby(player);
-                            player.sendMessage(Component.text(
-                                    "Could not prepare a practice copy. Try again.",
-                                    NamedTextColor.RED));
+                            player.sendMessage(messages.render(player, "practice.copy-failed"));
                             return;
                         }
                         PracticeCloneService.PracticeCopy copy = opt.get();
@@ -442,7 +444,7 @@ public final class PracticeService {
 
     private void finishJoinTeleport(Player player, PracticeSession session, PracticeRoom joinedRoom, Location spawn) {
         if (spawn == null || spawn.getWorld() == null) {
-            abortJoin(player, session, "Practice spawn is invalid.");
+            abortJoin(player, session, "practice.spawn-invalid");
             return;
         }
         SafeTeleport.teleport(player, spawn).whenComplete((ok, err) ->
@@ -456,32 +458,32 @@ public final class PracticeService {
                         return;
                     }
                     if (err != null || !Boolean.TRUE.equals(ok)) {
-                        abortJoin(player, session, "Could not teleport into the practice room (unsafe spawn).");
+                        abortJoin(player, session, "practice.teleport-unsafe");
                         return;
                     }
                     joinGraceUntilMs.put(player.getUniqueId(), System.currentTimeMillis() + 2000L);
                     if (joinedRoom.type() == PracticeType.ANKER) {
                         giveWaitHotbar(player, session);
-                        player.sendMessage(Component.text(
-                                "Joined practice: " + joinedRoom.displayName(), NamedTextColor.GREEN));
+                        player.sendMessage(messages.render(player, "practice.joined",
+                                MessageService.tags("name", joinedRoom.displayName())));
                     } else {
                         giveMaceLoadout(player, session);
                         spawnMaceBot(player, session, joinedRoom);
-                        player.sendMessage(Component.text(
-                                "Joined mace practice: " + joinedRoom.displayName(), NamedTextColor.GREEN));
+                        player.sendMessage(messages.render(player, "practice.joined-mace",
+                                MessageService.tags("name", joinedRoom.displayName())));
                     }
                 }));
     }
 
-    private void abortJoin(Player player, PracticeSession session, String message) {
+    private void abortJoin(Player player, PracticeSession session, String langKey) {
         cleanupSession(player.getUniqueId());
         try {
             stateManager.resetToLobby(player.getUniqueId());
         } catch (Exception ignored) {
         }
         lobbyService.sendToLobby(player);
-        if (message != null) {
-            player.sendMessage(Component.text(message, NamedTextColor.RED));
+        if (langKey != null) {
+            player.sendMessage(messages.render(player, langKey));
         }
     }
 
@@ -508,7 +510,7 @@ public final class PracticeService {
         joinGraceUntilMs.remove(player.getUniqueId());
         if (session == null) {
             if (announce) {
-                player.sendMessage(Component.text("Not in a practice room.", NamedTextColor.RED));
+                player.sendMessage(messages.render(player, "practice.not-in-room"));
             }
             return;
         }
@@ -524,7 +526,7 @@ public final class PracticeService {
             cloneService.release(cloneId);
         }
         if (announce) {
-            player.sendMessage(Component.text("Left practice.", NamedTextColor.YELLOW));
+            player.sendMessage(messages.render(player, "practice.left"));
         }
     }
 
@@ -558,25 +560,25 @@ public final class PracticeService {
 
     public void giveWaitHotbar(Player player, PracticeSession session) {
         player.getInventory().clear();
-        player.getInventory().setItem(0, PracticeItems.durationClock(session.durationSeconds()));
-        player.getInventory().setItem(1, PracticeItems.layoutSword());
-        player.getInventory().setItem(4, PracticeItems.startDye());
+        player.getInventory().setItem(0, PracticeItems.durationClock(messages, player, session.durationSeconds()));
+        player.getInventory().setItem(1, PracticeItems.layoutSword(messages, player));
+        player.getInventory().setItem(4, PracticeItems.startDye(messages, player));
         player.getInventory().setHeldItemSlot(4);
     }
 
     public void giveMaceLoadout(Player player, PracticeSession session) {
         player.getInventory().clear();
-        player.getInventory().setItem(0, PracticeItems.buildMace(
+        player.getInventory().setItem(0, PracticeItems.buildMace(messages, player,
                 session.maceDensity(), session.maceBreach(), session.maceWindBurst()));
-        player.getInventory().setItem(7, PracticeItems.maceSettings());
-        player.getInventory().setItem(8, PracticeItems.botSettings(session.botShieldRaised()));
+        player.getInventory().setItem(7, PracticeItems.maceSettings(messages, player));
+        player.getInventory().setItem(8, PracticeItems.botSettings(messages, player, session.botShieldRaised()));
         equipPlayerMaceArmor(player);
     }
 
     public void refreshMaceItem(Player player, PracticeSession session) {
-        player.getInventory().setItem(0, PracticeItems.buildMace(
+        player.getInventory().setItem(0, PracticeItems.buildMace(messages, player,
                 session.maceDensity(), session.maceBreach(), session.maceWindBurst()));
-        player.getInventory().setItem(8, PracticeItems.botSettings(session.botShieldRaised()));
+        player.getInventory().setItem(8, PracticeItems.botSettings(messages, player, session.botShieldRaised()));
         applyBotShield(session);
     }
 
@@ -595,9 +597,9 @@ public final class PracticeService {
             case PracticeItems.ACTION_DURATION -> {
                 session.cycleDuration();
                 preferredDurations.put(player.getUniqueId(), session.durationSeconds());
-                player.getInventory().setItem(0, PracticeItems.durationClock(session.durationSeconds()));
-                player.sendActionBar(Component.text("Duration: " + session.durationSeconds() + "s",
-                        NamedTextColor.GOLD));
+                player.getInventory().setItem(0, PracticeItems.durationClock(messages, player, session.durationSeconds()));
+                player.sendActionBar(messages.render(player, "practice.duration-bar",
+                        MessageService.tags("secs", String.valueOf(session.durationSeconds()))));
             }
             case PracticeItems.ACTION_LAYOUT -> {
                 if (openLayoutGui != null) {
@@ -645,7 +647,7 @@ public final class PracticeService {
                 player.showTitle(Title.title(
                         Component.text(String.valueOf(remaining[0]), NamedTextColor.YELLOW)
                                 .decorate(TextDecoration.BOLD),
-                        Component.text("Get ready", NamedTextColor.GRAY),
+                        messages.render(player, "practice.countdown-sub"),
                         Title.Times.times(Duration.ZERO, Duration.ofMillis(800), Duration.ofMillis(100))));
                 remaining[0]--;
                 return;
@@ -659,7 +661,7 @@ public final class PracticeService {
     private void startAnkerActive(Player player, PracticeSession session) {
         PracticeRoom room = get(session.practiceId()).orElse(null);
         if (room == null) {
-            player.sendMessage(Component.text("Practice room missing.", NamedTextColor.RED));
+            player.sendMessage(messages.render(player, "practice.room-missing"));
             returnToWaitSafely(player, session);
             return;
         }
@@ -670,16 +672,14 @@ public final class PracticeService {
             beginAnkerActiveNow(player, session);
             return;
         }
-        player.sendMessage(Component.text("Resetting practice terrain...", NamedTextColor.GRAY));
+        player.sendMessage(messages.render(player, "practice.resetting-terrain"));
         cloneService.repaste(session, room).whenComplete((ok, err) ->
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     if (!player.isOnline() || sessions.get(player.getUniqueId()) != session) {
                         return;
                     }
                     if (err != null || !Boolean.TRUE.equals(ok)) {
-                        player.sendMessage(Component.text(
-                                "Could not reset the practice terrain. Returning to wait.",
-                                NamedTextColor.RED));
+                        player.sendMessage(messages.render(player, "practice.reset-failed"));
                         returnToWaitSafely(player, session);
                         return;
                     }
@@ -719,7 +719,7 @@ public final class PracticeService {
         applyAnkerLayout(player, session);
         player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1f, 1.5f);
         player.showTitle(Title.title(
-                Component.text("START", NamedTextColor.GREEN).decorate(TextDecoration.BOLD),
+                messages.render(player, "practice.start-title"),
                 Component.text(session.durationSeconds() + "s", NamedTextColor.GRAY),
                 Title.Times.times(Duration.ZERO, Duration.ofSeconds(1), Duration.ofMillis(200))));
 
@@ -736,7 +736,8 @@ public final class PracticeService {
                 return;
             }
             left[0]--;
-            player.sendActionBar(Component.text("Time: " + left[0] + "s", NamedTextColor.AQUA));
+            player.sendActionBar(messages.render(player, "practice.time-bar",
+                    MessageService.tags("secs", String.valueOf(left[0]))));
         }, 20L, 20L);
         session.setTimerTask(task);
     }
@@ -796,7 +797,8 @@ public final class PracticeService {
                 plugin.getLogger().log(Level.WARNING, "Failed saving practice layout", e);
             }
         });
-        player.sendMessage(Component.text("Layout saved: " + layoutKey, NamedTextColor.GREEN));
+        player.sendMessage(messages.render(player, "practice.layout-saved",
+                MessageService.tags("key", layoutKey)));
     }
 
     private void endAnkerRun(Player player, PracticeSession session) {
@@ -812,30 +814,37 @@ public final class PracticeService {
         session.setPlaceBlocked(false);
         giveWaitHotbar(player, session);
         player.showTitle(Title.title(
-                Component.text("DONE", NamedTextColor.GOLD).decorate(TextDecoration.BOLD),
-                Component.text("Check your book", NamedTextColor.GRAY),
+                messages.render(player, "practice.done-title"),
+                messages.render(player, "practice.check-book"),
                 Title.Times.times(Duration.ZERO, Duration.ofSeconds(2), Duration.ofMillis(300))));
     }
 
     private void giveStatsBook(Player player, PracticeAnkerStats stats) {
         ItemStack book = new ItemStack(Material.WRITTEN_BOOK);
         BookMeta meta = (BookMeta) book.getItemMeta();
-        meta.setTitle("Practice Results");
+        String bookTitle = messages.raw(player, "practice.book-title");
+        meta.setTitle(bookTitle);
         meta.setAuthor("N Arena");
         String page = """
-                §6Practice Results
+                §6%s
                 §0
-                Clicks: %d
-                Avg CPS: %.2f
+                %s: %d
+                %s: %.2f
                 §0
-                Explode→Place: %.0f ms
-                Place→Charge: %.0f ms
-                Charge→Explode: %.0f ms
+                %s: %.0f ms
+                %s: %.0f ms
+                %s: %.0f ms
                 """.formatted(
+                bookTitle,
+                messages.raw(player, "practice.book-clicks"),
                 stats.clicks(),
+                messages.raw(player, "practice.book-avg-cps"),
                 stats.avgCps(),
+                messages.raw(player, "practice.book-explode-place"),
                 stats.avgExplodeToPlaceMs(),
+                messages.raw(player, "practice.book-place-charge"),
                 stats.avgPlaceToChargeMs(),
+                messages.raw(player, "practice.book-charge-explode"),
                 stats.avgChargeToExplodeMs());
         meta.addPages(Component.text(page));
         book.setItemMeta(meta);
@@ -902,7 +911,7 @@ public final class PracticeService {
             m.setRemoveWhenFarAway(false);
             m.setPersistent(false);
             m.setCollidable(true);
-            m.customName(Component.text("Mace Bot", NamedTextColor.GOLD).decorate(TextDecoration.BOLD));
+            m.customName(messages.render(player, "practice.mace-bot-name"));
             m.setCustomNameVisible(true);
             m.setProfile(ResolvableProfile.resolvableProfile(player.getPlayerProfile()));
             if (m.getAttribute(Attribute.MAX_HEALTH) != null) {

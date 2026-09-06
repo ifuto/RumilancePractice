@@ -265,6 +265,12 @@ party:
   help-start: "<grey>/team start <kit> | /team disband"
   info-line: "<aqua><visibility> party '<name>' (<size>/<max>)<sides>"
   info-sides: "  RED=<red> BLUE=<blue>"
+  hotbar-hub: "<aqua>Party Hub"
+  hotbar-hub-hint: "<gray>Members, settings, start battle"
+  hotbar-kit-edit: "<aqua>Kit Edit"
+  hotbar-kit-edit-hint: "<gray>Edit your kit layouts"
+  hotbar-leave: "<red>Leave Party"
+  hotbar-leave-hint: "<gray>Leave the party"
 
 general:
   prefix: ""
@@ -345,6 +351,9 @@ ffa:
   left: "<grey>You left the FFA arena."
   killed-by: "<red>You were killed by <yellow><killer></yellow>."
   repairing-title: "<red>FFA is under repair"
+  kills-bar: "<gold>Kills: <kills>  Deaths: <deaths>"
+  kill-streak: "<gold><n> kill streak!"
+  combat-bar: "<red>Combat: <secs>s"
 
 kit:
   created: "<green>Kit <kit> created."
@@ -380,6 +389,8 @@ arena:
 lobby:
   spawn-set: "<green>Lobby spawn point updated."
   teleported: "<grey>Teleported to the lobby."
+  compass-title: "<aqua>Game Menu"
+  compass-lore: "<gray>Right-click to open the practice menu."
 
 ranking:
   stats-header: "<grey>--- Ranked Stats: <player> (<kit>) ---"
@@ -439,12 +450,30 @@ match:
   opponent-left-countdown: "<grey>Your opponent left during the countdown - the match was cancelled."
   leave-banned: "<red>You left during the countdown too many times in a row - chat restricted for 3 days."
   leave-ban-reason: "Left during the pre-match countdown too many times in a row"
+  item-rematch: "<green>Rematch"
+  item-report: "<aqua>Match Report"
+  item-lobby: "<red>Return to Lobby"
+  result-win: "<green>WIN"
+  result-draw: "<yellow>DRAW"
+  result-loss: "<red>LOSS"
+  summary-no-stats: "<gray> (no combat stats)"
+  summary-stats: "<aqua>  DMG <dealt> / <taken>  •  Hits <hits>  •  Best Combo <combo>"
+  summary-prefix: "<gray>Match: "
+  summary-report-btn: "Report"
+  summary-report-hover: "Open the full match report"
+  eliminated: "<red>You were eliminated!"
 
 spectator:
   now-spectating: "<grey>You are now spectating <yellow><player></yellow>."
   stopped-spectating: "<grey>You stopped spectating."
   cannot-spectate: "<red>You cannot spectate that match right now."
   no-active-match: "<red><player> is not currently in a match."
+  not-fighting: "<red>That player is not in an active fight."
+  disabled-by-participant: "<red>Spectating is disabled by a participant."
+  cannot-enter-state: "<red>Cannot enter spectate state."
+  spectating-line: "<gray>Spectating </gray><side_red><dark_gray> vs </dark_gray><side_blue>"
+  players-count: "<n> players"
+  spectating-ffa: "<aqua>Spectating FFA: <player>"
 
 settings:
   updated: "<green>Updated <key> to <value>."
@@ -989,6 +1018,8 @@ gui:
   stats-title: "<name> — Stats"
   stats-unavailable: "Stats unavailable"
   profile-best-elo: "Best Elo"
+  practice-layout-order-anchor: "RESPAWN_ANCHOR then GLOWSTONE"
+  practice-layout-order-glow: "GLOWSTONE then RESPAWN_ANCHOR"
 
 lb:
   kill-title: "<gold><b>Monthly Kill Ranking</b></gold>"
@@ -996,3 +1027,60 @@ lb:
   no-records: "<gray>No records yet</gray>"
   kill-row: "<white>{name}</white> <gold>{kills} kills</gold> <gray>KD {kd}</gray>"
   streak-row: "<white>{name}</white> <gold>{streak} win streak</gold>"
+
+practice:
+  preparing-room: "<gray>Preparing practice room..."
+  copy-failed: "<red>Could not prepare a practice copy. Try again."
+  spawn-invalid: "<red>Practice spawn is invalid."
+  teleport-unsafe: "<red>Could not teleport into the practice room (unsafe spawn)."
+  joined: "<green>Joined practice: <name>"
+  joined-mace: "<green>Joined mace practice: <name>"
+  room-not-found: "<red>Practice room not found or disabled."
+  already-in: "<red>Already in a practice room. /prac leave"
+  join-from-lobby: "<red>Join practice from the lobby."
+  world-not-loaded: "<red>Practice world is not loaded."
+  cannot-enter: "<red>Cannot enter practice right now."
+  not-in-room: "<red>Not in a practice room."
+  left: "<yellow>Left practice."
+  duration-bar: "<gold>Duration: <secs>s"
+  time-bar: "<aqua>Time: <secs>s"
+  countdown-sub: "<gray>Get ready"
+  start-title: "<green><bold>START</bold>"
+  room-missing: "<red>Practice room missing."
+  resetting-terrain: "<gray>Resetting practice terrain..."
+  reset-failed: "<red>Could not reset the practice terrain. Returning to wait."
+  layout-saved: "<green>Layout saved: <key>"
+  done-title: "<gold><bold>DONE</bold>"
+  check-book: "<gray>Check your book"
+  book-title: "Practice Results"
+  book-clicks: "Clicks"
+  book-avg-cps: "Avg CPS"
+  book-explode-place: "Explode→Place"
+  book-place-charge: "Place→Charge"
+  book-charge-explode: "Charge→Explode"
+  mace-bot-name: "<gold><bold>Mace Bot</bold>"
+  item-duration: "<gold>Duration: <secs>s"
+  item-duration-lore: "<gray>Right-click to cycle 5/10/15/30"
+  item-layout: "<aqua>Edit Layout"
+  item-layout-lore: "<gray>Anchor 1st / Glowstone 1st"
+  item-start: "<green><bold>Start Practice</bold>"
+  item-start-lore: "<gray>Right-click to start (5s countdown)"
+  item-mace-settings: "<light_purple>Mace Settings"
+  item-mace-settings-lore: "<gray>Density / Breach / Wind Burst"
+  item-bot-settings: "<yellow>Bot Settings"
+  item-bot-shield: "<gray>Shield: <state>"
+  item-shield-up: "UP"
+  item-shield-down: "DOWN"
+  item-mace-name: "<light_purple>Practice Mace"
+
+killfeed:
+  view-inventory-hover: "<yellow>Click to view end inventory"
+
+chat:
+  spam-blocked: "<red>Your message was blocked because it was detected as spam."
+
+ban:
+  announce-banned: "<white><bold><player></bold></white> <#94A3B8>has been banned</#94A3B8>"
+  announce-kicked: "<white><bold><player></bold></white> <#94A3B8>has been kicked</#94A3B8>"
+  announce-reason: "Reason"
+  announce-duration: "Duration"

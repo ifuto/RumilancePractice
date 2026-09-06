@@ -5,8 +5,7 @@ import com.rumilance.practice.database.repository.SpamDetectionRepository;
 import com.rumilance.practice.punishment.ChatBanService;
 import com.rumilance.practice.punishment.SpamBanDuration;
 import com.rumilance.practice.util.AsyncExecutor;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
+import com.rumilance.practice.locale.MessageService;
 import org.bukkit.entity.Player;
 
 import java.time.Duration;
@@ -38,15 +37,18 @@ public final class SpamFilterService {
     private final ChatBanService chatBanService;
     private final AsyncExecutor asyncExecutor;
     private final Logger logger;
+    private final MessageService messages;
     private final Map<UUID, Recent> recents = new ConcurrentHashMap<>();
 
     public SpamFilterService(ConfigService configService, SpamDetectionRepository repository,
-                             ChatBanService chatBanService, AsyncExecutor asyncExecutor, Logger logger) {
+                             ChatBanService chatBanService, AsyncExecutor asyncExecutor, Logger logger,
+                             MessageService messages) {
         this.configService = configService;
         this.repository = repository;
         this.chatBanService = chatBanService;
         this.asyncExecutor = asyncExecutor;
         this.logger = logger;
+        this.messages = messages;
     }
 
     private boolean enabled() {
@@ -112,8 +114,7 @@ public final class SpamFilterService {
 
     private void onDetected(Player player) {
         UUID uuid = player.getUniqueId();
-        player.sendMessage(Component.text("スパムと判定されたためメッセージを送信できません。",
-                NamedTextColor.RED));
+        player.sendMessage(messages.render(player, "chat.spam-blocked"));
         int threshold = banThreshold();
         asyncExecutor.execute(() -> {
             try {

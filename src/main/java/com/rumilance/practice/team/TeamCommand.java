@@ -49,7 +49,7 @@ public final class TeamCommand implements CommandExecutor, TabCompleter {
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command,
                              @NotNull String label, @NotNull String[] args) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage(Component.text("Only players can use teams.", NamedTextColor.RED));
+            sender.sendMessage(messageService.render(null, "party.player-only"));
             return true;
         }
         if (args.length == 0 || args[0].equalsIgnoreCase("gui")) {

@@ -41,15 +41,23 @@ public final class LobbyCompassListener implements Listener {
 
     /** Builds the compass item. Exposed so other code (admin tools, /setfunc) can reuse the same icon. */
     public static ItemStack compassItem() {
+        return compassItem(null, null);
+    }
+
+    /** Localised variant rendered for {@code player}'s locale when a {@code messages} service is given. */
+    public static ItemStack compassItem(com.rumilance.practice.locale.MessageService messages,
+                                        org.bukkit.entity.Player player) {
         ItemStack stack = new ItemStack(Material.COMPASS);
         ItemMeta meta = stack.getItemMeta();
-        meta.displayName(Component.text("Game Menu", net.kyori.adventure.text.format.NamedTextColor.AQUA)
-                .decoration(TextDecoration.ITALIC, false));
-        meta.lore(java.util.List.of(
-                Component.text("Right-click to open the practice menu.",
-                        net.kyori.adventure.text.format.NamedTextColor.GRAY)
-                        .decoration(TextDecoration.ITALIC, false)
-        ));
+        Component name = Component.text("Game Menu", net.kyori.adventure.text.format.NamedTextColor.AQUA);
+        Component lore = Component.text("Right-click to open the practice menu.",
+                net.kyori.adventure.text.format.NamedTextColor.GRAY);
+        if (messages != null && player != null) {
+            name = messages.render(player, "lobby.compass-title");
+            lore = messages.render(player, "lobby.compass-lore");
+        }
+        meta.displayName(name.decoration(TextDecoration.ITALIC, false));
+        meta.lore(java.util.List.of(lore.decoration(TextDecoration.ITALIC, false)));
         meta.addItemFlags(org.bukkit.inventory.ItemFlag.values());
         meta.getPersistentDataContainer().set(ItemKeys.functionType(), PersistentDataType.STRING, "menu");
         stack.setItemMeta(meta);

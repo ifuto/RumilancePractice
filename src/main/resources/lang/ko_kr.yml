@@ -265,6 +265,12 @@ party:
   help-start: "<gray>/team start <kit> | /team disband"
   info-line: "<aqua><visibility> 파티 '<name>' (<size>/<max>)<sides>"
   info-sides: "  RED=<red> BLUE=<blue>"
+  hotbar-hub: "<aqua>파티 허브"
+  hotbar-hub-hint: "<gray>멤버·설정·대전 시작"
+  hotbar-kit-edit: "<aqua>킷 편집"
+  hotbar-kit-edit-hint: "<gray>킷 레이아웃 편집"
+  hotbar-leave: "<red>파티 나가기"
+  hotbar-leave-hint: "<gray>파티에서 나갑니다"
 
 general:
   prefix: ""
@@ -345,6 +351,9 @@ ffa:
   left: "<gray>FFA에서 퇴장했습니다."
   killed-by: "<red><yellow><killer></yellow>에게 처치당했습니다."
   repairing-title: "<red>FFA 복구 중입니다"
+  kills-bar: "<gold>킬: <kills>  데스: <deaths>"
+  kill-streak: "<gold><n>킬 스트릭!"
+  combat-bar: "<red>전투 중: <secs>초"
 
 kit:
   created: "<green>키트 <kit>를 생성했습니다."
@@ -380,6 +389,8 @@ arena:
 lobby:
   spawn-set: "<green>로비 스폰 지점을 업데이트했습니다."
   teleported: "<gray>로비로 이동했습니다."
+  compass-title: "<aqua>게임 메뉴"
+  compass-lore: "<gray>우클릭으로 연습 메뉴를 엽니다."
 
 ranking:
   stats-header: "<gray>--- 랭크 통계: <player> (<kit>) ---"
@@ -439,12 +450,30 @@ match:
   opponent-left-countdown: "<gray>상대가 카운트다운 중에 나가 경기가 취소되었습니다."
   leave-banned: "<red>카운트다운 중 연속 퇴장이 잦아 3일간 채팅이 제한되었습니다."
   leave-ban-reason: "시작 전 카운트다운 중 연속 퇴장"
+  item-rematch: "<green>재대결"
+  item-report: "<aqua>매치 리포트"
+  item-lobby: "<red>로비로 돌아가기"
+  result-win: "<green>승리"
+  result-draw: "<yellow>무승부"
+  result-loss: "<red>패배"
+  summary-no-stats: "<gray> (전투 통계 없음)"
+  summary-stats: "<aqua>  피해 <dealt> / <taken>  •  타격 <hits>  •  최고 콤보 <combo>"
+  summary-prefix: "<gray>매치: "
+  summary-report-btn: "리포트"
+  summary-report-hover: "전체 매치 리포트 열기"
+  eliminated: "<red>탈락했습니다!"
 
 spectator:
   now-spectating: "<gray>이제 <yellow><player></yellow> 님을 관전합니다."
   stopped-spectating: "<gray>관전을 중단했습니다."
   cannot-spectate: "<red>지금은 해당 경기를 관전할 수 없습니다."
   no-active-match: "<red><player> 님은 현재 경기 중이 아닙니다."
+  not-fighting: "<red>해당 플레이어는 전투 중이 아닙니다."
+  disabled-by-participant: "<red>참가자가 관전을 비활성화했습니다."
+  cannot-enter-state: "<red>관전 상태에 들어갈 수 없습니다."
+  spectating-line: "<gray>관전 중: </gray><side_red><dark_gray> vs </dark_gray><side_blue>"
+  players-count: "<n>명"
+  spectating-ffa: "<aqua>FFA 관전 중: <player>"
 
 settings:
   updated: "<green><key>을(를) <value>(으)로 변경했습니다."
@@ -989,6 +1018,8 @@ gui:
   stats-title: "<name> — 통계"
   stats-unavailable: "통계를 불러올 수 없음"
   profile-best-elo: "Best Elo"
+  practice-layout-order-anchor: "리스폰 정박기 → 발광석"
+  practice-layout-order-glow: "발광석 → 리스폰 정박기"
 
 lb:
   kill-title: "<gold><b>월간 킬 랭킹</b></gold>"
@@ -996,3 +1027,60 @@ lb:
   no-records: "<gray>아직 기록이 없습니다</gray>"
   kill-row: "<white>{name}</white> <gold>{kills}킬</gold> <gray>KD {kd}</gray>"
   streak-row: "<white>{name}</white> <gold>{streak}연승</gold>"
+
+practice:
+  preparing-room: "<gray>연습실을 준비하는 중..."
+  copy-failed: "<red>연습용 복사를 준비하지 못했습니다. 다시 시도해 주세요."
+  spawn-invalid: "<red>연습실 스폰이 잘못되었습니다."
+  teleport-unsafe: "<red>연습실로 텔레포트할 수 없습니다(위험한 스폰)."
+  joined: "<green>연습에 참가했습니다: <name>"
+  joined-mace: "<green>메이스 연습에 참가했습니다: <name>"
+  room-not-found: "<red>연습실을 찾을 수 없거나 비활성 상태입니다."
+  already-in: "<red>이미 연습실에 있습니다. /prac leave"
+  join-from-lobby: "<red>연습은 로비에서 참가하세요."
+  world-not-loaded: "<red>연습 월드가 로드되지 않았습니다."
+  cannot-enter: "<red>지금은 연습에 참가할 수 없습니다."
+  not-in-room: "<red>연습실에 있지 않습니다."
+  left: "<yellow>연습에서 나갔습니다."
+  duration-bar: "<gold>시간: <secs>초"
+  time-bar: "<aqua>남은 시간: <secs>초"
+  countdown-sub: "<gray>준비하세요"
+  start-title: "<green><bold>시작</bold>"
+  room-missing: "<red>연습실이 없습니다."
+  resetting-terrain: "<gray>지형을 재설정하는 중..."
+  reset-failed: "<red>지형을 재설정하지 못했습니다. 대기로 돌아갑니다."
+  layout-saved: "<green>레이아웃을 저장했습니다: <key>"
+  done-title: "<gold><bold>완료</bold>"
+  check-book: "<gray>책을 확인하세요"
+  book-title: "연습 결과"
+  book-clicks: "클릭 수"
+  book-avg-cps: "평균 CPS"
+  book-explode-place: "폭발→설치"
+  book-place-charge: "설치→충전"
+  book-charge-explode: "충전→폭발"
+  mace-bot-name: "<gold><bold>메이스 봇</bold>"
+  item-duration: "<gold>시간: <secs>초"
+  item-duration-lore: "<gray>우클릭으로 5/10/15/30 전환"
+  item-layout: "<aqua>레이아웃 편집"
+  item-layout-lore: "<gray>앵커 우선 / 발광석 우선"
+  item-start: "<green><bold>연습 시작</bold>"
+  item-start-lore: "<gray>우클릭으로 시작(5초 카운트다운)"
+  item-mace-settings: "<light_purple>메이스 설정"
+  item-mace-settings-lore: "<gray>밀도 / 관통 / 돌풍"
+  item-bot-settings: "<yellow>봇 설정"
+  item-bot-shield: "<gray>방패: <state>"
+  item-shield-up: "올림"
+  item-shield-down: "내림"
+  item-mace-name: "<light_purple>연습용 메이스"
+
+killfeed:
+  view-inventory-hover: "<yellow>클릭해서 최종 인벤토리 보기"
+
+chat:
+  spam-blocked: "<red>스팸으로 감지되어 메시지를 보낼 수 없습니다."
+
+ban:
+  announce-banned: "<white><bold><player></bold></white> <#94A3B8>님이 차단되었습니다</#94A3B8>"
+  announce-kicked: "<white><bold><player></bold></white> <#94A3B8>님이 추방되었습니다</#94A3B8>"
+  announce-reason: "사유"
+  announce-duration: "기간"

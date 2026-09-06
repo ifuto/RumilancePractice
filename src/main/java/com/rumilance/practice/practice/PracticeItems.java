@@ -1,10 +1,11 @@
 package com.rumilance.practice.practice;
 
 import com.rumilance.practice.gui.ItemBuilder;
+import com.rumilance.practice.locale.MessageService;
 import com.rumilance.practice.util.ItemKeys;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
+import org.bukkit.entity.Player;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Registry;
@@ -31,53 +32,51 @@ public final class PracticeItems {
     private PracticeItems() {
     }
 
-    public static ItemStack durationClock(int seconds) {
+    private static Component name(MessageService messages, Player player, String key,
+                                  net.kyori.adventure.text.minimessage.tag.resolver.TagResolver... tags) {
+        return messages.render(player, key, tags).decoration(TextDecoration.ITALIC, false);
+    }
+
+    public static ItemStack durationClock(MessageService messages, Player player, int seconds) {
         return ItemBuilder.of(Material.CLOCK)
-                .name(Component.text("Duration: " + seconds + "s", NamedTextColor.GOLD)
-                        .decoration(TextDecoration.ITALIC, false))
-                .lore(Component.text("Right-click to cycle 5/10/15/30", NamedTextColor.GRAY)
-                        .decoration(TextDecoration.ITALIC, false))
+                .name(name(messages, player, "practice.item-duration",
+                        net.kyori.adventure.text.minimessage.tag.resolver.Placeholder
+                                .unparsed("secs", String.valueOf(seconds))))
+                .lore(name(messages, player, "practice.item-duration-lore"))
                 .action(ACTION_DURATION)
                 .build();
     }
 
-    public static ItemStack layoutSword() {
+    public static ItemStack layoutSword(MessageService messages, Player player) {
         return ItemBuilder.of(Material.IRON_SWORD)
-                .name(Component.text("Edit Layout", NamedTextColor.AQUA)
-                        .decoration(TextDecoration.ITALIC, false))
-                .lore(Component.text("Anchor 1st / Glowstone 1st", NamedTextColor.GRAY)
-                        .decoration(TextDecoration.ITALIC, false))
+                .name(name(messages, player, "practice.item-layout"))
+                .lore(name(messages, player, "practice.item-layout-lore"))
                 .action(ACTION_LAYOUT)
                 .build();
     }
 
-    public static ItemStack startDye() {
+    public static ItemStack startDye(MessageService messages, Player player) {
         return ItemBuilder.of(Material.LIME_DYE)
-                .name(Component.text("Start Practice", NamedTextColor.GREEN)
-                        .decoration(TextDecoration.ITALIC, false)
-                        .decorate(TextDecoration.BOLD))
-                .lore(Component.text("Right-click to start (5s countdown)", NamedTextColor.GRAY)
-                        .decoration(TextDecoration.ITALIC, false))
+                .name(name(messages, player, "practice.item-start"))
+                .lore(name(messages, player, "practice.item-start-lore"))
                 .action(ACTION_START)
                 .build();
     }
 
-    public static ItemStack maceSettings() {
+    public static ItemStack maceSettings(MessageService messages, Player player) {
         return ItemBuilder.of(Material.MACE)
-                .name(Component.text("Mace Settings", NamedTextColor.LIGHT_PURPLE)
-                        .decoration(TextDecoration.ITALIC, false))
-                .lore(Component.text("Density / Breach / Wind Burst", NamedTextColor.GRAY)
-                        .decoration(TextDecoration.ITALIC, false))
+                .name(name(messages, player, "practice.item-mace-settings"))
+                .lore(name(messages, player, "practice.item-mace-settings-lore"))
                 .action(ACTION_MACE_SETTINGS)
                 .build();
     }
 
-    public static ItemStack botSettings(boolean shieldUp) {
+    public static ItemStack botSettings(MessageService messages, Player player, boolean shieldUp) {
+        String state = messages.raw(player, shieldUp ? "practice.item-shield-up" : "practice.item-shield-down");
         return ItemBuilder.of(Material.SHIELD)
-                .name(Component.text("Bot Settings", NamedTextColor.YELLOW)
-                        .decoration(TextDecoration.ITALIC, false))
-                .lore(Component.text("Shield: " + (shieldUp ? "UP" : "DOWN"), NamedTextColor.GRAY)
-                        .decoration(TextDecoration.ITALIC, false))
+                .name(name(messages, player, "practice.item-bot-settings"))
+                .lore(name(messages, player, "practice.item-bot-shield",
+                        net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("state", state)))
                 .action(ACTION_BOT_SETTINGS)
                 .build();
     }
@@ -91,13 +90,13 @@ public final class PracticeItems {
         return new ItemStack[]{anchor, glow};
     }
 
-    public static ItemStack buildMace(int density, int breach, int windBurst) {
+    public static ItemStack buildMace(MessageService messages, Player player,
+                                      int density, int breach, int windBurst) {
         ItemStack mace = new ItemStack(Material.MACE);
         ItemMeta meta = mace.getItemMeta();
         meta.setUnbreakable(true);
         meta.addItemFlags(ItemFlag.HIDE_UNBREAKABLE);
-        meta.displayName(Component.text("Practice Mace", NamedTextColor.LIGHT_PURPLE)
-                .decoration(TextDecoration.ITALIC, false));
+        meta.displayName(name(messages, player, "practice.item-mace-name"));
         mace.setItemMeta(meta);
         applyEnchant(mace, "density", density);
         applyEnchant(mace, "breach", breach);
