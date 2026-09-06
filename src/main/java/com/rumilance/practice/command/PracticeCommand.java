@@ -59,7 +59,7 @@ public final class PracticeCommand implements CommandExecutor, TabCompleter {
             case "draft" -> {
                 if (args.length < 3) {
                     player.sendMessage(Component.text(
-                            "Usage: /practice draft <Name> <ANKER|MACE>", NamedTextColor.YELLOW));
+                            "Usage: /practice draft <Name> <ANKER|MACE|SWORD|CRYSTAL>", NamedTextColor.YELLOW));
                     yield true;
                 }
                 String id = args[1];
@@ -71,7 +71,7 @@ public final class PracticeCommand implements CommandExecutor, TabCompleter {
                 try {
                     type = PracticeType.parse(args[2]);
                 } catch (Exception e) {
-                    player.sendMessage(Component.text("Type must be ANKER or MACE.", NamedTextColor.RED));
+                    player.sendMessage(Component.text("Type must be ANKER, MACE, SWORD or CRYSTAL.", NamedTextColor.RED));
                     yield true;
                 }
                 practiceService.createDraft(id, type);
@@ -247,7 +247,7 @@ public final class PracticeCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length == 3) {
             if (sub.equals("draft")) {
-                return TabCompletions.filter(current, "ANKER", "MACE");
+                return TabCompletions.filter(current, "ANKER", "MACE", "SWORD", "CRYSTAL");
             }
             if (sub.equals("selection") && args[1].equalsIgnoreCase("apply")) {
                 return TabCompletions.filter(current, names);

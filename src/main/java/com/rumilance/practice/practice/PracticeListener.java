@@ -66,31 +66,71 @@ public final class PracticeListener implements Listener {
         }
     }
 
-    /** Practice rooms: no damage to the practicing player (anchor blasts included). */
+    /**
+     * Practice rooms: no damage to the practicing player (anchor blasts included) — with one
+     * exception: the sword practice bot's swings are the whole point of that room.
+     */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onDamage(EntityDamageEvent event) {
         if (!(event.getEntity() instanceof Player player)) {
             return;
         }
-        if (practiceService.session(player.getUniqueId()).isEmpty()) {
+        var sessionOpt = practiceService.session(player.getUniqueId());
+        if (sessionOpt.isEmpty()) {
             return;
+        }
+        PracticeSession session = sessionOpt.get();
+        if (event instanceof EntityDamageByEntityEvent byEntity
+                && byEntity.getDamager() instanceof Mannequin bot
+                && session.combatBot() != null
+                && bot.getUniqueId().equals(session.combatBot().getUniqueId())) {
+            return; // sword-bot sparring hit: allow it
         }
         event.setCancelled(true);
         player.setFireTicks(0);
         player.setVelocity(new Vector());
     }
 
-    /** Cancel knockback applied to practice players (anchor / explosion / anything). */
+    /** Cancel knockback applied to practice players — except the sword bot's hits. */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onKnockback(EntityKnockbackEvent event) {
         if (!(event.getEntity() instanceof Player player)) {
             return;
         }
-        if (practiceService.session(player.getUniqueId()).isEmpty()) {
+        var sessionOpt = practiceService.session(player.getUniqueId());
+        if (sessionOpt.isEmpty()) {
+            return;
+        }
+        PracticeSession session = sessionOpt.get();
+        if (event.getDamager() instanceof Mannequin bot
+                && session.combatBot() != null
+                && bot.getUniqueId().equals(session.combatBot().getUniqueId())) {
             return;
         }
         event.setCancelled(true);
         event.setKnockback(new Vector());
+    }
+
+    /**
+     * Combat-bot damage routing (ITEM 41): sword hits, crystal blasts — anything landing on
+     * the session's bot is managed by the service (pops, staggers, respawns).
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onBotDamaged(EntityDamageEvent event) {
+        if (!(event.getEntity() instanceof Mannequin bot)) {
+            return;
+        }
+        for (PracticeSession session : practiceService.sessionsWithCombatBot()) {
+            Mannequin cb = session.combatBot();
+            if (cb == null || !cb.getUniqueId().equals(bot.getUniqueId())) {
+                continue;
+            }
+            Player player = org.bukkit.Bukkit.getPlayer(session.playerId());
+            if (player != null) {
+                practiceService.onCombatBotDamaged(player, session, event);
+            }
+            return;
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGH)
@@ -184,6 +224,86 @@ public final class PracticeListener implements Listener {
                 && session.phase() != PracticeSession.Phase.ACTIVE) {
             event.setCancelled(true);
         }
+    }
+
+    /**
+     * Crystal / anchor blasts must not eat the practice room terrain: inside any active
+     * practice region the explosion keeps its entity damage but loses its block list
+     * (shared templates are not disposable; clones reset anyway).
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onEntityExplode(org.bukkit.event.entity.EntityExplodeEvent event) {
+        if (insideAnyPracticeRegion(event.getLocation())) {
+            event.blockList().clear();
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onBlockExplode(org.bukkit.event.block.BlockExplodeEvent event) {
+        if (insideAnyPracticeRegion(event.getBlock().getLocation())) {
+            event.blockList().clear();
+        }
+    }
+
+    private boolean insideAnyPracticeRegion(org.bukkit.Location at) {
+        if (at == null) {
+            return false;
+        }
+        for (PracticeSession session : practiceService.activeSessions()) {
+            if (session.activeRegion() != null && session.activeRegion().contains(at)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * ITEM 41: the sword bot can actually down the practicing player. Keep it friendly —
+     * no drops, no death screen lingering, respawn at the room spawn with the room loadout.
+     */
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onPracticeDeath(org.bukkit.event.entity.PlayerDeathEvent event) {
+        Player player = event.getEntity();
+        var sessionOpt = practiceService.session(player.getUniqueId());
+        if (sessionOpt.isEmpty()) {
+            return;
+        }
+        PracticeSession session = sessionOpt.get();
+        event.getDrops().clear();
+        event.setShouldDropExperience(false);
+        event.deathMessage(null);
+        session.setBotNextAttackMs(System.currentTimeMillis() + 2_000L);
+        var plugin = org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(PracticeListener.class);
+        if (plugin == null) {
+            return;
+        }
+        org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+            if (!player.isOnline()) {
+                return;
+            }
+            player.spigot().respawn();
+            org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (!player.isOnline()) {
+                    return;
+                }
+                org.bukkit.Location spawn = session.activeSpawn();
+                if (spawn != null) {
+                    player.teleport(spawn);
+                }
+                player.setHealth(20.0);
+                player.setFoodLevel(20);
+                player.setSaturation(10.0f);
+                player.setFireTicks(0);
+                player.getInventory().clear();
+                switch (session.type()) {
+                    case MACE -> practiceService.giveMaceLoadout(player, session);
+                    case SWORD -> practiceService.giveSwordLoadout(player, session);
+                    case CRYSTAL -> practiceService.giveCrystalLoadout(player, session);
+                    default -> { }
+                }
+                player.updateInventory();
+            }, 2L);
+        });
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)

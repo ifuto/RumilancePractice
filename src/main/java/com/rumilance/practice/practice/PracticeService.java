@@ -29,6 +29,7 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Mannequin;
 import org.bukkit.entity.Player;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.inventory.EntityEquipment;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BookMeta;
@@ -110,7 +111,10 @@ public final class PracticeService {
         purgeLayoutsAsync();
         dailyPurgeTask = Bukkit.getScheduler().runTaskTimer(plugin, this::purgeLayoutsAsync,
                 20L * 60L * 60L * 24L, 20L * 60L * 60L * 24L);
-        maceAiTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tickMaceBots, 1L, 1L);
+        maceAiTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            tickMaceBots();
+            tickCombatBots();
+        }, 1L, 1L);
     }
 
     public void stop() {
@@ -378,6 +382,8 @@ public final class PracticeService {
         }
         try {
             PlayerState target = room.type() == PracticeType.MACE
+                    || room.type() == PracticeType.SWORD
+                    || room.type() == PracticeType.CRYSTAL
                     ? PlayerState.PRACTICE_ACTIVE
                     : PlayerState.PRACTICE_WAIT;
             stateManager.transition(player.getUniqueId(), target);
@@ -466,6 +472,16 @@ public final class PracticeService {
                         giveWaitHotbar(player, session);
                         player.sendMessage(messages.render(player, "practice.joined",
                                 MessageService.tags("name", joinedRoom.displayName())));
+                    } else if (joinedRoom.type() == PracticeType.SWORD) {
+                        giveSwordLoadout(player, session);
+                        spawnCombatBot(player, session, joinedRoom, PracticeType.SWORD);
+                        player.sendMessage(messages.render(player, "practice.joined-sword",
+                                MessageService.tags("name", joinedRoom.displayName())));
+                    } else if (joinedRoom.type() == PracticeType.CRYSTAL) {
+                        giveCrystalLoadout(player, session);
+                        spawnCombatBot(player, session, joinedRoom, PracticeType.CRYSTAL);
+                        player.sendMessage(messages.render(player, "practice.joined-crystal",
+                                MessageService.tags("name", joinedRoom.displayName())));
                     } else {
                         giveMaceLoadout(player, session);
                         spawnMaceBot(player, session, joinedRoom);
@@ -517,6 +533,7 @@ public final class PracticeService {
         preferredDurations.put(player.getUniqueId(), session.durationSeconds());
         session.cancelTimer();
         removeMaceBot(session);
+        removeCombatBot(session);
         UUID cloneId = session.cloneInstanceId();
         stateManager.resetToLobby(player.getUniqueId());
         if (returnToLobby && player.isOnline()) {
@@ -537,6 +554,7 @@ public final class PracticeService {
             preferredDurations.put(playerId, session.durationSeconds());
             session.cancelTimer();
             removeMaceBot(session);
+            removeCombatBot(session);
             UUID cloneId = session.cloneInstanceId();
             if (cloneId != null && cloneService != null) {
                 cloneService.release(cloneId);
@@ -551,6 +569,7 @@ public final class PracticeService {
         if (session != null) {
             session.cancelTimer();
             removeMaceBot(session);
+            removeCombatBot(session);
             UUID cloneId = session.cloneInstanceId();
             if (cloneId != null && cloneService != null) {
                 cloneService.release(cloneId);
@@ -990,6 +1009,293 @@ public final class PracticeService {
     public void onMaceHitBot(PracticeSession session) {
         if (session.botShieldRaised()) {
             session.setBotStunUntilMs(System.currentTimeMillis() + 1000L);
+        }
+    }
+
+    // ------------------------------------------------------------------ combat bots (ITEM 41)
+    // Sword / Crystal practice bots, inspired by Quantum's PvP Practice map (HeroBot-style
+    // fake-player sparring, re-implemented natively on Paper with Mannequin entities).
+
+    /** Read-only view over all live sessions (region checks, bot routing). */
+    public java.util.Collection<PracticeSession> activeSessions() {
+        return java.util.List.copyOf(sessions.values());
+    }
+
+    /** All sessions currently running a combat bot (damage routing for the listener). */
+    public java.util.Collection<PracticeSession> sessionsWithCombatBot() {
+        java.util.List<PracticeSession> out = new java.util.ArrayList<>();
+        for (PracticeSession session : sessions.values()) {
+            if (session.combatBot() != null) {
+                out.add(session);
+            }
+        }
+        return out;
+    }
+
+    /** Sword room loadout: sharp sword, shield, apples and full netherite (Quantum sword preset). */
+    public void giveSwordLoadout(Player player, PracticeSession session) {
+        player.getInventory().clear();
+        player.getInventory().setArmorContents(null);
+        player.getInventory().setItem(0, new ItemStack(Material.NETHERITE_SWORD));
+        player.getInventory().setItem(1, new ItemStack(Material.SHIELD));
+        player.getInventory().setItem(2, new ItemStack(Material.GOLDEN_APPLE, 8));
+        player.getInventory().setItem(8, PracticeItems.botSettings(messages, player, session.botShieldRaised()));
+        player.getInventory().setHelmet(new ItemStack(Material.NETHERITE_HELMET));
+        player.getInventory().setChestplate(new ItemStack(Material.NETHERITE_CHESTPLATE));
+        player.getInventory().setLeggings(new ItemStack(Material.NETHERITE_LEGGINGS));
+        player.getInventory().setBoots(new ItemStack(Material.NETHERITE_BOOTS));
+    }
+
+    /** Crystal room loadout: crystals + obsidian + totem; crystals keep refilling. */
+    public void giveCrystalLoadout(Player player, PracticeSession session) {
+        player.getInventory().clear();
+        player.getInventory().setArmorContents(null);
+        player.getInventory().setItem(0, new ItemStack(Material.END_CRYSTAL, 64));
+        player.getInventory().setItem(1, new ItemStack(Material.OBSIDIAN, 16));
+        player.getInventory().setItem(8, PracticeItems.botSettings(messages, player, session.botShieldRaised()));
+        player.getInventory().setItemInOffHand(new ItemStack(Material.TOTEM_OF_UNDYING));
+        player.getInventory().setHelmet(new ItemStack(Material.NETHERITE_HELMET));
+        player.getInventory().setChestplate(new ItemStack(Material.NETHERITE_CHESTPLATE));
+        player.getInventory().setLeggings(new ItemStack(Material.NETHERITE_LEGGINGS));
+        player.getInventory().setBoots(new ItemStack(Material.NETHERITE_BOOTS));
+    }
+
+    private void spawnCombatBot(Player player, PracticeSession session, PracticeRoom room,
+                                PracticeType type) {
+        removeCombatBot(session);
+        Location base = session.activeSpawn();
+        if (base == null) {
+            base = LocationUtil.deserialize(room.serializedSpawn());
+        } else {
+            base = base.clone();
+        }
+        if (base.getWorld() == null) {
+            World world = Bukkit.getWorld(room.world());
+            if (world == null) {
+                return;
+            }
+            base.setWorld(world);
+        }
+        Location botLoc = base.clone()
+                .add(player.getLocation().getDirection().setY(0).normalize().multiply(4));
+        botLoc.setY(base.getY());
+        if (botLoc.getWorld() == null) {
+            return;
+        }
+        boolean sword = type == PracticeType.SWORD;
+        Mannequin bot = botLoc.getWorld().spawn(botLoc, Mannequin.class, m -> {
+            m.setImmovable(!sword);
+            m.setGravity(true);
+            m.setSilent(true);
+            m.setCanPickupItems(false);
+            m.setRemoveWhenFarAway(false);
+            m.setPersistent(false);
+            m.setCollidable(true);
+            m.customName(messages.render(player, sword
+                    ? "practice.sword-bot-name" : "practice.crystal-bot-name"));
+            m.setCustomNameVisible(true);
+            m.setProfile(ResolvableProfile.resolvableProfile(player.getPlayerProfile()));
+            if (m.getAttribute(Attribute.MAX_HEALTH) != null) {
+                // Sword bot is a long-lived sparring partner; crystal bot pops in one combo.
+                m.getAttribute(Attribute.MAX_HEALTH).setBaseValue(sword ? 100.0d : 20.0d);
+            }
+            m.setHealth(sword ? 100.0d : 20.0d);
+            equipCombatBot(m, type, session.botShieldRaised());
+        });
+        session.setCombatBot(bot);
+        session.setBotHome(botLoc.clone());
+        session.setBotNextAttackMs(System.currentTimeMillis() + 2000L);
+        session.setBotStrafeFlipMs(System.currentTimeMillis() + 1500L);
+    }
+
+    private static void equipCombatBot(Mannequin bot, PracticeType type, boolean shieldUp) {
+        EntityEquipment eq = bot.getEquipment();
+        if (eq == null) {
+            return;
+        }
+        eq.setHelmet(new ItemStack(Material.NETHERITE_HELMET));
+        eq.setChestplate(new ItemStack(Material.NETHERITE_CHESTPLATE));
+        eq.setLeggings(new ItemStack(Material.NETHERITE_LEGGINGS));
+        eq.setBoots(new ItemStack(Material.NETHERITE_BOOTS));
+        if (type == PracticeType.SWORD) {
+            eq.setItemInMainHand(new ItemStack(Material.NETHERITE_SWORD));
+            eq.setItemInOffHand(shieldUp ? new ItemStack(Material.SHIELD) : null);
+        } else {
+            eq.setItemInMainHand(new ItemStack(Material.END_CRYSTAL));
+            eq.setItemInOffHand(new ItemStack(Material.TOTEM_OF_UNDYING));
+        }
+        eq.setHelmetDropChance(0f);
+        eq.setChestplateDropChance(0f);
+        eq.setLeggingsDropChance(0f);
+        eq.setBootsDropChance(0f);
+        eq.setItemInMainHandDropChance(0f);
+        eq.setItemInOffHandDropChance(0f);
+    }
+
+    private void removeCombatBot(PracticeSession session) {
+        Mannequin bot = session.combatBot();
+        if (bot != null && bot.isValid()) {
+            bot.remove();
+        }
+        session.setCombatBot(null);
+    }
+
+    /**
+     * Combat-bot AI tick. Sword bots close in, strafe and swing; crystal bots hold position
+     * and keep topping the player's crystal supply (Quantum "refill" toggle).
+     */
+    private void tickCombatBots() {
+        long now = System.currentTimeMillis();
+        for (PracticeSession session : sessions.values()) {
+            PracticeType type = session.type();
+            if (type != PracticeType.SWORD && type != PracticeType.CRYSTAL) {
+                continue;
+            }
+            Mannequin bot = session.combatBot();
+            Player player = Bukkit.getPlayer(session.playerId());
+            if (bot == null || !bot.isValid() || player == null || !player.isOnline()
+                    || player.isDead()) {
+                continue;
+            }
+            Location eye = bot.getEyeLocation();
+            Location target = player.getLocation().add(0, 1.0, 0);
+            Vector to = target.toVector().subtract(eye.toVector());
+            if (to.lengthSquared() < 0.0001) {
+                continue;
+            }
+            Location look = eye.clone().setDirection(to.normalize());
+            bot.setRotation(look.getYaw(), look.getPitch());
+
+            if (type == PracticeType.CRYSTAL) {
+                refillCrystals(player);
+                // Regen between combos so a half-finished combo never leaves a dead-looking bot.
+                if (now - session.botLastDamagedMs() > 5000L) {
+                    healToward(bot, 20.0d, 1.0d);
+                }
+                continue;
+            }
+
+            // --- sword bot: chase, strafe, attack ---
+            if (now - session.botLastDamagedMs() > 3000L) {
+                healToward(bot, 100.0d, 0.5d);
+            }
+            boolean blocking = session.botShieldRaised();
+            double distSq = bot.getLocation().distanceSquared(player.getLocation());
+            if (distSq > 2.2d * 2.2d) {
+                Vector dir = to.setY(0);
+                if (dir.lengthSquared() > 0.0001) {
+                    dir.normalize();
+                    // Strafe flips every 1.5-3s, mixing orbits into the approach.
+                    if (now >= session.botStrafeFlipMs()) {
+                        session.setBotStrafeDir(-session.botStrafeDir());
+                        session.setBotStrafeFlipMs(now + 1500L + java.util.concurrent.ThreadLocalRandom.current().nextInt(1500));
+                    }
+                    Vector side = new Vector(-dir.getZ(), 0, dir.getX())
+                            .multiply(0.16d * session.botStrafeDir());
+                    bot.setVelocity(dir.multiply(blocking ? 0.10d : 0.24d).add(side)
+                            .setY(bot.getVelocity().getY()));
+                }
+            } else {
+                bot.setVelocity(new Vector(0, bot.getVelocity().getY(), 0));
+            }
+            if (!blocking && distSq <= 3.2d * 3.2d && now >= session.botNextAttackMs()) {
+                bot.swingMainHand();
+                player.damage(5.0d, bot);
+                session.setBotNextAttackMs(now + 650L
+                        + java.util.concurrent.ThreadLocalRandom.current().nextInt(450));
+            }
+        }
+    }
+
+    private static void healToward(Mannequin bot, double max, double step) {
+        if (bot.getHealth() < max) {
+            bot.setHealth(Math.min(max, bot.getHealth() + step));
+        }
+    }
+
+    /** Keeps the crystal room stocked: top up when the player runs low. */
+    private void refillCrystals(Player player) {
+        int count = 0;
+        for (ItemStack item : player.getInventory().getStorageContents()) {
+            if (item != null && item.getType() == Material.END_CRYSTAL) {
+                count += item.getAmount();
+            }
+        }
+        if (count < 16) {
+            player.getInventory().addItem(new ItemStack(Material.END_CRYSTAL, 32));
+        }
+    }
+
+    /**
+     * Applies incoming damage to the combat bot and converts would-be-kills into practice
+     * events: crystal bots POP (totem-style) and reset; sword bots stagger home and heal.
+     *
+     * @return true when the hit should be consumed (the bot handled its own "death")
+     */
+    public boolean onCombatBotDamaged(Player player, PracticeSession session,
+                                      EntityDamageEvent event) {
+        Mannequin bot = session.combatBot();
+        if (bot == null || !bot.isValid()) {
+            return false;
+        }
+        session.setBotLastDamagedMs(System.currentTimeMillis());
+        boolean explosion = event.getCause() == EntityDamageEvent.DamageCause.ENTITY_EXPLOSION
+                || event.getCause() == EntityDamageEvent.DamageCause.BLOCK_EXPLOSION;
+        // Shield stance halves incoming damage (the bot is blocking).
+        if (session.botShieldRaised() && !explosion) {
+            event.setDamage(event.getDamage() * 0.5d);
+        }
+        if (bot.getHealth() - event.getFinalDamage() > 0.5d) {
+            return false;
+        }
+        event.setCancelled(true);
+        if (session.type() == PracticeType.CRYSTAL) {
+            session.incrementBotPops();
+            player.sendActionBar(messages.render(player, "practice.bot-pop",
+                    MessageService.tags("pops", String.valueOf(session.botPops()))));
+            player.playSound(bot.getLocation(), Sound.ITEM_TOTEM_USE, 1.0f, 1.0f);
+            if (bot.getWorld() != null) {
+                bot.getWorld().spawnParticle(org.bukkit.Particle.TOTEM_OF_UNDYING,
+                        bot.getLocation().add(0, 1, 0), 80, 0.5, 1.0, 0.5, 0.4);
+            }
+            respawnCombatBot(player, session);
+        } else {
+            session.incrementBotPops();
+            player.sendActionBar(messages.render(player, "practice.bot-down",
+                    MessageService.tags("kills", String.valueOf(session.botPops()))));
+            player.playSound(bot.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 1.4f);
+            respawnCombatBot(player, session);
+        }
+        return true;
+    }
+
+    /** Puts the bot back at its home spot with full health after a pop / kill. */
+    private void respawnCombatBot(Player player, PracticeSession session) {
+        Mannequin bot = session.combatBot();
+        if (bot == null) {
+            return;
+        }
+        Location home = session.botHome();
+        if (home != null && home.getWorld() != null) {
+            bot.teleport(home);
+        }
+        if (bot.getAttribute(Attribute.MAX_HEALTH) != null) {
+            bot.setHealth(bot.getAttribute(Attribute.MAX_HEALTH).getValue());
+        }
+        bot.setVelocity(new Vector());
+        session.setBotLastDamagedMs(System.currentTimeMillis());
+        session.setBotNextAttackMs(System.currentTimeMillis() + 1500L);
+    }
+
+    /** Sword-bot shield stance toggle (shared GUI hook with the mace bot). */
+    public void applyCombatBotShield(PracticeSession session) {
+        Mannequin bot = session.combatBot();
+        if (bot == null || !bot.isValid() || session.type() != PracticeType.SWORD) {
+            return;
+        }
+        EntityEquipment eq = bot.getEquipment();
+        if (eq != null) {
+            eq.setItemInOffHand(session.botShieldRaised() ? new ItemStack(Material.SHIELD) : null);
         }
     }
 

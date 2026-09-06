@@ -34,6 +34,19 @@ public final class PracticeSession {
     private int maceDensity;
     private int maceBreach;
     private int maceWindBurst;
+    /** Sword / crystal combat bot (ITEM 41, Quantum-style practice bots). */
+    private Mannequin combatBot;
+    /** Totem pops on the crystal bot / kills on the sword bot. */
+    private int botPops;
+    /** Last time the combat bot took damage (regen tag). */
+    private long botLastDamagedMs;
+    /** Next tick the sword bot may attack. */
+    private long botNextAttackMs;
+    /** Sword-bot strafe direction (-1 / +1) and when it flips next. */
+    private int botStrafeDir = 1;
+    private long botStrafeFlipMs;
+    /** Home spot the combat bot respawns at. */
+    private Location botHome;
 
     /** Disposable FAWE copy id; null when using shared template teleport. */
     private UUID cloneInstanceId;
@@ -46,7 +59,8 @@ public final class PracticeSession {
         this.playerId = playerId;
         this.practiceId = practiceId;
         this.type = type;
-        this.phase = type == PracticeType.MACE ? Phase.ACTIVE : Phase.WAIT;
+        this.phase = (type == PracticeType.MACE || type == PracticeType.SWORD
+                || type == PracticeType.CRYSTAL) ? Phase.ACTIVE : Phase.WAIT;
         if (type == PracticeType.ANKER) {
             this.ankerStats = new PracticeAnkerStats();
         }
@@ -142,6 +156,62 @@ public final class PracticeSession {
 
     public void setMaceBot(Mannequin maceBot) {
         this.maceBot = maceBot;
+    }
+
+    public Mannequin combatBot() {
+        return combatBot;
+    }
+
+    public void setCombatBot(Mannequin combatBot) {
+        this.combatBot = combatBot;
+    }
+
+    public int botPops() {
+        return botPops;
+    }
+
+    public void incrementBotPops() {
+        this.botPops++;
+    }
+
+    public long botLastDamagedMs() {
+        return botLastDamagedMs;
+    }
+
+    public void setBotLastDamagedMs(long botLastDamagedMs) {
+        this.botLastDamagedMs = botLastDamagedMs;
+    }
+
+    public long botNextAttackMs() {
+        return botNextAttackMs;
+    }
+
+    public void setBotNextAttackMs(long botNextAttackMs) {
+        this.botNextAttackMs = botNextAttackMs;
+    }
+
+    public int botStrafeDir() {
+        return botStrafeDir;
+    }
+
+    public void setBotStrafeDir(int botStrafeDir) {
+        this.botStrafeDir = botStrafeDir;
+    }
+
+    public long botStrafeFlipMs() {
+        return botStrafeFlipMs;
+    }
+
+    public void setBotStrafeFlipMs(long botStrafeFlipMs) {
+        this.botStrafeFlipMs = botStrafeFlipMs;
+    }
+
+    public Location botHome() {
+        return botHome;
+    }
+
+    public void setBotHome(Location botHome) {
+        this.botHome = botHome;
     }
 
     public boolean botShieldRaised() {

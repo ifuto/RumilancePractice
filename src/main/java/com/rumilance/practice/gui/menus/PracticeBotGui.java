@@ -76,6 +76,7 @@ public final class PracticeBotGui extends AbstractGui {
         practiceService.session(player.getUniqueId()).ifPresent(prac -> {
             prac.setBotShieldRaised(!prac.botShieldRaised());
             practiceService.applyBotShield(prac);
+            practiceService.applyCombatBotShield(prac);
             practiceService.refreshMaceItem(player, prac);
             refresh(player, session, inventory);
         });
