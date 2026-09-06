@@ -114,9 +114,8 @@ public final class PracticeListener implements Listener {
             return;
         }
         PracticeSession session = sessionOpt.get();
-        if ((session.type() == PracticeType.SWORD || session.type() == PracticeType.CRYSTAL)
-                && session.combatBot() != null) {
-            return; // sparring shoves / crystal blasts push the player
+        if (session.type().botMode() && session.combatBot() != null) {
+            return; // sparring shoves, crystal blasts, TNT carts and arrows push the player
         }
         event.setCancelled(true);
         event.setKnockback(new Vector());
@@ -299,6 +298,13 @@ public final class PracticeListener implements Listener {
             practiceService.endBotMatch(player, session, PracticeService.BotMatchResult.LOSE);
             return;
         }
+        // Dying before the fight (waiting room / countdown): abort the countdown and go back
+        // to the waiting hotbar — the bot never spawns outside ACTIVE, nothing can run wild.
+        if (session.phase() == PracticeSession.Phase.COUNTDOWN) {
+            session.cancelTimer();
+            session.setPhase(PracticeSession.Phase.WAIT);
+            session.setPlaceBlocked(false);
+        }
         var plugin = org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(PracticeListener.class);
         if (plugin == null) {
             return;
@@ -321,11 +327,21 @@ public final class PracticeListener implements Listener {
                 player.setSaturation(10.0f);
                 player.setFireTicks(0);
                 player.getInventory().clear();
-                switch (session.type()) {
-                    case MACE -> practiceService.giveMaceLoadout(player, session);
-                    case SWORD -> practiceService.giveSwordLoadout(player, session);
-                    case CRYSTAL -> practiceService.giveCrystalLoadout(player, session);
-                    default -> { }
+                if (session.phase() == PracticeSession.Phase.WAIT) {
+                    if (session.type() == PracticeType.ANKER) {
+                        practiceService.giveWaitHotbar(player, session);
+                    } else {
+                        practiceService.giveBotWaitHotbar(player, session);
+                    }
+                } else {
+                    switch (session.type()) {
+                        case MACE -> practiceService.giveMaceLoadout(player, session);
+                        case SWORD -> practiceService.giveSwordLoadout(player, session);
+                        case CRYSTAL -> practiceService.giveCrystalLoadout(player, session);
+                        case NETHERITE_POT -> practiceService.giveNethPotLoadout(player, session);
+                        case CART -> practiceService.giveCartLoadout(player, session);
+                        default -> { }
+                    }
                 }
                 player.updateInventory();
             }, 2L);

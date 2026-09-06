@@ -1100,6 +1100,8 @@ gui:
   bot-room-lore-cart: "弓で牽制し、TNTを転がしてくる。"
   bot-kit-label: "キット"
   bot-kit-default: "モード標準装備"
+  bot-map-label: "マップ"
+  bot-map-default: "最初の空き部屋"
 
 
 lb:

@@ -1099,6 +1099,8 @@ gui:
   bot-room-lore-cart: "Dispara con arco y lanza TNT."
   bot-kit-label: "Kit"
   bot-kit-default: "equipo del modo"
+  bot-map-label: "Mapa"
+  bot-map-default: "primera sala libre"
 
 lb:
   kill-title: "<gold><b>Ranking mensual de bajas</b></gold>"

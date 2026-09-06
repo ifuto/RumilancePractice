@@ -1099,6 +1099,8 @@ gui:
   bot-room-lore-cart: "用弓风筝你并滚来TNT。"
   bot-kit-label: "套件"
   bot-kit-default: "模式默认装备"
+  bot-map-label: "地图"
+  bot-map-default: "第一个空闲房间"
 
 lb:
   kill-title: "<gold><b>月度击杀榜</b></gold>"

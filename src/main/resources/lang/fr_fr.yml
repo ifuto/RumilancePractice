@@ -1099,6 +1099,8 @@ gui:
   bot-room-lore-cart: "Harcelle à l'arc et lance de la TNT."
   bot-kit-label: "Kit"
   bot-kit-default: "équipement du mode"
+  bot-map-label: "Carte"
+  bot-map-default: "première salle libre"
 
 lb:
   kill-title: "<gold><b>Classement mensuel des éliminations</b></gold>"

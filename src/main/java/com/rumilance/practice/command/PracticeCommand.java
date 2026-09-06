@@ -33,7 +33,7 @@ public final class PracticeCommand implements CommandExecutor, TabCompleter {
     private static final Set<String> FORBIDDEN = Set.of(
             "draft", "pos1", "pos2", "p1", "p2", "save", "enable", "disable", "delete", "list",
             "info", "tp", "anker", "mace", "type", "selection", "apply", "create", "selectionapply",
-            "botpos", "bindkit"
+            "botpos", "bindkit", "bindmap"
     );
 
     private final PracticeService practiceService;
@@ -173,6 +173,35 @@ public final class PracticeCommand implements CommandExecutor, TabCompleter {
                         : mode + " now uses server kit '" + kitName + "'.", NamedTextColor.GREEN));
                 yield true;
             }
+            case "bindmap" -> {
+                if (args.length < 3) {
+                    player.sendMessage(Component.text(
+                            "Usage: /practice bindmap <SWORD|CRYSTAL|MACE|NETHERITE_POT|CART> <room|clear>",
+                            NamedTextColor.YELLOW));
+                    yield true;
+                }
+                PracticeType mode;
+                try {
+                    mode = PracticeType.parse(args[1]);
+                } catch (Exception e) {
+                    player.sendMessage(Component.text(
+                            "Mode must be SWORD, CRYSTAL, MACE, NETHERITE_POT or CART.", NamedTextColor.RED));
+                    yield true;
+                }
+                String roomId = args[2].equalsIgnoreCase("clear") ? null : args[2];
+                if (roomId != null && practiceService.get(roomId).isEmpty()) {
+                    player.sendMessage(Component.text("Unknown practice room: " + roomId, NamedTextColor.RED));
+                    yield true;
+                }
+                if (!practiceService.bindBotRoom(mode, roomId)) {
+                    player.sendMessage(Component.text("Not a bot mode.", NamedTextColor.RED));
+                    yield true;
+                }
+                player.sendMessage(Component.text(roomId == null
+                        ? mode + " map binding cleared (first free room of the mode)."
+                        : mode + " now fights in '" + roomId + "'.", NamedTextColor.GREEN));
+                yield true;
+            }
             case "save" -> {
                 if (args.length < 2) {
                     player.sendMessage(Component.text("Usage: /practice save <Name>", NamedTextColor.YELLOW));
@@ -286,7 +315,7 @@ public final class PracticeCommand implements CommandExecutor, TabCompleter {
         String current = TabCompletions.current(args);
         if (args.length == 1) {
             return TabCompletions.filter(current,
-                    "draft", "pos1", "pos2", "selection", "p1", "botpos", "bindkit", "save",
+                    "draft", "pos1", "pos2", "selection", "p1", "botpos", "bindkit", "bindmap", "save",
                     "enable", "disable", "delete", "list", "info", "tp");
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
@@ -298,6 +327,8 @@ public final class PracticeCommand implements CommandExecutor, TabCompleter {
                 case "draft" -> List.of();
                 case "selection" -> TabCompletions.filter(current, "apply");
                 case "bindkit" -> TabCompletions.filter(current,
+                        "SWORD", "CRYSTAL", "MACE", "NETHERITE_POT", "CART");
+                case "bindmap" -> TabCompletions.filter(current,
                         "SWORD", "CRYSTAL", "MACE", "NETHERITE_POT", "CART");
                 case "p1", "botpos", "save", "enable", "disable", "delete", "info", "tp" ->
                         TabCompletions.filter(current, names);
@@ -313,6 +344,11 @@ public final class PracticeCommand implements CommandExecutor, TabCompleter {
             }
             if (sub.equals("botpos")) {
                 return TabCompletions.filter(current, "clear");
+            }
+            if (sub.equals("bindmap")) {
+                List<String> options = new ArrayList<>(names);
+                options.add("clear");
+                return TabCompletions.filter(current, options);
             }
         }
         return List.of();

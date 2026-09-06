@@ -78,6 +78,9 @@ public final class PracticeService {
     /** Admin kit binding per bot mode (Quantum's 5 fight modes -> server kits). */
     private final java.util.Map<PracticeType, String> botModeKits =
             new java.util.EnumMap<>(PracticeType.class);
+    /** Admin map binding per bot mode: fights run in the room tied to the mode's kit. */
+    private final java.util.Map<PracticeType, String> botModeRooms =
+            new java.util.EnumMap<>(PracticeType.class);
     /** Saved per-player difficulty (serialized), keyed by UUID string. */
     private final java.util.Map<String, String> savedDifficulty = new java.util.LinkedHashMap<>();
     private com.rumilance.practice.kit.KitService kitService;
@@ -141,7 +144,7 @@ public final class PracticeService {
         } else {
             botModeKits.put(type, kitName);
         }
-        persistBotKits();
+        persistBotBindings();
         return true;
     }
 
@@ -149,15 +152,36 @@ public final class PracticeService {
         return botModeKits.get(type);
     }
 
+    /** Binds the practice room (map) a bot mode fights in; {@code roomId} null clears it. */
+    public boolean bindBotRoom(PracticeType type, String roomId) {
+        if (!type.botMode()) {
+            return false;
+        }
+        if (roomId == null || roomId.isBlank()) {
+            botModeRooms.remove(type);
+        } else {
+            botModeRooms.put(type, roomId);
+        }
+        persistBotBindings();
+        return true;
+    }
+
+    public String botRoomFor(PracticeType type) {
+        return botModeRooms.get(type);
+    }
+
     public boolean kitExists(String kitName) {
         return kitService != null && kitService.get(kitName).isPresent();
     }
 
-    private void persistBotKits() {
+    private void persistBotBindings() {
         FileConfiguration yaml = configService.practices();
         yaml.set("bot-mode-kits", null);
         botModeKits.forEach((type, kit) ->
                 yaml.set("bot-mode-kits." + type.name(), kit));
+        yaml.set("bot-mode-rooms", null);
+        botModeRooms.forEach((type, roomId) ->
+                yaml.set("bot-mode-rooms." + type.name(), roomId));
         configService.save(ConfigService.PRACTICES);
     }
 
@@ -215,6 +239,7 @@ public final class PracticeService {
     public void reload() {
         rooms.clear();
         botModeKits.clear();
+        botModeRooms.clear();
         savedDifficulty.clear();
         FileConfiguration yaml = configService.practices();
         ConfigurationSection kits = yaml.getConfigurationSection("bot-mode-kits");
@@ -222,6 +247,15 @@ public final class PracticeService {
             for (String key : kits.getKeys(false)) {
                 try {
                     botModeKits.put(PracticeType.parse(key), kits.getString(key, ""));
+                } catch (Exception ignored) {
+                }
+            }
+        }
+        ConfigurationSection maps = yaml.getConfigurationSection("bot-mode-rooms");
+        if (maps != null) {
+            for (String key : maps.getKeys(false)) {
+                try {
+                    botModeRooms.put(PracticeType.parse(key), maps.getString(key, ""));
                 } catch (Exception ignored) {
                 }
             }
@@ -510,6 +544,10 @@ public final class PracticeService {
             player.sendMessage(messages.render(player, "practice.already-in"));
             return;
         }
+        if (isRoomBusy(practiceId)) {
+            player.sendMessage(messages.render(player, "gui.practice-room-busy"));
+            return;
+        }
         PlayerState state = stateManager.getState(player.getUniqueId());
         if (state != PlayerState.LOBBY && state != PlayerState.OPENING_GUI) {
             player.sendMessage(messages.render(player, "practice.join-from-lobby"));
@@ -736,10 +774,9 @@ public final class PracticeService {
         player.getInventory().setHeldItemSlot(4);
     }
 
-    /** Bot-room waiting kit: match length, difficulty, start, bot shield toggle. */
+    /** Bot-room waiting kit: difficulty, start, bot shield toggle (limit is fixed at 10 min). */
     public void giveBotWaitHotbar(Player player, PracticeSession session) {
         player.getInventory().clear();
-        player.getInventory().setItem(0, PracticeItems.durationClock(messages, player, session.durationSeconds()));
         player.getInventory().setItem(1, PracticeItems.botDifficulty(messages, player, session.difficulty()));
         player.getInventory().setItem(4, PracticeItems.startDye(messages, player));
         player.getInventory().setItem(8, PracticeItems.botSettings(messages, player, session.botShieldRaised()));
@@ -831,6 +868,9 @@ public final class PracticeService {
         WIN, LOSE, DRAW
     }
 
+    /** Bot fights are capped at ten minutes; no decision by then ends the match as a draw. */
+    public static final long BOT_MATCH_LIMIT_SECONDS = 600L;
+
     private void beginBotCountdown(Player player, PracticeSession session) {
         if (session.phase() != PracticeSession.Phase.WAIT) {
             return;
@@ -840,7 +880,9 @@ public final class PracticeService {
         session.cancelTimer();
         final int[] remaining = {5};
         BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
-            if (!player.isOnline() || sessions.get(player.getUniqueId()) != session) {
+            if (!player.isOnline() || player.isDead()
+                    || sessions.get(player.getUniqueId()) != session
+                    || session.phase() != PracticeSession.Phase.COUNTDOWN) {
                 session.cancelTimer();
                 return;
             }
@@ -861,6 +903,9 @@ public final class PracticeService {
     }
 
     private void startBotMatch(Player player, PracticeSession session) {
+        if (session.phase() != PracticeSession.Phase.COUNTDOWN) {
+            return;
+        }
         PracticeRoom room = get(session.practiceId()).orElse(null);
         if (room == null) {
             player.sendMessage(messages.render(player, "practice.room-missing"));
@@ -882,14 +927,14 @@ public final class PracticeService {
         Bukkit.getLogger().info("[N Arena][BotMatch] START player=" + player.getName()
                 + " mode=" + room.type() + " room=" + room.id()
                 + " difficulty=" + session.difficulty().preset());
-        // Time limit: full duration without a decision ends the match as a draw.
+        // Time limit: ten minutes without a decision ends the match as a draw.
         BukkitTask timeout = Bukkit.getScheduler().runTaskLater(plugin, () -> {
             PracticeSession live = sessions.get(player.getUniqueId());
             if (live == session && live.phase() == PracticeSession.Phase.ACTIVE
                     && player.isOnline()) {
                 endBotMatch(player, live, BotMatchResult.DRAW);
             }
-        }, session.durationSeconds() * 20L);
+        }, BOT_MATCH_LIMIT_SECONDS * 20L);
         session.setTimerTask(timeout);
     }
 
@@ -966,7 +1011,17 @@ public final class PracticeService {
                         : Sound.ENTITY_VILLAGER_NO, 1f, 1f);
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (player.isOnline()) {
-                leave(player, true);
+                if (player.isDead()) {
+                    // A defeated player is still on the death screen — respawn first, then home.
+                    player.spigot().respawn();
+                    Bukkit.getScheduler().runTask(plugin, () -> {
+                        if (player.isOnline()) {
+                            leave(player, true);
+                        }
+                    });
+                } else {
+                    leave(player, true);
+                }
             }
         }, 60L);
     }
@@ -1309,7 +1364,8 @@ public final class PracticeService {
     private void tickMaceBots() {
         long now = System.currentTimeMillis();
         for (PracticeSession session : sessions.values()) {
-            if (session.type() != PracticeType.MACE) {
+            if (session.type() != PracticeType.MACE
+                    || session.phase() != PracticeSession.Phase.ACTIVE) {
                 continue;
             }
             Mannequin bot = session.maceBot();
@@ -1675,8 +1731,9 @@ public final class PracticeService {
         // Arrow volley (the map detonates TNT carts with arrows — we keep the bow pressure).
         if (now >= session.botNextAttackMs()) {
             bot.swingMainHand();
+            Vector arrowDir = dir.clone().setY(0.06d).normalize().multiply(1.6d);
             org.bukkit.entity.Arrow arrow = bot.getWorld().spawnArrow(
-                    bot.getEyeLocation(), dir.setY(0.06d).normalize().multiply(1.6d), 1.6f, 2.0f);
+                    bot.getEyeLocation(), arrowDir, 1.6f, 2.0f);
             arrow.setShooter(bot);
             arrow.setDamage(diff.attackDamage() * 0.6d);
             long jitter = java.util.concurrent.ThreadLocalRandom.current().nextInt(400);

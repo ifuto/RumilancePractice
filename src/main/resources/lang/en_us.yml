@@ -1101,6 +1101,8 @@ gui:
   bot-room-lore-cart: "Kites with a bow and rolls TNT at you."
   bot-kit-label: "Kit"
   bot-kit-default: "mode default"
+  bot-map-label: "Map"
+  bot-map-default: "first free room"
 
 
 lb:

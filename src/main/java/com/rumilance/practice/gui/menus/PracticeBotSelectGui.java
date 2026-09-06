@@ -94,6 +94,7 @@ public final class PracticeBotSelectGui extends AbstractGui {
         List<PracticeRoom> rooms = roomsOf(mode);
         long free = rooms.stream().filter(r -> !practiceService.isRoomBusy(r.id())).count();
         String kit = practiceService.botKitFor(mode);
+        String map = practiceService.botRoomFor(mode);
         ItemBuilder builder = ItemBuilder.of(icon)
                 .name(t(player, typeKey).color(rooms.isEmpty() ? UiTheme.MUTED : UiTheme.SUCCESS)
                         .decoration(TextDecoration.ITALIC, false))
@@ -102,7 +103,11 @@ public final class PracticeBotSelectGui extends AbstractGui {
                         UiTheme.blank(),
                         UiTheme.labelValue(line(player, "gui.bot-kit-label"),
                                 kit == null || kit.isBlank()
-                                        ? line(player, "gui.bot-kit-default") : kit));
+                                        ? line(player, "gui.bot-kit-default") : kit),
+                        UiTheme.labelValue(line(player, "gui.bot-map-label"),
+                                map == null || map.isBlank()
+                                        ? line(player, "gui.bot-map-default")
+                                        : map.replace('_', ' ')));
         if (rooms.isEmpty()) {
             builder.lore(UiTheme.blank(),
                     UiTheme.status(line(player, "gui.practice-none"), UiTheme.WARNING),
@@ -153,10 +158,21 @@ public final class PracticeBotSelectGui extends AbstractGui {
                     } catch (IllegalArgumentException e) {
                         return;
                     }
-                    PracticeRoom target = roomsOf(mode).stream()
-                            .filter(r -> !practiceService.isRoomBusy(r.id()))
-                            .findFirst().orElse(null);
+                    // The bound map wins: fights run in the room tied to the mode's kit.
+                    PracticeRoom target = null;
+                    String boundRoom = practiceService.botRoomFor(mode);
+                    if (boundRoom != null && !boundRoom.isBlank()) {
+                        PracticeRoom bound = practiceService.get(boundRoom).orElse(null);
+                        if (bound != null && bound.enabled() && bound.type() == mode) {
+                            target = bound;
+                        }
+                    }
                     if (target == null) {
+                        target = roomsOf(mode).stream()
+                                .filter(r -> !practiceService.isRoomBusy(r.id()))
+                                .findFirst().orElse(null);
+                    }
+                    if (target == null || practiceService.isRoomBusy(target.id())) {
                         sounds.play(player, "error");
                         player.sendMessage(t(player, "gui.practice-room-busy").color(UiTheme.WARNING));
                         return;
