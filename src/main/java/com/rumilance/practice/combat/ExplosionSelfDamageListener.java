@@ -3,6 +3,7 @@ package com.rumilance.practice.combat;
 import org.bukkit.FluidCollisionMode;
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.block.data.type.Bed;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Creeper;
 import org.bukkit.entity.EnderCrystal;
@@ -13,9 +14,12 @@ import org.bukkit.entity.TNTPrimed;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
+import org.bukkit.event.block.BlockExplodeEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.projectiles.ProjectileSource;
@@ -32,24 +36,37 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Restores vanilla-style <strong>self-damage</strong> from explosions.
  *
- * <p>Vanilla never damages the entity that is an explosion's <em>source</em> (Paper #11167 —
- * "works as intended"), and modern Minecraft attributes end-crystal blasts to the player who
- * detonated them and creeper blasts to their igniter. The net effect on 1.21.x: punching your
- * own crystal, or detonating a creeper you ignited, deals you <strong>no</strong> damage —
- * which breaks crystal-PvP fundamentals (self-blast damage/knockback is part of the meta).
- * Practice TNT ({@code World.createExplosion(..., source)}) has the same hole.</p>
+ * <p>Vanilla never damages the entity that is an explosion's <em>source</em>, and modern
+ * Minecraft attributes crystal blasts to the detonator, creeper blasts to their igniter and
+ * TNT blasts to the igniter. The net effect: punching your own crystal, igniting your own
+ * TNT or creeper, or detonating your own respawn anchor / bed deals you <strong>no</strong>
+ * damage — which breaks crystal-PvP fundamentals (self-blast damage/knockback is part of the
+ * meta). Practice TNT ({@code World.createExplosion(..., source)}) has the same hole.</p>
+ *
+ * <p>Everything is covered: crystals, TNT (following primed-TNT ignition chains back to the
+ * original player), creepers, plugin blasts, and block explosions (respawn anchors and beds
+ * fire {@link BlockExplodeEvent} — the last right-clicker of the block is remembered briefly
+ * and treated as the source).</p>
  *
  * <p>For every blast we resolve the source player, pre-compute the exact vanilla damage +
  * knockback that entity would have taken, and apply it one tick later — but ONLY when vanilla
  * really skipped them (players who took a normal blast this tick are marked and skipped), so
- * this can never double-damage on a server/version where vanilla does apply it.</p>
+ * this can never double-damage on a server/version where vanilla does apply it. The applied
+ * damage is attributed to the player themselves ({@code player.damage(amount, player)}), so
+ * kill tracking treats it as a self-inflicted blast.</p>
  */
 public final class ExplosionSelfDamageListener implements Listener {
 
     /** Crystal blast power (vanilla EndCrystal explosion). */
     private static final float CRYSTAL_POWER = 6.0f;
+    /** Respawn anchor and bed blast power (both power 5 in vanilla). */
+    private static final float BLOCK_EXPLODE_POWER = 5.0f;
+    /** How far back a primed-TNT ignition chain is followed to find the original player. */
+    private static final int TNT_CHAIN_MAX = 8;
     /** How long a crystal keeps its last recorded detonator. */
     private static final long DETONATOR_TTL_MS = 5_000L;
+    /** How long an anchor/bed remembers its last right-clicker. */
+    private static final long BLOCK_INTERACT_TTL_MS = 10_000L;
     /** Exposure raycast sample points on the player body. */
     private static final double[][] SAMPLE_OFFSETS = {
             {0.0d, 0.2d, 0.0d},
@@ -66,6 +83,8 @@ public final class ExplosionSelfDamageListener implements Listener {
     }
 
     private final Map<UUID, Detonator> crystalDetonators = new ConcurrentHashMap<>();
+    /** Last right-clicker of an anchor/bed, keyed "world|x|y|z" — BlockExplodeEvent source. */
+    private final Map<String, Detonator> blockInteractions = new ConcurrentHashMap<>();
     /** Plugin-created blasts ({@code createExplosion}) carry no entity — match by tick+spot. */
     private final Deque<PluginBlast> pluginBlasts = new ArrayDeque<>();
     /** Players vanilla already damaged with an explosion this tick (double-damage guard). */
@@ -138,6 +157,66 @@ public final class ExplosionSelfDamageListener implements Listener {
             return;
         }
         vanillaBlastTick.put(player.getUniqueId(), org.bukkit.Bukkit.getCurrentTick());
+        if (vanillaBlastTick.size() > 128) {
+            int cutoff = org.bukkit.Bukkit.getCurrentTick() - 200;
+            vanillaBlastTick.values().removeIf(tick -> tick < cutoff);
+        }
+    }
+
+    /**
+     * Remembers who last right-clicked a respawn anchor or bed — those blocks explode via
+     * {@link BlockExplodeEvent}, which carries no entity and therefore no vanilla source.
+     */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onBlockInteract(PlayerInteractEvent event) {
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK || event.getClickedBlock() == null) {
+            return;
+        }
+        if (!isExplosiveBlock(event.getClickedBlock())) {
+            return;
+        }
+        blockInteractions.put(blockKey(event.getClickedBlock()),
+                new Detonator(event.getPlayer().getUniqueId(), System.currentTimeMillis()));
+        if (blockInteractions.size() > 256) {
+            long cutoff = System.currentTimeMillis() - BLOCK_INTERACT_TTL_MS;
+            blockInteractions.values().removeIf(d -> d.atMillis() < cutoff);
+        }
+    }
+
+    /** Respawn anchors and beds explode (no entity) — resolve the source from interactions. */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onBlockExplode(BlockExplodeEvent event) {
+        if (!isExplosiveBlock(event.getBlock())) {
+            return;
+        }
+        Detonator interaction = blockInteractions.remove(blockKey(event.getBlock()));
+        if (interaction == null
+                || System.currentTimeMillis() - interaction.atMillis() > BLOCK_INTERACT_TTL_MS) {
+            return;
+        }
+        Location center = event.getBlock().getLocation().add(0.5d, 0.5d, 0.5d);
+        scheduleSelfBlast(interaction.playerId(), center, BLOCK_EXPLODE_POWER);
+    }
+
+    private static boolean isExplosiveBlock(org.bukkit.block.Block block) {
+        org.bukkit.Material type = block.getType();
+        return type == org.bukkit.Material.RESPAWN_ANCHOR || block.getBlockData() instanceof Bed;
+    }
+
+    private static String blockKey(org.bukkit.block.Block block) {
+        return block.getWorld().getName() + "|" + block.getX() + "|" + block.getY() + "|" + block.getZ();
+    }
+
+    /** Central dispatch: resolves the source player and schedules the self-damage tick. */
+    private void scheduleSelfBlast(UUID sourceId, Location center, float power) {
+        Player source = org.bukkit.Bukkit.getPlayer(sourceId);
+        if (source == null || !source.isOnline() || source.getWorld() != center.getWorld()) {
+            return;
+        }
+        PendingBlast pending = new PendingBlast(
+                org.bukkit.Bukkit.getCurrentTick(), sourceId, center.getWorld(),
+                center.getX(), center.getY(), center.getZ(), power);
+        org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> applyIfSkipped(pending), 1L);
     }
 
     /** Vanilla damages entities AFTER the explode event, so we can resolve the blast here. */
@@ -152,8 +231,14 @@ public final class ExplosionSelfDamageListener implements Listener {
                 sourceId = detonator.playerId();
             }
         } else if (entity instanceof TNTPrimed tnt) {
-            if (tnt.getSource() instanceof Player player) {
-                sourceId = player.getUniqueId();
+            // Follow primed-TNT ignition chains back to the player who started them.
+            Entity current = tnt;
+            for (int hop = 0; hop < TNT_CHAIN_MAX && current instanceof TNTPrimed primed; hop++) {
+                if (primed.getSource() instanceof Player player) {
+                    sourceId = player.getUniqueId();
+                    break;
+                }
+                current = primed.getSource();
             }
             power = 4.0f;
         } else if (entity instanceof Creeper creeper) {
@@ -191,15 +276,7 @@ public final class ExplosionSelfDamageListener implements Listener {
         if (sourceId == null) {
             return;
         }
-        Player source = org.bukkit.Bukkit.getPlayer(sourceId);
-        if (source == null || !source.isOnline() || source.getWorld() != event.getLocation().getWorld()) {
-            return;
-        }
-        Location center = event.getLocation();
-        PendingBlast pending = new PendingBlast(
-                org.bukkit.Bukkit.getCurrentTick(), sourceId, center.getWorld(),
-                center.getX(), center.getY(), center.getZ(), power);
-        org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> applyIfSkipped(pending), 1L);
+        scheduleSelfBlast(sourceId, event.getLocation(), power);
     }
 
     private void applyIfSkipped(PendingBlast blast) {
@@ -259,9 +336,9 @@ public final class ExplosionSelfDamageListener implements Listener {
         if (knockback.lengthSquared() > 0.0d) {
             player.setVelocity(player.getVelocity().add(knockback));
         }
-        // No damager: the blast is attributed as self-inflicted/environmental, which every
-        // practice flow already handles (own-crystal deaths are opponent wins / plain deaths).
-        player.damage(damage);
+        // Self-attributed: the player is their own damager, so every combat flow sees a
+        // genuine self-inflicted blast (kill credit, death messages, totem handling).
+        player.damage(damage, player);
     }
 
     /** Fraction of sample rays from the blast centre to the player body that are unobstructed. */

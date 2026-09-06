@@ -182,8 +182,11 @@ public final class MatchActionBarService {
                                   boolean faceFirst) {
         NamedTextColor textColor = color.textColor();
         int score = id == null ? 0 : session.killsOf(id);
+        // Explicit WHITE on the head: an uncoloured child would inherit the team colour of the
+        // component it is appended to (visible on the right side: score-then-face), tinting the
+        // player sprite itself.
         Component face = (id != null && headFontService != null)
-                ? headFontService.head(id)
+                ? headFontService.head(id).color(NamedTextColor.WHITE)
                 : Component.empty();
         Component scoreText = Component.text(" " + score + " ", textColor);
         return faceFirst ? face.append(scoreText) : scoreText.append(face);

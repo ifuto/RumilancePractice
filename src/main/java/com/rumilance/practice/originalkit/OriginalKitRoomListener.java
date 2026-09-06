@@ -181,6 +181,49 @@ public final class OriginalKitRoomListener implements Listener {
         }
     }
 
+    /**
+     * The room's anvil is repair/combine only: renaming is not allowed while editing.
+     * A non-empty rename text marks a rename attempt, so the result is suppressed and the
+     * client grays it out. (The grindstone has no such restriction.)
+     */
+    @EventHandler
+    public void onPrepareAnvil(org.bukkit.event.inventory.PrepareAnvilEvent event) {
+        if (!(event.getView().getPlayer() instanceof Player player)) {
+            return;
+        }
+        if (!roomService.isEditing(player.getUniqueId())) {
+            return;
+        }
+        String rename = event.getInventory().getRenameText();
+        if (rename != null && !rename.isBlank()) {
+            event.setResult(null);
+        }
+    }
+
+    /** Belt and braces: no renamed result can ever be pulled out of an anvil while editing. */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onAnvilResultClick(org.bukkit.event.inventory.InventoryClickEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) {
+            return;
+        }
+        if (event.getView().getTopInventory().getType()
+                != org.bukkit.event.inventory.InventoryType.ANVIL) {
+            return;
+        }
+        if (!roomService.isEditing(player.getUniqueId())) {
+            return;
+        }
+        org.bukkit.inventory.AnvilInventory anvil =
+                (org.bukkit.inventory.AnvilInventory) event.getView().getTopInventory();
+        String rename = anvil.getRenameText();
+        if (rename != null && !rename.isBlank() && event.getRawSlot() < anvil.getSize()) {
+            event.setCancelled(true);
+            player.sendActionBar(Component.text(
+                    "Renaming is not allowed in the kit room — repair and combine only.",
+                    NamedTextColor.RED));
+        }
+    }
+
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         // Re-run isolation once the new player is present.

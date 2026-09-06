@@ -307,6 +307,28 @@ public final class GuiListener implements Listener {
             }
             return;
         }
+        if (handler instanceof InventoryDropHandler drop && session != null) {
+            boolean anyTop = false;
+            boolean allDropSlots = true;
+            for (int rawSlot : event.getRawSlots()) {
+                if (rawSlot < top.getSize()) {
+                    anyTop = true;
+                    if (!drop.isDropSlot(session, rawSlot)) {
+                        allDropSlots = false;
+                        break;
+                    }
+                }
+            }
+            if (anyTop && allDropSlots) {
+                event.setCancelled(true);
+                for (int rawSlot : event.getRawSlots()) {
+                    if (rawSlot < top.getSize()) {
+                        drop.handleDrop(player, session, top, rawSlot, event.getOldCursor());
+                    }
+                }
+                return;
+            }
+        }
         if (holder.type() != GuiType.EDIT_KIT) {
             event.setCancelled(true);
             return;

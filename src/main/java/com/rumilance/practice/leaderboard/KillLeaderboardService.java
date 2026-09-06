@@ -5,6 +5,7 @@ import com.rumilance.practice.database.repository.AnnualStreakRepository;
 import com.rumilance.practice.database.repository.DailyRankedStatsRepository;
 import com.rumilance.practice.database.repository.PlayerRepository;
 import com.rumilance.practice.locale.MessageService;
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
@@ -46,11 +47,16 @@ import java.util.logging.Level;
  * Floating leaderboards placed with {@code /lbspawn} ({@code kill} = monthly kills + KD,
  * {@code streak} = annual best win streak).
  *
- * <p>Every viewer within {@link #TRIGGER_RADIUS} blocks gets a PRIVATE copy of the board at
- * the board's own position (hidden from everyone else via {@code hideEntity}/{@code showEntity})
- * that turns to face them — orientation is per viewer, position never moves. Entering the
- * radius eases the board from its lobby-spawn yaw toward the player; leaving eases it back
- * before the shared board is handed back. Both transitions use cubic ease-out.</p>
+ * <p>The board is ONE text display: title line at the very top, ranks descending downward,
+ * rendered on a translucent black background panel ({@code setBackgroundColor} ARGB — the
+ * vanilla text-display backdrop).</p>
+ *
+ * <p><b>Player tracking is left to the client.</b> Every viewer inside
+ * {@link #TRIGGER_RADIUS} gets a PRIVATE copy with {@link Display.Billboard#VERTICAL}:
+ * the client turns the display toward its own player every frame (smooth vanilla
+ * animation, no server-side easing). Several players near one board therefore each see the
+ * board facing themselves — one duplicate per nearby viewer, position never moves. Outside
+ * the radius the shared copy stands at its saved yaw.</p>
  */
 public final class KillLeaderboardService implements Listener {
 
@@ -59,15 +65,16 @@ public final class KillLeaderboardService implements Listener {
     private static final String PERSONAL_MARKER = "kill_lb_personal";
     private static final DateTimeFormatter MONTH = DateTimeFormatter.ofPattern("yyyy-MM");
     /** Approaching closer than this switches the board into personal face-the-player mode. */
-    public static final double TRIGGER_RADIUS = 5.0;
+    public static final double TRIGGER_RADIUS = 7.0;
     /** How many players each board lists. */
     public static final int ROWS = 7;
     /** Stats refresh interval (millis). */
     private static final long REFRESH_MILLIS = 60_000L;
-    /** Seconds the ease-out rotation takes (entering / leaving the radius). */
-    private static final double EASE_SECONDS = 0.6;
-    /** Seconds between service ticks (matches the bootstrap timer). */
-    private static final double TICK_SECONDS = 3.0 / 20.0;
+    /** Translucent black backdrop behind the board text. */
+    private static final Color BACKDROP = Color.fromARGB(0x60, 0x00, 0x00, 0x00);
+    /** Vanilla text metrics in pixels: glyph height and line advance. */
+    private static final double GLYPH_PX = 8.0;
+    private static final double LINE_ADVANCE_PX = 9.0;
 
     /** Medal colours for the top three ranks. */
     private static final String[] RANK_COLORS = {"<gold>", "<#E8E8E8>", "<#FF9A3D>"};
@@ -80,7 +87,7 @@ public final class KillLeaderboardService implements Listener {
     private final java.util.function.Supplier<Location> lobbySpawn;
 
     private final Map<String, Board> boards = new LinkedHashMap<>();
-    /** (type + viewer) -> personal animation state. */
+    /** (type + viewer) -> personal copy state. */
     private final Map<String, ViewerState> viewers = new HashMap<>();
 
     public KillLeaderboardService(Plugin plugin,
@@ -110,7 +117,7 @@ public final class KillLeaderboardService implements Listener {
         Location base;
         float yaw;
         float scale = 1.2f;
-        final List<UUID> sharedDisplays = new ArrayList<>();
+        UUID sharedDisplay;
         /** Cached lines per locale + freshness stamp. */
         final Map<String, List<String>> linesByLocale = new HashMap<>();
         long linesBuiltAt;
@@ -123,16 +130,10 @@ public final class KillLeaderboardService implements Listener {
         }
     }
 
-    private enum Phase { ENTERING, TRACKING, EXITING }
-
     private static final class ViewerState {
-        Phase phase;
-        double progress;
-        float fromYaw;
-        float currentYaw;
         String locale;
         int lineVersion;
-        final List<UUID> displays = new ArrayList<>();
+        UUID display;
     }
 
     // ------------------------------------------------------------------ lifecycle
@@ -163,10 +164,11 @@ public final class KillLeaderboardService implements Listener {
 
     public void disable() {
         for (Board board : boards.values()) {
-            removeEntities(board.sharedDisplays);
+            removeEntity(board.sharedDisplay);
+            board.sharedDisplay = null;
         }
         for (ViewerState state : viewers.values()) {
-            removeEntities(state.displays);
+            removeEntity(state.display);
         }
         viewers.clear();
     }
@@ -192,7 +194,8 @@ public final class KillLeaderboardService implements Listener {
             return false;
         }
         clearViewersOf(board);
-        removeEntities(board.sharedDisplays);
+        removeEntity(board.sharedDisplay);
+        board.sharedDisplay = null;
         board.base = null;
         save();
         return true;
@@ -200,7 +203,7 @@ public final class KillLeaderboardService implements Listener {
 
     // ------------------------------------------------------------------ per-tick behaviour
 
-    /** Runs on the repeating task: stats refresh, viewer enter/leave, eased rotation. */
+    /** Runs on the repeating task: stats refresh + viewer enter/leave (no animation steps). */
     public void tick() {
         for (Board board : boards.values()) {
             if (board.base == null || board.base.getWorld() == null) {
@@ -218,22 +221,24 @@ public final class KillLeaderboardService implements Listener {
                     inRange.add(player.getUniqueId());
                 }
             }
-            // Viewer lifecycle.
             for (Player player : Bukkit.getOnlinePlayers()) {
                 String key = viewerKey(board, player.getUniqueId());
                 ViewerState state = viewers.get(key);
                 boolean near = inRange.contains(player.getUniqueId());
                 if (near && state == null) {
                     enter(board, player);
-                } else if (!near && state != null && state.phase != Phase.EXITING) {
-                    beginExit(board, player.getUniqueId(), state);
-                }
-            }
-            // Advance animations.
-            for (Player player : Bukkit.getOnlinePlayers()) {
-                ViewerState state = viewers.get(viewerKey(board, player.getUniqueId()));
-                if (state != null) {
-                    animate(board, player, state);
+                } else if (!near && state != null) {
+                    viewers.remove(key);
+                    removeEntity(state.display);
+                    setSharedHidden(board, player, false);
+                } else if (near && state != null) {
+                    // Rebuild the personal copy when stats refresh or the locale changed.
+                    String locale = messageService.resolveLocale(player);
+                    if (state.lineVersion != board.lineVersion || !locale.equals(state.locale)) {
+                        removeEntity(state.display);
+                        state.locale = locale;
+                        spawnPersonal(board, player.getUniqueId(), state);
+                    }
                 }
             }
         }
@@ -245,7 +250,7 @@ public final class KillLeaderboardService implements Listener {
         for (Board board : boards.values()) {
             ViewerState state = viewers.remove(viewerKey(board, id));
             if (state != null) {
-                removeEntities(state.displays);
+                removeEntity(state.display);
             }
         }
     }
@@ -263,10 +268,14 @@ public final class KillLeaderboardService implements Listener {
         NamespacedKey personalKey = markerKey(PERSONAL_MARKER);
         Set<UUID> tracked = new HashSet<>();
         for (Board board : boards.values()) {
-            tracked.addAll(board.sharedDisplays);
+            if (board.sharedDisplay != null) {
+                tracked.add(board.sharedDisplay);
+            }
         }
         for (ViewerState state : viewers.values()) {
-            tracked.addAll(state.displays);
+            if (state.display != null) {
+                tracked.add(state.display);
+            }
         }
         for (Entity entity : event.getEntities()) {
             if (!(entity instanceof TextDisplay display)) {
@@ -281,95 +290,33 @@ public final class KillLeaderboardService implements Listener {
         }
     }
 
-    // ------------------------------------------------------------------ viewer animation
+    // ------------------------------------------------------------------ viewer copies
 
     private void enter(Board board, Player player) {
-        String locale = messageService.resolveLocale(player);
         ViewerState state = new ViewerState();
-        state.phase = Phase.ENTERING;
-        state.progress = 0.0;
-        state.fromYaw = board.yaw;
-        state.currentYaw = board.yaw;
-        state.locale = locale;
-        spawnPersonal(board, player.getUniqueId(), state, board.yaw);
+        state.locale = messageService.resolveLocale(player);
+        spawnPersonal(board, player.getUniqueId(), state);
         viewers.put(viewerKey(board, player.getUniqueId()), state);
         setSharedHidden(board, player, true);
     }
 
-    private void beginExit(Board board, UUID playerId, ViewerState state) {
-        state.phase = Phase.EXITING;
-        state.progress = 0.0;
-        state.fromYaw = state.currentYaw;
-    }
-
-    /** Advances one animation step and applies the resulting yaw. */
-    private void animate(Board board, Player player, ViewerState state) {
-        switch (state.phase) {
-            case ENTERING -> {
-                float target = yawFacing(board.base, player.getLocation());
-                state.progress += TICK_SECONDS / EASE_SECONDS;
-                if (state.progress >= 1.0) {
-                    state.currentYaw = target;
-                    state.phase = Phase.TRACKING;
-                } else {
-                    state.currentYaw = angleLerp(state.fromYaw, target, easeOutCubic(state.progress));
-                }
-            }
-            case TRACKING -> {
-                float target = yawFacing(board.base, player.getLocation());
-                // Gentle pursuit so head movement stays smooth without a full re-ease.
-                float diff = shortestAngleDiff(state.currentYaw, target);
-                state.currentYaw = Math.abs(diff) < 0.5f ? target : state.currentYaw + diff * 0.35f;
-                // Rebuild the personal copy when stats refresh changed the lines.
-                if (state.lineVersion != board.lineVersion
-                        || !messageService.resolveLocale(player).equals(state.locale)) {
-                    float keep = state.currentYaw;
-                    removeEntities(state.displays);
-                    state.locale = messageService.resolveLocale(player);
-                    spawnPersonal(board, player.getUniqueId(), state, keep);
-                }
-            }
-            case EXITING -> {
-                state.progress += TICK_SECONDS / EASE_SECONDS;
-                if (state.progress >= 1.0) {
-                    viewers.remove(viewerKey(board, player.getUniqueId()));
-                    removeEntities(state.displays);
-                    setSharedHidden(board, player, false);
-                    return;
-                }
-                state.currentYaw = angleLerp(state.fromYaw, board.yaw, easeOutCubic(state.progress));
-            }
-        }
-        applyYaw(state, state.currentYaw);
-    }
-
-    private void applyYaw(ViewerState state, float yaw) {
-        for (UUID id : state.displays) {
-            Entity entity = Bukkit.getEntity(id);
-            if (entity == null) {
-                continue;
-            }
-            Location location = entity.getLocation();
-            location.setYaw(yaw);
-            location.setPitch(0f);
-            entity.teleport(location);
-        }
-    }
-
-    /** Spawns the viewer's private copy at the board's own position with the given yaw. */
-    private void spawnPersonal(Board board, UUID playerId, ViewerState state, float yaw) {
+    /**
+     * Spawns the viewer's private copy at the board's position. Billboard VERTICAL lets the
+     * CLIENT rotate it toward that viewer every frame — the vanilla tracking animation, no
+     * server-side easing or teleports.
+     */
+    private void spawnPersonal(Board board, UUID playerId, ViewerState state) {
         World world = board.base.getWorld();
         if (world == null) {
             return;
         }
         List<String> lines = linesFor(board, state.locale);
-        for (int i = 0; i < lines.size(); i++) {
-            Location line = board.base.clone().add(0, 0.25 + lineOffset(board, i), 0);
-            line.setYaw(yaw);
-            line.setPitch(0f);
-            state.displays.add(
-                    spawnDisplay(world, line, lines.get(i), PERSONAL_MARKER, board.scale).getUniqueId());
-        }
+        Location at = panelPivot(board, lines.size());
+        at.setYaw(board.yaw);
+        at.setPitch(0f);
+        TextDisplay display = world.spawn(at, TextDisplay.class, d -> configure(d,
+                String.join("\n", lines), PERSONAL_MARKER, board.scale, Display.Billboard.VERTICAL));
+        state.display = display.getUniqueId();
         state.lineVersion = board.lineVersion;
     }
 
@@ -378,7 +325,7 @@ public final class KillLeaderboardService implements Listener {
         for (Map.Entry<String, ViewerState> entry : Map.copyOf(viewers).entrySet()) {
             if (entry.getKey().startsWith(prefix)) {
                 viewers.remove(entry.getKey());
-                removeEntities(entry.getValue().displays);
+                removeEntity(entry.getValue().display);
                 String raw = entry.getKey().substring(prefix.length());
                 try {
                     Player player = Bukkit.getPlayer(UUID.fromString(raw));
@@ -392,19 +339,17 @@ public final class KillLeaderboardService implements Listener {
     }
 
     private void setSharedHidden(Board board, Player player, boolean hidden) {
-        for (UUID id : board.sharedDisplays) {
-            Entity entity = Bukkit.getEntity(id);
-            if (entity == null) {
-                continue;
+        Entity entity = board.sharedDisplay == null ? null : Bukkit.getEntity(board.sharedDisplay);
+        if (entity == null) {
+            return;
+        }
+        try {
+            if (hidden) {
+                player.hideEntity(plugin, entity);
+            } else {
+                player.showEntity(plugin, entity);
             }
-            try {
-                if (hidden) {
-                    player.hideEntity(plugin, entity);
-                } else {
-                    player.showEntity(plugin, entity);
-                }
-            } catch (Throwable ignored) {
-            }
+        } catch (Throwable ignored) {
         }
     }
 
@@ -412,63 +357,73 @@ public final class KillLeaderboardService implements Listener {
         return board.type + ":" + playerId;
     }
 
-    // ------------------------------------------------------------------ shared displays
+    // ------------------------------------------------------------------ shared display
 
     private void respawnShared(Board board) {
-        removeEntities(board.sharedDisplays);
+        removeEntity(board.sharedDisplay);
+        board.sharedDisplay = null;
         World world = board.base == null ? null : board.base.getWorld();
         if (world == null) {
             return;
         }
         List<String> lines = linesFor(board, messageService.localeService().defaultLocale());
-        for (int i = 0; i < lines.size(); i++) {
-            Location line = board.base.clone().add(0, 0.25 + lineOffset(board, i), 0);
-            line.setYaw(board.yaw);
-            line.setPitch(0f);
-            board.sharedDisplays.add(
-                    spawnDisplay(world, line, lines.get(i), MARKER, board.scale).getUniqueId());
-        }
+        Location at = panelPivot(board, lines.size());
+        at.setYaw(board.yaw);
+        at.setPitch(0f);
+        TextDisplay display = world.spawn(at, TextDisplay.class, d -> configure(d,
+                String.join("\n", lines), MARKER, board.scale, Display.Billboard.FIXED));
+        board.sharedDisplay = display.getUniqueId();
         board.lastSharedContent = String.join("\n", lines);
-        // Shared text changed -> force personal copies to rebuild on their next animate step.
+        // Shared text changed -> force personal copies to rebuild on their next tick step.
         board.lineVersion++;
     }
 
-    private double lineOffset(Board board, int index) {
-        return index * 0.34 * Math.max(0.5, board.scale);
+    /**
+     * The panel's pivot: the text display grows DOWNWARD from its position, so the pivot sits
+     * at the top of the panel, placing the panel's bottom edge at the classic {@code +0.25}
+     * board offset.
+     */
+    private Location panelPivot(Board board, int lineCount) {
+        double scale = Math.max(0.25, Math.min(16, board.scale));
+        double height = ((lineCount - 1) * LINE_ADVANCE_PX + GLYPH_PX) / 16.0 * scale;
+        return board.base.clone().add(0, 0.25 + height, 0);
     }
 
-    /** Removes the listed entities and clears the list. */
-    private void removeEntities(List<UUID> ids) {
-        for (UUID id : List.copyOf(ids)) {
-            Entity entity = Bukkit.getEntity(id);
-            if (entity != null) {
-                entity.remove();
-            }
+    private void removeEntity(UUID id) {
+        if (id == null) {
+            return;
         }
-        ids.clear();
+        Entity entity = Bukkit.getEntity(id);
+        if (entity != null) {
+            entity.remove();
+        }
     }
 
-    private TextDisplay spawnDisplay(World world, Location location, String miniMessage,
-                                     String marker, float scale) {
-        return world.spawn(location, TextDisplay.class, display -> {
-            display.text(MiniMessage.miniMessage().deserialize(miniMessage));
-            display.setBillboard(Display.Billboard.FIXED);
-            display.setShadowed(false);
-            display.setSeeThrough(false);
-            display.setBackgroundColor(Color.fromARGB(0, 0, 0, 0));
-            display.setAlignment(TextDisplay.TextAlignment.CENTER);
-            float s = Math.max(0.25f, Math.min(16f, scale));
-            display.setTransformation(new Transformation(
-                    new Vector3f(0f, 0f, 0f),
-                    new AxisAngle4f(0f, 0f, 0f, 1f),
-                    new Vector3f(s, s, s),
-                    new AxisAngle4f(0f, 0f, 0f, 1f)));
-            display.setPersistent(true);
-            display.setGravity(false);
-            display.setInvulnerable(true);
-            display.getPersistentDataContainer()
-                    .set(markerKey(marker), PersistentDataType.STRING, "lb");
-        });
+    private void configure(TextDisplay display, String miniMessage, String marker, float scale,
+                           Display.Billboard billboard) {
+        Component text;
+        try {
+            text = MiniMessage.miniMessage().deserialize(miniMessage);
+        } catch (RuntimeException e) {
+            text = Component.text(miniMessage);
+        }
+        display.text(text);
+        display.setBillboard(billboard);
+        display.setShadowed(true);
+        display.setSeeThrough(false);
+        display.setBackgroundColor(BACKDROP);
+        display.setAlignment(TextDisplay.TextAlignment.CENTER);
+        float s = Math.max(0.25f, Math.min(16f, scale));
+        display.setTransformation(new Transformation(
+                new Vector3f(0f, 0f, 0f),
+                new AxisAngle4f(0f, 0f, 0f, 1f),
+                new Vector3f(s, s, s),
+                new AxisAngle4f(0f, 0f, 0f, 1f)));
+        display.setPersistent(true);
+        display.setGravity(false);
+        display.setInvulnerable(true);
+        display.getPersistentDataContainer()
+                .set(markerKey(marker), PersistentDataType.STRING, "lb");
     }
 
     // ------------------------------------------------------------------ line building
@@ -489,16 +444,16 @@ public final class KillLeaderboardService implements Listener {
         for (String locale : List.copyOf(board.linesByLocale.keySet())) {
             board.linesByLocale.put(locale, buildLines(board, locale));
         }
-        if (!board.sharedDisplays.isEmpty()) {
+        if (board.sharedDisplay != null) {
             // Only respawn when the displayed numbers actually changed (no per-minute flicker).
             List<String> fresh = linesFor(board, messageService.localeService().defaultLocale());
             String joined = String.join("\n", fresh);
             if (joined.equals(board.lastSharedContent)) {
                 return;
             }
-            rebuildShared(board);
-            // Fresh shared entities are visible by default: re-hide them from every viewer
-            // who currently has a personal copy up.
+            respawnShared(board);
+            // The fresh shared entity is visible by default: re-hide it from every viewer who
+            // currently has a personal copy up.
             String prefix = board.type + ":";
             for (String key : viewers.keySet()) {
                 if (!key.startsWith(prefix)) {
@@ -513,25 +468,6 @@ public final class KillLeaderboardService implements Listener {
                 }
             }
         }
-    }
-
-    /** Re-renders shared displays with fresh numbers (viewer hide state re-applied next tick). */
-    private void rebuildShared(Board board) {
-        World world = board.base == null ? null : board.base.getWorld();
-        if (world == null) {
-            return;
-        }
-        removeEntities(board.sharedDisplays);
-        List<String> lines = linesFor(board, messageService.localeService().defaultLocale());
-        for (int i = 0; i < lines.size(); i++) {
-            Location line = board.base.clone().add(0, 0.25 + lineOffset(board, i), 0);
-            line.setYaw(board.yaw);
-            line.setPitch(0f);
-            board.sharedDisplays.add(
-                    spawnDisplay(world, line, lines.get(i), MARKER, board.scale).getUniqueId());
-        }
-        board.lastSharedContent = String.join("\n", lines);
-        board.lineVersion++;
     }
 
     private List<String> buildLines(Board board, String locale) {
@@ -612,27 +548,6 @@ public final class KillLeaderboardService implements Listener {
     }
 
     // ------------------------------------------------------------------ math helpers
-
-    private static double easeOutCubic(double t) {
-        double clamped = Math.max(0.0, Math.min(1.0, t));
-        double inv = 1.0 - clamped;
-        return 1.0 - inv * inv * inv;
-    }
-
-    /** Shortest signed angle difference {@code target - from} in degrees (-180..180]. */
-    private static float shortestAngleDiff(float from, float target) {
-        float diff = (target - from) % 360f;
-        if (diff > 180f) {
-            diff -= 360f;
-        } else if (diff < -180f) {
-            diff += 360f;
-        }
-        return diff;
-    }
-
-    private static float angleLerp(float from, float target, double t) {
-        return from + shortestAngleDiff(from, target) * (float) t;
-    }
 
     /** Horizontal yaw from {@code from} toward {@code target} (pitch ignored). */
     private static float yawFacing(Location from, Location target) {
