@@ -78,7 +78,7 @@ public final class AdminMenuGui extends AbstractGui {
                 .action("decorate")
                 .build());
 
-        inventory.setItem(GuiSlots.slot(2, 2), ItemBuilder.of(Material.DIAMOND_SWORD)
+        inventory.setItem(GuiSlots.slot(1, 2), ItemBuilder.of(Material.DIAMOND_SWORD)
                 .name(t(player, "gui.admin-kits").color(NamedTextColor.AQUA))
                 .lore(
                         UiTheme.divider(),
@@ -90,7 +90,7 @@ public final class AdminMenuGui extends AbstractGui {
                 .action("kits")
                 .build());
 
-        inventory.setItem(GuiSlots.slot(2, 4), ItemBuilder.of(Material.CHEST)
+        inventory.setItem(GuiSlots.slot(1, 4), ItemBuilder.of(Material.CHEST)
                 .name(t(player, "gui.admin-presets").color(NamedTextColor.YELLOW))
                 .lore(
                         UiTheme.divider(),
@@ -102,7 +102,7 @@ public final class AdminMenuGui extends AbstractGui {
                 .action("presets")
                 .build());
 
-        inventory.setItem(GuiSlots.slot(2, 6), ItemBuilder.of(Material.BOOK)
+        inventory.setItem(GuiSlots.slot(1, 6), ItemBuilder.of(Material.BOOK)
                 .name(t(player, "gui.admin-original").color(NamedTextColor.GREEN))
                 .lore(
                         UiTheme.divider(),
@@ -113,7 +113,7 @@ public final class AdminMenuGui extends AbstractGui {
                 .action("ekitadmin")
                 .build());
 
-        inventory.setItem(GuiSlots.slot(4, 2), ItemBuilder.of(Material.PLAYER_HEAD)
+        inventory.setItem(GuiSlots.slot(3, 2), ItemBuilder.of(Material.PLAYER_HEAD)
                 .name(t(player, "gui.admin-player-data").color(NamedTextColor.LIGHT_PURPLE))
                 .lore(
                         UiTheme.divider(),
@@ -125,7 +125,7 @@ public final class AdminMenuGui extends AbstractGui {
                 .action("playerdata")
                 .build());
 
-        inventory.setItem(GuiSlots.slot(4, 4), ItemBuilder.of(Material.BLAZE_ROD)
+        inventory.setItem(GuiSlots.slot(3, 4), ItemBuilder.of(Material.BLAZE_ROD)
                 .name(t(player, "gui.admin-wand").color(NamedTextColor.GOLD))
                 .lore(
                         UiTheme.divider(),
@@ -137,7 +137,7 @@ public final class AdminMenuGui extends AbstractGui {
                 .build());
 
         boolean required = packRequired.get();
-        inventory.setItem(GuiSlots.slot(4, 6), ItemBuilder.of(required
+        inventory.setItem(GuiSlots.slot(4, 4), ItemBuilder.of(required
                         ? Material.REDSTONE_TORCH : Material.LEVER)
                 .name(t(player, "gui.admin-pack-policy").color(required
                         ? NamedTextColor.RED : NamedTextColor.GREEN))
@@ -158,7 +158,7 @@ public final class AdminMenuGui extends AbstractGui {
                 .action("packpolicy")
                 .build());
 
-        inventory.setItem(GuiSlots.slot(2, 7), ItemBuilder.of(Material.OAK_SIGN)
+        inventory.setItem(GuiSlots.slot(3, 6), ItemBuilder.of(Material.OAK_SIGN)
                 .name(t(player, "gui.admin-sign").color(NamedTextColor.YELLOW))
                 .lore(
                         UiTheme.divider(),
