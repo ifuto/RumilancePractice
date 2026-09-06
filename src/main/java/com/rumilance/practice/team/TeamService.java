@@ -91,8 +91,15 @@ public final class TeamService {
     private volatile boolean lastBusyOffline;
     private volatile String lastSelfBusyStateKey;
 
+    private com.rumilance.practice.originalkit.OriginalKitService originalKitService;
+
     public void setStateManager(com.rumilance.practice.session.PlayerStateManager stateManager) {
         this.stateManager = stateManager;
+    }
+
+    public void setOriginalKitService(
+            com.rumilance.practice.originalkit.OriginalKitService originalKitService) {
+        this.originalKitService = originalKitService;
     }
 
     /** Localized / player-facing explanation for a non-{@link Result#OK} result. */
@@ -189,7 +196,8 @@ public final class TeamService {
         }
         com.rumilance.practice.state.PlayerState state = stateManager.getState(player.getUniqueId());
         return switch (state) {
-            case LOBBY, OPENING_GUI, IDLE -> null;
+            // Kit editing never blocks party life: a battle start force-saves the draft.
+            case LOBBY, OPENING_GUI, IDLE, EDITING_KIT -> null;
             default -> stateKey(state);
         };
     }
@@ -625,6 +633,17 @@ public final class TeamService {
             com.rumilance.practice.state.PlayerState state = stateManager == null
                     ? com.rumilance.practice.state.PlayerState.LOBBY
                     : stateManager.getState(memberId);
+            if (state == com.rumilance.practice.state.PlayerState.EDITING_KIT) {
+                // Party start is never blocked by kit editing: force-save the draft, leave
+                // the edit room and return the member to the lobby, then fight.
+                if (originalKitService != null) {
+                    originalKitService.forceSaveAndExitForMatch(member);
+                }
+                if (stateManager != null) {
+                    stateManager.resetToLobby(memberId);
+                }
+                state = com.rumilance.practice.state.PlayerState.LOBBY;
+            }
             boolean free = state == com.rumilance.practice.state.PlayerState.LOBBY
                     || state == com.rumilance.practice.state.PlayerState.OPENING_GUI
                     || state == com.rumilance.practice.state.PlayerState.IDLE;

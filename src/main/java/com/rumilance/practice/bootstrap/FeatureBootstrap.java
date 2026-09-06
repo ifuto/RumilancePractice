@@ -122,6 +122,7 @@ import com.rumilance.practice.gui.menus.PartyMapSelectGui;
 import com.rumilance.practice.gui.menus.PlayersGui;
 import com.rumilance.practice.gui.menus.PotionGui;
 import com.rumilance.practice.gui.menus.PracticeBotGui;
+import com.rumilance.practice.gui.menus.BotDifficultyGui;
 import com.rumilance.practice.gui.menus.PracticeBotSelectGui;
 import com.rumilance.practice.gui.menus.PracticeLayoutGui;
 import com.rumilance.practice.gui.menus.PracticeMaceGui;
@@ -829,6 +830,8 @@ public final class FeatureBootstrap {
         matchService.setOriginalKitService(originalKitService);
         // Party battles may fight with the owner's original kit as the shared loadout.
         teamKitSelectGui.setOriginalKitService(originalKitService);
+        // Party start force-saves any member still editing a kit (never blocks the start).
+        teamService.setOriginalKitService(originalKitService);
 
         // Sign queue: Unranked 1v1 queue joined from placed queue signs (the kit is fixed
         // per sign; the match fights with the first waiter's custom/original kit).
@@ -985,9 +988,13 @@ public final class FeatureBootstrap {
                 new PracticeMaceGui(guiSessions, soundService, practiceService);
         PracticeBotGui practiceBotGui =
                 new PracticeBotGui(guiSessions, soundService, practiceService);
+        BotDifficultyGui botDifficultyGui =
+                new BotDifficultyGui(guiSessions, soundService, practiceService);
         practiceService.setOpenLayoutGui(practiceLayoutGui::openFor);
         practiceService.setOpenMaceGui(practiceMaceGui::openFor);
         practiceService.setOpenBotGui(practiceBotGui::openFor);
+        practiceService.setOpenDifficultyGui(botDifficultyGui::openFor);
+        practiceService.setKitService(kitService);
 
         GuiListener guiListener = new GuiListener(guiSessions, stateManager, originalKitService, messageService);
         guiListener.register(rankedGui);
@@ -1041,6 +1048,7 @@ public final class FeatureBootstrap {
         guiListener.register(gameMenuGui);
         guiListener.register(battleMenuGui);
         guiListener.register(botSelectGui);
+        guiListener.register(botDifficultyGui);
         guiListener.register(matchInventoryGui);
         guiListener.register(matchHistoryGui);
         guiListener.register(practiceLayoutGui);
