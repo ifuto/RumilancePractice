@@ -1072,6 +1072,7 @@ practice:
   crystal-bot-name: "水晶Bot"
   bot-pop: "<gold>图腾破碎! <yellow><pops>"
   bot-down: "<gold>击倒Bot! <yellow><kills>"
+  bot-shield-stun: "<yellow>盾牌眩晕! 不要对着护盾乱砍。"
   room-not-found: "<red>练习室不存在或已禁用。"
   already-in: "<red>你已在练习室中。/prac leave"
   join-from-lobby: "<red>请从大厅加入练习。"

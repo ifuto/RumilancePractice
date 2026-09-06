@@ -64,6 +64,8 @@ public final class PracticeService {
 
     private final Map<String, PracticeRoom> rooms = new LinkedHashMap<>();
     private final Map<String, PracticeDraft> drafts = new ConcurrentHashMap<>();
+    /** Operator-set bot home position per room id (mace/sword/crystal bots). */
+    private final Map<String, String> botSpawns = new LinkedHashMap<>();
     private final Map<UUID, PracticeSession> sessions = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> preferredDurations = new ConcurrentHashMap<>();
     /** Ignore leave-on-exit until this epoch millis (join / teleport settle). */
@@ -167,6 +169,12 @@ public final class PracticeService {
                 String spawn = entry.getString("spawn", "");
                 boolean enabled = entry.getBoolean("enabled", false);
                 rooms.put(id, new PracticeRoom(id, type, world, region, spawn, enabled));
+                String botSpawn = entry.getString("bot-spawn", "");
+                if (botSpawn != null && !botSpawn.isBlank()) {
+                    botSpawns.put(id, botSpawn);
+                } else {
+                    botSpawns.remove(id);
+                }
             } catch (Exception e) {
                 plugin.getLogger().log(Level.WARNING, "Failed to load practice room '" + id + "'", e);
             }
@@ -195,6 +203,10 @@ public final class PracticeService {
             yaml.set(path + ".spawn-z", spawn.getZ());
             yaml.set(path + ".spawn-yaw", spawn.getYaw());
             yaml.set(path + ".spawn-pitch", spawn.getPitch());
+            String botSpawn = botSpawns.get(room.id());
+            if (botSpawn != null && !botSpawn.isBlank()) {
+                yaml.set(path + ".bot-spawn", botSpawn);
+            }
         }
         configService.save(ConfigService.PRACTICES);
     }
@@ -272,6 +284,60 @@ public final class PracticeService {
         return false;
     }
 
+    /**
+     * Operator sets where the practice bot lives in this arena (works for draft or saved
+     * room; any bot type — mace, sword, crystal). Pass {@code null} to clear.
+     */
+    public boolean setBotSpawn(String id, Location location) {
+        String serialized = location == null ? null : LocationUtil.serialize(location);
+        PracticeDraft draft = drafts.get(id);
+        if (draft != null) {
+            draft.setSerializedBotSpawn(serialized);
+            return true;
+        }
+        PracticeRoom room = rooms.get(id);
+        if (room != null) {
+            if (serialized == null || serialized.isBlank()) {
+                botSpawns.remove(id);
+            } else {
+                botSpawns.put(id, serialized);
+            }
+            persistAll();
+            return true;
+        }
+        return false;
+    }
+
+    /** Serialized bot home for a room id, if the operator configured one. */
+    public String botSpawnFor(String roomId) {
+        PracticeDraft draft = drafts.get(roomId);
+        if (draft != null && draft.serializedBotSpawn() != null && !draft.serializedBotSpawn().isBlank()) {
+            return draft.serializedBotSpawn();
+        }
+        return botSpawns.get(roomId);
+    }
+
+    /**
+     * Resolves the operator-configured bot home into a live location, mapping it through the
+     * clone offset when the session runs on a pasted copy. {@code null} when unconfigured.
+     */
+    private Location resolveConfiguredBotSpawn(PracticeSession session, PracticeRoom room) {
+        String configured = botSpawnFor(room.id());
+        if (configured == null || configured.isBlank()) {
+            return null;
+        }
+        Location cfg = LocationUtil.deserialize(configured);
+        if (cfg.getWorld() == null) {
+            cfg.setWorld(Bukkit.getWorld(room.world()));
+        }
+        Location roomSpawn = LocationUtil.deserialize(room.serializedSpawn());
+        Location active = session.activeSpawn();
+        if (cfg.getWorld() != null && roomSpawn != null && active != null) {
+            cfg.add(active.toVector().subtract(roomSpawn.toVector()));
+        }
+        return cfg.getWorld() == null ? null : cfg;
+    }
+
     /** Ensure selection covers spawn + footing adjustments from SafeTeleport. */
     private static Cuboid padRegionForSpawn(Cuboid region, Location spawn) {
         Cuboid with = region.including(spawn);
@@ -303,6 +369,9 @@ public final class PracticeService {
         PracticeRoom room = new PracticeRoom(draft.id(), draft.type(), region.worldName(),
                 region, draft.serializedSpawn(), false);
         rooms.put(room.id(), room);
+        if (draft.serializedBotSpawn() != null && !draft.serializedBotSpawn().isBlank()) {
+            botSpawns.put(room.id(), draft.serializedBotSpawn());
+        }
         drafts.remove(id);
         persistAll();
         refreshSchematic(room);
@@ -335,6 +404,7 @@ public final class PracticeService {
         if (rooms.remove(id) == null && drafts.remove(id) == null) {
             return false;
         }
+        botSpawns.remove(id);
         persistAll();
         return true;
     }
@@ -922,8 +992,11 @@ public final class PracticeService {
             }
             base.setWorld(world);
         }
-        Location botLoc = base.clone().add(player.getLocation().getDirection().setY(0).normalize().multiply(3));
-        botLoc.setY(base.getY());
+        Location botLoc = resolveConfiguredBotSpawn(session, room);
+        if (botLoc == null) {
+            botLoc = base.clone().add(player.getLocation().getDirection().setY(0).normalize().multiply(3));
+            botLoc.setY(base.getY());
+        }
         if (botLoc.getWorld() == null) {
             return;
         }
@@ -1081,15 +1154,19 @@ public final class PracticeService {
             }
             base.setWorld(world);
         }
-        Location botLoc = base.clone()
-                .add(player.getLocation().getDirection().setY(0).normalize().multiply(4));
-        botLoc.setY(base.getY());
+        // Operator-configured bot home first (/practice botpos); else 4 blocks ahead.
+        Location botLoc = resolveConfiguredBotSpawn(session, room);
+        if (botLoc == null) {
+            botLoc = base.clone()
+                    .add(player.getLocation().getDirection().setY(0).normalize().multiply(4));
+            botLoc.setY(base.getY());
+        }
         if (botLoc.getWorld() == null) {
             return;
         }
         boolean sword = type == PracticeType.SWORD;
         Mannequin bot = botLoc.getWorld().spawn(botLoc, Mannequin.class, m -> {
-            m.setImmovable(!sword);
+            m.setImmovable(false); // both bot types move: the crystal fighter orbits & retreats
             m.setGravity(true);
             m.setSilent(true);
             m.setCanPickupItems(false);
@@ -1138,6 +1215,7 @@ public final class PracticeService {
     }
 
     private void removeCombatBot(PracticeSession session) {
+        clearBotArtifacts(session);
         Mannequin bot = session.combatBot();
         if (bot != null && bot.isValid()) {
             bot.remove();
@@ -1172,11 +1250,7 @@ public final class PracticeService {
             bot.setRotation(look.getYaw(), look.getPitch());
 
             if (type == PracticeType.CRYSTAL) {
-                refillCrystals(player);
-                // Regen between combos so a half-finished combo never leaves a dead-looking bot.
-                if (now - session.botLastDamagedMs() > 5000L) {
-                    healToward(bot, 20.0d, 1.0d);
-                }
+                tickCrystalBot(player, session, bot, now);
                 continue;
             }
 
@@ -1232,6 +1306,146 @@ public final class PracticeService {
     }
 
     /**
+     * Crystal-bot combat AI, modelled on the Quantum map's crystal fighter: it orbits at
+     * range, sprints away while recovering after a hit, and runs full crystal combos —
+     * obsidian pedestal down, crystal on top, detonate near the player.
+     */
+    private void tickCrystalBot(Player player, PracticeSession session, Mannequin bot, long now) {
+        refillCrystals(player);
+        revertAgedBotBlocks(session, now);
+        // Regen between combos so a half-finished combo never leaves a dead-looking bot.
+        if (now - session.botLastDamagedMs() > 5000L) {
+            healToward(bot, 20.0d, 1.0d);
+        }
+
+        // --- movement: orbit at 3-6 blocks, retreat while recovering ---
+        Location botLoc = bot.getLocation();
+        double dist = botLoc.distance(player.getLocation());
+        Vector dir = player.getLocation().toVector().subtract(botLoc.toVector()).setY(0);
+        if (dir.lengthSquared() < 0.0001) {
+            return;
+        }
+        dir.normalize();
+        if (now >= session.botStrafeFlipMs()) {
+            session.setBotStrafeDir(-session.botStrafeDir());
+            session.setBotStrafeFlipMs(now + 1200L
+                    + java.util.concurrent.ThreadLocalRandom.current().nextInt(1600));
+        }
+        Vector side = new Vector(-dir.getZ(), 0, dir.getX())
+                .multiply(0.18d * session.botStrafeDir());
+        Vector move;
+        if (now < session.botRetreatUntilMs()) {
+            move = dir.clone().multiply(-0.30d).add(side); // recovery: sprint away (map behaviour)
+        } else if (dist < 3.0d) {
+            move = dir.clone().multiply(-0.22d).add(side);  // too close: back off
+        } else if (dist > 6.5d) {
+            move = dir.clone().multiply(0.24d).add(side);   // too far: close in
+        } else {
+            move = side;                                    // sweet spot: orbit
+        }
+        bot.setVelocity(move.setY(bot.getVelocity().getY()));
+
+        // --- attack: place a crystal combo near the player ---
+        if (now >= session.botNextAttackMs() && dist <= 9.0d
+                && session.botCrystals().size() < 2) {
+            if (launchCrystalAttack(player, session)) {
+                session.setBotNextAttackMs(now + 1900L
+                        + java.util.concurrent.ThreadLocalRandom.current().nextInt(1500));
+            } else {
+                session.setBotNextAttackMs(now + 500L); // no valid spot: retry soon
+            }
+        }
+    }
+
+    /**
+     * Bot crystal combo: obsidian pedestal in an air block beside the player, end crystal
+     * on top, detonated a beat later. Pedestals are tracked and reverted, and the bot is
+     * immune to the blasts of the crystals it placed itself.
+     */
+    private boolean launchCrystalAttack(Player player, PracticeSession session) {
+        org.bukkit.block.Block foot = player.getLocation().getBlock();
+        int[] dx = {1, -1, 0, 0};
+        int[] dz = {0, 0, 1, -1};
+        int start = java.util.concurrent.ThreadLocalRandom.current().nextInt(4);
+        org.bukkit.block.Block spot = null;
+        for (int k = 0; k < 4; k++) {
+            int i = (start + k) % 4;
+            org.bukkit.block.Block cand = foot.getRelative(dx[i], 0, dz[i]);
+            org.bukkit.block.Block below = cand.getRelative(org.bukkit.block.BlockFace.DOWN);
+            if ((cand.getType().isAir() || cand.getBlockData().isReplaceable())
+                    && below.getType().isSolid()
+                    && !below.getType().isAir()) {
+                spot = cand;
+                break;
+            }
+        }
+        if (spot == null) {
+            return false;
+        }
+        boolean pedestal = spot.getRelative(org.bukkit.block.BlockFace.DOWN).getType() != Material.OBSIDIAN
+                && spot.getRelative(org.bukkit.block.BlockFace.DOWN).getType() != Material.BEDROCK;
+        if (pedestal) {
+            spot.setType(Material.OBSIDIAN);
+            session.botPlacedBlocks().put(spot, System.currentTimeMillis());
+        }
+        Location crystalLoc = spot.getLocation().add(0.5d, 1.0d, 0.5d);
+        org.bukkit.entity.EnderCrystal crystal = spot.getWorld()
+                .spawn(crystalLoc, org.bukkit.entity.EnderCrystal.class,
+                        c -> c.setShowingBottom(false));
+        session.botCrystals().add(crystal.getUniqueId());
+        // One beat later: boom (if the crystal is still alive).
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (crystal.isValid()) {
+                Location boom = crystal.getLocation();
+                if (boom.getWorld() != null) {
+                    boom.getWorld().createExplosion(boom, 6.0f, false, false, crystal);
+                }
+                crystal.remove();
+            }
+            session.botCrystals().remove(crystal.getUniqueId());
+        }, 7L);
+        return true;
+    }
+
+    /** Obsidian pedestals melt away after a few seconds so the arena stays clean. */
+    private void revertAgedBotBlocks(PracticeSession session, long now) {
+        var blocks = session.botPlacedBlocks();
+        if (blocks.isEmpty()) {
+            return;
+        }
+        var it = blocks.entrySet().iterator();
+        while (it.hasNext()) {
+            var entry = it.next();
+            boolean aged = now - entry.getValue() > 7000L;
+            if (!aged && blocks.size() <= 10) {
+                break; // insertion-ordered: everything after is younger
+            }
+            org.bukkit.block.Block block = entry.getKey();
+            if (block.getType() == Material.OBSIDIAN) {
+                block.setType(Material.AIR);
+            }
+            it.remove();
+        }
+    }
+
+    /** Removes the bot's crystals and restores every obsidian pedestal it placed. */
+    private void clearBotArtifacts(PracticeSession session) {
+        for (java.util.UUID crystalId : java.util.List.copyOf(session.botCrystals())) {
+            org.bukkit.entity.Entity entity = Bukkit.getEntity(crystalId);
+            if (entity != null && entity.isValid()) {
+                entity.remove();
+            }
+        }
+        session.botCrystals().clear();
+        for (org.bukkit.block.Block block : session.botPlacedBlocks().keySet()) {
+            if (block.getType() == Material.OBSIDIAN) {
+                block.setType(Material.AIR);
+            }
+        }
+        session.botPlacedBlocks().clear();
+    }
+
+    /**
      * Applies incoming damage to the combat bot and converts would-be-kills into practice
      * events: crystal bots POP (totem-style) and reset; sword bots stagger home and heal.
      *
@@ -1243,14 +1457,30 @@ public final class PracticeService {
         if (bot == null || !bot.isValid()) {
             return false;
         }
+        // The crystal bot never pops to its own combo crystals.
+        if (event instanceof org.bukkit.event.entity.EntityDamageByEntityEvent byEntity
+                && session.botCrystals().contains(byEntity.getDamager().getUniqueId())) {
+            event.setCancelled(true);
+            return true;
+        }
         session.setBotLastDamagedMs(System.currentTimeMillis());
         boolean explosion = event.getCause() == EntityDamageEvent.DamageCause.ENTITY_EXPLOSION
                 || event.getCause() == EntityDamageEvent.DamageCause.BLOCK_EXPLOSION;
-        // Shield stance halves incoming damage (the bot is blocking).
-        if (session.botShieldRaised() && !explosion) {
+        // Shield stance halves incoming melee — and punishes mindless swinging with a stun,
+        // exactly like the Quantum map's "shield stunning" toggle.
+        if (session.type() == PracticeType.SWORD && session.botShieldRaised() && !explosion) {
             event.setDamage(event.getDamage() * 0.5d);
+            if (event.getCause() == EntityDamageEvent.DamageCause.ENTITY_ATTACK) {
+                player.addPotionEffect(new org.bukkit.potion.PotionEffect(
+                        org.bukkit.potion.PotionEffectType.SLOWNESS,
+                        java.time.Duration.ofMillis(900), 1));
+                player.sendActionBar(messages.render(player, "practice.bot-shield-stun"));
+            }
         }
         if (bot.getHealth() - event.getFinalDamage() > 0.5d) {
+            if (session.type() == PracticeType.CRYSTAL && explosion) {
+                session.setBotRetreatUntilMs(System.currentTimeMillis() + 1200L);
+            }
             return false;
         }
         event.setCancelled(true);
@@ -1263,6 +1493,7 @@ public final class PracticeService {
                 bot.getWorld().spawnParticle(org.bukkit.Particle.TOTEM_OF_UNDYING,
                         bot.getLocation().add(0, 1, 0), 80, 0.5, 1.0, 0.5, 0.4);
             }
+            session.setBotRetreatUntilMs(System.currentTimeMillis() + 1200L);
             respawnCombatBot(player, session);
         } else {
             session.incrementBotPops();
@@ -1288,6 +1519,7 @@ public final class PracticeService {
             bot.setHealth(bot.getAttribute(Attribute.MAX_HEALTH).getValue());
         }
         bot.setVelocity(new Vector());
+        equipCombatBot(bot, session.type(), session.botShieldRaised());
         session.setBotLastDamagedMs(System.currentTimeMillis());
         session.setBotNextAttackMs(System.currentTimeMillis() + 1500L);
     }

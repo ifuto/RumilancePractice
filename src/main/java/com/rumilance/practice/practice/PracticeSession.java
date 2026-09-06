@@ -47,6 +47,12 @@ public final class PracticeSession {
     private long botStrafeFlipMs;
     /** Home spot the combat bot respawns at. */
     private Location botHome;
+    /** End crystals the CRYSTAL bot placed itself (it is immune to their blasts). */
+    private final java.util.Set<java.util.UUID> botCrystals = new java.util.HashSet<>();
+    /** Obsidian the CRYSTAL bot placed, with placement time (reverted after a while). */
+    private final java.util.Map<org.bukkit.block.Block, Long> botPlacedBlocks = new java.util.LinkedHashMap<>();
+    /** Until this timestamp the crystal bot is recovering (sprinting away). */
+    private long botRetreatUntilMs;
 
     /** Disposable FAWE copy id; null when using shared template teleport. */
     private UUID cloneInstanceId;
@@ -212,6 +218,22 @@ public final class PracticeSession {
 
     public void setBotHome(Location botHome) {
         this.botHome = botHome;
+    }
+
+    public java.util.Set<java.util.UUID> botCrystals() {
+        return botCrystals;
+    }
+
+    public java.util.Map<org.bukkit.block.Block, Long> botPlacedBlocks() {
+        return botPlacedBlocks;
+    }
+
+    public long botRetreatUntilMs() {
+        return botRetreatUntilMs;
+    }
+
+    public void setBotRetreatUntilMs(long botRetreatUntilMs) {
+        this.botRetreatUntilMs = botRetreatUntilMs;
     }
 
     public boolean botShieldRaised() {

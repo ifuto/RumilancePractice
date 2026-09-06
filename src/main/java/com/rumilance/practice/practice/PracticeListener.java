@@ -67,8 +67,9 @@ public final class PracticeListener implements Listener {
     }
 
     /**
-     * Practice rooms: no damage to the practicing player (anchor blasts included) — with one
-     * exception: the sword practice bot's swings are the whole point of that room.
+     * Practice rooms: no damage to the practicing player (anchor blasts included) — except
+     * where fighting IS the point: sword-bot swings in SWORD rooms, and crystal blasts in
+     * CRYSTAL rooms (the bot fights back there; your own mistimed crystals hurt too).
      */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onDamage(EntityDamageEvent event) {
@@ -86,12 +87,17 @@ public final class PracticeListener implements Listener {
                 && bot.getUniqueId().equals(session.combatBot().getUniqueId())) {
             return; // sword-bot sparring hit: allow it
         }
+        if (session.type() == PracticeType.CRYSTAL
+                && (event.getCause() == EntityDamageEvent.DamageCause.ENTITY_EXPLOSION
+                        || event.getCause() == EntityDamageEvent.DamageCause.BLOCK_EXPLOSION)) {
+            return; // crystal-PvP damage: bot combos and your own crystals both count
+        }
         event.setCancelled(true);
         player.setFireTicks(0);
         player.setVelocity(new Vector());
     }
 
-    /** Cancel knockback applied to practice players — except the sword bot's hits. */
+    /** Cancel knockback applied to practice players — except in live bot fights. */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onKnockback(EntityKnockbackEvent event) {
         if (!(event.getEntity() instanceof Player player)) {
@@ -102,8 +108,9 @@ public final class PracticeListener implements Listener {
             return;
         }
         PracticeSession session = sessionOpt.get();
-        if (session.type() == PracticeType.SWORD && session.combatBot() != null) {
-            return; // only the sparring bot can hurt sword-practice players; let it shove them
+        if ((session.type() == PracticeType.SWORD || session.type() == PracticeType.CRYSTAL)
+                && session.combatBot() != null) {
+            return; // sparring shoves / crystal blasts push the player
         }
         event.setCancelled(true);
         event.setKnockback(new Vector());

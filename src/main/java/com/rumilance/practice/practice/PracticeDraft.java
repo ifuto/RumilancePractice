@@ -3,7 +3,7 @@ package com.rumilance.practice.practice;
 import com.rumilance.practice.util.Cuboid;
 
 /**
- * In-memory admin draft for a practice room (p1 spawn only).
+ * In-memory admin draft for a practice room (p1 spawn + optional bot home position).
  */
 public final class PracticeDraft {
 
@@ -11,6 +11,7 @@ public final class PracticeDraft {
     private PracticeType type;
     private Cuboid region;
     private String serializedSpawn;
+    private String serializedBotSpawn;
 
     public PracticeDraft(String id, PracticeType type) {
         this.id = id;
@@ -43,6 +44,14 @@ public final class PracticeDraft {
 
     public void setSerializedSpawn(String serializedSpawn) {
         this.serializedSpawn = serializedSpawn;
+    }
+
+    public String serializedBotSpawn() {
+        return serializedBotSpawn;
+    }
+
+    public void setSerializedBotSpawn(String serializedBotSpawn) {
+        this.serializedBotSpawn = serializedBotSpawn;
     }
 
     public boolean readyToSave() {

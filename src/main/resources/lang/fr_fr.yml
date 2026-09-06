@@ -1072,6 +1072,7 @@ practice:
   crystal-bot-name: "Bot Cristal"
   bot-pop: "<gold>Pop de totem ! <yellow><pops>"
   bot-down: "<gold>Bot vaincu ! <yellow><kills>"
+  bot-shield-stun: "<yellow>Étourdissement de bouclier ! Arrêtez de frapper la garde."
   room-not-found: "<red>Salle d'entraînement introuvable ou désactivée."
   already-in: "<red>Tu es déjà dans une salle d'entraînement. /prac leave"
   join-from-lobby: "<red>Rejoins l'entraînement depuis le lobby."

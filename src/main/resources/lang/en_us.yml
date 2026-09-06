@@ -1075,6 +1075,7 @@ practice:
   crystal-bot-name: "Crystal Bot"
   bot-pop: "<gold>Totem pop! <yellow><pops>"
   bot-down: "<gold>Bot down! <yellow><kills>"
+  bot-shield-stun: "<yellow>Shield stun! Stop swinging into the guard."
   room-not-found: "<red>Practice room not found or disabled."
   already-in: "<red>Already in a practice room. /prac leave"
   join-from-lobby: "<red>Join practice from the lobby."

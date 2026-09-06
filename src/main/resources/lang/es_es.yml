@@ -1072,6 +1072,7 @@ practice:
   crystal-bot-name: "Bot de Cristales"
   bot-pop: "<gold>¡Pop de tótem! <yellow><pops>"
   bot-down: "<gold>¡Bot eliminado! <yellow><kills>"
+  bot-shield-stun: "<yellow>¡Aturdimiento de escudo! No golpees la guardia a lo loco."
   room-not-found: "<red>Sala de práctica no encontrada o desactivada."
   already-in: "<red>Ya estás en una sala de práctica. /prac leave"
   join-from-lobby: "<red>Únete a la práctica desde el lobby."

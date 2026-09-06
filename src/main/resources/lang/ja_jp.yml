@@ -1074,6 +1074,7 @@ practice:
   crystal-bot-name: "クリスタルBot"
   bot-pop: "<gold>トーテムポップ! <yellow><pops>"
   bot-down: "<gold>Bot撃破! <yellow><kills>"
+  bot-shield-stun: "<yellow>シールドスタン! ガードへの連打は隙になる。"
   room-not-found: "<red>練習ルームが見つからないか無効です。"
   already-in: "<red>すでに練習ルームにいます。/prac leave"
   join-from-lobby: "<red>練習にはロビーから参加してください。"

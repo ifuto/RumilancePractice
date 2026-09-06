@@ -32,7 +32,8 @@ public final class PracticeCommand implements CommandExecutor, TabCompleter {
 
     private static final Set<String> FORBIDDEN = Set.of(
             "draft", "pos1", "pos2", "p1", "p2", "save", "enable", "disable", "delete", "list",
-            "info", "tp", "anker", "mace", "type", "selection", "apply", "create", "selectionapply"
+            "info", "tp", "anker", "mace", "type", "selection", "apply", "create", "selectionapply",
+            "botpos"
     );
 
     private final PracticeService practiceService;
@@ -50,7 +51,7 @@ public final class PracticeCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length < 1) {
             player.sendMessage(Component.text(
-                    "/practice <draft|pos1|selection|p1|save|enable|disable|delete|list|info|tp>",
+                    "/practice <draft|pos1|pos2|selection|p1|botpos|save|enable|disable|delete|list|info|tp>",
                     NamedTextColor.YELLOW));
             return true;
         }
@@ -78,7 +79,11 @@ public final class PracticeCommand implements CommandExecutor, TabCompleter {
                 player.sendMessage(Component.text("Draft created: " + id + " (" + type + ")",
                         NamedTextColor.GREEN));
                 player.sendMessage(Component.text(
-                        "Next: /practice pos1 -> pos2 -> selection apply " + id + " -> p1 " + id + " -> save",
+                        "Next: /practice pos1 -> pos2 -> selection apply " + id + " -> p1 " + id
+                                + (type == PracticeType.MACE || type == PracticeType.SWORD
+                                        || type == PracticeType.CRYSTAL
+                                        ? " -> botpos " + id + " (optional)" : "")
+                                + " -> save",
                         NamedTextColor.GRAY));
                 yield true;
             }
@@ -120,6 +125,23 @@ public final class PracticeCommand implements CommandExecutor, TabCompleter {
                 boolean ok = practiceService.setP1(args[1], player.getLocation());
                 player.sendMessage(Component.text(ok ? "p1 spawn set." : "Draft/room not found.",
                         ok ? NamedTextColor.GREEN : NamedTextColor.RED));
+                yield true;
+            }
+            case "botpos" -> {
+                if (args.length < 2) {
+                    player.sendMessage(Component.text("Usage: /practice botpos <Name>", NamedTextColor.YELLOW));
+                    yield true;
+                }
+                if (args.length >= 3 && args[2].equalsIgnoreCase("clear")) {
+                    boolean ok = practiceService.setBotSpawn(args[1], null);
+                    player.sendMessage(Component.text(ok ? "Bot position cleared (spawns in front of player)."
+                            : "Draft/room not found.", ok ? NamedTextColor.GREEN : NamedTextColor.RED));
+                    yield true;
+                }
+                boolean ok = practiceService.setBotSpawn(args[1], player.getLocation());
+                player.sendMessage(Component.text(ok
+                        ? "Bot home set here. The practice bot spawns at this spot."
+                        : "Draft/room not found.", ok ? NamedTextColor.GREEN : NamedTextColor.RED));
                 yield true;
             }
             case "save" -> {
@@ -176,12 +198,18 @@ public final class PracticeCommand implements CommandExecutor, TabCompleter {
                     yield true;
                 }
                 practiceService.get(args[1]).ifPresentOrElse(
-                        room -> player.sendMessage(Component.text(
-                                room.id() + " type=" + room.type() + " world=" + room.world()
-                                        + " enabled=" + room.enabled()
-                                        + " region=" + room.region()
-                                        + " spawn=" + room.serializedSpawn(),
-                                NamedTextColor.GRAY)),
+                        room -> {
+                            player.sendMessage(Component.text(
+                                    room.id() + " type=" + room.type() + " world=" + room.world()
+                                            + " enabled=" + room.enabled()
+                                            + " region=" + room.region()
+                                            + " spawn=" + room.serializedSpawn(),
+                                    NamedTextColor.GRAY));
+                            String botSpawn = practiceService.botSpawnFor(room.id());
+                            player.sendMessage(Component.text(
+                                    "bot-spawn=" + (botSpawn == null ? "(in front of player)" : botSpawn),
+                                    NamedTextColor.GRAY));
+                        },
                         () -> {
                             Optional<PracticeDraft> draft = practiceService.draft(args[1]);
                             if (draft.isPresent()) {
@@ -229,7 +257,7 @@ public final class PracticeCommand implements CommandExecutor, TabCompleter {
         String current = TabCompletions.current(args);
         if (args.length == 1) {
             return TabCompletions.filter(current,
-                    "draft", "pos1", "pos2", "selection", "p1", "save", "enable", "disable",
+                    "draft", "pos1", "pos2", "selection", "p1", "botpos", "save", "enable", "disable",
                     "delete", "list", "info", "tp");
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
@@ -240,7 +268,7 @@ public final class PracticeCommand implements CommandExecutor, TabCompleter {
             return switch (sub) {
                 case "draft" -> List.of();
                 case "selection" -> TabCompletions.filter(current, "apply");
-                case "p1", "save", "enable", "disable", "delete", "info", "tp" ->
+                case "p1", "botpos", "save", "enable", "disable", "delete", "info", "tp" ->
                         TabCompletions.filter(current, names);
                 default -> List.of();
             };
@@ -251,6 +279,9 @@ public final class PracticeCommand implements CommandExecutor, TabCompleter {
             }
             if (sub.equals("selection") && args[1].equalsIgnoreCase("apply")) {
                 return TabCompletions.filter(current, names);
+            }
+            if (sub.equals("botpos")) {
+                return TabCompletions.filter(current, "clear");
             }
         }
         return List.of();
