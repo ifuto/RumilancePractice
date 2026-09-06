@@ -162,6 +162,17 @@ public final class PracticeListener implements Listener {
             return;
         }
 
+        // Sword / crystal rooms: only the settings item is a menu button; the combat gear
+        // (sword, crystals, obsidian, apples) keeps its vanilla behaviour.
+        if ((session.type() == PracticeType.SWORD || session.type() == PracticeType.CRYSTAL)
+                && PracticeItems.ACTION_BOT_SETTINGS.equals(action)) {
+            event.setCancelled(true);
+            if (event.getAction() == Action.RIGHT_CLICK_AIR || event.getAction() == Action.RIGHT_CLICK_BLOCK) {
+                practiceService.handleMaceInteract(player, session, action);
+            }
+            return;
+        }
+
         if (session.type() == PracticeType.ANKER && session.phase() == PracticeSession.Phase.ACTIVE) {
             Block block = event.getClickedBlock();
             boolean right = event.getAction() == Action.RIGHT_CLICK_BLOCK;

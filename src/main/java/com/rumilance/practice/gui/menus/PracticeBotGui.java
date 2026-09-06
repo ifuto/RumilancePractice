@@ -19,7 +19,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 
 /**
- * Mace bot settings — toggle shield raised (1s stun window after hit when up).
+ * Practice bot settings (mace / sword / crystal bots) — toggle shield raised: mace bot
+ * staggers for a stun window, sword bot enters a blocking stance.
  */
 public final class PracticeBotGui extends AbstractGui {
 
@@ -77,7 +78,12 @@ public final class PracticeBotGui extends AbstractGui {
             prac.setBotShieldRaised(!prac.botShieldRaised());
             practiceService.applyBotShield(prac);
             practiceService.applyCombatBotShield(prac);
-            practiceService.refreshMaceItem(player, prac);
+            if (prac.type() == com.rumilance.practice.practice.PracticeType.MACE) {
+                practiceService.refreshMaceItem(player, prac);
+            } else {
+                player.getInventory().setItem(8, com.rumilance.practice.practice.PracticeItems
+                        .botSettings(practiceService.messagesService(), player, prac.botShieldRaised()));
+            }
             refresh(player, session, inventory);
         });
     }

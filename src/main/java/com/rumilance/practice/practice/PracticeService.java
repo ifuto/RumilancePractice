@@ -107,6 +107,11 @@ public final class PracticeService {
         this.openBotGui = openBotGui;
     }
 
+    /** Message service access (GUI menus building practice items need it). */
+    public MessageService messagesService() {
+        return messages;
+    }
+
     public void start() {
         purgeLayoutsAsync();
         dailyPurgeTask = Bukkit.getScheduler().runTaskTimer(plugin, this::purgeLayoutsAsync,
