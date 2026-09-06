@@ -105,6 +105,11 @@ public final class FloatingTextCleanup implements Listener {
             return true;
         }
         if (entity instanceof ArmorStand stand) {
+            // A ridden stand is somebody's seat (GSit parks players on invisible stands), never
+            // a hologram, so it is left alone even when it matches the signature below.
+            if (!stand.getPassengers().isEmpty() || stand.getVehicle() != null) {
+                return false;
+            }
             // Hologram signature: invisible + a shown custom name + no gravity. Anything with
             // equipment (real decorative stands) is left alone.
             boolean hologramLike = !stand.isVisible()

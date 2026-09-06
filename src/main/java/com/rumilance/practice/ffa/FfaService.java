@@ -568,9 +568,24 @@ public final class FfaService {
         }
     }
 
+    /** Kit rules for a player inside an FFA arena (totem gate); {@code null} when unmanaged. */
+    private KitDefinition kitOfPlayer(UUID playerId) {
+        return arenaOf(playerId)
+                .flatMap(FfaService.this::get)
+                .flatMap(arena -> kitService.get(arena.kitId()))
+                .orElse(null);
+    }
+
     public void handleLethal(Player victim, UUID killerId) {
         String arenaId = playerArena.get(victim.getUniqueId());
         if (arenaId == null) {
+            return;
+        }
+        // Absolute totem guarantee (mirrors MatchService.handleLethal): never score a death while
+        // the victim still holds a totem in a hand and the arena kit allows it - pop it instead.
+        if (com.rumilance.practice.combat.PracticeDeath.tryPopTotem(victim, kitOfPlayer(victim.getUniqueId()))) {
+            plugin.getLogger().warning("[N Arena][TotemGuard] FFA handleLethal popped a totem for "
+                    + victim.getName() + " instead of counting a death");
             return;
         }
         // Dedupe: ignore another lethal for a victim who already died within the respawn window

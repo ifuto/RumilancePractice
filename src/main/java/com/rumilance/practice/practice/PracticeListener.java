@@ -81,6 +81,14 @@ public final class PracticeListener implements Listener {
             return;
         }
         PracticeSession session = sessionOpt.get();
+        // Totem of undying: a practice player holding a totem in a hand can never die, whatever
+        // the room type is (crystal self-blasts and TNT carts are the lethal sources here). The
+        // pop runs before every exemption below so the totem is consumed exactly like vanilla.
+        if (com.rumilance.practice.combat.PracticeDeath.wouldDie(player, event)
+                && com.rumilance.practice.combat.PracticeDeath.tryPopTotem(
+                        player, practiceService.kitOf(session), event)) {
+            return;
+        }
         Mannequin combatBot = session.combatBot();
         if (event instanceof EntityDamageByEntityEvent byEntity && combatBot != null) {
             Entity damager = byEntity.getDamager();
@@ -289,6 +297,27 @@ public final class PracticeListener implements Listener {
             return;
         }
         PracticeSession session = sessionOpt.get();
+        // The totem failsafe (TotemGuardListener, registered first) already turned this death
+        // into a totem pop and owns the revive: don't run the practice death flow on top of it.
+        if (event.isCancelled()) {
+            return;
+        }
+        // Absolute guarantee: a death that reaches this point while the player still holds a
+        // totem is turned into a totem pop instead of a loss (damage paths pop first; this is
+        // the net for anything that arrives without a damage event we could intercept).
+        if (com.rumilance.practice.combat.PracticeDeath.hasTotemInHand(player)) {
+            var totemKit = practiceService.kitOf(session);
+            if (totemKit == null || totemKit.totem()) {
+                event.setCancelled(true);
+                event.getDrops().clear();
+                event.setKeepInventory(true);
+                event.setShouldDropExperience(false);
+                event.deathMessage(null);
+                com.rumilance.practice.combat.PracticeDeath.consumeTotemFromHand(player);
+                reviveWithTotem(player, session);
+                return;
+            }
+        }
         event.getDrops().clear();
         event.setShouldDropExperience(false);
         event.deathMessage(null);
@@ -369,6 +398,55 @@ public final class PracticeListener implements Listener {
             return;
         }
         practiceService.onMaceHitBot(session);
+    }
+
+    /**
+     * Brings a practice player back after a cancelled death: Paper keeps a cancelled death
+     * downed until the health is restored, so top the health up first and force the respawn
+     * when that was not enough, then put them back on their room spawn with their loadout and
+     * the vanilla totem effects.
+     */
+    private void reviveWithTotem(Player player, PracticeSession session) {
+        var plugin = org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(PracticeListener.class);
+        if (plugin == null) {
+            return;
+        }
+        com.rumilance.practice.combat.PracticeDeath.applyTotemEffects(player);
+        org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+            if (!player.isOnline()) {
+                return;
+            }
+            if (player.isDead() || player.getHealth() <= 0.0d) {
+                try {
+                    player.spigot().respawn();
+                } catch (IllegalStateException | IllegalArgumentException ignored) {
+                    // The cancelled death was enough; the health top-up below finishes the job.
+                }
+            }
+            org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (!player.isOnline()) {
+                    return;
+                }
+                if (player.getHealth() <= 0.0d) {
+                    player.setHealth(1.0d);
+                }
+                player.setFallDistance(0f);
+                player.setFireTicks(0);
+                player.setFoodLevel(20);
+                player.setSaturation(10.0f);
+                org.bukkit.Location spawn = session.activeSpawn();
+                if (spawn != null && spawn.getWorld() != null) {
+                    com.rumilance.practice.util.SafeTeleport.teleport(player, spawn);
+                }
+                if (session.phase() == PracticeSession.Phase.ACTIVE) {
+                    practiceService.refreshBotLoadout(player, session);
+                } else {
+                    practiceService.giveBotWaitHotbar(player, session);
+                }
+                com.rumilance.practice.combat.PracticeDeath.applyTotemEffects(player);
+                player.updateInventory();
+            }, 2L);
+        });
     }
 
     private static int anchorCharges(Block block) {

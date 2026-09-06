@@ -34,11 +34,11 @@ import java.util.function.Predicate;
  *       from the shoot draw force so partial/full pulls deal consistent damage.</li>
  * </ul>
  *
- * <p>Attribute swapping (e.g. swinging a sword after briefly holding a breach/density mace so the
- * mace's armor-piercing carries onto the sword hit) is intentionally left at vanilla timing and
- * power. {@code PaperCombatTuning} sets Paper's {@code update-equipment-on-player-actions=false}
- * to restore the vanilla swap window (MC-28289 behaviour), and we apply NO damage/crit penalty
- * to swap hits: a vanilla swap hit lands with the exact attributes vanilla gives it.</p>
+ * <p>Item/attribute swapping is left entirely alone: this plugin does NOT touch Paper's
+ * {@code unsupported-settings.update-equipment-on-player-actions}, does not reshape swap hits and
+ * applies no damage/crit penalty to them. A swap hit lands with exactly the attributes the server
+ * gives it (the old "vanilla item swap" tuning was removed because it made swap damage feel
+ * wrong); server owners who want a different swap timing set that Paper key themselves.</p>
  */
 public final class PaperCombatCompatListener implements Listener {
 

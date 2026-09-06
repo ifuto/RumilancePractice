@@ -9,7 +9,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
-public record KitDefinition(String name, String displayName, String icon, boolean ranked, boolean ffaEnabled, double maxHealth, boolean naturalHealthRegen, double knockbackMultiplier, List<KitItemEntry> items, Map<String, String> armor, boolean enabled, boolean autoFood, boolean swordShieldBreak, boolean blockPlace, boolean blockBreak, boolean breakPlayerPlacedOnly, List<String> canBreak, boolean pearl, boolean totem, boolean forceAdventure, int timeoutSeconds, List<String> arenas, List<String> partyArenas, List<String> startCommands, List<KitStartEffect> startEffects, boolean presetEnabled) {
+public record KitDefinition(String name, String displayName, String icon, boolean ranked, boolean ffaEnabled, double maxHealth, boolean naturalHealthRegen, double knockbackMultiplier, List<KitItemEntry> items, Map<String, String> armor, boolean enabled, boolean autoFood, boolean swordShieldBreak, boolean blockPlace, boolean blockBreak, boolean breakPlayerPlacedOnly, List<String> canBreak, boolean pearl, boolean totem, boolean forceAdventure, int timeoutSeconds, List<String> arenas, List<String> partyArenas, List<String> startCommands, List<KitStartEffect> startEffects, boolean presetEnabled, boolean bedExplosion) {
     public KitDefinition {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(displayName, "displayName");
@@ -126,6 +126,12 @@ public record KitDefinition(String name, String displayName, String icon, boolea
         private List<String> startCommands = new ArrayList<String>();
         private List<KitStartEffect> startEffects = new ArrayList<KitStartEffect>();
         private boolean presetEnabled;
+        /**
+         * "Bed Explosion" rule: right-clicking a bed placed during the fight detonates it like a
+         * Nether / End bed (power 5, intentional game design) even in the Overworld. Off by
+         * default so existing kits keep plain vanilla bed behaviour (sleep / spawn point).
+         */
+        private boolean bedExplosion;
 
         private Builder(String name) {
             this.name = Objects.requireNonNull(name, "name");
@@ -159,6 +165,7 @@ public record KitDefinition(String name, String displayName, String icon, boolea
             this.startCommands = new ArrayList<String>(source.startCommands);
             this.startEffects = new ArrayList<KitStartEffect>(source.startEffects);
             this.presetEnabled = source.presetEnabled;
+            this.bedExplosion = source.bedExplosion;
         }
 
         public Builder name(String value) {
@@ -353,8 +360,13 @@ public record KitDefinition(String name, String displayName, String icon, boolea
             return this;
         }
 
+        public Builder bedExplosion(boolean value) {
+            this.bedExplosion = value;
+            return this;
+        }
+
         public KitDefinition build() {
-            return new KitDefinition(this.name, this.displayName, this.icon, this.ranked, this.ffaEnabled, this.maxHealth, this.naturalHealthRegen, this.knockbackMultiplier, this.items, this.armor, this.enabled, this.autoFood, this.swordShieldBreak, this.blockPlace, this.blockBreak, this.breakPlayerPlacedOnly, this.canBreak, this.pearl, this.totem, this.forceAdventure, this.timeoutSeconds, this.arenas, this.partyArenas, this.startCommands, this.startEffects, this.presetEnabled);
+            return new KitDefinition(this.name, this.displayName, this.icon, this.ranked, this.ffaEnabled, this.maxHealth, this.naturalHealthRegen, this.knockbackMultiplier, this.items, this.armor, this.enabled, this.autoFood, this.swordShieldBreak, this.blockPlace, this.blockBreak, this.breakPlayerPlacedOnly, this.canBreak, this.pearl, this.totem, this.forceAdventure, this.timeoutSeconds, this.arenas, this.partyArenas, this.startCommands, this.startEffects, this.presetEnabled, this.bedExplosion);
         }
     }
 }

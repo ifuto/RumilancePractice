@@ -77,6 +77,7 @@ public final class SafeTeleport {
         // the client spectating the old entity while the server moves the camera, causing a
         // nasty unloaded-chunk desync. Detach from the target (vanilla behaviour) first.
         releaseSpectatorTarget(player);
+        releaseSeat(player);
         player.setVelocity(new Vector());
         player.setFallDistance(0f);
         boolean ok = player.teleport(target);
@@ -109,6 +110,23 @@ public final class SafeTeleport {
             }
         } catch (RuntimeException ignored) {
             // Best-effort: a teleport must never fail because of camera detachment.
+        }
+    }
+
+    /**
+     * Sits are owned by the external GSit plugin: a seated player rides an invisible seat
+     * armour stand. Teleporting a mounted player drags the seat along (or strands it in the
+     * destination), so every teleport stands the player up first. Also covers any other ride
+     * (boat, minecart, another plugin's seat) a lobby player might still be on when a fight,
+     * a spectate or a rescue moves them.
+     */
+    private static void releaseSeat(Player player) {
+        try {
+            if (player.isInsideVehicle()) {
+                player.leaveVehicle();
+            }
+        } catch (RuntimeException | NoSuchMethodError ignored) {
+            // Best-effort: a teleport must never fail because the player was sitting.
         }
     }
 

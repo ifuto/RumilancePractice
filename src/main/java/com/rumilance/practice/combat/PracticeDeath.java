@@ -74,12 +74,32 @@ public final class PracticeDeath {
         }
     }
 
+    public static void clearPendingHandTotem(Player player) {
+        if (player != null) {
+            pendingHandTotemUntil.remove(player.getUniqueId());
+        }
+    }
+
+    /**
+     * True when a totem sits in the main hand or the offhand right now — the only two slots
+     * vanilla resurrects from. The pending-swap window
+     * ({@link #markPendingHandTotem}) is deliberately NOT part of this check: it may only
+     * keep a lethal hit alive for one extra evaluation, never invent a totem that is not in
+     * a hand (a free pop with nothing consumed would be an exploit).
+     */
+    public static boolean hasTotemInHand(Player player) {
+        if (player == null) {
+            return false;
+        }
+        return isTotem(player.getInventory().getItemInOffHand())
+                || isTotem(player.getInventory().getItemInMainHand());
+    }
+
     public static boolean isHoldingTotem(Player player) {
         if (player == null) {
             return false;
         }
-        if (isTotem(player.getInventory().getItemInOffHand())
-                || isTotem(player.getInventory().getItemInMainHand())) {
+        if (hasTotemInHand(player)) {
             return true;
         }
         Long until = pendingHandTotemUntil.get(player.getUniqueId());
@@ -119,9 +139,11 @@ public final class PracticeDeath {
      * mainhand), cancels the damage, and applies vanilla totem effects. Works for every
      * {@link EntityDamageEvent.DamageCause}.
      *
-     * <p>Prefer {@link #shouldDeferTotemToVanilla} for combat hits so enchantments
-     * (e.g. mace Wind Burst) and {@link org.bukkit.event.entity.EntityResurrectEvent}
-     * run through vanilla.</p>
+     * <p>This is the ONLY totem path in practice combat: the pop is executed by the plugin, so
+     * no other listener (void rescue, fake-death, explosion attribution, another plugin
+     * cancelling the hit) can swallow it and leave a totem holder dead. A totem is only ever
+     * consumed from a hand — {@link #hasTotemInHand} — so a pending swap window can never
+     * grant a free pop.</p>
      *
      * @return {@code true} when a totem was popped
      */
@@ -129,34 +151,74 @@ public final class PracticeDeath {
         if (player == null || event == null) {
             return false;
         }
+        if (!canPopTotem(player, kit)) {
+            return false;
+        }
+        if (!wouldDie(player, event)) {
+            return false;
+        }
+        // Cancel FIRST: nothing may apply the lethal amount while we pop (and no other
+        // listener may see an uncancelled lethal and run its own death handling).
+        event.setCancelled(true);
+        event.setDamage(0);
+        return popTotemNow(player);
+    }
+
+    /**
+     * Event-less totem gate for the lethal handlers ({@code MatchService.handleLethal},
+     * {@code FfaService.handleLethal}, practice death). A lethal outcome that reaches those
+     * while the victim still holds a totem is popped here instead, so a "dead with a totem in
+     * hand" state can never be turned into a loss / kill / death screen.
+     *
+     * @return {@code true} when a totem was popped and the caller must treat the victim as alive
+     */
+    public static boolean tryPopTotem(Player player, KitDefinition kit) {
+        if (player == null || !canPopTotem(player, kit)) {
+            return false;
+        }
+        return popTotemNow(player);
+    }
+
+    /** Kit/permission gate: is a totem pop allowed for this player at all? */
+    public static boolean canPopTotem(Player player, KitDefinition kit) {
+        if (player == null || !player.isOnline()) {
+            return false;
+        }
+        if (player.getGameMode() == org.bukkit.GameMode.CREATIVE
+                || player.getGameMode() == org.bukkit.GameMode.SPECTATOR) {
+            return false;
+        }
         if (kit != null && !kit.totem()) {
             return false;
         }
-        if (!wouldDie(player, event) || !isHoldingTotem(player)) {
+        return hasTotemInHand(player);
+    }
+
+    /**
+     * Consumes one held totem and applies the vanilla activation. Returns {@code false} when
+     * there was nothing in a hand to consume (no free pops).
+     */
+    private static boolean popTotemNow(Player player) {
+        if (!hasTotemInHand(player)) {
             return false;
         }
         pendingHandTotemUntil.remove(player.getUniqueId());
-        event.setCancelled(true);
-        event.setDamage(0);
-        consumeHeldTotem(player);
+        consumeTotemFromHand(player);
         applyTotemActivation(player);
         return true;
     }
 
     /**
-     * Lethal hit while holding a totem: let vanilla consume it so attacker enchantments
-     * (Wind Burst, etc.) and {@link org.bukkit.event.entity.EntityResurrectEvent} still fire.
-     * Callers must skip {@link #tryPopTotem} and {@code handleLethal} for this tick, then
-     * verify survival on {@link org.bukkit.event.EventPriority#MONITOR}.
+     * Lethal hit while holding a totem: cancel the hit and pop the totem ourselves.
+     *
+     * @deprecated deferring to vanilla was the source of "died with a totem in hand": vanilla
+     *     only resurrects when the lethal damage reaches {@code LivingEntity#die}, and practice
+     *     cancels / re-routes lethal damage all over the place (void rescue, fake-death,
+     *     explosion self-damage one tick later, other plugins). Use {@link #tryPopTotem}.
      */
+    @Deprecated
     public static boolean shouldDeferTotemToVanilla(Player player, KitDefinition kit, EntityDamageEvent event) {
-        if (player == null || event == null) {
-            return false;
-        }
-        if (kit != null && !kit.totem()) {
-            return false;
-        }
-        return wouldDie(player, event) && isHoldingTotem(player);
+        return tryPopTotem(player, kit, event);
     }
 
     /** @deprecated use {@link #tryPopTotem} */
@@ -165,18 +227,28 @@ public final class PracticeDeath {
         return tryPopTotem(player, kit, event);
     }
 
-    /** Offhand first, then main hand  Esame priority as vanilla. */
-    static void consumeHeldTotem(Player player) {
+    /**
+     * Offhand first, then main hand -- same priority as vanilla. Public so the death failsafe
+     * ({@link TotemGuardListener}) can consume the totem that saved a cancelled death.
+     *
+     * @return true when a totem was consumed
+     */
+    public static boolean consumeTotemFromHand(Player player) {
+        if (player == null || !hasTotemInHand(player)) {
+            return false;
+        }
         PlayerInventory inventory = player.getInventory();
         ItemStack off = inventory.getItemInOffHand();
         if (isTotem(off)) {
             decrementOrClear(inventory, off, true);
-            return;
+            return true;
         }
         ItemStack main = inventory.getItemInMainHand();
         if (isTotem(main)) {
             decrementOrClear(inventory, main, false);
+            return true;
         }
+        return false;
     }
 
     private static void decrementOrClear(PlayerInventory inventory, ItemStack stack, boolean offhand) {
@@ -190,6 +262,14 @@ public final class PracticeDeath {
         } else {
             stack.setAmount(next);
         }
+    }
+
+    /**
+     * Vanilla totem activation: 1 HP, no fire/freeze, Regeneration II 45s, Fire Resistance 40s,
+     * Absorption IV 5s and the totem particle/sound. Public for the death failsafe.
+     */
+    public static void applyTotemEffects(Player player) {
+        applyTotemActivation(player);
     }
 
     static void applyTotemActivation(Player player) {

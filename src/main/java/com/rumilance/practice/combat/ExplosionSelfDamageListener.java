@@ -3,8 +3,9 @@ package com.rumilance.practice.combat;
 import org.bukkit.FluidCollisionMode;
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.block.data.type.Bed;
-import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Creeper;
 import org.bukkit.entity.EnderCrystal;
 import org.bukkit.entity.Entity;
@@ -20,7 +21,6 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.projectiles.ProjectileSource;
 import org.bukkit.util.RayTraceResult;
@@ -49,36 +49,31 @@ import java.util.concurrent.ConcurrentHashMap;
  * and treated as the source).</p>
  *
  * <p>For every blast we resolve the source player, pre-compute the exact vanilla damage +
- * knockback that entity would have taken, and apply it one tick later — but ONLY when vanilla
- * really skipped them (players who took a normal blast this tick are marked and skipped), so
- * this can never double-damage on a server/version where vanilla does apply it. The applied
- * damage is attributed to the player themselves ({@code player.damage(amount, player)}), so
- * kill tracking treats it as a self-inflicted blast.</p>
+ * knockback that entity would have taken ({@link ExplosionPhysics}: raw
+ * {@code (impact² + impact)/2 · 7 · (2·power) + 1}, exposure over the 12 sample points of the
+ * inflated player bounding box, and the knockback <em>delta</em> that subtracts the velocity the
+ * player already has in the blast direction), and apply it one tick later — but ONLY when vanilla
+ * really skipped them for THIS blast, so a player who is legitimately hit by two crystals in the
+ * same tick still gets both self-blasts and nobody is ever double-damaged.</p>
+ *
+ * <p>The applied damage is attributed to the player themselves
+ * ({@code player.damage(amount, player)}), so the whole vanilla pipeline (difficulty, armor,
+ * protection, absorption, i-frames) and our kill tracking treat it as a genuine self-inflicted
+ * blast.</p>
  */
 public final class ExplosionSelfDamageListener implements Listener {
 
-    /** Crystal blast power (vanilla EndCrystal explosion). */
-    private static final float CRYSTAL_POWER = 6.0f;
-    /** Respawn anchor and bed blast power (both power 5 in vanilla). */
-    private static final float BLOCK_EXPLODE_POWER = 5.0f;
+    /** Charged creeper blast power (vanilla: 6, same as an end crystal). */
+    private static final float CHARGED_CREEPER_POWER = 6.0f;
     /** How far back a primed-TNT ignition chain is followed to find the original player. */
     private static final int TNT_CHAIN_MAX = 8;
     /** How long a crystal keeps its last recorded detonator. */
     private static final long DETONATOR_TTL_MS = 5_000L;
     /** How long an anchor/bed remembers its last right-clicker. */
     private static final long BLOCK_INTERACT_TTL_MS = 10_000L;
-    /** Exposure raycast sample points on the player body. */
-    private static final double[][] SAMPLE_OFFSETS = {
-            {0.0d, 0.2d, 0.0d},
-            {0.0d, 0.9d, 0.0d},
-            {0.0d, 1.62d, 0.0d},
-            {0.3d, 0.9d, 0.0d},
-            {-0.3d, 0.9d, 0.0d},
-            {0.0d, 0.9d, 0.3d},
-            {0.0d, 0.9d, -0.3d},
-    };
 
     private final Plugin plugin;
+
     private record Detonator(UUID playerId, long atMillis) {
     }
 
@@ -87,15 +82,28 @@ public final class ExplosionSelfDamageListener implements Listener {
     private final Map<String, Detonator> blockInteractions = new ConcurrentHashMap<>();
     /** Plugin-created blasts ({@code createExplosion}) carry no entity — match by tick+spot. */
     private final Deque<PluginBlast> pluginBlasts = new ArrayDeque<>();
-    /** Players vanilla already damaged with an explosion this tick (double-damage guard). */
-    private final Map<UUID, Integer> vanillaBlastTick = new ConcurrentHashMap<>();
+    /**
+     * Players vanilla already damaged with THIS blast (double-damage guard), keyed
+     * {@code player -> blastKey}. A tick-wide flag used to suppress a second crystal in the same
+     * tick, which is a real crystal-PvP pattern (double-pop), so the guard is per blast.
+     */
+    private final Map<UUID, BlastHit> vanillaBlastHits = new ConcurrentHashMap<>();
+    /**
+     * Last tick a player took a BLOCK explosion (bed / respawn anchor). Those events carry no
+     * entity, so a block blast cannot be matched by identity - a short window is used instead.
+     */
+    private final Map<UUID, Integer> vanillaBlockBlastTick = new ConcurrentHashMap<>();
 
     private record PluginBlast(int tick, String world, double x, double y, double z,
                                float power, UUID source) {
     }
 
-    private record PendingBlast(int tick, UUID playerId, World world, double x, double y, double z,
-                                float power) {
+    private record PendingBlast(int tick, String blastKey, UUID playerId, World world,
+                                double x, double y, double z, float power, boolean blockBlast) {
+    }
+
+    /** One blast vanilla actually applied to a player, remembered for a few ticks. */
+    private record BlastHit(String blastKey, int tick) {
     }
 
     public ExplosionSelfDamageListener(Plugin plugin) {
@@ -145,7 +153,7 @@ public final class ExplosionSelfDamageListener implements Listener {
         }
     }
 
-    /** Marks players vanilla actually damaged this tick (double-damage guard). */
+    /** Marks players vanilla actually damaged with a given blast (double-damage guard). */
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onExplosionDamage(EntityDamageEvent event) {
         if (!(event.getEntity() instanceof Player player)) {
@@ -156,11 +164,38 @@ public final class ExplosionSelfDamageListener implements Listener {
                 && cause != EntityDamageEvent.DamageCause.BLOCK_EXPLOSION) {
             return;
         }
-        vanillaBlastTick.put(player.getUniqueId(), org.bukkit.Bukkit.getCurrentTick());
-        if (vanillaBlastTick.size() > 128) {
-            int cutoff = org.bukkit.Bukkit.getCurrentTick() - 200;
-            vanillaBlastTick.values().removeIf(tick -> tick < cutoff);
+        int tick = org.bukkit.Bukkit.getCurrentTick();
+        if (cause == EntityDamageEvent.DamageCause.BLOCK_EXPLOSION) {
+            vanillaBlockBlastTick.put(player.getUniqueId(), tick);
+            if (vanillaBlockBlastTick.size() > 256) {
+                int cutoff = tick - 100;
+                vanillaBlockBlastTick.values().removeIf(t -> t < cutoff);
+            }
         }
+        String key = blastKeyOf(event);
+        if (key == null) {
+            return;
+        }
+        vanillaBlastHits.put(player.getUniqueId(), new BlastHit(key, tick));
+        if (vanillaBlastHits.size() > 256) {
+            int cutoff = tick - 100;
+            vanillaBlastHits.values().removeIf(hit -> hit.tick() < cutoff);
+        }
+    }
+
+    /**
+     * Identifies the blast behind a damage event so the guard is per-explosion: two crystals
+     * popping in the same tick are two different blasts and both may need self-damage restored.
+     */
+    private static String blastKeyOf(EntityDamageEvent event) {
+        if (event instanceof EntityDamageByEntityEvent byEntity && byEntity.getDamager() != null) {
+            return "e:" + byEntity.getDamager().getUniqueId();
+        }
+        // Block explosions (bed / respawn anchor) carry no entity: fall back to the victim's own
+        // position + tick, which is unique enough because a block blast hits every player once.
+        Location at = event.getEntity().getLocation();
+        return "b:" + at.getWorld().getName() + "|" + at.getBlockX() + "|" + at.getBlockY()
+                + "|" + at.getBlockZ() + "|" + org.bukkit.Bukkit.getCurrentTick();
     }
 
     /**
@@ -195,7 +230,10 @@ public final class ExplosionSelfDamageListener implements Listener {
             return;
         }
         Location center = event.getBlock().getLocation().add(0.5d, 0.5d, 0.5d);
-        scheduleSelfBlast(interaction.playerId(), center, BLOCK_EXPLODE_POWER);
+        float power = event.getBlock().getType() == org.bukkit.Material.RESPAWN_ANCHOR
+                ? ExplosionPhysics.ANCHOR_POWER : ExplosionPhysics.BED_POWER;
+        scheduleSelfBlast(interaction.playerId(), center, power,
+                "blk:" + blockKey(event.getBlock()), true);
     }
 
     private static boolean isExplosiveBlock(org.bukkit.block.Block block) {
@@ -208,14 +246,19 @@ public final class ExplosionSelfDamageListener implements Listener {
     }
 
     /** Central dispatch: resolves the source player and schedules the self-damage tick. */
-    private void scheduleSelfBlast(UUID sourceId, Location center, float power) {
+    private void scheduleSelfBlast(UUID sourceId, Location center, float power, String blastKey) {
+        scheduleSelfBlast(sourceId, center, power, blastKey, false);
+    }
+
+    private void scheduleSelfBlast(UUID sourceId, Location center, float power, String blastKey,
+                                   boolean blockBlast) {
         Player source = org.bukkit.Bukkit.getPlayer(sourceId);
         if (source == null || !source.isOnline() || source.getWorld() != center.getWorld()) {
             return;
         }
         PendingBlast pending = new PendingBlast(
-                org.bukkit.Bukkit.getCurrentTick(), sourceId, center.getWorld(),
-                center.getX(), center.getY(), center.getZ(), power);
+                org.bukkit.Bukkit.getCurrentTick(), blastKey, sourceId, center.getWorld(),
+                center.getX(), center.getY(), center.getZ(), power, blockBlast);
         org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> applyIfSkipped(pending), 1L);
     }
 
@@ -224,7 +267,8 @@ public final class ExplosionSelfDamageListener implements Listener {
     public void onExplode(EntityExplodeEvent event) {
         Entity entity = event.getEntity();
         UUID sourceId = null;
-        float power = CRYSTAL_POWER;
+        float power = ExplosionPhysics.CRYSTAL_POWER;
+        String blastKey = "e:" + (entity == null ? "plugin" : entity.getUniqueId().toString());
         if (entity instanceof EnderCrystal) {
             Detonator detonator = crystalDetonators.remove(entity.getUniqueId());
             if (detonator != null && System.currentTimeMillis() - detonator.atMillis() <= DETONATOR_TTL_MS) {
@@ -240,12 +284,13 @@ public final class ExplosionSelfDamageListener implements Listener {
                 }
                 current = primed.getSource();
             }
-            power = 4.0f;
+            power = ExplosionPhysics.TNT_POWER;
         } else if (entity instanceof Creeper creeper) {
             if (creeper.getIgniter() instanceof Player player) {
                 sourceId = player.getUniqueId();
             }
-            power = creeper.isPowered() ? 6.0f : 3.0f;
+            // A charged creeper has the same power as an end crystal (6); a normal one 3.
+            power = creeper.isPowered() ? CHARGED_CREEPER_POWER : ExplosionPhysics.CREEPER_POWER;
         } else if (entity == null) {
             // Plugin-created explosion (createExplosion fires with no entity).
             int tick = org.bukkit.Bukkit.getCurrentTick();
@@ -267,6 +312,8 @@ public final class ExplosionSelfDamageListener implements Listener {
                     if (dx * dx + dy * dy + dz * dz <= 1.0d) {
                         sourceId = blast.source();
                         power = blast.power();
+                        blastKey = "p:" + blast.world() + "|" + blast.x() + "|" + blast.y() + "|"
+                                + blast.z() + "|" + blast.tick();
                         it.remove();
                         break;
                     }
@@ -276,7 +323,7 @@ public final class ExplosionSelfDamageListener implements Listener {
         if (sourceId == null) {
             return;
         }
-        scheduleSelfBlast(sourceId, event.getLocation(), power);
+        scheduleSelfBlast(sourceId, event.getLocation(), power, blastKey);
     }
 
     private void applyIfSkipped(PendingBlast blast) {
@@ -288,98 +335,137 @@ public final class ExplosionSelfDamageListener implements Listener {
                 || player.getGameMode() == org.bukkit.GameMode.SPECTATOR) {
             return;
         }
-        Integer damagedTick = vanillaBlastTick.get(player.getUniqueId());
-        if (damagedTick != null && damagedTick >= blast.tick()) {
-            // Vanilla dealt the blast to them after all — nothing was skipped.
+        BlastHit hit = vanillaBlastHits.get(player.getUniqueId());
+        if (hit != null && hit.blastKey().equals(blast.blastKey()) && hit.tick() >= blast.tick()) {
+            // Vanilla dealt THIS blast to them after all — nothing was skipped.
             return;
+        }
+        if (blast.blockBlast()) {
+            Integer blockTick = vanillaBlockBlastTick.get(player.getUniqueId());
+            if (blockTick != null && blockTick >= blast.tick()
+                    && org.bukkit.Bukkit.getCurrentTick() - blockTick <= 2) {
+                // Vanilla bed / anchor damage landed (no entity to match on): don't double it.
+                return;
+            }
         }
         Location loc = player.getLocation();
         if (loc.getWorld() == null || !loc.getWorld().equals(blast.world())) {
             return;
         }
-        double dist = Math.sqrt(
-                (loc.getX() - blast.x()) * (loc.getX() - blast.x())
-                        + (loc.getY() - blast.y()) * (loc.getY() - blast.y())
-                        + (loc.getZ() - blast.z()) * (loc.getZ() - blast.z()));
-        float diameter = blast.power() * 2.0f;
-        double scaled = dist / diameter;
-        if (scaled > 1.0d) {
+        // Vanilla measures from the explosion centre to the entity's FEET position.
+        double dx = loc.getX() - blast.x();
+        double dy = loc.getY() - blast.y();
+        double dz = loc.getZ() - blast.z();
+        double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (!ExplosionPhysics.inRadius(distance, blast.power())) {
             return;
         }
         double exposure = exposure(blast.world(), blast.x(), blast.y(), blast.z(), player);
         if (exposure <= 0.0d) {
             return;
         }
-        double impact = (1.0d - scaled) * exposure;
-        if (impact <= 0.0d) {
-            return;
-        }
-        double damage = Math.max(0.0d,
-                (int) ((impact * impact + impact) / 2.0d * 7.0d * diameter + 1.0d));
+        double impact = ExplosionPhysics.impact(distance, blast.power(), exposure);
+        double damage = ExplosionPhysics.rawDamage(impact, blast.power());
         if (damage <= 0.0d) {
             return;
         }
-        // Direction uses the player's eye height, exactly like vanilla explosion knockback.
-        double dx = loc.getX() - blast.x();
-        double dy = player.getEyeLocation().getY() - blast.y();
-        double dz = loc.getZ() - blast.z();
-        double len = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        Vector knockback = new Vector();
-        if (len > 1.0e-6d) {
-            double kbScale = impact * (1.0d - 0.15d * blastProtectionLevel(player));
-            if (kbScale > 0.0d) {
-                knockback = new Vector(dx / len * kbScale, dy / len * kbScale, dz / len * kbScale);
-            }
-        }
-        // Knockback first so a surviving victim is pushed exactly like vanilla; the damage
-        // call below may eliminate them (team elim / opponent win) mid-way.
-        if (knockback.lengthSquared() > 0.0d) {
-            player.setVelocity(player.getVelocity().add(knockback));
-        }
+        applyKnockback(player, blast, impact);
         // Self-attributed: the player is their own damager, so every combat flow sees a
         // genuine self-inflicted blast (kill credit, death messages, totem handling).
         player.damage(damage, player);
     }
 
-    /** Fraction of sample rays from the blast centre to the player body that are unobstructed. */
-    private double exposure(World world, double x, double y, double z, Player player) {
-        Location origin = new Location(world, x, y, z);
-        double px = player.getLocation().getX();
-        double py = player.getLocation().getY();
-        double pz = player.getLocation().getZ();
-        int clear = 0;
-        for (double[] offset : SAMPLE_OFFSETS) {
-            Location target = new Location(world, px + offset[0], py + offset[1], pz + offset[2]);
-            double maxDist = origin.distance(target);
-            if (maxDist < 1.0e-4d) {
-                clear++;
-                continue;
-            }
-            Vector direction = target.toVector().subtract(origin.toVector());
-            RayTraceResult hit = world.rayTraceBlocks(
-                    origin, direction, maxDist + 0.1d, FluidCollisionMode.NEVER, true);
-            if (hit == null || hit.getHitBlock() == null) {
-                clear++;
-            }
+    /**
+     * Vanilla {@code Explosion#finalizeExplosion} knockback: the direction runs from the blast
+     * centre to the player's EYES, and the impulse is {@code impact - dot(velocity, direction)}
+     * — a player already moving away keeps part of their speed, a player running in is not
+     * launched twice. Scaled by the {@code explosion_knockback_resistance} attribute (Blast
+     * Protection grants 0.15 per level through it since 1.21.2).
+     */
+    private void applyKnockback(Player player, PendingBlast blast, double impact) {
+        double dx = player.getEyeLocation().getX() - blast.x();
+        double dy = player.getEyeLocation().getY() - blast.y();
+        double dz = player.getEyeLocation().getZ() - blast.z();
+        double len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (len < 1.0e-6d) {
+            return;
         }
-        return (double) clear / SAMPLE_OFFSETS.length;
+        double ux = dx / len;
+        double uy = dy / len;
+        double uz = dz / len;
+        Vector velocity = player.getVelocity();
+        double dot = velocity.getX() * ux + velocity.getY() * uy + velocity.getZ() * uz;
+        double resistance = explosionKnockbackResistance(player);
+        double kx = ExplosionPhysics.knockbackDelta(ux, impact, dot, resistance);
+        double ky = ExplosionPhysics.knockbackDelta(uy, impact, dot, resistance);
+        double kz = ExplosionPhysics.knockbackDelta(uz, impact, dot, resistance);
+        if (kx == 0.0d && ky == 0.0d && kz == 0.0d) {
+            return;
+        }
+        player.setVelocity(velocity.add(new Vector(kx, ky, kz)));
     }
 
-    private int blastProtectionLevel(Player player) {
-        int max = 0;
-        for (ItemStack armor : player.getInventory().getArmorContents()) {
-            if (armor == null) {
-                continue;
-            }
-            try {
-                int level = armor.getEnchantmentLevel(Enchantment.BLAST_PROTECTION);
-                if (level > max) {
-                    max = level;
+    private static double explosionKnockbackResistance(Player player) {
+        try {
+            AttributeInstance attribute = player.getAttribute(Attribute.EXPLOSION_KNOCKBACK_RESISTANCE);
+            return attribute == null ? 0.0d : attribute.getValue();
+        } catch (RuntimeException | NoClassDefFoundError | NoSuchFieldError e) {
+            // Older API without the attribute: no resistance data, vanilla knockback.
+            return 0.0d;
+        }
+    }
+
+    /**
+     * Vanilla exposure: the bounding box inflated by 0.6 on every axis is cut into
+     * {@code ceil(size / 1.5)} steps per axis (2 x 3 x 2 = 12 sample points for a standing
+     * player) and a ray is cast from the blast centre to each point. The exposure is the
+     * fraction of rays that no collision-shaped block stops.
+     */
+    private double exposure(World world, double x, double y, double z, Player player) {
+        Location origin = new Location(world, x, y, z);
+        Location loc = player.getLocation();
+        double width = player.getWidth();
+        double height = player.getHeight();
+        double minX = loc.getX() - width / 2.0d - ExplosionPhysics.EXPOSURE_MARGIN;
+        double minY = loc.getY() - ExplosionPhysics.EXPOSURE_MARGIN;
+        double minZ = loc.getZ() - width / 2.0d - ExplosionPhysics.EXPOSURE_MARGIN;
+        double sizeX = width + 2.0d * ExplosionPhysics.EXPOSURE_MARGIN;
+        double sizeY = height + 2.0d * ExplosionPhysics.EXPOSURE_MARGIN;
+        double sizeZ = sizeX;
+        int stepsX = ExplosionPhysics.sampleSteps(width);
+        int stepsY = ExplosionPhysics.sampleSteps(height);
+        int stepsZ = stepsX;
+
+        int total = 0;
+        int clear = 0;
+        for (int ix = 0; ix < stepsX; ix++) {
+            double px = ExplosionPhysics.sampleCoordinate(minX, sizeX, stepsX, ix);
+            for (int iy = 0; iy < stepsY; iy++) {
+                double py = ExplosionPhysics.sampleCoordinate(minY, sizeY, stepsY, iy);
+                for (int iz = 0; iz < stepsZ; iz++) {
+                    double pz = ExplosionPhysics.sampleCoordinate(minZ, sizeZ, stepsZ, iz);
+                    total++;
+                    if (rayIsClear(world, origin, px, py, pz)) {
+                        clear++;
+                    }
                 }
-            } catch (RuntimeException ignored) {
-                // Enchantment registry hiccup: fall back to no reduction.
             }
         }
-        return max;
+        return total == 0 ? 0.0d : (double) clear / total;
+    }
+
+    /** One vanilla exposure ray: {@code ClipContext.Block.COLLIDER} from the centre to a sample. */
+    private boolean rayIsClear(World world, Location origin, double px, double py, double pz) {
+        double dx = px - origin.getX();
+        double dy = py - origin.getY();
+        double dz = pz - origin.getZ();
+        double length = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (length < 1.0e-4d) {
+            return true;
+        }
+        Vector direction = new Vector(dx / length, dy / length, dz / length);
+        RayTraceResult hit = world.rayTraceBlocks(
+                origin, direction, length, FluidCollisionMode.NEVER, true);
+        return hit == null || hit.getHitBlock() == null;
     }
 }

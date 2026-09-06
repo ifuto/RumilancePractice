@@ -93,22 +93,23 @@ public final class FfaListener implements Listener {
                 ffaService.tagCombat(victim.getUniqueId(), attackerId);
             }
         }
-        // After a vanilla/manual totem pop, stale HP frames can LOOK lethal; the grace window
-        // shields those frames. A GENUINE killing blow inside the window must still resolve —
-        // cancelling it unconditionally (the old behaviour) made the hit vanish entirely, so the
-        // victim got one free "invincible" hit after every totem pop. Mirrors MatchListener.
+        // Totem of undying: pop it OURSELVES (mirrors MatchListener). Deferring to vanilla left
+        // players dead with a totem in hand whenever the lethal frame never reached
+        // LivingEntity#die (void rescue, explosion self-damage, another plugin cancelling).
+        if (PracticeDeath.tryPopTotem(victim, kit, event)) {
+            return;
+        }
+
+        // After a totem pop, stale HP frames can LOOK lethal; the grace window shields those
+        // frames. A GENUINE killing blow inside the window must still resolve - cancelling it
+        // unconditionally (the old behaviour) made the hit vanish entirely, so the victim got
+        // one free "invincible" hit after every totem pop.
         if (PracticeDeath.isInResurrectGrace(victim)) {
-            if (PracticeDeath.shouldDeferTotemToVanilla(victim, kit, event)) {
-                return;
-            }
             if (PracticeDeath.remainingAfter(victim, event) <= 0) {
                 event.setCancelled(true);
                 event.setDamage(0);
                 ffaService.handleLethal(victim, resolveKiller(event));
             }
-            return;
-        }
-        if (PracticeDeath.shouldDeferTotemToVanilla(victim, kit, event)) {
             return;
         }
         double remaining = PracticeDeath.remainingAfter(victim, event);

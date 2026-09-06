@@ -1,0 +1,230 @@
+package com.rumilance.practice.combat;
+
+import com.rumilance.practice.model.KitDefinition;
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityResurrectEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.plugin.Plugin;
+
+import java.util.UUID;
+import java.util.function.Consumer;
+import java.util.function.Function;
+
+/**
+ * Last line of defence for the one rule practice PvP must never break:
+ * <strong>a player holding a totem of undying in a hand cannot die.</strong>
+ *
+ * <p>The mode listeners (match / FFA / practice / void rescue) pop totems themselves on the
+ * lethal {@link EntityDamageEvent}. This listener catches whatever still slips through — a hit
+ * another plugin left uncancelled, a damage cause no mode listener covers, a death arriving
+ * from a path that never produced a damage event we could see:</p>
+ *
+ * <ol>
+ *   <li>{@link EventPriority#MONITOR} on damage: lethal + uncancelled + totem in hand ⇒ cancel
+ *       the hit and pop the totem (a MONITOR handler may still cancel; nothing has been applied
+ *       yet, so the victim simply survives).</li>
+ *   <li>{@link PlayerDeathEvent}: cancel, consume the held totem and bring the player back
+ *       (health top-up, or a forced respawn + teleport home when Paper keeps them downed).</li>
+ * </ol>
+ *
+ * <p>Register this listener <em>first</em> so its MONITOR handler runs before any other plugin
+ * listener that would treat the same frame as a death.</p>
+ */
+public final class TotemGuardListener implements Listener {
+
+    /**
+     * Per-context wiring.
+     *
+     * @param kit      resolves the active kit for a player id ({@code null} = no kit rules,
+     *                 totems allowed), or {@code null} when the context does not apply
+     * @param inContext true while the player is inside this context (match / FFA / practice)
+     * @param safeLocation where the player should stand after a rescued death
+     * @param recover    optional extra recovery hook (e.g. FFA respawn: kit + stats + sight)
+     */
+    public record Context(
+            Function<UUID, KitDefinition> kit,
+            java.util.function.Predicate<UUID> inContext,
+            Function<UUID, Location> safeLocation,
+            Consumer<Player> recover
+    ) {
+        public static Context of(Function<UUID, KitDefinition> kit,
+                                 java.util.function.Predicate<UUID> inContext,
+                                 Function<UUID, Location> safeLocation) {
+            return new Context(kit, inContext, safeLocation, null);
+        }
+    }
+
+    private final Plugin plugin;
+    private final java.util.List<Context> contexts = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    public TotemGuardListener(Plugin plugin) {
+        this.plugin = plugin;
+    }
+
+    public TotemGuardListener addContext(Context context) {
+        if (context != null) {
+            contexts.add(context);
+        }
+        return this;
+    }
+
+    /** Kit rules for a player across every registered context; {@code null} when unmanaged. */
+    public KitDefinition kitFor(UUID playerId) {
+        for (Context context : contexts) {
+            if (context.inContext() == null || !context.inContext().test(playerId)) {
+                continue;
+            }
+            if (context.kit() == null) {
+                return null;
+            }
+            return context.kit().apply(playerId);
+        }
+        return null;
+    }
+
+    private Context contextOf(UUID playerId) {
+        for (Context context : contexts) {
+            if (context.inContext() != null && context.inContext().test(playerId)) {
+                return context;
+            }
+        }
+        return null;
+    }
+
+    /** True when this player is inside any guarded practice context. */
+    public boolean guards(UUID playerId) {
+        return contextOf(playerId) != null;
+    }
+
+    // ------------------------------------------------------------------ damage failsafe
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onLethalDamage(EntityDamageEvent event) {
+        if (event.isCancelled() || !(event.getEntity() instanceof Player player)) {
+            return;
+        }
+        UUID id = player.getUniqueId();
+        Context context = contextOf(id);
+        if (context == null) {
+            return;
+        }
+        if (!PracticeDeath.wouldDie(player, event)) {
+            return;
+        }
+        KitDefinition kit = context.kit() == null ? null : context.kit().apply(id);
+        if (!PracticeDeath.canPopTotem(player, kit)) {
+            return;
+        }
+        // Nothing was applied yet (MONITOR still runs before the damage lands), so cancelling
+        // here is a clean save: the totem pops, the killing blow disappears.
+        event.setCancelled(true);
+        event.setDamage(0);
+        if (PracticeDeath.tryPopTotem(player, kit)) {
+            Bukkit.getLogger().warning("[N Arena][TotemGuard] caught a lethal hit the mode listeners missed: "
+                    + player.getName() + " cause=" + event.getCause());
+            return;
+        }
+        // No consumable totem after all (race): keep the player alive anyway — a totem holder
+        // must never die — by nulling the hit. The next real hit decides the fight.
+        PracticeDeath.markResurrected(player);
+    }
+
+    /** Vanilla popped one for us (another plugin / a path we did not cover): stay consistent. */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onResurrect(EntityResurrectEvent event) {
+        if (event.getEntity() instanceof Player player) {
+            PracticeDeath.markResurrected(player);
+        }
+    }
+
+    // ------------------------------------------------------------------- death failsafe
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onDeath(PlayerDeathEvent event) {
+        Player player = event.getEntity();
+        UUID id = player.getUniqueId();
+        Context context = contextOf(id);
+        if (context == null) {
+            return;
+        }
+        KitDefinition kit = context.kit() == null ? null : context.kit().apply(id);
+        if (!PracticeDeath.hasTotemInHand(player) || (kit != null && !kit.totem())) {
+            return;
+        }
+        event.setCancelled(true);
+        event.getDrops().clear();
+        event.setKeepInventory(true);
+        event.setShouldDropExperience(false);
+        event.deathMessage(null);
+        Bukkit.getLogger().warning("[N Arena][TotemGuard] cancelled a death with a totem in hand: "
+                + player.getName() + " cause="
+                + (player.getLastDamageCause() == null ? "?" : player.getLastDamageCause().getCause()));
+        PracticeDeath.consumeTotemFromHand(player);
+        revive(player, context);
+    }
+
+    /**
+     * Brings the player back after a cancelled death. Paper keeps a cancelled death downed
+     * until the health is restored, so: top the health up first and, if the player is still
+     * dead on the next tick, force the respawn and put them back where they were fighting.
+     */
+    private void revive(Player player, Context context) {
+        Location dest = null;
+        if (context.safeLocation() != null) {
+            dest = context.safeLocation().apply(player.getUniqueId());
+        }
+        if (dest == null || dest.getWorld() == null) {
+            dest = player.getLocation();
+        }
+        final Location home = dest;
+        PracticeDeath.applyTotemEffects(player);
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (!player.isOnline()) {
+                return;
+            }
+            if (player.isDead() || player.getHealth() <= 0.0d) {
+                try {
+                    player.spigot().respawn();
+                } catch (IllegalStateException | IllegalArgumentException e) {
+                    // Not flagged dead server-side (the cancelled death was enough): fall
+                    // through, the health top-up below is all that is missing.
+                    plugin.getLogger().fine("[N Arena][TotemGuard] respawn not needed/possible: " + e.getMessage());
+                }
+            }
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (!player.isOnline()) {
+                    return;
+                }
+                if (player.getHealth() <= 0.0d) {
+                    player.setHealth(1.0d);
+                }
+                player.setFallDistance(0f);
+                player.setFireTicks(0);
+                player.setFreezeTicks(0);
+                if (home.getWorld() != null) {
+                    com.rumilance.practice.util.SafeTeleport.teleport(player, home);
+                }
+                PracticeDeath.applyTotemEffects(player);
+                if (context.recover() != null) {
+                    try {
+                        context.recover().accept(player);
+                    } catch (RuntimeException e) {
+                        plugin.getLogger().log(java.util.logging.Level.WARNING,
+                                "[N Arena][TotemGuard] recovery hook failed", e);
+                    }
+                }
+            });
+        });
+    }
+
+    /** Convenience for contexts without a kit rule set (totems always allowed). */
+    public static Function<UUID, KitDefinition> alwaysTotems() {
+        return id -> null;
+    }
+}

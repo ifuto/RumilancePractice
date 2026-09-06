@@ -22,11 +22,28 @@ import org.bukkit.inventory.ItemStack;
 import java.util.Locale;
 
 /**
- * ITEM 41 bot difficulty studio: one-click presets (the Quantum map's ladder, NPC through
- * SURVIVAL MASTER) plus a fully detailed parameter board — every stat of the fighter is
- * tunable, which flips the preset to CUSTOM. Choices persist per player.
+ * ITEM 41 bot difficulty studio: the Quantum map's seven-rung ladder (NPC … SURVIVAL MASTER) as
+ * one-click presets plus a fully detailed parameter board — every stat of the fighter is tunable,
+ * which flips the preset to CUSTOM. Choices persist per player.
  */
 public final class BotDifficultyGui extends AbstractGui {
+
+    /** The ladder, in map order (rung 0 .. rung 6). */
+    private static final BotDifficulty.Preset[] LADDER = {
+            BotDifficulty.Preset.NPC,
+            BotDifficulty.Preset.EASY,
+            BotDifficulty.Preset.INTERMEDIATE,
+            BotDifficulty.Preset.HARD,
+            BotDifficulty.Preset.CRAZY,
+            BotDifficulty.Preset.MASTER,
+            BotDifficulty.Preset.SURVIVAL_MASTER
+    };
+
+    private static final Material[] LADDER_ICONS = {
+            Material.WOODEN_SWORD, Material.STONE_SWORD, Material.IRON_SWORD,
+            Material.GOLDEN_SWORD, Material.DIAMOND_SWORD, Material.NETHERITE_SWORD,
+            Material.TOTEM_OF_UNDYING
+    };
 
     private final PracticeService practiceService;
 
@@ -68,28 +85,23 @@ public final class BotDifficultyGui extends AbstractGui {
         }
         BotDifficulty d = pracOpt.get().difficulty();
 
-        // Row 1 — the preset ladder.
-        Material[] icons = {Material.WOODEN_SWORD, Material.STONE_SWORD, Material.IRON_SWORD,
-                Material.GOLDEN_SWORD, Material.DIAMOND_SWORD, Material.NETHERITE_SWORD};
-        BotDifficulty.Preset[] ladder = {BotDifficulty.Preset.NPC, BotDifficulty.Preset.EASY,
-                BotDifficulty.Preset.NORMAL, BotDifficulty.Preset.HARD,
-                BotDifficulty.Preset.EXPERT, BotDifficulty.Preset.SURVIVAL_MASTER};
-        for (int i = 0; i < ladder.length; i++) {
-            BotDifficulty.Preset preset = ladder[i];
+        // Row 1 — the seven-rung ladder (map order), row 2 slot 8 — CUSTOM.
+        for (int i = 0; i < LADDER.length; i++) {
+            BotDifficulty.Preset preset = LADDER[i];
             boolean active = d.preset() == preset;
+            String key = preset.name().toLowerCase(Locale.ROOT);
             inventory.setItem(GuiSlots.slot(1, i + 1),
-                    ItemBuilder.of(icons[i])
-                            .name(t(player, "gui.difficulty-" + preset.name().toLowerCase(Locale.ROOT))
+                    ItemBuilder.of(LADDER_ICONS[i])
+                            .name(t(player, "gui.difficulty-" + key)
                                     .color(active ? UiTheme.SUCCESS : UiTheme.SECONDARY))
                             .lore(UiTheme.divider(),
-                                    UiTheme.line(line(player, "gui.difficulty-lore-"
-                                            + preset.name().toLowerCase(Locale.ROOT))),
+                                    UiTheme.line(line(player, "gui.difficulty-lore-" + key)),
                                     UiTheme.blank(),
                                     UiTheme.hint(line(player, "gui.toggle-hint")))
                             .glintIf(active)
                             .action("preset:" + preset.name()).build());
         }
-        inventory.setItem(GuiSlots.slot(1, 7),
+        inventory.setItem(GuiSlots.slot(2, 8),
                 ItemBuilder.of(Material.NETHER_STAR)
                         .name(t(player, "gui.difficulty-custom")
                                 .color(d.preset() == BotDifficulty.Preset.CUSTOM
@@ -98,20 +110,26 @@ public final class BotDifficultyGui extends AbstractGui {
                         .glintIf(d.preset() == BotDifficulty.Preset.CUSTOM)
                         .action("decorate").build());
 
-        // Rows 2-4 — the detail board (L +, R -, shift reset).
-        inventory.setItem(GuiSlots.slot(2, 1), paramTile(player, Material.GOLDEN_APPLE,
+        // Rows 3-5 — the detail board (L +, R -, shift reset).
+        inventory.setItem(GuiSlots.slot(3, 1), paramTile(player, Material.GOLDEN_APPLE,
                 "gui.param-hp", String.valueOf((int) d.botMaxHp()), "param:hp"));
-        inventory.setItem(GuiSlots.slot(2, 3), paramTile(player, Material.IRON_SWORD,
+        inventory.setItem(GuiSlots.slot(3, 3), paramTile(player, Material.IRON_SWORD,
                 "gui.param-damage", String.valueOf(d.attackDamage()), "param:damage"));
-        inventory.setItem(GuiSlots.slot(2, 5), paramTile(player, Material.CLOCK,
+        inventory.setItem(GuiSlots.slot(3, 5), paramTile(player, Material.CLOCK,
                 "gui.param-atkspeed", d.attackIntervalMs() + "ms", "param:atkspeed"));
-        inventory.setItem(GuiSlots.slot(2, 7), paramTile(player, Material.FEATHER,
+        inventory.setItem(GuiSlots.slot(3, 7), paramTile(player, Material.STICK,
+                "gui.param-reach", String.format(Locale.ROOT, "%.1f", d.reachBlocks()) + "b",
+                "param:reach"));
+        inventory.setItem(GuiSlots.slot(4, 1), paramTile(player, Material.FEATHER,
                 "gui.param-speed", String.format(Locale.ROOT, "%.2f", d.moveSpeed()), "param:speed"));
-        inventory.setItem(GuiSlots.slot(3, 1), paramTile(player, Material.GHAST_TEAR,
-                "gui.param-regen", String.valueOf((int) d.regenPerSecond()), "param:regen"));
-        inventory.setItem(GuiSlots.slot(3, 3), paramTile(player, Material.TNT,
+        inventory.setItem(GuiSlots.slot(4, 3), paramTile(player, Material.GHAST_TEAR,
+                "gui.param-regen", String.valueOf(d.regenPerSecond()), "param:regen"));
+        inventory.setItem(GuiSlots.slot(4, 5), paramTile(player, Material.TNT,
                 "gui.param-combo", d.comboCooldownMs() + "ms", "param:combo"));
-        inventory.setItem(GuiSlots.slot(3, 5),
+        inventory.setItem(GuiSlots.slot(4, 7), paramTile(player, Material.BOW,
+                "gui.param-aim", String.format(Locale.ROOT, "%.0f°", d.aimSpreadDegrees()),
+                "param:aim"));
+        inventory.setItem(GuiSlots.slot(5, 1),
                 ItemBuilder.of(d.shieldStun() ? UiTheme.TOGGLE_ON : UiTheme.TOGGLE_OFF)
                         .name(t(player, "gui.param-stun")
                                 .color(d.shieldStun() ? UiTheme.SUCCESS : UiTheme.MUTED))
@@ -119,9 +137,9 @@ public final class BotDifficultyGui extends AbstractGui {
                                 UiTheme.blank(),
                                 UiTheme.hint(line(player, "gui.toggle-hint")))
                         .action("param:stun").build());
-        inventory.setItem(GuiSlots.slot(3, 7), paramTile(player, Material.CHAINMAIL_CHESTPLATE,
+        inventory.setItem(GuiSlots.slot(5, 3), paramTile(player, Material.CHAINMAIL_CHESTPLATE,
                 "gui.param-block", (int) Math.round(d.shieldReduction() * 100) + "%", "param:block"));
-        inventory.setItem(GuiSlots.slot(4, 4), paramTile(player, Material.TOTEM_OF_UNDYING,
+        inventory.setItem(GuiSlots.slot(5, 5), paramTile(player, Material.TOTEM_OF_UNDYING,
                 "gui.param-goal", String.valueOf(d.totemGoal()), "param:goal"));
 
         paintNav(player, session, inventory);
@@ -153,28 +171,30 @@ public final class BotDifficultyGui extends AbstractGui {
         boolean changed = false;
 
         if (action.startsWith("preset:")) {
-            try {
-                d.applyPreset(BotDifficulty.Preset.valueOf(action.substring(7)));
-                changed = true;
-            } catch (IllegalArgumentException ignored) {
-            }
+            d.applyPreset(BotDifficulty.parsePreset(action.substring(7)));
+            changed = true;
         } else if (action.startsWith("param:")) {
             boolean left = click == ClickType.LEFT || click == ClickType.SHIFT_LEFT;
             boolean shift = click == ClickType.SHIFT_LEFT || click == ClickType.SHIFT_RIGHT;
             String p = action.substring(6);
             switch (p) {
-                case "hp" -> d.setBotMaxHp(shift ? 100 : d.botMaxHp() + (left ? 10 : -10));
-                case "damage" -> d.setAttackDamage(shift ? 5 : d.attackDamage() + (left ? 1 : -1));
-                case "atkspeed" -> d.setAttackIntervalMs(shift ? 900
-                        : d.attackIntervalMs() + (left ? -100 : 100));
-                case "speed" -> d.setMoveSpeed(shift ? 0.24 : d.moveSpeed() + (left ? 0.02 : -0.02));
-                case "regen" -> d.setRegenPerSecond(shift ? 10 : d.regenPerSecond() + (left ? 1 : -1));
-                case "combo" -> d.setComboCooldownMs(shift ? 2600
+                case "hp" -> d.setBotMaxHp(shift ? 50 : d.botMaxHp() + (left ? 10 : -10));
+                case "damage" -> d.setAttackDamage(shift ? 4 : d.attackDamage() + (left ? 1 : -1));
+                case "atkspeed" -> d.setAttackIntervalMs(shift ? 750
+                        : d.attackIntervalMs() + (left ? -50 : 50));
+                case "speed" -> d.setMoveSpeed(shift ? 0.22 : d.moveSpeed() + (left ? 0.02 : -0.02));
+                case "regen" -> d.setRegenPerSecond(shift ? 3
+                        : d.regenPerSecond() + (left ? 0.5 : -0.5));
+                case "combo" -> d.setComboCooldownMs(shift ? 2400
                         : d.comboCooldownMs() + (left ? -200 : 200));
                 case "stun" -> d.setShieldStun(!d.shieldStun());
                 case "block" -> d.setShieldReduction(shift ? 0.5
                         : d.shieldReduction() + (left ? 0.05 : -0.05));
                 case "goal" -> d.setTotemGoal(shift ? 3 : d.totemGoal() + (left ? 1 : -1));
+                case "reach" -> d.setReachBlocks(shift ? 3.0
+                        : d.reachBlocks() + (left ? 0.1 : -0.1));
+                case "aim" -> d.setAimSpreadDegrees(shift ? 5
+                        : d.aimSpreadDegrees() + (left ? -1 : 1));
                 default -> { }
             }
             changed = true;

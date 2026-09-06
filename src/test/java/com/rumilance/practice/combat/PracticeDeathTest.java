@@ -38,4 +38,37 @@ class PracticeDeathTest {
         assertTrue(2.0d - 4.0d <= 0.0d);
         assertFalse(PracticeDeath.wouldDie(2.0d, 4.0d, 4.0d));
     }
+
+    @Test
+    void totemChecksAreNullSafe() {
+        assertFalse(PracticeDeath.isTotem(null));
+        assertFalse(PracticeDeath.hasTotemInHand(null));
+        assertFalse(PracticeDeath.isHoldingTotem(null));
+        assertFalse(PracticeDeath.canPopTotem(null, null));
+        assertFalse(PracticeDeath.tryPopTotem(null, null));
+        assertFalse(PracticeDeath.tryPopTotem(null, null, null));
+        assertFalse(PracticeDeath.consumeTotemFromHand(null));
+        assertFalse(PracticeDeath.isInResurrectGrace(null));
+        // Grace / pending-window bookkeeping must tolerate a null player without throwing.
+        PracticeDeath.markResurrected(null);
+        PracticeDeath.clearResurrectGrace(null);
+        PracticeDeath.markPendingHandTotem(null);
+        PracticeDeath.clearPendingHandTotem(null);
+    }
+
+    @Test
+    void deprecatedVanillaDeferralAliasesPopTheTotemThemselves() {
+        // "Died with a totem in hand" came from deferring the pop to vanilla: these entry points
+        // now route to tryPopTotem and must stay harmless for a null victim.
+        assertFalse(PracticeDeath.shouldDeferTotemToVanilla(null, null, null));
+        assertFalse(PracticeDeath.letVanillaTotemPop(null, null, null));
+    }
+
+    @Test
+    void lethalIsInclusiveOfZeroRemainingHealth() {
+        // Exactly 0 remaining is dead in vanilla, so the guard must pop the totem there too.
+        assertTrue(PracticeDeath.wouldDie(10.0d, 0.0d, 10.0d));
+        assertEquals(0.0d, PracticeDeath.remainingAfter(10.0d, 0.0d, 10.0d), 0.0001d);
+        assertFalse(PracticeDeath.wouldDie(10.0d, 0.5d, 10.0d));
+    }
 }

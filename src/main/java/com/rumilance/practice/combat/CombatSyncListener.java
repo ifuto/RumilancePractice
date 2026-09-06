@@ -32,9 +32,7 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.util.Vector;
 
-import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Ping-aware combat netcode and anti-void transit:
@@ -57,7 +55,6 @@ public final class CombatSyncListener implements Listener {
     private final ArenaService arenaService;
     private final ViewControlService viewControl;
     private final KitService kitService;
-    private final Set<UUID> voidTotemExpected = ConcurrentHashMap.newKeySet();
 
     public CombatSyncListener(
             Plugin plugin,
@@ -131,7 +128,6 @@ public final class CombatSyncListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onResurrect(EntityResurrectEvent event) {
         if (event.getEntity() instanceof Player player && isCombatant(player.getUniqueId())) {
-            voidTotemExpected.remove(player.getUniqueId());
             PracticeDeath.markResurrected(player);
             player.setFireTicks(0);
             player.setFreezeTicks(0);
@@ -334,6 +330,13 @@ public final class CombatSyncListener implements Listener {
         }
     }
 
+    /**
+     * Void damage in a fight is never lethal: the hit is cancelled and the player is rescued to
+     * the last safe spot. A totem holder pops their totem first (vanilla does the same), so the
+     * void can never be used to burn - or to lose - a totem, and no deferral to vanilla is left
+     * anywhere: a deferred void death used to be a real death whenever vanilla's resurrect did
+     * not fire (totem not yet in the hand server-side, another plugin cancelling the frame).
+     */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onVoidDamage(EntityDamageEvent event) {
         if (!(event.getEntity() instanceof Player player)) {
@@ -343,35 +346,12 @@ public final class CombatSyncListener implements Listener {
             return;
         }
         if (isCombatant(player.getUniqueId())) {
-            KitDefinition kit = kitForCombatant(player);
-            if (PracticeDeath.shouldDeferTotemToVanilla(player, kit, event)) {
-                voidTotemExpected.add(player.getUniqueId());
-                return;
-            }
+            PracticeDeath.tryPopTotem(player, kitForCombatant(player), event);
         }
-        voidTotemExpected.remove(player.getUniqueId());
         event.setCancelled(true);
+        event.setDamage(0);
         if (isCombatant(player.getUniqueId())) {
             rescue(player);
-        }
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onVoidDamageMonitor(EntityDamageEvent event) {
-        if (!(event.getEntity() instanceof Player player)) {
-            return;
-        }
-        if (event.getCause() != EntityDamageEvent.DamageCause.VOID) {
-            return;
-        }
-        if (!isCombatant(player.getUniqueId())) {
-            return;
-        }
-        KitDefinition kit = kitForCombatant(player);
-        if (PracticeDeath.shouldDeferTotemToVanilla(player, kit, event)) {
-            voidTotemExpected.add(player.getUniqueId());
-        } else if (!PracticeDeath.wouldDie(player, event)) {
-            voidTotemExpected.remove(player.getUniqueId());
         }
     }
 
@@ -397,9 +377,6 @@ public final class CombatSyncListener implements Listener {
             event.setCancelled(true);
             event.getDrops().clear();
             event.setKeepInventory(true);
-            if (voidTotemExpected.remove(player.getUniqueId())) {
-                return;
-            }
             if (isCombatant(player.getUniqueId())) {
                 rescue(player);
             }
@@ -408,9 +385,7 @@ public final class CombatSyncListener implements Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        UUID id = event.getPlayer().getUniqueId();
-        voidTotemExpected.remove(id);
-        tracker.remove(id);
+        tracker.remove(event.getPlayer().getUniqueId());
     }
 
     public void rescue(Player player) {

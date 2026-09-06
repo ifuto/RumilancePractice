@@ -1438,6 +1438,17 @@ public final class MatchService {
         if (session.state() != MatchState.ACTIVE || session.isResultApplied()) {
             return;
         }
+        // Absolute totem guarantee: a lethal outcome must never be scored while the victim still
+        // holds a totem in a hand and the kit allows it. Every damage path pops the totem first
+        // (MatchListener, void rescue, TotemGuardListener); this is the final gate so even a
+        // lethal routed here by an unforeseen path turns into a totem pop instead of a loss.
+        Player totemVictim = Bukkit.getPlayer(victimId);
+        if (totemVictim != null && com.rumilance.practice.combat.PracticeDeath.tryPopTotem(
+                totemVictim, kitService.get(session.kitFor(victimId)).orElse(null))) {
+            Bukkit.getLogger().warning("[N Arena][TotemGuard] handleLethal popped a totem for "
+                    + totemVictim.getName() + " instead of ending the match");
+            return;
+        }
         // Dedupe: a fighter can only be processed once per match. Without this, two lethal damage
         // events for the same player (e.g. a pearl fall and a sword hit resolving in the same tick,
         // before the 1-tick-deferred solo ruling ends the match) would double-count the kill, play

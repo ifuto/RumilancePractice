@@ -381,6 +381,7 @@ public final class KitAdminGui extends AbstractGui {
             case "toggle:totem" -> b.totem(!kit.totem()).build();
             case "toggle:swordshieldbreak" -> b.swordShieldBreak(!kit.swordShieldBreak()).build();
             case "toggle:preset" -> b.presetEnabled(!kit.presetEnabled()).build();
+            case "toggle:bedexplosion" -> b.bedExplosion(!kit.bedExplosion()).build();
             default -> null;
         };
     }

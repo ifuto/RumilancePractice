@@ -54,8 +54,11 @@ public final class PracticeSession {
     private final java.util.Map<org.bukkit.block.Block, Long> botPlacedBlocks = new java.util.LinkedHashMap<>();
     /** Until this timestamp the crystal bot is recovering (sprinting away). */
     private long botRetreatUntilMs;
-    /** Fight tuning: coarse presets + fully detailed parameters. */
-    private BotDifficulty difficulty = BotDifficulty.of(BotDifficulty.Preset.NORMAL);
+    /**
+     * Fight tuning: coarse presets + fully detailed parameters. Defaults to the map's
+     * INTERMEDIATE rung — the one for a beginner-leaning intermediate player.
+     */
+    private BotDifficulty difficulty = BotDifficulty.of(BotDifficulty.Preset.INTERMEDIATE);
     /** When the ACTIVE bot fight started (results / console log). */
     private long matchStartMs;
     /** Primed TNT the CART bot threw (it is immune to their blasts). */

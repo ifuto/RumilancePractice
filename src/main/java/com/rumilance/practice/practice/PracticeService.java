@@ -949,6 +949,34 @@ public final class PracticeService {
         return messages.raw(player, key);
     }
 
+    /**
+     * Kit rules that apply to a practice session: the admin-bound server kit of the room's bot
+     * mode, or {@code null} when the mode runs on its built-in gear (no kit rules -> defaults,
+     * i.e. totems allowed). Used by the totem guarantee and the bed-explosion rule.
+     */
+    public com.rumilance.practice.model.KitDefinition kitOf(PracticeSession session) {
+        if (session == null || kitService == null) {
+            return null;
+        }
+        String boundKit = botModeKits.get(session.type());
+        if (boundKit == null || boundKit.isBlank()) {
+            return null;
+        }
+        return kitService.get(boundKit).orElse(null);
+    }
+
+    /** Re-applies the session's fight loadout (after a rescued death, a kit change, ...). */
+    public void refreshBotLoadout(Player player, PracticeSession session) {
+        if (player == null || session == null) {
+            return;
+        }
+        PracticeRoom room = get(session.practiceId()).orElse(null);
+        if (room == null) {
+            return;
+        }
+        giveBotLoadout(player, session, room);
+    }
+
     /** Player loadout: the admin-bound server kit wins, else the mode's built-in gear. */
     private void giveBotLoadout(Player player, PracticeSession session, PracticeRoom room) {
         String boundKit = botModeKits.get(room.type());
@@ -1629,7 +1657,8 @@ public final class PracticeService {
 
             // --- sword & netherite-pot bots: chase, strafe, swing (difficulty-tuned) ---
             BotDifficulty diff = session.difficulty();
-            if (now - session.botLastDamagedMs() > 3000L && diff.regenPerSecond() > 0) {
+            if (now - session.botLastDamagedMs() > BotDifficulty.REGEN_DELAY_MS
+                    && diff.regenPerSecond() > 0) {
                 healToward(bot, diff.botMaxHp(), diff.regenPerSecond() / 20.0d);
             }
             boolean blocking = session.botShieldRaised();
@@ -1651,11 +1680,19 @@ public final class PracticeService {
             } else {
                 bot.setVelocity(new Vector(0, bot.getVelocity().getY(), 0));
             }
-            if (!blocking && distSq <= 3.2d * 3.2d && now >= session.botNextAttackMs()) {
+            double reach = reachWithJitter(diff);
+            if (!blocking && diff.attackDamage() > 0.0d && now >= session.botNextAttackMs()
+                    && distSq <= reach * reach) {
                 bot.swingMainHand();
-                player.damage(diff.attackDamage(), bot);
+                // Map "aim": the higher the aim error the more swings whiff, so low rungs punish
+                // a player who stands still far less than MASTER / SURVIVAL MASTER.
+                if (aimRoll().nextDouble(100.0d) < missChancePercent(diff)) {
+                    player.sendActionBar(messages.render(player, "practice.bot-miss"));
+                } else {
+                    player.damage(diff.attackDamage(), bot);
+                }
                 session.setBotNextAttackMs(now + diff.attackIntervalMs()
-                        + java.util.concurrent.ThreadLocalRandom.current().nextInt(300));
+                        + java.util.concurrent.ThreadLocalRandom.current().nextInt(150));
             }
             if (type == PracticeType.NETHERITE_POT) {
                 tickNethPotPotions(player, session, bot, now);
@@ -1682,8 +1719,10 @@ public final class PracticeService {
                         org.bukkit.Color.fromRGB(0xF82423));
             }
         } else if (bot.getLocation().distanceSquared(player.getLocation()) <= 4.5d * 4.5d) {
-            // Splash of harming at the player.
-            player.damage(3.0d, bot);
+            // Splash of harming at the player (scales with the ladder; NPCs never throw).
+            BotDifficulty potDiff = session.difficulty();
+            double potDamage = Math.max(1.0d, potDiff.attackDamage() * 0.6d);
+            player.damage(potDamage, bot);
             player.sendActionBar(messages.render(player, "practice.bot-pot-hit"));
             if (player.getWorld() != null) {
                 player.getWorld().spawnParticle(org.bukkit.Particle.ENTITY_EFFECT,
@@ -1702,7 +1741,8 @@ public final class PracticeService {
      */
     private void tickCartBot(Player player, PracticeSession session, Mannequin bot, long now) {
         BotDifficulty diff = session.difficulty();
-        if (now - session.botLastDamagedMs() > 3000L && diff.regenPerSecond() > 0) {
+        if (now - session.botLastDamagedMs() > BotDifficulty.REGEN_DELAY_MS
+                && diff.regenPerSecond() > 0) {
             healToward(bot, diff.botMaxHp(), diff.regenPerSecond() / 20.0d);
         }
         Location botLoc = bot.getLocation();
@@ -1729,15 +1769,20 @@ public final class PracticeService {
         bot.setVelocity(move.setY(bot.getVelocity().getY()));
 
         // Arrow volley (the map detonates TNT carts with arrows — we keep the bow pressure).
-        if (now >= session.botNextAttackMs()) {
+        // Full-draw speed (3.0) like a player bow, damage and spread from the difficulty ladder.
+        if (now >= session.botNextAttackMs() && diff.attackDamage() > 0.0d) {
             bot.swingMainHand();
-            Vector arrowDir = dir.clone().setY(0.06d).normalize().multiply(1.6d);
+            double spread = Math.toRadians(diff.aimSpreadDegrees());
+            Vector arrowDir = dir.clone().setY(0.06d).normalize();
+            if (spread > 0.0d) {
+                arrowDir.rotateAroundY(aimRoll().nextDouble(-spread, spread));
+            }
             org.bukkit.entity.Arrow arrow = bot.getWorld().spawnArrow(
-                    bot.getEyeLocation(), arrowDir, 1.6f, 2.0f);
+                    bot.getEyeLocation(), arrowDir.multiply(1.9d), 3.0f, 0.0f);
             arrow.setShooter(bot);
-            arrow.setDamage(diff.attackDamage() * 0.6d);
+            arrow.setDamage(Math.max(1.0d, diff.attackDamage() * 0.7d));
             long jitter = java.util.concurrent.ThreadLocalRandom.current().nextInt(400);
-            session.setBotNextAttackMs(now + 1000L + jitter);
+            session.setBotNextAttackMs(now + Math.max(700L, diff.attackIntervalMs() * 2L) + jitter);
         }
         // Rolling TNT "cart" every combo cooldown.
         if (now >= session.botNextCartMs()) {
@@ -1751,6 +1796,25 @@ public final class PracticeService {
             session.botTnt().add(tnt.getUniqueId());
             session.setBotNextCartMs(now + diff.comboCooldownMs());
         }
+    }
+
+    /** Per-swing reach: the ladder value with a small jitter so spacing is not pixel-perfect. */
+    private static double reachWithJitter(BotDifficulty diff) {
+        return diff.reachBlocks()
+                + (java.util.concurrent.ThreadLocalRandom.current().nextDouble() * 0.5d - 0.25d);
+    }
+
+    /**
+     * Swing accuracy from the ladder's aim error: a 0° aim (SURVIVAL MASTER) never whiffs, a 12°
+     * aim (NPC) whiffs about a third of the time. Linear in between, capped so no rung is a
+     * guaranteed hit or a guaranteed miss.
+     */
+    private static double missChancePercent(BotDifficulty diff) {
+        return Math.max(0.0d, Math.min(35.0d, diff.aimSpreadDegrees() * 2.5d));
+    }
+
+    private static java.util.concurrent.ThreadLocalRandom aimRoll() {
+        return java.util.concurrent.ThreadLocalRandom.current();
     }
 
     private static void healToward(Mannequin bot, double max, double step) {
@@ -1780,9 +1844,12 @@ public final class PracticeService {
     private void tickCrystalBot(Player player, PracticeSession session, Mannequin bot, long now) {
         refillCrystals(player);
         revertAgedBotBlocks(session, now);
-        // Regen between combos so a half-finished combo never leaves a dead-looking bot.
-        if (now - session.botLastDamagedMs() > 5000L) {
-            healToward(bot, 20.0d, 1.0d);
+        // Regen between combos (the same 5s out-of-combat delay every other mode uses) so a
+        // half-finished combo never leaves a dead-looking bot. Crystal fighters deliberately
+        // keep the flat 20 HP body they spawn with; only the regen RATE comes from the ladder.
+        if (now - session.botLastDamagedMs() > BotDifficulty.REGEN_DELAY_MS) {
+            healToward(bot, 20.0d,
+                    Math.max(0.25d, session.difficulty().regenPerSecond() / 8.0d));
         }
 
         // --- movement: orbit at 3-6 blocks, retreat while recovering ---
@@ -1816,8 +1883,10 @@ public final class PracticeService {
         if (now >= session.botNextAttackMs() && dist <= 9.0d
                 && session.botCrystals().size() < 2) {
             if (launchCrystalAttack(player, session)) {
-                session.setBotNextAttackMs(now + 1900L
-                        + java.util.concurrent.ThreadLocalRandom.current().nextInt(1500));
+                // Map "crystal_cd / explosion_cd" rungs: combo speed IS the difficulty.
+                long combo = session.difficulty().comboCooldownMs();
+                session.setBotNextAttackMs(now + combo
+                        + java.util.concurrent.ThreadLocalRandom.current().nextInt(400));
             } else {
                 session.setBotNextAttackMs(now + 500L); // no valid spot: retry soon
             }
@@ -1932,9 +2001,13 @@ public final class PracticeService {
             return false;
         }
         BotDifficulty diff = session.difficulty();
-        // The bot never dies to its own combo weapons (crystals / TNT carts).
+        // The bot never dies to its own combo weapons (crystals / TNT carts). World
+        // #createExplosion(..., source) attributes the blast to the source entity, so the bot
+        // itself shows up as the damager of its own combo — that must be ignored too.
         if (event instanceof org.bukkit.event.entity.EntityDamageByEntityEvent byEntity
-                && (session.botCrystals().contains(byEntity.getDamager().getUniqueId())
+                && (byEntity.getDamager() == null
+                        || byEntity.getDamager().getUniqueId().equals(bot.getUniqueId())
+                        || session.botCrystals().contains(byEntity.getDamager().getUniqueId())
                         || session.botTnt().contains(byEntity.getDamager().getUniqueId()))) {
             event.setCancelled(true);
             return true;

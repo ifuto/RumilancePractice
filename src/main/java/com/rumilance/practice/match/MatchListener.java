@@ -129,23 +129,26 @@ public final class MatchListener implements Listener {
             recordCombatHit(session, attackerPlayer, victim, byEntity, event.getFinalDamage());
         }
 
-        // After a vanilla/manual totem pop, stale HP frames can LOOK lethal; the grace window
-        // shields those frames. A GENUINE killing blow inside the window must still resolve:
-        // skipping it used to let vanilla run a real death that onDeath cancels, leaving a
-        // "dead but alive" player the team alive-check still counts — party fights then never
-        // ended even at 0 opponents.
+        // Totem of undying: pop it OURSELVES. Deferring to vanilla used to leave players dead
+        // with a totem in hand, because vanilla only resurrects when the lethal damage actually
+        // reaches LivingEntity#die - and practice cancels / re-routes lethal damage in several
+        // places (void rescue, explosion self-damage one tick later, other plugins). A pop here
+        // is unconditional: the hit is cancelled, one totem is consumed, vanilla effects apply.
+        if (PracticeDeath.tryPopTotem(victim, kit, event)) {
+            return;
+        }
+
+        // After a totem pop, stale HP frames can LOOK lethal; the grace window shields those
+        // frames. A GENUINE killing blow inside the window must still resolve: skipping it used
+        // to let vanilla run a real death that onDeath cancels, leaving a "dead but alive"
+        // player the team alive-check still counts - party fights then never ended even at 0
+        // opponents.
         if (PracticeDeath.isInResurrectGrace(victim)) {
-            if (PracticeDeath.shouldDeferTotemToVanilla(victim, kit, event)) {
-                return;
-            }
             if (remaining <= 0) {
                 event.setCancelled(true);
                 event.setDamage(0);
                 matchService.handleLethal(session, victimId, attackerId);
             }
-            return;
-        }
-        if (PracticeDeath.shouldDeferTotemToVanilla(victim, kit, event)) {
             return;
         }
         if (remaining > 0) {

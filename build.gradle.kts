@@ -45,6 +45,7 @@ val hikariVersion = "7.1.0"
 val sqliteVersion = "3.53.2.0"
 val mariadbVersion = "3.5.9"
 val worldeditVersion = "7.3.0"
+val luckPermsVersion = "5.4"
 val junitVersion = "6.1.2"
 
 dependencies {
@@ -61,6 +62,10 @@ dependencies {
     // Compile against the stable API; the server must run a build that supports the target MC
     // version (1.21.11 support ships in ProtocolLib dev builds).
     compileOnly("net.dmulloy2:ProtocolLib:5.4.0")
+
+    // LuckPerms soft-dependency - GSit permission bridge (strip GSit.*, grant GSit.SitClick on
+    // join). API only: the server provides the implementation, so nothing is shaded.
+    compileOnly("net.luckperms:api:$luckPermsVersion")
 
     // Relational database access - shaded into the plugin jar and relocated to avoid classpath clashes.
     implementation("com.zaxxer:HikariCP:$hikariVersion")

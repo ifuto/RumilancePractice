@@ -212,10 +212,10 @@ combat:
     wind-charge: 0
   ping-offset-ms: 25
   spike-threshold-ms: 20
-  # Paper 1.21.4+ defaults update-equipment-on-player-actions to true, which makes hotbar/F-key
-  # swaps feel 50-50 vs vanilla. true = restore vanilla swap at runtime (also set the same key
-  # to false in config/paper-global.yml so it survives a restart without this plugin).
-  vanilla-item-swap: true
+  # Item swapping is NOT touched by this plugin any more (the old vanilla-item-swap tuning made
+  # swap damage feel wrong). Swap/attribute timing is whatever your server runs with: if you want
+  # the pre-1.21.4 behaviour, set unsupported-settings.update-equipment-on-player-actions: false
+  # in config/paper-global.yml yourself.
 
 # Fast TNT / creeper fuse for practice PvP.
 # Only applies in active duels and FFA — lobby eggs/TNT stay vanilla.
@@ -232,6 +232,15 @@ practice-tnt:
 original-kit:
   # /admin orkit close|open. When false, /originalkit is refused for non-admins.
   enabled: true
+
+# Sitting is handled by the external GSit plugin (this plugin's own lobby seats were removed so
+# the two never fight over the same stair/slab click). This bridge only normalises GSit's
+# permissions through LuckPerms: on EVERY join the player loses all GSit.* nodes and is granted
+# exactly the node below, i.e. "sit by clicking a block" and nothing else (no /sit command, no
+# crawling, no seat extras). Requires LuckPerms; set enabled: false to leave permissions alone.
+gsit:
+  enabled: true
+  grant: "GSit.SitClick"
 
 # Chat spam filter. Detections are counted persistently; once a player reaches ban-threshold
 # detections they receive an escalating ChatBan (2 weeks -> 1 month -> 3 months). Kept

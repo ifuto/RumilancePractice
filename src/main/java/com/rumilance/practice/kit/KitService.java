@@ -68,7 +68,9 @@ public final class KitService {
                     .forceAdventure(section.getBoolean("adventure", false))
                     .timeoutSeconds(section.getInt("timeout-seconds", 0))
                     .canBreak(section.getStringList("can-break"))
-                    .presetEnabled(section.getBoolean("preset-enabled", false));
+                    .presetEnabled(section.getBoolean("preset-enabled", false))
+                    // "Bed Explosion" kit rule: beds detonate on right click like Nether/End beds.
+                    .bedExplosion(section.getBoolean("bed-explosion", false));
 
             List<String> arenaList = section.getStringList("arenas");
             if (arenaList.isEmpty()) {
@@ -344,7 +346,12 @@ public final class KitService {
         ItemStack hand = player.getInventory().getItemInMainHand();
         String icon = hand.getType().isAir() ? "DIAMOND_SWORD" : hand.getType().name();
         // Storage key is lowercase; display name keeps the admin's original casing.
-        KitDefinition kit = KitDefinition.builder(key)
+        // Re-saving a layout must NOT reset the kit's rules (totem, pearl, block place/break,
+        // bed explosion, ...): only the contents, icon and display name come from the inventory.
+        KitDefinition.Builder builder = kits.get(key) != null
+                ? kits.get(key).toBuilder()
+                : KitDefinition.builder(key);
+        KitDefinition kit = builder
                 .displayName(id)
                 .icon(icon)
                 .items(items)
@@ -377,6 +384,7 @@ public final class KitService {
         yaml.set(path + ".arenas", kit.arenas());
         yaml.set(path + ".party-arenas", kit.partyArenas());
         yaml.set(path + ".preset-enabled", kit.presetEnabled());
+        yaml.set(path + ".bed-explosion", kit.bedExplosion());
         yaml.set(path + ".can-break", kit.canBreak());
         yaml.set(path + ".start-commands", kit.startCommands());
         List<Map<String, Object>> startEffectMaps = new ArrayList<>();

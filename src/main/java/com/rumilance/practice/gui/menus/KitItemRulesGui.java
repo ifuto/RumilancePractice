@@ -89,8 +89,30 @@ public final class KitItemRulesGui extends AbstractGui {
                 Component.text(line(player, "admin-gui.timeout") + ": " + kit.timeoutSeconds() + "s",
                         UiTheme.WARNING)
                         .decoration(TextDecoration.ITALIC, false), "noop"));
+        inventory.setItem(GuiSlots.slot(4, 2), bedExplosionToggle(player, kit));
         inventory.setItem(GuiSlots.slot(5, 4), ItemBuilder.action(UiTheme.BACK,
                 t(player, "menu.back"), "back"));
+    }
+
+    /**
+     * "Bed Explosion" kit rule: beds placed in the fight detonate on right click (Nether / End
+     * behaviour, power 5) instead of setting a spawn point. Lore explains the self-damage trade.
+     */
+    private ItemStack bedExplosionToggle(Player player, KitDefinition kit) {
+        boolean on = kit.bedExplosion();
+        return ItemBuilder.of(Material.RED_BED)
+                .name(Component.text(line(player, "admin-gui.bed-explosion") + ": ", UiTheme.MUTED)
+                        .append(Component.text(line(player, on ? "admin-gui.on" : "admin-gui.off"),
+                                on ? UiTheme.SUCCESS : UiTheme.DANGER))
+                        .decoration(TextDecoration.ITALIC, false))
+                .lore(UiTheme.divider(),
+                        UiTheme.line(line(player, "admin-gui.bed-explosion-lore")),
+                        UiTheme.line(line(player, "admin-gui.bed-explosion-lore2")),
+                        UiTheme.blank(),
+                        UiTheme.hint(line(player, "admin-gui.click-hint")))
+                .glintIf(on)
+                .action("toggle:bedexplosion")
+                .build();
     }
 
     private ItemStack header(Player player, KitDefinition kit) {

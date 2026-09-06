@@ -274,7 +274,7 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                 });
                 yield true;
             }
-            case "autoregen", "autofood", "blockplace", "blockbreak", "breakplayerplaced", "pearl", "totem", "swordshieldbreak" -> {
+            case "autoregen", "autofood", "blockplace", "blockbreak", "breakplayerplaced", "pearl", "totem", "swordshieldbreak", "bedexplosion" -> {
                 if (args.length < 3) {
                     yield true;
                 }
@@ -292,6 +292,7 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                         case "pearl" -> b.pearl(value);
                         case "totem" -> b.totem(value);
                         case "swordshieldbreak" -> b.swordShieldBreak(value);
+                        case "bedexplosion" -> b.bedExplosion(value);
                         default -> {
                         }
                     }
@@ -598,13 +599,14 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
             return filter(List.of(
                     "gui", "help", "create", "overwrite", "list", "info", "enable", "disable",
                     "delete", "timeout", "order", "rename", "arena", "adventure", "autoregen", "autofood",
-                    "blockplace", "blockbreak", "breakplayerplaced", "canbreak", "pearl", "totem", "swordshieldbreak"), args[0]);
+                    "blockplace", "blockbreak", "breakplayerplaced", "canbreak", "pearl", "totem", "swordshieldbreak",
+                    "bedexplosion"), args[0]);
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
         // Subcommands that take a kit name next.
         if (args.length == 2 && List.of("info", "enable", "disable", "delete", "timeout", "order", "rename", "arena",
                 "adventure", "autoregen", "autofood", "blockplace", "blockbreak", "breakplayerplaced", "canbreak", "pearl", "totem",
-                "swordshieldbreak").contains(sub)) {
+                "swordshieldbreak", "bedexplosion").contains(sub)) {
             return filter(kitService.all().stream().map(KitDefinition::name).toList(), args[1]);
         }
         if (args.length == 3 && sub.equals("arena")) {
@@ -622,7 +624,7 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                 return filter(List.of("up", "down"), args[2]);
             }
             if (List.of("adventure", "autoregen", "autofood", "blockplace", "blockbreak", "breakplayerplaced", "canbreak",
-                    "pearl", "totem", "swordshieldbreak").contains(sub)) {
+                    "pearl", "totem", "swordshieldbreak", "bedexplosion").contains(sub)) {
                 return filter(List.of("on", "off"), args[2]);
             }
         }

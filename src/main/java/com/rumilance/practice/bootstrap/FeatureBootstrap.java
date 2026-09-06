@@ -21,7 +21,6 @@ import com.rumilance.practice.combat.CombatSyncListener;
 import com.rumilance.practice.combat.TotemPickupListener;
 import com.rumilance.practice.combat.CrystalAnchorPerfListener;
 import com.rumilance.practice.combat.InstantExpCollectListener;
-import com.rumilance.practice.combat.PaperCombatTuning;
 import com.rumilance.practice.combat.KillFeed;
 import com.rumilance.practice.command.AcceptDenyCommand;
 import com.rumilance.practice.command.AdminCommand;
@@ -496,9 +495,6 @@ public final class FeatureBootstrap {
                 plugin, combatNet, matchService, ffaService, lobbyService, arenaService, viewControl, kitService);
         // Knockback shaping (coefficients, Y/ping sync) is delegated to an external plugin
         // (KnockBackSync); this plugin no longer creates its own knockback profile service.
-        if (configService.config().getBoolean("combat.vanilla-item-swap", true)) {
-            PaperCombatTuning.applyVanillaItemSwap(plugin.getLogger());
-        }
 
         WallTextService wallTextService = new WallTextService(plugin);
         services.register(WallTextService.class, wallTextService);
@@ -846,12 +842,16 @@ public final class FeatureBootstrap {
         plugin.getServer().getPluginManager().registerEvents(signQueueService, plugin);
         queueCoordinator.setSignQueueService(signQueueService);
 
-        // GSit-style lobby seats: right-click the top of bottom stairs / bottom slabs.
-        final com.rumilance.practice.sit.SitService sitService =
-                new com.rumilance.practice.sit.SitService(plugin, stateManager);
-        sitService.start();
-        services.register(com.rumilance.practice.sit.SitService.class, sitService);
-        plugin.getServer().getPluginManager().registerEvents(sitService, plugin);
+        // Sitting is NOT implemented by this plugin any more (the old built-in GSit-style lobby
+        // seats were removed): the external GSit plugin owns that interaction. This bridge only
+        // keeps GSit's permissions in line - on every join the player loses ALL GSit.* nodes and
+        // gets exactly GSit.SitClick back, so players can sit on stairs/slabs by clicking them
+        // and nothing else GSit offers (no /sit command, no double-seat conflicts).
+        com.rumilance.practice.gsit.GsitPermissionService gsitPermissions =
+                new com.rumilance.practice.gsit.GsitPermissionService(plugin, configService);
+        gsitPermissions.hook();
+        services.register(com.rumilance.practice.gsit.GsitPermissionService.class, gsitPermissions);
+        plugin.getServer().getPluginManager().registerEvents(gsitPermissions, plugin);
         plugin.getServer().getPluginManager().registerEvents(
                 new com.rumilance.practice.originalkit.OriginalKitRoomListener(
                         originalKitRoomService, originalKitService, plugin), plugin);
@@ -1196,6 +1196,70 @@ public final class FeatureBootstrap {
         services.register(ScoreboardService.class, scoreboardService);
 
         PluginManager pm = plugin.getServer().getPluginManager();
+
+        // ---------------------------------------------------------------------------
+        // Totem guarantee. Registered FIRST so its handlers run before every other
+        // listener of the same priority: a player with a totem of undying in a hand
+        // must never die in a match, in FFA or in a practice bot fight.
+        //   1. MONITOR on damage  -> lethal + uncancelled + totem in hand: pop it.
+        //   2. PlayerDeathEvent   -> cancel, consume the totem, revive in place.
+        //   3. handleLethal gates -> MatchService / FfaService refuse to score a death.
+        // ---------------------------------------------------------------------------
+        com.rumilance.practice.combat.TotemGuardListener totemGuard =
+                new com.rumilance.practice.combat.TotemGuardListener(plugin);
+        totemGuard.addContext(new com.rumilance.practice.combat.TotemGuardListener.Context(
+                id -> {
+                    com.rumilance.practice.session.MatchSession s =
+                            matchService.registry().byPlayer(id).orElse(null);
+                    return s == null ? null : kitService.get(s.kitFor(id)).orElse(null);
+                },
+                id -> {
+                    com.rumilance.practice.session.MatchSession s =
+                            matchService.registry().byPlayer(id).orElse(null);
+                    return s != null;
+                },
+                id -> {
+                    com.rumilance.practice.session.MatchSession s =
+                            matchService.registry().byPlayer(id).orElse(null);
+                    if (s == null || s.arenaInstanceId() == null) {
+                        return null;
+                    }
+                    com.rumilance.practice.model.ArenaInstance instance =
+                            arenaService.get(s.arenaInstanceId()).orElse(null);
+                    if (instance == null) {
+                        return null;
+                    }
+                    return s.teamColor(id) == com.rumilance.practice.state.TeamColor.RED
+                            ? arenaService.spawnA(instance)
+                            : arenaService.spawnB(instance);
+                },
+                null));
+        totemGuard.addContext(new com.rumilance.practice.combat.TotemGuardListener.Context(
+                id -> ffaService.arenaOf(id)
+                        .flatMap(ffaService::get)
+                        .flatMap(arena -> kitService.get(arena.kitId()))
+                        .orElse(null),
+                ffaService::isInFfa,
+                id -> {
+                    Player online = Bukkit.getPlayer(id);
+                    return online == null ? null : ffaService.spawnDestination(online);
+                },
+                ffaService::respawn));
+        totemGuard.addContext(new com.rumilance.practice.combat.TotemGuardListener.Context(
+                id -> practiceService.session(id).map(practiceService::kitOf).orElse(null),
+                id -> practiceService.session(id).isPresent(),
+                id -> practiceService.session(id)
+                        .map(com.rumilance.practice.practice.PracticeSession::activeSpawn)
+                        .orElse(null),
+                player -> practiceService.session(player.getUniqueId()).ifPresent(session -> {
+                    if (session.phase() == com.rumilance.practice.practice.PracticeSession.Phase.ACTIVE) {
+                        practiceService.refreshBotLoadout(player, session);
+                    } else {
+                        practiceService.giveBotWaitHotbar(player, session);
+                    }
+                })));
+        pm.registerEvents(totemGuard, plugin);
+
         pm.registerEvents(new com.rumilance.practice.replay.ReplayControlListener(replayService), plugin);
         pm.registerEvents(new BanLoginListener(banService), plugin);
         pm.registerEvents(new com.rumilance.practice.listener.ChatBanGuardListener(chatBanService), plugin);
@@ -1236,6 +1300,32 @@ public final class FeatureBootstrap {
                 new com.rumilance.practice.combat.ExplosionSelfDamageListener(plugin);
         practiceTntListener.setSelfDamage(explosionSelfDamage);
         pm.registerEvents(explosionSelfDamage, plugin);
+        // "Bed Explosion" kit rule (/kit -> item rules): a bed placed in the fight detonates on
+        // right click like a Nether / End bed (power 5, clicker takes the self-blast too).
+        com.rumilance.practice.combat.BedExplosionListener bedExplosion =
+                new com.rumilance.practice.combat.BedExplosionListener();
+        bedExplosion.setSelfDamage(explosionSelfDamage);
+        bedExplosion.addContext(new com.rumilance.practice.combat.BedExplosionListener.Context(
+                id -> {
+                    com.rumilance.practice.session.MatchSession s =
+                            matchService.registry().byPlayer(id).orElse(null);
+                    return s != null && s.state() == com.rumilance.practice.state.MatchState.ACTIVE;
+                },
+                id -> matchService.registry().byPlayer(id)
+                        .flatMap(s -> kitService.get(s.kitFor(id)))
+                        .orElse(null)));
+        bedExplosion.addContext(new com.rumilance.practice.combat.BedExplosionListener.Context(
+                ffaService::isInFfa,
+                id -> ffaService.arenaOf(id)
+                        .flatMap(ffaService::get)
+                        .flatMap(arena -> kitService.get(arena.kitId()))
+                        .orElse(null)));
+        bedExplosion.addContext(new com.rumilance.practice.combat.BedExplosionListener.Context(
+                id -> practiceService.session(id)
+                        .map(s -> s.phase() == com.rumilance.practice.practice.PracticeSession.Phase.ACTIVE)
+                        .orElse(false),
+                id -> practiceService.session(id).map(practiceService::kitOf).orElse(null)));
+        pm.registerEvents(bedExplosion, plugin);
         pm.registerEvents(practiceTntListener, plugin);
         pm.registerEvents(new CrystalAnchorPerfListener(matchService, ffaService), plugin);
         pm.registerEvents(new com.rumilance.practice.combat.PortalBlockListener(matchRegistry, ffaService), plugin);
@@ -1534,8 +1624,8 @@ public final class FeatureBootstrap {
         }
         services.find(com.rumilance.practice.signqueue.SignQueueService.class)
                 .ifPresent(com.rumilance.practice.signqueue.SignQueueService::shutdown);
-        services.find(com.rumilance.practice.sit.SitService.class)
-                .ifPresent(com.rumilance.practice.sit.SitService::shutdown);
+        services.find(com.rumilance.practice.gsit.GsitPermissionService.class)
+                .ifPresent(com.rumilance.practice.gsit.GsitPermissionService::shutdown);
         if (liveGuiTask != null) {
             liveGuiTask.cancel();
             liveGuiTask = null;
