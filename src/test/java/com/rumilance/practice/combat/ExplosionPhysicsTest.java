@@ -67,8 +67,8 @@ class ExplosionPhysicsTest {
         // The formula's "+ 1" is why a fully blocked blast still hurts (exposure 0 -> impact 0).
         assertEquals(1.0d, ExplosionPhysics.rawDamageAt(1.0d, ExplosionPhysics.CRYSTAL_POWER, 0.0d), 1e-9);
         assertEquals(1.0d, ExplosionPhysics.rawDamage(0.0d, ExplosionPhysics.TNT_POWER), 1e-9);
-        // ... and right at the edge of the radius it is still ~1.
-        assertEquals(1.0d, ExplosionPhysics.rawDamageAt(11.999d, ExplosionPhysics.CRYSTAL_POWER, 1.0d), 1e-3);
+        // ... and right at the edge of the radius it is still ~1 (impact ~0.0000833 -> 1.0035).
+        assertEquals(1.0d, ExplosionPhysics.rawDamageAt(11.999d, ExplosionPhysics.CRYSTAL_POWER, 1.0d), 1e-2);
         // A fully blocked blast pushes nobody.
         assertEquals(0.0d, ExplosionPhysics.knockbackMagnitude(0.0d,
                 ExplosionPhysics.KNOCKBACK_MULTIPLIER, 0.0d), 1e-9);

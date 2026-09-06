@@ -83,9 +83,19 @@ public final class BotDifficulty {
         if (raw == null || raw.isBlank()) {
             return of(Preset.INTERMEDIATE);
         }
-        String[] p = raw.split(":");
+        // limit -1: ":::" would otherwise split into an EMPTY array (trailing empties are
+        // dropped), and indexing parts[0] then threw ArrayIndexOutOfBoundsException instead of
+        // falling back to the default rung.
+        String[] p = raw.split(":", -1);
+        if (p.length == 0) {
+            return of(Preset.INTERMEDIATE);
+        }
         Preset preset = parsePreset(p[0]);
         if (preset == Preset.CUSTOM) {
+            if (p.length < 10) {
+                // A CUSTOM row without its ten numbers is corrupt: never trust half a profile.
+                return of(Preset.INTERMEDIATE);
+            }
             BotDifficulty d = new BotDifficulty();
             d.preset = Preset.CUSTOM;
             try {
