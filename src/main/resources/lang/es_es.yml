@@ -713,6 +713,7 @@ gui:
   kit-admin-item-rules-lore: "Regen, comida, perlas, tótems, escudos, tiempo límite"
   kit-admin-item-rules-title: "Reglas de objetos: <kit>"
   kit-admin-canbreak-hold: "Sostén un bloque en la mano para añadirlo o quitarlo de la lista de ruptura."
+  ekit-room-not-configured: "La sala de kits originales aún no está configurada. (OP: dentro de la sala usa /ekitadmin spawn y luego /ekitadmin region con la selección)"
   kit-admin-random: "Aleatorio"
   kit-arena-hint: "Izq. duelo / Der. equipo"
   start-effects-title: "Efectos iniciales: <kit>"

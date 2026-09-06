@@ -28,6 +28,11 @@ public final class OriginalKitRoomService {
 
     private final ConfigService configService;
     private final org.bukkit.plugin.Plugin plugin;
+    private volatile com.rumilance.practice.locale.MessageService messageService;
+
+    public void setMessageService(com.rumilance.practice.locale.MessageService messageService) {
+        this.messageService = messageService;
+    }
 
     private Location spawn;
     private Cuboid region;
@@ -153,8 +158,11 @@ public final class OriginalKitRoomService {
     /** Sends a player into the room; switches to creative only AFTER the teleport lands. */
     public void enter(Player player) {
         if (spawn == null) {
+            com.rumilance.practice.locale.MessageService messages = messageService;
+            String text = messages != null ? messages.raw(player, "gui.ekit-room-not-configured")
+                    : "Original kit room is not set up yet.";
             player.sendMessage(net.kyori.adventure.text.Component.text(
-                    "Original kit room is not set up yet.", net.kyori.adventure.text.format.NamedTextColor.RED));
+                    text, net.kyori.adventure.text.format.NamedTextColor.RED));
             return;
         }
         // Enter the editor set first so the hide-listener picks the player up on arrival.

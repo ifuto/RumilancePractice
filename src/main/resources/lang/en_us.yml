@@ -715,6 +715,7 @@ gui:
   kit-admin-item-rules-lore: "Regen, food, pearls, totems, shields, timeout"
   kit-admin-item-rules-title: "Item Rules: <kit>"
   kit-admin-canbreak-hold: "Hold a block in your hand to add or remove it from the break list."
+  ekit-room-not-configured: "The original kit room is not set up yet. (OP: stand in the room and run /ekitadmin spawn, then select it with the admin tool and run /ekitadmin region)"
   kit-admin-random: "Random"
   kit-arena-hint: "Duel left / Party right"
   start-effects-title: "Start effects: <kit>"

@@ -713,6 +713,7 @@ gui:
   kit-admin-item-rules-lore: "回复、食物、末影珍珠、图腾、盾牌、超时"
   kit-admin-item-rules-title: "物品规则: <kit>"
   kit-admin-canbreak-hold: "手持方块点击即可将方块加入或移出破坏列表。"
+  ekit-room-not-configured: "原创套件房间尚未设置。(OP: 站在房间内执行 /ekitadmin spawn,再用选择工具框选后执行 /ekitadmin region)"
   kit-admin-random: "随机"
   kit-arena-hint: "左键约战 / 右键队伍"
   start-effects-title: "开局效果：<kit>"

@@ -714,6 +714,7 @@ gui:
   kit-admin-item-rules-lore: "回復・食料・パール・トーテム・盾・タイムアウト"
   kit-admin-item-rules-title: "アイテムルール: <kit>"
   kit-admin-canbreak-hold: "手にブロックを持ってクリックすると、破壊リストに追加/削除できます。"
+  ekit-room-not-configured: "オリジナルキット部屋がまだ設定されていません。(OP: 部屋の中で /ekitadmin spawn、エリアを選択して /ekitadmin region)"
   kit-admin-random: "ランダム"
   kit-arena-hint: "デュエル左 / パーティ右"
   start-effects-title: "開始エフェクト: <kit>"

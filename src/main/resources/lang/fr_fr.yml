@@ -713,6 +713,7 @@ gui:
   kit-admin-item-rules-lore: "Régén, nourriture, perles, totems, boucliers, délai"
   kit-admin-item-rules-title: "Règles des objets : <kit>"
   kit-admin-canbreak-hold: "Tenez un bloc en main pour l'ajouter ou le retirer de la liste de casse."
+  ekit-room-not-configured: "La salle des kits originaux n'est pas encore configurée. (OP : dans la salle, /ekitadmin spawn puis /ekitadmin region avec la sélection)"
   kit-admin-random: "Aléatoire"
   kit-arena-hint: "G. duel / D. équipe"
   start-effects-title: "Effets de départ : <kit>"

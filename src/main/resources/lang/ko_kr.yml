@@ -713,6 +713,7 @@ gui:
   kit-admin-item-rules-lore: "체력 회복, 음식, 엔더 진주, 토템, 방패, 시간 제한"
   kit-admin-item-rules-title: "아이템 규칙: <kit>"
   kit-admin-canbreak-hold: "손에 블록을 든 채 클릭하면 파괴 목록에 추가/제거할 수 있습니다."
+  ekit-room-not-configured: "오리지널 킷 방이 아직 설정되지 않았습니다. (OP: 방 안에서 /ekitadmin spawn, 영역 선택 후 /ekitadmin region)"
   kit-admin-random: "Random"
   kit-arena-hint: "Duel left / Party right"
   start-effects-title: "Start effects: <kit>"

@@ -17,29 +17,34 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Groups the TAB (player list) into team columns for an active fight.
+ * Groups the TAB (player list) into one column per team for an active fight, with blank
+ * padding rows so the columns stay visually separated even for tiny rosters.
  *
  * <p><b>Mechanism — the 1.21.2+ list-order index.</b> Since 1.21.2 the vanilla client no
- * longer sorts the tab list by scoreboard team name; the server controls the order through a
- * non-negative ordering index per player (added in snapshot 24w33a) and the client sorts it
- * <i>highest to lowest</i>. Paper exposes it as {@link Player#setPlayerListOrder(int)}.
- * Roster columns are built by assigning each team its own index band: the first team gets
- * the highest values, later teams lower bands, and descending values inside a band yield an
- * alphabetical top-to-bottom roster. The client wraps entries into the next column every
- * 20 rows, so each team naturally becomes its own column. Spectators get the band below the
- * last team; lobby players keep the default index 0 and therefore always sort last.</p>
+ * longer sorts the tab list by scoreboard team name; the server controls the order through
+ * a non-negative priority per player (snapshot 24w33a) and the client sorts it <i>highest
+ * to lowest</i>. Paper exposes it for real players as {@link Player#setPlayerListOrder(int)}.
+ * Roster columns are built by assigning each team its own priority band: the first team the
+ * highest values, later teams lower bands, descending values inside a band yielding an
+ * alphabetical top-to-bottom roster.</p>
  *
- * <p>Each running match reserves a stable band of indexes ({@link #slotFor(UUID)}), so
- * several simultaneous matches never interleave their columns.</p>
+ * <p><b>Blank padding.</b> The client wraps the list into a new column every 20 entries,
+ * so a 3-person roster alone would never form its own column. Every team band is therefore
+ * padded up to a multiple of 20 rows with invisible fake player-info entries (blank display
+ * name, no ping icon) sent per viewer via ProtocolLib — the same technique layout plugins
+ * use. Each running match reserves a stable priority band ({@link #slotFor(UUID)}) so
+ * simultaneous matches never interleave; lobby players keep priority 0 and sort last.</p>
  *
- * <p><b>Safety switch.</b> Servers running NBT-injector style packet patchers (NBTAPI /
+ * <p><b>Safety switches.</b> Servers running NBT-injector style packet patchers (NBTAPI /
  * Triton) can crash inside their patched {@code ClientboundPlayerInfoUpdatePacket} writer
- * on the 1.21.2 UPDATE_LIST_ORDER action, which disconnects receivers when a match starts.
- * Such plugins are probed once and ordering auto-disables for them; operators can override
- * either way with {@code match.tab-columns-enabled}. Every order write is additionally
- * wrapped so a failure can never take down the scoreboard refresh.</p>
+ * on the 1.21.2 list-order action, which disconnects receivers when a match starts. Such
+ * plugins are probed once and ordering auto-disables for them; operators can override
+ * either way with {@code match.tab-columns-enabled}. Without ProtocolLib the layout still
+ * groups real players via priorities — only the blank padding is skipped. Every packet
+ * write is wrapped so a failure can never take down the scoreboard refresh.</p>
  *
  * <p>The display-name side stays as before: the client renders a set display name verbatim
  * and only falls back to "team prefix + team-coloured name" when it is unset, so on
@@ -49,13 +54,29 @@ import java.util.UUID;
  */
 public final class TabFightListService {
 
-    /** One team column: enough headroom for any realistic roster. */
+    /** One team column: enough headroom for any realistic roster + padding. */
     private static final int SLOT_WIDTH = 1000;
-    /** Index space reserved per match: 7 team columns + the spectator column. */
+    /** Priority space reserved per match: 7 team columns + the spectator column. */
     private static final int MATCH_SPAN = 8 * SLOT_WIDTH;
-    /** Highest index handed out; the client lists higher indexes first. */
+    /** Highest priority handed out; the client lists higher values first. */
     private static final int ORDER_TOP = 1_000_000;
-    /** Plugins known to patch the player-info packet writer and crash on UPDATE_LIST_ORDER. */
+    /** Vanilla wraps the tab list into a new column every 20 entries. */
+    private static final int ROWS_PER_COLUMN = 20;
+    /** Shared pool of blank pad entries (7 teams x 19 pads + spectator padding). */
+    private static final int PAD_COUNT = 160;
+    private static final UUID[] PAD_IDS = new UUID[PAD_COUNT];
+    private static final String[] PAD_NAMES = new String[PAD_COUNT];
+    private static final Map<UUID, String> PAD_NAME_BY_ID = new HashMap<>();
+
+    static {
+        for (int i = 0; i < PAD_COUNT; i++) {
+            PAD_IDS[i] = UUID.randomUUID();
+            PAD_NAMES[i] = String.format(java.util.Locale.ROOT, "NPad%03d", i);
+            PAD_NAME_BY_ID.put(PAD_IDS[i], PAD_NAMES[i]);
+        }
+    }
+
+    /** Plugins known to patch the player-info packet writer and crash on the 1.21.2 action. */
     private static final String[] PACKET_PATCHERS = {"NBTAPI", "Item-NBT-API", "TritonSpigot", "Triton"};
 
     private final org.bukkit.plugin.Plugin plugin;
@@ -65,7 +86,11 @@ public final class TabFightListService {
     private final Set<UUID> layoutApplied = new HashSet<>();
     /** Stable column-band slot per running match id. */
     private final Map<UUID, Integer> matchSlots = new HashMap<>();
+    /** Per viewer: pad id -> priority currently sent to that client. */
+    private final Map<UUID, Map<UUID, Integer>> sentPads = new ConcurrentHashMap<>();
     private volatile Boolean patcherCache;
+    /** Set once a pad packet fails; padding then stays off for this boot. */
+    private volatile boolean padsBroken;
 
     public TabFightListService(org.bukkit.plugin.Plugin plugin) {
         this.plugin = plugin;
@@ -110,6 +135,24 @@ public final class TabFightListService {
         return false;
     }
 
+    /** Blank padding needs the ordering packets plus ProtocolLib for the fake entries. */
+    private boolean padsUsable() {
+        if (padsBroken || !columnsEnabled()) {
+            return false;
+        }
+        // Check the plain Bukkit side first so TabPadPackets (ProtocolLib types) is never
+        // even class-loaded on servers without the soft-depend.
+        if (Bukkit.getPluginManager().getPlugin("ProtocolLib") == null) {
+            return false;
+        }
+        try {
+            return TabPadPackets.available();
+        } catch (Throwable t) {
+            padsBroken = true;
+            return false;
+        }
+    }
+
     /** Reserves a stable column band for a match (lowest free slot). */
     private int slotFor(UUID matchId) {
         return matchSlots.computeIfAbsent(matchId, id -> {
@@ -127,7 +170,7 @@ public final class TabFightListService {
         matchSlots.keySet().retainAll(activeMatches);
     }
 
-    /** Applies the fight layout to the tablist of every online player. */
+    /** Applies the fight layout (real players' priorities) for one match. */
     public void apply(MatchSession session, Collection<? extends Player> online) {
         if (session == null) {
             return;
@@ -137,7 +180,116 @@ public final class TabFightListService {
         }
         layoutApplied.removeIf(id -> Bukkit.getPlayer(id) == null);
         boolean ordering = columnsEnabled();
+        Groups groups = collectGroups(session, online);
 
+        Comparator<Player> byName = Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER);
+        int matchTop = ORDER_TOP - slotFor(session.id()) * MATCH_SPAN;
+        int columnIndex = 0;
+        for (TeamColor color : TeamColor.values()) { // canonical battle order RED -> GOLD
+            List<Player> roster = groups.rosters().get(color);
+            if (roster == null || roster.isEmpty()) {
+                continue;
+            }
+            roster.sort(byName);
+            int order = matchTop - columnIndex * SLOT_WIDTH;
+            for (Player p : roster) {
+                applyListEntry(p, ordering, order--);
+            }
+            columnIndex++;
+        }
+        if (!groups.spectators().isEmpty()) {
+            groups.spectators().sort(byName);
+            int order = matchTop - columnIndex * SLOT_WIDTH;
+            for (Player p : groups.spectators()) {
+                applyListEntry(p, ordering, order--);
+            }
+        }
+    }
+
+    /**
+     * Syncs the blank padding entries of one viewer with the layout of the match they are
+     * in (or watching). Pads fill each team column up to a multiple of 20 rows so every
+     * team starts at the top of its own column.
+     */
+    public void applyViewerPads(Player viewer, MatchSession session) {
+        sentPads.keySet().removeIf(id -> Bukkit.getPlayer(id) == null);
+        Map<UUID, Integer> sent = sentPads.computeIfAbsent(viewer.getUniqueId(), id -> new ConcurrentHashMap<>());
+        boolean want = padsUsable() && session != null
+                && (session.state() == MatchState.ACTIVE || session.state() == MatchState.ENDING);
+        if (!want) {
+            removeAllPads(viewer, sent);
+            return;
+        }
+        Groups groups = collectGroups(session, Bukkit.getOnlinePlayers());
+        int matchTop = ORDER_TOP - slotFor(session.id()) * MATCH_SPAN;
+        Map<UUID, Integer> needed = new HashMap<>();
+        int columnIndex = 0;
+        int padIndex = 0;
+        for (TeamColor color : TeamColor.values()) {
+            List<Player> roster = groups.rosters().get(color);
+            if (roster == null || roster.isEmpty()) {
+                continue;
+            }
+            int base = matchTop - columnIndex * SLOT_WIDTH;
+            int size = roster.size();
+            int padCount = (ROWS_PER_COLUMN - size % ROWS_PER_COLUMN) % ROWS_PER_COLUMN;
+            for (int j = 0; j < padCount && padIndex < PAD_COUNT; j++) {
+                needed.put(PAD_IDS[padIndex], base - size - 1 - j);
+                padIndex++;
+            }
+            columnIndex++;
+        }
+
+        List<UUID> stale = sent.keySet().stream().filter(id -> !needed.containsKey(id)).toList();
+        if (!stale.isEmpty()) {
+            try {
+                TabPadPackets.removePads(viewer, stale);
+            } catch (Throwable t) {
+                padsBroken = true;
+                return;
+            }
+            stale.forEach(sent::remove);
+        }
+        for (Map.Entry<UUID, Integer> entry : needed.entrySet()) {
+            UUID padId = entry.getKey();
+            int priority = entry.getValue();
+            Integer current = sent.get(padId);
+            if (current != null && current == priority) {
+                continue;
+            }
+            try {
+                if (current == null) {
+                    TabPadPackets.addPad(viewer, padId, PAD_NAME_BY_ID.get(padId), priority);
+                } else {
+                    TabPadPackets.updatePriority(viewer, padId, PAD_NAME_BY_ID.get(padId), priority);
+                }
+                sent.put(padId, priority);
+            } catch (Throwable t) {
+                padsBroken = true;
+                removeAllPads(viewer, sent);
+                return;
+            }
+        }
+    }
+
+    private void removeAllPads(Player viewer, Map<UUID, Integer> sent) {
+        if (sent.isEmpty()) {
+            return;
+        }
+        List<UUID> ids = List.copyOf(sent.keySet());
+        sent.clear();
+        if (!TabPadPackets.available()) {
+            return;
+        }
+        try {
+            TabPadPackets.removePads(viewer, ids);
+        } catch (Throwable t) {
+            padsBroken = true;
+        }
+    }
+
+    /** Live fighters grouped by team colour plus every spectator, for one match. */
+    private Groups collectGroups(MatchSession session, Collection<? extends Player> online) {
         Map<TeamColor, List<Player>> rosters = new EnumMap<>(TeamColor.class);
         List<Player> spectators = new ArrayList<>();
         for (Player p : online) {
@@ -150,29 +302,7 @@ public final class TabFightListService {
                 spectators.add(p);
             }
         }
-
-        Comparator<Player> byName = Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER);
-        int matchTop = ORDER_TOP - slotFor(session.id()) * MATCH_SPAN;
-        int columnIndex = 0;
-        for (TeamColor color : TeamColor.values()) { // canonical battle order RED -> GOLD
-            List<Player> roster = rosters.get(color);
-            if (roster == null || roster.isEmpty()) {
-                continue;
-            }
-            roster.sort(byName);
-            int order = matchTop - columnIndex * SLOT_WIDTH;
-            for (Player p : roster) {
-                applyListEntry(p, ordering, order--);
-            }
-            columnIndex++;
-        }
-        if (!spectators.isEmpty()) {
-            spectators.sort(byName);
-            int order = matchTop - columnIndex * SLOT_WIDTH;
-            for (Player p : spectators) {
-                applyListEntry(p, ordering, order--);
-            }
-        }
+        return new Groups(rosters, spectators);
     }
 
     /**
@@ -195,8 +325,16 @@ public final class TabFightListService {
         }
     }
 
-    /** Restores vanilla ordering and the rank-styled list name for one player. */
+    /** Restores vanilla ordering, the styled list name and removes pads for one player. */
     public void clear(Player player) {
+        Map<UUID, Integer> sent = sentPads.remove(player.getUniqueId());
+        if (sent != null && !sent.isEmpty() && TabPadPackets.available()) {
+            try {
+                TabPadPackets.removePads(player, List.copyOf(sent.keySet()));
+            } catch (Throwable t) {
+                padsBroken = true;
+            }
+        }
         if (!layoutApplied.remove(player.getUniqueId())) {
             return;
         }
@@ -210,5 +348,8 @@ public final class TabFightListService {
         if (rankService != null) {
             rankService.applyNametag(player);
         }
+    }
+
+    private record Groups(Map<TeamColor, List<Player>> rosters, List<Player> spectators) {
     }
 }

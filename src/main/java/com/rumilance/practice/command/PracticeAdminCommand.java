@@ -39,6 +39,7 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
     private final ArenaService arenaService;
     private final FfaService ffaService;
     private com.rumilance.practice.practice.PracticeService practiceService;
+    private volatile com.rumilance.practice.signqueue.SignQueueService signQueueService;
     private java.util.function.Consumer<Player> openAdminMenu;
     private com.rumilance.practice.scoreboard.ScoreboardService scoreboardService;
 
@@ -68,6 +69,10 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
 
     public void setPracticeService(com.rumilance.practice.practice.PracticeService practiceService) {
         this.practiceService = practiceService;
+    }
+
+    public void setSignQueueService(com.rumilance.practice.signqueue.SignQueueService signQueueService) {
+        this.signQueueService = signQueueService;
     }
 
     public void setOpenAdminMenu(java.util.function.Consumer<Player> openAdminMenu) {
@@ -101,7 +106,7 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
         }
 
         if (args.length == 0) {
-            sender.sendMessage(Component.text("/practiceadmin <menu|tool|reload|status|matches|cleanup|maintenance>",
+            sender.sendMessage(Component.text("/practiceadmin <menu|tool|sign|reload|status|matches|cleanup|maintenance>",
                     NamedTextColor.YELLOW));
             return true;
         }
@@ -118,6 +123,33 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
                 } else {
                     sender.sendMessage(Component.text("The admin menu is in-game only.", NamedTextColor.RED));
                 }
+                yield true;
+            }
+            case "sign" -> {
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage(Component.text("Queue signs are in-game only.", NamedTextColor.RED));
+                    yield true;
+                }
+                if (args.length < 2) {
+                    sender.sendMessage(Component.text(
+                            "Usage: /practiceadmin sign <kit>", NamedTextColor.YELLOW));
+                    yield true;
+                }
+                com.rumilance.practice.signqueue.SignQueueService signs = signQueueService;
+                if (signs == null) {
+                    sender.sendMessage(Component.text("Sign queue service not wired.", NamedTextColor.RED));
+                    yield true;
+                }
+                String kitId = args[1].toLowerCase(Locale.ROOT);
+                if (kitService.get(kitId).isEmpty()) {
+                    sender.sendMessage(Component.text("Unknown kit: " + args[1], NamedTextColor.RED));
+                    yield true;
+                }
+                player.getInventory().addItem(signs.createSignItem(player, kitId));
+                soundService.play(player, "gui-click");
+                player.sendMessage(Component.text(
+                        "Queue sign for kit '" + kitId + "' given. Place it to create the queue sign.",
+                        NamedTextColor.GREEN));
                 yield true;
             }
             case "tool" -> {
@@ -238,10 +270,14 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
             return TabCompletions.filter(current, "pos1", "pos2", "spawn", "info", "validate");
         }
         if (args.length == 1) {
-            return TabCompletions.filter(current, "tool", "reload", "status", "matches", "cleanup", "maintenance");
+            return TabCompletions.filter(current, "menu", "sign", "tool", "reload", "status", "matches", "cleanup", "maintenance");
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("maintenance")) {
             return TabCompletions.filter(current, "on", "off");
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("sign")) {
+            return TabCompletions.filter(current,
+                    kitService.enabled().stream().map(k -> k.name()).toList());
         }
         return List.of();
     }

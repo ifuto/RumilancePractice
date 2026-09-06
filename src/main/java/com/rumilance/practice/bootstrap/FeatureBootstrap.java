@@ -816,6 +816,7 @@ public final class FeatureBootstrap {
         services.register(OriginalKitService.class, originalKitService);
         com.rumilance.practice.originalkit.OriginalKitRoomService originalKitRoomService =
                 new com.rumilance.practice.originalkit.OriginalKitRoomService(configService, plugin);
+        originalKitRoomService.setMessageService(messageService);
         services.register(com.rumilance.practice.originalkit.OriginalKitRoomService.class, originalKitRoomService);
         originalKitService.setRoomService(originalKitRoomService);
         matchService.setOriginalKitService(originalKitService);
@@ -1331,6 +1332,7 @@ public final class FeatureBootstrap {
                 plugin, configService, soundService, matchService, lobbyService, runtimeFlags, kitService,
                 arenaStore, arenaService, ffaService);
         practiceAdmin.setOpenAdminMenu(adminMenuGui::open);
+        practiceAdmin.setSignQueueService(signQueueService);
         practiceAdmin.setScoreboardService(scoreboardService);
         practiceAdmin.setPracticeService(practiceService);
         AdminCommand adminCommand = new AdminCommand(

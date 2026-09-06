@@ -244,6 +244,14 @@ public final class OriginalKitService {
 
     /** Opens an edit session for a slot and sends the player into the room (creative after TP). */
     public void enterRoomEditor(Player player, int slot, ItemStack[] layout) {
+        if (roomService == null || !roomService.isConfigured()) {
+            // Never stash the lobby inventory without a room to edit in — the player would
+            // be stranded in the edit state. Report the missing room instead.
+            if (roomService != null) {
+                roomService.enter(player);
+            }
+            return;
+        }
         editContexts.computeIfAbsent(player.getUniqueId(), id -> new EditContext(slot, layout));
         stashInventory(player);
         // Restore the existing kit contents for editing.

@@ -81,8 +81,9 @@ match:
   # Countdown after match end before players/spectators are teleported back to the lobby.
   end-teleport-delay-seconds: 5
   # TAB list grouping during a match: each team becomes its own column in battle order
-  # (RED | BLUE | ...), spectators below them, alphabetical inside each column. Built on
-  # the 1.21.2+ player-list order index (Paper setPlayerListOrder). Servers running
+  # (RED | BLUE | ...), spectators below them, alphabetical inside each column. Columns are
+  # visually separated with blank padding rows (invisible tab-only entries, ProtocolLib).
+  # Built on the 1.21.2+ player-list order index (Paper setPlayerListOrder). Servers running
   # NBT-injector packet patchers (NBTAPI / Triton) are auto-detected and skip the ordering
   # to avoid kicks; set this to true/false to force it either way. When off, the TAB keeps
   # vanilla order and the players' styled list names during matches.

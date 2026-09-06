@@ -508,6 +508,9 @@ public final class ScoreboardService {
             com.rumilance.practice.font.RankIconNameTags.clear(handle.board);
             com.rumilance.practice.match.MatchTeamVisuals.apply(
                     handle.board, player, visualSession, Bukkit.getOnlinePlayers());
+            if (tabFightListService != null) {
+                tabFightListService.applyViewerPads(player, visualSession);
+            }
         } else if (handle != null) {
             com.rumilance.practice.match.MatchTeamVisuals.clear(handle.board);
             if (tabFightListService != null) {
