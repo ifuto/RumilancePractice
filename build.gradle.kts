@@ -100,6 +100,51 @@ tasks.test {
         events(TestLogEvent.PASSED, TestLogEvent.FAILED, TestLogEvent.SKIPPED)
         exceptionFormat = TestExceptionFormat.FULL
     }
+    // Always run the failure report, even (especially) when the tests failed.
+    finalizedBy("reportTestFailures")
+}
+
+/**
+ * Gradle's own test logging splits "<Class> > <method>() FAILED" from the assertion line, so a CI
+ * annotation can end up saying only "expected: <2> but was: <1>" with no clue which test it came
+ * from (the raw log and the artifacts are not always reachable). This task parses the JUnit XML
+ * and fails the build with ONE line per failing test that contains the class, the method, the
+ * assertion message and the first source line of the stack - text the CI grep is guaranteed to
+ * pick up ("Caused by:", "expected:", "but was:", ".java:NNN:").
+ */
+tasks.register("reportTestFailures") {
+    val resultDir = layout.buildDirectory.dir("test-results/test")
+    onlyIf { resultDir.get().asFile.isDirectory }
+    doLast {
+        val failures = mutableListOf<String>()
+        resultDir.get().asFile
+            .listFiles { file -> file.isFile && file.name.endsWith(".xml") }
+            ?.sortedBy { it.name }
+            ?.forEach { file ->
+                val root = groovy.xml.XmlSlurper().parse(file)
+                root."testcase".forEach { testcase ->
+                    listOf("failure", "error").forEach { kind ->
+                        testcase."$kind".forEach { problem ->
+                            val message = problem.@message.text().trim()
+                                .lineSequence().firstOrNull { it.isNotBlank() } ?: ""
+                            val trace = problem.text().lineSequence()
+                                .firstOrNull { it.contains(".java:") }?.trim() ?: ""
+                            failures += testcase.@classname.text() + " > " +
+                                    testcase.@name.text() + " FAILED -> " + message +
+                                    (if (trace.isEmpty()) "" else " @ " + trace)
+                        }
+                    }
+                }
+            }
+        if (failures.isEmpty()) {
+            return@doLast
+        }
+        failures.take(12).forEach { logger.error("TESTFAILURE {}", it) }
+        // Public API exception on purpose: its message is printed in the build's
+        // "Caused by:" chain, which is exactly what the CI grep turns into annotations.
+        throw GradleException(
+                "There were failing tests: " + failures.take(12).joinToString(" ; ").take(1800))
+    }
 }
 
 tasks.shadowJar {
