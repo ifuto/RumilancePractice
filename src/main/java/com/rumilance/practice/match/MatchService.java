@@ -1866,6 +1866,41 @@ public final class MatchService {
         }
     }
 
+    /** Console mirror of every match outcome (players only see titles — staff see this). */
+    private void logMatchResult(MatchSession session, UUID winnerId, boolean draw) {
+        try {
+            StringBuilder players = new StringBuilder();
+            for (UUID id : session.participants()) {
+                if (!players.isEmpty()) {
+                    players.append(", ");
+                }
+                String name = Bukkit.getOfflinePlayer(id).getName();
+                players.append(name == null ? id : name);
+                if (session.isTeamMatch()) {
+                    players.append('[').append(session.teamColor(id)).append(']');
+                }
+            }
+            String outcome;
+            if (draw) {
+                outcome = "DRAW";
+            } else if (winnerId == null) {
+                outcome = "NO RESULT";
+            } else {
+                String winnerName = Bukkit.getOfflinePlayer(winnerId).getName();
+                outcome = "WINNER " + (winnerName == null ? winnerId : winnerName);
+                if (session.isTeamMatch()) {
+                    outcome += "[" + session.teamColor(winnerId) + "]";
+                }
+            }
+            plugin.getLogger().info("[Match] " + session.mode()
+                    + (session.kitName() == null ? "" : " kit=" + session.kitName())
+                    + " players=[" + players + "] result=" + outcome
+                    + (session.isDisconnectForfeit() ? " (disconnect forfeit)" : ""));
+        } catch (RuntimeException ignored) {
+            // Logging must never break the match flow.
+        }
+    }
+
     public void endMatch(MatchSession session, UUID winnerId, boolean draw) {
         if (session.state() == MatchState.ENDING || session.state() == MatchState.CLOSED
                 || session.state() == MatchState.CLEANING || session.state() == MatchState.FAILED) {
@@ -1878,6 +1913,7 @@ public final class MatchService {
         if (!draw && winnerId != null) {
             session.addSeriesWin(winnerId);
         }
+        logMatchResult(session, winnerId, draw);
         for (UUID id : session.participants()) {
             try {
                 stateManager.transition(id, PlayerState.ENDING);
