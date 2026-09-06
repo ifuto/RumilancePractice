@@ -28,8 +28,16 @@ Paper 1.21.11 向け Practice PvP プラグイン **N Arena**(プラグイン名
 - デス→ロビー戻り、戦闘ログ
 
 ### プラクティス
-- `/prac` `/practice` — ソロ練習モード。アンカー・TNT・マスの練習台
-- 練習ボット(PracticeBotGui)、レイアウト編集(PracticeLayoutGui)
+- `/prac` `/practice` — ソロ練習モード。アンカー・TNT・メイスの練習台
+- **対戦ボット部屋**(ITEM 41): `/practice draft <名前> <ANKER|MACE|SWORD|CRYSTAL>`
+  → `pos1`/`pos2` → `selection apply` → `p1` → `botpos`(任意) → `save` → `enable`
+  - ソードBot: 追跡+左右ストレイフで斬りかかる(100HP)、シールド構えで被ダメ半減+
+    殴り返すとスタン、3秒無被撃で回復
+  - クリスタルBot: 3〜6mを周回移動し、黒曜石台+エンドクリスタルのコンボで攻撃してくる
+    (配布マップ準拠)。トーテムでポップして離脱→復帰。自クリスタルでは自滅しない
+  - クリスタル部屋は爆発ダメージがプレイヤーにも通る(自クリ誤爆含む、トーテムで耐える)
+- `/practice botpos <名前> [clear]` — アリーナ内のBot出現位置を運営が設定(全Bot種対応)
+- 練習ボット設定(PracticeBotGui: シールド切替)、レイアウト編集(PracticeLayoutGui)
 
 ### 試合エンジン
 - カウントダウン(開始ロック)、試合再生成、勝敗判定、タイムアウト引き分け
