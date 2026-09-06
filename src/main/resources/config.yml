@@ -1,4 +1,4 @@
-# RumilancePractice main configuration file.
+# N Arena (plugin: NARENA) main configuration file.
 # Most values here can be reloaded at runtime with /rumireload.
 
 plugin:
@@ -49,16 +49,16 @@ resource-pack:
   url: "https://raw.githubusercontent.com/ifuto/RumilancePractice/arena/01a06257-rumilancepractice/dist/RumilanceResourcePack.zip"
   # SHA-1 of the zip as 40 hex characters (must match the file exactly; see
   # dist/RumilanceResourcePack.sha1). The client rejects a hash mismatch.
-  sha1: "c4cf82d41ba0564aaac4752cb6a95225e768b2e2"
+  sha1: "2ad094674379fb5cc9e1f224647b9f30c26e2072"
   # true  = REQUIRED: kick players who decline the pack or fail to download it.
   # false = RECOMMENDED: they may decline and keep playing (text rank badges instead of
   #         the icon glyphs). Switchable at runtime from the admin GUI; that choice is
   #         stored in pack-policy.yml and wins over this value.
   required: false
   # Prompt shown in the client's resource-pack dialog.
-  prompt: "Rumilance Practice のアイコン表示に必要なリソースパックです"
+  prompt: "N Arena のアイコン表示に必要なリソースパックです"
   # Kick message shown to players who declined / failed the pack.
-  kick-message: "Rumilance をプレイするにはリソースパックの適用が必要です。\n適用を拒否、またはダウンロードに失敗したため切断されました。"
+  kick-message: "N Arena をプレイするにはリソースパックの適用が必要です。\n適用を拒否、またはダウンロードに失敗したため切断されました。"
 
 executor:
   # Size of the async worker pool used for I/O and heavier computations
@@ -183,7 +183,7 @@ gui:
 
 # Central Scoreboard/TAB — 文言・レイアウトは scoreboard.yml が正。
 # ここは後方互換のフォールバック（プラグイン起動時に scoreboard.yml が無い場合の既定）。
-# 通常は plugins/RumilancePractice/scoreboard.yml を編集してください。
+# 通常は plugins/n-arena/scoreboard.yml を編集してください。
 scoreboard:
   enabled: true
   update-interval-ticks: 20

@@ -821,7 +821,7 @@ public final class PracticeService {
         ItemStack book = new ItemStack(Material.WRITTEN_BOOK);
         BookMeta meta = (BookMeta) book.getItemMeta();
         meta.setTitle("Practice Results");
-        meta.setAuthor("Rumilance");
+        meta.setAuthor("N Arena");
         String page = """
                 §6Practice Results
                 §0

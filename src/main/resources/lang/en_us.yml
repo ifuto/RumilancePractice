@@ -1,4 +1,4 @@
-# English (US) - default/fallback locale for RumilancePractice.
+# English (US) - default/fallback locale for N Arena.
 # Values are MiniMessage strings. Placeholders use <angle_bracket> tags, e.g. <player>, <amount>.
 # Style: no chat prefix, minimal bold (only emphatic titles/buttons), clean modern palette.
 welcome:

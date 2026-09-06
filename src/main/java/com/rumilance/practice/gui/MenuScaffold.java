@@ -9,7 +9,7 @@ import org.bukkit.inventory.ItemStack;
 import java.util.List;
 
 /**
- * Layout helpers that draw the standard RumilancePractice menu chrome (dark fill,
+ * Layout helpers that draw the standard N Arena menu chrome (dark fill,
  * thin top accent, navigation buttons) into an {@link Inventory}. Every public method
  * returns the inventory it was given so calls can be chained. The content "grid" for a
  * standard 6-row menu is rows 1-4, columns 1-7 (28 slots), matching the existing

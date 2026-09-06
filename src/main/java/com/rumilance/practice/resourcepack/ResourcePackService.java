@@ -55,7 +55,7 @@ public final class ResourcePackService implements Listener {
     private static final String DEFAULT_URL =
             "https://raw.githubusercontent.com/ifuto/RumilancePractice/"
                     + "arena/01a06257-rumilancepractice/dist/RumilanceResourcePack.zip";
-    private static final String DEFAULT_SHA1 = "c4cf82d41ba0564aaac4752cb6a95225e768b2e2";
+    private static final String DEFAULT_SHA1 = "2ad094674379fb5cc9e1f224647b9f30c26e2072";
 
     /** Small delay after join so login-time packets settle before the pack prompt. */
     private static final long APPLY_DELAY_TICKS = 10L;
@@ -297,7 +297,7 @@ public final class ResourcePackService implements Listener {
             return;
         }
         String message = configService.config().getString("resource-pack.kick-message",
-                "This server requires the Rumilance resource pack.");
+                "This server requires the N Arena resource pack.");
         logger.info(() -> "Kicking " + player.getName()
                 + " — resource pack " + status.name().toLowerCase(java.util.Locale.ROOT));
         player.kick(Component.text(message));
@@ -314,7 +314,7 @@ public final class ResourcePackService implements Listener {
         String url = configService.config().getString("resource-pack.url", DEFAULT_URL);
         String sha1Hex = configService.config().getString("resource-pack.sha1", DEFAULT_SHA1);
         String prompt = configService.config().getString("resource-pack.prompt",
-                "Required for Rumilance Practice icons.");
+                "Required for N Arena icons.");
         if (url == null || url.isBlank()) {
             logger.warning("resource-pack.url is empty — plugin pack distribution disabled.");
             return null;

@@ -1,6 +1,6 @@
-# RumilancePractice
+# N Arena (RumilancePractice)
 
-Paper 1.21.11 向け Practice PvP プラグインです。ランク戦 / アンランクド戦 / ロビー / Kit / キュー / FAWE アリーナを独自実装しています。
+Paper 1.21.11 向け Practice PvP プラグイン **N Arena** です。ランク戦 / アンランクド戦 / ロビー / Kit / キュー / FAWE アリーナを独自実装しています。
 
 ## 必要環境
 
