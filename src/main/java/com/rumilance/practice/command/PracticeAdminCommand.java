@@ -101,12 +101,25 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
         }
 
         if (args.length == 0) {
-            sender.sendMessage(Component.text("/practiceadmin <tool|reload|status|matches|cleanup|maintenance>",
+            sender.sendMessage(Component.text("/practiceadmin <menu|tool|reload|status|matches|cleanup|maintenance>",
                     NamedTextColor.YELLOW));
             return true;
         }
 
         return switch (args[0].toLowerCase(Locale.ROOT)) {
+            case "menu" -> {
+                if (sender instanceof Player player) {
+                    if (openAdminMenu != null) {
+                        soundService.play(player, "gui-open");
+                        openAdminMenu.accept(player);
+                    } else {
+                        player.sendMessage(Component.text("Admin menu not wired.", NamedTextColor.RED));
+                    }
+                } else {
+                    sender.sendMessage(Component.text("The admin menu is in-game only.", NamedTextColor.RED));
+                }
+                yield true;
+            }
             case "tool" -> {
                 if (sender instanceof Player player) {
                     AdminTools.give(player);

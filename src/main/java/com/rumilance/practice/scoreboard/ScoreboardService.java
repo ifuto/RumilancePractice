@@ -254,6 +254,7 @@ public final class ScoreboardService {
                     tabFightListService.apply(session, online);
                 }
             }
+            tabFightListService.prune(applied);
         }
         if (opponentHealthNametagService != null) {
             for (Player player : online) {

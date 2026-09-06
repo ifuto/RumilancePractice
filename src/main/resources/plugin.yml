@@ -177,7 +177,7 @@ commands:
     permission: rumilance.admin
   practiceadmin:
     description: Practice administration.
-    usage: /practiceadmin <tool|reload|status|matches|cleanup|maintenance>
+    usage: /practiceadmin <menu|tool|reload|status|matches|cleanup|maintenance>
     permission: rumilance.admin
   rumireload:
     description: Reload every YAML configuration (kits, arenas, ffa, sounds, scoreboard, locales, effects).

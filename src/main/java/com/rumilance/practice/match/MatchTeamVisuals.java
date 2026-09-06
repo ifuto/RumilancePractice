@@ -14,14 +14,13 @@ import java.util.Collection;
  * Applies red/blue nametag + TAB list colours for everyone watching a match scoreboard.
  * One team per fighter so HP suffixes and rank-badge prefixes do not collide.
  *
- * <p><b>TAB grouping without any player-info packets:</b> the client sorts tab entries with
- * equal list order by team name (case-sensitive, ascending — vanilla behaviour, verified
- * against the protocol wiki), so the team names encode the layout: {@code 0<sortKey><name>}
- * for fighters, where the digit sort key follows canonical battle order (RED, BLUE, GREEN,
- * YELLOW, AQUA, PURPLE, GOLD) and the lowercased player name yields alphabetical rosters
- * inside each column. Spectators share one {@code 9_spec} team and therefore always sort
- * last. This works on every client and is unaffected by packet-patching (NBT-injector)
- * plugins that choke on the 1.21.2 list-order action.</p>
+ * <p><b>TAB grouping:</b> the column layout on 1.21.2+ clients comes from the list-order
+ * index bands assigned by {@link com.rumilance.practice.scoreboard.TabFightListService}
+ * (vanilla team-name sorting was removed from the client in 1.21.2). The team names still
+ * follow the {@code 0<sortKey><name>} encoding — digit sort key in canonical battle order
+ * (RED, BLUE, GREEN, YELLOW, AQUA, PURPLE, GOLD), lowercased name for alphabetical rosters,
+ * spectators on one {@code 9_spec} team — so pre-1.21.2 clients that DO sort by team name
+ * see the same grouping, and every fighter keeps a unique team for its prefix.</p>
  *
  * <p>Fight teams also carry a name <strong>prefix</strong> resolved by the injected
  * {@code prefixResolver}: during team fights it renders the RED/BLUE team marker and, for

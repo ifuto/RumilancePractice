@@ -67,9 +67,9 @@ Paper 1.21.11 向け Practice PvP プラグイン **N Arena**(プラグイン名
 - **通報**: `/report` `/reportlist` `/objection`(異議申立)
 - **リプレイ**: `/replay` — 試合の録画・NPC再生、アーカイブ
 - **試合調査**: `/matchinv`(試合時のインベントリ参照)、`/matchreport`
-- `/checkid`(プレイヤーID照合)、プレイヤーデータGUI、プレイヤー検索
-- `/forceend` `/forcematch`(試合強制操作)、`/admin` `/practiceadmin`
-- アリーナ管理: `/arena`(FAWE連携のアリーナ再生成、使い捨てアリーナ)、`/setfunc`
+- **試合強制操作(OP)**: `/forcematch <player1> <player2> <kit> [arena]` — 双方が戦闘可能な場合に対戦を強制開始(`[arena]` 省略時はランダム、`random` も可)。`/forceend <player>` — 対象の試合を引き分けで強制終了
+- **管理GUI**: `/practiceadmin menu` で直接開く、または `/practiceadmin tool` で配布されるネザースターを右クリック。キット/アリーナ/プリセット/eキット/看板キット/リソースパック方針などをここから管理
+- `/checkid`(プレイヤーID照合)、プレイヤーデータGUI、プレイヤー検索、`/admin` `/practiceadmin`
 - **看板保護**(看板の不正編集ガード、`/signcheck`)、`/walltext`(壁面テキスト装飾)
 - `/rumireload`(設定リロード)、`/packpolicy`(リソパ方針をコンソールから切替)
 
@@ -86,7 +86,7 @@ Paper 1.21.11 向け Practice PvP プラグイン **N Arena**(プラグイン名
 - **多言語対応**: 日本語・英語(米/英)・韓国語・中国語・スペイン語・フランス語の7言語。`/lang` で切替、初回参加時に言語選択GUI
 - **Lunar Client**: Apollo リッチプレゼンス連携
 - **Bedrock(Geyser)対応**: 参加検知、プラットフォーム別マッチング
-- **TAB プラグイン連携**: 試合中チーム表示(色付き)、可視性制御、グループ分け
+- **TAB(プレイヤーリスト)**: 試合中はチーム別の縦列に自動整列(チーム順に列、列内は名前順、観戦者は下部)、チームカラー・ランクバッジ・チームマーカー表示、ロビープレイヤーは試合参加者から非表示。1.21.2+ のリスト順序インデックスで実現(`match.tab-columns-enabled`、パケットパッチャー系プラグインは自動検出して無効化)
 - **ProtocolLib**: カスタムモデルデータ・パケットレベルの見た目制御
 
 ## ロビー・ワールド
