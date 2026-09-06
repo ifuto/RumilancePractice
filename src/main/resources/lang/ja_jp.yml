@@ -1021,6 +1021,11 @@ gui:
   profile-best-elo: "Best Elo"
   practice-layout-order-anchor: "リスポーンアンカー → グロウストーン"
   practice-layout-order-glow: "グロウストーン → リスポーンアンカー"
+  team-settings-title: "チーム設定"
+  team-settings-entry: "チーム設定"
+  team-settings-lore: "招待・公開設定・マップ・フレンドリーファイア・チーム構成・陣営振り分け"
+  team-settings-hint: "クリック: チーム設定を開く"
+  back-to-hub: "チームハブに戻る"
 
 
 lb:

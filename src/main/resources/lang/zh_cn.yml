@@ -1020,6 +1020,11 @@ gui:
   profile-best-elo: "最高分"
   practice-layout-order-anchor: "重生锚 → 萤石"
   practice-layout-order-glow: "萤石 → 重生锚"
+  team-settings-title: "队伍设置"
+  team-settings-entry: "队伍设置"
+  team-settings-lore: "邀请·公开设置·地图·友军伤害·队伍构成·阵营分配"
+  team-settings-hint: "点击:打开队伍设置"
+  back-to-hub: "返回队伍中心"
 
 lb:
   kill-title: "<gold><b>月度击杀榜</b></gold>"

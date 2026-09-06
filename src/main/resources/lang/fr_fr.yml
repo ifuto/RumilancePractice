@@ -1020,6 +1020,11 @@ gui:
   profile-best-elo: "Meilleur Elo"
   practice-layout-order-anchor: "ANCRE DE RÉAPPARITION puis PIERRE LUMINEUSE"
   practice-layout-order-glow: "PIERRE LUMINEUSE puis ANCRE DE RÉAPPARITION"
+  team-settings-title: "Réglages d'équipe"
+  team-settings-entry: "Réglages d'équipe"
+  team-settings-lore: "Invitations, visibilité, carte, tir allié, composition, camps"
+  team-settings-hint: "Clic : ouvrir les réglages d'équipe"
+  back-to-hub: "Retour au hub d'équipe"
 
 lb:
   kill-title: "<gold><b>Classement mensuel des éliminations</b></gold>"

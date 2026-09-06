@@ -1020,6 +1020,11 @@ gui:
   profile-best-elo: "Mejor Elo"
   practice-layout-order-anchor: "ANCLA DE REAPARICIÓN y luego PIEDRA LUMINOSA"
   practice-layout-order-glow: "PIEDRA LUMINOSA y luego ANCLA DE REAPARICIÓN"
+  team-settings-title: "Ajustes de equipo"
+  team-settings-entry: "Ajustes de equipo"
+  team-settings-lore: "Invitaciones, visibilidad, mapa, fuego amigo, composición, bandos"
+  team-settings-hint: "Clic: abrir ajustes de equipo"
+  back-to-hub: "Volver al centro de equipo"
 
 lb:
   kill-title: "<gold><b>Ranking mensual de bajas</b></gold>"
