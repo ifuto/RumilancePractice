@@ -29,9 +29,18 @@ GUI全面リビルドにあたり、**機能を一切失わないため**の完�
   `bot`(ITEM 41: ボット練習部屋一覧へ) `leave-queue`(キュー離脱・入っていれば表示) `close`
 - キュー中は参加中表示/離脱ボタンに切替。
 
-### PracticeBotSelectGui(ボット部屋一覧・ITEM 41)
-- BattleMenuの`bot`から。有効なSWORD/CRYSTAL/MACE部屋をグリッド+ページング表示。
-- 各部屋クリックで `practiceService.join`(/prac相当)。使用中部屋は鍵表示。`close` `back`。
+### PracticeBotSelectGui(ボットモード選択・ITEM 44)
+- BattleMenuの`bot`から。5モード(クリスタル/ネザポット/メイス/カート/ソード)を
+  2行目に間隔を空けて配置。各タイル=説明+運営紐づけキット+空き状況。
+- `mode:<TYPE>` クリックでそのモードの最初の空き部屋へ `practiceService.join`。
+  部屋なし/満杯は鍵表示+エラー音。`close` `back`。
+
+### BotDifficultyGui(ボット難易度・ITEM 44・6行・PURPLE)
+- WAITホットバーのネザースターから。1行目=配布マップ準拠プリセット梯子
+  (木〜ネザライト剣6種+カスタム星)、2〜4行目=詳細パラメータタイル。
+- パラメータ: 体力/攻撃力/攻撃間隔/移動速度/回復/コンボ間隔/シールドスタン(トグル)/
+  シールド軽減/トーテム目標。左+右−シフト=プリセット値へ。
+- クリック即保存(`practiceService.saveDifficulty`)+リフレッシュ。`close` `back`。
 
 ### SettingsGui(個人設定)
 - アクション(全部トグル): `toggle:scoreboard` `toggle:sounds` `toggle:spectators`
