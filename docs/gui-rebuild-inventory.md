@@ -58,14 +58,23 @@ GUI全面リビルドにあたり、**機能を一切失わないため**の完�
   `leave`(脱退・ConfirmGui経由) `page:next/prev`(メンバーページ) `close`
 - メンバーをヘッド表示(クリックでキック等の権限操作・ホストのみ)。
 
-### TeamSettingsGui
-- `invite`(招待GUIへ) `toggle_ff`(フレンドリーファイア) `toggle_public`(公開/非公開)
-  `select_map`(マップ選択) `autosplit`(自動チーム振り分け) `clearsides`(陣営クリア)
-  `open_team_config`(チーム構成・人数設定) `disband`(解散・確認あり) `close`
+### TeamSettingsGui(ITEM 40b でスリム化)
+- ルール系のみ: `invite`(招待) `toggle_ff`(フレンドリーファイア)
+  `toggle_public`(公開/非公開) `select_map`(マップ選択)
+  `open_team_manage`(チーム管理メニューへ) `close`
+- 運営系(構成・自動振り分け・陣営クリア・解散)は TeamManageGui へ分離。
 
-### TeamConfigGui(チーム構成)
-- `count:cycle`(チーム人数の循環切替) `reset_all` `back_to_hub` `close`
-- チーム色羊毛で色設定、各チームの人数を調整。
+### TeamManageGui(チーム管理・ITEM 40b 新設)
+- `open_team_config`(チーム構成) `autosplit`(自動振り分け) `clearsides`(陣営クリア)
+  `disband`(解散・ConfirmGui確認あり) `back`(設定へ戻る) `close`
+
+### TeamConfigGui(チーム構成・ITEM 40b でボタン追加方式に再構築)
+- `team:add`(チーム追加・ライムガラス) `team:remove`(チーム削除・赤ガラス)
+  `reset_all` `back_to_hub`(管理へ戻る) `close`
+- 従来の `count:cycle` 本(クリック循環)は廃止。チーム列(羊毛)の右隣に
+  「チームを追加」ボタン、ランク上限超過列はバリア+ランク表示
+  (4-5枠=VIP / 6-7枠=VIP+)。未作成チーム列は淡色フィラー。
+- チーム色羊毛で色設定、各チームのHP/サイズ/効果/キットを列ごとに調整。
 
 ### PartyInviteGui(招待一覧)
 - 届いた招待をリスト表示、クリックで承諾/拒否。`page:next/prev` `back` `close`。
