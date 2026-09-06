@@ -871,6 +871,25 @@ public final class PracticeService {
     /** Bot fights are capped at ten minutes; no decision by then ends the match as a draw. */
     public static final long BOT_MATCH_LIMIT_SECONDS = 600L;
 
+    // --- mace bot (Quantum parity: quantum:mace/tick, mace/lunge, mace/wind) ---------------
+    /** Fall distance from which a mace hit counts as a smash attack (a normal jump qualifies). */
+    private static final double MACE_SMASH_FALL_BLOCKS = 0.9d;
+    /** Extra smash damage per block fallen past that, and the cap on the whole scale. */
+    private static final double MACE_SMASH_PER_BLOCK = 0.35d;
+    private static final double MACE_SMASH_MAX_SCALE = 3.0d;
+    /** Lunge window: sprint-jump at the player from here and smash on the way down. */
+    private static final double MACE_LUNGE_MIN_RANGE = 2.2d;
+    private static final double MACE_LUNGE_MAX_RANGE = 5.0d;
+    private static final double MACE_LUNGE_UP = 0.55d;
+    private static final double MACE_LUNGE_FORWARD = 0.32d;
+    /** Recovery after a committed smash: the mace swing is slow, so is the bot. */
+    private static final long MACE_LAND_RECOVERY_MS = 350L;
+    /** Wind-charge self-launch: needs room so the burst does not shove the player off a ledge. */
+    private static final double MACE_WIND_MIN_RANGE = 4.0d;
+    private static final long MACE_WIND_COOLDOWN_MS = 5200L;
+    /** How long a swing into the bot's raised shield costs the player. */
+    private static final long MACE_SHIELD_STUN_MS = 1000L;
+
     private void beginBotCountdown(Player player, PracticeSession session) {
         if (session.phase() != PracticeSession.Phase.WAIT) {
             return;
@@ -1331,8 +1350,11 @@ public final class PracticeService {
         if (botLoc.getWorld() == null) {
             return;
         }
+        // The dummy is a fighter: it walks in, lunges and smashes, so it needs the same body
+        // as every other bot - movable, and as tanky as the rung says.
+        double maxHp = session.difficulty().botMaxHp();
         Mannequin bot = botLoc.getWorld().spawn(botLoc, Mannequin.class, m -> {
-            m.setImmovable(true);
+            m.setImmovable(false);
             m.setGravity(true);
             m.setSilent(true);
             m.setCanPickupItems(false);
@@ -1343,12 +1365,18 @@ public final class PracticeService {
             m.setCustomNameVisible(true);
             m.setProfile(ResolvableProfile.resolvableProfile(player.getPlayerProfile()));
             if (m.getAttribute(Attribute.MAX_HEALTH) != null) {
-                m.getAttribute(Attribute.MAX_HEALTH).setBaseValue(20.0d);
+                m.getAttribute(Attribute.MAX_HEALTH).setBaseValue(maxHp);
             }
-            m.setHealth(20.0d);
+            m.setHealth(maxHp);
             equipMaceBot(m, session.botShieldRaised());
         });
         session.setMaceBot(bot);
+        session.setBotHome(botLoc.clone());
+        long now = System.currentTimeMillis();
+        session.setBotNextAttackMs(now + 2000L);
+        session.setBotNextLungeMs(now + 1200L);
+        session.setBotNextWindMs(now + MACE_WIND_COOLDOWN_MS);
+        session.setBotStrafeFlipMs(now + 1500L);
     }
 
     private static void equipMaceBot(Mannequin bot, boolean shieldUp) {
@@ -1360,7 +1388,9 @@ public final class PracticeService {
         eq.setChestplate(new ItemStack(Material.NETHERITE_CHESTPLATE));
         eq.setLeggings(new ItemStack(Material.NETHERITE_LEGGINGS));
         eq.setBoots(new ItemStack(Material.NETHERITE_BOOTS));
-        eq.setItemInMainHand(new ItemStack(Material.NETHERITE_SWORD));
+        // A mace, not a sword: the player is practising smash-attack trades, so the dummy has
+        // to swing the weapon the mode is about.
+        eq.setItemInMainHand(new ItemStack(Material.MACE));
         eq.setItemInOffHand(shieldUp ? new ItemStack(Material.SHIELD) : null);
         eq.setHelmetDropChance(0f);
         eq.setChestplateDropChance(0f);
@@ -1389,6 +1419,13 @@ public final class PracticeService {
         session.setMaceBot(null);
     }
 
+    /**
+     * Mace bot (Quantum parity: {@code quantum:mace/tick} + {@code mace/lunge} + {@code mace/wind}).
+     * The dummy fights back instead of standing still: it walks in, sprint-jumps (lunges) at the
+     * player and lands SMASH attacks whose damage scales with the fall distance; from HARD upward
+     * it also drops a wind charge at its own feet to buy height for a bigger smash. Timing, reach,
+     * aim error, speed and regen all come from the rung, exactly like the other kits' bots.
+     */
     private void tickMaceBots() {
         long now = System.currentTimeMillis();
         for (PracticeSession session : sessions.values()) {
@@ -1396,30 +1433,235 @@ public final class PracticeService {
                     || session.phase() != PracticeSession.Phase.ACTIVE) {
                 continue;
             }
-            Mannequin bot = session.maceBot();
             Player player = Bukkit.getPlayer(session.playerId());
-            if (bot == null || !bot.isValid() || player == null || !player.isOnline()) {
+            if (player == null || !player.isOnline() || player.isDead()) {
+                continue;
+            }
+            PracticeRoom room = get(session.practiceId()).orElse(null);
+            if (room == null) {
+                continue;
+            }
+            Mannequin bot = session.maceBot();
+            if (bot == null || !bot.isValid() || bot.isDead()) {
+                // Chunk unloads or a stray kill must not leave an empty arena behind.
+                spawnMaceBot(player, session, room);
                 continue;
             }
             if (now < session.botStunUntilMs()) {
                 bot.setVelocity(new Vector(0, bot.getVelocity().getY(), 0));
                 continue;
             }
+            BotDifficulty diff = session.difficulty();
+            if (now - session.botLastDamagedMs() > BotDifficulty.REGEN_DELAY_MS
+                    && diff.regenPerSecond() > 0) {
+                healToward(bot, diff.botMaxHp(), diff.regenPerSecond() / 20.0d);
+            }
+
             Location eye = bot.getEyeLocation();
+            Location botLoc = bot.getLocation();
             Location target = player.getLocation().add(0, 1.0, 0);
             Vector to = target.toVector().subtract(eye.toVector());
             if (to.lengthSquared() < 0.0001) {
                 continue;
             }
-            Location look = eye.clone().setDirection(to.normalize());
-            bot.setRotation(look.getYaw(), look.getPitch());
+            turnToward(bot, eye, to.clone().normalize(), diff);
+
+            double dist = eye.distance(target);
+            double reach = reachWithJitter(diff);
+            double dx = target.getX() - botLoc.getX();
+            double dz = target.getZ() - botLoc.getZ();
+            double flat = Math.sqrt(dx * dx + dz * dz);
+            boolean grounded = bot.isOnGround();
+            double fall = bot.getFallDistance();
+
+            // 1) SMASH: a mace hit landed while falling. Vanilla scales smash damage with the
+            //    fall distance, and the map only commits a slam once it has real height.
+            if (!grounded && fall >= MACE_SMASH_FALL_BLOCKS && dist <= reach + 0.75d
+                    && now >= session.botNextAttackMs()) {
+                botSwing(player, bot, diff, diff.attackDamage() * maceSmashScale(fall));
+                session.setBotNextAttackMs(now + diff.attackIntervalMs() + MACE_LAND_RECOVERY_MS);
+                continue;
+            }
+            // 2) WIND CHARGE (HARD and up): blast itself skyward and smash on the way down.
+            if (grounded && flat >= MACE_WIND_MIN_RANGE && now >= session.botNextWindMs()
+                    && diff.preset().ordinal() >= BotDifficulty.Preset.HARD.ordinal()) {
+                launchMaceWindCharge(bot);
+                session.setBotNextWindMs(now + MACE_WIND_COOLDOWN_MS
+                        + java.util.concurrent.ThreadLocalRandom.current().nextInt(1200));
+                continue;
+            }
+            // 3) LUNGE: sprint-jump at the player (map: move forward + sprint + jump + attack).
+            if (grounded && flat > 0.0001 && dist >= MACE_LUNGE_MIN_RANGE
+                    && dist <= MACE_LUNGE_MAX_RANGE && now >= session.botNextLungeMs()) {
+                bot.setVelocity(new Vector(dx / flat * MACE_LUNGE_FORWARD, MACE_LUNGE_UP,
+                        dz / flat * MACE_LUNGE_FORWARD));
+                bot.swingMainHand();
+                session.setBotNextLungeMs(now + diff.attackIntervalMs() * 4L);
+                continue;
+            }
+            // 4) Plain melee when already inside reach with no height to smash from.
+            if (grounded && dist <= reach && now >= session.botNextAttackMs()) {
+                botSwing(player, bot, diff, diff.attackDamage());
+                session.setBotNextAttackMs(now + diff.attackIntervalMs()
+                        + java.util.concurrent.ThreadLocalRandom.current().nextInt(150));
+                continue;
+            }
+            // 5) Reposition: walk in (full speed past 4 blocks), orbit while the shield is up,
+            //    and step up one-block ledges instead of grinding into them.
+            if (grounded && flat > 0.0001) {
+                Vector dir = new Vector(dx / flat, 0, dz / flat);
+                Location ahead = botLoc.clone().add(dir.clone().multiply(0.9d));
+                boolean ledge = ahead.getBlock().getType().isSolid()
+                        && ahead.getBlock().getRelative(0, 1, 0).getType().isAir();
+                if (now >= session.botStrafeFlipMs()) {
+                    session.setBotStrafeDir(-session.botStrafeDir());
+                    session.setBotStrafeFlipMs(now + 1500L
+                            + java.util.concurrent.ThreadLocalRandom.current().nextInt(1500));
+                }
+                double speed = diff.moveSpeed() * (dist > 4.0d ? 1.0d : 0.55d);
+                if (session.botShieldRaised()) {
+                    speed *= 0.4d; // a raised shield walks, it does not sprint
+                }
+                Vector side = new Vector(-dir.getZ(), 0, dir.getX())
+                        .multiply(diff.moveSpeed() * 0.5d * session.botStrafeDir());
+                bot.setVelocity(dir.multiply(speed).add(side).setY(bot.getVelocity().getY()));
+                if (ledge) {
+                    bot.setVelocity(bot.getVelocity().setY(0.45d));
+                }
+            }
         }
     }
 
-    public void onMaceHitBot(PracticeSession session) {
-        if (session.botShieldRaised()) {
-            session.setBotStunUntilMs(System.currentTimeMillis() + 1000L);
+    /**
+     * Smash-attack damage scale: vanilla mace smashes hit harder the further the attacker fell
+     * (Density and Breach then modify that again). Approximated linearly and capped, so a bot
+     * launched by a wind charge hurts a lot but cannot one-shot a full-health player.
+     */
+    static double maceSmashScale(double fallDistance) {
+        double extra = Math.max(0.0d, fallDistance - MACE_SMASH_FALL_BLOCKS) * MACE_SMASH_PER_BLOCK;
+        return Math.min(MACE_SMASH_MAX_SCALE, 1.0d + extra);
+    }
+
+    /**
+     * Map behaviour {@code quantum:mace/wind}: drop a wind charge at the bot's own feet and ride
+     * the burst upward, trading the height for a bigger smash on the way down. Wind charges deal
+     * no damage and break no blocks, so the burst only moves entities.
+     */
+    private void launchMaceWindCharge(Mannequin bot) {
+        World world = bot.getWorld();
+        if (world == null) {
+            return;
         }
+        world.spawn(bot.getLocation().add(0, 0.35, 0), org.bukkit.entity.WindCharge.class,
+                charge -> {
+                    charge.setPersistent(false);
+                    charge.setVelocity(new Vector(0, -0.35, 0));
+                });
+        bot.swingMainHand();
+    }
+
+    /**
+     * The player swung into the mace bot's raised shield: whether that costs them a stun is the
+     * rung's call, same rule the sword and netherite-pot bots use.
+     */
+    public void onMaceHitBot(PracticeSession session) {
+        if (!session.botShieldRaised() || !session.difficulty().shieldStun()) {
+            return;
+        }
+        session.setBotStunUntilMs(System.currentTimeMillis() + MACE_SHIELD_STUN_MS);
+        Player player = Bukkit.getPlayer(session.playerId());
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+        player.addPotionEffect(new org.bukkit.potion.PotionEffect(
+                org.bukkit.potion.PotionEffectType.SLOWNESS, 18, 1));
+        player.sendActionBar(messages.render(player, "practice.bot-shield-stun"));
+    }
+
+    /**
+     * Damage routing for the mace dummy: a raised shield reduces melee like every other bot, and
+     * dropping it wins the match. Outside a live match it simply comes back at its home spot.
+     */
+    public boolean onMaceBotDamaged(Player player, PracticeSession session, EntityDamageEvent event) {
+        Mannequin bot = session.maceBot();
+        if (bot == null || !bot.isValid()) {
+            return false;
+        }
+        BotDifficulty diff = session.difficulty();
+        boolean explosion = event.getCause() == EntityDamageEvent.DamageCause.ENTITY_EXPLOSION
+                || event.getCause() == EntityDamageEvent.DamageCause.BLOCK_EXPLOSION;
+        if (session.botShieldRaised() && !explosion) {
+            event.setDamage(event.getDamage() * (1.0d - diff.shieldReduction()));
+        }
+        session.setBotLastDamagedMs(System.currentTimeMillis());
+        if (bot.getHealth() - event.getFinalDamage() > 0.5d) {
+            return false;
+        }
+        event.setCancelled(true);
+        session.incrementBotPops();
+        player.playSound(bot.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 1.4f);
+        if (session.phase() == PracticeSession.Phase.ACTIVE) {
+            endBotMatch(player, session, BotMatchResult.WIN);
+            return true;
+        }
+        player.sendActionBar(messages.render(player, "practice.bot-down",
+                MessageService.tags("kills", String.valueOf(session.botPops()))));
+        PracticeRoom room = get(session.practiceId()).orElse(null);
+        if (room != null) {
+            spawnMaceBot(player, session, room);
+        }
+        return true;
+    }
+
+    /**
+     * One bot swing: the rung's aim error decides whether it connects (the map's "aim" score -
+     * sloppy rungs whiff often, MASTER almost never does).
+     */
+    private void botSwing(Player player, Mannequin bot, BotDifficulty diff, double damage) {
+        bot.swingMainHand();
+        if (damage <= 0.0d) {
+            return;
+        }
+        if (aimRoll().nextDouble(100.0d) < missChancePercent(diff)) {
+            player.sendActionBar(messages.render(player, "practice.bot-miss"));
+            return;
+        }
+        player.damage(damage, bot);
+    }
+
+    /**
+     * Turns the bot toward {@code direction} by at most the degrees its rung allows per tick.
+     * Neither vanilla nor the map snaps a head around instantly (the map caps it with
+     * {@code max_rotation_per_tick}, 4 deg/tick on Intermediate), and an instant snap makes every
+     * rung feel identical: a slow turner can be circled, a precise one tracks a strafing player.
+     */
+    private static void turnToward(Mannequin bot, Location eye, Vector direction, BotDifficulty diff) {
+        Location look = eye.clone().setDirection(direction);
+        double rate = turnRatePerTick(diff);
+        Location self = bot.getLocation();
+        bot.setRotation((float) stepAngle(self.getYaw(), look.getYaw(), rate),
+                (float) stepValue(self.getPitch(),
+                        Math.max(-89.0f, Math.min(89.0f, look.getPitch())), rate));
+    }
+
+    /** Turn rate in degrees per tick, derived from the rung's aim error: sloppy aim turns slow. */
+    static double turnRatePerTick(BotDifficulty diff) {
+        return Math.max(3.0d, 20.0d - diff.aimSpreadDegrees());
+    }
+
+    /** Yaw step taking the shortest way round, clamped to {@code maxStep} degrees. */
+    static double stepAngle(double current, double target, double maxStep) {
+        double delta = ((target - current + 540.0d) % 360.0d) - 180.0d;
+        return current + clampStep(delta, maxStep);
+    }
+
+    /** Straight-line step (pitch), clamped to {@code maxStep} degrees. */
+    static double stepValue(double current, double target, double maxStep) {
+        return current + clampStep(target - current, maxStep);
+    }
+
+    static double clampStep(double value, double max) {
+        return Math.max(-max, Math.min(max, value));
     }
 
     // ------------------------------------------------------------------ combat bots (ITEM 41)
@@ -1643,8 +1885,7 @@ public final class PracticeService {
             if (to.lengthSquared() < 0.0001) {
                 continue;
             }
-            Location look = eye.clone().setDirection(to.normalize());
-            bot.setRotation(look.getYaw(), look.getPitch());
+            turnToward(bot, eye, to.normalize(), session.difficulty());
 
             if (type == PracticeType.CRYSTAL) {
                 tickCrystalBot(player, session, bot, now);
@@ -1683,14 +1924,9 @@ public final class PracticeService {
             double reach = reachWithJitter(diff);
             if (!blocking && diff.attackDamage() > 0.0d && now >= session.botNextAttackMs()
                     && distSq <= reach * reach) {
-                bot.swingMainHand();
                 // Map "aim": the higher the aim error the more swings whiff, so low rungs punish
                 // a player who stands still far less than MASTER / SURVIVAL MASTER.
-                if (aimRoll().nextDouble(100.0d) < missChancePercent(diff)) {
-                    player.sendActionBar(messages.render(player, "practice.bot-miss"));
-                } else {
-                    player.damage(diff.attackDamage(), bot);
-                }
+                botSwing(player, bot, diff, diff.attackDamage());
                 session.setBotNextAttackMs(now + diff.attackIntervalMs()
                         + java.util.concurrent.ThreadLocalRandom.current().nextInt(150));
             }

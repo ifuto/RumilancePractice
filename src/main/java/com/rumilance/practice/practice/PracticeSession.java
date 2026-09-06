@@ -67,6 +67,10 @@ public final class PracticeSession {
     private long botPotionUntilMs;
     /** Next time the cart bot may roll TNT. */
     private long botNextCartMs;
+    /** Next time the mace bot may lunge (sprint-jump into a smash attack). */
+    private long botNextLungeMs;
+    /** Next time the mace bot may wind-charge itself into the air. */
+    private long botNextWindMs;
 
     /** Disposable FAWE copy id; null when using shared template teleport. */
     private UUID cloneInstanceId;
@@ -228,6 +232,22 @@ public final class PracticeSession {
 
     public void setBotStrafeFlipMs(long botStrafeFlipMs) {
         this.botStrafeFlipMs = botStrafeFlipMs;
+    }
+
+    public long botNextLungeMs() {
+        return botNextLungeMs;
+    }
+
+    public void setBotNextLungeMs(long botNextLungeMs) {
+        this.botNextLungeMs = botNextLungeMs;
+    }
+
+    public long botNextWindMs() {
+        return botNextWindMs;
+    }
+
+    public void setBotNextWindMs(long botNextWindMs) {
+        this.botNextWindMs = botNextWindMs;
     }
 
     public Location botHome() {

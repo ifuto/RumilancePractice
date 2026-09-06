@@ -89,7 +89,9 @@ public final class PracticeListener implements Listener {
                         player, practiceService.kitOf(session), event)) {
             return;
         }
-        Mannequin combatBot = session.combatBot();
+        // Whoever fights back in this session: the combat bot for sword / crystal / nethpot /
+        // cart, the mace dummy for MACE (it lunges, wind-charges and smashes like the map's bot).
+        Mannequin combatBot = session.combatBot() != null ? session.combatBot() : session.maceBot();
         if (event instanceof EntityDamageByEntityEvent byEntity && combatBot != null) {
             Entity damager = byEntity.getDamager();
             boolean botHit = damager instanceof Mannequin bot
@@ -122,8 +124,9 @@ public final class PracticeListener implements Listener {
             return;
         }
         PracticeSession session = sessionOpt.get();
-        if (session.type().botMode() && session.combatBot() != null) {
-            return; // sparring shoves, crystal blasts, TNT carts and arrows push the player
+        if (session.type().botMode()
+                && (session.combatBot() != null || session.maceBot() != null)) {
+            return; // sparring shoves, mace smashes, crystal blasts, TNT carts and arrows push
         }
         event.setCancelled(true);
         event.setKnockback(new Vector());
@@ -146,6 +149,18 @@ public final class PracticeListener implements Listener {
             Player player = org.bukkit.Bukkit.getPlayer(session.playerId());
             if (player != null) {
                 practiceService.onCombatBotDamaged(player, session, event);
+            }
+            return;
+        }
+        // The mace dummy is tracked separately from the combat bots: dropping it wins the match.
+        for (PracticeSession session : practiceService.activeSessions()) {
+            Mannequin maceBot = session.maceBot();
+            if (maceBot == null || !maceBot.getUniqueId().equals(bot.getUniqueId())) {
+                continue;
+            }
+            Player player = org.bukkit.Bukkit.getPlayer(session.playerId());
+            if (player != null) {
+                practiceService.onMaceBotDamaged(player, session, event);
             }
             return;
         }
