@@ -50,9 +50,10 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>For every blast we resolve the source player, pre-compute the exact vanilla damage +
  * knockback that entity would have taken ({@link ExplosionPhysics}: raw
- * {@code (impact² + impact)/2 · 7 · (2·power) + 1}, exposure over the 12 sample points of the
- * inflated player bounding box, and the knockback <em>delta</em> that subtracts the velocity the
- * player already has in the blast direction), and apply it one tick later — but ONLY when vanilla
+ * {@code (impact² + impact)/2 · 7 · (2·power) + 1}, exposure over the vanilla sample grid of the
+ * player's bounding box — 3 x 5 x 3 = 45 rays standing — and knockback
+ * {@code impact · multiplier · (1 - explosion_knockback_resistance)} along centre→eyes),
+ * and apply it one tick later — but ONLY when vanilla
  * really skipped them for THIS blast, so a player who is legitimately hit by two crystals in the
  * same tick still gets both self-blasts and nobody is ever double-damaged.</p>
  *
@@ -360,27 +361,29 @@ public final class ExplosionSelfDamageListener implements Listener {
         if (!ExplosionPhysics.inRadius(distance, blast.power())) {
             return;
         }
+        // Exposure may legitimately be 0 (fully walled off): vanilla still hurts everything inside
+        // the radius for the formula's + 1, it just applies no knockback. Skipping here instead
+        // would make a blocked own-blast free, which is not how the vanilla trade-off plays.
         double exposure = exposure(blast.world(), blast.x(), blast.y(), blast.z(), player);
-        if (exposure <= 0.0d) {
-            return;
-        }
         double impact = ExplosionPhysics.impact(distance, blast.power(), exposure);
         double damage = ExplosionPhysics.rawDamage(impact, blast.power());
         if (damage <= 0.0d) {
             return;
         }
-        applyKnockback(player, blast, impact);
+        if (impact > 0.0d) {
+            applyKnockback(player, blast, impact);
+        }
         // Self-attributed: the player is their own damager, so every combat flow sees a
         // genuine self-inflicted blast (kill credit, death messages, totem handling).
         player.damage(damage, player);
     }
 
     /**
-     * Vanilla {@code Explosion#finalizeExplosion} knockback: the direction runs from the blast
-     * centre to the player's EYES, and the impulse is {@code impact - dot(velocity, direction)}
-     * — a player already moving away keeps part of their speed, a player running in is not
-     * launched twice. Scaled by the {@code explosion_knockback_resistance} attribute (Blast
-     * Protection grants 0.15 per level through it since 1.21.2).
+     * Vanilla {@code Explosion#finalizeExplosion} knockback: take the vector from the blast centre
+     * to the player's EYES, scale it to {@code impact * knockbackMultiplier *
+     * (1 - explosion_knockback_resistance)} and ADD it to the current velocity (Blast Protection
+     * grants 0.15 resistance per level through that attribute since 1.21.2). The distance used for
+     * the impact itself is measured to the FEET, exactly like vanilla.
      */
     private void applyKnockback(Player player, PendingBlast blast, double impact) {
         double dx = player.getEyeLocation().getX() - blast.x();
@@ -390,19 +393,13 @@ public final class ExplosionSelfDamageListener implements Listener {
         if (len < 1.0e-6d) {
             return;
         }
-        double ux = dx / len;
-        double uy = dy / len;
-        double uz = dz / len;
-        Vector velocity = player.getVelocity();
-        double dot = velocity.getX() * ux + velocity.getY() * uy + velocity.getZ() * uz;
-        double resistance = explosionKnockbackResistance(player);
-        double kx = ExplosionPhysics.knockbackDelta(ux, impact, dot, resistance);
-        double ky = ExplosionPhysics.knockbackDelta(uy, impact, dot, resistance);
-        double kz = ExplosionPhysics.knockbackDelta(uz, impact, dot, resistance);
-        if (kx == 0.0d && ky == 0.0d && kz == 0.0d) {
+        double magnitude = ExplosionPhysics.knockbackMagnitude(impact,
+                ExplosionPhysics.KNOCKBACK_MULTIPLIER, explosionKnockbackResistance(player));
+        if (magnitude <= 0.0d) {
             return;
         }
-        player.setVelocity(velocity.add(new Vector(kx, ky, kz)));
+        player.setVelocity(player.getVelocity().add(new Vector(
+                dx / len * magnitude, dy / len * magnitude, dz / len * magnitude)));
     }
 
     private static double explosionKnockbackResistance(Player player) {
@@ -416,34 +413,36 @@ public final class ExplosionSelfDamageListener implements Listener {
     }
 
     /**
-     * Vanilla exposure: the bounding box inflated by 0.6 on every axis is cut into
-     * {@code ceil(size / 1.5)} steps per axis (2 x 3 x 2 = 12 sample points for a standing
-     * player) and a ray is cast from the blast centre to each point. The exposure is the
-     * fraction of rays that no collision-shaped block stops.
+     * Vanilla exposure ({@code Explosion#getSeenPercent}): the bounding box is sampled on a
+     * {@code ceil(2 * size + 1)} grid per axis — 3 x 5 x 3 = 45 rays for a standing player — and
+     * a ray is cast between the blast centre and each sample point. The exposure is the fraction
+     * of rays that no collision-shaped block stops. The samples start at the box minimum: vanilla
+     * computes a centring offset and then never applies it, which is the known directional bias of
+     * explosion exposure (MC-232355).
      */
     private double exposure(World world, double x, double y, double z, Player player) {
         Location origin = new Location(world, x, y, z);
         Location loc = player.getLocation();
         double width = player.getWidth();
         double height = player.getHeight();
-        double minX = loc.getX() - width / 2.0d - ExplosionPhysics.EXPOSURE_MARGIN;
-        double minY = loc.getY() - ExplosionPhysics.EXPOSURE_MARGIN;
-        double minZ = loc.getZ() - width / 2.0d - ExplosionPhysics.EXPOSURE_MARGIN;
-        double sizeX = width + 2.0d * ExplosionPhysics.EXPOSURE_MARGIN;
-        double sizeY = height + 2.0d * ExplosionPhysics.EXPOSURE_MARGIN;
-        double sizeZ = sizeX;
         int stepsX = ExplosionPhysics.sampleSteps(width);
         int stepsY = ExplosionPhysics.sampleSteps(height);
-        int stepsZ = stepsX;
+        int stepsZ = ExplosionPhysics.sampleSteps(width);
+        if (stepsX <= 0 || stepsY <= 0 || stepsZ <= 0) {
+            return 0.0d; // vanilla: a non-positive step yields zero exposure
+        }
+        double minX = loc.getX() - width / 2.0d;
+        double minY = loc.getY();
+        double minZ = loc.getZ() - width / 2.0d;
 
         int total = 0;
         int clear = 0;
         for (int ix = 0; ix < stepsX; ix++) {
-            double px = ExplosionPhysics.sampleCoordinate(minX, sizeX, stepsX, ix);
+            double px = ExplosionPhysics.sampleCoordinate(minX, width, ix);
             for (int iy = 0; iy < stepsY; iy++) {
-                double py = ExplosionPhysics.sampleCoordinate(minY, sizeY, stepsY, iy);
+                double py = ExplosionPhysics.sampleCoordinate(minY, height, iy);
                 for (int iz = 0; iz < stepsZ; iz++) {
-                    double pz = ExplosionPhysics.sampleCoordinate(minZ, sizeZ, stepsZ, iz);
+                    double pz = ExplosionPhysics.sampleCoordinate(minZ, width, iz);
                     total++;
                     if (rayIsClear(world, origin, px, py, pz)) {
                         clear++;

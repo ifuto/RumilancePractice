@@ -105,45 +105,48 @@ tasks.test {
 }
 
 /**
- * Gradle's own test logging splits "<Class> > <method>() FAILED" from the assertion line, so a CI
- * annotation can end up saying only "expected: <2> but was: <1>" with no clue which test it came
- * from (the raw log and the artifacts are not always reachable). This task parses the JUnit XML
- * and fails the build with ONE line per failing test that contains the class, the method, the
- * assertion message and the first source line of the stack - text the CI grep is guaranteed to
- * pick up ("Caused by:", "expected:", "but was:", ".java:NNN:").
+ * Gradle's own test logging prints "<Class> > <method>() FAILED" and the assertion message on
+ * separate lines, so a red CI build only surfaced "expected: <2> but was: <1>" with no clue which
+ * test produced it (raw logs and artifacts are not reachable from every environment). This task
+ * parses the JUnit XML and fails the build with ONE line per failing test containing class,
+ * method, assertion message and the first source line of the stack - text the CI grep already
+ * looks for ("Caused by:", "expected:", "but was:", ".java:NNN:"). JDK XML only, no Groovy and no
+ * Gradle internals, so it cannot break the build by itself.
  */
 tasks.register("reportTestFailures") {
-    val resultDir = layout.buildDirectory.dir("test-results/test")
-    onlyIf { resultDir.get().asFile.isDirectory }
+    // Resolved eagerly (plain java.io.File), so the action needs no implicit receivers at all.
+    val resultDir = File(project.layout.buildDirectory.get().asFile, "test-results/test")
     doLast {
+        val dir = resultDir
+        val xmlFiles = dir.listFiles()?.filter { it.isFile && it.name.endsWith(".xml") } ?: emptyList()
         val failures = mutableListOf<String>()
-        resultDir.get().asFile
-            .listFiles { file -> file.isFile && file.name.endsWith(".xml") }
-            ?.sortedBy { it.name }
-            ?.forEach { file ->
-                val root = groovy.xml.XmlSlurper().parse(file)
-                root."testcase".forEach { testcase ->
-                    listOf("failure", "error").forEach { kind ->
-                        testcase."$kind".forEach { problem ->
-                            val message = problem.@message.text().trim()
-                                .lineSequence().firstOrNull { it.isNotBlank() } ?: ""
-                            val trace = problem.text().lineSequence()
-                                .firstOrNull { it.contains(".java:") }?.trim() ?: ""
-                            failures += testcase.@classname.text() + " > " +
-                                    testcase.@name.text() + " FAILED -> " + message +
-                                    (if (trace.isEmpty()) "" else " @ " + trace)
-                        }
+        val factory = javax.xml.parsers.DocumentBuilderFactory.newInstance()
+        for (xmlFile in xmlFiles.sortedBy { it.name }) {
+            val cases = factory.newDocumentBuilder().parse(xmlFile).getElementsByTagName("testcase")
+            for (c in 0 until cases.length) {
+                val testcase = cases.item(c) as org.w3c.dom.Element
+                for (kind in listOf("failure", "error")) {
+                    val problems = testcase.getElementsByTagName(kind)
+                    for (q in 0 until problems.length) {
+                        val problem = problems.item(q) as org.w3c.dom.Element
+                        val message = problem.getAttribute("message").trim()
+                            .lineSequence().firstOrNull { it.isNotBlank() } ?: ""
+                        val trace = problem.textContent.lineSequence()
+                            .firstOrNull { it.contains(".java:") }?.trim() ?: ""
+                        failures += testcase.getAttribute("classname") + " > " +
+                                testcase.getAttribute("name") + " FAILED -> " + message +
+                                (if (trace.isEmpty()) "" else " @ " + trace)
                     }
                 }
             }
-        if (failures.isEmpty()) {
-            return@doLast
         }
-        failures.take(12).forEach { logger.error("TESTFAILURE {}", it) }
-        // Public API exception on purpose: its message is printed in the build's
-        // "Caused by:" chain, which is exactly what the CI grep turns into annotations.
-        throw GradleException(
-                "There were failing tests: " + failures.take(12).joinToString(" ; ").take(1800))
+        if (failures.isNotEmpty()) {
+            for (line in failures.take(12)) {
+                logger.error("TESTFAILURE {}", line)
+            }
+            throw GradleException(
+                    "There were failing tests: " + failures.take(12).joinToString(" ; ").take(1800))
+        }
     }
 }
 
