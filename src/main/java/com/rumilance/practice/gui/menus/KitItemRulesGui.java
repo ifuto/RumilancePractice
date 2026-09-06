@@ -49,6 +49,16 @@ public final class KitItemRulesGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.PURPLE;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.PAPER;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         String kit = session.selectedKit() == null ? "" : session.selectedKit();
         return t(player, "gui.kit-admin-item-rules-title",
@@ -57,7 +67,7 @@ public final class KitItemRulesGui extends AbstractGui {
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
         KitDefinition kit = kitOf(session);
         if (kit == null) {
             inventory.setItem(GuiSlots.slot(5, 4), ItemBuilder.action(UiTheme.BACK,

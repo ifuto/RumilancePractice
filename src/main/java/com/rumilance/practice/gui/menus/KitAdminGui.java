@@ -100,13 +100,23 @@ public final class KitAdminGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.PURPLE;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.BOOK;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return messageService.render(player, "admin-gui.title");
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
         String locale = messageService.resolveLocale(player);
         String view = session.get("view", String.class);
         if (view == null) {

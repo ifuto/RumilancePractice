@@ -64,14 +64,23 @@ public final class PlayersGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.WHITE;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.PLAYER_HEAD;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return t(player, "gui.players-title").color(UiTheme.PRIMARY);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
-        MenuScaffold.header(inventory, 0, title(player, session));
+        paintFrame(player, session, inventory);
 
         List<Player> online = new ArrayList<>(Bukkit.getOnlinePlayers());
         online.removeIf(p -> p.getUniqueId().equals(player.getUniqueId()));

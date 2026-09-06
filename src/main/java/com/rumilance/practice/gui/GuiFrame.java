@@ -91,6 +91,40 @@ public final class GuiFrame {
         return inventory;
     }
 
+    /**
+     * Frame for screens whose TOP row carries content (e.g. the kit preview's armor bar):
+     * border on the bottom + sides only.
+     */
+    public static Inventory frameOpenTop(Inventory inventory, Theme theme) {
+        inventory.clear();
+        ItemStack pane = ItemBuilder.hiddenFill(theme.pane);
+        int rows = rows(inventory);
+        int lastRow = rows - 1;
+        for (int col = 0; col < GuiSlots.ROW_SIZE; col++) {
+            inventory.setItem(GuiSlots.slot(lastRow, col), pane);
+        }
+        for (int row = 0; row < lastRow; row++) {
+            inventory.setItem(GuiSlots.slot(row, 0), pane);
+            inventory.setItem(GuiSlots.slot(row, GuiSlots.ROW_SIZE - 1), pane);
+        }
+        return inventory;
+    }
+
+    /**
+     * Free-edit screens (rows of player-editable slots): only the bottom bar is framed; the
+     * rest stays fully editable. Controls are placed on the bar afterwards.
+     */
+    public static Inventory bottomBar(Inventory inventory, Theme theme) {
+        ItemStack pane = ItemBuilder.hiddenFill(theme.pane);
+        int lastRow = rows(inventory) - 1;
+        if (lastRow >= 0) {
+            for (int col = 0; col < GuiSlots.ROW_SIZE; col++) {
+                inventory.setItem(GuiSlots.slot(lastRow, col), pane);
+            }
+        }
+        return inventory;
+    }
+
     /** Title icon at (0,4): themed item carrying the menu name, purely decorative. */
     public static Inventory title(Inventory inventory, Material icon, Component name) {
         inventory.setItem(GuiSlots.slot(0, 4),

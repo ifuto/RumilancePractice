@@ -55,6 +55,16 @@ public final class PartyMapSelectGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.CYAN;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.FILLED_MAP;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return t(player, "party.map-title").color(UiTheme.PRIMARY);
     }
@@ -77,7 +87,7 @@ public final class PartyMapSelectGui extends AbstractGui {
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
         Team team = teamService.teamOf(player.getUniqueId()).orElse(null);
         String kitId = session.get("kit_id", String.class);
         String current = team == null ? null : team.selectedArena();

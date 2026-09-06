@@ -109,14 +109,23 @@ public final class ShieldPatternGui extends AbstractGui implements GuiCloseHandl
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.ORANGE;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.SHIELD;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return Component.text("Shield Patterns", NamedTextColor.GOLD);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
-        MenuScaffold.header(inventory, 0, title(player, session));
+        paintFrame(player, session, inventory);
 
         DyeColor dye = dye(session);
         List<Pattern> layers = layers(session);

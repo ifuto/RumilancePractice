@@ -47,6 +47,16 @@ public final class EkitAdminGui extends AbstractGui implements BottomInventoryCl
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.PURPLE;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.NAME_TAG;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         String view = session.get("admin_view", String.class);
         if ("chest".equals(view)) {
@@ -69,7 +79,7 @@ public final class EkitAdminGui extends AbstractGui implements BottomInventoryCl
     }
 
     private void renderCategories(Player player, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
         String[][] cats = {
                 {"Weapons/Armor", "NETHERITE_CHESTPLATE"},
                 {"Offhand", "WATER_BUCKET"},
@@ -86,7 +96,7 @@ public final class EkitAdminGui extends AbstractGui implements BottomInventoryCl
     }
 
     private void renderChest(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
         String cat = session.get("admin_cat", String.class);
         if (cat == null) {
             return;

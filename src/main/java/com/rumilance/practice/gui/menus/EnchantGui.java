@@ -59,6 +59,16 @@ public final class EnchantGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.PURPLE;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.ENCHANTED_BOOK;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return t(player, "gui.enchant-title").color(UiTheme.PRIMARY);
     }
@@ -77,7 +87,7 @@ public final class EnchantGui extends AbstractGui {
         }
         Map<String, Integer> applied = applied(session);
         String view = session.get("view", String.class);
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
         if ("levels".equals(view)) {
             String pick = session.get("pick", String.class);
             Enchantment ench = pick == null ? null : Registry.ENCHANTMENT.get(NamespacedKey.minecraft(pick));

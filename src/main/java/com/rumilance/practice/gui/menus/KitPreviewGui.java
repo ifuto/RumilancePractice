@@ -43,6 +43,16 @@ public final class KitPreviewGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.YELLOW;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.DIAMOND_SWORD;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         String kit = session.selectedKit() == null
                 ? "Kit"
@@ -52,7 +62,7 @@ public final class KitPreviewGui extends AbstractGui {
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
 
         KitDefinition kit = session.selectedKit() == null
                 ? kitService.enabled().stream().findFirst().orElse(null)
@@ -66,8 +76,6 @@ public final class KitPreviewGui extends AbstractGui {
             MenuScaffold.closeButton(inventory, t(player, "menu.close"));
             return;
         }
-
-        MenuScaffold.header(inventory, 0, title(player, session));
 
         // Armor + off-hand across the top bar (slots 0..4 mapped to inventory slots).
         placeArmor(inventory, kit);

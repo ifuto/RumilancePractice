@@ -59,13 +59,23 @@ public final class AdminMenuGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.PURPLE;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.COMMAND_BLOCK;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return t(player, "gui.admin-title").color(NamedTextColor.AQUA);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
 
         inventory.setItem(GuiSlots.slot(0, 4), ItemBuilder.of(Material.NETHER_STAR)
                 .name(t(player, "gui.admin-hub").color(NamedTextColor.AQUA))

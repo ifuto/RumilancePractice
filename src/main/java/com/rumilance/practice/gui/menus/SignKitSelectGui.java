@@ -40,13 +40,23 @@ public final class SignKitSelectGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.YELLOW;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.OAK_SIGN;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return t(player, "gui.sign-kit-title").color(NamedTextColor.AQUA);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
         List<KitDefinition> kits = kitService.enabled();
         int index = 0;
         for (KitDefinition kit : kits) {

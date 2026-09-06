@@ -58,6 +58,16 @@ public final class StatsKitGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.CYAN;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.BOOK;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         UUID target = session.targetPlayer() == null ? player.getUniqueId() : session.targetPlayer();
         return t(player, "gui.stats-title", MessageService.tags("name", StatsService.nameOf(target)))
@@ -67,7 +77,7 @@ public final class StatsKitGui extends AbstractGui {
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
         UUID target = session.targetPlayer() == null ? player.getUniqueId() : session.targetPlayer();
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
 
         Player online = Bukkit.getPlayer(target);
         inventory.setItem(GuiSlots.slot(0, 4),

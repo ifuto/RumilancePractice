@@ -104,13 +104,23 @@ public final class TeamHubGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.WHITE;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.BEACON;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return t(player, "party.hub-title").color(UiTheme.PRIMARY);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
         Team team = teamService.teamOf(player.getUniqueId()).orElse(null);
         if (team == null) {
             // Player left / was kicked while the menu was open: show a friendly redirect tile.

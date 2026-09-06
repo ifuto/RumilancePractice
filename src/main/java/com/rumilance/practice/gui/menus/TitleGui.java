@@ -14,6 +14,7 @@ import com.rumilance.practice.sound.SoundService;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.entity.Player;
+import org.bukkit.Material;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
@@ -35,14 +36,23 @@ public final class TitleGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.PURPLE;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.NAME_TAG;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return t(player, "gui.titles-title").color(UiTheme.PRIMARY);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
-        MenuScaffold.header(inventory, 0, title(player, session));
+        paintFrame(player, session, inventory);
 
         KillTitle selected = titleService.selected(player);
         List<KillTitle> titles = titleService.all();

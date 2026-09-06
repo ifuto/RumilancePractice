@@ -53,13 +53,23 @@ public final class EkitCopyGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.YELLOW;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.WRITABLE_BOOK;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return t(player, "gui.ekit-copy-title").color(UiTheme.PRIMARY);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
         int i = 0;
         for (KitDefinition kit : kitService.enabled()) {
             if (i >= 35) {

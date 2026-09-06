@@ -75,6 +75,16 @@ public final class QueueKitGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.YELLOW;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.BOOK;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return t(player, ranked ? "gui.ranked-queue" : "gui.unranked-queue")
                 .color(ranked ? UiTheme.PRIMARY : UiTheme.SECONDARY);
@@ -82,8 +92,7 @@ public final class QueueKitGui extends AbstractGui {
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
-        MenuScaffold.header(inventory, 0, title(player, session));
+        paintFrame(player, session, inventory);
 
         List<KitDefinition> kits = kitService.enabled();
         int index = 0;

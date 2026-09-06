@@ -241,8 +241,8 @@ public final class MenuScaffold {
         }
         int pageSize = gridPageSize();
         if (page > 0) {
-            inventory.setItem(GuiSlots.slot(lastRow, 2),
-                    ItemBuilder.of(UiTheme.PREV_PAGE)
+            inventory.setItem(GuiSlots.slot(lastRow, 0),
+                    ItemBuilder.of(Material.ARROW)
                             .name(prevLabel)
                             .lore(prevLore)
                             .action("page:prev")
@@ -250,15 +250,15 @@ public final class MenuScaffold {
         }
         int pageCount = Math.max(1, (totalItems + pageSize - 1) / pageSize);
         if (pageCount > 1) {
-            inventory.setItem(GuiSlots.slot(lastRow, 3),
+            inventory.setItem(GuiSlots.slot(lastRow, 6),
                     ItemBuilder.of(Material.PAPER)
                             .name(pageLabel)
                             .action("decorate")
                             .build());
         }
         if ((long) (page + 1) * pageSize < totalItems) {
-            inventory.setItem(GuiSlots.slot(lastRow, 6),
-                    ItemBuilder.of(UiTheme.NEXT_PAGE)
+            inventory.setItem(GuiSlots.slot(lastRow, GuiSlots.ROW_SIZE - 1),
+                    ItemBuilder.of(Material.ARROW)
                             .name(nextLabel)
                             .lore(nextLore)
                             .action("page:next")

@@ -48,14 +48,23 @@ public final class KitSelectGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.YELLOW;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.DIAMOND_SWORD;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return t(player, "gui.kit-select-title").color(UiTheme.PRIMARY);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
-        MenuScaffold.header(inventory, 0, title(player, session));
+        paintFrame(player, session, inventory);
 
         List<KitDefinition> kits = new ArrayList<>();
         kitService.enabled().forEach(kits::add);

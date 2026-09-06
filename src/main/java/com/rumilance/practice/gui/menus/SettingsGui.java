@@ -59,6 +59,16 @@ public final class SettingsGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.LIGHT_GRAY;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.COMPARATOR;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return FunctionalItemListener.stripVariationSelectors(
                 t(player, "gui.settings-title").color(UiTheme.PRIMARY));
@@ -67,8 +77,7 @@ public final class SettingsGui extends AbstractGui {
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
         PlayerSettings s = settingsService.get(player);
-        MenuScaffold.chrome(inventory);
-        MenuScaffold.header(inventory, 0, title(player, session));
+        paintFrame(player, session, inventory);
 
         inventory.setItem(GuiSlots.slot(2, 1), toggle(player, Material.BARRIER, "gui.deny-duels",
                 !s.acceptDuelRequests(), "deny_duels",

@@ -71,6 +71,16 @@ public final class PresetAdminGui extends AbstractGui implements FreeInventoryEd
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.PURPLE;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.BOOK;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         if ("chest".equals(session.get(VIEW, String.class))) {
             String cat = session.get(CAT, String.class);
@@ -126,7 +136,7 @@ public final class PresetAdminGui extends AbstractGui implements FreeInventoryEd
     }
 
     private void renderCategories(Player player, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
         for (int i = 0; i < PresetItems.CATEGORIES.size(); i++) {
             String category = PresetItems.CATEGORIES.get(i);
             inventory.setItem(20 + i, GuiDecorator.button(categoryMaterial(category),
@@ -141,7 +151,8 @@ public final class PresetAdminGui extends AbstractGui implements FreeInventoryEd
     private void renderChest(Player player, GuiSession session, Inventory inventory) {
         // Bottom bar only: rows 0-3 are ALL free-edit slots — the standard chrome top bar
         // used to cover the first nine of them with uneditable black panes.
-        MenuScaffold.bottomChrome(inventory);
+        com.rumilance.practice.gui.GuiFrame.bottomBar(inventory,
+                com.rumilance.practice.gui.GuiFrame.Theme.PURPLE);
         String cat = session.get(CAT, String.class);
         if (cat == null) {
             return;

@@ -299,6 +299,16 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.YELLOW;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.BOOK;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         String kit = session.selectedKit();
         return Component.text(kit == null ? "Edit Kit"
@@ -308,7 +318,8 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.editorChrome(inventory);
+        com.rumilance.practice.gui.GuiFrame.frameOpenBottom(inventory,
+                com.rumilance.practice.gui.GuiFrame.Theme.YELLOW);
         if ("picker".equals(session.get("mode", String.class)) || session.selectedKit() == null) {
             int i = 0;
             for (KitDefinition kit : kitService.enabled()) {

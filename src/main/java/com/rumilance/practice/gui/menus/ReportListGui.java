@@ -42,13 +42,23 @@ public final class ReportListGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.RED;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.WRITABLE_BOOK;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return t(player, "gui.reports-title").color(UiTheme.HEADER);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
         List<PlayerReport> reports = reportService.listPending();
         if (reports.isEmpty()) {
             inventory.setItem(22, ItemBuilder.of(Material.PAPER)

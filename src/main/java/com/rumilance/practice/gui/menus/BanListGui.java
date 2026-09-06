@@ -37,13 +37,23 @@ public final class BanListGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.RED;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.WRITABLE_BOOK;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return t(player, "gui.ban-title").color(UiTheme.HEADER);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
         List<BanRecord> bans = banService.activeNewestFirst();
         int pages = Math.max(1, (bans.size() + PAGE_SIZE - 1) / PAGE_SIZE);
         if (session.page() >= pages) {

@@ -58,6 +58,16 @@ public final class DuelMapSelectGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.CYAN;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.FILLED_MAP;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return text(player, "duel-gui.map-title").color(UiTheme.PRIMARY)
                 .decoration(TextDecoration.ITALIC, false);
@@ -65,8 +75,7 @@ public final class DuelMapSelectGui extends AbstractGui {
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
-        MenuScaffold.header(inventory, 0, title(player, session));
+        paintFrame(player, session, inventory);
 
         String current = normalizeMap(session.selectedMap());
         boolean randomSelected = "random".equals(current);

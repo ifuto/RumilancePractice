@@ -117,6 +117,16 @@ public final class DuelRequestGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.LIGHT_BLUE;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.DIAMOND_SWORD;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return messageService.render(messageService.resolveLocale(player),
                 session.ranked() ? "duel-gui.title-ranked" : "duel-gui.title-unranked");
@@ -124,7 +134,7 @@ public final class DuelRequestGui extends AbstractGui {
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
         String locale = messageService.resolveLocale(player);
         UUID targetId = session.targetPlayer();
         Player target = targetId == null ? null : Bukkit.getPlayer(targetId);

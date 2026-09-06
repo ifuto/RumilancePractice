@@ -65,6 +65,16 @@ public final class ProfileGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.WHITE;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.PLAYER_HEAD;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         UUID target = session.targetPlayer() == null ? player.getUniqueId() : session.targetPlayer();
         return Component.text(StatsService.nameOf(target), UiTheme.HEADER)
@@ -96,7 +106,7 @@ public final class ProfileGui extends AbstractGui {
         // Elo is private: only the player viewing their own profile sees Elo numbers.
         boolean self = target.equals(player.getUniqueId());
 
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
 
         // Header: player head on the accent bar, with ping/online status.
         Player online = Bukkit.getPlayer(target);

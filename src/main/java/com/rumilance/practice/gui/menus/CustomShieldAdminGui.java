@@ -40,14 +40,23 @@ public final class CustomShieldAdminGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.PURPLE;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.SHIELD;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return Component.text("Custom Shield — Hidden Rank", NamedTextColor.LIGHT_PURPLE);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
-        MenuScaffold.header(inventory, 0, title(player, session));
+        paintFrame(player, session, inventory);
 
         List<UUID> holders = new ArrayList<>(hiddenRanks.customShieldHolders());
         holders.sort(Comparator.comparing(hiddenRanks::lastName, String.CASE_INSENSITIVE_ORDER));

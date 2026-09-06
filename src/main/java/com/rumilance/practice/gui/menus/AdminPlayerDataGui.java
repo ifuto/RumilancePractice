@@ -102,6 +102,16 @@ public final class AdminPlayerDataGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.PURPLE;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.PLAYER_HEAD;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return t(player, "gui.admin-data-title").color(NamedTextColor.AQUA);
     }
@@ -120,7 +130,7 @@ public final class AdminPlayerDataGui extends AbstractGui {
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
         UUID target = targetOf(session);
         if (target == null) {
             inventory.setItem(GuiSlots.slot(2, 4),

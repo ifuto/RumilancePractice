@@ -93,9 +93,13 @@ public final class BattleMenuGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.LIGHT_BLUE;
+    }
+
+    @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
-        MenuScaffold.header(inventory, 0, title(player, session));
+        paintFrame(player, session, inventory);
         paintStatusChip(player, inventory);
 
         PlayerState state = stateOf(player);
@@ -103,19 +107,17 @@ public final class BattleMenuGui extends AbstractGui {
         QueueService.QueueEntry queueEntry = queueService == null
                 ? null : queueService.get(player.getUniqueId()).orElse(null);
 
-        // Row 1 — the three competitive entries, one clean row.
-        inventory.setItem(GuiSlots.slot(1, 1), queueTile(player, Material.DIAMOND_SWORD,
+        // Sparse pyramid: competitive modes top row, duel centred, FFA + history below.
+        inventory.setItem(GuiSlots.slot(1, 2), queueTile(player, Material.DIAMOND_SWORD,
                 "menu.ranked", UiTheme.PRIMARY, "menu.ranked-lore", "ranked", true,
                 MatchMode.RANKED, state, inParty, queueEntry));
-        inventory.setItem(GuiSlots.slot(1, 4), queueTile(player, Material.GOLDEN_SWORD,
+        inventory.setItem(GuiSlots.slot(1, 6), queueTile(player, Material.GOLDEN_SWORD,
                 "menu.unranked", UiTheme.VALUE, "menu.unranked-lore", "unranked", false,
                 MatchMode.UNRANKED, state, inParty, queueEntry));
-        inventory.setItem(GuiSlots.slot(1, 7), duelTile(player, state, inParty));
-
-        // Row 2 — FFA centred, match history to its right.
-        inventory.setItem(GuiSlots.slot(2, 4), ffaTile(player, state));
+        inventory.setItem(GuiSlots.slot(2, 4), duelTile(player, state, inParty));
+        inventory.setItem(GuiSlots.slot(3, 2), ffaTile(player, state));
         if (matchHistoryGui != null) {
-            inventory.setItem(GuiSlots.slot(2, 6), historyTile(player, state));
+            inventory.setItem(GuiSlots.slot(3, 6), historyTile(player, state));
         }
 
         paintNav(player, session, inventory);

@@ -45,6 +45,16 @@ public final class MatchHistoryGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.CYAN;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.BOOK;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return t(player, "gui.history-title").color(UiTheme.PRIMARY)
                 .decoration(TextDecoration.ITALIC, false);
@@ -52,8 +62,7 @@ public final class MatchHistoryGui extends AbstractGui {
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
-        MenuScaffold.header(inventory, 0, title(player, session));
+        paintFrame(player, session, inventory);
 
         List<MatchHistoryStore.Entry> entries = store.recent(player.getUniqueId());
         int page = session.page();

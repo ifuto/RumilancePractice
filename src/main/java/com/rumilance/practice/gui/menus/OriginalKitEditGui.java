@@ -75,6 +75,16 @@ public final class OriginalKitEditGui extends AbstractGui implements BottomInven
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.YELLOW;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.CHEST;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return t(player, "gui.original-edit-title").color(UiTheme.PRIMARY);
     }
@@ -91,7 +101,7 @@ public final class OriginalKitEditGui extends AbstractGui implements BottomInven
 
     private void renderTop(Player player, Inventory inventory, OriginalKitService.EditContext ctx) {
         ItemStack[] layout = ctx.layout;
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
         inventory.setItem(0, decorative());
         inventory.setItem(1, tagged(player, layout[36], "slot:36"));
         inventory.setItem(2, tagged(player, layout[37], "slot:37"));

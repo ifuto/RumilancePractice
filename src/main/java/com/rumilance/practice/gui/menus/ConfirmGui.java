@@ -49,6 +49,16 @@ public final class ConfirmGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.ORANGE;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.OAK_SIGN;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         Component stored = session.get("title", Component.class);
         return stored != null ? stored : t(player, "gui.confirm-title").color(UiTheme.PRIMARY);
@@ -56,7 +66,7 @@ public final class ConfirmGui extends AbstractGui {
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
         Component message = session.get("title", Component.class);
         List<Component> lore = session.get("lore", List.class);
         ItemStack info = new ItemStack(Material.PAPER);

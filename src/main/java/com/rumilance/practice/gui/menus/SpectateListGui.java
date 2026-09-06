@@ -77,14 +77,23 @@ public final class SpectateListGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.LIME;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.ENDER_EYE;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return t(player, "gui.spectate-title").color(UiTheme.PRIMARY);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
-        MenuScaffold.header(inventory, 0, title(player, session));
+        paintFrame(player, session, inventory);
 
         // Spectatable from "match found" (arena reservation) onwards — not only once the
         // fight is ACTIVE — so the entry shows up the moment the match is made.

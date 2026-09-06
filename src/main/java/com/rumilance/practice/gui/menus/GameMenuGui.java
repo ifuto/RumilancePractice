@@ -83,11 +83,13 @@ public final class GameMenuGui extends AbstractGui {
     }
 
     @Override
+    protected Material titleIcon() {
+        return Material.COMPASS;
+    }
+
+    @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        com.rumilance.practice.gui.GuiFrame.frame(inventory,
-                com.rumilance.practice.gui.GuiFrame.Theme.WHITE);
-        com.rumilance.practice.gui.GuiFrame.title(inventory, Material.COMPASS,
-                t(player, "menu.game-title"));
+        paintFrame(player, session, inventory);
         paintStatusChip(player, inventory);
 
         // Sparse, centred diamond layout — the things players reach for constantly.

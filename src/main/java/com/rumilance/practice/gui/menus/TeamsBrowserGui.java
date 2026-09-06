@@ -49,13 +49,23 @@ public final class TeamsBrowserGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.WHITE;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.NETHERITE_UPGRADE_SMITHING_TEMPLATE;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return t(player, "party.browser-title").color(UiTheme.PRIMARY);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
 
         // Create buttons (top of content area).
         inventory.setItem(GuiSlots.slot(1, 2),

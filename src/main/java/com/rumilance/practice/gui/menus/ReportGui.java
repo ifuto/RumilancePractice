@@ -51,13 +51,23 @@ public final class ReportGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.RED;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.WRITABLE_BOOK;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return t(player, "gui.report-title").color(UiTheme.DANGER);
     }
 
     @Override
     protected void render(Player reporter, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
         UUID targetId = session.targetPlayer();
         OfflinePlayer target = targetId == null ? null : Bukkit.getOfflinePlayer(targetId);
         String name = target == null || target.getName() == null ? "?" : target.getName();

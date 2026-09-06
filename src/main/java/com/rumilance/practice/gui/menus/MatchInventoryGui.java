@@ -57,6 +57,16 @@ public final class MatchInventoryGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.CYAN;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.CHEST;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         MatchInventoryStore.Fighter fighter = focusedFighter(session);
         if (fighter == null) {

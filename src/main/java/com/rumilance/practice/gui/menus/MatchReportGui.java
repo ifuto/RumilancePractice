@@ -63,13 +63,23 @@ public final class MatchReportGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.CYAN;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.GOLDEN_HELMET;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return t(player, "gui.match-report-title").color(UiTheme.PRIMARY);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
 
         String rawId = session.get("match_id", String.class);
         if (rawId == null) {
@@ -98,8 +108,6 @@ public final class MatchReportGui extends AbstractGui {
         UUID b = match.participants().get(1);
         MatchCombatTracker.CombatStats statsA = matchService.combatStats(matchId, a).orElse(null);
         MatchCombatTracker.CombatStats statsB = matchService.combatStats(matchId, b).orElse(null);
-
-        MenuScaffold.header(inventory, 0, title(player, session));
 
         // Trophy / draw marker at the centre of the grid.
         Material trophy = match.isDraw() ? Material.WHITE_BANNER : Material.GOLDEN_HELMET;

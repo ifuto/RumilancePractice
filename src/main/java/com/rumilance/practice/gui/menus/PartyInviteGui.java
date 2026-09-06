@@ -54,13 +54,23 @@ public final class PartyInviteGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.LIME;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.BOOK;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return t(player, "party.invite-title").color(UiTheme.PRIMARY);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
         Team team = teamService.teamOf(player.getUniqueId()).orElse(null);
         if (team == null || !team.isOwner(player.getUniqueId())) {
             inventory.setItem(MenuScaffold.gridSlot(13),

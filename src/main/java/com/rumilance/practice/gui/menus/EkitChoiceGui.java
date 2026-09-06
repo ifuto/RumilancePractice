@@ -47,13 +47,23 @@ public final class EkitChoiceGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.YELLOW;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.WRITABLE_BOOK;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return t(player, "gui.ekit-choice-title").color(UiTheme.PRIMARY);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
         inventory.setItem(GuiSlots.slot(1, 2), ItemBuilder.action(Material.PAPER,
                 t(player, "gui.ekit-choice-create").color(UiTheme.SUCCESS), "create"));
         inventory.setItem(GuiSlots.slot(1, 6), ItemBuilder.action(Material.DIAMOND,

@@ -43,14 +43,23 @@ public final class ArrowEffectGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.LIME;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.ARROW;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return t(player, "gui.arrow-title").color(UiTheme.PRIMARY);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
-        MenuScaffold.header(inventory, 0, title(player, session));
+        paintFrame(player, session, inventory);
 
         String selected = settingsService.get(player).arrowEffect();
         List<String> ids = arrowEffectService.effectIds().stream().sorted().toList();

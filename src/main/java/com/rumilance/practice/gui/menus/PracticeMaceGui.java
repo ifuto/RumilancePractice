@@ -38,13 +38,23 @@ public final class PracticeMaceGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.RED;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.MACE;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return t(player, "gui.practice-mace-title").color(UiTheme.PRIMARY);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
         PracticeSession prac = practiceService.session(player.getUniqueId()).orElse(null);
         int density = prac == null ? 0 : prac.maceDensity();
         int breach = prac == null ? 0 : prac.maceBreach();

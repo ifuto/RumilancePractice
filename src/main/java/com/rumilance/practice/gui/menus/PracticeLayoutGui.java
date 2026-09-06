@@ -39,13 +39,23 @@ public final class PracticeLayoutGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.YELLOW;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.PAPER;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return t(player, "gui.practice-layout-title").color(UiTheme.PRIMARY);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
         inventory.setItem(11, ItemBuilder.of(Material.RESPAWN_ANCHOR)
                 .name(t(player, "gui.practice-anchor-first").color(NamedTextColor.AQUA))
                 .lore(UiTheme.line(line(player, "gui.practice-layout-order-anchor")),

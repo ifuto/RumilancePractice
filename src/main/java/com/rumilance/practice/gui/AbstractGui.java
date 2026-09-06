@@ -8,6 +8,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 
@@ -67,8 +68,27 @@ public abstract class AbstractGui {
         return messages.raw(player, key);
     }
 
+    /**
+     * The screen's frame colour. ITEM 40 rebuild: every menu declares its own theme here;
+     * {@link #paintFrame} draws the full-perimeter coloured frame + title icon.
+     */
+    protected GuiFrame.Theme theme() {
+        return GuiFrame.Theme.WHITE;
+    }
+
+    /** Icon rendered inside the title slot (0,4). */
+    protected Material titleIcon() {
+        return Material.NETHER_STAR;
+    }
+
+    /** Draws the themed full-perimeter frame and the (0,4) title icon. */
+    protected void paintFrame(Player player, GuiSession session, Inventory inventory) {
+        GuiFrame.frame(inventory, theme());
+        GuiFrame.title(inventory, titleIcon(), title(player, session));
+    }
+
     protected void paintNav(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.nav(inventory, session, t(player, "menu.close"), t(player, "menu.back"));
+        GuiFrame.close(inventory, session, t(player, "menu.close"), t(player, "menu.back"));
     }
 
     protected void paintPaging(Player player, Inventory inventory, int page, int totalItems) {

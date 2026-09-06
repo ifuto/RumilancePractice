@@ -38,13 +38,23 @@ public final class PracticeBotGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.LIME;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.ARMOR_STAND;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return t(player, "gui.practice-bot-title").color(UiTheme.PRIMARY);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
         PracticeSession prac = practiceService.session(player.getUniqueId()).orElse(null);
         boolean up = prac != null && prac.botShieldRaised();
         String state = line(player, up ? "gui.practice-shield-up" : "gui.practice-shield-down");

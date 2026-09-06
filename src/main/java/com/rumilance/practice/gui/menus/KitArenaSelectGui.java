@@ -56,6 +56,16 @@ public final class KitArenaSelectGui extends AbstractGui {
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.PURPLE;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.GRASS_BLOCK;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         String kit = session.selectedKit();
         return t(player, "gui.kit-arena-title", MessageService.tags("kit", kit == null ? "?" : kit))
@@ -64,7 +74,7 @@ public final class KitArenaSelectGui extends AbstractGui {
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
         KitDefinition kit = kitService.get(session.selectedKit()).orElse(null);
         if (kit == null) {
             return;

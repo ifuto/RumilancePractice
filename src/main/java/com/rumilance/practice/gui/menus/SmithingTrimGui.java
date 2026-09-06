@@ -125,13 +125,23 @@ public final class SmithingTrimGui extends AbstractGui implements GuiCloseHandle
     }
 
     @Override
+    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
+        return com.rumilance.practice.gui.GuiFrame.Theme.ORANGE;
+    }
+
+    @Override
+    protected Material titleIcon() {
+        return Material.NETHERITE_UPGRADE_SMITHING_TEMPLATE;
+    }
+
+    @Override
     protected Component title(Player player, GuiSession session) {
         return t(player, "gui.trim-title").color(UiTheme.PRIMARY);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        MenuScaffold.chrome(inventory);
+        paintFrame(player, session, inventory);
         ItemStack armor = session.get("armor", ItemStack.class);
         if (armor == null) {
             MenuScaffold.closeButton(inventory);
