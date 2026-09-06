@@ -1110,6 +1110,16 @@ public final class PracticeService {
         return out;
     }
 
+    /** True while any live session occupies the given practice room (bot picker UI). */
+    public boolean isRoomBusy(String practiceId) {
+        for (PracticeSession session : sessions.values()) {
+            if (session.practiceId().equals(practiceId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** Sword room loadout: sharp sword, shield, apples and full netherite (Quantum sword preset). */
     public void giveSwordLoadout(Player player, PracticeSession session) {
         player.getInventory().clear();

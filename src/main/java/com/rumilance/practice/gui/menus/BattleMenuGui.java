@@ -45,6 +45,7 @@ public final class BattleMenuGui extends AbstractGui {
     private TeamService teamService;
     private java.util.function.IntSupplier ffaOccupants = () -> 0;
     private MatchHistoryGui matchHistoryGui;
+    private PracticeBotSelectGui botSelectGui;
 
     public BattleMenuGui(
             GuiSessionRegistry registry,
@@ -86,6 +87,11 @@ public final class BattleMenuGui extends AbstractGui {
         this.matchHistoryGui = matchHistoryGui;
     }
 
+    /** ITEM 41: bot practice room picker (sword / crystal / mace bots). */
+    public void setBotSelectGui(PracticeBotSelectGui botSelectGui) {
+        this.botSelectGui = botSelectGui;
+    }
+
     @Override
     protected Component title(Player player, GuiSession session) {
         return text(player, "menu.battle-title").color(UiTheme.PRIMARY)
@@ -116,6 +122,9 @@ public final class BattleMenuGui extends AbstractGui {
                 MatchMode.UNRANKED, state, inParty, queueEntry));
         inventory.setItem(GuiSlots.slot(2, 4), duelTile(player, state, inParty));
         inventory.setItem(GuiSlots.slot(3, 2), ffaTile(player, state));
+        if (botSelectGui != null) {
+            inventory.setItem(GuiSlots.slot(3, 4), botTile(player, state));
+        }
         if (matchHistoryGui != null) {
             inventory.setItem(GuiSlots.slot(3, 6), historyTile(player, state));
         }
@@ -215,6 +224,12 @@ public final class BattleMenuGui extends AbstractGui {
                 "menu.ffa-lore", "ffa", false, state, false, false, live);
     }
 
+    /** ITEM 41: practice against sword / crystal / mace bots (solo, never party-locked). */
+    private ItemStack botTile(Player player, PlayerState state) {
+        return mode(player, Material.ARMOR_STAND, "menu.bot", UiTheme.SUCCESS,
+                "menu.bot-lore", "bot", false, state, false, false, null);
+    }
+
     /** Review-only tile: never busy/party locked, so results stay reachable right after a fight. */
     private ItemStack historyTile(Player player, PlayerState state) {
         return ItemBuilder.of(Material.BOOK)
@@ -276,6 +291,11 @@ public final class BattleMenuGui extends AbstractGui {
             case "unranked" -> openChild(player, unrankedGui::open);
             case "player-duel" -> openChild(player, playersGui::open);
             case "ffa" -> openChild(player, ffaListGui::open);
+            case "bot" -> {
+                if (botSelectGui != null) {
+                    openChild(player, botSelectGui::open);
+                }
+            }
             case "history" -> {
                 if (matchHistoryGui != null) {
                     openChild(player, matchHistoryGui::open);

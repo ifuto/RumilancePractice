@@ -39,6 +39,8 @@ menu:
   ffa-lore: "乱戦アリーナ。"
   history: "試合履歴"
   history-lore: "直近の試合結果・スコア・終了インベントリ。"
+  bot: "ボット"
+  bot-lore: "ソード・クリスタル・メイスのBotと練習する。"
   bot: "ソードBot"
   bot-lore: "一人で練習。Noob → Marlowww。"
   kits: "キット編集"
@@ -1052,6 +1054,19 @@ gui:
   team-settings-lore: "招待・公開設定・マップ・フレンドリーファイア+チーム管理"
   team-settings-hint: "クリック: チーム設定を開く"
   back-to-hub: "チームハブに戻る"
+  practice-select-title: "ボット練習"
+  room-type-label: "種類"
+  room-type-sword: "ソードBot"
+  room-type-crystal: "クリスタルBot"
+  room-type-mace: "メイスBot"
+  bot-room-lore-sword: "追跡・ストレイフ・斬撃で応戦する練習相手。"
+  bot-room-lore-crystal: "黒曜石+クリスタルのコンボで反撃してくる。"
+  bot-room-lore-mace: "スマッシュ攻撃を練習するための的。"
+  practice-none: "ボット部屋がまだありません"
+  practice-none-lore: "/practice draft で運営に作成を依頼してください。"
+  practice-join-hint: "クリック: 入室して戦う"
+  practice-room-busy: "使用中"
+  practice-room-busy-hint: "現在のセッションが終わると空きます"
 
 
 lb:

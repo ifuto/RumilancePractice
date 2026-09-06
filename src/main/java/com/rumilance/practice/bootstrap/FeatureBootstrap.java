@@ -122,6 +122,7 @@ import com.rumilance.practice.gui.menus.PartyMapSelectGui;
 import com.rumilance.practice.gui.menus.PlayersGui;
 import com.rumilance.practice.gui.menus.PotionGui;
 import com.rumilance.practice.gui.menus.PracticeBotGui;
+import com.rumilance.practice.gui.menus.PracticeBotSelectGui;
 import com.rumilance.practice.gui.menus.PracticeLayoutGui;
 import com.rumilance.practice.gui.menus.PracticeMaceGui;
 import com.rumilance.practice.gui.menus.PresetAdminGui;
@@ -959,6 +960,9 @@ public final class FeatureBootstrap {
         MatchHistoryGui matchHistoryGui = new MatchHistoryGui(
                 guiSessions, soundService, matchHistoryStore, matchInventoryGui);
         battleMenuGui.setMatchHistoryGui(matchHistoryGui);
+        PracticeBotSelectGui botSelectGui =
+                new PracticeBotSelectGui(guiSessions, soundService, practiceService);
+        battleMenuGui.setBotSelectGui(botSelectGui);
         BanListGui banListGui = new BanListGui(guiSessions, soundService, banService);
         ReportGui reportGui = new ReportGui(guiSessions, soundService, reportService);
         ReportListGui reportListGui =
@@ -1036,6 +1040,7 @@ public final class FeatureBootstrap {
         guiListener.register(arenaAdminGui);
         guiListener.register(gameMenuGui);
         guiListener.register(battleMenuGui);
+        guiListener.register(botSelectGui);
         guiListener.register(matchInventoryGui);
         guiListener.register(matchHistoryGui);
         guiListener.register(practiceLayoutGui);

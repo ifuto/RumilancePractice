@@ -40,6 +40,8 @@ menu:
   ffa-lore: "Free-for-all arenas."
   history: "Match History"
   history-lore: "Recent results, scores and end inventories."
+  bot: "Bot"
+  bot-lore: "Practice against sword, crystal and mace bots."
   bot: "Sword Bot"
   bot-lore: "Practice alone. Noob → Marlowww."
   kits: "Kit Editor"
@@ -1053,6 +1055,19 @@ gui:
   team-settings-lore: "Invites, visibility, map, friendly fire + team management"
   team-settings-hint: "Click: open team settings"
   back-to-hub: "Back to team hub"
+  practice-select-title: "Bot Practice"
+  room-type-label: "Type"
+  room-type-sword: "Sword Bot"
+  room-type-crystal: "Crystal Bot"
+  room-type-mace: "Mace Bot"
+  bot-room-lore-sword: "A sparring partner that chases, strafes and swings."
+  bot-room-lore-crystal: "Fights back with obsidian + crystal combos."
+  bot-room-lore-mace: "A dummy for practicing smash attacks."
+  practice-none: "No bot rooms yet"
+  practice-none-lore: "Ask staff to create one with /practice draft."
+  practice-join-hint: "Click: enter and fight"
+  practice-room-busy: "Room in use"
+  practice-room-busy-hint: "Frees up when the current session ends"
 
 
 lb:
