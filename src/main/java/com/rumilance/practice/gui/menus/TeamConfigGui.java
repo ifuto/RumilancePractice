@@ -21,6 +21,7 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffectType;
 
 import java.util.List;
@@ -28,18 +29,26 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Per-team battle settings for multi-team party battles (owner only). One column per active
- * team with:
+ * Per-team battle settings for multi-team party battles (owner only) — ITEM 40b rebuild
+ * following the {@code gui.json} "Team List" mockup: button-based team adding instead of the
+ * old click-to-cycle book. One column per active team (columns 1..n):
  * <ul>
- *   <li>row 1 — team color (wool; click toggles/cycles the color, swapping rosters)</li>
+ *   <li>row 1 — team color (wool; click cycles the color, swapping rosters)</li>
  *   <li>row 2 — team max health (L +2 / R -2 / shift reset to 20)</li>
  *   <li>row 3 — team body size (L +0.25 / R -0.25 / shift reset to 1.0)</li>
  *   <li>row 4 — permanent potion effects (L cycles presets / R clears)</li>
  *   <li>row 5 — own-kit override (L next kit / R previous / shift off)</li>
  * </ul>
- * Row 0 carries the team-count cycler (rank-clamped) and a reset button.
+ * Right after the last team column sits the lime <b>Add Team</b> button; columns beyond the
+ * rank limit show barrier locks explaining which rank unlocks them. Row 0 carries the
+ * matching <b>Remove Team</b> button, the live team-count chip and reset-all.
  */
 public final class TeamConfigGui extends AbstractGui {
+
+    /** Team columns live at cols 1..7 (col 0/8 belong to the frame). */
+    private static final int LAST_TEAM_COL = 7;
+    /** Team slots 4-5 need VIP; slots 6-7 need VIP+ (mirrors {@code TeamService.maxTeamsFor}). */
+    private static final int VIP_PLUS_THRESHOLD = 5;
 
     /**
      * Curated permanent-effect bundles the owner can cycle through. Values are 0-based
@@ -58,6 +67,7 @@ public final class TeamConfigGui extends AbstractGui {
     private final TeamService teamService;
     private final KitService kitService;
     private TeamHubGui teamHubGui;
+    private TeamManageGui teamManageGui;
 
     public TeamConfigGui(GuiSessionRegistry registry, SoundService sounds,
                          TeamService teamService, KitService kitService) {
@@ -68,6 +78,10 @@ public final class TeamConfigGui extends AbstractGui {
 
     public void setTeamHubGui(TeamHubGui teamHubGui) {
         this.teamHubGui = teamHubGui;
+    }
+
+    public void setTeamManageGui(TeamManageGui teamManageGui) {
+        this.teamManageGui = teamManageGui;
     }
 
     @Override
@@ -102,30 +116,65 @@ public final class TeamConfigGui extends AbstractGui {
         }
 
         List<TeamColor> colors = team.activeColors();
+        int teamCount = colors.size();
         int maxTeams = teamService.maxTeamsFor(player.getUniqueId());
 
-        // --- row 0: team-count cycler + reset ---
-        inventory.setItem(GuiSlots.slot(0, 0),
+        // --- row 0: remove-team button, live count chip, reset ---
+        boolean canRemove = teamCount > 2;
+        inventory.setItem(GuiSlots.slot(0, 1),
+                ItemBuilder.of(canRemove ? Material.RED_STAINED_GLASS_PANE : Material.GRAY_STAINED_GLASS_PANE)
+                        .name(t(player, "gui.team-remove-team")
+                                .color(canRemove ? UiTheme.DANGER : UiTheme.MUTED))
+                        .lore(UiTheme.divider(),
+                                UiTheme.line(line(player, canRemove
+                                        ? "gui.team-remove-team-hint" : "gui.team-remove-team-min")),
+                                UiTheme.blank(),
+                                UiTheme.hint(line(player, "gui.toggle-hint")))
+                        .action(canRemove ? "team:remove" : "decorate").build());
+        inventory.setItem(GuiSlots.slot(0, 2),
                 ItemBuilder.of(Material.BOOK)
                         .name(Component.text(line(player, "gui.team-count-label")
-                                .replace("<n>", String.valueOf(colors.size())), UiTheme.HEADER)
+                                .replace("<n>", String.valueOf(teamCount)), UiTheme.HEADER)
                                 .decoration(TextDecoration.ITALIC, false))
                         .lore(UiTheme.divider(),
                                 UiTheme.labelValue(line(player, "gui.team-count-max"), String.valueOf(maxTeams)),
                                 UiTheme.blank(),
-                                UiTheme.hint(line(player, "gui.team-count-hint")))
-                        .action("count:cycle").build());
-        inventory.setItem(GuiSlots.slot(0, 8),
+                                UiTheme.hint(line(player, "gui.team-count-info-hint")))
+                        .action("decorate").build());
+        inventory.setItem(GuiSlots.slot(0, 7),
                 ItemBuilder.of(Material.WATER_BUCKET)
                         .name(t(player, "gui.team-config-reset").color(UiTheme.WARNING))
                         .lore(UiTheme.hint(line(player, "gui.team-config-reset-hint")))
                         .action("reset_all").build());
 
-        // --- one column per active team ---
+        // --- row 1: team headers, then the Add Team button, then locked/free slots ---
+        for (int slotNum = teamCount + 1; slotNum <= LAST_TEAM_COL; slotNum++) {
+            if (slotNum == teamCount + 1 && teamCount < maxTeams) {
+                inventory.setItem(GuiSlots.slot(1, slotNum),
+                        ItemBuilder.of(Material.LIME_STAINED_GLASS_PANE)
+                                .name(t(player, "gui.team-add-team").color(UiTheme.SUCCESS))
+                                .lore(UiTheme.divider(),
+                                        UiTheme.line(line(player, "gui.team-add-team-hint")),
+                                        UiTheme.blank(),
+                                        UiTheme.hint(line(player, "gui.toggle-hint")))
+                                .action("team:add").build());
+            } else if (slotNum > maxTeams) {
+                inventory.setItem(GuiSlots.slot(1, slotNum),
+                        ItemBuilder.of(Material.BARRIER)
+                                .name(t(player, slotNum <= VIP_PLUS_THRESHOLD
+                                        ? "gui.team-lock-vip" : "gui.team-lock-vipplus")
+                                        .color(UiTheme.MUTED))
+                                .action("decorate").build());
+            } else {
+                inventory.setItem(GuiSlots.slot(1, slotNum), fillerPane(player));
+            }
+        }
+
+        // --- one column per active team (columns 1..n) ---
         for (int i = 0; i < colors.size(); i++) {
             TeamColor color = colors.get(i);
             TeamConfig config = team.configOf(color);
-            int col = i;
+            int col = i + 1;
             int memberCount = team.side(color).size();
 
             inventory.setItem(GuiSlots.slot(1, col),
@@ -181,16 +230,22 @@ public final class TeamConfigGui extends AbstractGui {
                             .action("kit:" + color.name()).build());
         }
 
-        // --- bottom-right controls ---
-        inventory.setItem(GuiSlots.slot(5, 7),
-                ItemBuilder.of(Material.OAK_SIGN)
-                        .name(Component.text(line(player, "gui.team-config-help-title"), UiTheme.MUTED)
-                                .decoration(TextDecoration.ITALIC, false))
-                        .lore(UiTheme.line(line(player, "gui.team-config-help-1")),
-                                UiTheme.line(line(player, "gui.team-config-help-2")),
-                                UiTheme.line(line(player, "gui.team-config-help-3")))
-                        .action("decorate").build());
+        // --- config rows for not-yet-created teams stay as quiet filler ---
+        for (int col = teamCount + 1; col <= LAST_TEAM_COL; col++) {
+            for (int row = 2; row <= 5; row++) {
+                inventory.setItem(GuiSlots.slot(row, col), fillerPane(player));
+            }
+        }
+
         backToHub(inventory, player);
+    }
+
+    /** Quiet "no team here" tile (gui.json mockup: "Not Avalible Team"). */
+    private ItemStack fillerPane(Player player) {
+        return ItemBuilder.of(Material.LIGHT_GRAY_STAINED_GLASS_PANE)
+                .name(Component.text(line(player, "gui.team-slot-unavailable"), UiTheme.MUTED)
+                        .decoration(TextDecoration.ITALIC, false))
+                .action("decorate").build();
     }
 
     private void backToHub(Inventory inventory, Player player) {
@@ -243,7 +298,9 @@ public final class TeamConfigGui extends AbstractGui {
         if ("back_to_hub".equals(action) || "close".equals(action)) {
             sounds.play(player, "gui-back");
             player.closeInventory();
-            if (teamHubGui != null) {
+            if (teamManageGui != null) {
+                teamManageGui.open(player);
+            } else if (teamHubGui != null) {
                 teamHubGui.open(player);
             }
             return;
@@ -253,11 +310,14 @@ public final class TeamConfigGui extends AbstractGui {
             return;
         }
 
-        if ("count:cycle".equals(action)) {
-            int next = clickType == ClickType.RIGHT || clickType == ClickType.SHIFT_RIGHT
-                    ? team.teamCount() - 1
-                    : team.teamCount() + 1;
-            TeamService.Result r = teamService.setTeamCount(player, next);
+        if ("team:add".equals(action)) {
+            TeamService.Result r = teamService.setTeamCount(player, team.teamCount() + 1);
+            sounds.play(player, r == TeamService.Result.OK ? "gui-click" : "error");
+            refresh(player, session, inventory);
+            return;
+        }
+        if ("team:remove".equals(action)) {
+            TeamService.Result r = teamService.setTeamCount(player, team.teamCount() - 1);
             sounds.play(player, r == TeamService.Result.OK ? "gui-click" : "error");
             refresh(player, session, inventory);
             return;
