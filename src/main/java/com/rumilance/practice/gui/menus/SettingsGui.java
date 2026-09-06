@@ -79,35 +79,35 @@ public final class SettingsGui extends AbstractGui {
         PlayerSettings s = settingsService.get(player);
         paintFrame(player, session, inventory);
 
-        inventory.setItem(GuiSlots.slot(2, 1), toggle(player, Material.BARRIER, "gui.deny-duels",
+        inventory.setItem(GuiSlots.slot(1, 1), toggle(player, Material.BARRIER, "gui.deny-duels",
                 !s.acceptDuelRequests(), "deny_duels",
                 "gui.deny-duels-lore"));
-        inventory.setItem(GuiSlots.slot(2, 3), toggle(player, Material.COMPASS, "gui.auto-requeue",
+        inventory.setItem(GuiSlots.slot(1, 3), toggle(player, Material.COMPASS, "gui.auto-requeue",
                 s.autoRequeue(), "auto_requeue",
                 "gui.auto-requeue-lore"));
-        inventory.setItem(GuiSlots.slot(2, 5), toggle(player, Material.ENDER_EYE, "gui.allow-spectate",
+        inventory.setItem(GuiSlots.slot(1, 5), toggle(player, Material.ENDER_EYE, "gui.allow-spectate",
                 s.spectateVisible(), "spectators",
                 "gui.allow-spectate-lore"));
-        inventory.setItem(GuiSlots.slot(2, 7), toggle(player, Material.PAPER, "gui.hide-chat",
+        inventory.setItem(GuiSlots.slot(1, 7), toggle(player, Material.PAPER, "gui.hide-chat",
                 s.hideOtherChat(), "hide_chat",
                 "gui.hide-chat-lore"));
-        inventory.setItem(GuiSlots.slot(3, 1), toggle(player, Material.NOTE_BLOCK, "gui.sounds",
+        inventory.setItem(GuiSlots.slot(2, 1), toggle(player, Material.NOTE_BLOCK, "gui.sounds",
                 s.soundsEnabled(), "sounds",
                 "gui.sounds-lore"));
-        inventory.setItem(GuiSlots.slot(3, 3), toggle(player, Material.WRITABLE_BOOK, "gui.match-report",
+        inventory.setItem(GuiSlots.slot(2, 3), toggle(player, Material.WRITABLE_BOOK, "gui.match-report",
                 s.showMatchReport(), "match_report",
                 "gui.match-report-lore"));
-        inventory.setItem(GuiSlots.slot(3, 5), toggle(player, Material.PAINTING, "gui.scoreboard",
+        inventory.setItem(GuiSlots.slot(2, 5), toggle(player, Material.PAINTING, "gui.scoreboard",
                 s.scoreboardEnabled(), "scoreboard",
                 "gui.scoreboard-lore"));
-        inventory.setItem(GuiSlots.slot(3, 7), toggle(player, Material.GLOWSTONE_DUST, "gui.ally-glow",
+        inventory.setItem(GuiSlots.slot(2, 7), toggle(player, Material.GLOWSTONE_DUST, "gui.ally-glow",
                 s.teamGlow(), "team_glow",
                 "gui.ally-glow-lore"));
-        inventory.setItem(GuiSlots.slot(4, 3), toggle(player, Material.LEATHER_CHESTPLATE, "gui.team-leather",
+        inventory.setItem(GuiSlots.slot(3, 2), toggle(player, Material.LEATHER_CHESTPLATE, "gui.team-leather",
                 s.teamColoredArmor(), "team_armor",
                 "gui.team-leather-lore"));
         renderNameColorEntry(player, inventory);
-        inventory.setItem(GuiSlots.slot(4, 5),
+        inventory.setItem(GuiSlots.slot(3, 6),
                 ItemBuilder.of(Material.OAK_SIGN)
                         .name(t(player, "gui.chat-whitelist").color(UiTheme.SECONDARY))
                         .lore(
@@ -131,7 +131,7 @@ public final class SettingsGui extends AbstractGui {
         boolean vipPlus = nameColorService != null
                 && nameColorService.isVipPlus(player.getUniqueId());
         if (!vipPlus) {
-            inventory.setItem(GuiSlots.slot(4, 1),
+            inventory.setItem(GuiSlots.slot(3, 4),
                     ItemBuilder.of(Material.GRAY_DYE)
                             .name(t(player, "gui.namecolor-locked").color(UiTheme.MUTED))
                             .lore(UiTheme.line(line(player, "gui.namecolor-locked-lore")))
@@ -146,7 +146,7 @@ public final class SettingsGui extends AbstractGui {
             case SOLID -> "gui.namecolor-mode-solid";
             case GRADIENT -> "gui.namecolor-mode-gradient";
         };
-        inventory.setItem(GuiSlots.slot(4, 1),
+        inventory.setItem(GuiSlots.slot(3, 4),
                 ItemBuilder.of(Material.NAME_TAG)
                         .name(t(player, "gui.namecolor-settings-entry").color(UiTheme.HEADER))
                         .lore(

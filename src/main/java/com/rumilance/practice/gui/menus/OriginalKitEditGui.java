@@ -101,7 +101,7 @@ public final class OriginalKitEditGui extends AbstractGui implements BottomInven
 
     private void renderTop(Player player, Inventory inventory, OriginalKitService.EditContext ctx) {
         ItemStack[] layout = ctx.layout;
-        paintFrame(player, session, inventory);
+        com.rumilance.practice.gui.GuiFrame.frame(inventory, theme());
         inventory.setItem(0, decorative());
         inventory.setItem(1, tagged(player, layout[36], "slot:36"));
         inventory.setItem(2, tagged(player, layout[37], "slot:37"));

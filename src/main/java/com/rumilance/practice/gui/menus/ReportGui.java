@@ -67,7 +67,7 @@ public final class ReportGui extends AbstractGui {
 
     @Override
     protected void render(Player reporter, GuiSession session, Inventory inventory) {
-        paintFrame(player, session, inventory);
+        paintFrame(reporter, session, inventory);
         UUID targetId = session.targetPlayer();
         OfflinePlayer target = targetId == null ? null : Bukkit.getOfflinePlayer(targetId);
         String name = target == null || target.getName() == null ? "?" : target.getName();

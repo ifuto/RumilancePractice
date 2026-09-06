@@ -136,7 +136,7 @@ public final class PresetAdminGui extends AbstractGui implements FreeInventoryEd
     }
 
     private void renderCategories(Player player, Inventory inventory) {
-        paintFrame(player, session, inventory);
+        com.rumilance.practice.gui.GuiFrame.frame(inventory, theme());
         for (int i = 0; i < PresetItems.CATEGORIES.size(); i++) {
             String category = PresetItems.CATEGORIES.get(i);
             inventory.setItem(20 + i, GuiDecorator.button(categoryMaterial(category),

@@ -79,7 +79,7 @@ public final class EkitAdminGui extends AbstractGui implements BottomInventoryCl
     }
 
     private void renderCategories(Player player, Inventory inventory) {
-        paintFrame(player, session, inventory);
+        com.rumilance.practice.gui.GuiFrame.frame(inventory, theme());
         String[][] cats = {
                 {"Weapons/Armor", "NETHERITE_CHESTPLATE"},
                 {"Offhand", "WATER_BUCKET"},
