@@ -25,9 +25,13 @@ class GsitPermissionServiceTest {
         assertTrue(GsitPermissionService.isGsitNode("gsit.sit"));
         assertTrue(GsitPermissionService.isGsitNode("gsit.crawl"));
         assertTrue(GsitPermissionService.isGsitNode("-gsit.sit"));
+        assertTrue(GsitPermissionService.isGsitNode("--gsit.sit"));
+        assertTrue(GsitPermissionService.isGsitNode("-gsit"));
+        assertTrue(GsitPermissionService.isGsitNode(" -GSit.Crawl "));
         assertTrue(GsitPermissionService.isGsitNode(" gsit.belt "));
         assertFalse(GsitPermissionService.isGsitNode(null));
         assertFalse(GsitPermissionService.isGsitNode(""));
+        assertFalse(GsitPermissionService.isGsitNode("-"));
         assertFalse(GsitPermissionService.isGsitNode("gsitx"));
         assertFalse(GsitPermissionService.isGsitNode("rumilance.user"));
         // Groups are LuckPerms inheritance nodes, not GSit nodes: never strip a group.
@@ -71,6 +75,14 @@ class GsitPermissionServiceTest {
         var empty = GsitPermissionService.plan(List.of(), GRANT);
         assertFalse(empty.isNoop()); // the grant is still missing -> one write, then noop forever
         assertFalse(empty.granted());
+    }
+
+    @Test
+    void aNegatedGrantIsReplacedByTheRealOne() {
+        // "-GSit.SitClick" vetoes sitting: it has to go, and the positive node has to be added.
+        var plan = GsitPermissionService.plan(List.of("-GSit.SitClick", "gsit.*"), GRANT);
+        assertEquals(List.of("-GSit.SitClick", "gsit.*"), plan.remove());
+        assertFalse(plan.granted());
     }
 
     @Test

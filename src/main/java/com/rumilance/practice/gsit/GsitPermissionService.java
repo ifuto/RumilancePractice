@@ -34,7 +34,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * normalised in LuckPerms:</p>
  * <ol>
  *   <li>ALL {@code GSit.*} nodes are removed from the player's own data — including the wildcard
- *       node {@code gsit.*} and its negations, so nothing can re-grant the rest;</li>
+ *       node {@code gsit.*} and negated variants ({@code -gsit.sit}), so nothing can re-grant or
+ *       veto the rest;</li>
  *   <li>exactly {@code GSit.SitClick} is granted, i.e. "sit down by clicking a block" and nothing
  *       else (no {@code /sit} command, no crawling, no belt/seat extras).</li>
  * </ol>
@@ -108,8 +109,16 @@ public final class GsitPermissionService implements Listener {
             return false;
         }
         String trimmed = key.trim();
-        return trimmed.equalsIgnoreCase(GSIT_ROOT)
-                || trimmed.regionMatches(true, 0, GSIT_PREFIX, 0, GSIT_PREFIX.length());
+        // LuckPerms writes negations as a leading '-' ("--" for an explicit false), and a
+        // negated GSit node is still a GSit node: leaving "-gsit.*" behind would keep the
+        // wildcard in the player's data.
+        int from = 0;
+        while (from < trimmed.length() && trimmed.charAt(from) == '-') {
+            from++;
+        }
+        String plain = trimmed.substring(from);
+        return plain.equalsIgnoreCase(GSIT_ROOT)
+                || plain.regionMatches(true, 0, GSIT_PREFIX, 0, GSIT_PREFIX.length());
     }
 
     /**

@@ -47,7 +47,7 @@ public final class BotDifficulty {
     private double shieldReduction = 0.5d;
     private int totemGoal = 3; // crystal bot pops needed to win
     private double reachBlocks = 3.0d;     // map "reach" (10 = 1 block)
-    private double aimSpreadDegrees = 4.0d; // map "aim": per-swing direction error
+    private double aimSpreadDegrees = 5.0d; // map "aim": per-swing direction error
 
     public static BotDifficulty of(Preset preset) {
         BotDifficulty d = new BotDifficulty();

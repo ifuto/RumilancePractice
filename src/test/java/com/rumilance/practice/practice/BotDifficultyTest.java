@@ -31,6 +31,26 @@ class BotDifficultyTest {
     }
 
     @Test
+    void freshInstanceIsExactlyTheIntermediateRung() {
+        // The field defaults ARE the default rung: a drift here silently changes every player
+        // whose difficulty was never saved (and breaks the serialize round-trip).
+        BotDifficulty fresh = new BotDifficulty();
+        BotDifficulty rung = BotDifficulty.of(BotDifficulty.Preset.INTERMEDIATE);
+        assertEquals(rung.preset(), fresh.preset());
+        assertEquals(rung.botMaxHp(), fresh.botMaxHp(), 1e-9);
+        assertEquals(rung.attackDamage(), fresh.attackDamage(), 1e-9);
+        assertEquals(rung.attackIntervalMs(), fresh.attackIntervalMs());
+        assertEquals(rung.moveSpeed(), fresh.moveSpeed(), 1e-9);
+        assertEquals(rung.regenPerSecond(), fresh.regenPerSecond(), 1e-9);
+        assertEquals(rung.comboCooldownMs(), fresh.comboCooldownMs());
+        assertEquals(rung.shieldStun(), fresh.shieldStun());
+        assertEquals(rung.shieldReduction(), fresh.shieldReduction(), 1e-9);
+        assertEquals(rung.totemGoal(), fresh.totemGoal());
+        assertEquals(rung.reachBlocks(), fresh.reachBlocks(), 1e-9);
+        assertEquals(rung.aimSpreadDegrees(), fresh.aimSpreadDegrees(), 1e-9);
+    }
+
+    @Test
     void legacySavesMapOntoTheMapRungs() {
         assertEquals(BotDifficulty.Preset.INTERMEDIATE, BotDifficulty.parsePreset("NORMAL"));
         assertEquals(BotDifficulty.Preset.CRAZY, BotDifficulty.parsePreset("EXPERT"));
