@@ -1472,8 +1472,7 @@ public final class PracticeService {
             event.setDamage(event.getDamage() * 0.5d);
             if (event.getCause() == EntityDamageEvent.DamageCause.ENTITY_ATTACK) {
                 player.addPotionEffect(new org.bukkit.potion.PotionEffect(
-                        org.bukkit.potion.PotionEffectType.SLOWNESS,
-                        java.time.Duration.ofMillis(900), 1));
+                        org.bukkit.potion.PotionEffectType.SLOWNESS, 18, 1));
                 player.sendActionBar(messages.render(player, "practice.bot-shield-stun"));
             }
         }
