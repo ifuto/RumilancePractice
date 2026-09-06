@@ -893,7 +893,7 @@ public final class PracticeService {
         session.setTimerTask(timeout);
     }
 
-    private Component modeName(Player player, PracticeType type) {
+    private String modeName(Player player, PracticeType type) {
         String key = switch (type) {
             case SWORD -> "gui.room-type-sword";
             case CRYSTAL -> "gui.room-type-crystal";
@@ -901,7 +901,7 @@ public final class PracticeService {
             case CART -> "gui.room-type-cart";
             default -> "gui.room-type-mace";
         };
-        return messages.render(player, key);
+        return messages.raw(player, key);
     }
 
     /** Player loadout: the admin-bound server kit wins, else the mode's built-in gear. */

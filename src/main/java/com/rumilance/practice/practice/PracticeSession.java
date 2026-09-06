@@ -187,6 +187,10 @@ public final class PracticeSession {
         return botPops;
     }
 
+    public void setBotPops(int botPops) {
+        this.botPops = botPops;
+    }
+
     public void incrementBotPops() {
         this.botPops++;
     }
