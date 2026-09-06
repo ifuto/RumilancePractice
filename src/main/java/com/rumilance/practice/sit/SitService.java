@@ -50,6 +50,8 @@ public final class SitService implements Listener {
 
     /** Marker-stand passenger offset is zero, so add a small lift above the seat surface. */
     private static final double SEAT_SURFACE_LIFT = 0.05d;
+    /** GSit (MC ≥ 1.20.2) shifts stair seats down half a block relative to the block top. */
+    private static final double STAIR_Y_OFFSET = 0.5d;
     /** GSit's stair seat shift toward the stair's facing direction. */
     private static final double STAIR_XZ_OFFSET = 0.123d;
     /** Keep slab click positions this far inside the block so the seat stays on the slab. */
@@ -166,10 +168,21 @@ public final class SitService implements Listener {
             case EAST -> -90f;
             default -> 0f;
         };
-        Location location = block.getLocation().add(0.5d + shift.getX(), SEAT_SURFACE_LIFT,
+        Location location = block.getLocation().add(0.5d + shift.getX(),
+                blockSurfaceHeight(block) - STAIR_Y_OFFSET + SEAT_SURFACE_LIFT,
                 0.5d + shift.getZ());
         location.setYaw(yaw);
         return location;
+    }
+
+    /**
+     * The block's collision surface height relative to its own Y (GSit's {@code additionalOffset}):
+     * 0.5 for bottom slabs, 1.0 for bottom stairs (their bounding box spans the full cube).
+     * Zero-size shapes fall back to a full block so the seat never spawns inside geometry.
+     */
+    private double blockSurfaceHeight(Block block) {
+        double height = block.getBoundingBox().getMaxY() - block.getY();
+        return height <= 0.001d ? 1.0d : height;
     }
 
     /** Slab seat: exact clicked point (inset so the player stays on the slab); free yaw. */
@@ -186,7 +199,8 @@ public final class SitService implements Listener {
         }
         relX = Math.min(1.0d - SLAB_INSET, Math.max(SLAB_INSET, relX));
         relZ = Math.min(1.0d - SLAB_INSET, Math.max(SLAB_INSET, relZ));
-        Location location = block.getLocation().add(relX, SEAT_SURFACE_LIFT, relZ);
+        Location location = block.getLocation().add(relX,
+                blockSurfaceHeight(block) + SEAT_SURFACE_LIFT, relZ);
         location.setYaw(player.getLocation().getYaw());
         return location;
     }
@@ -200,6 +214,7 @@ public final class SitService implements Listener {
             ArmorStand stand = block.getWorld().spawn(seatLocation, ArmorStand.class, as -> {
                 as.setInvisible(true);
                 as.setMarker(true);
+                as.setSmall(true);
                 as.setGravity(false);
                 as.setInvulnerable(true);
                 as.setSilent(true);

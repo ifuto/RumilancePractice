@@ -10,6 +10,7 @@ import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -159,15 +160,23 @@ public final class FunctionalItemListener implements Listener {
         return text.replace("\uFE0E", "").replace("\uFE0F", "");
     }
 
-    @EventHandler
+    /**
+     * LOWEST priority + no cancelled early-exit: functional items must fire no matter what the
+     * player is looking at. Previously this ran at NORMAL and bailed on any pre-cancelled
+     * interact (sign-queue signs, countdown locks, other LOWEST listeners), so the same item
+     * only worked while aiming at a plain full block. Sneak right-clicks pass through to the
+     * block itself (GSit-style bypass), so signs etc. stay usable while holding a lobby item.
+     */
+    @EventHandler(priority = EventPriority.LOWEST)
     public void onInteract(PlayerInteractEvent event) {
-        if (event.isCancelled()) {
-            return;
-        }
         if (event.getHand() != EquipmentSlot.HAND) {
             return;
         }
         if (event.getAction() != Action.RIGHT_CLICK_AIR && event.getAction() != Action.RIGHT_CLICK_BLOCK) {
+            return;
+        }
+        Player player = event.getPlayer();
+        if (player.isSneaking()) {
             return;
         }
         ItemStack item = event.getItem();
@@ -179,7 +188,6 @@ public final class FunctionalItemListener implements Listener {
             event.setCancelled(true);
             // The same leave item serves both the regular queue and the sign queue.
             var signQueue = signQueueService;
-            Player player = event.getPlayer();
             if (signQueue != null && signQueue.isQueued(player.getUniqueId())) {
                 signQueue.leave(player);
             } else {
@@ -199,7 +207,6 @@ public final class FunctionalItemListener implements Listener {
         event.setCancelled(true);
         event.setUseItemInHand(org.bukkit.event.Event.Result.DENY);
         event.setUseInteractedBlock(org.bukkit.event.Event.Result.DENY);
-        Player player = event.getPlayer();
         soundService.play(player, "gui-open", 1.4f);
         switch (function.toLowerCase(Locale.ROOT)) {
             case "ranked" -> rankedGui.open(player);
