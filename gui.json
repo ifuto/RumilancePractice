@@ -1,0 +1,1700 @@
+{
+  "version": 2,
+  "saves": [
+    {
+      "id": "42e60a2b-da18-4385-89b9-588c6847142c",
+      "name": "Team List",
+      "createdAt": 1788675324728,
+      "main": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {
+          "x": 86,
+          "y": -22,
+          "z": -26
+        },
+        "items": [
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:netherite_upgrade_smithing_template",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Team List"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:red_wool",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Red Team (3Players) Click to view Red Members"
+            }
+          },
+          {
+            "id": "minecraft:blue_wool",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Blue Team (12Players) Click to View blue members"
+            }
+          },
+          {
+            "id": "minecraft:lime_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Add Team"
+            }
+          },
+          {
+            "id": "minecraft:barrier",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "VIP can only add team more"
+            }
+          },
+          {
+            "id": "minecraft:barrier",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "VIP can only add team more"
+            }
+          },
+          {
+            "id": "minecraft:barrier",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "VIP+ can only add team more"
+            }
+          },
+          {
+            "id": "minecraft:barrier",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "VIP+ can only add team more"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:golden_apple",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Max Health"
+            }
+          },
+          {
+            "id": "minecraft:golden_apple",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Max Health"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Not Avalible Team"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Not Avalible Team"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Not Avalible Team"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Not Avalible Team"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Not Avalible Team"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:leather_chestplate",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Body Size"
+            }
+          },
+          {
+            "id": "minecraft:leather_chestplate",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Body Size"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Not Avalible Team"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Not Avalible Team"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Not Avalible Team"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Not Avalible Team"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Not Avalible Team"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:potion",
+            "count": 1,
+            "components": {
+              "minecraft:potion_contents": {
+                "potion": "minecraft:water"
+              },
+              "minecraft:custom_name": "Effect"
+            }
+          },
+          {
+            "id": "minecraft:potion",
+            "count": 1,
+            "components": {
+              "minecraft:potion_contents": {
+                "potion": "minecraft:water"
+              },
+              "minecraft:custom_name": "Effect"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Not Avalible Team"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Not Avalible Team"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Not Avalible Team"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Not Avalible Team"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Not Avalible Team"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:arrow",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Back"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "fc58eb7e-f9b8-4d01-ab11-f86ae8226d45",
+      "name": "Player List",
+      "createdAt": 1788675317206,
+      "main": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {
+          "x": 86,
+          "y": -22,
+          "z": -24
+        },
+        "items": [
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:red_wool",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Red Team"
+            }
+          },
+          {
+            "id": "minecraft:blue_wool",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Blue Team"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:diamond_sword",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Random Team"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:arrow",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "←"
+            }
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1
+          },
+          {
+            "id": "minecraft:arrow",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "→"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:arrow",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Back"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "470d1506-4727-470c-a81a-b57f659a7c5f",
+      "name": "Party Hub",
+      "createdAt": 1788675305666,
+      "main": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {
+          "x": 86,
+          "y": -22,
+          "z": -22
+        },
+        "items": [
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1,
+            "components": {
+              "minecraft:profile": {
+                "name": "owner"
+              },
+              "minecraft:custom_name": "Party Hoster's Head"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          null,
+          null,
+          {
+            "id": "minecraft:player_head",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Player List"
+            }
+          },
+          null,
+          {
+            "id": "minecraft:netherite_upgrade_smithing_template",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Team List"
+            }
+          },
+          null,
+          null,
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          null,
+          null,
+          {
+            "id": "minecraft:book",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Select Kit"
+            }
+          },
+          null,
+          {
+            "id": "minecraft:diamond_sword",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Start Battle"
+            }
+          },
+          null,
+          null,
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:barrier",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Close"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "a5dc63f0-b7a1-4108-bd6e-e54b1faa78b7",
+      "name": "Party",
+      "createdAt": 1788675298525,
+      "main": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {
+          "x": 86,
+          "y": -22,
+          "z": -20
+        },
+        "items": [
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:name_tag",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Party"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          null,
+          {
+            "id": "minecraft:lime_dye",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Create Public Team"
+            }
+          },
+          null,
+          {
+            "id": "minecraft:oak_sign",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Public Team List"
+            }
+          },
+          null,
+          {
+            "id": "minecraft:gray_dye",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Create Private Team"
+            }
+          },
+          null,
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:barrier",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Close"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "84bd35cb-440b-425a-88a1-aa926d375ca6",
+      "name": "Kit Editor",
+      "createdAt": 1788675235229,
+      "main": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {
+          "x": 86,
+          "y": -22,
+          "z": -18
+        },
+        "items": [
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:book",
+            "count": 1
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:diamond_sword",
+            "count": 1
+          },
+          {
+            "id": "minecraft:diamond_axe",
+            "count": 1
+          },
+          {
+            "id": "minecraft:netherite_sword",
+            "count": 1
+          },
+          {
+            "id": "minecraft:netherite_axe",
+            "count": 1
+          },
+          {
+            "id": "minecraft:golden_apple",
+            "count": 1
+          },
+          {
+            "id": "minecraft:ender_pearl",
+            "count": 1
+          },
+          {
+            "id": "minecraft:end_crystal",
+            "count": 1
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:mace",
+            "count": 1
+          },
+          {
+            "id": "minecraft:paper",
+            "count": 1
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:arrow",
+            "count": 1
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:barrier",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Close"
+            }
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:arrow",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "a5c7bc0f-0506-4a7a-9440-984f6d53704a",
+      "name": "Battle Menu",
+      "createdAt": 1788675228402,
+      "main": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {
+          "x": 86,
+          "y": -22,
+          "z": -16
+        },
+        "items": [
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:nether_star",
+            "count": 1
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1
+          },
+          null,
+          {
+            "id": "minecraft:diamond_sword",
+            "count": 1
+          },
+          null,
+          null,
+          null,
+          {
+            "id": "minecraft:iron_sword",
+            "count": 1
+          },
+          null,
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1
+          },
+          null,
+          null,
+          null,
+          {
+            "id": "minecraft:player_head",
+            "count": 1,
+            "components": {
+              "minecraft:profile": {
+                "name": "Ifuto_mitai"
+              }
+            }
+          },
+          null,
+          null,
+          null,
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1
+          },
+          null,
+          {
+            "id": "minecraft:end_crystal",
+            "count": 1
+          },
+          null,
+          null,
+          null,
+          {
+            "id": "minecraft:book",
+            "count": 1
+          },
+          null,
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:barrier",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Close"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "693ff586-3ec3-4cba-a4ac-2637943279b2",
+      "name": "Spectate",
+      "createdAt": 1788675221490,
+      "main": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {
+          "x": 86,
+          "y": -22,
+          "z": -14
+        },
+        "items": [
+          {
+            "id": "minecraft:lime_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:lime_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:lime_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:lime_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:ender_eye",
+            "count": 1
+          },
+          {
+            "id": "minecraft:lime_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:lime_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:lime_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:lime_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:lime_stained_glass_pane",
+            "count": 1
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "id": "minecraft:lime_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:lime_stained_glass_pane",
+            "count": 1
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "id": "minecraft:lime_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:lime_stained_glass_pane",
+            "count": 1
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "id": "minecraft:lime_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:lime_stained_glass_pane",
+            "count": 1
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "id": "minecraft:lime_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:arrow",
+            "count": 1
+          },
+          {
+            "id": "minecraft:lime_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:lime_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:barrier",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Close"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:lime_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:lime_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:arrow",
+            "count": 1
+          }
+        ]
+      }
+    },
