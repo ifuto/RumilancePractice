@@ -29,6 +29,7 @@ Paper 1.21.11 向け Practice PvP プラグイン **N Arena**(プラグイン名
 
 ### プラクティス
 - `/prac` `/practice` — ソロ練習モード。アンカー・TNT・メイスの練習台
+- **Battle Menuの「ボット」**(ITEM 41): 有効なボット部屋一覧からクリックで入室
 - **対戦ボット部屋**(ITEM 41): `/practice draft <名前> <ANKER|MACE|SWORD|CRYSTAL>`
   → `pos1`/`pos2` → `selection apply` → `p1` → `botpos`(任意) → `save` → `enable`
   - ソードBot: 追跡+左右ストレイフで斬りかかる(100HP)、シールド構えで被ダメ半減+

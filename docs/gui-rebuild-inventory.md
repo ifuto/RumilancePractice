@@ -26,8 +26,12 @@ GUI全面リビルドにあたり、**機能を一切失わないため**の完�
 ### BattleMenuGui(対戦メニュー)
 - 開く: GameMenuの`battle`。6行。
 - アクション: `ranked` `unranked` `ffa` `player-duel`(デュエル依頼) `history`(戦歴)
-  `leave-queue`(キュー離脱・入っていれば表示) `close`
+  `bot`(ITEM 41: ボット練習部屋一覧へ) `leave-queue`(キュー離脱・入っていれば表示) `close`
 - キュー中は参加中表示/離脱ボタンに切替。
+
+### PracticeBotSelectGui(ボット部屋一覧・ITEM 41)
+- BattleMenuの`bot`から。有効なSWORD/CRYSTAL/MACE部屋をグリッド+ページング表示。
+- 各部屋クリックで `practiceService.join`(/prac相当)。使用中部屋は鍵表示。`close` `back`。
 
 ### SettingsGui(個人設定)
 - アクション(全部トグル): `toggle:scoreboard` `toggle:sounds` `toggle:spectators`
