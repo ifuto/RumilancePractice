@@ -25,6 +25,7 @@ public final class PracticeItems {
     public static final String ACTION_START = "prac_start";
     public static final String ACTION_MACE_SETTINGS = "prac_mace_settings";
     public static final String ACTION_BOT_SETTINGS = "prac_bot_settings";
+    public static final String ACTION_DIFFICULTY = "prac_difficulty";
 
     public static final String LAYOUT_ANCHOR_FIRST = "anchor_first";
     public static final String LAYOUT_GLOW_FIRST = "glow_first";
@@ -78,6 +79,19 @@ public final class PracticeItems {
                 .lore(name(messages, player, "practice.item-bot-shield",
                         net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("state", state)))
                 .action(ACTION_BOT_SETTINGS)
+                .build();
+    }
+
+    public static ItemStack botDifficulty(MessageService messages, Player player, BotDifficulty difficulty) {
+        String preset = messages.raw(player, "practice.difficulty-preset-"
+                + difficulty.preset().name().toLowerCase(java.util.Locale.ROOT));
+        return ItemBuilder.of(Material.NETHER_STAR)
+                .name(name(messages, player, "practice.item-difficulty"))
+                .lore(name(messages, player, "practice.item-difficulty-state",
+                        net.kyori.adventure.text.minimessage.tag.resolver.Placeholder.unparsed("preset", preset)),
+                        name(messages, player, "practice.item-difficulty-lore"))
+                .action(ACTION_DIFFICULTY)
+                .glintIf(true)
                 .build();
     }
 

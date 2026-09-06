@@ -15,7 +15,8 @@ public final class PracticeSession {
     public enum Phase {
         WAIT,
         COUNTDOWN,
-        ACTIVE
+        ACTIVE,
+        ENDED
     }
 
     private final UUID playerId;
@@ -53,6 +54,16 @@ public final class PracticeSession {
     private final java.util.Map<org.bukkit.block.Block, Long> botPlacedBlocks = new java.util.LinkedHashMap<>();
     /** Until this timestamp the crystal bot is recovering (sprinting away). */
     private long botRetreatUntilMs;
+    /** Fight tuning: coarse presets + fully detailed parameters. */
+    private BotDifficulty difficulty = BotDifficulty.of(BotDifficulty.Preset.NORMAL);
+    /** When the ACTIVE bot fight started (results / console log). */
+    private long matchStartMs;
+    /** Primed TNT the CART bot threw (it is immune to their blasts). */
+    private final java.util.Set<java.util.UUID> botTnt = new java.util.HashSet<>();
+    /** Next time the netherite-pot bot may drink / throw. */
+    private long botPotionUntilMs;
+    /** Next time the cart bot may roll TNT. */
+    private long botNextCartMs;
 
     /** Disposable FAWE copy id; null when using shared template teleport. */
     private UUID cloneInstanceId;
@@ -65,8 +76,8 @@ public final class PracticeSession {
         this.playerId = playerId;
         this.practiceId = practiceId;
         this.type = type;
-        this.phase = (type == PracticeType.MACE || type == PracticeType.SWORD
-                || type == PracticeType.CRYSTAL) ? Phase.ACTIVE : Phase.WAIT;
+        // All rooms open in WAIT: bot fights run as proper matches (countdown on demand).
+        this.phase = Phase.WAIT;
         if (type == PracticeType.ANKER) {
             this.ankerStats = new PracticeAnkerStats();
         }
@@ -234,6 +245,42 @@ public final class PracticeSession {
 
     public void setBotRetreatUntilMs(long botRetreatUntilMs) {
         this.botRetreatUntilMs = botRetreatUntilMs;
+    }
+
+    public BotDifficulty difficulty() {
+        return difficulty;
+    }
+
+    public void setDifficulty(BotDifficulty difficulty) {
+        this.difficulty = difficulty;
+    }
+
+    public long matchStartMs() {
+        return matchStartMs;
+    }
+
+    public void setMatchStartMs(long matchStartMs) {
+        this.matchStartMs = matchStartMs;
+    }
+
+    public java.util.Set<java.util.UUID> botTnt() {
+        return botTnt;
+    }
+
+    public long botPotionUntilMs() {
+        return botPotionUntilMs;
+    }
+
+    public void setBotPotionUntilMs(long botPotionUntilMs) {
+        this.botPotionUntilMs = botPotionUntilMs;
+    }
+
+    public long botNextCartMs() {
+        return botNextCartMs;
+    }
+
+    public void setBotNextCartMs(long botNextCartMs) {
+        this.botNextCartMs = botNextCartMs;
     }
 
     public boolean botShieldRaised() {

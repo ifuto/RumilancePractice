@@ -5,12 +5,12 @@ import com.rumilance.practice.gui.GuiSession;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.GuiType;
 import com.rumilance.practice.gui.ItemBuilder;
-import com.rumilance.practice.gui.MenuScaffold;
 import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.model.PracticeRoom;
 import com.rumilance.practice.practice.PracticeService;
 import com.rumilance.practice.practice.PracticeType;
 import com.rumilance.practice.sound.SoundService;
+import com.rumilance.practice.util.GuiSlots;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
@@ -23,17 +23,22 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * ITEM 41: bot-room picker reachable from the Battle Menu. Lists every enabled practice
- * room that runs a combat bot (sword / crystal / mace) and joins it on click — the same
- * flow as {@code /prac <name>}, minus the typing.
+ * ITEM 41: Battle-Menu bot entry. The five fight modes the Quantum bot supports — Crystal,
+ * Netherite Pot, Mace, Cart PvP and Sword — each bound by an admin to a server kit.
+ * Picking a mode joins the first free room of that type (players duel the bot like any
+ * other opponent: countdown, difficulty, result).
  */
 public final class PracticeBotSelectGui extends AbstractGui {
+
+    private static final PracticeType[] MODES = {
+            PracticeType.CRYSTAL, PracticeType.NETHERITE_POT, PracticeType.MACE,
+            PracticeType.CART, PracticeType.SWORD};
 
     private final PracticeService practiceService;
 
     public PracticeBotSelectGui(GuiSessionRegistry registry, SoundService sounds,
                                 PracticeService practiceService) {
-        super(registry, sounds, GuiType.PRACTICE_SELECT, 6, true);
+        super(registry, sounds, GuiType.PRACTICE_SELECT, 5, true);
         this.practiceService = practiceService;
     }
 
@@ -53,77 +58,76 @@ public final class PracticeBotSelectGui extends AbstractGui {
                 .decoration(TextDecoration.ITALIC, false);
     }
 
-    private List<PracticeRoom> botRooms() {
-        List<PracticeRoom> rooms = new ArrayList<>();
-        for (PracticeRoom room : practiceService.enabled()) {
-            if (room.type() == PracticeType.SWORD
-                    || room.type() == PracticeType.CRYSTAL
-                    || room.type() == PracticeType.MACE) {
-                rooms.add(room);
-            }
-        }
-        return rooms;
-    }
-
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
         paintFrame(player, session, inventory);
-
-        List<PracticeRoom> rooms = botRooms();
-        int page = session.page();
-        int perPage = MenuScaffold.gridPageSize();
-        int from = Math.min(page * perPage, rooms.size());
-        int to = Math.min(from + perPage, rooms.size());
-        int index = 0;
-        for (int i = from; i < to; i++) {
-            inventory.setItem(MenuScaffold.gridSlot(index++), roomIcon(player, rooms.get(i)));
+        // Row 2 — the five modes, centred with breathing room.
+        int[] cols = {1, 2, 4, 6, 7};
+        for (int i = 0; i < MODES.length; i++) {
+            inventory.setItem(GuiSlots.slot(2, cols[i]), modeTile(player, MODES[i]));
         }
-        if (rooms.isEmpty()) {
-            inventory.setItem(MenuScaffold.gridSlot(10),
-                    ItemBuilder.of(Material.LIGHT_GRAY_STAINED_GLASS)
-                            .name(t(player, "gui.practice-none").color(UiTheme.MUTED))
-                            .lore(UiTheme.line(line(player, "gui.practice-none-lore")))
-                            .action("decorate").build());
-        }
-
-        paintPaging(player, inventory, page, Math.max(rooms.size(), 1));
         paintNav(player, session, inventory);
     }
 
-    private ItemStack roomIcon(Player player, PracticeRoom room) {
-        Material icon = switch (room.type()) {
-            case SWORD -> Material.NETHERITE_SWORD;
+    private ItemStack modeTile(Player player, PracticeType mode) {
+        Material icon = switch (mode) {
             case CRYSTAL -> Material.END_CRYSTAL;
+            case NETHERITE_POT -> Material.SPLASH_POTION;
             case MACE -> Material.MACE;
-            default -> Material.ARMOR_STAND;
+            case CART -> Material.TNT_MINECART;
+            default -> Material.NETHERITE_SWORD;
         };
-        String typeKey = switch (room.type()) {
-            case SWORD -> "gui.room-type-sword";
+        String typeKey = switch (mode) {
             case CRYSTAL -> "gui.room-type-crystal";
-            default -> "gui.room-type-mace";
+            case NETHERITE_POT -> "gui.room-type-nethpot";
+            case CART -> "gui.room-type-cart";
+            case MACE -> "gui.room-type-mace";
+            default -> "gui.room-type-sword";
         };
-        String descKey = switch (room.type()) {
-            case SWORD -> "gui.bot-room-lore-sword";
+        String descKey = switch (mode) {
             case CRYSTAL -> "gui.bot-room-lore-crystal";
-            default -> "gui.bot-room-lore-mace";
+            case NETHERITE_POT -> "gui.bot-room-lore-nethpot";
+            case CART -> "gui.bot-room-lore-cart";
+            case MACE -> "gui.bot-room-lore-mace";
+            default -> "gui.bot-room-lore-sword";
         };
-        boolean busy = practiceService.isRoomBusy(room.id());
+        List<PracticeRoom> rooms = roomsOf(mode);
+        long free = rooms.stream().filter(r -> !practiceService.isRoomBusy(r.id())).count();
+        String kit = practiceService.botKitFor(mode);
         ItemBuilder builder = ItemBuilder.of(icon)
-                .name(Component.text(room.displayName(), busy ? UiTheme.MUTED : UiTheme.SUCCESS)
+                .name(t(player, typeKey).color(rooms.isEmpty() ? UiTheme.MUTED : UiTheme.SUCCESS)
                         .decoration(TextDecoration.ITALIC, false))
                 .lore(UiTheme.divider(),
-                        UiTheme.labelValue(line(player, "gui.room-type-label"), line(player, typeKey)),
                         UiTheme.line(line(player, descKey)),
-                        UiTheme.blank());
-        if (busy) {
-            builder.lore(UiTheme.status(line(player, "gui.practice-room-busy"), UiTheme.WARNING),
-                    UiTheme.blank(),
+                        UiTheme.blank(),
+                        UiTheme.labelValue(line(player, "gui.bot-kit-label"),
+                                kit == null || kit.isBlank()
+                                        ? line(player, "gui.bot-kit-default") : kit));
+        if (rooms.isEmpty()) {
+            builder.lore(UiTheme.blank(),
+                    UiTheme.status(line(player, "gui.practice-none"), UiTheme.WARNING),
+                    UiTheme.hint(line(player, "gui.practice-none-lore")));
+            builder.action("locked:mode");
+        } else if (free == 0) {
+            builder.lore(UiTheme.blank(),
+                    UiTheme.status(line(player, "gui.practice-room-busy"), UiTheme.WARNING),
                     UiTheme.hint(line(player, "gui.practice-room-busy-hint")));
+            builder.action("locked:mode");
         } else {
-            builder.lore(UiTheme.hint(line(player, "gui.practice-join-hint")));
+            builder.lore(UiTheme.blank(), UiTheme.hint(line(player, "gui.practice-join-hint")));
+            builder.action("mode:" + mode.name());
         }
-        builder.action(busy ? "locked:room" : "join:" + room.id());
         return builder.build();
+    }
+
+    private List<PracticeRoom> roomsOf(PracticeType mode) {
+        List<PracticeRoom> out = new ArrayList<>();
+        for (PracticeRoom room : practiceService.enabled()) {
+            if (room.type() == mode) {
+                out.add(room);
+            }
+        }
+        return out;
     }
 
     @Override
@@ -137,26 +141,29 @@ public final class PracticeBotSelectGui extends AbstractGui {
                 sounds.play(player, "gui-back");
                 player.closeInventory();
             }
-            case "page:prev" -> {
-                session.setPage(session.page() - 1);
-                sounds.play(player, "gui-click");
-                refresh(player, session, inventory);
-            }
-            case "page:next" -> {
-                session.setPage(session.page() + 1);
-                sounds.play(player, "gui-click");
-                refresh(player, session, inventory);
-            }
             default -> {
                 if (action.startsWith("locked:")) {
                     sounds.play(player, "error");
                     return;
                 }
-                if (action.startsWith("join:")) {
-                    String id = action.substring("join:".length());
+                if (action.startsWith("mode:")) {
+                    PracticeType mode;
+                    try {
+                        mode = PracticeType.valueOf(action.substring(5));
+                    } catch (IllegalArgumentException e) {
+                        return;
+                    }
+                    PracticeRoom target = roomsOf(mode).stream()
+                            .filter(r -> !practiceService.isRoomBusy(r.id()))
+                            .findFirst().orElse(null);
+                    if (target == null) {
+                        sounds.play(player, "error");
+                        player.sendMessage(t(player, "gui.practice-room-busy").color(UiTheme.WARNING));
+                        return;
+                    }
                     sounds.play(player, "select");
                     player.closeInventory();
-                    practiceService.join(player, id);
+                    practiceService.join(player, target.id());
                 }
             }
         }

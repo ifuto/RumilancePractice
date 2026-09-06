@@ -81,16 +81,22 @@ public final class PracticeListener implements Listener {
             return;
         }
         PracticeSession session = sessionOpt.get();
-        if (event instanceof EntityDamageByEntityEvent byEntity
-                && byEntity.getDamager() instanceof Mannequin bot
-                && session.combatBot() != null
-                && bot.getUniqueId().equals(session.combatBot().getUniqueId())) {
-            return; // sword-bot sparring hit: allow it
+        Mannequin combatBot = session.combatBot();
+        if (event instanceof EntityDamageByEntityEvent byEntity && combatBot != null) {
+            Entity damager = byEntity.getDamager();
+            boolean botHit = damager instanceof Mannequin bot
+                    && bot.getUniqueId().equals(combatBot.getUniqueId());
+            boolean botProjectile = damager instanceof org.bukkit.entity.Projectile proj
+                    && proj.getShooter() instanceof Entity shooter
+                    && shooter.getUniqueId().equals(combatBot.getUniqueId());
+            if (botHit || botProjectile) {
+                return; // sparring hit (melee swing or arrow volley): allow it
+            }
         }
-        if (session.type() == PracticeType.CRYSTAL
+        if ((session.type() == PracticeType.CRYSTAL || session.type() == PracticeType.CART)
                 && (event.getCause() == EntityDamageEvent.DamageCause.ENTITY_EXPLOSION
                         || event.getCause() == EntityDamageEvent.DamageCause.BLOCK_EXPLOSION)) {
-            return; // crystal-PvP damage: bot combos and your own crystals both count
+            return; // blast damage is the point in crystal & cart rooms
         }
         event.setCancelled(true);
         player.setFireTicks(0);
@@ -152,8 +158,7 @@ public final class PracticeListener implements Listener {
         ItemStack item = event.getItem();
         String action = PracticeItems.readAction(item);
 
-        if (session.type() == PracticeType.ANKER && session.phase() == PracticeSession.Phase.WAIT
-                && action != null) {
+        if (session.phase() == PracticeSession.Phase.WAIT && action != null) {
             event.setCancelled(true);
             if (event.getAction() == Action.RIGHT_CLICK_AIR || event.getAction() == Action.RIGHT_CLICK_BLOCK) {
                 practiceService.handleWaitInteract(player, session, action);
@@ -289,6 +294,11 @@ public final class PracticeListener implements Listener {
         event.setShouldDropExperience(false);
         event.deathMessage(null);
         session.setBotNextAttackMs(System.currentTimeMillis() + 2_000L);
+        if (session.type().botMode() && session.phase() == PracticeSession.Phase.ACTIVE) {
+            // A real match: death is the loss. endBotMatch handles result + lobby return.
+            practiceService.endBotMatch(player, session, PracticeService.BotMatchResult.LOSE);
+            return;
+        }
         var plugin = org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(PracticeListener.class);
         if (plugin == null) {
             return;

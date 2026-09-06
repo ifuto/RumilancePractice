@@ -74,6 +74,13 @@ public final class PracticeService {
     private volatile java.util.function.BiConsumer<Player, PracticeSession> openLayoutGui;
     private volatile java.util.function.BiConsumer<Player, PracticeSession> openMaceGui;
     private volatile java.util.function.BiConsumer<Player, PracticeSession> openBotGui;
+    private volatile java.util.function.BiConsumer<Player, PracticeSession> openDifficultyGui;
+    /** Admin kit binding per bot mode (Quantum's 5 fight modes -> server kits). */
+    private final java.util.Map<PracticeType, String> botModeKits =
+            new java.util.EnumMap<>(PracticeType.class);
+    /** Saved per-player difficulty (serialized), keyed by UUID string. */
+    private final java.util.Map<String, String> savedDifficulty = new java.util.LinkedHashMap<>();
+    private com.rumilance.practice.kit.KitService kitService;
 
     private BukkitTask dailyPurgeTask;
     private BukkitTask maceAiTask;
@@ -114,6 +121,65 @@ public final class PracticeService {
         return messages;
     }
 
+    public void setOpenDifficultyGui(java.util.function.BiConsumer<Player, PracticeSession> gui) {
+        this.openDifficultyGui = gui;
+    }
+
+    public void setKitService(com.rumilance.practice.kit.KitService kitService) {
+        this.kitService = kitService;
+    }
+
+    // ------------------------------------------------------- bot mode kit binding (admin)
+
+    /** Binds a server kit to a bot fight mode; {@code kitName} null clears the binding. */
+    public boolean bindBotKit(PracticeType type, String kitName) {
+        if (!type.botMode()) {
+            return false;
+        }
+        if (kitName == null || kitName.isBlank()) {
+            botModeKits.remove(type);
+        } else {
+            botModeKits.put(type, kitName);
+        }
+        persistBotKits();
+        return true;
+    }
+
+    public String botKitFor(PracticeType type) {
+        return botModeKits.get(type);
+    }
+
+    public boolean kitExists(String kitName) {
+        return kitService != null && kitService.get(kitName).isPresent();
+    }
+
+    private void persistBotKits() {
+        FileConfiguration yaml = configService.practices();
+        yaml.set("bot-mode-kits", null);
+        botModeKits.forEach((type, kit) ->
+                yaml.set("bot-mode-kits." + type.name(), kit));
+        configService.save(ConfigService.PRACTICES);
+    }
+
+    private void persistDifficulties() {
+        FileConfiguration yaml = configService.practices();
+        yaml.set("bot-difficulty", null);
+        savedDifficulty.forEach((uuid, ser) -> yaml.set("bot-difficulty." + uuid, ser));
+        configService.save(ConfigService.PRACTICES);
+    }
+
+    /** Loads the player's saved difficulty into the session (or NORMAL). */
+    public void applySavedDifficulty(PracticeSession session) {
+        String ser = savedDifficulty.get(session.playerId().toString());
+        session.setDifficulty(BotDifficulty.deserialize(ser));
+    }
+
+    /** Saves the player's difficulty choice (called from the difficulty GUI). */
+    public void saveDifficulty(java.util.UUID playerId, BotDifficulty difficulty) {
+        savedDifficulty.put(playerId.toString(), difficulty.serialize());
+        persistDifficulties();
+    }
+
     public void start() {
         purgeLayoutsAsync();
         dailyPurgeTask = Bukkit.getScheduler().runTaskTimer(plugin, this::purgeLayoutsAsync,
@@ -148,7 +214,24 @@ public final class PracticeService {
 
     public void reload() {
         rooms.clear();
+        botModeKits.clear();
+        savedDifficulty.clear();
         FileConfiguration yaml = configService.practices();
+        ConfigurationSection kits = yaml.getConfigurationSection("bot-mode-kits");
+        if (kits != null) {
+            for (String key : kits.getKeys(false)) {
+                try {
+                    botModeKits.put(PracticeType.parse(key), kits.getString(key, ""));
+                } catch (Exception ignored) {
+                }
+            }
+        }
+        ConfigurationSection diffs = yaml.getConfigurationSection("bot-difficulty");
+        if (diffs != null) {
+            for (String key : diffs.getKeys(false)) {
+                savedDifficulty.put(key, diffs.getString(key, ""));
+            }
+        }
         ConfigurationSection root = yaml.getConfigurationSection("practices");
         if (root == null) {
             return;
@@ -456,12 +539,8 @@ public final class PracticeService {
             refreshSchematic(room);
         }
         try {
-            PlayerState target = room.type() == PracticeType.MACE
-                    || room.type() == PracticeType.SWORD
-                    || room.type() == PracticeType.CRYSTAL
-                    ? PlayerState.PRACTICE_ACTIVE
-                    : PlayerState.PRACTICE_WAIT;
-            stateManager.transition(player.getUniqueId(), target);
+            // Every room now opens in its lobby/wait phase; the fight starts on purpose.
+            stateManager.transition(player.getUniqueId(), PlayerState.PRACTICE_WAIT);
         } catch (Exception e) {
             player.sendMessage(messages.render(player, "practice.cannot-enter"));
             return;
@@ -470,6 +549,7 @@ public final class PracticeService {
         PracticeSession session = new PracticeSession(player.getUniqueId(), room.id(), room.type());
         int preferred = preferredDurations.getOrDefault(player.getUniqueId(), 10);
         session.setDurationSeconds(preferred);
+        applySavedDifficulty(session);
         sessions.put(player.getUniqueId(), session);
         joinGraceUntilMs.put(player.getUniqueId(), System.currentTimeMillis() + 8000L);
 
@@ -547,20 +627,16 @@ public final class PracticeService {
                         giveWaitHotbar(player, session);
                         player.sendMessage(messages.render(player, "practice.joined",
                                 MessageService.tags("name", joinedRoom.displayName())));
-                    } else if (joinedRoom.type() == PracticeType.SWORD) {
-                        giveSwordLoadout(player, session);
-                        spawnCombatBot(player, session, joinedRoom, PracticeType.SWORD);
-                        player.sendMessage(messages.render(player, "practice.joined-sword",
-                                MessageService.tags("name", joinedRoom.displayName())));
-                    } else if (joinedRoom.type() == PracticeType.CRYSTAL) {
-                        giveCrystalLoadout(player, session);
-                        spawnCombatBot(player, session, joinedRoom, PracticeType.CRYSTAL);
-                        player.sendMessage(messages.render(player, "practice.joined-crystal",
-                                MessageService.tags("name", joinedRoom.displayName())));
                     } else {
-                        giveMaceLoadout(player, session);
-                        spawnMaceBot(player, session, joinedRoom);
-                        player.sendMessage(messages.render(player, "practice.joined-mace",
+                        giveBotWaitHotbar(player, session);
+                        String key = switch (joinedRoom.type()) {
+                            case SWORD -> "practice.joined-sword";
+                            case CRYSTAL -> "practice.joined-crystal";
+                            case NETHERITE_POT -> "practice.joined-nethpot";
+                            case CART -> "practice.joined-cart";
+                            default -> "practice.joined-mace";
+                        };
+                        player.sendMessage(messages.render(player, key,
                                 MessageService.tags("name", joinedRoom.displayName())));
                     }
                 }));
@@ -660,6 +736,16 @@ public final class PracticeService {
         player.getInventory().setHeldItemSlot(4);
     }
 
+    /** Bot-room waiting kit: match length, difficulty, start, bot shield toggle. */
+    public void giveBotWaitHotbar(Player player, PracticeSession session) {
+        player.getInventory().clear();
+        player.getInventory().setItem(0, PracticeItems.durationClock(messages, player, session.durationSeconds()));
+        player.getInventory().setItem(1, PracticeItems.botDifficulty(messages, player, session.difficulty()));
+        player.getInventory().setItem(4, PracticeItems.startDye(messages, player));
+        player.getInventory().setItem(8, PracticeItems.botSettings(messages, player, session.botShieldRaised()));
+        player.getInventory().setHeldItemSlot(4);
+    }
+
     public void giveMaceLoadout(Player player, PracticeSession session) {
         player.getInventory().clear();
         player.getInventory().setItem(0, PracticeItems.buildMace(messages, player,
@@ -700,7 +786,23 @@ public final class PracticeService {
                     openLayoutGui.accept(player, session);
                 }
             }
-            case PracticeItems.ACTION_START -> beginAnkerCountdown(player, session);
+            case PracticeItems.ACTION_BOT_SETTINGS -> {
+                if (openBotGui != null) {
+                    openBotGui.accept(player, session);
+                }
+            }
+            case PracticeItems.ACTION_DIFFICULTY -> {
+                if (openDifficultyGui != null) {
+                    openDifficultyGui.accept(player, session);
+                }
+            }
+            case PracticeItems.ACTION_START -> {
+                if (session.type() == PracticeType.ANKER) {
+                    beginAnkerCountdown(player, session);
+                } else {
+                    beginBotCountdown(player, session);
+                }
+            }
             default -> {
             }
         }
@@ -721,6 +823,152 @@ public final class PracticeService {
             default -> {
             }
         }
+    }
+
+    // ---------------------------------------------------------------- bot matches (ITEM 41+)
+
+    public enum BotMatchResult {
+        WIN, LOSE, DRAW
+    }
+
+    private void beginBotCountdown(Player player, PracticeSession session) {
+        if (session.phase() != PracticeSession.Phase.WAIT) {
+            return;
+        }
+        session.setPhase(PracticeSession.Phase.COUNTDOWN);
+        session.setPlaceBlocked(true);
+        session.cancelTimer();
+        final int[] remaining = {5};
+        BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            if (!player.isOnline() || sessions.get(player.getUniqueId()) != session) {
+                session.cancelTimer();
+                return;
+            }
+            if (remaining[0] > 0) {
+                player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1f, 1f);
+                player.showTitle(Title.title(
+                        Component.text(String.valueOf(remaining[0]), NamedTextColor.YELLOW)
+                                .decorate(TextDecoration.BOLD),
+                        messages.render(player, "practice.countdown-sub"),
+                        Title.Times.times(Duration.ZERO, Duration.ofMillis(800), Duration.ofMillis(100))));
+                remaining[0]--;
+                return;
+            }
+            session.cancelTimer();
+            startBotMatch(player, session);
+        }, 0L, 20L);
+        session.setTimerTask(task);
+    }
+
+    private void startBotMatch(Player player, PracticeSession session) {
+        PracticeRoom room = get(session.practiceId()).orElse(null);
+        if (room == null) {
+            player.sendMessage(messages.render(player, "practice.room-missing"));
+            leave(player, true);
+            return;
+        }
+        session.setPhase(PracticeSession.Phase.ACTIVE);
+        session.setMatchStartMs(System.currentTimeMillis());
+        session.setBotPops(0);
+        giveBotLoadout(player, session, room);
+        if (room.type() == PracticeType.MACE) {
+            spawnMaceBot(player, session, room);
+        } else {
+            spawnCombatBot(player, session, room, room.type());
+        }
+        player.playSound(player.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 0.6f, 1.4f);
+        player.sendActionBar(messages.render(player, "practice.match-started",
+                MessageService.tags("mode", modeName(player, room.type()))));
+        Bukkit.getLogger().info("[N Arena][BotMatch] START player=" + player.getName()
+                + " mode=" + room.type() + " room=" + room.id()
+                + " difficulty=" + session.difficulty().preset());
+        // Time limit: full duration without a decision ends the match as a draw.
+        BukkitTask timeout = Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            PracticeSession live = sessions.get(player.getUniqueId());
+            if (live == session && live.phase() == PracticeSession.Phase.ACTIVE
+                    && player.isOnline()) {
+                endBotMatch(player, live, BotMatchResult.DRAW);
+            }
+        }, session.durationSeconds() * 20L);
+        session.setTimerTask(timeout);
+    }
+
+    private Component modeName(Player player, PracticeType type) {
+        String key = switch (type) {
+            case SWORD -> "gui.room-type-sword";
+            case CRYSTAL -> "gui.room-type-crystal";
+            case NETHERITE_POT -> "gui.room-type-nethpot";
+            case CART -> "gui.room-type-cart";
+            default -> "gui.room-type-mace";
+        };
+        return messages.render(player, key);
+    }
+
+    /** Player loadout: the admin-bound server kit wins, else the mode's built-in gear. */
+    private void giveBotLoadout(Player player, PracticeSession session, PracticeRoom room) {
+        String boundKit = botModeKits.get(room.type());
+        if (boundKit != null && !boundKit.isBlank() && kitService != null) {
+            var kitOpt = kitService.get(boundKit);
+            if (kitOpt.isPresent()) {
+                player.getInventory().clear();
+                player.getInventory().setArmorContents(null);
+                kitService.apply(player, kitOpt.get());
+                player.getInventory().setItem(8,
+                        PracticeItems.botSettings(messages, player, session.botShieldRaised()));
+                return;
+            }
+            plugin.getLogger().warning("[N Arena] Bot kit binding '" + boundKit
+                    + "' for mode " + room.type() + " not found; using default gear.");
+        }
+        switch (room.type()) {
+            case MACE -> giveMaceLoadout(player, session);
+            case SWORD -> giveSwordLoadout(player, session);
+            case CRYSTAL -> giveCrystalLoadout(player, session);
+            case NETHERITE_POT -> giveNethPotLoadout(player, session);
+            case CART -> giveCartLoadout(player, session);
+            default -> { }
+        }
+    }
+
+    public void endBotMatch(Player player, PracticeSession session, BotMatchResult result) {
+        if (session.phase() == PracticeSession.Phase.ENDED) {
+            return;
+        }
+        session.setPhase(PracticeSession.Phase.ENDED);
+        session.cancelTimer();
+        long seconds = session.matchStartMs() <= 0 ? 0
+                : (System.currentTimeMillis() - session.matchStartMs()) / 1000L;
+        PracticeRoom room = get(session.practiceId()).orElse(null);
+        String mode = room == null ? String.valueOf(session.type()) : room.type().name();
+        String roomId = room == null ? "?" : room.id();
+        Bukkit.getLogger().info("[N Arena][BotMatch] END player=" + player.getName()
+                + " mode=" + mode + " room=" + roomId + " result=" + result
+                + " pops=" + session.botPops() + " duration=" + seconds + "s"
+                + " difficulty=" + session.difficulty().preset());
+        NamedTextColor color = switch (result) {
+            case WIN -> NamedTextColor.GREEN;
+            case LOSE -> NamedTextColor.RED;
+            case DRAW -> NamedTextColor.YELLOW;
+        };
+        String key = switch (result) {
+            case WIN -> "practice.bot-result-win";
+            case LOSE -> "practice.bot-result-lose";
+            case DRAW -> "practice.bot-result-draw";
+        };
+        player.showTitle(Title.title(
+                messages.render(player, key).color(color).decorate(TextDecoration.BOLD),
+                messages.render(player, "practice.bot-result-sub",
+                        MessageService.tags("secs", String.valueOf(seconds),
+                                "pops", String.valueOf(session.botPops()))),
+                Title.Times.times(Duration.ofMillis(200), Duration.ofMillis(2500), Duration.ofMillis(400))));
+        player.playSound(player.getLocation(),
+                result == BotMatchResult.WIN ? Sound.UI_TOAST_CHALLENGE_COMPLETE
+                        : Sound.ENTITY_VILLAGER_NO, 1f, 1f);
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (player.isOnline()) {
+                leave(player, true);
+            }
+        }, 60L);
     }
 
     private void beginAnkerCountdown(Player player, PracticeSession session) {
@@ -1148,6 +1396,35 @@ public final class PracticeService {
         player.getInventory().setBoots(new ItemStack(Material.NETHERITE_BOOTS));
     }
 
+    /** Netherite Pot loadout: sword, pots for sustain and burst, apples (map nethpot kit). */
+    public void giveNethPotLoadout(Player player, PracticeSession session) {
+        player.getInventory().clear();
+        player.getInventory().setArmorContents(null);
+        player.getInventory().setItem(0, new ItemStack(Material.NETHERITE_SWORD));
+        player.getInventory().setItem(1, new ItemStack(Material.SPLASH_POTION, 16));
+        player.getInventory().setItem(2, new ItemStack(Material.GOLDEN_APPLE, 8));
+        player.getInventory().setItem(8, PracticeItems.botSettings(messages, player, session.botShieldRaised()));
+        player.getInventory().setHelmet(new ItemStack(Material.NETHERITE_HELMET));
+        player.getInventory().setChestplate(new ItemStack(Material.NETHERITE_CHESTPLATE));
+        player.getInventory().setLeggings(new ItemStack(Material.NETHERITE_LEGGINGS));
+        player.getInventory().setBoots(new ItemStack(Material.NETHERITE_BOOTS));
+    }
+
+    /** Cart PvP loadout: bow + sword, like the map's TNT-minecart fighter. */
+    public void giveCartLoadout(Player player, PracticeSession session) {
+        player.getInventory().clear();
+        player.getInventory().setArmorContents(null);
+        player.getInventory().setItem(0, new ItemStack(Material.BOW));
+        player.getInventory().setItem(1, new ItemStack(Material.NETHERITE_SWORD));
+        player.getInventory().setItem(2, new ItemStack(Material.ARROW, 64));
+        player.getInventory().setItem(3, new ItemStack(Material.GOLDEN_APPLE, 8));
+        player.getInventory().setItem(8, PracticeItems.botSettings(messages, player, session.botShieldRaised()));
+        player.getInventory().setHelmet(new ItemStack(Material.NETHERITE_HELMET));
+        player.getInventory().setChestplate(new ItemStack(Material.NETHERITE_CHESTPLATE));
+        player.getInventory().setLeggings(new ItemStack(Material.NETHERITE_LEGGINGS));
+        player.getInventory().setBoots(new ItemStack(Material.NETHERITE_BOOTS));
+    }
+
     private void spawnCombatBot(Player player, PracticeSession session, PracticeRoom room,
                                 PracticeType type) {
         removeCombatBot(session);
@@ -1174,24 +1451,30 @@ public final class PracticeService {
         if (botLoc.getWorld() == null) {
             return;
         }
-        boolean sword = type == PracticeType.SWORD;
+        String nameKey = switch (type) {
+            case SWORD -> "practice.sword-bot-name";
+            case CRYSTAL -> "practice.crystal-bot-name";
+            case NETHERITE_POT -> "practice.nethpot-bot-name";
+            case CART -> "practice.cart-bot-name";
+            default -> "practice.sword-bot-name";
+        };
+        // Crystal bot dies to one combo (totem pops win the match); the rest tank by difficulty.
+        double maxHp = type == PracticeType.CRYSTAL ? 20.0d : session.difficulty().botMaxHp();
         Mannequin bot = botLoc.getWorld().spawn(botLoc, Mannequin.class, m -> {
-            m.setImmovable(false); // both bot types move: the crystal fighter orbits & retreats
+            m.setImmovable(false); // every fighter moves: orbit, chase, retreat
             m.setGravity(true);
             m.setSilent(true);
             m.setCanPickupItems(false);
             m.setRemoveWhenFarAway(false);
             m.setPersistent(false);
             m.setCollidable(true);
-            m.customName(messages.render(player, sword
-                    ? "practice.sword-bot-name" : "practice.crystal-bot-name"));
+            m.customName(messages.render(player, nameKey));
             m.setCustomNameVisible(true);
             m.setProfile(ResolvableProfile.resolvableProfile(player.getPlayerProfile()));
             if (m.getAttribute(Attribute.MAX_HEALTH) != null) {
-                // Sword bot is a long-lived sparring partner; crystal bot pops in one combo.
-                m.getAttribute(Attribute.MAX_HEALTH).setBaseValue(sword ? 100.0d : 20.0d);
+                m.getAttribute(Attribute.MAX_HEALTH).setBaseValue(maxHp);
             }
-            m.setHealth(sword ? 100.0d : 20.0d);
+            m.setHealth(maxHp);
             equipCombatBot(m, type, session.botShieldRaised());
         });
         session.setCombatBot(bot);
@@ -1209,12 +1492,21 @@ public final class PracticeService {
         eq.setChestplate(new ItemStack(Material.NETHERITE_CHESTPLATE));
         eq.setLeggings(new ItemStack(Material.NETHERITE_LEGGINGS));
         eq.setBoots(new ItemStack(Material.NETHERITE_BOOTS));
-        if (type == PracticeType.SWORD) {
-            eq.setItemInMainHand(new ItemStack(Material.NETHERITE_SWORD));
-            eq.setItemInOffHand(shieldUp ? new ItemStack(Material.SHIELD) : null);
-        } else {
-            eq.setItemInMainHand(new ItemStack(Material.END_CRYSTAL));
-            eq.setItemInOffHand(new ItemStack(Material.TOTEM_OF_UNDYING));
+        switch (type) {
+            case SWORD, NETHERITE_POT -> {
+                eq.setItemInMainHand(new ItemStack(Material.NETHERITE_SWORD));
+                eq.setItemInOffHand(type == PracticeType.NETHERITE_POT
+                        ? new ItemStack(Material.SPLASH_POTION)
+                        : (shieldUp ? new ItemStack(Material.SHIELD) : null));
+            }
+            case CART -> {
+                eq.setItemInMainHand(new ItemStack(Material.BOW));
+                eq.setItemInOffHand(new ItemStack(Material.ARROW));
+            }
+            default -> { // CRYSTAL
+                eq.setItemInMainHand(new ItemStack(Material.END_CRYSTAL));
+                eq.setItemInOffHand(new ItemStack(Material.TOTEM_OF_UNDYING));
+            }
         }
         eq.setHelmetDropChance(0f);
         eq.setChestplateDropChance(0f);
@@ -1241,13 +1533,24 @@ public final class PracticeService {
         long now = System.currentTimeMillis();
         for (PracticeSession session : sessions.values()) {
             PracticeType type = session.type();
-            if (type != PracticeType.SWORD && type != PracticeType.CRYSTAL) {
+            if (!type.botMode() || type == PracticeType.MACE) {
+                continue;
+            }
+            if (session.phase() != PracticeSession.Phase.ACTIVE) {
                 continue;
             }
             Mannequin bot = session.combatBot();
             Player player = Bukkit.getPlayer(session.playerId());
-            if (bot == null || !bot.isValid() || player == null || !player.isOnline()
-                    || player.isDead()) {
+            if (player == null || !player.isOnline() || player.isDead()) {
+                continue;
+            }
+            // Robustness for many concurrent bots: chunk unloads or stray damage can
+            // despawn a mannequin — bring it back at home instead of leaving an empty arena.
+            if (bot == null || !bot.isValid()) {
+                PracticeRoom room = get(session.practiceId()).orElse(null);
+                if (room != null) {
+                    spawnCombatBot(player, session, room, type);
+                }
                 continue;
             }
             Location eye = bot.getEyeLocation();
@@ -1263,10 +1566,15 @@ public final class PracticeService {
                 tickCrystalBot(player, session, bot, now);
                 continue;
             }
+            if (type == PracticeType.CART) {
+                tickCartBot(player, session, bot, now);
+                continue;
+            }
 
-            // --- sword bot: chase, strafe, attack ---
-            if (now - session.botLastDamagedMs() > 3000L) {
-                healToward(bot, 100.0d, 0.5d);
+            // --- sword & netherite-pot bots: chase, strafe, swing (difficulty-tuned) ---
+            BotDifficulty diff = session.difficulty();
+            if (now - session.botLastDamagedMs() > 3000L && diff.regenPerSecond() > 0) {
+                healToward(bot, diff.botMaxHp(), diff.regenPerSecond() / 20.0d);
             }
             boolean blocking = session.botShieldRaised();
             double distSq = bot.getLocation().distanceSquared(player.getLocation());
@@ -1280,19 +1588,111 @@ public final class PracticeService {
                         session.setBotStrafeFlipMs(now + 1500L + java.util.concurrent.ThreadLocalRandom.current().nextInt(1500));
                     }
                     Vector side = new Vector(-dir.getZ(), 0, dir.getX())
-                            .multiply(0.16d * session.botStrafeDir());
-                    bot.setVelocity(dir.multiply(blocking ? 0.10d : 0.24d).add(side)
-                            .setY(bot.getVelocity().getY()));
+                            .multiply(diff.moveSpeed() * 0.66d * session.botStrafeDir());
+                    bot.setVelocity(dir.multiply(blocking ? diff.moveSpeed() * 0.4d : diff.moveSpeed())
+                            .add(side).setY(bot.getVelocity().getY()));
                 }
             } else {
                 bot.setVelocity(new Vector(0, bot.getVelocity().getY(), 0));
             }
             if (!blocking && distSq <= 3.2d * 3.2d && now >= session.botNextAttackMs()) {
                 bot.swingMainHand();
-                player.damage(5.0d, bot);
-                session.setBotNextAttackMs(now + 650L
-                        + java.util.concurrent.ThreadLocalRandom.current().nextInt(450));
+                player.damage(diff.attackDamage(), bot);
+                session.setBotNextAttackMs(now + diff.attackIntervalMs()
+                        + java.util.concurrent.ThreadLocalRandom.current().nextInt(300));
             }
+            if (type == PracticeType.NETHERITE_POT) {
+                tickNethPotPotions(player, session, bot, now);
+            }
+        }
+    }
+
+    /**
+     * Netherite-pot fighter extras (map "NETHERITE POT" mode): drinks a healing splash
+     * when hurt, hurls harming splashes at a close-range player.
+     */
+    private void tickNethPotPotions(Player player, PracticeSession session, Mannequin bot, long now) {
+        if (now < session.botPotionUntilMs()) {
+            return;
+        }
+        BotDifficulty diff = session.difficulty();
+        double hp = bot.getHealth();
+        if (hp < diff.botMaxHp() * 0.5d) {
+            // Chug: instant heal + red sparkle.
+            healToward(bot, diff.botMaxHp(), 8.0d);
+            if (bot.getWorld() != null) {
+                bot.getWorld().spawnParticle(org.bukkit.Particle.ENTITY_EFFECT,
+                        bot.getLocation().add(0, 1.2, 0), 24, 0.4, 0.6, 0.4, 1.0d,
+                        org.bukkit.Color.fromRGB(0xF82423));
+            }
+        } else if (bot.getLocation().distanceSquared(player.getLocation()) <= 4.5d * 4.5d) {
+            // Splash of harming at the player.
+            player.damage(3.0d, bot);
+            player.sendActionBar(messages.render(player, "practice.bot-pot-hit"));
+            if (player.getWorld() != null) {
+                player.getWorld().spawnParticle(org.bukkit.Particle.ENTITY_EFFECT,
+                        player.getLocation().add(0, 1, 0), 30, 0.4, 0.8, 0.4, 1.0d,
+                        org.bukkit.Color.fromRGB(0x43075A));
+            }
+        } else {
+            return; // nothing to drink or throw yet
+        }
+        session.setBotPotionUntilMs(now + diff.comboCooldownMs() + 1500L);
+    }
+
+    /**
+     * Cart PvP fighter (map "TNT MINECART" mode): the bot kites with a bow and rolls
+     * primed TNT at the player — our native take on rail-cart detonation practice.
+     */
+    private void tickCartBot(Player player, PracticeSession session, Mannequin bot, long now) {
+        BotDifficulty diff = session.difficulty();
+        if (now - session.botLastDamagedMs() > 3000L && diff.regenPerSecond() > 0) {
+            healToward(bot, diff.botMaxHp(), diff.regenPerSecond() / 20.0d);
+        }
+        Location botLoc = bot.getLocation();
+        double dist = botLoc.distance(player.getLocation());
+        Vector dir = player.getLocation().toVector().subtract(botLoc.toVector()).setY(0);
+        if (dir.lengthSquared() < 0.0001) {
+            return;
+        }
+        dir.normalize();
+        if (now >= session.botStrafeFlipMs()) {
+            session.setBotStrafeDir(-session.botStrafeDir());
+            session.setBotStrafeFlipMs(now + 1200L + java.util.concurrent.ThreadLocalRandom.current().nextInt(1600));
+        }
+        Vector side = new Vector(-dir.getZ(), 0, dir.getX())
+                .multiply(diff.moveSpeed() * 0.75d * session.botStrafeDir());
+        Vector move;
+        if (dist < 4.0d) {
+            move = dir.clone().multiply(-diff.moveSpeed()).add(side);  // keep bow range
+        } else if (dist > 9.0d) {
+            move = dir.clone().multiply(diff.moveSpeed()).add(side);
+        } else {
+            move = side;
+        }
+        bot.setVelocity(move.setY(bot.getVelocity().getY()));
+
+        // Arrow volley (the map detonates TNT carts with arrows — we keep the bow pressure).
+        if (now >= session.botNextAttackMs()) {
+            bot.swingMainHand();
+            org.bukkit.entity.Arrow arrow = bot.getWorld().spawnArrow(
+                    bot.getEyeLocation(), dir.setY(0.06d).normalize().multiply(1.6d), 1.6f, 2.0f);
+            arrow.setShooter(bot);
+            arrow.setDamage(diff.attackDamage() * 0.6d);
+            long jitter = java.util.concurrent.ThreadLocalRandom.current().nextInt(400);
+            session.setBotNextAttackMs(now + 1000L + jitter);
+        }
+        // Rolling TNT "cart" every combo cooldown.
+        if (now >= session.botNextCartMs()) {
+            org.bukkit.entity.TNTPrimed tnt = bot.getWorld().spawn(
+                    botLoc.add(0, 1.1, 0), org.bukkit.entity.TNTPrimed.class, t -> {
+                        t.setFuseTicks(26);
+                        t.setYield(4.0f);
+                        t.setSource(bot);
+                    });
+            tnt.setVelocity(dir.clone().normalize().multiply(0.85d).setY(0.18d));
+            session.botTnt().add(tnt.getUniqueId());
+            session.setBotNextCartMs(now + diff.comboCooldownMs());
         }
     }
 
@@ -1438,7 +1838,7 @@ public final class PracticeService {
         }
     }
 
-    /** Removes the bot's crystals and restores every obsidian pedestal it placed. */
+    /** Removes the bot's crystals / TNT and restores every obsidian pedestal it placed. */
     private void clearBotArtifacts(PracticeSession session) {
         for (java.util.UUID crystalId : java.util.List.copyOf(session.botCrystals())) {
             org.bukkit.entity.Entity entity = Bukkit.getEntity(crystalId);
@@ -1447,6 +1847,13 @@ public final class PracticeService {
             }
         }
         session.botCrystals().clear();
+        for (java.util.UUID tntId : java.util.List.copyOf(session.botTnt())) {
+            org.bukkit.entity.Entity entity = Bukkit.getEntity(tntId);
+            if (entity != null && entity.isValid()) {
+                entity.remove();
+            }
+        }
+        session.botTnt().clear();
         for (org.bukkit.block.Block block : session.botPlacedBlocks().keySet()) {
             if (block.getType() == Material.OBSIDIAN) {
                 block.setType(Material.AIR);
@@ -1467,20 +1874,24 @@ public final class PracticeService {
         if (bot == null || !bot.isValid()) {
             return false;
         }
-        // The crystal bot never pops to its own combo crystals.
+        BotDifficulty diff = session.difficulty();
+        // The bot never dies to its own combo weapons (crystals / TNT carts).
         if (event instanceof org.bukkit.event.entity.EntityDamageByEntityEvent byEntity
-                && session.botCrystals().contains(byEntity.getDamager().getUniqueId())) {
+                && (session.botCrystals().contains(byEntity.getDamager().getUniqueId())
+                        || session.botTnt().contains(byEntity.getDamager().getUniqueId()))) {
             event.setCancelled(true);
             return true;
         }
         session.setBotLastDamagedMs(System.currentTimeMillis());
         boolean explosion = event.getCause() == EntityDamageEvent.DamageCause.ENTITY_EXPLOSION
                 || event.getCause() == EntityDamageEvent.DamageCause.BLOCK_EXPLOSION;
-        // Shield stance halves incoming melee — and punishes mindless swinging with a stun,
+        // Shield stance reduces incoming melee — and punishes mindless swinging with a stun,
         // exactly like the Quantum map's "shield stunning" toggle.
-        if (session.type() == PracticeType.SWORD && session.botShieldRaised() && !explosion) {
-            event.setDamage(event.getDamage() * 0.5d);
-            if (event.getCause() == EntityDamageEvent.DamageCause.ENTITY_ATTACK) {
+        if ((session.type() == PracticeType.SWORD || session.type() == PracticeType.NETHERITE_POT)
+                && session.botShieldRaised() && !explosion) {
+            event.setDamage(event.getDamage() * (1.0d - diff.shieldReduction()));
+            if (diff.shieldStun()
+                    && event.getCause() == EntityDamageEvent.DamageCause.ENTITY_ATTACK) {
                 player.addPotionEffect(new org.bukkit.potion.PotionEffect(
                         org.bukkit.potion.PotionEffectType.SLOWNESS, 18, 1));
                 player.sendActionBar(messages.render(player, "practice.bot-shield-stun"));
@@ -1493,18 +1904,29 @@ public final class PracticeService {
             return false;
         }
         event.setCancelled(true);
+        boolean matchLive = session.phase() == PracticeSession.Phase.ACTIVE;
         if (session.type() == PracticeType.CRYSTAL) {
             session.incrementBotPops();
-            player.sendActionBar(messages.render(player, "practice.bot-pop",
-                    MessageService.tags("pops", String.valueOf(session.botPops()))));
             player.playSound(bot.getLocation(), Sound.ITEM_TOTEM_USE, 1.0f, 1.0f);
             if (bot.getWorld() != null) {
                 bot.getWorld().spawnParticle(org.bukkit.Particle.TOTEM_OF_UNDYING,
                         bot.getLocation().add(0, 1, 0), 80, 0.5, 1.0, 0.5, 0.4);
             }
+            if (matchLive && session.botPops() >= diff.totemGoal()) {
+                endBotMatch(player, session, BotMatchResult.WIN);
+                return true;
+            }
+            player.sendActionBar(messages.render(player, "practice.bot-pop",
+                    MessageService.tags("pops", session.botPops() + "/" + diff.totemGoal())));
             session.setBotRetreatUntilMs(System.currentTimeMillis() + 1200L);
             respawnCombatBot(player, session);
         } else {
+            if (matchLive) {
+                // One full takedown wins the match.
+                player.playSound(bot.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 1.4f);
+                endBotMatch(player, session, BotMatchResult.WIN);
+                return true;
+            }
             session.incrementBotPops();
             player.sendActionBar(messages.render(player, "practice.bot-down",
                     MessageService.tags("kills", String.valueOf(session.botPops()))));

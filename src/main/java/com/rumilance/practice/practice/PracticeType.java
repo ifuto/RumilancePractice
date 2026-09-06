@@ -11,7 +11,15 @@ public enum PracticeType {
     ANKER,
     MACE,
     SWORD,
-    CRYSTAL;
+    CRYSTAL,
+    NETHERITE_POT,
+    CART;
+
+    /** Every type that runs a combat bot (battle-menu "Bot" modes). */
+    public boolean botMode() {
+        return this == MACE || this == SWORD || this == CRYSTAL
+                || this == NETHERITE_POT || this == CART;
+    }
 
     public static PracticeType parse(String raw) {
         if (raw == null || raw.isBlank()) {

@@ -33,7 +33,7 @@ public final class PracticeCommand implements CommandExecutor, TabCompleter {
     private static final Set<String> FORBIDDEN = Set.of(
             "draft", "pos1", "pos2", "p1", "p2", "save", "enable", "disable", "delete", "list",
             "info", "tp", "anker", "mace", "type", "selection", "apply", "create", "selectionapply",
-            "botpos"
+            "botpos", "bindkit"
     );
 
     private final PracticeService practiceService;
@@ -60,7 +60,7 @@ public final class PracticeCommand implements CommandExecutor, TabCompleter {
             case "draft" -> {
                 if (args.length < 3) {
                     player.sendMessage(Component.text(
-                            "Usage: /practice draft <Name> <ANKER|MACE|SWORD|CRYSTAL>", NamedTextColor.YELLOW));
+                            "Usage: /practice draft <Name> <ANKER|MACE|SWORD|CRYSTAL|NETHERITE_POT|CART>", NamedTextColor.YELLOW));
                     yield true;
                 }
                 String id = args[1];
@@ -72,7 +72,7 @@ public final class PracticeCommand implements CommandExecutor, TabCompleter {
                 try {
                     type = PracticeType.parse(args[2]);
                 } catch (Exception e) {
-                    player.sendMessage(Component.text("Type must be ANKER, MACE, SWORD or CRYSTAL.", NamedTextColor.RED));
+                    player.sendMessage(Component.text("Type must be ANKER, MACE, SWORD, CRYSTAL, NETHERITE_POT or CART.", NamedTextColor.RED));
                     yield true;
                 }
                 practiceService.createDraft(id, type);
@@ -142,6 +142,35 @@ public final class PracticeCommand implements CommandExecutor, TabCompleter {
                 player.sendMessage(Component.text(ok
                         ? "Bot home set here. The practice bot spawns at this spot."
                         : "Draft/room not found.", ok ? NamedTextColor.GREEN : NamedTextColor.RED));
+                yield true;
+            }
+            case "bindkit" -> {
+                if (args.length < 3) {
+                    player.sendMessage(Component.text(
+                            "Usage: /practice bindkit <SWORD|CRYSTAL|MACE|NETHERITE_POT|CART> <kit|clear>",
+                            NamedTextColor.YELLOW));
+                    yield true;
+                }
+                PracticeType mode;
+                try {
+                    mode = PracticeType.parse(args[1]);
+                } catch (Exception e) {
+                    player.sendMessage(Component.text(
+                            "Mode must be SWORD, CRYSTAL, MACE, NETHERITE_POT or CART.", NamedTextColor.RED));
+                    yield true;
+                }
+                String kitName = args[2].equalsIgnoreCase("clear") ? null : args[2];
+                if (kitName != null && !practiceService.kitExists(kitName)) {
+                    player.sendMessage(Component.text("Unknown kit: " + kitName, NamedTextColor.RED));
+                    yield true;
+                }
+                if (!practiceService.bindBotKit(mode, kitName)) {
+                    player.sendMessage(Component.text("Not a bot mode.", NamedTextColor.RED));
+                    yield true;
+                }
+                player.sendMessage(Component.text(kitName == null
+                        ? mode + " kit binding cleared (built-in gear)."
+                        : mode + " now uses server kit '" + kitName + "'.", NamedTextColor.GREEN));
                 yield true;
             }
             case "save" -> {
@@ -257,8 +286,8 @@ public final class PracticeCommand implements CommandExecutor, TabCompleter {
         String current = TabCompletions.current(args);
         if (args.length == 1) {
             return TabCompletions.filter(current,
-                    "draft", "pos1", "pos2", "selection", "p1", "botpos", "save", "enable", "disable",
-                    "delete", "list", "info", "tp");
+                    "draft", "pos1", "pos2", "selection", "p1", "botpos", "bindkit", "save",
+                    "enable", "disable", "delete", "list", "info", "tp");
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
         List<String> names = new ArrayList<>();
@@ -268,6 +297,8 @@ public final class PracticeCommand implements CommandExecutor, TabCompleter {
             return switch (sub) {
                 case "draft" -> List.of();
                 case "selection" -> TabCompletions.filter(current, "apply");
+                case "bindkit" -> TabCompletions.filter(current,
+                        "SWORD", "CRYSTAL", "MACE", "NETHERITE_POT", "CART");
                 case "p1", "botpos", "save", "enable", "disable", "delete", "info", "tp" ->
                         TabCompletions.filter(current, names);
                 default -> List.of();
@@ -275,7 +306,7 @@ public final class PracticeCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length == 3) {
             if (sub.equals("draft")) {
-                return TabCompletions.filter(current, "ANKER", "MACE", "SWORD", "CRYSTAL");
+                return TabCompletions.filter(current, "ANKER", "MACE", "SWORD", "CRYSTAL", "NETHERITE_POT", "CART");
             }
             if (sub.equals("selection") && args[1].equalsIgnoreCase("apply")) {
                 return TabCompletions.filter(current, names);
