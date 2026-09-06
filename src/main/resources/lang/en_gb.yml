@@ -29,6 +29,25 @@ queue:
   high-ping: "<red>Your ping (<ping>ms) is too high for ranked (max <max>ms)."
   joined: "<green>Joined the <mode> queue for <yellow><kit></yellow>."
   left: "<grey>Left the queue."
+  sign-full: "<red>That queue is full (2/2)."
+  sign-waiting: "<aqua>Queue <kit> | <seconds>s | <count>/<capacity>"
+  waiting-bar: "<aqua>Queue <kit> (<platform>) | <seconds>s | <waiting> waiting"
+
+tell:
+  usage: "<grey>Usage:</grey> <yellow>/tell \\<player> \\<message></yellow>"
+  usage-reply: "<grey>Usage:</grey> <yellow>/reply \\<message></yellow>"
+  no-reply: "<red>Nobody to reply to."
+  offline: "<red>Player <target> not found."
+  self: "<red>You cannot message yourself."
+  to: "<gold>To <target></gold> <grey>»</grey> <white><message></white>"
+  from: "<aqua>From <target></aqua> <grey>»</grey> <white><message></white>"
+
+packpolicy:
+  usage: "<gray>Usage:</gray> <yellow>/packpolicy [required|recommended|status]</yellow>"
+  set-required: "<red>Resource pack policy: REQUIRED — players who decline/fail the pack are kicked."
+  set-recommended: "<green>Resource pack policy: RECOMMENDED — players may decline and keep playing (text rank badges)."
+  status-required: "<gray>Resource pack policy:</gray> <red>REQUIRED</red> <gray>(decline/fail = kick)</gray>"
+  status-recommended: "<gray>Resource pack policy:</gray> <green>RECOMMENDED</green> <gray>(decline = join, text badges N / N+ / OWNER)</gray>"
 
 match:
   countdown: "<yellow>Match starting in <seconds>..."
@@ -50,6 +69,9 @@ settings:
 
 arena:
   created: "<green>Arena <arena> created."
+
+menu:
+  leave-queue: "Leave Queue"
 
 gui:
   language-title: "Select Language"
@@ -329,6 +351,21 @@ gui:
   admin-wand-lore-1: "Use the hotbar blaze rod"
   admin-wand-lore-2: "Left-click = pos1 / right = pos2"
   admin-wand-lore-3: "Then confirm with /arena or /ffa"
+  admin-pack-policy: "Resource Pack Policy"
+  admin-pack-policy-now-required: "Now: REQUIRED (kick on decline)"
+  admin-pack-policy-now-recommended: "Now: RECOMMENDED (join without)"
+  admin-pack-policy-lore-1: "Required kicks players who decline the pack"
+  admin-pack-policy-lore-2: "or fail to download it."
+  admin-pack-policy-lore-3: "Recommended lets them join — badges become N / N+ / OWNER text."
+  admin-pack-policy-changed-required: "Resource pack: REQUIRED — declining players are kicked."
+  admin-pack-policy-changed-recommended: "Resource pack: RECOMMENDED — players may decline and keep playing."
+  admin-sign: "Queue Sign"
+  admin-sign-lore-1: "Take an Unranked Queue sign."
+  admin-sign-lore-2: "Pick the kit; unlimited supply."
+  sign-kit-title: "Queue Sign Kit"
+  sign-kit-give-lore: "Receive the queue sign for this kit"
+  sign-kit-item-lore: "Place to create an Unranked Queue sign"
+  sign-kit-item-hint: "Place to create a queue sign"
   saved: "Saved"
   unsaved: "Empty"
   original-edit-title: "Edit original kit"

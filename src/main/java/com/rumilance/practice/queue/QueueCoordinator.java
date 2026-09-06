@@ -15,7 +15,6 @@ import com.rumilance.practice.state.MatchMode;
 import com.rumilance.practice.state.PlayerState;
 import com.rumilance.practice.util.AsyncExecutor;
 import com.rumilance.practice.util.ItemKeys;
-import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
@@ -242,8 +241,10 @@ public final class QueueCoordinator {
                 long waited = now.getEpochSecond() - entry.joinedAt().getEpochSecond();
                 int waiting = queueService.waitingCount(entry.mode(), entry.kitId(), entry.platform());
                 String platformLabel = entry.platform() == PlayerPlatform.BEDROCK ? "BE" : "Java";
-                player.sendActionBar(Component.text("Queue " + entry.kitId() + " (" + platformLabel + ") | "
-                        + waited + "s | " + waiting + " waiting", NamedTextColor.AQUA));
+                player.sendActionBar(messageService.render(player, "queue.waiting-bar",
+                        MessageService.tags("kit", entry.kitId(), "platform", platformLabel,
+                                "seconds", String.valueOf(waited),
+                                "waiting", String.valueOf(waiting))));
             });
         }
     }
@@ -251,7 +252,8 @@ public final class QueueCoordinator {
     private void giveLeaveItem(Player player) {
         ItemStack item = new ItemStack(Material.RED_DYE);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(Component.text("Leave Queue", NamedTextColor.RED)
+        meta.displayName(messageService.render(player, "menu.leave-queue")
+                .color(NamedTextColor.RED)
                 .decoration(TextDecoration.ITALIC, false));
         meta.getPersistentDataContainer().set(ItemKeys.leaveQueue(), PersistentDataType.BYTE, (byte) 1);
         item.setItemMeta(meta);

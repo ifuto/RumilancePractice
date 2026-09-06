@@ -84,6 +84,25 @@ queue:
   high-ping: "<red>핑(<ping>ms)이 너무 높아 랭크에 참여할 수 없습니다 (최대 <max>ms)."
   joined: "<green><yellow><kit></yellow> <mode> 대기열에 참여했습니다."
   left: "<gray>대기열에서 나갔습니다."
+  sign-full: "<red>해당 대기열이 가득 찼습니다 (2/2)."
+  sign-waiting: "<aqua><kit> 대기열 | <seconds>초 | <count>/<capacity>"
+  waiting-bar: "<aqua><kit> (<platform>) 대기열 | <seconds>초 | <waiting>명 대기 중"
+
+tell:
+  usage: "<gray>사용법:</gray> <yellow>/tell \\<player> \\<message></yellow>"
+  usage-reply: "<gray>사용법:</gray> <yellow>/reply \\<message></yellow>"
+  no-reply: "<red>답장할 상대가 없습니다."
+  offline: "<red>플레이어 <target> 님을 찾을 수 없습니다."
+  self: "<red>자기 자신에게는 메시지를 보낼 수 없습니다."
+  to: "<gold>To <target></gold> <gray>»</gray> <white><message></white>"
+  from: "<aqua>From <target></aqua> <gray>»</gray> <white><message></white>"
+
+packpolicy:
+  usage: "<gray>사용법:</gray> <yellow>/packpolicy [required|recommended|status]</yellow>"
+  set-required: "<red>리소스팩 정책: 필수 — 팩을 거부하거나 다운로드에 실패한 플레이어는 추방됩니다."
+  set-recommended: "<green>리소스팩 정책: 권장 — 거부해도 계속 플레이할 수 있습니다 (텍스트 랭크 배지)."
+  status-required: "<gray>리소스팩 정책:</gray> <red>필수</red> <gray>(거부/실패 = 추방)</gray>"
+  status-recommended: "<gray>리소스팩 정책:</gray> <green>권장</green> <gray>(거부 = 참여 가능, 텍스트 배지 N / N+ / OWNER)</gray>"
 
 match:
   countdown: "<yellow>경기가 <seconds>초 후 시작됩니다..."
@@ -104,6 +123,9 @@ match:
   opponent-left-countdown: "<gray>상대가 카운트다운 중에 나가 경기가 취소되었습니다."
   leave-banned: "<red>카운트다운 중 연속 퇴장이 잦아 3일간 채팅이 제한되었습니다."
   leave-ban-reason: "시작 전 카운트다운 중 연속 퇴장"
+
+menu:
+  leave-queue: "대기열 나가기"
 
 gui:
   language-title: "언어 선택"
@@ -383,6 +405,21 @@ gui:
   admin-wand-lore-1: "Use the hotbar blaze rod"
   admin-wand-lore-2: "Left-click = pos1 / right = pos2"
   admin-wand-lore-3: "Then confirm with /arena or /ffa"
+  admin-pack-policy: "리소스팩 정책"
+  admin-pack-policy-now-required: "현재: 필수 (거부 시 추방)"
+  admin-pack-policy-now-recommended: "현재: 권장 (미적용 상태로 참여 가능)"
+  admin-pack-policy-lore-1: "필수: 팩을 거부하거나 다운로드에"
+  admin-pack-policy-lore-2: "실패한 플레이어는 추방됩니다."
+  admin-pack-policy-lore-3: "권장: 참여 가능하며 배지가 N / N+ / OWNER 텍스트로 표시됩니다."
+  admin-pack-policy-changed-required: "리소스팩: 필수로 변경 — 거부하는 플레이어는 추방됩니다."
+  admin-pack-policy-changed-recommended: "리소스팩: 권장으로 변경 — 거부해도 계속 플레이할 수 있습니다."
+  admin-sign: "대기열 표지판"
+  admin-sign-lore-1: "Unranked Queue 표지판을 받습니다."
+  admin-sign-lore-2: "킷을 선택하세요. 무제한 공급."
+  sign-kit-title: "대기열 표지판 킷 선택"
+  sign-kit-give-lore: "이 킷의 대기열 표지판을 받습니다"
+  sign-kit-item-lore: "설치하면 Unranked Queue 표지판이 생성됩니다"
+  sign-kit-item-hint: "설치하면 대기열 표지판이 생성됩니다"
   saved: "Saved"
   unsaved: "Empty"
   original-edit-title: "Edit original kit"

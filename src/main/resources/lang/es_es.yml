@@ -31,6 +31,25 @@ queue:
   high-ping: "<red>Tu ping (<ping>ms) es demasiado alto para ranked (máx <max>ms)."
   joined: "<green>Te uniste a la cola <mode> de <yellow><kit></yellow>."
   left: "<gray>Saliste de la cola."
+  sign-full: "<red>Esa cola está llena (2/2)."
+  sign-waiting: "<aqua>Cola <kit> | <seconds>s | <count>/<capacity>"
+  waiting-bar: "<aqua>Cola <kit> (<platform>) | <seconds>s | <waiting> en espera"
+
+tell:
+  usage: "<gray>Uso:</gray> <yellow>/tell \\<player> \\<message></yellow>"
+  usage-reply: "<gray>Uso:</gray> <yellow>/reply \\<message></yellow>"
+  no-reply: "<red>No hay nadie a quien responder."
+  offline: "<red>Jugador <target> no encontrado."
+  self: "<red>No puedes enviarte mensajes a ti mismo."
+  to: "<gold>To <target></gold> <gray>»</gray> <white><message></white>"
+  from: "<aqua>From <target></aqua> <gray>»</gray> <white><message></white>"
+
+packpolicy:
+  usage: "<gray>Uso:</gray> <yellow>/packpolicy [required|recommended|status]</yellow>"
+  set-required: "<red>Política del paquete de recursos: OBLIGATORIO — los jugadores que lo rechacen o fallen al descargarlo serán expulsados."
+  set-recommended: "<green>Política del paquete de recursos: RECOMENDADO — los jugadores pueden rechazarlo y seguir jugando (insignias de texto)."
+  status-required: "<gray>Política del paquete de recursos:</gray> <red>OBLIGATORIO</red> <gray>(rechazo/fallo = expulsión)</gray>"
+  status-recommended: "<gray>Política del paquete de recursos:</gray> <green>RECOMENDADO</green> <gray>(rechazo = puede entrar, insignias N / N+ / OWNER)</gray>"
 
 match:
   countdown: "<yellow>La partida empieza en <seconds>..."
@@ -56,6 +75,7 @@ settings:
   invalid-value: "<red>'<value>' no es un valor válido para <key>."
 
 menu:
+  leave-queue: "Salir de la cola"
   close: "Cerrar"
   back: "Atrás"
 

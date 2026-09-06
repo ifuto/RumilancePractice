@@ -31,6 +31,25 @@ queue:
   high-ping: "<red>你的延迟 (<ping>ms) 过高，无法排位（上限 <max>ms）。"
   joined: "<green>已加入 <yellow><kit></yellow> 的 <mode> 队列。"
   left: "<gray>已离开队列。"
+  sign-full: "<red>该队列已满 (2/2)。"
+  sign-waiting: "<aqua><kit> 队列 | 已等待 <seconds> 秒 | <count>/<capacity>"
+  waiting-bar: "<aqua><kit> (<platform>) 队列 | 已等待 <seconds> 秒 | <waiting> 人等待中"
+
+tell:
+  usage: "<gray>用法：</gray> <yellow>/tell \\<player> \\<message></yellow>"
+  usage-reply: "<gray>用法：</gray> <yellow>/reply \\<message></yellow>"
+  no-reply: "<red>没有可回复的对象。"
+  offline: "<red>找不到玩家 <target>。"
+  self: "<red>不能给自己发送私信。"
+  to: "<gold>To <target></gold> <gray>»</gray> <white><message></white>"
+  from: "<aqua>From <target></aqua> <gray>»</gray> <white><message></white>"
+
+packpolicy:
+  usage: "<gray>用法：</gray> <yellow>/packpolicy [required|recommended|status]</yellow>"
+  set-required: "<red>资源包策略：必须 — 拒绝或下载失败的玩家将被踢出。"
+  set-recommended: "<green>资源包策略：推荐 — 玩家可以拒绝并继续游玩（文字段位徽章）。"
+  status-required: "<gray>资源包策略：</gray> <red>必须</red> <gray>（拒绝/失败 = 踢出）</gray>"
+  status-recommended: "<gray>资源包策略：</gray> <green>推荐</green> <gray>（拒绝 = 可加入，文字徽章 N / N+ / OWNER）</gray>"
 
 match:
   countdown: "<yellow>比赛将在 <seconds> 秒后开始……"
@@ -56,6 +75,7 @@ settings:
   invalid-value: "<red>'<value>' 不是 <key> 的有效值。"
 
 menu:
+  leave-queue: "离开队列"
   close: "关闭"
   back: "返回"
 

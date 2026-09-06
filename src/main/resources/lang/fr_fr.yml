@@ -31,6 +31,25 @@ queue:
   high-ping: "<red>Ton ping (<ping>ms) est trop élevé pour le ranked (max <max>ms)."
   joined: "<green>Tu as rejoint la file <mode> de <yellow><kit></yellow>."
   left: "<gray>Tu as quitté la file."
+  sign-full: "<red>Cette file est pleine (2/2)."
+  sign-waiting: "<aqua>File <kit> | <seconds> s | <count>/<capacity>"
+  waiting-bar: "<aqua>File <kit> (<platform>) | <seconds> s | <waiting> en attente"
+
+tell:
+  usage: "<gray>Utilisation :</gray> <yellow>/tell \\<player> \\<message></yellow>"
+  usage-reply: "<gray>Utilisation :</gray> <yellow>/reply \\<message></yellow>"
+  no-reply: "<red>Personne à qui répondre."
+  offline: "<red>Joueur <target> introuvable."
+  self: "<red>Impossible de vous envoyer un message à vous-même."
+  to: "<gold>To <target></gold> <gray>»</gray> <white><message></white>"
+  from: "<aqua>From <target></aqua> <gray>»</gray> <white><message></white>"
+
+packpolicy:
+  usage: "<gray>Utilisation :</gray> <yellow>/packpolicy [required|recommended|status]</yellow>"
+  set-required: "<red>Politique du pack de ressources : OBLIGATOIRE — les joueurs qui refusent ou échouent au téléchargement sont expulsés."
+  set-recommended: "<green>Politique du pack de ressources : RECOMMANDÉ — les joueurs peuvent refuser et continuer à jouer (badges texte)."
+  status-required: "<gray>Politique du pack de ressources :</gray> <red>OBLIGATOIRE</red> <gray>(refus/échec = expulsion)</gray>"
+  status-recommended: "<gray>Politique du pack de ressources :</gray> <green>RECOMMANDÉ</green> <gray>(refus = peut rejoindre, badges N / N+ / OWNER)</gray>"
 
 match:
   countdown: "<yellow>Le match commence dans <seconds>..."
@@ -56,6 +75,7 @@ settings:
   invalid-value: "<red>'<value>' n'est pas une valeur valide pour <key>."
 
 menu:
+  leave-queue: "Quitter la file"
   close: "Fermer"
   back: "Retour"
 

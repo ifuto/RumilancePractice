@@ -395,8 +395,11 @@ public final class SignQueueService implements Listener {
         String kitLabel = kitService.get(kitId)
                 .map(KitDefinition::prettyDisplayName).orElse(kitId);
         int count = waitingCount(kitId);
-        sign.getSide(Side.FRONT).line(0, Component.text("Unranked Queue",
-                NamedTextColor.GOLD).decoration(TextDecoration.BOLD, true));
+        // Signs are world blocks seen by everyone — render the title once in the server's
+        // default locale rather than per viewer.
+        sign.getSide(Side.FRONT).line(0, messageService.render(
+                        messageService.localeService().defaultLocale(), "gui.unranked-queue")
+                .color(NamedTextColor.GOLD).decoration(TextDecoration.BOLD, true));
         sign.getSide(Side.FRONT).line(1, Component.text(kitLabel, NamedTextColor.AQUA));
         sign.getSide(Side.FRONT).line(2, Component.empty());
         sign.getSide(Side.FRONT).line(3, Component.text(
@@ -481,8 +484,11 @@ public final class SignQueueService implements Listener {
                     continue;
                 }
                 long waited = now.getEpochSecond() - waiter.joinedAt().getEpochSecond();
-                player.sendActionBar(Component.text("Queue " + entry.getKey() + " | "
-                        + waited + "s | " + waiters.size() + " / " + CAPACITY, NamedTextColor.AQUA));
+                player.sendActionBar(messageService.render(player, "queue.sign-waiting",
+                        MessageService.tags("kit", entry.getKey(),
+                                "seconds", String.valueOf(waited),
+                                "count", String.valueOf(waiters.size()),
+                                "capacity", String.valueOf(CAPACITY))));
             }
         }
     }
@@ -498,7 +504,8 @@ public final class SignQueueService implements Listener {
     private void giveLeaveItem(Player player) {
         ItemStack item = new ItemStack(Material.RED_DYE);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(Component.text("Leave Queue", NamedTextColor.RED)
+        meta.displayName(messageService.render(player, "menu.leave-queue")
+                .color(NamedTextColor.RED)
                 .decoration(TextDecoration.ITALIC, false));
         meta.getPersistentDataContainer().set(ItemKeys.leaveQueue(), PersistentDataType.BYTE, (byte) 1);
         item.setItemMeta(meta);

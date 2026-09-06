@@ -1,8 +1,7 @@
 package com.rumilance.practice.command;
 
+import com.rumilance.practice.locale.MessageService;
 import com.rumilance.practice.resourcepack.ResourcePackService;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -20,9 +19,11 @@ import java.util.List;
 public final class PackPolicyCommand implements CommandExecutor, TabCompleter {
 
     private final ResourcePackService packService;
+    private final MessageService messageService;
 
-    public PackPolicyCommand(ResourcePackService packService) {
+    public PackPolicyCommand(ResourcePackService packService, MessageService messageService) {
         this.packService = packService;
+        this.messageService = messageService;
     }
 
     @Override
@@ -31,7 +32,7 @@ public final class PackPolicyCommand implements CommandExecutor, TabCompleter {
         // Console (any non-player sender) and admins only.
         if (sender instanceof org.bukkit.entity.Player
                 && !sender.hasPermission("rumilance.admin")) {
-            sender.sendMessage(Component.text("No permission.", NamedTextColor.RED));
+            messageService.send(sender, "general.no-permission");
             return true;
         }
         if (args.length == 0) {
@@ -42,30 +43,23 @@ public final class PackPolicyCommand implements CommandExecutor, TabCompleter {
         switch (mode) {
             case "required", "must", "on" -> {
                 packService.setRequired(true);
-                sender.sendMessage(Component.text("Resource pack policy: REQUIRED"
-                        + " — players who decline/fail the pack are kicked.", NamedTextColor.RED));
+                messageService.send(sender, "packpolicy.set-required");
             }
             case "recommended", "optional", "off" -> {
                 packService.setRequired(false);
-                sender.sendMessage(Component.text("Resource pack policy: RECOMMENDED"
-                        + " — players may decline and keep playing (text rank badges).",
-                        NamedTextColor.GREEN));
+                messageService.send(sender, "packpolicy.set-recommended");
             }
             case "status", "info" -> status(sender);
-            default -> sender.sendMessage(Component.text(
-                    "Usage: /packpolicy [required|recommended|status]", NamedTextColor.YELLOW));
+            default -> messageService.send(sender, "packpolicy.usage");
         }
         return true;
     }
 
     private void status(CommandSender sender) {
         boolean required = packService.required();
-        sender.sendMessage(Component.text("Resource pack policy: ", NamedTextColor.GRAY)
-                .append(Component.text(required ? "REQUIRED" : "RECOMMENDED",
-                        required ? NamedTextColor.RED : NamedTextColor.GREEN))
-                .append(Component.text(required
-                        ? " (decline/fail = kick)"
-                        : " (decline = join, text badges N / N+ / OWNER)", NamedTextColor.GRAY)));
+        messageService.send(sender, required
+                ? "packpolicy.status-required"
+                : "packpolicy.status-recommended");
     }
 
     @Override

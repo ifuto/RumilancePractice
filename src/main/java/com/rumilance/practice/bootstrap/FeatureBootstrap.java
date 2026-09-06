@@ -1347,7 +1347,8 @@ public final class FeatureBootstrap {
         bind("toggle", arenaKitAdmin);
         bind("chatban", chatBanCommand);
         bind("chatunban", chatBanCommand);
-        bind("packpolicy", new com.rumilance.practice.command.PackPolicyCommand(resourcePackService));
+        bind("packpolicy", new com.rumilance.practice.command.PackPolicyCommand(
+                resourcePackService, messageService));
         com.rumilance.practice.command.TellCommand tellCommand =
                 new com.rumilance.practice.command.TellCommand(messageService, chatBanService);
         plugin.getServer().getPluginManager().registerEvents(tellCommand, plugin);

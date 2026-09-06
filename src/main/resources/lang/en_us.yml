@@ -401,6 +401,8 @@ queue:
   joined: "<green>Joined the <mode> queue for <yellow><kit></yellow>."
   left: "<gray>Left the queue."
   sign-full: "<red>That queue is full (2/2)."
+  sign-waiting: "<aqua>Queue <kit> | <seconds>s | <count>/<capacity>"
+  waiting-bar: "<aqua>Queue <kit> (<platform>) | <seconds>s | <waiting> waiting"
 
 tell:
   usage: "<gray>Usage:</gray> <yellow>/tell \\<player> \\<message></yellow>"
@@ -410,6 +412,13 @@ tell:
   self: "<red>You cannot message yourself."
   to: "<gold>To <target></gold> <gray>»</gray> <white><message></white>"
   from: "<aqua>From <target></aqua> <gray>»</gray> <white><message></white>"
+
+packpolicy:
+  usage: "<gray>Usage:</gray> <yellow>/packpolicy [required|recommended|status]</yellow>"
+  set-required: "<red>Resource pack policy: REQUIRED — players who decline/fail the pack are kicked."
+  set-recommended: "<green>Resource pack policy: RECOMMENDED — players may decline and keep playing (text rank badges)."
+  status-required: "<gray>Resource pack policy:</gray> <red>REQUIRED</red> <gray>(decline/fail = kick)</gray>"
+  status-recommended: "<gray>Resource pack policy:</gray> <green>RECOMMENDED</green> <gray>(decline = join, text badges N / N+ / OWNER)</gray>"
 
 match:
   countdown: "<yellow>Match starting in <seconds>..."

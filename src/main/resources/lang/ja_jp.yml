@@ -400,6 +400,8 @@ queue:
   joined: "<green><yellow><kit></yellow> の<mode>キューに参加しました。"
   left: "<gray>キューから抜けました。"
   sign-full: "<red>そのキューはいっぱいです (2/2)。"
+  sign-waiting: "<aqua><kit> キュー | <seconds>秒 | <count>/<capacity>"
+  waiting-bar: "<aqua><kit> (<platform>) キュー | <seconds>秒 | <waiting>人待ち"
 
 tell:
   usage: "<gray>使い方:</gray> <yellow>/tell \\<player> \\<message></yellow>"
@@ -409,6 +411,13 @@ tell:
   self: "<red>自分自身には送れません。"
   to: "<gold>To <target></gold> <gray>»</gray> <white><message></white>"
   from: "<aqua>From <target></aqua> <gray>»</gray> <white><message></white>"
+
+packpolicy:
+  usage: "<gray>使い方:</gray> <yellow>/packpolicy [required|recommended|status]</yellow>"
+  set-required: "<red>リソースパック方針: 必須 — 拒否・ダウンロード失敗したプレイヤーはキックされます。"
+  set-recommended: "<green>リソースパック方針: 推奨 — 拒否してもプレイできます (ランクバッジはテキスト表示)。"
+  status-required: "<gray>リソースパック方針:</gray> <red>必須</red> <gray>(拒否/失敗 = キック)</gray>"
+  status-recommended: "<gray>リソースパック方針:</gray> <green>推奨</green> <gray>(拒否 = 参加可、テキストバッジ N / N+ / OWNER)</gray>"
 
 match:
   countdown: "<yellow>試合開始まで <seconds> 秒..."
