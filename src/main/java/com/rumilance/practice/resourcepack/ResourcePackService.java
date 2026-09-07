@@ -199,10 +199,16 @@ public final class ResourcePackService implements Listener {
     /** Sends the pack to the player (no-op when disabled or misconfigured). */
     public void applyTo(Player player) {
         ResourcePackRequest toSend = this.request;
-        if (toSend == null) {
+        if (toSend == null || player == null || !player.isOnline()) {
             return;
         }
-        player.sendResourcePacks(toSend);
+        try {
+            player.sendResourcePacks(toSend);
+        } catch (Throwable t) {
+            // A broken send (odd client, plugin acting up mid-shutdown, ...) must never
+            // bubble up into the join/status handler that called us.
+            logger.log(Level.WARNING, "Failed to send the resource pack to " + player.getName(), t);
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR)

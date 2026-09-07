@@ -1422,9 +1422,13 @@ public final class PracticeService {
         session.setBotStrafeFlipMs(now + 1500L);
     }
 
-    private static void equipMaceBot(Mannequin bot, boolean shieldUp) {
+    private void equipMaceBot(Mannequin bot, boolean shieldUp) {
         EntityEquipment eq = bot.getEquipment();
         if (eq == null) {
+            return;
+        }
+        // Admin binding first: the dummy wears the same kit the player fights with.
+        if (applyBoundBotKit(PracticeType.MACE, eq, shieldUp, new ItemStack(Material.MACE))) {
             return;
         }
         eq.setHelmet(new ItemStack(Material.NETHERITE_HELMET));
@@ -1441,6 +1445,119 @@ public final class PracticeService {
         eq.setBootsDropChance(0f);
         eq.setItemInMainHandDropChance(0f);
         eq.setItemInOffHandDropChance(0f);
+    }
+
+    /**
+     * Equips a bot from the admin-bound server kit of its mode (same loadout the player
+     * receives): armor pieces, first hotbar item as the main weapon (falling back to the
+     * mode's iconic weapon) and the kit offhand (falling back to the shield state).
+     *
+     * @return {@code true} when a bound kit was found and applied, {@code false} when the
+     *         caller should fall back to the built-in mode gear.
+     */
+    private boolean applyBoundBotKit(PracticeType type, EntityEquipment eq, boolean shieldUp,
+                                     ItemStack fallbackWeapon) {
+        if (eq == null || kitService == null) {
+            return false;
+        }
+        String bound = botModeKits.get(type);
+        if (bound == null || bound.isBlank()) {
+            return false;
+        }
+        com.rumilance.practice.model.KitDefinition kit;
+        try {
+            kit = kitService.get(bound).orElse(null);
+        } catch (RuntimeException e) {
+            kit = null;
+        }
+        if (kit == null) {
+            return false;
+        }
+        eq.setHelmet(kitArmorPiece(kit, "helmet"));
+        eq.setChestplate(kitArmorPiece(kit, "chestplate"));
+        eq.setLeggings(kitArmorPiece(kit, "leggings"));
+        eq.setBoots(kitArmorPiece(kit, "boots"));
+        ItemStack main = kitFirstHotbarItem(kit);
+        eq.setItemInMainHand(main != null ? main : fallbackWeapon);
+        ItemStack off = kitEntryStack(kit, BOT_KIT_OFFHAND_SLOT);
+        if (off != null) {
+            eq.setItemInOffHand(off);
+        } else {
+            eq.setItemInOffHand(shieldUp ? new ItemStack(Material.SHIELD) : null);
+        }
+        eq.setHelmetDropChance(0f);
+        eq.setChestplateDropChance(0f);
+        eq.setLeggingsDropChance(0f);
+        eq.setBootsDropChance(0f);
+        eq.setItemInMainHandDropChance(0f);
+        eq.setItemInOffHandDropChance(0f);
+        return true;
+    }
+
+    /** Kit offhand slot convention (see KitService.OFFHAND_SLOT). */
+    private static final int BOT_KIT_OFFHAND_SLOT =
+            com.rumilance.practice.kit.KitService.OFFHAND_SLOT;
+    /** Prefix marking an armor value that stores a full serialized item, not just a material. */
+    private static final String BOT_KIT_ARMOR_DATA_PREFIX = "data:";
+
+    /** One armor piece of a kit: plain material name, or a fully serialized stack ("data:"). */
+    private static ItemStack kitArmorPiece(com.rumilance.practice.model.KitDefinition kit,
+                                           String key) {
+        String raw = kit.armor().get(key);
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            if (raw.startsWith(BOT_KIT_ARMOR_DATA_PREFIX)) {
+                return com.rumilance.practice.util.ItemSerializer.singleFromBase64(
+                        raw.substring(BOT_KIT_ARMOR_DATA_PREFIX.length()));
+            }
+            return new ItemStack(Material.valueOf(raw));
+        } catch (IllegalArgumentException | NullPointerException e) {
+            return null; // unknown material / corrupt serialization -> keep the slot empty
+        }
+    }
+
+    /** First non-air hotbar item (slots 0-8) of a kit, or {@code null} when there is none. */
+    private static ItemStack kitFirstHotbarItem(com.rumilance.practice.model.KitDefinition kit) {
+        ItemStack best = null;
+        int bestSlot = Integer.MAX_VALUE;
+        for (com.rumilance.practice.model.KitItemEntry entry : kit.items()) {
+            if (entry.slot() < 0 || entry.slot() > 8 || entry.slot() >= bestSlot) {
+                continue;
+            }
+            ItemStack stack = kitEntryStack(kit, entry.slot());
+            if (stack != null && !stack.getType().isAir()) {
+                best = stack;
+                bestSlot = entry.slot();
+            }
+        }
+        return best;
+    }
+
+    /** One stored kit item as an ItemStack (serialized data wins over the material name). */
+    private static ItemStack kitEntryStack(com.rumilance.practice.model.KitDefinition kit,
+                                           int slot) {
+        for (com.rumilance.practice.model.KitItemEntry entry : kit.items()) {
+            if (entry.slot() != slot) {
+                continue;
+            }
+            try {
+                if (entry.itemDataBase64() != null && !entry.itemDataBase64().isBlank()) {
+                    ItemStack rebuilt =
+                            com.rumilance.practice.util.ItemSerializer.singleFromBase64(
+                                    entry.itemDataBase64());
+                    if (rebuilt != null) {
+                        return rebuilt;
+                    }
+                }
+                Material material = Material.valueOf(entry.material());
+                return new ItemStack(material, Math.max(1, entry.amount()));
+            } catch (IllegalArgumentException | NullPointerException e) {
+                return null;
+            }
+        }
+        return null;
     }
 
     public void applyBotShield(PracticeSession session) {
@@ -1472,27 +1589,37 @@ public final class PracticeService {
     private void tickMaceBots() {
         long now = System.currentTimeMillis();
         for (PracticeSession session : sessions.values()) {
+            try {
+                tickMaceBot(session, now);
+            } catch (Throwable t) {
+                safeEndBrokenBotSession(session, t);
+            }
+        }
+    }
+
+    private void tickMaceBot(PracticeSession session, long now) {
+        {
             if (session.type() != PracticeType.MACE
                     || session.phase() != PracticeSession.Phase.ACTIVE) {
-                continue;
+                return;
             }
             Player player = Bukkit.getPlayer(session.playerId());
             if (player == null || !player.isOnline() || player.isDead()) {
-                continue;
+                return;
             }
             PracticeRoom room = get(session.practiceId()).orElse(null);
             if (room == null) {
-                continue;
+                return;
             }
             Mannequin bot = session.maceBot();
             if (bot == null || !bot.isValid() || bot.isDead()) {
                 // Chunk unloads or a stray kill must not leave an empty arena behind.
                 spawnMaceBot(player, session, room);
-                continue;
+                return;
             }
             if (now < session.botStunUntilMs()) {
                 bot.setVelocity(new Vector(0, bot.getVelocity().getY(), 0));
-                continue;
+                return;
             }
             BotDifficulty diff = session.difficulty();
             if (now - session.botLastDamagedMs() > BotDifficulty.REGEN_DELAY_MS
@@ -1505,7 +1632,7 @@ public final class PracticeService {
             Location target = player.getLocation().add(0, 1.0, 0);
             Vector to = target.toVector().subtract(eye.toVector());
             if (to.lengthSquared() < 0.0001) {
-                continue;
+                return;
             }
             turnToward(bot, eye, to.clone().normalize(), diff);
 
@@ -1523,7 +1650,7 @@ public final class PracticeService {
                     && now >= session.botNextAttackMs()) {
                 botSwing(player, bot, diff, diff.attackDamage() * maceSmashScale(fall));
                 session.setBotNextAttackMs(now + diff.attackIntervalMs() + MACE_LAND_RECOVERY_MS);
-                continue;
+                return;
             }
             // 2) WIND CHARGE (HARD and up): blast itself skyward and smash on the way down.
             if (grounded && flat >= MACE_WIND_MIN_RANGE && now >= session.botNextWindMs()
@@ -1531,7 +1658,7 @@ public final class PracticeService {
                 launchMaceWindCharge(bot);
                 session.setBotNextWindMs(now + MACE_WIND_COOLDOWN_MS
                         + java.util.concurrent.ThreadLocalRandom.current().nextInt(1200));
-                continue;
+                return;
             }
             PracticeSession.BotAbilityState maceAb = session.abilities();
             // 2b) WIND PEARL (Quantum parity: mace_new/wind_pearl, HARD and up): wind blast
@@ -1541,7 +1668,7 @@ public final class PracticeService {
                 launchMaceWindCharge(bot);
                 bot.setVelocity(new Vector(dx / flat * 0.55d, 0.35d, dz / flat * 0.55d));
                 maceAb.nextWindPearlMs(now + WIND_PEARL_COOLDOWN_MS);
-                continue;
+                return;
             }
             // 2c) FAR PEARL (Quantum parity: mace_new/far_pearl): blink to a kiting player.
             if (grounded && dist >= FAR_PEARL_MIN_RANGE && dist <= FAR_PEARL_MAX_RANGE
@@ -1551,7 +1678,7 @@ public final class PracticeService {
                 if (landing != null) {
                     maceAb.nextFarPearlMs(now + FAR_PEARL_COOLDOWN_MS);
                     pearlTeleportFx(bot, landing);
-                    continue;
+                    return;
                 }
                 maceAb.nextFarPearlMs(now + 1500L); // no safe spot: retry soon, don't spam scans
             }
@@ -1566,7 +1693,7 @@ public final class PracticeService {
                             botLoc.add(0, 0.4, 0), 12, 0.3, 0.2, 0.3, 0.05d);
                 }
                 maceAb.nextElytraMs(now + ELYTRA_COOLDOWN_MS);
-                continue;
+                return;
             }
             // 3) LUNGE: sprint-jump at the player (map: move forward + sprint + jump + attack).
             if (grounded && flat > 0.0001 && dist >= MACE_LUNGE_MIN_RANGE
@@ -1575,14 +1702,14 @@ public final class PracticeService {
                         dz / flat * MACE_LUNGE_FORWARD));
                 bot.swingMainHand();
                 session.setBotNextLungeMs(now + diff.attackIntervalMs() * 4L);
-                continue;
+                return;
             }
             // 4) Plain melee when already inside reach with no height to smash from.
             if (grounded && dist <= reach && now >= session.botNextAttackMs()) {
                 botSwing(player, bot, diff, diff.attackDamage());
                 session.setBotNextAttackMs(now + diff.attackIntervalMs()
                         + java.util.concurrent.ThreadLocalRandom.current().nextInt(150));
-                continue;
+                return;
             }
             // 5) Reposition: walk in (full speed past 4 blocks), orbit while the shield is up,
             //    and step up one-block ledges instead of grinding into them.
@@ -1887,9 +2014,18 @@ public final class PracticeService {
         session.setBotStrafeFlipMs(System.currentTimeMillis() + 1500L);
     }
 
-    private static void equipCombatBot(Mannequin bot, PracticeType type, boolean shieldUp) {
+    private void equipCombatBot(Mannequin bot, PracticeType type, boolean shieldUp) {
         EntityEquipment eq = bot.getEquipment();
         if (eq == null) {
+            return;
+        }
+        // Admin binding first: the dummy wears the same kit the player fights with.
+        ItemStack fallbackWeapon = switch (type) {
+            case SWORD, NETHERITE_POT -> new ItemStack(Material.NETHERITE_SWORD);
+            case CART -> new ItemStack(Material.BOW);
+            default -> new ItemStack(Material.END_CRYSTAL);
+        };
+        if (applyBoundBotKit(type, eq, shieldUp, fallbackWeapon)) {
             return;
         }
         eq.setHelmet(new ItemStack(Material.NETHERITE_HELMET));
@@ -1938,17 +2074,45 @@ public final class PracticeService {
     private void tickCombatBots() {
         long now = System.currentTimeMillis();
         for (PracticeSession session : sessions.values()) {
+            try {
+                tickCombatBot(session, now);
+            } catch (Throwable t) {
+                safeEndBrokenBotSession(session, t);
+            }
+        }
+    }
+
+    /** A broken bot session must not poison the shared AI tick loop: log and end it. */
+    private void safeEndBrokenBotSession(PracticeSession session, Throwable t) {
+        Player player = Bukkit.getPlayer(session.playerId());
+        plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                "[N Arena] Bot AI tick failed for " + (player == null ? "offline-player" : player.getName())
+                        + " — ending the session safely.", t);
+        try {
+            if (player != null && player.isOnline()) {
+                leave(player, true);
+            } else {
+                sessions.remove(session.playerId(), session);
+            }
+        } catch (Throwable ignored) {
+            // Last resort: drop the session reference so the next tick never retries it.
+            sessions.remove(session.playerId(), session);
+        }
+    }
+
+    private void tickCombatBot(PracticeSession session, long now) {
+        {
             PracticeType type = session.type();
             if (!type.botMode() || type == PracticeType.MACE) {
-                continue;
+                return;
             }
             if (session.phase() != PracticeSession.Phase.ACTIVE) {
-                continue;
+                return;
             }
             Mannequin bot = session.combatBot();
             Player player = Bukkit.getPlayer(session.playerId());
             if (player == null || !player.isOnline() || player.isDead()) {
-                continue;
+                return;
             }
             // Robustness for many concurrent bots: chunk unloads or stray damage can
             // despawn a mannequin — bring it back at home instead of leaving an empty arena.
@@ -1957,7 +2121,7 @@ public final class PracticeService {
                 if (room != null) {
                     spawnCombatBot(player, session, room, type);
                 }
-                continue;
+                return;
             }
             // Bot-placed block reverts (pedestals, webs, lava, rails...) share one sweeper.
             revertAgedBotBlocks(session, now);
@@ -1965,17 +2129,17 @@ public final class PracticeService {
             Location target = player.getLocation().add(0, 1.0, 0);
             Vector to = target.toVector().subtract(eye.toVector());
             if (to.lengthSquared() < 0.0001) {
-                continue;
+                return;
             }
             turnToward(bot, eye, to.normalize(), session.difficulty());
 
             if (type == PracticeType.CRYSTAL) {
                 tickCrystalBot(player, session, bot, now);
-                continue;
+                return;
             }
             if (type == PracticeType.CART) {
                 tickCartBot(player, session, bot, now);
-                continue;
+                return;
             }
 
             // --- sword & netherite-pot bots: chase, strafe, swing (difficulty-tuned) ---
@@ -2000,7 +2164,7 @@ public final class PracticeService {
             tickSwordDisruption(player, session, bot, type, dist, now);
 
             if (escaped) {
-                continue; // just pearled out: re-aim next tick instead of swinging air
+                return; // just pearled out: re-aim next tick instead of swinging air
             }
             if (distSq > 2.2d * 2.2d) {
                 Vector dir = to.setY(0);

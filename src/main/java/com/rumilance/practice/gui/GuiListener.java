@@ -57,6 +57,8 @@ public final class GuiListener implements Listener {
     private java.util.function.Consumer<Player> reopenOriginalEditor;
 
     private static final long CLICK_DEBOUNCE_MS = 350L;
+    private static final java.util.logging.Logger LOG =
+            java.util.logging.Logger.getLogger("RumilancePractice");
     private final ConcurrentHashMap<UUID, Long> lastClickAt = new ConcurrentHashMap<>();
 
     public GuiListener(GuiSessionRegistry registry, PlayerStateManager stateManager,
@@ -242,6 +244,29 @@ public final class GuiListener implements Listener {
         }
     }
 
+    /**
+     * Dispatches one click with full fault containment: a menu bug (bad item meta, a race
+     * with party state, a null in a just-changed model) must never walk away with the
+     * player's input. The failure is logged with full context, the player hears a clear
+     * error cue, and the menu simply stays open for a retry.
+     */
+    private void clickSafely(AbstractGui handler, Player player, GuiSession session, Inventory top,
+                             int slot, String action, ClickType click) {
+        try {
+            handler.handleClick(player, session, top, slot, action, click);
+        } catch (Throwable t) {
+            LOG.log(java.util.logging.Level.SEVERE,
+                    "GUI click failed (gui=" + handler.type() + ", action=\"" + action
+                            + "\", player=" + player.getName() + ")", t);
+            try {
+                player.playSound(player.getLocation(),
+                        org.bukkit.Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            } catch (Throwable ignored) {
+                // Even the feedback must never fail the click pipeline.
+            }
+        }
+    }
+
     private void dispatchTopClick(Player player, GuiSession session, Inventory top,
                                   AbstractGui handler, InventoryClickEvent event) {
         ItemStack current = event.getCurrentItem();
@@ -250,13 +275,13 @@ public final class GuiListener implements Listener {
             if (handler instanceof EditKitGui editKit && editKit.isEditorMode(session)) {
                 int layoutIndex = KitLayoutEditor.layoutIndexForGuiSlot(event.getSlot());
                 if (layoutIndex >= 0) {
-                    handler.handleClick(player, session, top, event.getSlot(),
+                    clickSafely(handler, player, session, top, event.getSlot(),
                             "slot:" + layoutIndex, event.getClick());
                 }
             } else if (handler instanceof com.rumilance.practice.gui.menus.OriginalKitEditGui) {
                 int layoutIndex = com.rumilance.practice.gui.menus.OriginalKitEditGui.layoutIndexForGuiSlot(event.getSlot());
                 if (layoutIndex >= 0) {
-                    handler.handleClick(player, session, top, event.getSlot(),
+                    clickSafely(handler, player, session, top, event.getSlot(),
                             "slot:" + layoutIndex, event.getClick());
                 }
             }
@@ -278,7 +303,7 @@ public final class GuiListener implements Listener {
             return;
         }
         lastClickAt.put(player.getUniqueId(), now);
-        handler.handleClick(player, session, top, event.getSlot(), guiAction, event.getClick());
+        clickSafely(handler, player, session, top, event.getSlot(), guiAction, event.getClick());
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
