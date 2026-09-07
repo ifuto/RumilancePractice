@@ -197,6 +197,19 @@ performance:
   # Soft cap on particles spawned per player per visual effect (region selection, arrow trails).
   particle-limit-per-player: 40
 
+# Paper's automatic kicks for players who are already in the game. Both are decided on Paper's
+# typed kick cause (PlayerKickEvent.Cause), never on the message text, so bans, /kick, idle
+# kicks and every other cause are untouched. Reloadable with /rumireload.
+connection:
+  # Cancel the keep-alive "Timed out" kick (Cause.TIMEOUT). A lag spike / frozen client no
+  # longer ends a fight; a truly dead connection is still closed by Netty (that is a quit,
+  # not a kick, and cannot be prevented by any plugin).
+  suppress-timeout-kick: true
+  # Cancel vanilla's "Flying is not enabled on this server" floating kick
+  # (Cause.FLYING_PLAYER / FLYING_VEHICLE). Wind charges, mace jumps, pearl chains and
+  # ping rubber-banding trip it on legit players. Does NOT grant flight or change game modes.
+  suppress-flying-kick: true
+
 # Ping-aware combat netcode. This controls crit rewind and rubber-band/anti-void handling.
 # Knockback shaping (coefficients, horizontal/vertical KB, ping-based KB sync) is NOT done
 # here: install an external knockback plugin such as KnockBackSync and configure it there.

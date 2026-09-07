@@ -132,6 +132,7 @@ Paper 1.21.11 向け Practice PvP プラグイン **N Arena**(プラグイン名
 - スコアボード(試合中/ロビー表示)、MOTD、サウンド設定(`/setting`)
 - 視点設定(エンティティ表示制御)、個人用ワールドボーダー、ワールド別描画距離
 - 進捗・爆発・飛び道具などの競技用挙動調整
+- **Paper 自動キックの抑止**: keep-alive の「Timed out」と「Flying is not enabled on this server」の自動キックをキャンセル(`config.yml` `connection.*`)。BAN / `/kick` / 放置キックは対象外
 
 ## 技術基盤
 

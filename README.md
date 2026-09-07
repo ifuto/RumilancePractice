@@ -11,11 +11,18 @@ Paper 1.21.11 向け Practice PvP プラグイン **N Arena** です。ランク
 ## ビルド
 
 ```bash
-cd RumilancePractice
+# macOS / Linux
+bash ./gradlew build --no-daemon
+# Windows
 ./gradlew.bat build
 ```
 
-成果物: `build/libs/RumilancePractice-1.2.0.jar`
+成果物: `build/libs/RumilancePractice-<version>.jar`（`version` は `gradle.properties` が正）。
+依存ライブラリ入りのこの JAR を導入してください。`-thin.jar` は配布用ではありません。
+
+既存の [build Workflow](.github/workflows/build.yml) が push / 手動実行のたびに Java 21 でビルド・全テスト・
+JAR 生成を行い、`jars`（配布用 JAR）と `build-log` を Artifact に保存します。
+変更を完了扱いにする前に毎回、最終コミットで CI を通し JAR を確認します（[作業ルール](AGENTS.md)）。
 
 ## 導入
 
@@ -56,6 +63,8 @@ cd RumilancePractice
 - 機能アイテムは表示名ではなく PDC `function_type` で識別
 - プレイヤー状態は UUID キーの `PlayerStateManager` で一意管理
 - サーバー停止時は切断 ChatBan を発行しません（`MatchSession.shuttingDown`）
+- **Paper のタイムアウト / Fly 自動キックを無効化**（`PaperKickProtectionListener`）。`PlayerKickEvent.Cause` が `TIMEOUT` / `FLYING_PLAYER` / `FLYING_VEHICLE` のキックをキャンセルします。理由文ではなく Paper の Cause で判定するため、BAN・`/kick`・他プラグインのキック・その他の不正パケット判定は従来どおりです。飛行権限・ゲームモード・`server.properties` は変更しません。`config.yml` の `connection.suppress-timeout-kick` / `connection.suppress-flying-kick` で個別に切替可能（`/rumireload` 対応）
+  - 防げるのは接続済みプレイヤーに対するキャンセル可能なキックのみです。Netty の read timeout や物理的な通信断・クライアント / プロキシ側のタイムアウトは「切断」であり、どのプラグインでも防げません
 
 ## 権限
 

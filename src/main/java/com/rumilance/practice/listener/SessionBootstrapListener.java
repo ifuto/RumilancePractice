@@ -195,9 +195,11 @@ public final class SessionBootstrapListener implements Listener {
         });
     }
 
-    @EventHandler(priority = EventPriority.MONITOR)
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onKick(org.bukkit.event.player.PlayerKickEvent event) {
         // Kicked / banned players leave silently: no "[-] name" line follows the kick screen.
+        // A cancelled kick (Paper timeout / flying kick suppressed by PaperKickProtectionListener)
+        // must NOT arm the suppression, or the player's later real quit would be silent.
         JoinQuitMessages.apply(event);
     }
 

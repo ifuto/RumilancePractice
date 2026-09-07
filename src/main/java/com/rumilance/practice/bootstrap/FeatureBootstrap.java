@@ -146,6 +146,7 @@ import com.rumilance.practice.kit.KitLayoutCache;
 import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.kit.PresetItems;
 import com.rumilance.practice.listener.AdvancementBlockListener;
+import com.rumilance.practice.listener.PaperKickProtectionListener;
 import com.rumilance.practice.listener.PracticePearlListener;
 import com.rumilance.practice.listener.PracticeSideListener;
 import com.rumilance.practice.listener.SessionBootstrapListener;
@@ -1263,6 +1264,9 @@ public final class FeatureBootstrap {
         pm.registerEvents(new com.rumilance.practice.replay.ReplayControlListener(replayService), plugin);
         pm.registerEvents(new BanLoginListener(banService), plugin);
         pm.registerEvents(new com.rumilance.practice.listener.ChatBanGuardListener(chatBanService), plugin);
+        // Paper's automatic "Timed out" / "Flying is not enabled" kicks are cancelled for
+        // in-game players (config.yml connection.*); bans and manual kicks are untouched.
+        pm.registerEvents(new PaperKickProtectionListener(configService::config, plugin.getLogger()), plugin);
         SessionBootstrapListener sessionBootstrapListener = new SessionBootstrapListener(
                 sessionManager, stateManager, lobbyService, settings.defaultLocale(), playerRepository,
                 layoutCache, settingsService, asyncExecutor, plugin, messageService, rankService, chatBanService);
