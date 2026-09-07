@@ -39,7 +39,6 @@ public enum GuiType {
     TEAMS_BROWSER,
     TEAM_HUB,
     TEAM_SETTINGS,
-    TEAM_MANAGE,
     TEAM_CONFIG,
     TEAM_KIT_SELECT,
     PARTY_INVITE,

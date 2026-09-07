@@ -18,17 +18,24 @@ import org.bukkit.event.inventory.ClickType;
 import org.bukkit.inventory.Inventory;
 
 /**
- * Owner-only team RULES panel (ITEM 40b slim-down): membership and battle rules only —
- * invite, visibility, map and friendly fire, plus one door to {@link TeamManageGui} where
- * the operational tools live (team composition, autosplit, side cleanup, disband).
+ * Owner-only team settings & operations — the single second-level screen of the party GUI.
+ * Everything that is not daily wanted lives here (old Settings/Manage screens merged into
+ * one, so navigation is always Hub → Settings → optional battle config):
+ * <ul>
+ *   <li>Row 1 — battle rules: public/private, map selection, friendly fire</li>
+ *   <li>Row 2 — team operations: per-team battle settings, autosplit, clear sides</li>
+ *   <li>Row 3 — disband (destructive, confirmation dialog)</li>
+ * </ul>
+ * Invite lives on the hub because it is a daily action; back always returns to the hub.
  */
 public final class TeamSettingsGui extends AbstractGui {
 
     private final TeamService teamService;
     private TeamHubGui teamHubGui;
-    private PartyInviteGui partyInviteGui;
+    private TeamsBrowserGui browser;
     private TeamKitSelectGui kitSelect;
-    private TeamManageGui teamManageGui;
+    private TeamConfigGui teamConfigGui;
+    private ConfirmGui confirmGui;
     private TeamHubGui.ArenaTemplateStoreSupplier arenaStoreSupplier;
 
     public TeamSettingsGui(GuiSessionRegistry registry, SoundService sounds,
@@ -41,16 +48,20 @@ public final class TeamSettingsGui extends AbstractGui {
         this.teamHubGui = teamHubGui;
     }
 
-    public void setPartyInviteGui(PartyInviteGui partyInviteGui) {
-        this.partyInviteGui = partyInviteGui;
+    public void setBrowser(TeamsBrowserGui browser) {
+        this.browser = browser;
     }
 
     public void setKitSelect(TeamKitSelectGui kitSelect) {
         this.kitSelect = kitSelect;
     }
 
-    public void setTeamManageGui(TeamManageGui teamManageGui) {
-        this.teamManageGui = teamManageGui;
+    public void setTeamConfigGui(TeamConfigGui teamConfigGui) {
+        this.teamConfigGui = teamConfigGui;
+    }
+
+    public void setConfirmGui(ConfirmGui confirmGui) {
+        this.confirmGui = confirmGui;
     }
 
     public void setArenaStoreSupplier(TeamHubGui.ArenaTemplateStoreSupplier arenaStoreSupplier) {
@@ -88,17 +99,8 @@ public final class TeamSettingsGui extends AbstractGui {
             return;
         }
 
-        // Row 1 — membership & discovery (three buttons, generous gaps).
+        // Row 1 — battle rules.
         inventory.setItem(GuiSlots.slot(1, 2),
-                ItemBuilder.of(Material.PLAYER_HEAD)
-                        .name(t(player, "party.invite").color(UiTheme.SUCCESS))
-                        .lore(UiTheme.divider(),
-                                UiTheme.line(line(player, "party.invite-lore-heads")),
-                                UiTheme.line(line(player, "party.invite-lore")),
-                                UiTheme.blank(),
-                                UiTheme.hint(line(player, "party.invite-hint")))
-                        .action("invite").build());
-        inventory.setItem(GuiSlots.slot(1, 4),
                 ItemBuilder.of(team.isPublic() ? UiTheme.TOGGLE_ON : UiTheme.TOGGLE_OFF)
                         .name(t(player, team.isPublic() ? "party.public-team" : "party.private-team")
                                 .color(team.isPublic() ? UiTheme.SUCCESS : UiTheme.MUTED))
@@ -110,7 +112,7 @@ public final class TeamSettingsGui extends AbstractGui {
                                 UiTheme.hint(line(player, "party.toggle-hint")))
                         .action("toggle_public").build());
         if (arenaStoreSupplier != null && !arenaStoreSupplier.partyArenas().isEmpty()) {
-            inventory.setItem(GuiSlots.slot(1, 6),
+            inventory.setItem(GuiSlots.slot(1, 4),
                     ItemBuilder.of(Material.MAP)
                             .name(t(player, "party.select-map").color(UiTheme.PRIMARY))
                             .lore(UiTheme.divider(),
@@ -123,9 +125,7 @@ public final class TeamSettingsGui extends AbstractGui {
                                     UiTheme.hint(line(player, "party.select-map-hint")))
                             .action("select_map").build());
         }
-
-        // Row 2 — battle rules on the left, the door to the management tools on the right.
-        inventory.setItem(GuiSlots.slot(2, 2),
+        inventory.setItem(GuiSlots.slot(1, 6),
                 ItemBuilder.of(team.friendlyFire() ? Material.TNT : Material.SHIELD)
                         .name(t(player, team.friendlyFire() ? "party.ff-on-label" : "party.ff-off-label")
                                 .color(team.friendlyFire() ? UiTheme.DANGER : UiTheme.SUCCESS))
@@ -136,16 +136,43 @@ public final class TeamSettingsGui extends AbstractGui {
                                 UiTheme.blank(),
                                 UiTheme.hint(line(player, "gui.toggle-hint")))
                         .action("toggle_ff").build());
-        if (teamManageGui != null) {
-            inventory.setItem(GuiSlots.slot(2, 6),
-                    ItemBuilder.of(Material.CHEST)
-                            .name(t(player, "gui.team-manage-open").color(UiTheme.PRIMARY))
+
+        // Row 2 — team operations.
+        if (teamConfigGui != null) {
+            inventory.setItem(GuiSlots.slot(2, 2),
+                    ItemBuilder.of(Material.COMMAND_BLOCK)
+                            .name(t(player, "gui.team-config-open").color(UiTheme.PRIMARY))
                             .lore(UiTheme.divider(),
-                                    UiTheme.line(line(player, "gui.team-manage-open-lore")),
+                                    UiTheme.line(line(player, "gui.team-config-open-lore")),
                                     UiTheme.blank(),
                                     UiTheme.hint(line(player, "gui.toggle-hint")))
-                            .action("open_team_manage").build());
+                            .action("open_team_config").build());
         }
+        inventory.setItem(GuiSlots.slot(2, 4),
+                ItemBuilder.of(Material.ENDER_PEARL)
+                        .name(t(player, "party.autosplit").color(UiTheme.PRIMARY))
+                        .lore(UiTheme.divider(),
+                                UiTheme.line(line(player, "party.autosplit-lore-1")),
+                                UiTheme.line(line(player, "party.autosplit-lore-2")),
+                                UiTheme.line(line(player, "party.autosplit-lore-3")),
+                                UiTheme.blank(),
+                                UiTheme.hint(line(player, "party.autosplit-hint")))
+                        .action("autosplit").build());
+        inventory.setItem(GuiSlots.slot(2, 6),
+                ItemBuilder.of(Material.WATER_BUCKET)
+                        .name(t(player, "party.clear-sides").color(UiTheme.WARNING))
+                        .lore(UiTheme.hint(line(player, "party.clear-sides-hint")))
+                        .action("clearsides").build());
+
+        // Row 3 — destructive action, alone on the right, behind a confirmation.
+        inventory.setItem(GuiSlots.slot(3, 6),
+                ItemBuilder.of(Material.BARRIER)
+                        .name(t(player, "party.disband").color(UiTheme.DANGER))
+                        .lore(UiTheme.divider(),
+                                UiTheme.line(line(player, "party.disband-confirm-lore")),
+                                UiTheme.blank(),
+                                UiTheme.hint(line(player, "party.disband-hint")))
+                        .action("disband").build());
 
         MenuScaffold.returnButton(inventory, t(player, "gui.back-to-hub"));
     }
@@ -156,6 +183,19 @@ public final class TeamSettingsGui extends AbstractGui {
                 () -> {
                     if (player.isOnline() && teamHubGui != null) {
                         teamHubGui.open(player);
+                    }
+                });
+    }
+
+    private void openLater(Player player, AbstractGui gui) {
+        if (gui == null) {
+            return;
+        }
+        org.bukkit.Bukkit.getScheduler().runTask(
+                org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
+                () -> {
+                    if (player.isOnline()) {
+                        gui.open(player);
                     }
                 });
     }
@@ -174,24 +214,6 @@ public final class TeamSettingsGui extends AbstractGui {
                 sounds.play(player, "gui-back");
                 backToHub(player);
             }
-            case "invite" -> {
-                if (!owner) {
-                    return;
-                }
-                sounds.play(player, "gui-click");
-                if (partyInviteGui != null) {
-                    org.bukkit.Bukkit.getScheduler().runTask(
-                            org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
-                            () -> {
-                                if (player.isOnline()) {
-                                    partyInviteGui.openFor(player);
-                                }
-                            });
-                } else {
-                    player.closeInventory();
-                    player.sendMessage(t(player, "party.invite-unavailable"));
-                }
-            }
             case "toggle_public" -> {
                 if (owner) {
                     teamService.togglePublic(player);
@@ -209,30 +231,64 @@ public final class TeamSettingsGui extends AbstractGui {
             case "select_map" -> {
                 // Map selection goes through kit selection first: picking a kit opens that
                 // kit's party-map list, and choosing a map starts the battle.
-                if (!owner || kitSelect == null) {
+                if (!owner) {
                     return;
                 }
                 sounds.play(player, "gui-click");
-                org.bukkit.Bukkit.getScheduler().runTask(
-                        org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
-                        () -> {
-                            if (player.isOnline()) {
-                                kitSelect.open(player);
-                            }
-                        });
+                openLater(player, kitSelect);
             }
-            case "open_team_manage" -> {
-                if (!owner || teamManageGui == null) {
+            case "open_team_config" -> {
+                if (!owner) {
                     return;
                 }
                 sounds.play(player, "gui-open");
-                org.bukkit.Bukkit.getScheduler().runTask(
-                        org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
-                        () -> {
-                            if (player.isOnline()) {
-                                teamManageGui.open(player);
-                            }
-                        });
+                openLater(player, teamConfigGui);
+            }
+            case "autosplit" -> {
+                if (owner) {
+                    TeamService.Result r = teamService.autoAssign(player);
+                    sounds.play(player, r == TeamService.Result.OK ? "select" : "error");
+                    refresh(player, session, inventory);
+                }
+            }
+            case "clearsides" -> {
+                if (owner) {
+                    teamService.clearSides(player);
+                    sounds.play(player, "gui-click");
+                    refresh(player, session, inventory);
+                }
+            }
+            case "disband" -> {
+                if (!owner) {
+                    return;
+                }
+                sounds.play(player, "gui-click");
+                if (confirmGui != null) {
+                    confirmGui.open(player,
+                            t(player, "party.disband-confirm").color(UiTheme.DANGER),
+                            java.util.List.of(UiTheme.line(line(player, "party.disband-confirm-lore"))),
+                            who -> {
+                                sounds.play(who, "select");
+                                teamService.disband(who);
+                                who.closeInventory();
+                                if (browser != null) {
+                                    browser.open(who);
+                                }
+                            },
+                            who -> {
+                                sounds.play(who, "gui-back");
+                                openLater(who, this);
+                            });
+                } else if (click == ClickType.SHIFT_LEFT || click == ClickType.SHIFT_RIGHT) {
+                    sounds.play(player, "select");
+                    teamService.disband(player);
+                    player.closeInventory();
+                    if (browser != null) {
+                        browser.open(player);
+                    }
+                } else {
+                    sounds.play(player, "error");
+                }
             }
             default -> {
             }

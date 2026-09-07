@@ -53,9 +53,8 @@ public final class ResourcePackService implements Listener {
 
     /** Shipped default: the repo's dist/ zip (public repository). */
     private static final String DEFAULT_URL =
-            "https://raw.githubusercontent.com/ifuto/RumilancePractice/"
-                    + "arena/01a06257-rumilancepractice/dist/RumilanceResourcePack.zip";
-    private static final String DEFAULT_SHA1 = "2ad094674379fb5cc9e1f224647b9f30c26e2072";
+            "https://raw.githubusercontent.com/ifuto/RumilancePractice/main/dist/RumilanceResourcePack.zip";
+    private static final String DEFAULT_SHA1 = "42d41dcee474c577b653049e55d8c4ca87364f7b";
 
     /** Small delay after join so login-time packets settle before the pack prompt. */
     private static final long APPLY_DELAY_TICKS = 10L;

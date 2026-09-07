@@ -29,13 +29,13 @@ Admin / VIP+ / VIP の **ランクバッジ** はリソースパックのカス�
 resource-pack:
   enabled: true          # false でプラグインからの配布を無効化
   url: "https://…/RumilanceResourcePack.zip"   # パックの直接ダウンロードURL
-  sha1: "c4cf82d41ba0564aaac4752cb6a95225e768b2e2"   # ZIP の SHA1（40桁hex）
+  sha1: "42d41dcee474c577b653049e55d8c4ca87364f7b"   # ZIP の SHA1（40桁hex）
   required: true         # true = 拒否/失敗でキック
   prompt: "…"            # クライアントのパック適用ダイアログに出す文
   kick-message: "…"      # キック時の表示文（\n で改行可）
 ```
 
-既定値はリポジトリの `dist/` パック（上記の GitHub raw URL）になっているので、
+既定値はリポジトリ main ブランチの `dist/` パック（上記の GitHub raw URL）になっているので、
 **何も設定しなくてもこのまま動きます**。自前のホスティングを用意したら
 `url`（と、中身を変えた場合は `sha1`）だけ書き換えて `/rumireload` してください。
 
@@ -78,7 +78,7 @@ URL からダウンロードします。
 現在コミット済みパックの SHA1:
 
 ```
-c4cf82d41ba0564aaac4752cb6a95225e768b2e2
+42d41dcee474c577b653049e55d8c4ca87364f7b
 ```
 
 > **グリフの描画について（1.21.6+ 対策）**: このパックはアイコンのグリフプロバイダーを
@@ -99,13 +99,13 @@ c4cf82d41ba0564aaac4752cb6a95225e768b2e2
 ```properties
 # Cloudflare Pages 利用時
 resource-pack=https://<プロジェクト名>.pages.dev/RumilanceResourcePack.mczip
-resource-pack-sha1=c4cf82d41ba0564aaac4752cb6a95225e768b2e2
+resource-pack-sha1=42d41dcee474c577b653049e55d8c4ca87364f7b
 require-resource-pack=true
 resource-pack-prompt={"text":"Rumilanceのアイコン表示に必要です","color":"aqua"}
 
 # またはリポジトリの dist パック直接指定（マージ後は .../main/...）
 resource-pack=https://raw.githubusercontent.com/ifuto/RumilancePractice/main/dist/RumilanceResourcePack.zip
-resource-pack-sha1=c4cf82d41ba0564aaac4752cb6a95225e768b2e2
+resource-pack-sha1=42d41dcee474c577b653049e55d8c4ca87364f7b
 require-resource-pack=true
 ```
 
@@ -132,7 +132,9 @@ sha1sum dist/RumilanceResourcePack.zip
 
 ## 補足
 
-- 1.21.9+ の `min_format`/`max_format` 入り `pack.mcmeta` 済み（対象 1.21.11 / pack_format 75）
+- 1.21.9+ の `min_format`/`max_format` 入り `pack.mcmeta` 済み
+  （`pack_format: 75` = 1.21.11 向け、適用範囲 `min [34,0]` 〜 `max [100,0]`。
+  1.21.x 全クライアントと 26.1/26.2 など今後の新リリースでも「非互換」扱いになりません）
 - パック未適用のプレイヤーにグリフが豆腐（□）に見える問題は、プラグイン配布の
   `resource-pack.required: true`（拒否/失敗でキック）でそもそも防げます
   （server.properties 方式なら `require-resource-pack=true` が相当）

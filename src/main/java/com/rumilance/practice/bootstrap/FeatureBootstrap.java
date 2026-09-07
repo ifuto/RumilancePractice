@@ -136,7 +136,6 @@ import com.rumilance.practice.gui.menus.SpectateListGui;
 import com.rumilance.practice.gui.menus.StatsKitGui;
 import com.rumilance.practice.gui.menus.TeamConfigGui;
 import com.rumilance.practice.gui.menus.TeamHubGui;
-import com.rumilance.practice.gui.menus.TeamManageGui;
 import com.rumilance.practice.gui.menus.TeamSettingsGui;
 import com.rumilance.practice.gui.menus.TeamKitSelectGui;
 import com.rumilance.practice.gui.menus.TeamsBrowserGui;
@@ -761,11 +760,6 @@ public final class FeatureBootstrap {
                 new TeamConfigGui(guiSessions, soundService, teamService, kitService);
         teamConfigGui.setTeamHubGui(teamHubGui);
         teamHubGui.setTeamConfigGui(teamConfigGui);
-        TeamManageGui teamManageGui =
-                new TeamManageGui(guiSessions, soundService, teamService);
-        teamManageGui.setBrowser(teamsBrowserGui);
-        teamManageGui.setTeamConfigGui(teamConfigGui);
-        teamConfigGui.setTeamManageGui(teamManageGui);
         teamsBrowserGui.setHub(teamHubGui);
         PartyInviteGui partyInviteGui = new PartyInviteGui(
                 guiSessions, soundService, teamService, messageService);
@@ -782,11 +776,11 @@ public final class FeatureBootstrap {
         TeamSettingsGui teamSettingsGui =
                 new TeamSettingsGui(guiSessions, soundService, teamService);
         teamSettingsGui.setTeamHubGui(teamHubGui);
-        teamSettingsGui.setPartyInviteGui(partyInviteGui);
         teamSettingsGui.setKitSelect(teamKitSelectGui);
-        teamSettingsGui.setTeamManageGui(teamManageGui);
+        teamSettingsGui.setTeamConfigGui(teamConfigGui);
+        teamSettingsGui.setBrowser(teamsBrowserGui);
         teamSettingsGui.setArenaStoreSupplier(arenaStore::partyArenas);
-        teamManageGui.setTeamSettingsGui(teamSettingsGui);
+        teamConfigGui.setTeamSettingsGui(teamSettingsGui);
         teamHubGui.setTeamSettingsGui(teamSettingsGui);
         ArenaAdminGui arenaAdminGui = new ArenaAdminGui(
                 guiSessions, soundService, arenaStore, arenaService);
@@ -860,8 +854,7 @@ public final class FeatureBootstrap {
 
         ConfirmGui confirmGui = new ConfirmGui(guiSessions, soundService);
         confirmGui.setOriginalKitService(originalKitService);
-        teamHubGui.setConfirmGui(confirmGui);
-        teamManageGui.setConfirmGui(confirmGui);
+        teamSettingsGui.setConfirmGui(confirmGui);
         teamHubGui.setStateManager(stateManager);
         OriginalKitEditGui originalKitEditGui =
                 new OriginalKitEditGui(guiSessions, soundService, originalKitService, ekitItems);
@@ -1039,7 +1032,6 @@ public final class FeatureBootstrap {
         guiListener.register(teamsBrowserGui);
         guiListener.register(teamHubGui);
         guiListener.register(teamSettingsGui);
-        guiListener.register(teamManageGui);
         guiListener.register(teamConfigGui);
         guiListener.register(teamKitSelectGui);
         guiListener.register(partyInviteGui);

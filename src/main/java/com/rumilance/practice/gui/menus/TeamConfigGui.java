@@ -67,7 +67,7 @@ public final class TeamConfigGui extends AbstractGui {
     private final TeamService teamService;
     private final KitService kitService;
     private TeamHubGui teamHubGui;
-    private TeamManageGui teamManageGui;
+    private TeamSettingsGui teamSettingsGui;
 
     public TeamConfigGui(GuiSessionRegistry registry, SoundService sounds,
                          TeamService teamService, KitService kitService) {
@@ -80,8 +80,8 @@ public final class TeamConfigGui extends AbstractGui {
         this.teamHubGui = teamHubGui;
     }
 
-    public void setTeamManageGui(TeamManageGui teamManageGui) {
-        this.teamManageGui = teamManageGui;
+    public void setTeamSettingsGui(TeamSettingsGui teamSettingsGui) {
+        this.teamSettingsGui = teamSettingsGui;
     }
 
     @Override
@@ -298,8 +298,8 @@ public final class TeamConfigGui extends AbstractGui {
         if ("back_to_hub".equals(action) || "close".equals(action)) {
             sounds.play(player, "gui-back");
             player.closeInventory();
-            if (teamManageGui != null) {
-                teamManageGui.open(player);
+            if (teamSettingsGui != null) {
+                teamSettingsGui.open(player);
             } else if (teamHubGui != null) {
                 teamHubGui.open(player);
             }

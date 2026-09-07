@@ -29,10 +29,10 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * The main team control panel (fully GUI-driven), redesigned around the actions a party
- * owner actually reaches for: invite players, auto-split sides, toggle public/private,
- * full settings, start the battle and — with a confirmation — disband. Every member is
- * listed in the standard 28-slot content grid with a side-coloured icon:
+ * The main party control panel, deliberately kept to the daily flow. Five buttons along
+ * the bottom — invite players, auto-split sides, settings (every other control: public /
+ * private, map, friendly fire, per-team battle setup, disband), start the battle, close.
+ * Every member is listed in the standard 28-slot content grid with a side-coloured icon:
  * <ul>
  *   <li>Left-click a member — cycle their side (RED → BLUE → unassigned)</li>
  *   <li>Right-click (or shift-click) a member — kick (owner only)</li>
@@ -51,7 +51,6 @@ public final class TeamHubGui extends AbstractGui {
     private PartyInviteGui partyInviteGui;
     private PartyMapSelectGui partyMapSelectGui;
     private ArenaTemplateStoreSupplier arenaStoreSupplier;
-    private ConfirmGui confirmGui;
     private com.rumilance.practice.session.PlayerStateManager stateManager;
     private TeamConfigGui teamConfigGui;
     private TeamSettingsGui teamSettingsGui;
@@ -62,10 +61,6 @@ public final class TeamHubGui extends AbstractGui {
 
     public void setTeamSettingsGui(TeamSettingsGui teamSettingsGui) {
         this.teamSettingsGui = teamSettingsGui;
-    }
-
-    public void setConfirmGui(ConfirmGui confirmGui) {
-        this.confirmGui = confirmGui;
     }
 
     public void setStateManager(com.rumilance.practice.session.PlayerStateManager stateManager) {
@@ -152,8 +147,10 @@ public final class TeamHubGui extends AbstractGui {
         }
         paintPaging(player, inventory, page, members.size());
 
-        // --- bottom bar (owner): quick actions left to right in the order owners use them:
-        // invite -> auto-split -> visibility -> settings -> start -> disband -> close ---
+        // --- bottom bar (owner): the daily flow, left to right: invite members,
+        // auto-split them onto sides, then start the battle. Everything else
+        // (public/private, maps, friendly fire, per-team setup, disband) lives one
+        // click away in the settings screen ---
         if (owner) {
             inventory.setItem(GuiSlots.slot(5, 0),
                     ItemBuilder.of(Material.NETHER_STAR)
@@ -162,24 +159,13 @@ public final class TeamHubGui extends AbstractGui {
                                     UiTheme.line(line(player, "gui.party-quick-invite-lore")))
                             .action("quick_invite").build());
             inventory.setItem(GuiSlots.slot(5, 1),
-                    ItemBuilder.of(Material.TARGET)
+                    ItemBuilder.of(Material.ENDER_PEARL)
                             .name(t(player, "gui.party-auto-split").color(UiTheme.PRIMARY))
                             .lore(UiTheme.divider(),
                                     UiTheme.line(line(player, "gui.party-auto-split-lore")))
                             .action("auto_split").build());
             inventory.setItem(GuiSlots.slot(5, 2),
-                    ItemBuilder.of(Material.LEVER)
-                            .name(t(player, "gui.party-visibility").color(UiTheme.PRIMARY))
-                            .lore(UiTheme.divider(),
-                                    UiTheme.status(team.isPublic()
-                                                    ? line(player, "gui.party-public")
-                                                    : line(player, "gui.party-private"),
-                                            team.isPublic() ? UiTheme.SUCCESS : UiTheme.MUTED),
-                                    UiTheme.blank(),
-                                    UiTheme.hint(line(player, "gui.party-visibility-hint")))
-                            .action("toggle_public").build());
-            inventory.setItem(GuiSlots.slot(5, 3),
-                    ItemBuilder.of(Material.COMMAND_BLOCK)
+                    ItemBuilder.of(Material.COMPARATOR)
                             .name(t(player, "gui.team-settings-entry").color(UiTheme.PRIMARY))
                             .lore(UiTheme.divider(),
                                     UiTheme.line(line(player, "gui.team-settings-lore")),
@@ -227,12 +213,6 @@ public final class TeamHubGui extends AbstractGui {
                                             : blockedHint)
                             .glintIf(ready)
                             .action("choose_kit").build());
-            inventory.setItem(GuiSlots.slot(5, 7),
-                    ItemBuilder.of(Material.TNT)
-                            .name(t(player, "gui.party-disband").color(UiTheme.DANGER))
-                            .lore(UiTheme.divider(),
-                                    UiTheme.line(line(player, "gui.party-disband-lore")))
-                            .action("ask_disband").build());
             inventory.setItem(GuiSlots.slot(5, 8),
                     ItemBuilder.action(UiTheme.CLOSE, t(player, "menu.close"), "close"));
         } else {
@@ -382,40 +362,6 @@ public final class TeamHubGui extends AbstractGui {
                             .decoration(TextDecoration.ITALIC, false));
                 }
                 refresh(player, session, inventory);
-            }
-            case "toggle_public" -> {
-                if (!owner) {
-                    return;
-                }
-                TeamService.Result result = teamService.togglePublic(player);
-                sounds.play(player, result == TeamService.Result.OK ? "gui-click" : "error");
-                refresh(player, session, inventory);
-            }
-            case "ask_disband" -> {
-                if (!owner || confirmGui == null) {
-                    return;
-                }
-                sounds.play(player, "gui-open");
-                org.bukkit.Bukkit.getScheduler().runTask(
-                        org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
-                        () -> {
-                            if (player.isOnline()) {
-                                confirmGui.open(player,
-                                        t(player, "gui.party-disband-confirm").color(UiTheme.DANGER),
-                                        java.util.List.of(
-                                                UiTheme.line(line(player,
-                                                        "gui.party-disband-confirm-lore"))),
-                                        yes -> {
-                                            teamService.disband(yes);
-                                            yes.closeInventory();
-                                        },
-                                        no -> {
-                                            if (no.isOnline()) {
-                                                open(no);
-                                            }
-                                        });
-                            }
-                        });
             }
             case "team_settings" -> {
                 if (!owner || teamSettingsGui == null) {
