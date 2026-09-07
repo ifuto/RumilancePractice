@@ -81,7 +81,9 @@ class FfaSpawnMathTest {
         assertTrue(FfaSpawnMath.isSpawnGround("WHITE_TERRACOTTA"));
         assertFalse(FfaSpawnMath.isSpawnGround("LAVA"));
         assertFalse(FfaSpawnMath.isSpawnGround("AIR"));
-        assertFalse(FfaSpawnMath.isSpawnGround("GLASS"));
+        assertFalse(FfaSpawnMath.isSpawnGround("WATER"));
+        assertFalse(FfaSpawnMath.isSpawnGround("CACTUS"));
+        // Glass is intentionally standable since v1.14.0 (glass-floor FFA arenas).
     }
 
     @Test
