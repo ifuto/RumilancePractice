@@ -755,10 +755,20 @@ public final class FfaService {
         }
         // Fallback to the configured arena spawn, but never raw: correct it onto a standable
         // surface in its own column so an outdated spawn cannot leave a player floating in the
-        // air or buried underground, then clamp it inside the arena region so a stale spawn
-        // outside the wall can never place the player beyond the border.
+        // air or buried underground. standClear only pops out of thin floors, so also run the
+        // deep same-column scan (down to the arena floor) for spawns saved while flying; the
+        // last resort walks the region for ANY standable spot before ever using the raw point,
+        // then clamps inside the arena region in case a stale spawn escaped the wall.
         Location footing = com.rumilance.practice.util.SpawnFooting.standClear(arena.spawn());
-        Location base = footing != null ? footing : arena.spawn();
+        if (footing == null && arena.region() != null && arena.region().world() != null) {
+            int minY = Math.max(arena.region().world().getMinHeight(), arena.region().minY());
+            footing = com.rumilance.practice.util.SpawnFooting.standClearDeep(arena.spawn(), minY);
+        }
+        if (footing == null) {
+            java.util.List<Location> clear = new java.util.ArrayList<>();
+            footing = FfaSpawnLocator.find(arena, clear);
+        }
+        Location base = footing != null && footing.getWorld() != null ? footing : arena.spawn();
         return LocationUtil.safeTeleportLocation(base, arena.region());
     }
 

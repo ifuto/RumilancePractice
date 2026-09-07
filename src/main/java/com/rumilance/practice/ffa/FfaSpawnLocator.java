@@ -3,7 +3,6 @@ package com.rumilance.practice.ffa;
 import com.rumilance.practice.util.Cuboid;
 import com.rumilance.practice.util.LocationUtil;
 import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 
@@ -12,7 +11,12 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Finds a standing location on a {@link Material#GRASS_BLOCK} inside an FFA cuboid.
+ * Finds a standing location on any safe ground surface inside an FFA cuboid — grass,
+ * stone, planks, terracotta etc. ({@link FfaSpawnMath#isSpawnGround}), since custom
+ * arenas are rarely floored with grass alone. The fallback point also passes through
+ * {@link com.rumilance.practice.util.SpawnFooting#standClear} so a stale configured
+ * spawn can never come back raw (buried under a freshly pasted floor or floating
+ * above a crater).
  * Samples loaded columns only so a large region does not hitch the main thread.
  */
 public final class FfaSpawnLocator {
@@ -69,6 +73,15 @@ public final class FfaSpawnLocator {
             }
         }
         if (grass.isEmpty()) {
+            Location clear = com.rumilance.practice.util.SpawnFooting.standClear(fallback);
+            if (clear == null) {
+                int minY = Math.max(world.getMinHeight(), region.minY());
+                clear = com.rumilance.practice.util.SpawnFooting.standClearDeep(fallback, minY);
+            }
+            if (clear != null) {
+                fallback = clear;
+                fallback.setWorld(world);
+            }
             randomYaw(fallback);
             return fallback;
         }
@@ -96,7 +109,17 @@ public final class FfaSpawnLocator {
         }
         int pick = FfaSpawnMath.pickIndex(
                 grass.size(), cx, cz, trimmedX, trimmedZ, MIN_DISTANCE * MIN_DISTANCE, rng);
-        Location chosen = pick < 0 ? fallback : grass.get(pick).clone();
+        Location chosen = pick < 0 ? null : grass.get(pick).clone();
+        if (chosen == null) {
+            chosen = com.rumilance.practice.util.SpawnFooting.standClear(fallback);
+            if (chosen == null) {
+                int minY = Math.max(world.getMinHeight(), region.minY());
+                chosen = com.rumilance.practice.util.SpawnFooting.standClearDeep(fallback, minY);
+            }
+        }
+        if (chosen == null) {
+            chosen = fallback;
+        }
         randomYaw(chosen);
         return chosen;
     }
@@ -106,7 +129,7 @@ public final class FfaSpawnLocator {
         int minY = region.minY();
         for (int y = maxY; y >= minY; y--) {
             Block ground = world.getBlockAt(x, y, z);
-            if (ground.getType() != Material.GRASS_BLOCK) {
+            if (!FfaSpawnMath.isSpawnGround(ground.getType().name())) {
                 continue;
             }
             int feetY = y + 1;

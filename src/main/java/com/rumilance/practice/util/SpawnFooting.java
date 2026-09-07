@@ -113,6 +113,23 @@ public final class SpawnFooting {
         return null;
     }
 
+    /**
+     * Broader same-column rescue for a spawn saved far above ground (admin placed it while
+     * flying, or the arena floor was moved down later): scan the column downward to
+     * {@code minY} for the first standable surface. Never walks sideways, so a stale point
+     * still cannot tunnel into a cave network beyond the arena.
+     */
+    public static Location standClearDeep(Location spawn, int minY) {
+        if (spawn == null || spawn.getWorld() == null) {
+            return null;
+        }
+        Location desired = LocationUtil.safeTeleportLocation(spawn);
+        int startY = desired.getBlockY();
+        int floor = Math.max(desired.getWorld().getMinHeight(), minY);
+        Location down = scan(desired, startY, floor, -1);
+        return down != null ? down : forceLift(desired);
+    }
+
     public static boolean bothReady(Location spawnA, Location spawnB) {
         return standClear(spawnA) != null && standClear(spawnB) != null;
     }

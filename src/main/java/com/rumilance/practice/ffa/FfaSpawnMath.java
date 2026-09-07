@@ -130,10 +130,16 @@ public final class FfaSpawnMath {
                     "CUT_SANDSTONE", "SMOOTH_SANDSTONE", "SMOOTH_RED_SANDSTONE",
                     "PRISMARINE", "PRISMARINE_BRICKS", "DARK_PRISMARINE",
                     "QUARTZ_BLOCK", "SMOOTH_QUARTZ", "SNOW_BLOCK", "PACKED_ICE", "BLUE_ICE",
-                    "HONEYCOMB_BLOCK", "AMETHYST_BLOCK", "COPPER_BLOCK" -> true;
+                    "HONEYCOMB_BLOCK", "AMETHYST_BLOCK", "COPPER_BLOCK", "BEDROCK",
+                    "SMOOTH_STONE", "PACKED_MUD", "SCULK", "GLASS", "TINTED_GLASS",
+                    "PURPUR_BLOCK", "END_STONE_BRICKS", "WHITE_WOOL" -> true;
             default -> materialName.endsWith("_PLANKS")
                     || materialName.endsWith("_CONCRETE")
-                    || materialName.endsWith("_TERRACOTTA");
+                    || materialName.endsWith("_TERRACOTTA")
+                    || materialName.endsWith("_WOOL")
+                    || materialName.endsWith("_LOG")
+                    || materialName.startsWith("POLISHED_")
+                    || materialName.startsWith("SMOOTH_");
         };
     }
 
@@ -142,7 +148,8 @@ public final class FfaSpawnMath {
             return false;
         }
         return switch (materialName) {
-            case "AIR", "CAVE_AIR", "SHORT_GRASS", "TALL_GRASS", "FERN", "LARGE_FERN",
+            case "AIR", "CAVE_AIR", "VOID_AIR", "LIGHT", "STRUCTURE_VOID",
+                    "SHORT_GRASS", "TALL_GRASS", "FERN", "LARGE_FERN",
                     "DEAD_BUSH", "SNOW", "MOSS_CARPET", "PINK_PETALS" -> true;
             default -> false;
         };

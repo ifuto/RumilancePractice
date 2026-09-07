@@ -99,4 +99,35 @@ class FfaSpawnMathTest {
         assertEquals(-3, (int) (key >> 32));
         assertEquals(-5, (int) key);
     }
+
+
+    @Test
+    void spawnGroundAcceptsNonGrassArenaFloors() {
+        assertTrue(FfaSpawnMath.isSpawnGround("SMOOTH_STONE"));
+        assertTrue(FfaSpawnMath.isSpawnGround("QUARTZ_BLOCK"));
+        assertTrue(FfaSpawnMath.isSpawnGround("WHITE_WOOL"));
+        assertTrue(FfaSpawnMath.isSpawnGround("ORANGE_CONCRETE"));
+        assertTrue(FfaSpawnMath.isSpawnGround("GLASS"));
+        assertTrue(FfaSpawnMath.isSpawnGround("POLISHED_DIORITE"));
+        assertTrue(FfaSpawnMath.isSpawnGround("BEDROCK"));
+        assertTrue(FfaSpawnMath.isSpawnGround("OAK_LOG"));
+    }
+
+    @Test
+    void feetAndHeadAcceptVoidAirAndLightBlocks() {
+        assertTrue(FfaSpawnMath.isPassableSpawnFeet("VOID_AIR"));
+        assertTrue(FfaSpawnMath.isPassableSpawnFeet("LIGHT"));
+        assertTrue(FfaSpawnMath.isPassableSpawnFeet("STRUCTURE_VOID"));
+        assertFalse(FfaSpawnMath.isPassableSpawnFeet("WATER"));
+    }
+
+    @Test
+    void findsSurfaceOnStoneFloorToo() {
+        int found = FfaSpawnMath.findGrassFeetY(64, 72, y -> switch (y) {
+            case 70 -> "GRASS_BLOCK";
+            case 64 -> "STONE";
+            default -> "AIR";
+        });
+        assertEquals(71, found);
+    }
 }
