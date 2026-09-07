@@ -9,6 +9,7 @@ import com.rumilance.practice.state.MatchState;
 import com.rumilance.practice.state.PlayerState;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import org.bukkit.event.player.PlayerKickEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
@@ -29,7 +30,26 @@ public final class PracticeGuards {
             "silence", "snout"
     );
 
+    /**
+     * Kick causes this server never wants applied: Paper's "Timed out" keepalive kick, the
+     * vanilla "Flying is not enabled" kicks (player + vehicle) and the idle kick must not
+     * drop practice players. Command/ban/plugin kicks use other causes and still go through.
+     */
+    private static final Set<PlayerKickEvent.Cause> SUPPRESSED_KICK_CAUSES = Set.of(
+            PlayerKickEvent.Cause.TIMEOUT,
+            PlayerKickEvent.Cause.IDLING,
+            PlayerKickEvent.Cause.FLYING_PLAYER,
+            PlayerKickEvent.Cause.FLYING_VEHICLE
+    );
+
     private PracticeGuards() {
+    }
+
+    // --- Server automatic kicks (Paper) ---
+
+    /** True when an automatic server kick (timeout / idling / flying) should be cancelled. */
+    public static boolean shouldSuppressAutomaticKick(PlayerKickEvent.Cause cause) {
+        return cause != null && SUPPRESSED_KICK_CAUSES.contains(cause);
     }
 
     // --- Kit layout ---

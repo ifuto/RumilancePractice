@@ -1263,6 +1263,16 @@ public final class FeatureBootstrap {
         pm.registerEvents(new com.rumilance.practice.replay.ReplayControlListener(replayService), plugin);
         pm.registerEvents(new BanLoginListener(banService), plugin);
         pm.registerEvents(new com.rumilance.practice.listener.ChatBanGuardListener(chatBanService), plugin);
+        // No automatic server kicks: Paper's "Timed out" (keepalive TIMEOUT), vanilla
+        // "Flying is not enabled" (FLYING_PLAYER/FLYING_VEHICLE) and idle (IDLING) kicks are
+        // cancelled by KickGuardListener; per player the netty 30s read-timeout handler is
+        // stripped as well so even a frozen client is not dropped without an event.
+        com.rumilance.practice.guard.TimeoutChannelGuard timeoutChannelGuard =
+                new com.rumilance.practice.guard.TimeoutChannelGuard(plugin.getLogger());
+        pm.registerEvents(new com.rumilance.practice.guard.KickGuardListener(timeoutChannelGuard), plugin);
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            timeoutChannelGuard.disableReadTimeout(online);
+        }
         SessionBootstrapListener sessionBootstrapListener = new SessionBootstrapListener(
                 sessionManager, stateManager, lobbyService, settings.defaultLocale(), playerRepository,
                 layoutCache, settingsService, asyncExecutor, plugin, messageService, rankService, chatBanService);

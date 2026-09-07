@@ -6,6 +6,7 @@ import com.rumilance.practice.rank.PlayerRank;
 import com.rumilance.practice.state.MatchMode;
 import com.rumilance.practice.state.MatchState;
 import com.rumilance.practice.state.PlayerState;
+import org.bukkit.event.player.PlayerKickEvent;
 import org.bukkit.inventory.ItemStack;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -447,5 +448,26 @@ class PracticeGuardsTest {
         // is blocked by MatchListener already; looseItemMoveBlocked governs world drops,
         // and rematch items must never hit the ground.
         assertTrue(PracticeGuards.looseItemMoveBlocked(PlayerState.ENDING));
+    }
+
+    // --- Automatic kick suppression (Paper) ---
+
+    @ParameterizedTest(name = "automatic kick cause {0} is suppressed")
+    @EnumSource(value = PlayerKickEvent.Cause.class,
+            names = {"TIMEOUT", "IDLING", "FLYING_PLAYER", "FLYING_VEHICLE"})
+    void automaticKickCausesAreSuppressed(PlayerKickEvent.Cause cause) {
+        assertTrue(PracticeGuards.shouldSuppressAutomaticKick(cause));
+    }
+
+    @Test
+    void manualPluginAndBanKicksStayAllowed() {
+        for (PlayerKickEvent.Cause cause : PlayerKickEvent.Cause.values()) {
+            switch (cause) {
+                case TIMEOUT, IDLING, FLYING_PLAYER, FLYING_VEHICLE -> { }
+                default -> assertFalse(PracticeGuards.shouldSuppressAutomaticKick(cause),
+                        "unexpected suppression: " + cause);
+            }
+        }
+        assertFalse(PracticeGuards.shouldSuppressAutomaticKick(null));
     }
 }

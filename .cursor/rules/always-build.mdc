@@ -12,3 +12,12 @@ Java / Gradle / YAML / リソースを変更したら、そのターンの最後
 ```
 
 完了後、`build/libs/RumilancePractice-<version>.jar` が今回のバージョンで存在することを確認する。`version` は `gradle.properties` が正。`build.gradle.kts` にバージョンを直書きしない。
+
+# CI（毎回・完成後に必ず回す）
+
+リポジトリには `.github/workflows/build.yml` があり、push ごとに `./gradlew build`（test + shadowJar）を実行し、失敗時はエラー行を抽出してアノテーション化、成功/失敗に関わらず `build-log` と `jars` Artifact を保存する。ローカルで JDK や Gradle の依存解決が使えない sandbox 環境では、この CI をビルド・バグ取り・JAR 生成の手段として毎回使う:
+
+1. 変更をまとめたら push（セッションブランチへ）
+2. `gh run watch` で `build` ワークフローの完了を待つ
+3. 失敗したら `gh run view --log-failed` でエラーを読み、修正して再 push —— 緑になるまで繰り返す
+4. 成功したら Artifact `jars` に `RumilancePractice-<version>.jar` が生成されていることを確認する（`gh run download -n jars` で取得可能）
