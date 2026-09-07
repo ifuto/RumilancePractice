@@ -1189,7 +1189,10 @@ public final class FeatureBootstrap {
         TabFightListService tabFightListService = new TabFightListService(plugin);
         tabFightListService.setRankService(rankService);
         tabFightListService.setConfigService(configService);
+        tabFightListService.setNameColorService(nameColorService);
         scoreboardService.setTabFightListService(tabFightListService);
+        // 1v1 polish: i-frame hits still sound like real hits (no mechanic changes).
+        com.rumilance.practice.combat.DuelHitSoundService.register(plugin, matchRegistry);
         if (scoreboardConfig.enabled()) {
             scoreboardService.start();
         }

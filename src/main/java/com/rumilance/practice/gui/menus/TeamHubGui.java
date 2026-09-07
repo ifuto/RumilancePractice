@@ -29,15 +29,16 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * The main team control panel (fully GUI-driven). The owner gets invite / visibility /
- * side-assignment / auto-split / start controls; members get a "leave team" panel. Every
- * member is listed in the standard 28-slot content grid with a side-coloured icon:
+ * The main team control panel (fully GUI-driven), redesigned around the actions a party
+ * owner actually reaches for: invite players, auto-split sides, toggle public/private,
+ * full settings, start the battle and — with a confirmation — disband. Every member is
+ * listed in the standard 28-slot content grid with a side-coloured icon:
  * <ul>
- *   <li>Left-click a member — assign RED</li>
- *   <li>Right-click a member — assign BLUE</li>
- *   <li>Shift-click a member — kick (owner only)</li>
+ *   <li>Left-click a member — cycle their side (RED → BLUE → unassigned)</li>
+ *   <li>Right-click (or shift-click) a member — kick (owner only)</li>
  * </ul>
  * Sides may be arbitrarily uneven (max 15 per side); paging kicks in past 28 members.
+ * Party members that are not the owner get a leave button instead of the owner bar.
  */
 public final class TeamHubGui extends AbstractGui {
 
@@ -151,9 +152,33 @@ public final class TeamHubGui extends AbstractGui {
         }
         paintPaging(player, inventory, page, members.size());
 
-        // --- bottom bar: settings entry, start battle (centre), leave/disband ---
+        // --- bottom bar (owner): quick actions left to right in the order owners use them:
+        // invite -> auto-split -> visibility -> settings -> start -> disband -> close ---
         if (owner) {
+            inventory.setItem(GuiSlots.slot(5, 0),
+                    ItemBuilder.of(Material.NETHER_STAR)
+                            .name(t(player, "gui.party-quick-invite").color(UiTheme.PRIMARY))
+                            .lore(UiTheme.divider(),
+                                    UiTheme.line(line(player, "gui.party-quick-invite-lore")))
+                            .action("quick_invite").build());
             inventory.setItem(GuiSlots.slot(5, 1),
+                    ItemBuilder.of(Material.TARGET)
+                            .name(t(player, "gui.party-auto-split").color(UiTheme.PRIMARY))
+                            .lore(UiTheme.divider(),
+                                    UiTheme.line(line(player, "gui.party-auto-split-lore")))
+                            .action("auto_split").build());
+            inventory.setItem(GuiSlots.slot(5, 2),
+                    ItemBuilder.of(Material.LEVER)
+                            .name(t(player, "gui.party-visibility").color(UiTheme.PRIMARY))
+                            .lore(UiTheme.divider(),
+                                    UiTheme.status(team.isPublic()
+                                                    ? line(player, "gui.party-public")
+                                                    : line(player, "gui.party-private"),
+                                            team.isPublic() ? UiTheme.SUCCESS : UiTheme.MUTED),
+                                    UiTheme.blank(),
+                                    UiTheme.hint(line(player, "gui.party-visibility-hint")))
+                            .action("toggle_public").build());
+            inventory.setItem(GuiSlots.slot(5, 3),
                     ItemBuilder.of(Material.COMMAND_BLOCK)
                             .name(t(player, "gui.team-settings-entry").color(UiTheme.PRIMARY))
                             .lore(UiTheme.divider(),
@@ -203,6 +228,12 @@ public final class TeamHubGui extends AbstractGui {
                             .glintIf(ready)
                             .action("choose_kit").build());
             inventory.setItem(GuiSlots.slot(5, 7),
+                    ItemBuilder.of(Material.TNT)
+                            .name(t(player, "gui.party-disband").color(UiTheme.DANGER))
+                            .lore(UiTheme.divider(),
+                                    UiTheme.line(line(player, "gui.party-disband-lore")))
+                            .action("ask_disband").build());
+            inventory.setItem(GuiSlots.slot(5, 8),
                     ItemBuilder.action(UiTheme.CLOSE, t(player, "menu.close"), "close"));
         } else {
             inventory.setItem(GuiSlots.slot(5, 4),
@@ -210,6 +241,8 @@ public final class TeamHubGui extends AbstractGui {
                             .name(t(player, "party.leave").color(UiTheme.WARNING))
                             .lore(UiTheme.hint(line(player, "party.leave-hint")))
                             .action("leave").build());
+            inventory.setItem(GuiSlots.slot(5, 8),
+                    ItemBuilder.action(UiTheme.CLOSE, t(player, "menu.close"), "close"));
         }
     }
 
@@ -297,7 +330,7 @@ public final class TeamHubGui extends AbstractGui {
             b.lore(UiTheme.blank(),
                     UiTheme.hint(line(viewer, "gui.party-click-cycle")));
             if (!team.isOwner(member)) {
-                b.lore(UiTheme.hint(line(viewer, "party.shift-kick")));
+                b.lore(UiTheme.hint(line(viewer, "party.right-kick")));
             }
         }
         return b.skullOwner(p).action("member:" + member).build();
@@ -323,6 +356,66 @@ public final class TeamHubGui extends AbstractGui {
                 teamService.leave(player);
                 player.closeInventory();
                 browser.open(player);
+            }
+            case "quick_invite" -> {
+                if (!owner || partyInviteGui == null) {
+                    return;
+                }
+                sounds.play(player, "gui-open");
+                org.bukkit.Bukkit.getScheduler().runTask(
+                        org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
+                        () -> {
+                            if (player.isOnline()) {
+                                partyInviteGui.openFor(player);
+                            }
+                        });
+            }
+            case "auto_split" -> {
+                if (!owner) {
+                    return;
+                }
+                TeamService.Result result = teamService.autoAssign(player);
+                sounds.play(player, result == TeamService.Result.OK ? "gui-click" : "error");
+                if (result != TeamService.Result.OK) {
+                    player.sendMessage(Component.text(
+                            teamService.errorMessage(player, result), UiTheme.DANGER)
+                            .decoration(TextDecoration.ITALIC, false));
+                }
+                refresh(player, session, inventory);
+            }
+            case "toggle_public" -> {
+                if (!owner) {
+                    return;
+                }
+                TeamService.Result result = teamService.togglePublic(player);
+                sounds.play(player, result == TeamService.Result.OK ? "gui-click" : "error");
+                refresh(player, session, inventory);
+            }
+            case "ask_disband" -> {
+                if (!owner || confirmGui == null) {
+                    return;
+                }
+                sounds.play(player, "gui-open");
+                org.bukkit.Bukkit.getScheduler().runTask(
+                        org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
+                        () -> {
+                            if (player.isOnline()) {
+                                confirmGui.open(player,
+                                        t(player, "gui.party-disband-confirm").color(UiTheme.DANGER),
+                                        java.util.List.of(
+                                                UiTheme.line(line(player,
+                                                        "gui.party-disband-confirm-lore"))),
+                                        yes -> {
+                                            teamService.disband(yes);
+                                            yes.closeInventory();
+                                        },
+                                        no -> {
+                                            if (no.isOnline()) {
+                                                open(no);
+                                            }
+                                        });
+                            }
+                        });
             }
             case "team_settings" -> {
                 if (!owner || teamSettingsGui == null) {
@@ -388,11 +481,13 @@ public final class TeamHubGui extends AbstractGui {
                         return;
                     }
                     TeamService.Result r;
-                    if (click == ClickType.SHIFT_LEFT || click == ClickType.SHIFT_RIGHT) {
+                    if (click == ClickType.RIGHT || click == ClickType.SHIFT_LEFT
+                            || click == ClickType.SHIFT_RIGHT) {
+                        // Right-click (and the legacy shift-click convention) kicks.
                         r = teamService.kick(player, name);
                     } else {
                         // One-button cycling: first click RED, next toggles to BLUE, then
-                        // back to unassigned — no left/right distinction needed.
+                        // back to unassigned.
                         r = teamService.cycleSide(player, name);
                     }
                     sounds.play(player, r == TeamService.Result.OK ? "gui-click" : "error");

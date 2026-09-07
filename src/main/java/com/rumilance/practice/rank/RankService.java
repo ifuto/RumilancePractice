@@ -196,6 +196,14 @@ public final class RankService {
         player.setCustomNameVisible(false);
     }
 
+    /** Just the rank-styled name component (no side effects) — used by the TAB fight layout. */
+    public Component styledComponentName(Player player) {
+        if (player == null) {
+            return Component.empty();
+        }
+        return styledName(player.getName(), get(player));
+    }
+
     /**
      * Styled display name: plain white for NORM, aqua→blue gradient for ranks. Rank badges
      * come from the resource-pack icon font prefix (see IconFontService / RankIconNameTags);

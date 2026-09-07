@@ -56,13 +56,21 @@ final class TabPadPackets {
         return Boolean.TRUE.equals(available);
     }
 
-    /** Adds one blank pad entry to {@code viewer}'s player list at the given priority. */
+    /** Adds one pad entry to {@code viewer}'s player list at the given priority. */
     static void addPad(Player viewer, UUID padId, String padName, int priority) {
+        addPad(viewer, padId, padName, priority, " ");
+    }
+
+    /**
+     * Adds one pad entry with a styled display name (legacy {@code §}-formatted text, e.g. a
+     * column header). Shares the blank-pad mechanics: fake profile, latency -1, no entity.
+     */
+    static void addPad(Player viewer, UUID padId, String padName, int priority, String displayName) {
         ProtocolManager pm = manager;
         WrappedGameProfile profile = new WrappedGameProfile(padId, padName);
         PlayerInfoData data = new PlayerInfoData(padId, -1, true,
                 EnumWrappers.NativeGameMode.NOT_SET, profile,
-                WrappedChatComponent.fromText(" "), priority, null);
+                WrappedChatComponent.fromText(displayName == null ? " " : displayName), priority, null);
         sendSingle(pm, viewer, EnumWrappers.PlayerInfoAction.ADD_PLAYER, data);
         sendSingle(pm, viewer, EnumWrappers.PlayerInfoAction.UPDATE_LISTED, data);
         sendSingle(pm, viewer, EnumWrappers.PlayerInfoAction.UPDATE_LATENCY, data);
@@ -76,6 +84,14 @@ final class TabPadPackets {
                 EnumWrappers.NativeGameMode.NOT_SET, new WrappedGameProfile(padId, padName),
                 WrappedChatComponent.fromText(" "), priority, null);
         sendSingle(manager, viewer, EnumWrappers.PlayerInfoAction.UPDATE_LIST_ORDER, data);
+    }
+
+    /** Re-styles an already-added pad (blank row turning into a column header, or vice versa). */
+    static void updateDisplayName(Player viewer, UUID padId, String padName, String displayName) {
+        PlayerInfoData data = new PlayerInfoData(padId, -1, true,
+                EnumWrappers.NativeGameMode.NOT_SET, new WrappedGameProfile(padId, padName),
+                WrappedChatComponent.fromText(displayName == null ? " " : displayName), 0, null);
+        sendSingle(manager, viewer, EnumWrappers.PlayerInfoAction.UPDATE_DISPLAY_NAME, data);
     }
 
     /** Removes pad entries from {@code viewer}'s player list. */
