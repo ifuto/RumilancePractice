@@ -13,6 +13,10 @@ Java / Gradle / YAML / リソースを変更したら、そのターンの最後
 
 完了後、`build/libs/RumilancePractice-<version>.jar` が今回のバージョンで存在することを確認する。`version` は `gradle.properties` が正。`build.gradle.kts` にバージョンを直書きしない。
 
+# バージョンを必ず上げる
+
+コード / リソースを更新したら、コミット前に必ず `gradle.properties` の `version` を上げる（通常はパッチを +1。機能追加ならマイナー bump も可）。上げ忘れたまま CI を通さない。CI の `jars` Artifact には新しいバージョン番号の JAR が乗るはず、という形で二重チェックする。
+
 # CI（毎回・完成後に必ず回す）
 
 リポジトリには `.github/workflows/build.yml` があり、push ごとに `./gradlew build`（test + shadowJar）を実行し、失敗時はエラー行を抽出してアノテーション化、成功/失敗に関わらず `build-log` と `jars` Artifact を保存する。ローカルで JDK や Gradle の依存解決が使えない sandbox 環境では、この CI をビルド・バグ取り・JAR 生成の手段として毎回使う:

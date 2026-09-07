@@ -57,6 +57,7 @@ cd RumilancePractice
 - プレイヤー状態は UUID キーの `PlayerStateManager` で一意管理
 - サーバー停止時は切断 ChatBan を発行しません（`MatchSession.shuttingDown`）
 - タイムアウト・放置・Fly による自動キックは行いません（`KickGuardListener` が Paper の `TIMEOUT` / `IDLING` / `FLYING_PLAYER` / `FLYING_VEHICLE` キックをキャンセルし、参加時に netty の read-timeout も除去。コマンド・BAN・プラグインによるキックは従来通り有効）
+- 練習ボットの戦闘関数と Quantum マップ関数の対応表は [docs/bot-combat-parity.md](docs/bot-combat-parity.md)
 
 ## 権限
 
