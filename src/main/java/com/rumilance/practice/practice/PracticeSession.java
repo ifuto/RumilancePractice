@@ -50,8 +50,98 @@ public final class PracticeSession {
     private Location botHome;
     /** End crystals the CRYSTAL bot placed itself (it is immune to their blasts). */
     private final java.util.Set<java.util.UUID> botCrystals = new java.util.HashSet<>();
-    /** Obsidian the CRYSTAL bot placed, with placement time (reverted after a while). */
-    private final java.util.Map<org.bukkit.block.Block, Long> botPlacedBlocks = new java.util.LinkedHashMap<>();
+    /** Blocks the combat bots placed mid-fight (pedestal, cobweb, lava...), reverted by TTL. */
+    private final java.util.Map<org.bukkit.block.Block, BotBlock> botPlacedBlocks = new java.util.LinkedHashMap<>();
+    /** Cooldowns / counters for the Quantum-parity combat abilities. */
+    private final BotAbilityState abilities = new BotAbilityState();
+
+    /** A block a bot placed mid-fight: after {@code ttlMs} it is reverted to AIR. */
+    public record BotBlock(org.bukkit.Material type, long atMs, long ttlMs) {
+    }
+
+    /**
+     * Per-fight cooldown timers and use counters for the Quantum-parity combat abilities
+     * (crits, jump resets, escape pearls, golden apples, cobweb / water / lava tricks, axe
+     * shield disables, crossbow + anchor mixups, far pearls, elytra engages, defensive blocks).
+     * Owned by the session so a respawned bot restarts with an empty bag of tricks.
+     */
+    public static final class BotAbilityState {
+        /** Next jump-crit the sword/pot bot may attempt (Quantum: sword/crit + pcrit gate). */
+        private long nextCritMs;
+        /** Next combo jump-reset hop after a landed hit (Quantum: sword/combo/jumpreset). */
+        private long nextJumpResetMs;
+        /** Next escape pearl when hurt and cornered (Quantum: passive/escape/pearl). */
+        private long nextPearlMs;
+        /** Next golden-apple chomp under pressure (Quantum: passive/gap). */
+        private long nextGapMs;
+        /** Next bow shot at a far target (Quantum: sword bowcharge). */
+        private long nextBowMs;
+        /** Next cobweb placed at the player's feet (Quantum: cobwebs/cobweb). */
+        private long nextCobwebMs;
+        /** Next self water-bucket save from fire / cobwebs (Quantum: cobwebs/water_main). */
+        private long nextWaterMs;
+        /** Next lava bucket under an airborne player (Quantum: cobwebs/empty_lava). */
+        private long nextLavaMs;
+        /** Next axe swing that disables the player's shield (Quantum: shield/disable). */
+        private long nextAxeMs;
+        /** Next crystal-bot crossbow snipe (Quantum: crystal/passive/crossbow). */
+        private long nextCrossbowMs;
+        /** Next respawn-anchor mixup (Quantum: g1gc/anchor). */
+        private long nextAnchorMs;
+        /** Next defensive block wall (Quantum: crystal/passive/block, cart/defenseplace). */
+        private long nextDefenseBlockMs;
+        /** Next long-range pearl engage (Quantum: mace_new/far_pearl). */
+        private long nextFarPearlMs;
+        /** Next wind-charge + pearl burst engage (Quantum: mace_new/wind_pearl). */
+        private long nextWindPearlMs;
+        /** Next elytra-style rocket engage (Quantum: mace_new/elytra). */
+        private long nextElytraMs;
+        /** Golden apples eaten this life (map caps its sustain, so do we: max 2). */
+        private int gapUses;
+        /** Harming splashes thrown since the last restock drink (map cap: 2). */
+        private int potUses;
+
+        public long nextCritMs() { return nextCritMs; }
+        public void nextCritMs(long v) { nextCritMs = v; }
+        public long nextJumpResetMs() { return nextJumpResetMs; }
+        public void nextJumpResetMs(long v) { nextJumpResetMs = v; }
+        public long nextPearlMs() { return nextPearlMs; }
+        public void nextPearlMs(long v) { nextPearlMs = v; }
+        public long nextGapMs() { return nextGapMs; }
+        public void nextGapMs(long v) { nextGapMs = v; }
+        public long nextBowMs() { return nextBowMs; }
+        public void nextBowMs(long v) { nextBowMs = v; }
+        public long nextCobwebMs() { return nextCobwebMs; }
+        public void nextCobwebMs(long v) { nextCobwebMs = v; }
+        public long nextWaterMs() { return nextWaterMs; }
+        public void nextWaterMs(long v) { nextWaterMs = v; }
+        public long nextLavaMs() { return nextLavaMs; }
+        public void nextLavaMs(long v) { nextLavaMs = v; }
+        public long nextAxeMs() { return nextAxeMs; }
+        public void nextAxeMs(long v) { nextAxeMs = v; }
+        public long nextCrossbowMs() { return nextCrossbowMs; }
+        public void nextCrossbowMs(long v) { nextCrossbowMs = v; }
+        public long nextAnchorMs() { return nextAnchorMs; }
+        public void nextAnchorMs(long v) { nextAnchorMs = v; }
+        public long nextDefenseBlockMs() { return nextDefenseBlockMs; }
+        public void nextDefenseBlockMs(long v) { nextDefenseBlockMs = v; }
+        public long nextFarPearlMs() { return nextFarPearlMs; }
+        public void nextFarPearlMs(long v) { nextFarPearlMs = v; }
+        public long nextWindPearlMs() { return nextWindPearlMs; }
+        public void nextWindPearlMs(long v) { nextWindPearlMs = v; }
+        public long nextElytraMs() { return nextElytraMs; }
+        public void nextElytraMs(long v) { nextElytraMs = v; }
+        public int gapUses() { return gapUses; }
+        public void gapUses(int v) { gapUses = v; }
+        public int potUses() { return potUses; }
+        public void potUses(int v) { potUses = v; }
+
+        /** A fresh life after a pop / takedown: keeps cooldowns, restores consumables. */
+        public void resetConsumables() {
+            gapUses = 0;
+            potUses = 0;
+        }
+    }
     /** Until this timestamp the crystal bot is recovering (sprinting away). */
     private long botRetreatUntilMs;
     /**
@@ -262,8 +352,12 @@ public final class PracticeSession {
         return botCrystals;
     }
 
-    public java.util.Map<org.bukkit.block.Block, Long> botPlacedBlocks() {
+    public java.util.Map<org.bukkit.block.Block, BotBlock> botPlacedBlocks() {
         return botPlacedBlocks;
+    }
+
+    public BotAbilityState abilities() {
+        return abilities;
     }
 
     public long botRetreatUntilMs() {

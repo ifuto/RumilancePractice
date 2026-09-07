@@ -889,6 +889,49 @@ public final class PracticeService {
     private static final long MACE_WIND_COOLDOWN_MS = 5200L;
     /** How long a swing into the bot's raised shield costs the player. */
     private static final long MACE_SHIELD_STUN_MS = 1000L;
+    // --- Quantum-parity combat abilities (sword/crit, cobwebs, decisions...) ----------
+    /** Sword bot jump-crit cadence: at fastest, every 5th swing window, scaled by the rung. */
+    private static final long CRIT_MIN_INTERVAL_MS = 1400L;
+    /** Escape pearl: bot wounded this badly (fraction of max HP) may pearl out. */
+    private static final double ESCAPE_PEARL_HP_FRACTION = 0.35d;
+    /** Cooldown for the escape pearl (map: pearlcd 20 ticks + spread reacquire time). */
+    private static final long ESCAPE_PEARL_COOLDOWN_MS = 9000L;
+    /** Golden apple: eaten below half HP, heals 40%, at most twice per bot life. */
+    private static final long GAP_COOLDOWN_MS = 500L;
+    private static final double GAP_HEAL_FRACTION = 0.4d;
+    private static final int GAP_MAX_USES = 2;
+    /** Cobweb trick: placed under the player, melts away after TTL. */
+    private static final long COBWEB_COOLDOWN_MS = 6000L;
+    private static final long COBWEB_TTL_MS = 8000L;
+    /** Self water bucket: puts the bot out / washes webs, small soak visual. */
+    private static final long WATER_COOLDOWN_MS = 9000L;
+    private static final long WATER_TTL_MS = 1500L;
+    /** Lava bucket under an airborne player (very short lived so rooms stay clean). */
+    private static final long LAVA_COOLDOWN_MS = 8000L;
+    private static final long LAVA_TTL_MS = 1800L;
+    /** Axe swing that disables a raised player shield (vanilla-style 4s shield cooldown). */
+    private static final long AXE_COOLDOWN_MS = 7000L;
+    private static final int AXE_SHIELD_DISABLE_TICKS = 80;
+    /** Sword bow: used beyond melee range. */
+    private static final long BOW_COOLDOWN_MS = 3500L;
+    /** Crystal crossbow sniping: mid range poke between combos. */
+    private static final double CROSSBOW_MIN_RANGE = 5.5d;
+    private static final double CROSSBOW_MAX_RANGE = 15.0d;
+    /** Respawn-anchor mixup (g1gc): only from HARD upward, every other combo at most. */
+    private static final long ANCHOR_MIN_COOLDOWN_MS = 6500L;
+    /** Defensive block wall (crystal obsidian / cart oak log). */
+    private static final long DEFENSE_BLOCK_COOLDOWN_MS = 9000L;
+    private static final long DEFENSE_BLOCK_TTL_MS = 7000L;
+    /** Mace far-pearl engage when the player kites beyond melee. */
+    private static final long FAR_PEARL_COOLDOWN_MS = 8000L;
+    private static final double FAR_PEARL_MIN_RANGE = 8.0d;
+    private static final double FAR_PEARL_MAX_RANGE = 24.0d;
+    /** Mace wind+forward burst (wind_pearl) and elytra-style rocket engages. */
+    private static final long WIND_PEARL_COOLDOWN_MS = 9000L;
+    private static final long ELYTRA_COOLDOWN_MS = 12000L;
+    /** Generic pedestal / quick-block TTLs for the tracked-block reverter. */
+    private static final long PEDESTAL_TTL_MS = 7000L;
+    private static final long CART_RAIL_TTL_MS = 8000L;
 
     private void beginBotCountdown(Player player, PracticeSession session) {
         if (session.phase() != PracticeSession.Phase.WAIT) {
@@ -1490,6 +1533,41 @@ public final class PracticeService {
                         + java.util.concurrent.ThreadLocalRandom.current().nextInt(1200));
                 continue;
             }
+            PracticeSession.BotAbilityState maceAb = session.abilities();
+            // 2b) WIND PEARL (Quantum parity: mace_new/wind_pearl, HARD and up): wind blast
+            //     plus a forward shove, so the bot sails over the gap into a big smash.
+            if (grounded && flat >= 4.5d && dist <= 9.0d && now >= maceAb.nextWindPearlMs()
+                    && diff.preset().ordinal() >= BotDifficulty.Preset.HARD.ordinal()) {
+                launchMaceWindCharge(bot);
+                bot.setVelocity(new Vector(dx / flat * 0.55d, 0.35d, dz / flat * 0.55d));
+                maceAb.nextWindPearlMs(now + WIND_PEARL_COOLDOWN_MS);
+                continue;
+            }
+            // 2c) FAR PEARL (Quantum parity: mace_new/far_pearl): blink to a kiting player.
+            if (grounded && dist >= FAR_PEARL_MIN_RANGE && dist <= FAR_PEARL_MAX_RANGE
+                    && now >= maceAb.nextFarPearlMs() && diff.attackDamage() > 0.0d && flat > 0.0001) {
+                Vector toward = new Vector(dx / flat, 0, dz / flat);
+                Location landing = findPearlLanding(session, botLoc, toward, dist - 2.5d);
+                if (landing != null) {
+                    maceAb.nextFarPearlMs(now + FAR_PEARL_COOLDOWN_MS);
+                    pearlTeleportFx(bot, landing);
+                    continue;
+                }
+                maceAb.nextFarPearlMs(now + 1500L); // no safe spot: retry soon, don't spam scans
+            }
+            // 2d) ELYTRA (Quantum parity: mace_new/elytra, HARD and up): rocket up-forward,
+            //     the descent falls straight into the SMASH branch above.
+            if (grounded && dist > 7.0d && dist <= 20.0d && now >= maceAb.nextElytraMs()
+                    && diff.preset().ordinal() >= BotDifficulty.Preset.HARD.ordinal() && flat > 0.0001) {
+                bot.setVelocity(new Vector(dx / flat * 0.7d, 0.95d, dz / flat * 0.7d));
+                if (bot.getWorld() != null) {
+                    bot.getWorld().playSound(botLoc, Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 0.9f, 1.1f);
+                    bot.getWorld().spawnParticle(org.bukkit.Particle.CLOUD,
+                            botLoc.add(0, 0.4, 0), 12, 0.3, 0.2, 0.3, 0.05d);
+                }
+                maceAb.nextElytraMs(now + ELYTRA_COOLDOWN_MS);
+                continue;
+            }
             // 3) LUNGE: sprint-jump at the player (map: move forward + sprint + jump + attack).
             if (grounded && flat > 0.0001 && dist >= MACE_LUNGE_MIN_RANGE
                     && dist <= MACE_LUNGE_MAX_RANGE && now >= session.botNextLungeMs()) {
@@ -1821,9 +1899,11 @@ public final class PracticeService {
         switch (type) {
             case SWORD, NETHERITE_POT -> {
                 eq.setItemInMainHand(new ItemStack(Material.NETHERITE_SWORD));
+                // Quantum passive/main: shield down means a totem rides the offhand.
                 eq.setItemInOffHand(type == PracticeType.NETHERITE_POT
                         ? new ItemStack(Material.SPLASH_POTION)
-                        : (shieldUp ? new ItemStack(Material.SHIELD) : null));
+                        : (shieldUp ? new ItemStack(Material.SHIELD)
+                                : new ItemStack(Material.TOTEM_OF_UNDYING)));
             }
             case CART -> {
                 eq.setItemInMainHand(new ItemStack(Material.BOW));
@@ -1879,6 +1959,8 @@ public final class PracticeService {
                 }
                 continue;
             }
+            // Bot-placed block reverts (pedestals, webs, lava, rails...) share one sweeper.
+            revertAgedBotBlocks(session, now);
             Location eye = bot.getEyeLocation();
             Location target = player.getLocation().add(0, 1.0, 0);
             Vector to = target.toVector().subtract(eye.toVector());
@@ -1898,12 +1980,28 @@ public final class PracticeService {
 
             // --- sword & netherite-pot bots: chase, strafe, swing (difficulty-tuned) ---
             BotDifficulty diff = session.difficulty();
+            PracticeSession.BotAbilityState ab = session.abilities();
             if (now - session.botLastDamagedMs() > BotDifficulty.REGEN_DELAY_MS
                     && diff.regenPerSecond() > 0) {
                 healToward(bot, diff.botMaxHp(), diff.regenPerSecond() / 20.0d);
             }
             boolean blocking = session.botShieldRaised();
             double distSq = bot.getLocation().distanceSquared(player.getLocation());
+            double dist = Math.sqrt(distSq);
+
+            // Quantum passive layer: gap healing, water saves, escape pearls (map state3
+            // passives run before the fight loop each tick).
+            tickBotGap(session, bot, diff.botMaxHp(), now);
+            tickBotWaterSave(session, bot, now);
+            boolean escaped = tickEscapePearl(player, session, bot, diff.botMaxHp(), now);
+
+            // Quantum disruption layer (cobwebs/fluid_main + shield/disable): webs at the
+            // player's feet, lava under an airborne player, and axe swings that strip shields.
+            tickSwordDisruption(player, session, bot, type, dist, now);
+
+            if (escaped) {
+                continue; // just pearled out: re-aim next tick instead of swinging air
+            }
             if (distSq > 2.2d * 2.2d) {
                 Vector dir = to.setY(0);
                 if (dir.lengthSquared() > 0.0001) {
@@ -1915,8 +2013,32 @@ public final class PracticeService {
                     }
                     Vector side = new Vector(-dir.getZ(), 0, dir.getX())
                             .multiply(diff.moveSpeed() * 0.66d * session.botStrafeDir());
-                    bot.setVelocity(dir.multiply(blocking ? diff.moveSpeed() * 0.4d : diff.moveSpeed())
-                            .add(side).setY(bot.getVelocity().getY()));
+                    Vector move = dir.multiply(blocking ? diff.moveSpeed() * 0.4d : diff.moveSpeed())
+                            .add(side).setY(bot.getVelocity().getY());
+                    // Obstacle hop (map bot_mech/jump): pressing forward but not moving means a
+                    // one-block lip ahead — hop over it instead of grinding.
+                    if (bot.isOnGround() && !blocking) {
+                        Vector vel = bot.getVelocity();
+                        if (vel.getX() * vel.getX() + vel.getZ() * vel.getZ() < 0.05d * 0.05d) {
+                            move.setY(0.42d);
+                        }
+                    }
+                    bot.setVelocity(move);
+                    // Long-range bow pressure (map sword bowcharge / passive bow): pokes while
+                    // walking into melee range. (Fresh direction: dir/to were scaled in-place
+                    // by the movement math above.)
+                    if (!blocking && dist >= 8.0d && dist <= 18.0d && now >= ab.nextBowMs()
+                            && diff.attackDamage() > 0.0d) {
+                        botShootArrow(bot, diff, player.getLocation().toVector()
+                                        .subtract(bot.getLocation().toVector()).setY(0),
+                                diff.attackDamage() * 0.8d);
+                        if (bot.getWorld() != null) {
+                            bot.getWorld().playSound(bot.getLocation(),
+                                    Sound.ENTITY_ARROW_SHOOT, 1.0f, 1.0f);
+                        }
+                        ab.nextBowMs(now + BOW_COOLDOWN_MS
+                                + java.util.concurrent.ThreadLocalRandom.current().nextInt(800));
+                    }
                 }
             } else {
                 bot.setVelocity(new Vector(0, bot.getVelocity().getY(), 0));
@@ -1924,9 +2046,16 @@ public final class PracticeService {
             double reach = reachWithJitter(diff);
             if (!blocking && diff.attackDamage() > 0.0d && now >= session.botNextAttackMs()
                     && distSq <= reach * reach) {
-                // Map "aim": the higher the aim error the more swings whiff, so low rungs punish
-                // a player who stands still far less than MASTER / SURVIVAL MASTER.
-                botSwing(player, bot, diff, diff.attackDamage());
+                if (now >= ab.nextCritMs() && bot.isOnGround()
+                        && !inCobweb(player.getLocation())) {
+                    // Jump-crit (Quantum: sword/crit gated by sword/pcrit): hop now, connect on
+                    // the way down; the map's crit replaces a plain hit.
+                    swordJumpCrit(player, session, bot, diff, reach, now);
+                } else {
+                    // Map "aim": the higher the aim error the more swings whiff, so low rungs
+                    // punish a player who stands still far less than MASTER / SURVIVAL MASTER.
+                    botSwing(player, bot, diff, diff.attackDamage());
+                }
                 session.setBotNextAttackMs(now + diff.attackIntervalMs()
                         + java.util.concurrent.ThreadLocalRandom.current().nextInt(150));
             }
@@ -1945,20 +2074,24 @@ public final class PracticeService {
             return;
         }
         BotDifficulty diff = session.difficulty();
+        PracticeSession.BotAbilityState ab = session.abilities();
         double hp = bot.getHealth();
         if (hp < diff.botMaxHp() * 0.5d) {
-            // Chug: instant heal + red sparkle.
+            // Chug: instant heal + red sparkle (and a restock, like the map's pot_cd reset).
             healToward(bot, diff.botMaxHp(), 8.0d);
+            ab.potUses(0);
             if (bot.getWorld() != null) {
                 bot.getWorld().spawnParticle(org.bukkit.Particle.ENTITY_EFFECT,
                         bot.getLocation().add(0, 1.2, 0), 24, 0.4, 0.6, 0.4, 1.0d,
                         org.bukkit.Color.fromRGB(0xF82423));
             }
-        } else if (bot.getLocation().distanceSquared(player.getLocation()) <= 4.5d * 4.5d) {
-            // Splash of harming at the player (scales with the ladder; NPCs never throw).
+        } else if (bot.getLocation().distanceSquared(player.getLocation()) <= 4.5d * 4.5d
+                && ab.potUses() < 2) {
+            // Splash of harming at the player (map cap: two pots before a restock drink).
             BotDifficulty potDiff = session.difficulty();
             double potDamage = Math.max(1.0d, potDiff.attackDamage() * 0.6d);
             player.damage(potDamage, bot);
+            ab.potUses(ab.potUses() + 1);
             player.sendActionBar(messages.render(player, "practice.bot-pot-hit"));
             if (player.getWorld() != null) {
                 player.getWorld().spawnParticle(org.bukkit.Particle.ENTITY_EFFECT,
@@ -1977,10 +2110,15 @@ public final class PracticeService {
      */
     private void tickCartBot(Player player, PracticeSession session, Mannequin bot, long now) {
         BotDifficulty diff = session.difficulty();
+        PracticeSession.BotAbilityState ab = session.abilities();
         if (now - session.botLastDamagedMs() > BotDifficulty.REGEN_DELAY_MS
                 && diff.regenPerSecond() > 0) {
             healToward(bot, diff.botMaxHp(), diff.regenPerSecond() / 20.0d);
         }
+        // The map's cart fighter shares the sword passive suite: gap and pearl-outs under fire.
+        tickBotGap(session, bot, diff.botMaxHp(), now);
+        tickBotWaterSave(session, bot, now);
+        tickEscapePearl(player, session, bot, diff.botMaxHp(), now);
         Location botLoc = bot.getLocation();
         double dist = botLoc.distance(player.getLocation());
         Vector dir = player.getLocation().toVector().subtract(botLoc.toVector()).setY(0);
@@ -2005,22 +2143,14 @@ public final class PracticeService {
         bot.setVelocity(move.setY(bot.getVelocity().getY()));
 
         // Arrow volley (the map detonates TNT carts with arrows — we keep the bow pressure).
-        // Full-draw speed (3.0) like a player bow, damage and spread from the difficulty ladder.
+        // Full-draw speed like a player bow, damage and spread from the difficulty ladder.
         if (now >= session.botNextAttackMs() && diff.attackDamage() > 0.0d) {
             bot.swingMainHand();
-            double spread = Math.toRadians(diff.aimSpreadDegrees());
-            Vector arrowDir = dir.clone().setY(0.06d).normalize();
-            if (spread > 0.0d) {
-                arrowDir.rotateAroundY(aimRoll().nextDouble(-spread, spread));
-            }
-            org.bukkit.entity.Arrow arrow = bot.getWorld().spawnArrow(
-                    bot.getEyeLocation(), arrowDir.multiply(1.9d), 3.0f, 0.0f);
-            arrow.setShooter(bot);
-            arrow.setDamage(Math.max(1.0d, diff.attackDamage() * 0.7d));
+            botShootArrow(bot, diff, dir, diff.attackDamage() * 0.7d);
             long jitter = java.util.concurrent.ThreadLocalRandom.current().nextInt(400);
             session.setBotNextAttackMs(now + Math.max(700L, diff.attackIntervalMs() * 2L) + jitter);
         }
-        // Rolling TNT "cart" every combo cooldown.
+        // Rolling TNT "cart" every combo cooldown (on a rail, like the map's cart tracks).
         if (now >= session.botNextCartMs()) {
             org.bukkit.entity.TNTPrimed tnt = bot.getWorld().spawn(
                     botLoc.add(0, 1.1, 0), org.bukkit.entity.TNTPrimed.class, t -> {
@@ -2031,6 +2161,414 @@ public final class PracticeService {
             tnt.setVelocity(dir.clone().normalize().multiply(0.85d).setY(0.18d));
             session.botTnt().add(tnt.getUniqueId());
             session.setBotNextCartMs(now + diff.comboCooldownMs());
+            placeTrackedBlock(session, tnt.getLocation().getBlock(),
+                    Material.POWERED_RAIL, CART_RAIL_TTL_MS);
+        }
+        // Defensive oak-log block when the player is on top of it (map: cart/defenseplace).
+        if (dist < 3.5d && bot.getHealth() < diff.botMaxHp() * 0.6d
+                && now >= ab.nextDefenseBlockMs()) {
+            placeDefenseWall(session, bot, dir, Material.OAK_LOG, now);
+        }
+    }
+
+    // ================= Quantum-parity combat abilities (shared helpers) =================
+
+    /** Environment probe (Quantum parity: quantum:decisions/airborne): genuinely airborne. */
+    private static boolean isAirborne(org.bukkit.entity.Entity entity) {
+        return !entity.isOnGround() && entity.getFallDistance() > 0.4d;
+    }
+
+    /** True when the entity at {@code loc} is standing inside a cobweb. */
+    private static boolean inCobweb(Location loc) {
+        if (loc == null || loc.getWorld() == null) {
+            return false;
+        }
+        if (loc.getBlock().getType() == Material.COBWEB) {
+            return true;
+        }
+        return loc.clone().add(0, 1, 0).getBlock().getType() == Material.COBWEB;
+    }
+
+    /**
+     * Tracks a bot-placed block for TTL reverts. Only claimed from air / replaceable blocks
+     * and set without physics (fluids stay put; nothing spreads into the room).
+     *
+     * @return true when the placement happened
+     */
+    private boolean placeTrackedBlock(PracticeSession session, org.bukkit.block.Block block,
+                                      Material type, long ttlMs) {
+        if (block == null || (!block.getType().isAir() && !block.getBlockData().isReplaceable())) {
+            return false;
+        }
+        block.setType(type, false);
+        session.botPlacedBlocks().put(block,
+                new PracticeSession.BotBlock(type, System.currentTimeMillis(), ttlMs));
+        return true;
+    }
+
+    /** Vanilla-style arrow shot shared by the sword bow, cart bow and crystal crossbow. */
+    private void botShootArrow(Mannequin bot, BotDifficulty diff, Vector flatDir,
+                               double damage) {
+        if (bot.getWorld() == null || flatDir.lengthSquared() < 0.0001) {
+            return;
+        }
+        double spread = Math.toRadians(diff.aimSpreadDegrees());
+        Vector arrowDir = flatDir.clone().setY(0.06d).normalize();
+        if (spread > 0.0d) {
+            arrowDir.rotateAroundY(aimRoll().nextDouble(-spread, spread));
+        }
+        org.bukkit.entity.Arrow arrow = bot.getWorld().spawnArrow(
+                bot.getEyeLocation(), arrowDir.multiply(1.9d), 3.0f, 0.0f);
+        arrow.setShooter(bot);
+        arrow.setDamage(Math.max(1.0d, damage));
+        bot.swingMainHand();
+    }
+
+    /**
+     * Golden apple under pressure (Quantum parity: sword/passive/gap + pot/gap): below half
+     * HP, chew a gap — 40% heal with the golden sparkle, at most twice per bot life so a
+     * committed combo still finishes the bot.
+     */
+    private void tickBotGap(PracticeSession session, Mannequin bot, double maxHp, long now) {
+        PracticeSession.BotAbilityState ab = session.abilities();
+        if (now < ab.nextGapMs() || ab.gapUses() >= GAP_MAX_USES
+                || bot.getHealth() >= maxHp * 0.5d) {
+            return;
+        }
+        ab.gapUses(ab.gapUses() + 1);
+        ab.nextGapMs(now + GAP_COOLDOWN_MS);
+        healToward(bot, maxHp, maxHp * GAP_HEAL_FRACTION);
+        if (bot.getWorld() != null) {
+            bot.getWorld().playSound(bot.getLocation(), Sound.ENTITY_GENERIC_EAT, 1.0f, 1.1f);
+            bot.getWorld().spawnParticle(org.bukkit.Particle.ENTITY_EFFECT,
+                    bot.getLocation().add(0, 1.2, 0), 26, 0.4, 0.6, 0.4, 1.0d,
+                    org.bukkit.Color.fromRGB(0xF5C72C));
+        }
+    }
+
+    /**
+     * Self water bucket (Quantum parity: cobwebs/water_main): douse the bot when ablaze,
+     * wash cobwebs off itself. Leaves a brief soak block that the reverter clears.
+     */
+    private void tickBotWaterSave(PracticeSession session, Mannequin bot, long now) {
+        PracticeSession.BotAbilityState ab = session.abilities();
+        if (now < ab.nextWaterMs()) {
+            return;
+        }
+        Location loc = bot.getLocation();
+        if (bot.getFireTicks() > 0) {
+            bot.setFireTicks(0);
+            placeTrackedBlock(session, loc.getBlock(), Material.WATER, WATER_TTL_MS);
+            ab.nextWaterMs(now + WATER_COOLDOWN_MS);
+            waterSplashFx(bot);
+            return;
+        }
+        if (inCobweb(loc)) {
+            org.bukkit.block.Block feet = loc.getBlock();
+            org.bukkit.block.Block head = feet.getRelative(org.bukkit.block.BlockFace.UP);
+            if (feet.getType() == Material.COBWEB) {
+                feet.setType(Material.AIR, false);
+            }
+            if (head.getType() == Material.COBWEB) {
+                head.setType(Material.AIR, false);
+            }
+            ab.nextWaterMs(now + WATER_COOLDOWN_MS);
+            waterSplashFx(bot);
+        }
+    }
+
+    private static void waterSplashFx(Mannequin bot) {
+        if (bot.getWorld() == null) {
+            return;
+        }
+        bot.getWorld().playSound(bot.getLocation(), Sound.ITEM_BUCKET_EMPTY, 0.8f, 1.2f);
+        bot.getWorld().spawnParticle(org.bukkit.Particle.SPLASH,
+                bot.getLocation().add(0, 0.8, 0), 24, 0.4, 0.5, 0.4, 0.1d);
+    }
+
+    /**
+     * Escape pearl (Quantum parity: sword & crystal passive/escape/pearl): wounded and
+     * cornered, the bot blinks backwards onto solid ground inside the room.
+     *
+     * @return true when the pearl happened this tick (caller should skip the attack loop)
+     */
+    private boolean tickEscapePearl(Player player, PracticeSession session, Mannequin bot,
+                                    double maxHp, long now) {
+        PracticeSession.BotAbilityState ab = session.abilities();
+        if (now < ab.nextPearlMs() || session.difficulty().attackDamage() <= 0.0d
+                || bot.getHealth() > maxHp * ESCAPE_PEARL_HP_FRACTION
+                || bot.getLocation().distanceSquared(player.getLocation()) > 6.0d * 6.0d) {
+            return false; // cornered only: nobody pearls away from a distant target (map <= 10)
+        }
+        Vector away = bot.getLocation().toVector().subtract(player.getLocation().toVector())
+                .setY(0);
+        if (away.lengthSquared() < 0.01d) {
+            return false;
+        }
+        Location landing = findPearlLanding(session, bot.getLocation(), away.normalize(), 12.0d);
+        if (landing == null) {
+            ab.nextPearlMs(now + 1500L); // no safe spot: retry soon, don't spam scans
+            return false;
+        }
+        ab.nextPearlMs(now + ESCAPE_PEARL_COOLDOWN_MS);
+        pearlTeleportFx(bot, landing);
+        return true;
+    }
+
+    /**
+     * Finds a survivable pearl landing {@code preferred} blocks along {@code horizontal} from
+     * {@code from}: inside the practice region, on solid ground, with two air blocks to stand
+     * in. Falls back to shorter hops when the full leap leaves the room.
+     */
+    private Location findPearlLanding(PracticeSession session, Location from,
+                                      Vector horizontal, double preferred) {
+        PracticeRoom room = get(session.practiceId()).orElse(null);
+        if (room == null || from.getWorld() == null) {
+            return null;
+        }
+        double[] tries = {preferred, preferred - 2.0d, preferred - 4.0d, preferred / 2.0d};
+        for (double dist : tries) {
+            if (dist < 2.0d) {
+                continue;
+            }
+            Location cand = from.clone().add(horizontal.clone().multiply(dist));
+            for (int dy = 2; dy >= -8; dy--) {
+                Location probe = cand.clone().add(0, dy, 0);
+                if (!contains(session, room, probe)) {
+                    continue;
+                }
+                org.bukkit.block.Block ground = probe.getBlock();
+                if (!ground.getType().isSolid()) {
+                    continue;
+                }
+                org.bukkit.block.Block feet = ground.getRelative(org.bukkit.block.BlockFace.UP);
+                org.bukkit.block.Block head = feet.getRelative(org.bukkit.block.BlockFace.UP);
+                if (feet.getType().isSolid() || head.getType().isSolid()
+                        || feet.isLiquid() || head.isLiquid()) {
+                    break; // ground found but no room to stand on this column
+                }
+                return feet.getLocation().add(0.5d, 0.0d, 0.5d)
+                        .setDirection(from.getDirection());
+            }
+        }
+        return null;
+    }
+
+    /** Pearl blink with the tell-tale purple trail at both ends. */
+    private static void pearlTeleportFx(Mannequin bot, Location landing) {
+        World world = bot.getWorld();
+        Location from = bot.getLocation();
+        if (world != null) {
+            world.playSound(from, Sound.ENTITY_ENDER_PEARL_THROW, 1.0f, 1.0f);
+            world.spawnParticle(org.bukkit.Particle.PORTAL, from.add(0, 1, 0), 40, 0.3, 0.6, 0.3, 0.6d);
+        }
+        bot.teleport(landing);
+        bot.setVelocity(new Vector());
+        if (world != null) {
+            world.playSound(landing, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
+            world.spawnParticle(org.bukkit.Particle.PORTAL, landing.clone().add(0, 1, 0), 40,
+                    0.3, 0.6, 0.3, 0.6d);
+        }
+    }
+
+    /**
+     * Sword-kit disruption (Quantum parity: cobwebs/cobweb + cobwebs/empty_lava +
+     * shield/disable): webs under the feet, lava where an airborne player will land, and an
+     * axe swing that strips a raised shield.
+     */
+    private void tickSwordDisruption(Player player, PracticeSession session, Mannequin bot,
+                                     PracticeType type, double dist, long now) {
+        PracticeSession.BotAbilityState ab = session.abilities();
+        BotDifficulty diff = session.difficulty();
+        if (diff.attackDamage() <= 0.0d) {
+            return; // NPC rung never fights dirty
+        }
+        // Cobweb at the player's feet (skip if they already sit in one).
+        if (now >= ab.nextCobwebMs() && dist <= 4.0d && !inCobweb(player.getLocation())) {
+            if (placeTrackedBlock(session, player.getLocation().getBlock(),
+                    Material.COBWEB, COBWEB_TTL_MS)) {
+                bot.swingMainHand();
+                if (bot.getWorld() != null) {
+                    bot.getWorld().playSound(player.getLocation(),
+                            Sound.BLOCK_STONE_PLACE, 1.0f, 1.4f);
+                }
+                ab.nextCobwebMs(now + COBWEB_COOLDOWN_MS);
+            }
+        }
+        // Lava bucket dropped where an airborne player comes down (fire-immune targets are
+        // not worth the bucket, same as the map's predicate check).
+        if (now >= ab.nextLavaMs() && dist <= 6.5d && isAirborne(player)
+                && !player.isInWater()
+                && !player.hasPotionEffect(org.bukkit.potion.PotionEffectType.FIRE_RESISTANCE)) {
+            Location base = player.getLocation();
+            for (int dy = 1; dy <= 5; dy++) {
+                org.bukkit.block.Block column = base.clone().add(0, -dy, 0).getBlock();
+                if (!column.getType().isSolid()) {
+                    continue;
+                }
+                if (placeTrackedBlock(session, column.getRelative(org.bukkit.block.BlockFace.UP),
+                        Material.LAVA, LAVA_TTL_MS)) {
+                    if (bot.getWorld() != null) {
+                        bot.getWorld().playSound(player.getLocation(),
+                                Sound.ITEM_BUCKET_EMPTY_LAVA, 1.0f, 1.0f);
+                    }
+                    ab.nextLavaMs(now + LAVA_COOLDOWN_MS);
+                }
+                break; // first landing surface wins, lava or not
+            }
+        }
+        // Axe swing that disables the player's raised shield (vanilla shield-cooldown trick).
+        if ((type == PracticeType.SWORD || type == PracticeType.NETHERITE_POT)
+                && now >= ab.nextAxeMs() && dist <= diff.reachBlocks() + 1.0d
+                && player.isBlocking()) {
+            ab.nextAxeMs(now + AXE_COOLDOWN_MS);
+            EntityEquipment eq = bot.getEquipment();
+            if (eq != null) {
+                eq.setItemInMainHand(new ItemStack(Material.NETHERITE_AXE));
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    EntityEquipment later = bot.getEquipment();
+                    if (bot.isValid() && later != null) {
+                        later.setItemInMainHand(new ItemStack(Material.NETHERITE_SWORD));
+                    }
+                }, 10L);
+            }
+            bot.swingMainHand();
+            player.setCooldown(Material.SHIELD, AXE_SHIELD_DISABLE_TICKS);
+            if (bot.getWorld() != null) {
+                bot.getWorld().playSound(bot.getLocation(), Sound.ITEM_SHIELD_BREAK, 1.0f, 1.0f);
+            }
+            player.damage(Math.max(1.0d, diff.attackDamage() * 0.6d), bot);
+        }
+    }
+
+    /**
+     * Sword-kit jump crit (Quantum parity: sword/crit + scrit + combo/jumpreset): hop now,
+     * connect on the way down for a 1.5x critical hit, then scrit backpedal — and from HARD
+     * upward occasionally chain straight back in with a sprint jump-reset.
+     */
+    private void swordJumpCrit(Player player, PracticeSession session, Mannequin bot,
+                               BotDifficulty diff, double reach, long now) {
+        PracticeSession.BotAbilityState ab = session.abilities();
+        ab.nextCritMs(now + Math.max(CRIT_MIN_INTERVAL_MS, diff.attackIntervalMs() * 5L)
+                + java.util.concurrent.ThreadLocalRandom.current().nextInt(1200));
+        Vector vel = bot.getVelocity();
+        bot.setVelocity(new Vector(vel.getX(), 0.42d, vel.getZ()));
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (!bot.isValid() || !player.isOnline()
+                    || session.phase() != PracticeSession.Phase.ACTIVE) {
+                return;
+            }
+            double landedRange = reach + 1.0d;
+            if (bot.getLocation().distanceSquared(player.getLocation())
+                    > landedRange * landedRange) {
+                return; // knocked away mid-jump: the crit whiffs with the swing
+            }
+            botSwing(player, bot, diff, diff.attackDamage() * 1.5d);
+            if (player.getWorld() != null) {
+                player.getWorld().spawnParticle(org.bukkit.Particle.CRIT,
+                        player.getLocation().add(0, 1.0, 0), 18, 0.3, 0.5, 0.3, 0.4d);
+                player.getWorld().playSound(player.getLocation(),
+                        Sound.ENTITY_PLAYER_ATTACK_CRIT, 1.0f, 1.0f);
+            }
+            // scrit: backpedal out of the trade (Quantum: sword/scrit).
+            Vector away = bot.getLocation().toVector()
+                    .subtract(player.getLocation().toVector()).setY(0);
+            if (away.lengthSquared() > 0.01d) {
+                away.normalize().multiply(0.38d);
+                bot.setVelocity(new Vector(away.getX(), 0.28d, away.getZ()));
+            }
+            // combo/jumpreset (HARD and up): sometimes chains back in with a sprint-hop.
+            if (diff.preset().ordinal() >= BotDifficulty.Preset.HARD.ordinal()
+                    && System.currentTimeMillis() >= ab.nextJumpResetMs()
+                    && java.util.concurrent.ThreadLocalRandom.current().nextDouble() < 0.35d) {
+                ab.nextJumpResetMs(System.currentTimeMillis() + 1500L);
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (!bot.isValid() || !player.isOnline()) {
+                        return;
+                    }
+                    Vector in = player.getLocation().toVector()
+                            .subtract(bot.getLocation().toVector()).setY(0);
+                    if (in.lengthSquared() > 0.01d) {
+                        in.normalize().multiply(0.3d);
+                        bot.setVelocity(new Vector(in.getX(), 0.42d, in.getZ()));
+                    }
+                }, 4L);
+            }
+        }, 6L);
+    }
+
+    /**
+     * Respawn-anchor strike (Quantum parity: g1gc/anchor): charged anchor materialises beside
+     * the player and is detonated a beat later — the overworld makes that a bomb.
+     */
+    private boolean launchAnchorStrike(Player player, PracticeSession session, Mannequin bot) {
+        org.bukkit.block.Block foot = player.getLocation().getBlock();
+        int[] dx = {1, -1, 0, 0};
+        int[] dz = {0, 0, 1, -1};
+        int start = java.util.concurrent.ThreadLocalRandom.current().nextInt(4);
+        org.bukkit.block.Block spot = null;
+        for (int k = 0; k < 4; k++) {
+            int i = (start + k) % 4;
+            org.bukkit.block.Block cand = foot.getRelative(dx[i], 0, dz[i]);
+            if ((cand.getType().isAir() || cand.getBlockData().isReplaceable())
+                    && cand.getRelative(org.bukkit.block.BlockFace.DOWN).getType().isSolid()) {
+                spot = cand;
+                break;
+            }
+        }
+        if (spot == null) {
+            return false;
+        }
+        org.bukkit.block.data.type.RespawnAnchor data =
+                (org.bukkit.block.data.type.RespawnAnchor)
+                        Material.RESPAWN_ANCHOR.createBlockData();
+        data.setCharges(data.getMaximumCharges());
+        if (!placeTrackedBlock(session, spot, Material.RESPAWN_ANCHOR, 3000L)) {
+            return false;
+        }
+        spot.setBlockData(data, false);
+        bot.swingMainHand();
+        final org.bukkit.block.Block fuseBlock = spot;
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (fuseBlock.getType() != Material.RESPAWN_ANCHOR) {
+                return;
+            }
+            Location boom = fuseBlock.getLocation().add(0.5d, 0.5d, 0.5d);
+            session.botPlacedBlocks().remove(fuseBlock);
+            fuseBlock.setType(Material.AIR, false);
+            if (boom.getWorld() != null) {
+                boom.getWorld().createExplosion(boom, 5.0f, false, false, bot);
+            }
+        }, 8L);
+        return true;
+    }
+
+    /**
+     * Defensive block wall between bot and player (Quantum parity: crystal/passive/block,
+     * cart/defenseplace) plus a backwards hop, buying the bot breathing room. Blocks melt
+     * away via the tracked-block reverter.
+     */
+    private void placeDefenseWall(PracticeSession session, Mannequin bot, Vector dirFlat,
+                                  Material type, long now) {
+        PracticeSession.BotAbilityState ab = session.abilities();
+        if (dirFlat.lengthSquared() < 0.0001) {
+            return;
+        }
+        Vector toward = dirFlat.clone().setY(0).normalize();
+        org.bukkit.block.Block feet = bot.getLocation().add(toward).getBlock();
+        boolean placed = placeTrackedBlock(session, feet, type, DEFENSE_BLOCK_TTL_MS);
+        if (type == Material.OBSIDIAN) {
+            placed |= placeTrackedBlock(session,
+                    feet.getRelative(org.bukkit.block.BlockFace.UP), type, DEFENSE_BLOCK_TTL_MS);
+        }
+        if (!placed) {
+            return;
+        }
+        ab.nextDefenseBlockMs(now + DEFENSE_BLOCK_COOLDOWN_MS);
+        bot.swingMainHand();
+        bot.setVelocity(new Vector(-toward.getX() * 0.35d, 0.25d, -toward.getZ() * 0.35d));
+        if (bot.getWorld() != null) {
+            bot.getWorld().playSound(bot.getLocation(), Sound.BLOCK_STONE_PLACE, 1.0f, 1.0f);
         }
     }
 
@@ -2079,7 +2617,8 @@ public final class PracticeService {
      */
     private void tickCrystalBot(Player player, PracticeSession session, Mannequin bot, long now) {
         refillCrystals(player);
-        revertAgedBotBlocks(session, now);
+        BotDifficulty crystalDiff = session.difficulty();
+        PracticeSession.BotAbilityState ab = session.abilities();
         // Regen between combos (the same 5s out-of-combat delay every other mode uses) so a
         // half-finished combo never leaves a dead-looking bot. Crystal fighters deliberately
         // keep the flat 20 HP body they spawn with; only the regen RATE comes from the ladder.
@@ -2087,6 +2626,10 @@ public final class PracticeService {
             healToward(bot, 20.0d,
                     Math.max(0.25d, session.difficulty().regenPerSecond() / 8.0d));
         }
+        // Crystal passives (map: crystal/passive/gap, water save, escape/pearl).
+        tickBotGap(session, bot, 20.0d, now);
+        tickBotWaterSave(session, bot, now);
+        tickEscapePearl(player, session, bot, 20.0d, now);
 
         // --- movement: orbit at 3-6 blocks, retreat while recovering ---
         Location botLoc = bot.getLocation();
@@ -2115,12 +2658,36 @@ public final class PracticeService {
         }
         bot.setVelocity(move.setY(bot.getVelocity().getY()));
 
+        // --- passive pressure: crossbow poke mid-range (map: crystal/passive/crossbow) ---
+        if (dist >= CROSSBOW_MIN_RANGE && dist <= CROSSBOW_MAX_RANGE
+                && now >= ab.nextCrossbowMs() && crystalDiff.attackDamage() > 0.0d) {
+            botShootArrow(bot, crystalDiff, dir, crystalDiff.attackDamage() * 0.6d);
+            if (bot.getWorld() != null) {
+                bot.getWorld().playSound(botLoc, Sound.ITEM_CROSSBOW_SHOOT, 1.0f, 1.0f);
+            }
+            ab.nextCrossbowMs(now + crystalDiff.comboCooldownMs() * 2L
+                    + java.util.concurrent.ThreadLocalRandom.current().nextInt(400));
+        }
+
+        // --- defensive obsidian wall when hurt (map: crystal/passive/block) ---
+        if (bot.getHealth() <= 10.0d && dist <= 4.0d && now >= ab.nextDefenseBlockMs()) {
+            placeDefenseWall(session, bot, dir, Material.OBSIDIAN, now);
+        }
+
         // --- attack: place a crystal combo near the player ---
         if (now >= session.botNextAttackMs() && dist <= 9.0d
                 && session.botCrystals().size() < 2) {
-            if (launchCrystalAttack(player, session)) {
+            long combo = crystalDiff.comboCooldownMs();
+            // g1gc anchor mixups (map: g1gc/anchor): from HARD upward, about half of the close
+            // combos are respawn-anchor strikes instead of pedestal crystals.
+            boolean anchorMix = combo <= 1800L && dist <= 6.0d && now >= ab.nextAnchorMs()
+                    && java.util.concurrent.ThreadLocalRandom.current().nextDouble() < 0.5d;
+            if (anchorMix && launchAnchorStrike(player, session, bot)) {
+                ab.nextAnchorMs(now + Math.max(ANCHOR_MIN_COOLDOWN_MS, combo * 2L));
+                session.setBotNextAttackMs(now + combo
+                        + java.util.concurrent.ThreadLocalRandom.current().nextInt(400));
+            } else if (launchCrystalAttack(player, session)) {
                 // Map "crystal_cd / explosion_cd" rungs: combo speed IS the difficulty.
-                long combo = session.difficulty().comboCooldownMs();
                 session.setBotNextAttackMs(now + combo
                         + java.util.concurrent.ThreadLocalRandom.current().nextInt(400));
             } else {
@@ -2157,8 +2724,9 @@ public final class PracticeService {
         boolean pedestal = spot.getRelative(org.bukkit.block.BlockFace.DOWN).getType() != Material.OBSIDIAN
                 && spot.getRelative(org.bukkit.block.BlockFace.DOWN).getType() != Material.BEDROCK;
         if (pedestal) {
-            spot.setType(Material.OBSIDIAN);
-            session.botPlacedBlocks().put(spot, System.currentTimeMillis());
+            spot.setType(Material.OBSIDIAN, false);
+            session.botPlacedBlocks().put(spot, new PracticeSession.BotBlock(
+                    Material.OBSIDIAN, System.currentTimeMillis(), PEDESTAL_TTL_MS));
         }
         Location crystalLoc = spot.getLocation().add(0.5d, 1.0d, 0.5d);
         org.bukkit.entity.EnderCrystal crystal = spot.getWorld()
@@ -2179,7 +2747,11 @@ public final class PracticeService {
         return true;
     }
 
-    /** Obsidian pedestals melt away after a few seconds so the arena stays clean. */
+    /**
+     * Bot-placed blocks melt away once their TTL expires (pedestals after a while, lava much
+     * faster) so the arena stays clean. A block is only reverted when it still IS what the
+     * bot placed — player edits are never rolled back.
+     */
     private void revertAgedBotBlocks(PracticeSession session, long now) {
         var blocks = session.botPlacedBlocks();
         if (blocks.isEmpty()) {
@@ -2188,19 +2760,20 @@ public final class PracticeService {
         var it = blocks.entrySet().iterator();
         while (it.hasNext()) {
             var entry = it.next();
-            boolean aged = now - entry.getValue() > 7000L;
+            PracticeSession.BotBlock placed = entry.getValue();
+            boolean aged = now - placed.atMs() > placed.ttlMs();
             if (!aged && blocks.size() <= 10) {
                 break; // insertion-ordered: everything after is younger
             }
             org.bukkit.block.Block block = entry.getKey();
-            if (block.getType() == Material.OBSIDIAN) {
-                block.setType(Material.AIR);
+            if (block.getType() == placed.type()) {
+                block.setType(Material.AIR, false);
             }
             it.remove();
         }
     }
 
-    /** Removes the bot's crystals / TNT and restores every obsidian pedestal it placed. */
+    /** Removes the bot's crystals / TNT and reverts every block it placed. */
     private void clearBotArtifacts(PracticeSession session) {
         for (java.util.UUID crystalId : java.util.List.copyOf(session.botCrystals())) {
             org.bukkit.entity.Entity entity = Bukkit.getEntity(crystalId);
@@ -2216,9 +2789,9 @@ public final class PracticeService {
             }
         }
         session.botTnt().clear();
-        for (org.bukkit.block.Block block : session.botPlacedBlocks().keySet()) {
-            if (block.getType() == Material.OBSIDIAN) {
-                block.setType(Material.AIR);
+        for (var entry : session.botPlacedBlocks().entrySet()) {
+            if (entry.getKey().getType() == entry.getValue().type()) {
+                entry.getKey().setType(Material.AIR, false);
             }
         }
         session.botPlacedBlocks().clear();
@@ -2246,6 +2819,16 @@ public final class PracticeService {
                         || session.botCrystals().contains(byEntity.getDamager().getUniqueId())
                         || session.botTnt().contains(byEntity.getDamager().getUniqueId()))) {
             event.setCancelled(true);
+            return true;
+        }
+        // The bots' own fire tricks (lava buckets) and stray flames must not pop them.
+        EntityDamageEvent.DamageCause cause = event.getCause();
+        if (cause == EntityDamageEvent.DamageCause.FIRE
+                || cause == EntityDamageEvent.DamageCause.FIRE_TICK
+                || cause == EntityDamageEvent.DamageCause.LAVA
+                || cause == EntityDamageEvent.DamageCause.HOT_FLOOR) {
+            event.setCancelled(true);
+            bot.setFireTicks(0);
             return true;
         }
         session.setBotLastDamagedMs(System.currentTimeMillis());
@@ -2319,6 +2902,7 @@ public final class PracticeService {
         equipCombatBot(bot, session.type(), session.botShieldRaised());
         session.setBotLastDamagedMs(System.currentTimeMillis());
         session.setBotNextAttackMs(System.currentTimeMillis() + 1500L);
+        session.abilities().resetConsumables(); // a fresh life restocks gaps and pots
     }
 
     /** Sword-bot shield stance toggle (shared GUI hook with the mace bot). */
@@ -2329,7 +2913,9 @@ public final class PracticeService {
         }
         EntityEquipment eq = bot.getEquipment();
         if (eq != null) {
-            eq.setItemInOffHand(session.botShieldRaised() ? new ItemStack(Material.SHIELD) : null);
+            eq.setItemInOffHand(session.botShieldRaised()
+                    ? new ItemStack(Material.SHIELD)
+                    : new ItemStack(Material.TOTEM_OF_UNDYING));
         }
     }
 

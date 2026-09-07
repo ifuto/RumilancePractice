@@ -108,6 +108,17 @@ public final class PracticeListener implements Listener {
                         || event.getCause() == EntityDamageEvent.DamageCause.BLOCK_EXPLOSION)) {
             return; // blast damage is the point in crystal & cart rooms
         }
+        // The bots fight dirty (Quantum parity: cobwebs/empty_lava): their lava buckets and
+        // the burns they leave behind are real damage in a bot fight — everything else stays
+        // a clean sparring room with damage cancelled.
+        if (session.type().botMode()
+                && (session.combatBot() != null || session.maceBot() != null)
+                && (event.getCause() == EntityDamageEvent.DamageCause.LAVA
+                        || event.getCause() == EntityDamageEvent.DamageCause.FIRE
+                        || event.getCause() == EntityDamageEvent.DamageCause.FIRE_TICK
+                        || event.getCause() == EntityDamageEvent.DamageCause.HOT_FLOOR)) {
+            return;
+        }
         event.setCancelled(true);
         player.setFireTicks(0);
         player.setVelocity(new Vector());
