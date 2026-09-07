@@ -1,5 +1,5 @@
 ---
-description: コードを変えたら必ず ./gradlew test shadowJar を実行する
+description: コードを変えたら必ず test shadowJar と既存 Workflow の CI を確認して JAR を生成する
 alwaysApply: true
 ---
 
@@ -12,3 +12,8 @@ Java / Gradle / YAML / リソースを変更したら、そのターンの最後
 ```
 
 完了後、`build/libs/RumilancePractice-<version>.jar` が今回のバージョンで存在することを確認する。`version` は `gradle.properties` が正。`build.gradle.kts` にバージョンを直書きしない。
+
+ローカルだけで終わらせず、既存の `.github/workflows/build.yml` を最終コミットで毎回実行する。
+失敗ログを確認して修正・再実行し、成功した run の `jars` Artifact と配布用 JAR を確認する。
+完了報告には CI の結果と run リンク、JAR の入手先を記載する。詳しい手順・環境制約時の扱いは
+リポジトリ直下の `AGENTS.md` に従う。

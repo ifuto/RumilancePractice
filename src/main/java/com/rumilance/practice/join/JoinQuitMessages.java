@@ -47,6 +47,9 @@ public final class JoinQuitMessages {
 
     /** Kicked/banned players leave silently — no {@code [-] name} line in chat. */
     public static void apply(org.bukkit.event.player.PlayerKickEvent event) {
+        if (event.isCancelled()) {
+            return;
+        }
         SUPPRESSED_QUITS.add(event.getPlayer().getUniqueId());
         event.leaveMessage(null);
     }

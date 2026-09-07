@@ -11,11 +11,18 @@ Paper 1.21.11 向け Practice PvP プラグイン **N Arena** です。ランク
 ## ビルド
 
 ```bash
-cd RumilancePractice
+# macOS / Linux
+bash ./gradlew build --no-daemon
+# Windows
 ./gradlew.bat build
 ```
 
-成果物: `build/libs/RumilancePractice-1.2.0.jar`
+成果物: `build/libs/RumilancePractice-<version>.jar`（`version` は `gradle.properties`）。
+依存ライブラリ入りのこの JAR を導入してください。`-thin.jar` は配布用ではありません。
+
+既存の [build Workflow](.github/workflows/build.yml) は push / 手動実行で Java 21 のビルド・
+全テスト・JAR 生成を行い、`jars` と `build-log` を Artifact に保存します。
+変更完了時は毎回、最終コミットの CI 成功と JAR を確認します（[作業ルール](AGENTS.md)）。
 
 ## 導入
 
@@ -56,6 +63,9 @@ cd RumilancePractice
 - 機能アイテムは表示名ではなく PDC `function_type` で識別
 - プレイヤー状態は UUID キーの `PlayerStateManager` で一意管理
 - サーバー停止時は切断 ChatBan を発行しません（`MatchSession.shuttingDown`）
+- **Paper のタイムアウト / Fly 自動キックを無効化**（`PlayerKickEvent.Cause.TIMEOUT` / `FLYING_PLAYER` / `FLYING_VEHICLE`）。プラグイン有効中は全プレイヤーに適用され、追加設定は不要です。飛行権限・ゲームモード・`server.properties` は変更しません。
+  - BAN、管理者 / 他プラグインによる Kick、放置（`IDLING`）やその他の不正パケット判定は従来どおりです。理由文ではなく Paper の Cause で判定します。
+  - 対象は接続済みプレイヤーのキャンセル可能なキックです。ログイン前の時間制限、Netty の read timeout、通信断、クライアント / プロキシ側のタイムアウトは防げません。
 
 ## 権限
 
