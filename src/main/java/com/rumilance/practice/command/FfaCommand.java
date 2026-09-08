@@ -53,7 +53,7 @@ public final class FfaCommand implements CommandExecutor, TabCompleter {
 
         String sub = args[0].toLowerCase(Locale.ROOT);
         boolean admin = sender.hasPermission("rumilance.admin");
-        if (!admin && List.of("create", "selection", "spawn", "kit", "enable", "disable", "delete", "reset", "rename", "resettime", "icon", "settings")
+        if (!admin && List.of("create", "selection", "spawn", "kit", "enable", "disable", "delete", "reset", "rename", "resettime", "icon", "settings", "deletespawn")
                 .contains(sub)) {
             sender.sendMessage(Component.text("No permission.", NamedTextColor.RED));
             return true;
@@ -124,6 +124,18 @@ public final class FfaCommand implements CommandExecutor, TabCompleter {
                 }
                 boolean ok = ffaService.updateSpawn(args[1], player.getLocation());
                 player.sendMessage(Component.text(ok ? "Spawn set." : "Arena not found.",
+                        ok ? NamedTextColor.GREEN : NamedTextColor.RED));
+                yield true;
+            }
+            case "deletespawn" -> {
+                if (args.length < 2) {
+                    sender.sendMessage(Component.text("Usage: /ffa deletespawn <arena>", NamedTextColor.YELLOW));
+                    yield true;
+                }
+                boolean ok = ffaService.deleteSpawn(args[1]);
+                sender.sendMessage(Component.text(
+                        ok ? "Fixed spawn cleared; arena now spawns on random far-away grass."
+                           : "Arena not found.",
                         ok ? NamedTextColor.GREEN : NamedTextColor.RED));
                 yield true;
             }
@@ -265,7 +277,7 @@ public final class FfaCommand implements CommandExecutor, TabCompleter {
             List<String> base = new ArrayList<>(List.of("leave"));
             if (sender.hasPermission("rumilance.admin")) {
                 base.addAll(List.of("create", "selection", "spawn", "kit", "enable", "disable",
-                        "delete", "reset", "rename", "resettime", "icon", "settings"));
+                        "delete", "reset", "rename", "resettime", "icon", "settings", "deletespawn"));
             }
             return TabCompletions.filter(current, base);
         }
@@ -273,7 +285,7 @@ public final class FfaCommand implements CommandExecutor, TabCompleter {
         if (!sender.hasPermission("rumilance.admin")) {
             return List.of();
         }
-        if (args.length == 2 && List.of("enable", "disable", "delete", "reset", "spawn", "kit", "rename", "resettime", "icon")
+        if (args.length == 2 && List.of("enable", "disable", "delete", "reset", "spawn", "deletespawn", "kit", "rename", "resettime", "icon")
                 .contains(args[0].toLowerCase(Locale.ROOT))) {
             return TabCompletions.filter(current,
                     ffaService.list().stream().map(FfaService.FfaArena::id).toList());

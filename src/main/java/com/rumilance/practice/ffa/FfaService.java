@@ -92,7 +92,9 @@ public final class FfaService {
         }
 
         public FfaArena withSpawn(Location newSpawn) {
-            return new FfaArena(id, kitId, world, region, newSpawn.clone(), enabled,
+            // null = back to "random standing spot far from occupants" spawning.
+            return new FfaArena(id, kitId, world, region,
+                    newSpawn != null ? newSpawn.clone() : null, enabled,
                     resetIntervalSeconds, iconMaterial, tpaEnabled, rtpQueueEnabled);
         }
 
@@ -275,12 +277,16 @@ public final class FfaService {
             Cuboid region = Cuboid.of(world,
                     entry.getInt("pos1.x"), entry.getInt("pos1.y"), entry.getInt("pos1.z"),
                     entry.getInt("pos2.x"), entry.getInt("pos2.y"), entry.getInt("pos2.z"));
-            Location spawn = new Location(Bukkit.getWorld(world),
+            // A missing spawn section means "no fixed spawn configured": players then spawn
+            // on random standing spots (grass preferred) far from other occupants.
+            Location spawn = entry.contains("spawn.x")
+                    ? new Location(Bukkit.getWorld(world),
                     entry.getDouble("spawn.x", 0.5),
                     entry.getDouble("spawn.y", 65),
                     entry.getDouble("spawn.z", 0.5),
                     (float) entry.getDouble("spawn.yaw", 0),
-                    (float) entry.getDouble("spawn.pitch", 0));
+                    (float) entry.getDouble("spawn.pitch", 0))
+                    : null;
             int interval = entry.contains("reset-interval-seconds")
                     ? entry.getInt("reset-interval-seconds", 0)
                     : globalDefault;
@@ -339,8 +345,13 @@ public final class FfaService {
             return null;
         }
         FfaArena arena = arenas.get(arenaId);
-        if (arena == null || arena.spawn() == null) {
+        if (arena == null) {
             return null;
+        }
+        // Unspawned arenas respawn on a random standing spot far from other occupants —
+        // never mid-air / inside the floor of a stale fixed point.
+        if (arena.spawn() == null) {
+            return pickSpawn(arena, player.getUniqueId());
         }
         return LocationUtil.safeTeleportLocation(arena.spawn(), arena.region());
     }
@@ -814,8 +825,7 @@ public final class FfaService {
             footing = com.rumilance.practice.util.SpawnFooting.standClearDeep(arena.spawn(), minY);
         }
         if (footing == null) {
-            java.util.List<Location> clear = new java.util.ArrayList<>();
-            footing = FfaSpawnLocator.find(arena, clear);
+            footing = FfaSpawnLocator.find(arena, occupied);
         }
         Location base = footing != null && footing.getWorld() != null ? footing : arena.spawn();
         return LocationUtil.safeTeleportLocation(base, arena.region());
@@ -952,6 +962,18 @@ public final class FfaService {
             return false;
         }
         FfaArena updated = existing.withRegion(region);
+        arenas.put(updated.id(), updated);
+        persist(updated);
+        return true;
+    }
+
+    /** Clears a configured spawn so the arena goes back to random far-away grass spawning. */
+    public boolean deleteSpawn(String id) {
+        FfaArena existing = findArena(id);
+        if (existing == null) {
+            return false;
+        }
+        FfaArena updated = existing.withSpawn(null);
         arenas.put(updated.id(), updated);
         persist(updated);
         return true;
@@ -1242,11 +1264,15 @@ public final class FfaService {
         yaml.set(path + ".pos2.x", arena.region().maxX());
         yaml.set(path + ".pos2.y", arena.region().maxY());
         yaml.set(path + ".pos2.z", arena.region().maxZ());
-        yaml.set(path + ".spawn.x", arena.spawn().getX());
-        yaml.set(path + ".spawn.y", arena.spawn().getY());
-        yaml.set(path + ".spawn.z", arena.spawn().getZ());
-        yaml.set(path + ".spawn.yaw", arena.spawn().getYaw());
-        yaml.set(path + ".spawn.pitch", arena.spawn().getPitch());
+        if (arena.spawn() != null) {
+            yaml.set(path + ".spawn.x", arena.spawn().getX());
+            yaml.set(path + ".spawn.y", arena.spawn().getY());
+            yaml.set(path + ".spawn.z", arena.spawn().getZ());
+            yaml.set(path + ".spawn.yaw", arena.spawn().getYaw());
+            yaml.set(path + ".spawn.pitch", arena.spawn().getPitch());
+        } else {
+            yaml.set(path + ".spawn", null);
+        }
         yaml.set(path + ".icon", arena.iconMaterial());
         yaml.set(path + ".settings.tpa", arena.tpaEnabled());
         yaml.set(path + ".settings.rtpqueue", arena.rtpQueueEnabled());

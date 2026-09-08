@@ -41,6 +41,14 @@ public final class FfaSpawnLocator {
                     region.minY() + 1.0d,
                     (region.minZ() + region.maxZ()) * 0.5d + 0.5d);
         } else {
+            // No configured spawn and no world/region to scan: nothing safe to offer.
+            if (configured == null && arena.region() != null && arena.region().world() != null) {
+                Location centerish = new Location(arena.region().world(),
+                        (arena.region().minX() + arena.region().maxX()) * 0.5d + 0.5d,
+                        arena.region().minY() + 1.0d,
+                        (arena.region().minZ() + arena.region().maxZ()) * 0.5d + 0.5d);
+                return com.rumilance.practice.util.SpawnFooting.standClear(centerish);
+            }
             return configured;
         }
         if (world == null) {
