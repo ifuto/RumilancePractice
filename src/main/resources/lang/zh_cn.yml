@@ -1301,6 +1301,8 @@ anticheat:
   list-header: "<gold>- 必需Mod的玩家（<n>） -"
   list-line: "  <yellow><target>"
   list-empty: "<gray>没有被强制要求的玩家。"
+  kick-impossible: "<red>检测到物理上不可能的攻击（距<victim><reach>米）。"
+  alert-impossible: "<red>[AC] <target> 打出了不可能的攻击（距<victim><reach>米，已取消）。"
   kick-untrusted-build: "<red>未授权的反作弊Mod构建。请安装官方 rumilance-ac 后重连。"
   kick-heartbeat: "<red>反作弊客户端失去响应。请在 rumilance-ac 运行状态下重新连接。"
   kick-digest: "<red>游戏数据流与受验证客户端不一致（疑似作弊注入）。"

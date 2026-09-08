@@ -1301,6 +1301,8 @@ anticheat:
   list-header: "<gold>- Mod-required players (<n>) -"
   list-line: "  <yellow><target>"
   list-empty: "<gray>No players are mod-required."
+  kick-impossible: "<red>Physically impossible hit detected (<reach>m toward <victim>)."
+  alert-impossible: "<red>[AC] <target> landed an impossible hit (<reach>m toward <victim>; cancelled)."
   kick-untrusted-build: "<red>Untrusted anti-cheat mod build. Install the official rumilance-ac build and reconnect."
   kick-heartbeat: "<red>Anti-cheat client stopped responding. Reconnect with the rumilance-ac mod running."
   kick-digest: "<red>Your gameplay stream diverges from the attested client (cheat injection indicator)."

@@ -1301,6 +1301,8 @@ anticheat:
   list-header: "<gold>- Joueurs avec mod obligatoire (<n>) -"
   list-line: "  <yellow><target>"
   list-empty: "<gray>Aucun joueur n’a le mod obligatoire."
+  kick-impossible: "<red>Coup physiquement impossible détecté (<reach> m vers <victim>)."
+  alert-impossible: "<red>[AC] <target> a porté un coup impossible (<reach> m vers <victim> ; annulé)."
   kick-untrusted-build: "<red>Build du mod non approuvée. Installez la version officielle de rumilance-ac puis reconnectez-vous."
   kick-heartbeat: "<red>Le client anti-triche ne répond plus. Reconnectez-vous avec le mod rumilance-ac actif."
   kick-digest: "<red>Votre trafic de jeu diffère du client attesté (indice d’injection de triche)."

@@ -1301,6 +1301,8 @@ anticheat:
   list-header: "<gold>- Jugadores con mod obligatorio (<n>) -"
   list-line: "  <yellow><target>"
   list-empty: "<gray>Ningún jugador tiene el mod obligatorio."
+  kick-impossible: "<red>Golpe físicamente imposible detectado (<reach>m hacia <victim>)."
+  alert-impossible: "<red>[AC] <target> ejecutó un golpe imposible (<reach>m hacia <victim>; cancelado)."
   kick-untrusted-build: "<red>Build del mod no autorizada. Instala la versión oficial de rumilance-ac y reconecta."
   kick-heartbeat: "<red>El cliente anti-cheat dejó de responder. Reconecta con el mod rumilance-ac activo."
   kick-digest: "<red>Tu tráfico de juego difiere del cliente certificado (indicio de inyección de trampas)."

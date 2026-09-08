@@ -105,6 +105,8 @@ public final class AntiCheatService implements Listener, PluginMessageListener {
         plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, CHANNEL);
         plugin.getServer().getMessenger().registerIncomingPluginChannel(plugin, CHANNEL, this);
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
+        plugin.getServer().getPluginManager().registerEvents(
+                new EnvelopeGuardListener(this), plugin);
         loadAll();
         Bukkit.getScheduler().runTaskTimer(plugin, this::heartbeat, HEARTBEAT_PERIOD_TICKS,
                 HEARTBEAT_PERIOD_TICKS);
@@ -215,10 +217,11 @@ public final class AntiCheatService implements Listener, PluginMessageListener {
 
     /**
      * Server half of the digest binding. Teleports are excluded (no client move packet
-     * corresponds to them), and the client side mirrors every other rule, so the streams
-     * stay one-to-one for any honest client.
+     * corresponds to them). Cancelled move events are STILL recorded: a plugin veto rolls
+     * back game state, but the client-side packet stream provably contained the move, so
+     * the digest must mirror the transport stream — not the accepted game state.
      */
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.MONITOR)
     public void onMove(PlayerMoveEvent event) {
         if (event instanceof PlayerTeleportEvent) {
             return;
@@ -450,6 +453,29 @@ public final class AntiCheatService implements Listener, PluginMessageListener {
                 jar,
                 trustedHashes.isEmpty() ? "no-pins" : (session.jarTrusted ? "yes" : "NO")
         };
+    }
+
+    /** Ops+console alert for a physically impossible hit (envelope violation). */
+    public void alertImpossible(Player attacker, String victim, double reach) {
+        var mini = net.kyori.adventure.text.minimessage.MiniMessage.miniMessage();
+        String raw = messageService.raw(attacker, "anticheat.alert-impossible")
+                .replace("<target>", attacker.getName())
+                .replace("<victim>", victim)
+                .replace("<reach>", String.format(java.util.Locale.ROOT, "%.2f", reach));
+        Bukkit.getConsoleSender().sendMessage(mini.deserialize(raw));
+        for (Player op : Bukkit.getOnlinePlayers()) {
+            if (op.isOp()) {
+                op.sendMessage(mini.deserialize(raw));
+            }
+        }
+    }
+
+    /** Required-user fail-close for an envelope violation. */
+    public void kickImpossible(Player attacker, String victim, double reach) {
+        attacker.kick(messageService.render(attacker, "anticheat.kick-impossible",
+                MessageService.tags(
+                        "victim", victim,
+                        "reach", String.format(java.util.Locale.ROOT, "%.2f", reach))));
     }
 
     private void kick(Player player, String key) {

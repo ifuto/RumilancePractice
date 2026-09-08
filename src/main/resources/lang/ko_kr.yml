@@ -1301,6 +1301,8 @@ anticheat:
   list-header: "<gold>- 모드 필수 플레이어 (<n>) -"
   list-line: "  <yellow><target>"
   list-empty: "<gray>필수화된 플레이어가 없습니다."
+  kick-impossible: "<red>물리적으로 불가능한 타격 감지(<victim> 에게 <reach>m)."
+  alert-impossible: "<red>[AC] <target> 불가능한 타격(<victim> 에게 <reach>m, 취소됨)."
   kick-untrusted-build: "<red>승인되지 않은 AC 모드 빌드입니다. 공식 rumilance-ac 를 설치 후 재접속하세요."
   kick-heartbeat: "<red>AC 클라이언트가 응답하지 않습니다. rumilance-ac 를 켜고 재접속하세요."
   kick-digest: "<red>실제 게임 트래픽이 인증된 클라이언트와 다릅니다(치트 주입 징후)."

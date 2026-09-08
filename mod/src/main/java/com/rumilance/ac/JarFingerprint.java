@@ -23,11 +23,19 @@ import java.util.Optional;
  */
 public final class JarFingerprint {
 
+    /** Cached result; recomputed whenever the jar's mtime/size sentinel moves, so a
+     * mid-session on-disk swap (or a running-jar patcher that rewrites the file) is
+     * reflected at the next heartbeat instead of being masked by a boot-time cache. */
+    private static Path cachedPath;
+    private static long cachedMillis = -1L;
+    private static long cachedSize = -1L;
+    private static String cachedSha;
+
     private JarFingerprint() {
     }
 
     /** Hex SHA-256 of the jar containing this mod, or empty when not on a real jar. */
-    public static Optional<String> ownJarSha256() {
+    public static synchronized Optional<String> ownJarSha256() {
         Optional<ModContainer> self = FabricLoader.getInstance().getModContainer("rumilance-ac");
         if (self.isEmpty()) {
             return Optional.empty();
@@ -39,14 +47,25 @@ public final class JarFingerprint {
         if (root == null || !root.getFileName().toString().endsWith(".jar")) {
             return Optional.empty();
         }
-        try (InputStream in = Files.newInputStream(root)) {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] buffer = new byte[1 << 16];
-            int read;
-            while ((read = in.read(buffer)) != -1) {
-                digest.update(buffer, 0, read);
+        try {
+            long millis = Files.getLastModifiedTime(root).toMillis();
+            long size = Files.size(root);
+            if (root.equals(cachedPath) && millis == cachedMillis && size == cachedSize) {
+                return Optional.ofNullable(cachedSha);
             }
-            return Optional.of(HexFormat.of().formatHex(digest.digest()));
+            try (InputStream in = Files.newInputStream(root)) {
+                MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                byte[] buffer = new byte[1 << 16];
+                int read;
+                while ((read = in.read(buffer)) != -1) {
+                    digest.update(buffer, 0, read);
+                }
+                cachedPath = root;
+                cachedMillis = millis;
+                cachedSize = size;
+                cachedSha = HexFormat.of().formatHex(digest.digest());
+                return Optional.of(cachedSha);
+            }
         } catch (IOException | NoSuchAlgorithmException e) {
             return Optional.empty();
         }
