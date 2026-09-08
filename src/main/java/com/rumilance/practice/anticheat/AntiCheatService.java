@@ -362,21 +362,24 @@ public final class AntiCheatService implements Listener, PluginMessageListener {
             clientCount = Long.parseUnsignedLong(parts[7].trim());
             clientDigest = Long.parseUnsignedLong(parts[8].trim(), 16);
         } catch (NumberFormatException e) {
-            digestMismatch(player, session);
+            digestMismatch(player, session, -1, MovementDigest.FNV_OFFSET, false);
             return false;
         }
         Long expected = session.digest.digestAt(clientCount);
         if (expected != null && expected == clientDigest) {
             return true; // perfect proof
         }
-        digestMismatch(player, session, clientCount, clientDigest);
+        digestMismatch(player, session, clientCount, clientDigest, true);
         return false;
     }
 
-    private void digestMismatch(Player player, Session session, long clientCount, long clientDigest) {
+    private void digestMismatch(Player player, Session session, long clientCount, long clientDigest,
+                                boolean allowResync) {
         boolean requiredUser = isRequired(player.getUniqueId());
         long now = System.currentTimeMillis();
-        boolean withinGrace = session.resyncs < MAX_RESYNCS_PER_SESSION
+        boolean withinGrace = allowResync
+                && clientCount > 0
+                && session.resyncs < MAX_RESYNCS_PER_SESSION
                 && now - session.lastResyncAt > RESYNC_COOLDOWN_MILLIS;
         if (withinGrace) {
             // One tolerated re-anchor (e.g. pre-mod-login traffic skew); still logged, and
