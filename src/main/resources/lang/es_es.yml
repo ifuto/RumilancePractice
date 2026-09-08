@@ -1280,8 +1280,11 @@ arena-source:
   teleported: "<aqua>Teletransportado al punto de origen de <yellow><id></yellow>."
 
 tier:
-  header: "<gold>— Evaluación de tier —"
-  current: "Tu tier actual: "
-  samples: "<gray>Combates de práctica registrados: <yellow><n>"
-  progress-title: "<gold>Historial de la escalera de bots:"
-  hint: "<gray>Vence a los bots de práctica para subir de tier (5+ combates por nivel, 60%+ de victorias)."
+  header: "<gold>— Tier de habilidad (PvP real) —"
+  current: "Tu tier: "
+  rank: "<gray>Posición en el servidor: <yellow>#<rank></yellow> de <population> jugadores <gray>(top <pct>%)"
+  stats: "<gray>Mejor kit: <yellow><kit></yellow> — ELO <yellow><elo></yellow> — partidas clas.: <yellow><matches>"
+  unranked: "<yellow>Sin tier aún — por debajo del umbral de colocación."
+  unranked-progress: "<gray>La colocación se abre tras <yellow><n></yellow> partidas clasificatorias."
+  bands-title: "<gold>Bandas de tier (% de jugadores elegibles):"
+  hint: "<gray>El tier sale de combates reales (ELO clas. del mejor kit). HT1 = top 0.1% — uno entre mil."

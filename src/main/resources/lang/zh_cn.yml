@@ -1280,8 +1280,11 @@ arena-source:
   teleported: "<aqua>已传送到 <yellow><id></yellow> 的来源地点。"
 
 tier:
-  header: "<gold>— 段位评定 —"
+  header: "<gold>— 技术段位（实战PvP） —"
   current: "当前段位: "
-  samples: "<gray>已记录的练习对局数: <yellow><n>"
-  progress-title: "<gold>机器人阶梯战绩:"
-  hint: "<gray>击败练习机器人可提升段位（每档至少5场、胜率60%以上）。"
+  rank: "<gray>服务器排名: <yellow><population>人中 #<rank></yellow> <gray>（前 <pct>%）"
+  stats: "<gray>擅长职业: <yellow><kit></yellow> — ELO <yellow><elo></yellow> — 排位场次: <yellow><matches>"
+  unranked: "<yellow>暂无段位 — 未达到定级要求。"
+  unranked-progress: "<gray>累计完成 <yellow><n></yellow> 场排位后开始定级。"
+  bands-title: "<gold>段位区间（占合格玩家的前 %）:"
+  hint: "<gray>段位由实战成绩（最佳职业排位ELO）决定。HT1 = 前 0.1%（千里挑一）。"

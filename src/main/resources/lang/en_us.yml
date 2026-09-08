@@ -1283,8 +1283,11 @@ arena-source:
   teleported: "<aqua>Teleported to the source point of <yellow><id></yellow>."
 
 tier:
-  header: "<gold>— Skill tier evaluation —"
+  header: "<gold>— Skill tier (real PvP) —"
   current: "Your skill tier: "
-  samples: "<gray>Recorded practice fights: <yellow><n>"
-  progress-title: "<gold>Bot ladder record:"
-  hint: "<gray>Beat practice bots to raise your tier (5+ fights per rung, 60%+ win rate)."
+  rank: "<gray>Server standing: <yellow>#<rank></yellow> of <population> ranked players <gray>(top <pct>%)"
+  stats: "<gray>Best kit: <yellow><kit></yellow> — ELO <yellow><elo></yellow> — ranked matches: <yellow><matches>"
+  unranked: "<yellow>No tier yet — below the placement threshold."
+  unranked-progress: "<gray>Placement opens after <yellow><n></yellow> ranked matches total."
+  bands-title: "<gold>Tier bands (share of eligible ranked players):"
+  hint: "<gray>Tiers come from real player fights (best-kit ranked ELO). HT1 = top 0.1% — one in a thousand."

@@ -1,37 +1,43 @@
 package com.rumilance.practice.tier;
 
+import com.rumilance.practice.database.repository.RankedStatsRepository;
+import com.rumilance.practice.model.RankedKitStats;
+import com.rumilance.practice.util.AsyncExecutor;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.Plugin;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.EnumMap;
-import java.util.Locale;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.rumilance.practice.practice.BotDifficulty.Preset;
-
 /**
- * Auto skill tiering ({@code HT1} … {@code HT5}, {@code LT1} … {@code LT5}) evaluated from
- * practice fights against the seven-step bot ladder — the Quantum-style way: a tier says
- * "this player comfortably beats bots up to rung X".
+ * Auto skill tiering ({@code HT1} … {@code HT5}, {@code LT1} … {@code LT5}) computed from
+ * <b>real player-vs-player</b> results — not bots. The server's ranked ELO tables are the
+ * combat record: every ranked duel is a sample of two players' moves, aim, trading and
+ * builds, distilled into ELO by actual humans fighting each other.
  *
- * <h3>Signals & anti-fraud</h3>
+ * <h3>Model</h3>
  * <ul>
- *   <li>Every bot pop the player lands = one WIN at the current difficulty rung; every practice
- *       death = one LOSS there. Stored per rung.</li>
- *   <li>A rung counts toward a tier only with {@link #MIN_SAMPLES} samples and ≥60% win rate —
- *       one lucky kill never ranks you up.</li>
- *   <li>The HT bracket demands stricter thresholds and bigger samples (10 / 15 matches at the
- *       top), so killaura-ish bursts would still need many rounds <em>and</em> the losses a
- *       human collects falling for successive rungs; automated samples can additionally be
- *       invalidated later without schema changes.</li>
- *   <li>Records persist in {@code tiers.yml} (data folder), loaded on enable, saved on
- *       disable — no ConfigService coupling, so config.yml stays untouched.</li>
+ *   <li>Per player: composite score = best-kit ELO (top kit only, so one strong kit is a
+ *       genuine signal and one weak kit never dilutes it).</li>
+ *   <li>Placement gate: at least {@link #MIN_MATCHES} ranked matches across all kits —
+ *       fights are against whatever various players the queue provides, which is the
+ *       anti-cheese property (no single opponent can hand you a tier).</li>
+ *   <li>Tiers are rarity bands over the eligible population, so the ladder self-calibrates
+ *       to the real player base: {@code HT1} is the top 0.1% ("1 in 1000"), {@code HT5} is
+ *       the top-10% shell of regulars — the "beginner who already plays some PvP" rung.</li>
  * </ul>
+ *
+ * <p>The snapshot refreshes from the DB on a timer (async) and is persisted to
+ * {@code tiers.yml} as a warm-start cache — config.yml stays untouched.</p>
  */
 public final class TierService {
 
@@ -46,7 +52,7 @@ public final class TierService {
         LT3("LT3", org.bukkit.ChatColor.GREEN),
         LT4("LT4", org.bukkit.ChatColor.GRAY),
         LT5("LT5", org.bukkit.ChatColor.DARK_GRAY),
-        UNRANKED("—", org.bukkit.ChatColor.DARK_GRAY);
+        UNRANKED("\u2014", org.bukkit.ChatColor.DARK_GRAY);
 
         private final String label;
         private final org.bukkit.ChatColor color;
@@ -66,158 +72,160 @@ public final class TierService {
     }
 
     private static final String FILE = "tiers.yml";
-    /** Minimum fights at one rung before its win rate counts. */
-    static final int MIN_SAMPLES = 5;
-    /** HT-tier sample gates, per level (HT5..HT1 != need bigger samples toward the top). */
-    private static final int[] HT_MIN_SAMPLES = {MIN_SAMPLES, 8, 10, 12, 15};
-    /** Ordered ladder for evaluation: index 0 = weakest. */
-    private static final Preset[] LADDER_ASC = {
-            Preset.NPC, Preset.EASY, Preset.INTERMEDIATE, Preset.HARD,
-            Preset.CRAZY, Preset.MASTER, Preset.SURVIVAL_MASTER
+    /** Ranked matches (all kits summed) required before a player is placed at all. */
+    static final int MIN_MATCHES = 20;
+    /**
+     * Rarity bands: cumulative share of the eligible population the tier covers, from the
+     * strongest player down. HT1 is "1 in 1,000" (needs a population that large to exist at
+     * all); HT5 is the top-10% shell — the rung of a beginner who already plays some PvP.
+     */
+    private static final Tier[] BAND_TIERS = {
+            Tier.HT1, Tier.HT2, Tier.HT3, Tier.HT4, Tier.HT5,
+            Tier.LT1, Tier.LT2, Tier.LT3, Tier.LT4, Tier.LT5
     };
-    /** Bot pop above this win rate marks the rung "comfortably beaten". */
-    static final double BASE_WIN_RATE = 0.60d;
+    private static final double[] BAND_CEIL = {
+            0.001, 0.003, 0.01, 0.03, 0.10,
+            0.20, 0.35, 0.50, 0.70, 1.00
+    };
+    private static final long REFRESH_TICKS = 20L * 60L * 10L; // 10 minutes
 
     private final Plugin plugin;
-    /** player id -> rung -> {wins, losses}. */
-    private final Map<UUID, EnumMap<Preset, int[]>> stats = new ConcurrentHashMap<>();
+    private final RankedStatsRepository rankedStatsRepository;
+    private final AsyncExecutor asyncExecutor;
+    /** uuid -> standing snapshot (async-computed, main-thread + async safe reads). */
+    private final Map<UUID, Standing> standings = new ConcurrentHashMap<>();
+    private volatile int eligibleCount;
+    private volatile boolean refreshInFlight;
 
-    public TierService(Plugin plugin) {
+    public TierService(Plugin plugin, RankedStatsRepository rankedStatsRepository,
+                       AsyncExecutor asyncExecutor) {
         this.plugin = plugin;
+        this.rankedStatsRepository = rankedStatsRepository;
+        this.asyncExecutor = asyncExecutor;
     }
 
-    // ------------------------------------------------------------------ recording
-
-    /** A bot pop the player earned (bot stagger, crystal pop, mace knock-out). */
-    public void recordPop(UUID playerId, Preset rung) {
-        record(playerId, rung, true);
+    /** One player's placed standing in the latest snapshot. */
+    public record Standing(Tier tier, int rank, int population, double percentile,
+                           int bestElo, String topKit, int matches) {
     }
 
-    /** A full defeat in the practice room (player death). */
-    public void recordDeath(UUID playerId, Preset rung) {
-        record(playerId, rung, false);
+    // ------------------------------------------------------------------ refresh
+
+    /** Starts the periodic refresh task (call on enable). */
+    public void start() {
+        loadAll();
+        refresh();
+        org.bukkit.Bukkit.getScheduler().runTaskTimer(plugin, this::refresh,
+                REFRESH_TICKS, REFRESH_TICKS);
     }
 
-    private void record(UUID playerId, Preset rung, boolean win) {
-        if (playerId == null || rung == null || rung == Preset.CUSTOM) {
+    /** Recomputes the whole ladder from the ranked stats table (async DB, main-thread swap). */
+    public void refresh() {
+        if (refreshInFlight) {
             return;
         }
-        EnumMap<Preset, int[]> byRung = stats.computeIfAbsent(playerId, id -> new EnumMap<>(Preset.class));
-        synchronized (byRung) {
-            int[] entry = byRung.computeIfAbsent(rung, r -> new int[2]);
-            entry[win ? 0 : 1]++;
-        }
+        refreshInFlight = true;
+        asyncExecutor.runAsync(() -> {
+            try {
+                List<RankedKitStats> rows = rankedStatsRepository.findAll();
+                Map<UUID, Standing> computed = compute(rows);
+                org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+                    standings.clear();
+                    standings.putAll(computed.standings());
+                    eligibleCount = computed.eligibleCount();
+                    refreshInFlight = false;
+                });
+            } catch (Exception e) {
+                refreshInFlight = false;
+                plugin.getLogger().warning("[Tier] refresh failed: " + e.getMessage());
+            }
+        });
     }
 
-    // ------------------------------------------------------------------ evaluation
+    /** Package-private so the computation can be unit-tested. */
+    record Computation(Map<UUID, Standing> standings, int eligibleCount) {
+    }
 
-    /** Current tier of the player from their per-rung practice record. */
+    /** Pure ladder arithmetic, unit-test friendly (no Bukkit). See class javadoc. */
+    static Computation compute(List<RankedKitStats> rows) {
+        Map<UUID, List<RankedKitStats>> byPlayer = new HashMap<>();
+        for (RankedKitStats row : rows) {
+            byPlayer.computeIfAbsent(row.uuid(), id -> new ArrayList<>(4)).add(row);
+        }
+        record Raw(int score, int matches, String topKit) {
+        }
+        Map<UUID, Raw> raw = new HashMap<>();
+        for (Map.Entry<UUID, List<RankedKitStats>> entry : byPlayer.entrySet()) {
+            int best = 0;
+            int matches = 0;
+            String topKit = "";
+            for (RankedKitStats row : entry.getValue()) {
+                matches += row.wins() + row.losses();
+                if (row.elo() > best) {
+                    best = row.elo();
+                    topKit = row.kit();
+                }
+            }
+            if (matches >= MIN_MATCHES && best > 0) {
+                raw.put(entry.getKey(), new Raw(best, matches, topKit));
+            }
+        }
+        List<Map.Entry<UUID, Raw>> order = new ArrayList<>(raw.entrySet());
+        order.sort(Map.Entry.<UUID, Raw>comparingByValue(
+                Comparator.comparingInt(Raw::score).reversed()));
+        int population = order.size();
+        Map<UUID, Standing> out = new HashMap<>(population * 2);
+        int rank = 0;
+        for (Map.Entry<UUID, Raw> entry : order) {
+            rank++;
+            double percentile = rank / (double) population;
+            Tier tier = bandOf(percentile);
+            out.put(entry.getKey(), new Standing(tier, rank, population, percentile,
+                    entry.getValue().score(), entry.getValue().topKit(), entry.getValue().matches()));
+        }
+        return new Computation(out, population);
+    }
+
+    /** Maps a cumulative population share (0..1) to its tier band. */
+    static Tier bandOf(double percentile) {
+        for (int i = 0; i < BAND_TIERS.length; i++) {
+            if (percentile <= BAND_CEIL[i] + 1e-9d) {
+                return BAND_TIERS[i];
+            }
+        }
+        return Tier.LT5;
+    }
+
+    // ------------------------------------------------------------------ queries
+
     public Tier tierOf(UUID playerId) {
-        EnumMap<Preset, int[]> byRung = stats.get(playerId);
-        if (byRung == null) {
-            return Tier.UNRANKED;
-        }
-        synchronized (byRung) {
-            Tier tier = Tier.UNRANKED;
-            for (int rung = 0; rung < LADDER_ASC.length; rung++) {
-                Tier candidate = tierForRung(rung, byRung.get(LADDER_ASC[rung]));
-                if (candidate == Tier.UNRANKED) {
-                    continue;
-                }
-                if (candidate.ordinal() < tier.ordinal() || tier == Tier.UNRANKED) {
-                    // Lower ordinal = stronger tier (HT1=0), so keep the strongest cleared rung.
-                    tier = candidate;
-                }
-            }
-            return tier;
-        }
+        Standing s = standings.get(playerId);
+        return s != null ? s.tier() : Tier.UNRANKED;
     }
 
-    /** The one tier a rung record supports (UNRANKED when samples/thresholds miss). */
-    private Tier tierForRung(int rungIndex, int[] entry) {
-        if (entry == null) {
-            return Tier.UNRANKED;
-        }
-        int wins = entry[0];
-        int losses = entry[1];
-        int samples = wins + losses;
-        if (samples < MIN_SAMPLES) {
-            return Tier.UNRANKED;
-        }
-        double rate = wins / (double) samples;
-        return switch (rungIndex) {
-            case 0 -> rate >= BASE_WIN_RATE ? Tier.LT5 : Tier.UNRANKED;
-            case 1 -> rate >= BASE_WIN_RATE ? Tier.LT4 : Tier.UNRANKED;
-            case 2 -> rate >= BASE_WIN_RATE ? Tier.LT3 : Tier.UNRANKED;
-            case 3 -> rate >= BASE_WIN_RATE ? Tier.LT2 : Tier.UNRANKED;
-            case 4 -> rate >= BASE_WIN_RATE ? Tier.LT1 : Tier.UNRANKED;
-            case 5 -> // MASTER
-                    tierByBands(rate, samples,
-                            new double[]{0.65, 0.80}, new int[]{HT_MIN_SAMPLES[0], HT_MIN_SAMPLES[1]},
-                            new Tier[]{Tier.HT5, Tier.HT4});
-            default -> // SURVIVAL_MASTER
-                    tierByBands(rate, samples,
-                            new double[]{0.65, 0.80, 0.92}, new int[]{HT_MIN_SAMPLES[2], HT_MIN_SAMPLES[3], HT_MIN_SAMPLES[4]},
-                            new Tier[]{Tier.HT3, Tier.HT2, Tier.HT1});
-        };
+    public Optional<Standing> standingOf(UUID playerId) {
+        return Optional.ofNullable(standings.get(playerId));
     }
 
-    /** Picks the strictest band the record qualifies for (highest winrate band & sample gate). */
-    private static Tier tierByBands(double rate, int samples, double[] rates, int[] mins, Tier[] tiers) {
-        for (int i = rates.length - 1; i >= 0; i--) {
-            if (rate >= rates[i] && samples >= mins[i]) {
-                return tiers[i];
-            }
-        }
-        return Tier.UNRANKED;
+    public int eligibleCount() {
+        return eligibleCount;
     }
 
-    /** Per-rung readout for {@code /tier}'s detailed view: samples({win}/{loss}), win rate. */
-    public String progressLine(UUID playerId) {
-        EnumMap<Preset, int[]> byRung = stats.get(playerId);
-        StringBuilder out = new StringBuilder();
-        for (Preset rung : LADDER_ASC) {
-            int[] e = byRung == null ? null : byRung.get(rung);
-            if (out.length() > 0) {
-                out.append('\n');
-            }
-            out.append(rung.name());
-            out.append(": ");
-            if (e == null || e[0] + e[1] == 0) {
-                out.append('-');
-            } else {
-                int samples = e[0] + e[1];
-                int pct = (int) Math.round(100.0 * e[0] / samples);
-                out.append(e[0]).append('W').append('/').append(e[1]).append('L')
-                        .append(" (").append(pct).append("%)");
-            }
-        }
-        return out.toString();
+    public int minMatches() {
+        return MIN_MATCHES;
     }
 
-    public int samples(UUID playerId) {
-        EnumMap<Preset, int[]> byRung = stats.get(playerId);
-        if (byRung == null) {
-            return 0;
-        }
-        int total = 0;
-        synchronized (byRung) {
-            for (int[] e : byRung.values()) {
-                total += e[0] + e[1];
-            }
-        }
-        return total;
-    }
-
-    // ------------------------------------------------------------------ persistence
+    // ------------------------------------------------------------------ persistence (warm-start cache)
 
     public void loadAll() {
-        stats.clear();
+        standings.clear();
+        eligibleCount = 0;
         File file = dataFile();
         if (!file.isFile()) {
             return;
         }
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+        eligibleCount = Math.max(0, yaml.getInt("eligible-count"));
         ConfigurationSection players = yaml.getConfigurationSection("players");
         if (players == null) {
             return;
@@ -229,35 +237,35 @@ public final class TierService {
             } catch (IllegalArgumentException e) {
                 continue;
             }
-            ConfigurationSection rungs = players.getConfigurationSection(key);
-            if (rungs == null) {
+            Tier tier;
+            try {
+                tier = Tier.valueOf(players.getString(key + ".tier", "UNRANKED"));
+            } catch (IllegalArgumentException e) {
                 continue;
             }
-            EnumMap<Preset, int[]> byRung = new EnumMap<>(Preset.class);
-            for (String rungName : rungs.getKeys(false)) {
-                Preset rung = BotDifficultySafe.parse(rungName);
-                if (rung == null) {
-                    continue;
-                }
-                byRung.put(rung, new int[]{rungs.getInt(rungName + ".wins"), rungs.getInt(rungName + ".losses")});
-            }
-            if (!byRung.isEmpty()) {
-                stats.put(id, byRung);
-            }
+            standings.put(id, new Standing(tier,
+                    players.getInt(key + ".rank"),
+                    players.getInt(key + ".population"),
+                    players.getDouble(key + ".percentile"),
+                    players.getInt(key + ".best-elo"),
+                    players.getString(key + ".top-kit", ""),
+                    players.getInt(key + ".matches")));
         }
     }
 
     public void saveAll() {
         YamlConfiguration yaml = new YamlConfiguration();
-        for (Map.Entry<UUID, EnumMap<Preset, int[]>> entry : stats.entrySet()) {
-            EnumMap<Preset, int[]> byRung = entry.getValue();
-            synchronized (byRung) {
-                for (Map.Entry<Preset, int[]> rung : byRung.entrySet()) {
-                    String base = "players." + entry.getKey() + "." + rung.getKey().name();
-                    yaml.set(base + ".wins", rung.getValue()[0]);
-                    yaml.set(base + ".losses", rung.getValue()[1]);
-                }
-            }
+        yaml.set("eligible-count", eligibleCount);
+        for (Map.Entry<UUID, Standing> entry : standings.entrySet()) {
+            String base = "players." + entry.getKey();
+            Standing s = entry.getValue();
+            yaml.set(base + ".tier", s.tier().name());
+            yaml.set(base + ".rank", s.rank());
+            yaml.set(base + ".population", s.population());
+            yaml.set(base + ".percentile", s.percentile());
+            yaml.set(base + ".best-elo", s.bestElo());
+            yaml.set(base + ".top-kit", s.topKit());
+            yaml.set(base + ".matches", s.matches());
         }
         File file = dataFile();
         file.getParentFile().mkdirs();
@@ -270,19 +278,5 @@ public final class TierService {
 
     private File dataFile() {
         return new File(plugin.getDataFolder(), FILE);
-    }
-
-    /** Dead-locked parse helper so this class never imports incomplete BotDifficulty helpers. */
-    private static final class BotDifficultySafe {
-        static Preset parse(String raw) {
-            if (raw == null) {
-                return null;
-            }
-            try {
-                return Preset.valueOf(raw.toUpperCase(Locale.ROOT));
-            } catch (IllegalArgumentException e) {
-                return null;
-            }
-        }
     }
 }

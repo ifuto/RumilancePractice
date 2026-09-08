@@ -1280,8 +1280,11 @@ arena-source:
   teleported: "<aqua><yellow><id></yellow>의 원본 지점으로 텔레포트했습니다."
 
 tier:
-  header: "<gold>— 티어 평가 —"
+  header: "<gold>— 스킬 티어 (실전 PvP) —"
   current: "현재 티어: "
-  samples: "<gray>기록된 연습 대전 수: <yellow><n>"
-  progress-title: "<gold>봇 래더 전적:"
-  hint: "<gray>연습 봇을 이겨 티어를 올리세요 (단계당 5전 이상, 승률 60% 이상)."
+  rank: "<gray>서버 순위: <yellow><population>명 중 #<rank></yellow> <gray>(상위 <pct>%)"
+  stats: "<gray>주력 키트: <yellow><kit></yellow> — ELO <yellow><elo></yellow> — 랭크전: <yellow><matches>전"
+  unranked: "<yellow>아직 티어 없음 — 배치 기준 미달."
+  unranked-progress: "<gray>랭크전 합계 <yellow><n></yellow>전이 되면 배치가 시작됩니다."
+  bands-title: "<gold>티어 구간 (대상 플레이어 상위 %):"
+  hint: "<gray>티어는 실제 유저 전적(주력 키트 랭크 ELO)으로 결정됩니다. HT1 = 상위 0.1% (1000명 중 1명)."

@@ -124,6 +124,21 @@ public final class RankedStatsRepository {
         return result;
     }
 
+    /** Every ranked-stats row (all players, all kits) — used by the tier snapshot. */
+    public List<RankedKitStats> findAll() throws SQLException {
+        String sql = "SELECT id, uuid, kit, elo, wins, losses, win_streak, best_elo FROM "
+                + databaseService.table("ranked_stats");
+        List<RankedKitStats> result = new ArrayList<>();
+        try (Connection connection = databaseService.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet resultSet = statement.executeQuery()) {
+            while (resultSet.next()) {
+                result.add(map(resultSet));
+            }
+        }
+        return result;
+    }
+
     public int deleteForPlayer(UUID uuid) throws SQLException {
         String sql = "DELETE FROM " + databaseService.table("ranked_stats") + " WHERE uuid = ?";
         try (Connection connection = databaseService.getConnection();

@@ -519,11 +519,11 @@ public final class FeatureBootstrap {
                 rankedStatsRepository, matchHistoryRepository, dailyRankedStatsRepository, configService);
         services.register(StatsService.class, statsService);
 
-        // Auto skill tiering from practice-bot results (Quantum-style HT1..LT5 ladder).
+        // Auto skill tiering from real PvP (best-kit ranked ELO -> rarity bands, HT1 = top 0.1%).
         com.rumilance.practice.tier.TierService tierService =
-                new com.rumilance.practice.tier.TierService(plugin);
+                new com.rumilance.practice.tier.TierService(plugin, rankedStatsRepository, asyncExecutor);
         services.register(com.rumilance.practice.tier.TierService.class, tierService);
-        Bukkit.getScheduler().runTask(plugin, tierService::loadAll);
+        tierService.start();
 
         StatsResetService statsResetService = new StatsResetService(
                 rankedStatsRepository, ffaStatsRepository, dailyRankedStatsRepository,
@@ -971,7 +971,6 @@ public final class FeatureBootstrap {
         practiceService.setOpenMaceGui(practiceMaceGui::openFor);
         practiceService.setOpenBotGui(practiceBotGui::openFor);
         practiceService.setOpenDifficultyGui(botDifficultyGui::openFor);
-        practiceService.setTierService(tierService);
         practiceService.setKitService(kitService);
 
         GuiListener guiListener = new GuiListener(guiSessions, stateManager, originalKitService, messageService);
@@ -1533,6 +1532,9 @@ public final class FeatureBootstrap {
         bind("team", new TeamCommand(teamService, kitService, teamHubGui, teamsBrowserGui, messageService));
         bind("prac", new PracCommand(practiceService));
         bind("tier", new com.rumilance.practice.command.TierCommand(tierService, messageService));
+        // Server-wide crafting restriction: log -> planks only (lobby OPs exempt).
+        plugin.getServer().getPluginManager().registerEvents(
+                new com.rumilance.practice.craft.CraftRestrictionListener(stateManager), plugin);
         bind("practice", new PracticeCommand(practiceService));
         bind("setrank", new SetRankCommand(rankService, playerRepository));
         bind("urank", new com.rumilance.practice.command.HiddenRankCommand(hiddenRankService, customShieldAdminGui));

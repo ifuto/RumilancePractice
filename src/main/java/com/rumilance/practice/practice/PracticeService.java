@@ -75,8 +75,6 @@ public final class PracticeService {
     private volatile java.util.function.BiConsumer<Player, PracticeSession> openMaceGui;
     private volatile java.util.function.BiConsumer<Player, PracticeSession> openBotGui;
     private volatile java.util.function.BiConsumer<Player, PracticeSession> openDifficultyGui;
-    /** Records tier-evaluation events (bot pops as wins, practice deaths as losses). */
-    private volatile com.rumilance.practice.tier.TierService tierService;
     /** Admin kit binding per bot mode (Quantum's 5 fight modes -> server kits). */
     private final java.util.Map<PracticeType, String> botModeKits =
             new java.util.EnumMap<>(PracticeType.class);
@@ -128,31 +126,6 @@ public final class PracticeService {
 
     public void setOpenDifficultyGui(java.util.function.BiConsumer<Player, PracticeSession> gui) {
         this.openDifficultyGui = gui;
-    }
-
-    public void setTierService(com.rumilance.practice.tier.TierService service) {
-        this.tierService = service;
-    }
-
-    /** Records a bot pop (player win against the current rung) for tier evaluation. */
-    private void recordTierPop(UUID playerId, PracticeSession session) {
-        com.rumilance.practice.tier.TierService svc = tierService;
-        if (svc != null && session != null && session.difficulty() != null) {
-            svc.recordPop(playerId, session.difficulty().preset());
-        }
-    }
-
-    /** Practice death of a player (real defeat signal) — forwarded from the death listener. */
-    public void recordTierDeath(UUID playerId) {
-        com.rumilance.practice.tier.TierService svc = tierService;
-        if (svc == null || playerId == null) {
-            return;
-        }
-        PracticeSession session = sessions.get(playerId);
-        if (session == null || session.difficulty() == null) {
-            return;
-        }
-        svc.recordDeath(playerId, session.difficulty().preset());
     }
 
     public void setKitService(com.rumilance.practice.kit.KitService kitService) {
@@ -1831,7 +1804,6 @@ public final class PracticeService {
         }
         event.setCancelled(true);
         session.incrementBotPops();
-        recordTierPop(session.playerId(), session);
         player.playSound(bot.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 1.4f);
         if (session.phase() == PracticeSession.Phase.ACTIVE) {
             endBotMatch(player, session, BotMatchResult.WIN);
@@ -3048,7 +3020,6 @@ public final class PracticeService {
         boolean matchLive = session.phase() == PracticeSession.Phase.ACTIVE;
         if (session.type() == PracticeType.CRYSTAL) {
             session.incrementBotPops();
-            recordTierPop(session.playerId(), session);
             player.playSound(bot.getLocation(), Sound.ITEM_TOTEM_USE, 1.0f, 1.0f);
             if (bot.getWorld() != null) {
                 bot.getWorld().spawnParticle(org.bukkit.Particle.TOTEM_OF_UNDYING,
@@ -3070,7 +3041,6 @@ public final class PracticeService {
                 return true;
             }
             session.incrementBotPops();
-            recordTierPop(session.playerId(), session);
             player.sendActionBar(messages.render(player, "practice.bot-down",
                     MessageService.tags("kills", String.valueOf(session.botPops()))));
             player.playSound(bot.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 1.4f);
