@@ -205,7 +205,16 @@ public final class FfaService {
     private final Map<UUID, Integer> lastLethalTick = new ConcurrentHashMap<>();
     private static final int LETHAL_DEDUPE_TICKS = 20;
     private final Map<String, Boolean> resetting = new ConcurrentHashMap<>();
-    private final Map<String, List<BlockChange>> blockDiffs = new ConcurrentHashMap<>();
+    /**
+     * Per-arena terrain deltas kept in INSERTION order, keyed by packed block position so a
+     * same-block update is an O(1) idempotent putIfAbsent (was: full linear scan per change —
+     * the quadratic hot path that saturated the main thread in busy arenas). At 50k distinct
+     * blocks the arena stops accumulating new positions (same cap as before).
+     */
+    private final Map<String, java.util.LinkedHashMap<Long, BlockChange>> blockDiffs =
+            new ConcurrentHashMap<>();
+    /** Max blocks restored per main-thread tick during an FFA reset. */
+    private static final int RESTORE_BATCH_PER_TICK = 1024;
     /** Per-arena countdown deadline (millis); absent or 0 = timer inactive. */
     private final Map<String, Long> nextResetAtMillis = new ConcurrentHashMap<>();
     /** Last observed remaining seconds, used to fire warn thresholds once each. */
@@ -853,16 +862,27 @@ public final class FfaService {
         }
     }
 
+    /** Pack a block position (26-bit signed X / 12-bit Y / 26-bit Z) into one sortable long. */
+    static long packBlock(final Location loc) {
+        long x = loc.getBlockX() + 33_554_432L;
+        long y = loc.getBlockY() + 2048L;
+        long z = loc.getBlockZ() + 33_554_432L;
+        return (x & 0x3FFFFFFL) | ((y & 0xFFFL) << 26) | ((z & 0x3FFFFFFL) << 38);
+    }
+
     private void recordBlockChangeForArena(String arenaId, Location location, String previousData) {
-        List<BlockChange> list = blockDiffs.computeIfAbsent(arenaId, id -> new ArrayList<>());
-        synchronized (list) {
-            for (BlockChange existing : list) {
-                if (sameBlock(existing.location(), location)) {
-                    return;
-                }
+        if (location == null) {
+            return;
+        }
+        java.util.LinkedHashMap<Long, BlockChange> map =
+                blockDiffs.computeIfAbsent(arenaId, id -> new java.util.LinkedHashMap<>());
+        synchronized (map) {
+            long key = packBlock(location);
+            if (map.containsKey(key)) {
+                return; // earliest previous-state is the restore target; later writes are covered
             }
-            if (list.size() < 50_000) {
-                list.add(new BlockChange(location.clone(), previousData));
+            if (map.size() < 50_000) {
+                map.put(key, new BlockChange(location.clone(), previousData));
             }
         }
         // Terrain changed inside the arena: refresh the chunk's indexed grass spots so
@@ -870,16 +890,6 @@ public final class FfaService {
         if (spawnIndex != null && location != null) {
             spawnIndex.markDirty(arenaId, location);
         }
-    }
-
-    private static boolean sameBlock(Location a, Location b) {
-        if (a == null || b == null || a.getWorld() == null || b.getWorld() == null) {
-            return false;
-        }
-        return a.getWorld().equals(b.getWorld())
-                && a.getBlockX() == b.getBlockX()
-                && a.getBlockY() == b.getBlockY()
-                && a.getBlockZ() == b.getBlockZ();
     }
 
     public void create(String id, Cuboid region, Location spawn, String kitId) {
@@ -905,7 +915,7 @@ public final class FfaService {
             return RenameResult.TARGET_EXISTS;
         }
         arenas.remove(existing.id());
-        List<BlockChange> diffs = blockDiffs.remove(existing.id());
+        java.util.LinkedHashMap<Long, BlockChange> diffs = blockDiffs.remove(existing.id());
         Long nextAt = nextResetAtMillis.remove(existing.id());
         Integer lastRem = lastResetRemaining.remove(existing.id());
         FfaArena renamed = existing.withId(newId);
@@ -1173,7 +1183,7 @@ public final class FfaService {
         if (resetHook != null) {
             resetHook.accept(arena.id());
         }
-        List<BlockChange> diffs = blockDiffs.remove(arena.id());
+        java.util.LinkedHashMap<Long, BlockChange> diffs = blockDiffs.remove(arena.id());
         Runnable finish = () -> {
             resetting.put(arena.id(), false);
             // Terrain was restored: rebuild this arena's spawn spots from the fresh ground.
@@ -1185,26 +1195,45 @@ public final class FfaService {
             }
         };
         if (diffs != null && !diffs.isEmpty()) {
-            Bukkit.getScheduler().runTask(plugin, () -> {
-                // Undo in reverse so stacked place/break/explosion diffs restore correctly.
-                for (int i = diffs.size() - 1; i >= 0; i--) {
-                    BlockChange change = diffs.get(i);
-                    World blockWorld = change.location().getWorld();
-                    if (blockWorld == null) {
-                        continue;
-                    }
-                    try {
-                        BlockData data = Bukkit.createBlockData(change.previousData());
-                        change.location().getBlock().setBlockData(data, false);
-                    } catch (IllegalArgumentException ignored) {
-                        // skip corrupt entries
-                    }
-                }
-                finish.run();
-            });
+            List<BlockChange> ordered;
+            synchronized (diffs) {
+                ordered = new ArrayList<>(diffs.values());
+            }
+            restoreDiffsBatched(ordered, 0, finish);
         } else {
             Bukkit.getScheduler().runTaskLater(plugin, finish, 40L);
         }
+    }
+
+    /**
+     * Bounded terrain undo: restores at most {@link #RESTORE_BATCH_PER_TICK} block diffs per
+     * main-thread tick, then schedules the next slice. A 50k-block arena therefore finishes in
+     * seconds without ever freezing the server (previously one monolithic burst froze it for
+     * the whole restore).
+     */
+    private void restoreDiffsBatched(List<BlockChange> ordered, int cursor, Runnable finish) {
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            int end = Math.min(ordered.size(), cursor + RESTORE_BATCH_PER_TICK);
+            // Undo in reverse so stacked place/break/explosion diffs restore correctly.
+            for (int i = end - 1; i >= cursor; i--) {
+                BlockChange change = ordered.get(i);
+                World blockWorld = change.location().getWorld();
+                if (blockWorld == null) {
+                    continue;
+                }
+                try {
+                    BlockData data = Bukkit.createBlockData(change.previousData());
+                    change.location().getBlock().setBlockData(data, false);
+                } catch (IllegalArgumentException ignored) {
+                    // skip corrupt entries
+                }
+            }
+            if (end < ordered.size()) {
+                restoreDiffsBatched(ordered, end, finish);
+            } else {
+                finish.run();
+            }
+        });
     }
 
     private void cleanupEntities(FfaArena arena) {
@@ -1216,7 +1245,12 @@ public final class FfaService {
             return;
         }
         Cuboid region = arena.region();
-        for (Entity entity : world.getEntities()) {
+        // Paper API: only entities inside the arena bounding box, not a worldwide sweep.
+        org.bukkit.util.BoundingBox box = new org.bukkit.util.BoundingBox(
+                region.minX(), region.minY(), region.minZ(),
+                region.maxX() + 1.0d, region.maxY() + 1.0d, region.maxZ() + 1.0d);
+        for (Entity entity : world.getNearbyEntities(box,
+                entity -> region.contains(entity.getLocation()))) {
             if (!(entity instanceof Player) && region.contains(entity.getLocation())
                     && (entity instanceof EnderCrystal
                     || entity instanceof TNTPrimed
