@@ -1280,3 +1280,10 @@ rtpqueue:
 arena-source:
   world-missing: "<red>テレポート不可: <id> のワールド <world> が読み込まれていません。"
   teleported: "<aqua><yellow><id></yellow> のコピー元地点へテレポートしました。"
+
+tier:
+  header: "<gold>— ティア評価 —"
+  current: "現在のティア: "
+  samples: "<gray>記録済みの練習対戦数: <yellow><n>"
+  progress-title: "<gold>ボット・ラダー戦績:"
+  hint: "<gray>練習ボットに勝ってティアを上げよう（各ランク5戦以上・勝率60%以上）。"

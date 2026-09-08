@@ -1278,3 +1278,10 @@ rtpqueue:
 arena-source:
   world-missing: "<red>Téléportation impossible : le monde <world> de <id> n’est pas chargé."
   teleported: "<aqua>Téléporté au point source de <yellow><id></yellow>."
+
+tier:
+  header: "<gold>— Évaluation du tier —"
+  current: "Votre tier actuel : "
+  samples: "<gray>Combats d'entraînement enregistrés : <yellow><n>"
+  progress-title: "<gold>Historique de l'échelle des bots :"
+  hint: "<gray>Battez les bots d'entraînement pour monter de tier (5+ combats par niveau, 60 %+ de victoires)."

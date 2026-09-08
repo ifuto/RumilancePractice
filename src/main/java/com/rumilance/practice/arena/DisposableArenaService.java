@@ -208,18 +208,54 @@ public final class DisposableArenaService extends AbstractArenaService {
         if (world == null || !faweBridge.isAvailable()) {
             return CompletableFuture.completedFuture(null);
         }
-        return faweBridge.clearRegion(world,
+        // Arena is only erased AFTER every player was confirmed teleported out: match-end
+        // teleports are async, so without this barrier FAWE could rip the ground out from
+        // under someone mid-teleport on a busy tick. Re-checks every 2 ticks, 1s hard cap,
+        // then proceeds (a logged path so a stuck player cannot leak a copy).
+        java.util.concurrent.CompletableFuture<Void> result = new java.util.concurrent.CompletableFuture<>();
+        releaseWhenEmpty(instance, world, result, 0);
+        return result;
+    }
+
+    private void releaseWhenEmpty(ArenaInstance instance, World world,
+                                  java.util.concurrent.CompletableFuture<Void> result, int attempt) {
+        if (!plugin.isEnabled()) {
+            result.complete(null);
+            return;
+        }
+        boolean occupied = false;
+        for (org.bukkit.entity.Player player : world.getPlayers()) {
+            org.bukkit.Location loc = player.getLocation();
+            int x = loc.getBlockX(), y = loc.getBlockY(), z = loc.getBlockZ();
+            if (x >= instance.minX() && x <= instance.maxX()
+                    && y >= instance.minY() && y <= instance.maxY()
+                    && z >= instance.minZ() && z <= instance.maxZ()) {
+                occupied = true;
+                break;
+            }
+        }
+        if (occupied && attempt < 10) {
+            Bukkit.getScheduler().runTaskLater(plugin,
+                    () -> releaseWhenEmpty(instance, world, result, attempt + 1), 2L);
+            return;
+        }
+        if (occupied) {
+            LOGGER.warning("Clearing disposable copy " + instance.id()
+                    + " while a player still bounds inside (teleport barrier exhausted).");
+        }
+        faweBridge.clearRegion(world,
                         instance.minX(), instance.minY(), instance.minZ(),
                         instance.maxX(), instance.maxY(), instance.maxZ())
                 .handle((success, throwable) -> {
                     if (throwable != null || !Boolean.TRUE.equals(success)) {
-                        LOGGER.warning("Failed to clear disposable arena copy " + instanceId
+                        LOGGER.warning("Failed to clear disposable arena copy " + instance.id()
                                 + " (template=" + instance.template().name() + ").");
                     }
                     // Unpin the chunk tickets so the area can unload normally again.
                     if (plugin.isEnabled()) {
                         Bukkit.getScheduler().runTask(plugin, () -> unpinChunks(world, instance));
                     }
+                    result.complete(null);
                     return null;
                 });
     }

@@ -1278,3 +1278,10 @@ rtpqueue:
 arena-source:
   world-missing: "<red>Cannot teleport: world <world> for <id> is not loaded."
   teleported: "<aqua>Teleported to the source point of <yellow><id></yellow>."
+
+tier:
+  header: "<gold>— Skill tier evaluation —"
+  current: "Your skill tier: "
+  samples: "<gray>Recorded practice fights: <yellow><n>"
+  progress-title: "<gold>Bot ladder record:"
+  hint: "<gray>Beat practice bots to raise your tier (5+ fights per rung, 60%+ win rate)."

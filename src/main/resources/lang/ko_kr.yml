@@ -1278,3 +1278,10 @@ rtpqueue:
 arena-source:
   world-missing: "<red>텔레포트 불가: <id>의 월드 <world>가 로드되지 않았습니다."
   teleported: "<aqua><yellow><id></yellow>의 원본 지점으로 텔레포트했습니다."
+
+tier:
+  header: "<gold>— 티어 평가 —"
+  current: "현재 티어: "
+  samples: "<gray>기록된 연습 대전 수: <yellow><n>"
+  progress-title: "<gold>봇 래더 전적:"
+  hint: "<gray>연습 봇을 이겨 티어를 올리세요 (단계당 5전 이상, 승률 60% 이상)."

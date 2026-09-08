@@ -9,6 +9,8 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockBurnEvent;
+import org.bukkit.event.block.BlockFadeEvent;
+import org.bukkit.event.block.LeavesDecayEvent;
 import org.bukkit.event.block.BlockExplodeEvent;
 import org.bukkit.event.block.BlockFormEvent;
 import org.bukkit.event.block.BlockFromToEvent;
@@ -91,6 +93,24 @@ public final class FfaBlockTracker implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onForm(BlockFormEvent event) {
+        Block block = event.getBlock();
+        if (block == null || !ffaService.isInFfaRegion(block.getLocation())) {
+            return;
+        }
+        ffaService.recordBlockChangeAt(block.getLocation(), block.getBlockData().getAsString());
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onFade(BlockFadeEvent event) {
+        Block block = event.getBlock();
+        if (block == null || !ffaService.isInFfaRegion(block.getLocation())) {
+            return;
+        }
+        ffaService.recordBlockChangeAt(block.getLocation(), block.getBlockData().getAsString());
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onLeavesDecay(LeavesDecayEvent event) {
         Block block = event.getBlock();
         if (block == null || !ffaService.isInFfaRegion(block.getLocation())) {
             return;

@@ -1278,3 +1278,10 @@ rtpqueue:
 arena-source:
   world-missing: "<red>无法传送: <id> 的世界 <world> 未加载。"
   teleported: "<aqua>已传送到 <yellow><id></yellow> 的来源地点。"
+
+tier:
+  header: "<gold>— 段位评定 —"
+  current: "当前段位: "
+  samples: "<gray>已记录的练习对局数: <yellow><n>"
+  progress-title: "<gold>机器人阶梯战绩:"
+  hint: "<gray>击败练习机器人可提升段位（每档至少5场、胜率60%以上）。"

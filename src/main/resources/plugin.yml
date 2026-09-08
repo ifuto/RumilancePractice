@@ -133,6 +133,10 @@ commands:
     description: Join/leave the random-teleport duel queue of your current FFA arena.
     usage: /rtpqueue [join|leave]
     permission: rumilance.user
+  tier:
+    description: "Shows your auto skill tier evaluated from practice bot fights"
+    usage: "/tier"
+    permission: rumilance.user
   prac:
     description: Join or leave a practice room.
     usage: /prac <name>|leave

@@ -322,6 +322,9 @@ public final class PracticeListener implements Listener {
         if (sessionOpt.isEmpty()) {
             return;
         }
+        // Tier evaluation: a practice death is the clean "defeat" signal against the
+        // current bot rung. (Totem-popped deaths below are NOT losses.)
+        practiceService.recordTierDeath(player.getUniqueId());
         PracticeSession session = sessionOpt.get();
         // The totem failsafe (TotemGuardListener, registered first) already turned this death
         // into a totem pop and owns the revive: don't run the practice death flow on top of it.

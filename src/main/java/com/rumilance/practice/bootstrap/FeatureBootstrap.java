@@ -518,6 +518,13 @@ public final class FeatureBootstrap {
         StatsService statsService = new StatsService(
                 rankedStatsRepository, matchHistoryRepository, dailyRankedStatsRepository, configService);
         services.register(StatsService.class, statsService);
+
+        // Auto skill tiering from practice-bot results (Quantum-style HT1..LT5 ladder).
+        com.rumilance.practice.tier.TierService tierService =
+                new com.rumilance.practice.tier.TierService(plugin);
+        services.register(com.rumilance.practice.tier.TierService.class, tierService);
+        Bukkit.getScheduler().runTask(plugin, tierService::loadAll);
+
         StatsResetService statsResetService = new StatsResetService(
                 rankedStatsRepository, ffaStatsRepository, dailyRankedStatsRepository,
                 matchHistoryRepository, winStreakRepository);
@@ -964,6 +971,7 @@ public final class FeatureBootstrap {
         practiceService.setOpenMaceGui(practiceMaceGui::openFor);
         practiceService.setOpenBotGui(practiceBotGui::openFor);
         practiceService.setOpenDifficultyGui(botDifficultyGui::openFor);
+        practiceService.setTierService(tierService);
         practiceService.setKitService(kitService);
 
         GuiListener guiListener = new GuiListener(guiSessions, stateManager, originalKitService, messageService);
@@ -1524,6 +1532,7 @@ public final class FeatureBootstrap {
         bind("leave", new LeaveCommand(matchService, messageService));
         bind("team", new TeamCommand(teamService, kitService, teamHubGui, teamsBrowserGui, messageService));
         bind("prac", new PracCommand(practiceService));
+        bind("tier", new com.rumilance.practice.command.TierCommand(tierService, messageService));
         bind("practice", new PracticeCommand(practiceService));
         bind("setrank", new SetRankCommand(rankService, playerRepository));
         bind("urank", new com.rumilance.practice.command.HiddenRankCommand(hiddenRankService, customShieldAdminGui));
@@ -1638,6 +1647,8 @@ public final class FeatureBootstrap {
         if (banService != null) {
             banService.persist();
         }
+        services.find(com.rumilance.practice.tier.TierService.class)
+                .ifPresent(com.rumilance.practice.tier.TierService::saveAll);
         if (practiceService != null) {
             practiceService.stop();
         }

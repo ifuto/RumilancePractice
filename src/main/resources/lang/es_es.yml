@@ -1278,3 +1278,10 @@ rtpqueue:
 arena-source:
   world-missing: "<red>No se puede teletransportar: el mundo <world> de <id> no está cargado."
   teleported: "<aqua>Teletransportado al punto de origen de <yellow><id></yellow>."
+
+tier:
+  header: "<gold>— Evaluación de tier —"
+  current: "Tu tier actual: "
+  samples: "<gray>Combates de práctica registrados: <yellow><n>"
+  progress-title: "<gold>Historial de la escalera de bots:"
+  hint: "<gray>Vence a los bots de práctica para subir de tier (5+ combates por nivel, 60%+ de victorias)."
