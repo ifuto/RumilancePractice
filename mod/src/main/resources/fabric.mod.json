@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "rumilance-ac",
+  "version": "${version}",
+  "name": "RumilanceAC",
+  "description": "Client-side anti-cheat attestation for the Rumilance practice server. Blacklist-only detection (no false positives on performance/utility mods like Sodium or Shield Stats), nonce-based server handshake.",
+  "authors": ["Rumilance"],
+  "license": "PolyForm Shield 1.0.0",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.rumilance.ac.RumilanceAcMod"
+    ]
+  },
+  "mixins": [
+    "rumilance-ac.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft": ">=1.21.1 <1.22",
+    "fabric-api": "*"
+  }
+}

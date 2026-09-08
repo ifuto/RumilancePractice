@@ -2,7 +2,8 @@
 # .github/workflows/ に build.yml と並べて置くだけで有効化。
 # 発火: mod/** を含むPush、または手動 (Actions → build-mod → Run workflow)。
 # 出力: 成功時に mod-jars アーティファクト (mod/build/libs/*.jar)。
-# ※ mod/ が存在しない間は paths フィルタにより自動発火も手動も失敗しない限り走りません。
+# ※ gradle wrapperのjarをリポジトリに含めないため、setup-gradleがGradle本体を導入します
+#    （前版の ./gradlew 版からの差分はそこだけです。差し替えをお願いします）。
 
 name: build-mod
 
@@ -17,7 +18,6 @@ permissions:
 
 jobs:
   build-mod:
-    if: ${{ github.event_name == 'push' || hashFiles('mod/gradlew') != '' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -29,11 +29,14 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10"
+
       - name: Build mod
-        if: hashFiles('mod/gradlew') != ''
         run: |
-          chmod +x mod/gradlew
-          (cd mod && ./gradlew build --no-daemon --stacktrace) 2>&1 | tee /tmp/mod-build.log
+          (cd mod && gradle build --no-daemon --stacktrace) 2>&1 | tee /tmp/mod-build.log
 
       - name: Upload mod jars
         if: always()

@@ -134,9 +134,13 @@ commands:
     usage: /rtpqueue [join|leave]
     permission: rumilance.user
   tier:
-    description: "Shows your auto skill tier evaluated from practice bot fights"
-    usage: "/tier"
+    description: "Shows your per-kit skill tiers from real PvP rankings"
+    usage: "/tier [bands]"
     permission: rumilance.user
+  anticheat:
+    description: "Mandate the anti-cheat client mod for specific players (OP/console)"
+    usage: "/anticheat <require|unrequire|status|list> [player]"
+    permission: rumilance.anticheat
   prac:
     description: Join or leave a practice room.
     usage: /prac <name>|leave
@@ -360,6 +364,9 @@ permissions:
     default: op
   rumilance.sign.bypass:
     description: Bypass the sign translation-key anti-cheat guard.
+    default: op
+  rumilance.anticheat:
+    description: Manage anti-cheat client mod mandates.
     default: op
   rumilance.user.def:
     description: Default original-kit plan.
