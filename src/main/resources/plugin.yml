@@ -113,6 +113,26 @@ commands:
     description: Open FFA list GUI or manage FFA arenas.
     usage: /ffa [draft|pos1|pos2|selection|spawn|deletespawn|kit|save|enable|disable|delete|reset|resettime|leave]
     permission: rumilance.user
+  tpa:
+    description: Ask a player in your FFA arena to teleport you to them (needs the arena's TPA setting).
+    usage: /tpa <player>
+    permission: rumilance.user
+  tpahere:
+    description: Ask a player in your FFA arena to teleport them to you (needs the arena's TPA setting).
+    usage: /tpahere <player>
+    permission: rumilance.user
+  tpaccept:
+    description: Accept the pending teleport request.
+    usage: /tpaccept
+    permission: rumilance.user
+  tpadeny:
+    description: Decline the pending teleport request.
+    usage: /tpadeny
+    permission: rumilance.user
+  rtpqueue:
+    description: Join/leave the random-teleport duel queue of your current FFA arena.
+    usage: /rtpqueue [join|leave]
+    permission: rumilance.user
   prac:
     description: Join or leave a practice room.
     usage: /prac <name>|leave
@@ -287,10 +307,6 @@ commands:
     description: View the combat report card for your most recent match.
     usage: /matchreport [toggle]
     permission: rumilance.user
-  walltext:
-    description: Place wall-mounted text labels (TextDisplay) on the block face in sight.
-    usage: /walltext <set|scale|remove|list|reload> ...
-    permission: rumilance.admin
   lbspawn:
     description: Place (or remove) floating leaderboards (monthly kills / annual win streak).
     usage: /lbspawn <kill|streak|remove <kill|streak|all>>

@@ -29,6 +29,8 @@ public final class AdminMenuGui extends AbstractGui {
     private java.util.function.Supplier<Boolean> packRequired = () -> false;
     private Consumer<Player> togglePackPolicy = p -> { };
     private Consumer<Player> openSignKitSelect = p -> { };
+    private Consumer<Player> openFfaSettings = p -> { };
+    private Consumer<Player> openArenaSource = p -> { };
 
     public AdminMenuGui(GuiSessionRegistry registry, SoundService sounds) {
         super(registry, sounds, GuiType.ADMIN_MENU, 6, false);
@@ -51,6 +53,16 @@ public final class AdminMenuGui extends AbstractGui {
                               Consumer<Player> togglePackPolicy) {
         this.packRequired = packRequired == null ? () -> false : packRequired;
         this.togglePackPolicy = togglePackPolicy == null ? p -> { } : togglePackPolicy;
+    }
+
+    /** Opens the per-arena FFA settings browser. */
+    public void setOpenFfaSettings(Consumer<Player> opener) {
+        this.openFfaSettings = opener == null ? p -> { } : opener;
+    }
+
+    /** Opens the arena/FFA source teleport browser. */
+    public void setOpenArenaSource(Consumer<Player> opener) {
+        this.openArenaSource = opener == null ? p -> { } : opener;
     }
 
     /** Opens the queue-sign kit picker (unlimited queue-sign supply). */
@@ -180,6 +192,30 @@ public final class AdminMenuGui extends AbstractGui {
                 .action("signkit")
                 .build());
 
+        inventory.setItem(GuiSlots.slot(2, 3), ItemBuilder.of(Material.COMPARATOR)
+                .name(t(player, "gui.admin-ffa-settings").color(NamedTextColor.RED))
+                .lore(
+                        UiTheme.divider(),
+                        UiTheme.line(line(player, "gui.admin-ffa-settings-lore-1")),
+                        UiTheme.line(line(player, "gui.admin-ffa-settings-lore-2")),
+                        UiTheme.blank(),
+                        UiTheme.hint(line(player, "menu.click"))
+                )
+                .action("ffasettings")
+                .build());
+
+        inventory.setItem(GuiSlots.slot(2, 5), ItemBuilder.of(Material.ENDER_EYE)
+                .name(t(player, "gui.admin-arena-source").color(NamedTextColor.AQUA))
+                .lore(
+                        UiTheme.divider(),
+                        UiTheme.line(line(player, "gui.admin-arena-source-lore-1")),
+                        UiTheme.line(line(player, "gui.admin-arena-source-lore-2")),
+                        UiTheme.blank(),
+                        UiTheme.hint(line(player, "menu.click"))
+                )
+                .action("arenasource")
+                .build());
+
         inventory.setItem(GuiSlots.slot(5, 4), ItemBuilder.of(Material.BARRIER)
                 .name(t(player, "menu.close").color(NamedTextColor.RED))
                 .action("close")
@@ -208,6 +244,14 @@ public final class AdminMenuGui extends AbstractGui {
             case "packpolicy" -> {
                 sounds.play(player, "gui-click");
                 togglePackPolicy.accept(player);
+            }
+            case "ffasettings" -> {
+                sounds.play(player, "gui-click");
+                openFfaSettings.accept(player);
+            }
+            case "arenasource" -> {
+                sounds.play(player, "gui-click");
+                openArenaSource.accept(player);
             }
             case "signkit" -> {
                 sounds.play(player, "gui-click");

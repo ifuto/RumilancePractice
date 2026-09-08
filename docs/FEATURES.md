@@ -105,7 +105,7 @@ Paper 1.21.11 向け Practice PvP プラグイン **N Arena**(プラグイン名
 - **試合強制操作(OP)**: `/forcematch <player1> <player2> <kit> [arena]` — 双方が戦闘可能な場合に対戦を強制開始(`[arena]` 省略時はランダム、`random` も可)。`/forceend <player>` — 対象の試合を引き分けで強制終了
 - **管理GUI**: `/practiceadmin menu` で直接開く、または `/practiceadmin tool` で配布されるネザースターを右クリック。キット/アリーナ/プリセット/eキット/看板キット/リソースパック方針などをここから管理
 - `/checkid`(プレイヤーID照合)、プレイヤーデータGUI、プレイヤー検索、`/admin` `/practiceadmin`
-- **看板保護**(看板の不正編集ガード、`/signcheck`)、`/walltext`(壁面テキスト装飾)
+- **看板保護**(看板の不正編集ガード、`/signcheck`)
 - `/rumireload`(設定リロード)、`/packpolicy`(リソパ方針をコンソールから切替)
 
 ## リソースパック

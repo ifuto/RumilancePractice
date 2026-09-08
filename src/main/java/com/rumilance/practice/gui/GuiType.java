@@ -16,6 +16,8 @@ public enum GuiType {
     EDIT_KIT,
     ORIGINAL_KIT,
     FFA_LIST,
+    FFA_SETTINGS,
+    ARENA_SOURCE,
     ARROW_EFFECT,
     KILL_EFFECT,
     ADMIN_MENU,

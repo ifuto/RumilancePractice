@@ -1,7 +1,6 @@
 package com.rumilance.practice.lobby;
 
 import com.rumilance.practice.PluginIdentity;
-import com.rumilance.practice.decor.WallTextService;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.World;
@@ -29,7 +28,6 @@ import org.bukkit.plugin.Plugin;
 public final class FloatingTextCleanup implements Listener {
 
     private final Plugin plugin;
-    private final NamespacedKey wallTextKey;
     private final NamespacedKey heartTextKey;
     private final NamespacedKey killLbKey;
     private final NamespacedKey killLbPersonalKey;
@@ -39,7 +37,6 @@ public final class FloatingTextCleanup implements Listener {
 
     private FloatingTextCleanup(Plugin plugin, long windowSeconds) {
         this.plugin = plugin;
-        this.wallTextKey = new NamespacedKey(PluginIdentity.PDC_NAMESPACE, WallTextService.MARKER);
         this.heartTextKey = new NamespacedKey(PluginIdentity.PDC_NAMESPACE, "opp-heart");
         // Leaderboard text displays (shared + per-viewer copies) must survive the sweep.
         this.killLbKey = new NamespacedKey(PluginIdentity.PDC_NAMESPACE, "kill_lb");
@@ -96,8 +93,7 @@ public final class FloatingTextCleanup implements Listener {
     private boolean isFloatingText(Entity entity) {
         if (entity instanceof TextDisplay display) {
             var pdc = display.getPersistentDataContainer();
-            if (pdc.has(wallTextKey, PersistentDataType.STRING)
-                    || pdc.has(heartTextKey, PersistentDataType.BYTE)
+            if (pdc.has(heartTextKey, PersistentDataType.BYTE)
                     || pdc.has(killLbKey, PersistentDataType.STRING)
                     || pdc.has(killLbPersonalKey, PersistentDataType.STRING)) {
                 return false;

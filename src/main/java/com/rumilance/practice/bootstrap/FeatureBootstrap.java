@@ -32,6 +32,8 @@ import com.rumilance.practice.command.DuelChatInterceptListener;
 import com.rumilance.practice.command.DuelCommand;
 import com.rumilance.practice.command.EkitAdminCommand;
 import com.rumilance.practice.command.FfaCommand;
+import com.rumilance.practice.command.FfaTpaCommand;
+import com.rumilance.practice.command.FfaRtpQueueCommand;
 import com.rumilance.practice.command.GiveItemCommand;
 import com.rumilance.practice.command.LangCommand;
 import com.rumilance.practice.command.LeaveCommand;
@@ -70,8 +72,6 @@ import com.rumilance.practice.database.repository.RankedStatsRepository;
 import com.rumilance.practice.database.repository.SettingsRepository;
 import com.rumilance.practice.database.repository.SpamDetectionRepository;
 import com.rumilance.practice.database.repository.WinStreakRepository;
-import com.rumilance.practice.decor.WallTextCommand;
-import com.rumilance.practice.decor.WallTextService;
 import com.rumilance.practice.duel.DuelLogStore;
 import com.rumilance.practice.duel.DuelRequestService;
 import com.rumilance.practice.ekit.EkitItems;
@@ -79,6 +79,8 @@ import com.rumilance.practice.elo.EloCalculator;
 import com.rumilance.practice.ffa.FfaBlockTracker;
 import com.rumilance.practice.ffa.FfaListener;
 import com.rumilance.practice.ffa.FfaService;
+import com.rumilance.practice.ffa.FfaTpaService;
+import com.rumilance.practice.ffa.FfaRtpQueueService;
 import com.rumilance.practice.guard.ItemFlowGuardListener;
 import com.rumilance.practice.ffa.FfaSpawnIndex;
 import com.rumilance.practice.gui.KitAnvilRenameService;
@@ -102,6 +104,7 @@ import com.rumilance.practice.gui.menus.EkitCopyGui;
 import com.rumilance.practice.gui.menus.EkitSelectGui;
 import com.rumilance.practice.gui.menus.EnchantGui;
 import com.rumilance.practice.gui.menus.FfaListGui;
+import com.rumilance.practice.gui.menus.ArenaSourceGui;
 import com.rumilance.practice.gui.menus.GameMenuGui;
 import com.rumilance.practice.gui.menus.KitAdminGui;
 import com.rumilance.practice.gui.menus.KitArenaSelectGui;
@@ -495,9 +498,6 @@ public final class FeatureBootstrap {
         // Knockback shaping (coefficients, Y/ping sync) is delegated to an external plugin
         // (KnockBackSync); this plugin no longer creates its own knockback profile service.
 
-        WallTextService wallTextService = new WallTextService(plugin);
-        services.register(WallTextService.class, wallTextService);
-        plugin.getServer().getPluginManager().registerEvents(wallTextService, plugin);
         com.rumilance.practice.database.repository.AnnualStreakRepository annualStreakRepository =
                 services.get(com.rumilance.practice.database.repository.AnnualStreakRepository.class);
         com.rumilance.practice.leaderboard.KillLeaderboardService killLeaderboardService =
@@ -512,36 +512,8 @@ public final class FeatureBootstrap {
         Bukkit.getScheduler().runTaskTimer(plugin, killLeaderboardService::tick, 20L, 3L);
         bind("lbspawn", new com.rumilance.practice.leaderboard.LbSpawnCommand(killLeaderboardService));
         Bukkit.getScheduler().runTask(plugin, () -> {
-            wallTextService.load();
             killLeaderboardService.load();
-            wallTextService.clearAutoLabels();
-            if (!(arenaService instanceof DisposableArenaService)) {
-                for (ArenaTemplate template : arenaStore.templates()) {
-                    wallTextService.placeAutoLabel(
-                            "auto_arena_" + template.name(), template.world(),
-                            template.minX(), template.minY(), template.minZ(),
-                            template.maxX(), template.maxY(), template.maxZ(),
-                            KitNames.pretty(template.name()) + " Arena");
-                }
-            }
-            for (FfaService.FfaArena ffaArena : ffaService.list()) {
-                Cuboid region = ffaArena.region();
-                wallTextService.placeAutoLabel(
-                        "auto_ffa_" + ffaArena.id(), region.worldName(),
-                        region.minX(), region.minY(), region.minZ(),
-                        region.maxX(), region.maxY(), region.maxZ(),
-                        KitNames.pretty(ffaArena.id()) + " FFA");
-            }
         });
-        if (arenaService instanceof DisposableArenaService disposableService) {
-            disposableService.setCopyHooks(
-                    inst -> wallTextService.placeAutoLabel(
-                            "auto_copy_" + inst.id(), inst.template().world(),
-                            inst.minX(), inst.minY(), inst.minZ(),
-                            inst.maxX(), inst.maxY(), inst.maxZ(),
-                            KitNames.pretty(inst.template().name()) + " Arena"),
-                    inst -> wallTextService.removeAutoLabel("auto_copy_" + inst.id()));
-        }
 
         StatsService statsService = new StatsService(
                 rankedStatsRepository, matchHistoryRepository, dailyRankedStatsRepository, configService);
@@ -897,6 +869,11 @@ public final class FeatureBootstrap {
 
         AdminMenuGui adminMenuGui = new AdminMenuGui(guiSessions, soundService);
         adminMenuGui.setOpenKitAdmin(kitAdminGui::open);
+        com.rumilance.practice.gui.menus.FfaSettingsGui ffaSettingsGui =
+                new com.rumilance.practice.gui.menus.FfaSettingsGui(guiSessions, soundService, ffaService);
+        ArenaSourceGui arenaSourceGui = new ArenaSourceGui(guiSessions, soundService, arenaStore, ffaService);
+        adminMenuGui.setOpenFfaSettings(ffaSettingsGui::open);
+        adminMenuGui.setOpenArenaSource(arenaSourceGui::open);
         adminMenuGui.setOpenPresetAdmin(player -> {
             presetAdminGui.setReturnTo(adminMenuGui::open);
             presetAdminGui.openAdmin(player);
@@ -1350,6 +1327,20 @@ public final class FeatureBootstrap {
             }
             return ffaService.isInFfa(id);
         };
+        com.rumilance.practice.util.LocatorBarService locatorBarService =
+                new com.rumilance.practice.util.LocatorBarService(plugin, id -> {
+                    com.rumilance.practice.session.MatchSession s = matchService.registry().byPlayer(id).orElse(null);
+                    if (s != null) {
+                        com.rumilance.practice.state.MatchState st = s.state();
+                        return st == com.rumilance.practice.state.MatchState.ACTIVE
+                                || st == com.rumilance.practice.state.MatchState.COUNTDOWN
+                                || st == com.rumilance.practice.state.MatchState.ENDING;
+                    }
+                    return ffaService.isInFfa(id) || practiceService.isInPractice(id);
+                });
+        pm.registerEvents(locatorBarService, plugin);
+        locatorBarService.start();
+        services.register(com.rumilance.practice.util.LocatorBarService.class, locatorBarService);
         pm.registerEvents(new com.rumilance.practice.combat.PaperCombatCompatListener(plugin, combatant), plugin);
         // Paper #11012/#9504: resync the hotbar when our kit/arena rules cancel a place/break.
         pm.registerEvents(new com.rumilance.practice.guard.BlockInteractionResyncListener(plugin, combatant), plugin);
@@ -1443,6 +1434,10 @@ public final class FeatureBootstrap {
         arenaKitAdmin.setPartyIconPrompt(partyIconListener::await);
         ChatBanCommand chatBanCommand = new ChatBanCommand(chatBanService, playerRepository);
         FfaCommand ffaCommand = new FfaCommand(ffaListGui, ffaService, kitService);
+        guiListener.register(ffaSettingsGui);
+        guiListener.register(arenaSourceGui);
+        ffaCommand.setOpenFfaSettings((panelPlayer, arenaId) -> ffaSettingsGui.open(panelPlayer, arenaId));
+
         PracticeAdminCommand practiceAdmin = new PracticeAdminCommand(
                 plugin, configService, soundService, matchService, lobbyService, runtimeFlags, kitService,
                 arenaStore, arenaService, ffaService);
@@ -1501,8 +1496,30 @@ public final class FeatureBootstrap {
                 services.get(com.rumilance.practice.originalkit.OriginalKitRoomService.class)));
         bind("giveitem", new GiveItemCommand());
         bind("matchreport", new MatchReportCommand(matchService, settingsService));
-        bind("walltext", new WallTextCommand(wallTextService));
         bind("ffa", ffaCommand);
+        FfaTpaService ffaTpaService = new FfaTpaService(ffaService, messageService);
+        FfaTpaCommand ffaTpaCommand = new FfaTpaCommand(ffaTpaService);
+        bind("tpa", ffaTpaCommand);
+        bind("tpahere", ffaTpaCommand);
+        bind("tpaccept", ffaTpaCommand);
+        bind("tpadeny", ffaTpaCommand);
+        FfaRtpQueueService ffaRtpQueueService = new FfaRtpQueueService(ffaService, ffaSpawnIndex, messageService);
+        FfaRtpQueueCommand ffaRtpQueueCommand = new FfaRtpQueueCommand(ffaRtpQueueService);
+        bind("rtpqueue", ffaRtpQueueCommand);
+        // Drop stale TPA requests / RTP queue entries on quit or when a player leaves an arena.
+        pm.registerEvents(new org.bukkit.event.Listener() {
+            @org.bukkit.event.EventHandler
+            public void onQuit(org.bukkit.event.player.PlayerQuitEvent event) {
+                ffaTpaService.cancelAll(event.getPlayer().getUniqueId());
+                ffaRtpQueueService.cancelAll(event.getPlayer().getUniqueId());
+            }
+        }, plugin);
+        ffaService.addLeaveListener(id -> {
+            ffaTpaService.cancelAll(id);
+            ffaRtpQueueService.cancelAll(id);
+        });
+        services.register(FfaTpaService.class, ffaTpaService);
+        services.register(FfaRtpQueueService.class, ffaRtpQueueService);
         bind("killeffect", new com.rumilance.practice.command.KillEffectCommand(killEffectGui));
         bind("leave", new LeaveCommand(matchService, messageService));
         bind("team", new TeamCommand(teamService, kitService, teamHubGui, teamsBrowserGui, messageService));

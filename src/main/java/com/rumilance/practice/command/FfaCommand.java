@@ -28,11 +28,17 @@ public final class FfaCommand implements CommandExecutor, TabCompleter {
     private final FfaListGui ffaListGui;
     private final FfaService ffaService;
     private final KitService kitService;
+    private java.util.function.BiConsumer<Player, String> openFfaSettings = (player, arenaId) -> { };
 
     public FfaCommand(FfaListGui ffaListGui, FfaService ffaService, KitService kitService) {
         this.ffaListGui = ffaListGui;
         this.ffaService = ffaService;
         this.kitService = kitService;
+    }
+
+    /** Opens the per-arena settings GUI (wired by bootstrap). */
+    public void setOpenFfaSettings(java.util.function.BiConsumer<Player, String> opener) {
+        this.openFfaSettings = opener == null ? (player, arenaId) -> { } : opener;
     }
 
     @Override
@@ -47,7 +53,7 @@ public final class FfaCommand implements CommandExecutor, TabCompleter {
 
         String sub = args[0].toLowerCase(Locale.ROOT);
         boolean admin = sender.hasPermission("rumilance.admin");
-        if (!admin && List.of("create", "selection", "spawn", "kit", "enable", "disable", "delete", "reset", "rename", "resettime", "icon")
+        if (!admin && List.of("create", "selection", "spawn", "kit", "enable", "disable", "delete", "reset", "rename", "resettime", "icon", "settings")
                 .contains(sub)) {
             sender.sendMessage(Component.text("No permission.", NamedTextColor.RED));
             return true;
@@ -81,6 +87,18 @@ public final class FfaCommand implements CommandExecutor, TabCompleter {
                     case NOT_FOUND -> "Arena not found: " + args[1];
                     case TARGET_EXISTS -> "Target name already exists: " + args[2];
                 }, r == FfaService.RenameResult.OK ? NamedTextColor.GREEN : NamedTextColor.RED));
+                yield true;
+            }
+            case "settings" -> {
+                if (!(sender instanceof Player player) || args.length < 2) {
+                    sender.sendMessage(Component.text("Usage: /ffa settings <arena>", NamedTextColor.YELLOW));
+                    yield true;
+                }
+                if (ffaService.find(args[1]).isEmpty()) {
+                    sender.sendMessage(Component.text("Arena not found: " + args[1], NamedTextColor.RED));
+                    yield true;
+                }
+                openFfaSettings.accept(player, args[1].toLowerCase(Locale.ROOT));
                 yield true;
             }
             case "selection" -> {
@@ -247,7 +265,7 @@ public final class FfaCommand implements CommandExecutor, TabCompleter {
             List<String> base = new ArrayList<>(List.of("leave"));
             if (sender.hasPermission("rumilance.admin")) {
                 base.addAll(List.of("create", "selection", "spawn", "kit", "enable", "disable",
-                        "delete", "reset", "rename", "resettime", "icon"));
+                        "delete", "reset", "rename", "resettime", "icon", "settings"));
             }
             return TabCompletions.filter(current, base);
         }

@@ -60,7 +60,9 @@ public final class FfaService {
             Location spawn,
             boolean enabled,
             int resetIntervalSeconds,
-            String iconMaterial
+            String iconMaterial,
+            boolean tpaEnabled,
+            boolean rtpQueueEnabled
     ) {
         public FfaArena {
             resetIntervalSeconds = Math.max(0, resetIntervalSeconds);
@@ -70,33 +72,57 @@ public final class FfaService {
         }
 
         public FfaArena withResetInterval(int seconds) {
-            return new FfaArena(id, kitId, world, region, spawn, enabled, Math.max(0, seconds), iconMaterial);
+            return new FfaArena(id, kitId, world, region, spawn, enabled, Math.max(0, seconds), iconMaterial,
+                    tpaEnabled, rtpQueueEnabled);
         }
 
         public FfaArena withEnabled(boolean value) {
-            return new FfaArena(id, kitId, world, region, spawn, value, resetIntervalSeconds, iconMaterial);
+            return new FfaArena(id, kitId, world, region, spawn, value, resetIntervalSeconds, iconMaterial,
+                    tpaEnabled, rtpQueueEnabled);
         }
 
         public FfaArena withKit(String kit) {
-            return new FfaArena(id, kit, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial);
+            return new FfaArena(id, kit, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
+                    tpaEnabled, rtpQueueEnabled);
         }
 
         public FfaArena withRegion(Cuboid newRegion) {
             return new FfaArena(id, kitId, newRegion.worldName(), newRegion, spawn, enabled,
-                    resetIntervalSeconds, iconMaterial);
+                    resetIntervalSeconds, iconMaterial, tpaEnabled, rtpQueueEnabled);
         }
 
         public FfaArena withSpawn(Location newSpawn) {
             return new FfaArena(id, kitId, world, region, newSpawn.clone(), enabled,
-                    resetIntervalSeconds, iconMaterial);
+                    resetIntervalSeconds, iconMaterial, tpaEnabled, rtpQueueEnabled);
         }
 
         public FfaArena withId(String newId) {
-            return new FfaArena(newId, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial);
+            return new FfaArena(newId, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
+                    tpaEnabled, rtpQueueEnabled);
+        }
+
+        public FfaArena withTpa(boolean value) {
+            return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
+                    value, rtpQueueEnabled);
+        }
+
+        public FfaArena withRtpQueue(boolean value) {
+            return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
+                    tpaEnabled, value);
+        }
+
+        /** Region size seen from above: X x Z block counts. */
+        public int sizeX() {
+            return region != null ? region.maxX() - region.minX() + 1 : 0;
+        }
+
+        public int sizeZ() {
+            return region != null ? region.maxZ() - region.minZ() + 1 : 0;
         }
 
         public FfaArena withIconMaterial(String material) {
-            return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, material);
+            return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, material,
+                    tpaEnabled, rtpQueueEnabled);
         }
     }
 
@@ -167,6 +193,9 @@ public final class FfaService {
     }
     private final Map<String, FfaArena> arenas = new ConcurrentHashMap<>();
     private final Map<UUID, String> playerArena = new ConcurrentHashMap<>();
+    /** One-shot consumer run for every player that leaves an arena (any reason). */
+    private final java.util.List<java.util.function.Consumer<UUID>> leaveListeners =
+            new java.util.concurrent.CopyOnWriteArrayList<>();
     private final Map<UUID, FfaStats> sessionStats = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> killStreaks = new ConcurrentHashMap<>();
     private final Map<UUID, CombatTag> combatUntil = new ConcurrentHashMap<>();
@@ -263,7 +292,9 @@ public final class FfaService {
                     spawn,
                     entry.getBoolean("enabled", true),
                     interval,
-                    entry.getString("icon", "IRON_SWORD")
+                    entry.getString("icon", "IRON_SWORD"),
+                    entry.getBoolean("settings.tpa", false),
+                    entry.getBoolean("settings.rtpqueue", false)
             );
             arenas.put(id, arena);
             armResetTimer(arena, false);
@@ -277,6 +308,23 @@ public final class FfaService {
     /** Live arena definitions (same contents as {@link #list()}). */
     public java.util.Collection<FfaArena> arenasView() {
         return java.util.Collections.unmodifiableCollection(arenas.values());
+    }
+
+    /** Registers a hook fired after a player is removed from their arena map entry. */
+    public void addLeaveListener(java.util.function.Consumer<UUID> listener) {
+        if (listener != null) {
+            leaveListeners.add(listener);
+        }
+    }
+
+    private void fireLeave(UUID id) {
+        for (java.util.function.Consumer<UUID> listener : leaveListeners) {
+            try {
+                listener.accept(id);
+            } catch (Throwable ignored) {
+                // listers must never break the leave path
+            }
+        }
     }
 
     /** Players currently inside any FFA arena. */
@@ -410,6 +458,7 @@ public final class FfaService {
     private void leave(Player player, boolean returnToLobby) {
         UUID id = player.getUniqueId();
         playerArena.remove(id);
+        fireLeave(id);
         sessionStats.remove(id);
         killStreaks.remove(id);
         combatUntil.remove(id);
@@ -824,7 +873,7 @@ public final class FfaService {
     }
 
     public void create(String id, Cuboid region, Location spawn, String kitId) {
-        FfaArena arena = new FfaArena(id, kitId, region.worldName(), region, spawn.clone(), false, 0, "IRON_SWORD");
+        FfaArena arena = new FfaArena(id, kitId, region.worldName(), region, spawn.clone(), false, 0, "IRON_SWORD", false, false);
         arenas.put(arena.id(), arena);
         persist(arena);
         armResetTimer(arena, false);
@@ -868,6 +917,33 @@ public final class FfaService {
         configService.ffa().set("arenas." + existing.id(), null);
         persist(renamed);
         return RenameResult.OK;
+    }
+
+    public boolean setTpaEnabled(String id, boolean value) {
+        FfaArena existing = findArena(id);
+        if (existing == null) {
+            return false;
+        }
+        FfaArena updated = existing.withTpa(value);
+        arenas.put(updated.id(), updated);
+        persist(updated);
+        return true;
+    }
+
+    public boolean setRtpQueueEnabled(String id, boolean value) {
+        FfaArena existing = findArena(id);
+        if (existing == null) {
+            return false;
+        }
+        FfaArena updated = existing.withRtpQueue(value);
+        arenas.put(updated.id(), updated);
+        persist(updated);
+        return true;
+    }
+
+    /** Arena definition lookup (lowercased id, exact). */
+    public java.util.Optional<FfaArena> find(String id) {
+        return java.util.Optional.ofNullable(findArena(id));
     }
 
     public boolean updateRegion(String id, Cuboid region) {
@@ -1172,6 +1248,8 @@ public final class FfaService {
         yaml.set(path + ".spawn.yaw", arena.spawn().getYaw());
         yaml.set(path + ".spawn.pitch", arena.spawn().getPitch());
         yaml.set(path + ".icon", arena.iconMaterial());
+        yaml.set(path + ".settings.tpa", arena.tpaEnabled());
+        yaml.set(path + ".settings.rtpqueue", arena.rtpQueueEnabled());
         configService.save(ConfigService.FFA);
     }
 }

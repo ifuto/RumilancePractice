@@ -53,15 +53,6 @@ public final class DisposableArenaService extends AbstractArenaService {
 
     /** Live pasted copies (instanceId -> instance); used for overlap checks and cleanup. */
     private final Map<UUID, ArenaInstance> liveCopies = new ConcurrentHashMap<>();
-    /** Optional hooks fired on the main thread after a copy is pasted / before it is cleared. */
-    private volatile java.util.function.Consumer<ArenaInstance> onCopyPasted;
-    private volatile java.util.function.Consumer<ArenaInstance> onCopyCleared;
-
-    public void setCopyHooks(java.util.function.Consumer<ArenaInstance> pasted,
-                             java.util.function.Consumer<ArenaInstance> cleared) {
-        this.onCopyPasted = pasted;
-        this.onCopyCleared = cleared;
-    }
 
     public DisposableArenaService(org.bukkit.plugin.Plugin plugin, FaweBridge faweBridge, File schematicRoot,
                                   int placementRange, int spacing, int centerX, int centerZ) {
@@ -150,10 +141,6 @@ public final class DisposableArenaService extends AbstractArenaService {
                         liveCopies.remove(instance.id());
                         return Optional.<ArenaInstance>empty();
                     }
-                    java.util.function.Consumer<ArenaInstance> hook = onCopyPasted;
-                    if (hook != null && plugin.isEnabled()) {
-                        Bukkit.getScheduler().runTask(plugin, () -> hook.accept(instance));
-                    }
                     return Optional.of(instance);
                 });
     }
@@ -216,10 +203,6 @@ public final class DisposableArenaService extends AbstractArenaService {
             // Not a disposable copy (in-place fallback): just release the slot.
             super.get(instanceId).ifPresent(this::markAvailable);
             return CompletableFuture.completedFuture(null);
-        }
-        java.util.function.Consumer<ArenaInstance> hook = onCopyCleared;
-        if (hook != null && plugin.isEnabled()) {
-            Bukkit.getScheduler().runTask(plugin, () -> hook.accept(instance));
         }
         World world = Bukkit.getWorld(instance.template().world());
         if (world == null || !faweBridge.isAvailable()) {
