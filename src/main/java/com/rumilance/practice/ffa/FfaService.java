@@ -217,9 +217,18 @@ public final class FfaService {
     private static final int RESTORE_BATCH_PER_TICK = 1024;
     /** Per-arena countdown deadline (millis); absent or 0 = timer inactive. */
     private final Map<String, Long> nextResetAtMillis = new ConcurrentHashMap<>();
+    /** Arena ids whose reset finished inside the coalescing window, in finish order. */
+    private final java.util.Deque<String> openAnnounceQueue = new java.util.ArrayDeque<>();
+    /** Scheduled single-shot that flushes {@link #openAnnounceQueue} (null when idle). */
+    private volatile org.bukkit.scheduler.BukkitTask openAnnounceFlush;
     /** Last observed remaining seconds, used to fire warn thresholds once each. */
     private final Map<String, Integer> lastResetRemaining = new ConcurrentHashMap<>();
     private static final int[] RESET_WARN_AT = {300, 240, 180, 120, 60, 30, 5, 4, 3, 2, 1};
+    /** Arenas whose reset deadlines fall inside this window are aligned to the same instant
+     *  and announced as one bundle (players hated the 1-2s apart duplicate spam). */
+    private static final long RESET_ALIGN_WINDOW_MILLIS = 3_000L;
+    /** Re-open announcements are held at most this long before going out individually. */
+    private static final long OPEN_ANNOUNCE_WINDOW_MILLIS = 3_000L;
     private BukkitTask combatTask;
 
     public FfaService(
@@ -1077,10 +1086,51 @@ public final class FfaService {
             nextResetAtMillis.put(arena.id(),
                     System.currentTimeMillis() + arena.resetIntervalSeconds() * 1000L);
         }
+        alignResetDeadlines();
+    }
+
+    /**
+     * Micro alignment: when several arenas' reset deadlines sit within {@link
+     * #RESET_ALIGN_WINDOW_MILLIS} of each other, pull the later ones forward to the earliest
+     * deadline so all resets and their notifications happen in one fused instant — never a
+     * staggered duplicate again. Only EARLIER shifts happen (never postpone a reset).
+     */
+    private void alignResetDeadlines() {
+        List<Long> times;
+        synchronized (nextResetAtMillis) {
+            times = new ArrayList<>(nextResetAtMillis.values());
+        }
+        if (times.size() < 2) {
+            return;
+        }
+        times.sort(Long::compareTo);
+        // Group: deadlines are "the same" when within window of the earliest in the group.
+        java.util.Map<Long, Long> aligned = new java.util.HashMap<>();
+        long groupAnchor = -1L;
+        for (Long deadline : times) {
+            if (groupAnchor >= 0 && deadline - groupAnchor <= RESET_ALIGN_WINDOW_MILLIS) {
+                aligned.put(deadline, groupAnchor);
+            } else {
+                groupAnchor = deadline;
+            }
+        }
+        if (aligned.isEmpty()) {
+            return;
+        }
+        synchronized (nextResetAtMillis) {
+            for (java.util.Map.Entry<String, Long> entry : nextResetAtMillis.entrySet()) {
+                Long target = aligned.get(entry.getValue());
+                if (target != null) {
+                    entry.setValue(target);
+                }
+            }
+        }
     }
 
     private void tickResets() {
         long now = System.currentTimeMillis();
+        // Collect all warnings crossing a threshold THIS tick, then send one bundled message.
+        java.util.Map<Integer, List<String>> bundles = new java.util.HashMap<>();
         for (FfaArena arena : arenas.values()) {
             if (arena.resetIntervalSeconds() <= 0) {
                 continue;
@@ -1099,9 +1149,32 @@ public final class FfaService {
             lastResetRemaining.put(arena.id(), remaining);
             for (int at : RESET_WARN_AT) {
                 if (prev > at && remaining <= at) {
-                    announceResetWarning(arena, at);
+                    bundles.computeIfAbsent(at, k -> new ArrayList<>()).add(arena.id());
                 }
             }
+        }
+        for (java.util.Map.Entry<Integer, List<String>> entry : bundles.entrySet()) {
+            announceResetWarningBundle(entry.getKey(), entry.getValue());
+        }
+    }
+
+    private void announceResetWarningBundle(int remainingSeconds, List<String> arenaIds) {
+        if (arenaIds == null || arenaIds.isEmpty()) {
+            return;
+        }
+        String joined = String.join(" + ", arenaIds);
+        String timeLabel = remainingSeconds >= 60 && remainingSeconds % 60 == 0
+                ? FfaResetTimes.format(remainingSeconds)
+                : remainingSeconds + (remainingSeconds == 1 ? " second" : " seconds");
+        Component message = Component.text("⚠ ", NamedTextColor.YELLOW)
+                .append(Component.text(joined + " FFA will reset in ", NamedTextColor.WHITE))
+                .append(Component.text(timeLabel + ".", NamedTextColor.YELLOW));
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            player.sendMessage(message);
+            if (stateManager.getState(player.getUniqueId()) == PlayerState.EDITING_KIT) {
+                continue;
+            }
+            soundService.play(player, "ffa-reset-warn"); // one sound per bundled group
         }
     }
 
@@ -1109,33 +1182,48 @@ public final class FfaService {
         lastResetRemaining.put(arena.id(), Integer.MAX_VALUE);
         nextResetAtMillis.put(arena.id(),
                 System.currentTimeMillis() + arena.resetIntervalSeconds() * 1000L);
+        alignResetDeadlines(); // re-glue any arena that drifted into the alignment window
         reset(arena.id(), true);
     }
 
     private void announceResetWarning(FfaArena arena, int remainingSeconds) {
-        String timeLabel = remainingSeconds >= 60 && remainingSeconds % 60 == 0
-                ? FfaResetTimes.format(remainingSeconds)
-                : remainingSeconds + (remainingSeconds == 1 ? " second" : " seconds");
-        Component message = Component.text("⚠ ", NamedTextColor.YELLOW)
-                .append(Component.text(arena.id() + " FFA will reset in ", NamedTextColor.WHITE))
-                .append(Component.text(timeLabel + ".", NamedTextColor.YELLOW));
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            player.sendMessage(message);
-            if (stateManager.getState(player.getUniqueId()) == PlayerState.EDITING_KIT) {
-                continue;
-            }
-            soundService.play(player, "ffa-reset-warn");
-        }
+        announceResetWarningBundle(remainingSeconds, List.of(arena.id()));
     }
 
     private void announceResetOpen(FfaArena arena) {
-        Component message = Component.text(arena.id() + " FFA is now open !", NamedTextColor.GREEN);
+        // Bundle arenas whose terrain restores finish within OPEN_ANNOUNCE_WINDOW so a
+        // timer cluster appears as ONE line + ONE sound instead of 2-second-apart repeats.
+        synchronized (openAnnounceQueue) {
+            if (!openAnnounceQueue.contains(arena.id())) {
+                openAnnounceQueue.addLast(arena.id());
+            }
+        }
+        if (openAnnounceFlush == null) {
+            // 2.5s hold-off: aligned restores finish within this span, so one flush covers all.
+            openAnnounceFlush = Bukkit.getScheduler().runTaskLater(plugin, this::flushResetOpens, 50L);
+        }
+    }
+
+    private void flushResetOpens() {
+        List<String> ids = new ArrayList<>();
+        synchronized (openAnnounceQueue) {
+            String id;
+            while ((id = openAnnounceQueue.pollFirst()) != null) {
+                ids.add(id);
+            }
+        }
+        openAnnounceFlush = null;
+        if (ids.isEmpty()) {
+            return;
+        }
+        Component message = Component.text(
+                String.join(" + ", ids) + " FFA is now open !", NamedTextColor.GREEN);
         for (Player player : Bukkit.getOnlinePlayers()) {
             player.sendMessage(message);
             if (stateManager.getState(player.getUniqueId()) == PlayerState.EDITING_KIT) {
                 continue;
             }
-            soundService.play(player, "ffa-open");
+            soundService.play(player, "ffa-open"); // announced once per bundle, never echoed
         }
     }
 
