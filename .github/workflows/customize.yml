@@ -1,0 +1,47 @@
+# customize.yml — Trigger.md 実行パイプライン。
+# .github/workflows/ に置くだけで有効化。
+# 発火: Trigger.md へのPush、または手動 (Actions → customize → Run workflow)。これだけ。
+# 動作: Trigger.md の「最初のコードフェンス（```〜```）の中身」を bash -euo pipefail で実行。
+#       フェンスが無い場合はファイル全体をスクリプトとして実行。
+#       出力は trigger-log アーティファクトに必ず残る。
+# 汎用性: 書き換え→Pushの2ステップで、デプロイ・一括置換・定期メンテ代替まで何でも回せる。
+
+name: customize
+
+on:
+  push:
+    paths:
+      - "Trigger.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  run-trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract trigger script from Trigger.md
+        run: |
+          awk '/^```/{ if (flag) exit; flag=1; next } flag' Trigger.md > /tmp/trigger.sh
+          if [ ! -s /tmp/trigger.sh ]; then
+            echo "no fenced block found; running whole Trigger.md as script"
+            cp Trigger.md /tmp/trigger.sh
+          fi
+          echo "===== trigger script ====="
+          cat /tmp/trigger.sh
+          echo "=========================="
+
+      - name: Execute Trigger.md
+        run: bash -euo pipefail /tmp/trigger.sh 2>&1 | tee /tmp/trigger.log
+
+      - name: Upload trigger log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trigger-log
+          path: /tmp/trigger.log
+          if-no-files-found: ignore
