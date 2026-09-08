@@ -1,0 +1,52 @@
+# build-mod.yml — 連携Mod（mod/ ディレクトリ）のGradleビルド。
+# .github/workflows/ に build.yml と並べて置くだけで有効化。
+# 発火: mod/** を含むPush、または手動 (Actions → build-mod → Run workflow)。
+# 出力: 成功時に mod-jars アーティファクト (mod/build/libs/*.jar)。
+# ※ mod/ が存在しない間は paths フィルタにより自動発火も手動も失敗しない限り走りません。
+
+name: build-mod
+
+on:
+  push:
+    paths:
+      - "mod/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-mod:
+    if: ${{ github.event_name == 'push' || hashFiles('mod/gradlew') != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Build mod
+        if: hashFiles('mod/gradlew') != ''
+        run: |
+          chmod +x mod/gradlew
+          (cd mod && ./gradlew build --no-daemon --stacktrace) 2>&1 | tee /tmp/mod-build.log
+
+      - name: Upload mod jars
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mod-jars
+          path: mod/build/libs/*.jar
+          if-no-files-found: ignore
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mod-build-log
+          path: /tmp/mod-build.log
+          if-no-files-found: ignore
