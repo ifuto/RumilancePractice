@@ -128,11 +128,11 @@ public final class TierService {
         asyncExecutor.runAsync(() -> {
             try {
                 List<RankedKitStats> rows = rankedStatsRepository.findAll();
-                Map<UUID, Standing> computed = compute(rows);
+                Computation computation = compute(rows);
                 org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
                     standings.clear();
-                    standings.putAll(computed.standings());
-                    eligibleCount = computed.eligibleCount();
+                    standings.putAll(computation.standings());
+                    eligibleCount = computation.eligibleCount();
                     refreshInFlight = false;
                 });
             } catch (Exception e) {
