@@ -1280,11 +1280,9 @@ arena-source:
   teleported: "<aqua>Teleported to the source point of <yellow><id></yellow>."
 
 tier:
-  header: "<gold>— Skill tier (real PvP) —"
-  current: "Your skill tier: "
-  rank: "<gray>Server standing: <yellow>#<rank></yellow> of <population> ranked players <gray>(top <pct>%)"
-  stats: "<gray>Best kit: <yellow><kit></yellow> — ELO <yellow><elo></yellow> — ranked matches: <yellow><matches>"
-  unranked: "<yellow>No tier yet — below the placement threshold."
-  unranked-progress: "<gray>Placement opens after <yellow><n></yellow> ranked matches total."
-  bands-title: "<gold>Tier bands (share of eligible ranked players):"
-  hint: "<gray>Tiers come from real player fights (best-kit ranked ELO). HT1 = top 0.1% — one in a thousand."
+  header: "<gold>— Skill tiers (per kit, real PvP) —"
+  kit-line: "<yellow><kit></yellow>: <tier> <gray>(#<rank> of <population>, top <pct>%)</gray> — ELO <yellow><elo></yellow>, <yellow><matches></yellow> ranked"
+  unranked: "<yellow>No kit placements yet — below the placement threshold."
+  unranked-progress: "<gray>Each kit needs <yellow><n></yellow> ranked matches to place."
+  bands-title: "<gold>Tier ladder (share of each kit’s ranked players):"
+  hint: "<gray>Tiers are per kit, from real PvP (that kit’s ranked ELO). HT1 = top 0.1% — one in a thousand."

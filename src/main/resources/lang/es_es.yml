@@ -1280,11 +1280,9 @@ arena-source:
   teleported: "<aqua>Teletransportado al punto de origen de <yellow><id></yellow>."
 
 tier:
-  header: "<gold>— Tier de habilidad (PvP real) —"
-  current: "Tu tier: "
-  rank: "<gray>Posición en el servidor: <yellow>#<rank></yellow> de <population> jugadores <gray>(top <pct>%)"
-  stats: "<gray>Mejor kit: <yellow><kit></yellow> — ELO <yellow><elo></yellow> — partidas clas.: <yellow><matches>"
-  unranked: "<yellow>Sin tier aún — por debajo del umbral de colocación."
-  unranked-progress: "<gray>La colocación se abre tras <yellow><n></yellow> partidas clasificatorias."
-  bands-title: "<gold>Bandas de tier (% de jugadores elegibles):"
-  hint: "<gray>El tier sale de combates reales (ELO clas. del mejor kit). HT1 = top 0.1% — uno entre mil."
+  header: "<gold>— Tiers de habilidad (por kit, PvP real) —"
+  kit-line: "<yellow><kit></yellow>: <tier> <gray>(n.º <rank> de <population>, top <pct>%)</gray> — ELO <yellow><elo></yellow>, <yellow><matches></yellow> clas."
+  unranked: "<yellow>Sin tier en ningún kit — por debajo del umbral."
+  unranked-progress: "<gray>Cada kit requiere <yellow><n></yellow> partidas clasificatorias."
+  bands-title: "<gold>Escalera de tiers (% de jugadores clasificados por kit):"
+  hint: "<gray>El tier es por kit y sale del PvP real (ELO clas. de ese kit). Orden: HT1>LT1>HT2>…>LT5; HT1 = top 0.1%."

@@ -1280,11 +1280,9 @@ arena-source:
   teleported: "<aqua>Téléporté au point source de <yellow><id></yellow>."
 
 tier:
-  header: "<gold>— Tier de skill (PvP réel) —"
-  current: "Votre tier : "
-  rank: "<gray>Classement serveur : <yellow>#<rank></yellow> sur <population> joueurs <gray>(top <pct>% )"
-  stats: "<gray>Meilleur kit : <yellow><kit></yellow> — ELO <yellow><elo></yellow> — matchs classés : <yellow><matches>"
-  unranked: "<yellow>Pas encore de tier — seuil de placement non atteint."
-  unranked-progress: "<gray>Le placement commence après <yellow><n></yellow> matchs classés au total."
-  bands-title: "<gold>Paliers de tier (% des joueurs éligibles) :"
-  hint: "<gray>Le tier vient des vrais combats (ELO classé du meilleur kit). HT1 = top 0,1 % — un sur mille."
+  header: "<gold>— Tiers de skill (par kit, PvP réel) —"
+  kit-line: "<yellow><kit></yellow> : <tier> <gray>(n° <rank> sur <population>, top <pct>%)</gray> — ELO <yellow><elo></yellow>, <yellow><matches></yellow> classés"
+  unranked: "<yellow>Aucun tier sur aucun kit — seuil non atteint."
+  unranked-progress: "<gray>Chaque kit requiert <yellow><n></yellow> matchs classés."
+  bands-title: "<gold>Échelle des tiers (% des joueurs classés par kit) :"
+  hint: "<gray>Le tier est par kit, issu du PvP réel (ELO classé du kit). Ordre : HT1>LT1>HT2>…>LT5 ; HT1 = top 0,1 %."

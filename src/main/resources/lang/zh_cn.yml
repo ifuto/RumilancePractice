@@ -1280,11 +1280,9 @@ arena-source:
   teleported: "<aqua>已传送到 <yellow><id></yellow> 的来源地点。"
 
 tier:
-  header: "<gold>— 技术段位（实战PvP） —"
-  current: "当前段位: "
-  rank: "<gray>服务器排名: <yellow><population>人中 #<rank></yellow> <gray>（前 <pct>%）"
-  stats: "<gray>擅长职业: <yellow><kit></yellow> — ELO <yellow><elo></yellow> — 排位场次: <yellow><matches>"
-  unranked: "<yellow>暂无段位 — 未达到定级要求。"
-  unranked-progress: "<gray>累计完成 <yellow><n></yellow> 场排位后开始定级。"
-  bands-title: "<gold>段位区间（占合格玩家的前 %）:"
-  hint: "<gray>段位由实战成绩（最佳职业排位ELO）决定。HT1 = 前 0.1%（千里挑一）。"
+  header: "<gold>— 技术段位（按职业·实战PvP） —"
+  kit-line: "<yellow><kit></yellow>: <tier> <gray>（<population>人中 #<rank>，前 <pct>%）</gray> — ELO <yellow><elo></yellow>·<yellow><matches></yellow> 场"
+  unranked: "<yellow>尚无职业段位 — 未达到定级场次。"
+  unranked-progress: "<gray>每个职业完成 <yellow><n></yellow> 场排位即可定级。"
+  bands-title: "<gold>段位阶梯（各职业排位玩家的前 %）:"
+  hint: "<gray>段位按职业计算，来自实战（该职业排位ELO）。顺序 HT1>LT1>HT2>…>LT5，HT1 = 前 0.1%。"

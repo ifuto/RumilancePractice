@@ -1280,11 +1280,9 @@ arena-source:
   teleported: "<aqua><yellow><id></yellow>의 원본 지점으로 텔레포트했습니다."
 
 tier:
-  header: "<gold>— 스킬 티어 (실전 PvP) —"
-  current: "현재 티어: "
-  rank: "<gray>서버 순위: <yellow><population>명 중 #<rank></yellow> <gray>(상위 <pct>%)"
-  stats: "<gray>주력 키트: <yellow><kit></yellow> — ELO <yellow><elo></yellow> — 랭크전: <yellow><matches>전"
-  unranked: "<yellow>아직 티어 없음 — 배치 기준 미달."
-  unranked-progress: "<gray>랭크전 합계 <yellow><n></yellow>전이 되면 배치가 시작됩니다."
-  bands-title: "<gold>티어 구간 (대상 플레이어 상위 %):"
-  hint: "<gray>티어는 실제 유저 전적(주력 키트 랭크 ELO)으로 결정됩니다. HT1 = 상위 0.1% (1000명 중 1명)."
+  header: "<gold>— 스킬 티어 (키트별, 실전 PvP) —"
+  kit-line: "<yellow><kit></yellow>: <tier> <gray>(<population>명 중 #<rank>, 상위 <pct>%)</gray> — ELO <yellow><elo></yellow>, <yellow><matches></yellow>전"
+  unranked: "<yellow>키트별 배치 없음 — 배치 기준 미달."
+  unranked-progress: "<gray>키트당 <yellow><n></yellow>전이면 배치됩니다."
+  bands-title: "<gold>티어 래더 (키트별 랭크 플레이어 상위 %):"
+  hint: "<gray>티어는 키트별로, 실전 전적(해당 키트 랭크 ELO)으로 결정됩니다. 순서는 HT1>LT1>HT2>…>LT5, HT1 = 상위 0.1%."

@@ -1282,11 +1282,9 @@ arena-source:
   teleported: "<aqua><yellow><id></yellow> のコピー元地点へテレポートしました。"
 
 tier:
-  header: "<gold>— スキル・ティア（対人戦） —"
-  current: "現在のティア: "
-  rank: "<gray>サーバー順位: <yellow><population>人中 #<rank></yellow> <gray>（上位 <pct>%）"
-  stats: "<gray>得意キット: <yellow><kit></yellow> — ELO <yellow><elo></yellow> — ランク戦: <yellow><matches>戦"
-  unranked: "<yellow>ティア未配置 — プレースメント基準未達です。"
-  unranked-progress: "<gray>ランク戦合計 <yellow><n></yellow> 戦でプレースメント開始。"
-  bands-title: "<gold>ティア区分（対象プレイヤーの上位%）:"
-  hint: "<gray>ティアは対人戦の成績（ベストキットのランクELO）で決定。HT1 = 上位0.1%（1000人に1人）。"
+  header: "<gold>— スキル・ティア（キット別・対人戦） —"
+  kit-line: "<yellow><kit></yellow>: <tier> <gray>（<population>人中 #<rank>・上位 <pct>%）</gray> — ELO <yellow><elo></yellow>・<yellow><matches></yellow> 戦"
+  unranked: "<yellow>キット別プレースメントなし — 基準戦数未達です。"
+  unranked-progress: "<gray>各キット <yellow><n></yellow> 戦でプレースメント開始。"
+  bands-title: "<gold>ティア・ラダー（各キットのランク戦プレイヤー上位%）:"
+  hint: "<gray>ティアはキット別・対人戦成績（そのキットのランクELO）で決定。順位は HT1>LT1>HT2>…>LT5、HT1 = 上位0.1%。"
