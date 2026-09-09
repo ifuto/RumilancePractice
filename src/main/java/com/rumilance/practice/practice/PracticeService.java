@@ -1428,7 +1428,7 @@ public final class PracticeService {
             return;
         }
         // Admin binding first: the dummy wears the same kit the player fights with.
-        if (applyBoundBotKit(PracticeType.MACE, eq, shieldUp, new ItemStack(Material.MACE))) {
+        if (applyBoundBotKit(PracticeType.MACE, bot, eq, shieldUp, new ItemStack(Material.MACE))) {
             return;
         }
         eq.setHelmet(new ItemStack(Material.NETHERITE_HELMET));
@@ -1439,12 +1439,7 @@ public final class PracticeService {
         // to swing the weapon the mode is about.
         eq.setItemInMainHand(new ItemStack(Material.MACE));
         eq.setItemInOffHand(shieldUp ? new ItemStack(Material.SHIELD) : null);
-        eq.setHelmetDropChance(0f);
-        eq.setChestplateDropChance(0f);
-        eq.setLeggingsDropChance(0f);
-        eq.setBootsDropChance(0f);
-        eq.setItemInMainHandDropChance(0f);
-        eq.setItemInOffHandDropChance(0f);
+        zeroDropChances(bot, eq);
     }
 
     /**
@@ -1455,8 +1450,23 @@ public final class PracticeService {
      * @return {@code true} when a bound kit was found and applied, {@code false} when the
      *         caller should fall back to the built-in mode gear.
      */
-    private boolean applyBoundBotKit(PracticeType type, EntityEquipment eq, boolean shieldUp,
-                                     ItemStack fallbackWeapon) {
+    /** Zeroes equipment drop chances — only for Mob equipment. Paper's Mannequin equipment
+     * rejects drop chances (CraftBukkit: "Cannot set drop chance for non-Mob entity"), and a
+     * Mannequin never drops gear anyway. */
+    private static void zeroDropChances(LivingEntity owner, EntityEquipment eq) {
+        if (!(owner instanceof org.bukkit.entity.Mob)) {
+            return;
+        }
+        eq.setHelmetDropChance(0f);
+        eq.setChestplateDropChance(0f);
+        eq.setLeggingsDropChance(0f);
+        eq.setBootsDropChance(0f);
+        eq.setItemInMainHandDropChance(0f);
+        eq.setItemInOffHandDropChance(0f);
+    }
+
+    private boolean applyBoundBotKit(PracticeType type, LivingEntity owner, EntityEquipment eq,
+                                     boolean shieldUp, ItemStack fallbackWeapon) {
         if (eq == null || kitService == null) {
             return false;
         }
@@ -1485,12 +1495,7 @@ public final class PracticeService {
         } else {
             eq.setItemInOffHand(shieldUp ? new ItemStack(Material.SHIELD) : null);
         }
-        eq.setHelmetDropChance(0f);
-        eq.setChestplateDropChance(0f);
-        eq.setLeggingsDropChance(0f);
-        eq.setBootsDropChance(0f);
-        eq.setItemInMainHandDropChance(0f);
-        eq.setItemInOffHandDropChance(0f);
+        zeroDropChances(owner, eq);
         return true;
     }
 
@@ -2025,7 +2030,7 @@ public final class PracticeService {
             case CART -> new ItemStack(Material.BOW);
             default -> new ItemStack(Material.END_CRYSTAL);
         };
-        if (applyBoundBotKit(type, eq, shieldUp, fallbackWeapon)) {
+        if (applyBoundBotKit(type, bot, eq, shieldUp, fallbackWeapon)) {
             return;
         }
         eq.setHelmet(new ItemStack(Material.NETHERITE_HELMET));
@@ -2050,12 +2055,7 @@ public final class PracticeService {
                 eq.setItemInOffHand(new ItemStack(Material.TOTEM_OF_UNDYING));
             }
         }
-        eq.setHelmetDropChance(0f);
-        eq.setChestplateDropChance(0f);
-        eq.setLeggingsDropChance(0f);
-        eq.setBootsDropChance(0f);
-        eq.setItemInMainHandDropChance(0f);
-        eq.setItemInOffHandDropChance(0f);
+        zeroDropChances(bot, eq);
     }
 
     private void removeCombatBot(PracticeSession session) {

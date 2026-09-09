@@ -94,10 +94,10 @@ public final class FaweBridgeImpl implements FaweBridge {
                 }
 
                 Files.createDirectories(outputFile.toAbsolutePath().getParent());
-                ClipboardFormat format = ClipboardFormats.findByFile(outputFile.toFile());
-                if (format == null) {
-                    format = BuiltInClipboardFormat.SPONGE_V3_SCHEMATIC;
-                }
+                // Never probe a brand-new file for its format: findByFile opens the file and
+                // throws NoSuchFileException when it doesn't exist yet (exactly our case —
+                // fresh room snapshots). Every schematic we write is Sponge v3 (.schem).
+                ClipboardFormat format = BuiltInClipboardFormat.SPONGE_V3_SCHEMATIC;
                 try (ClipboardWriter writer = format.getWriter(new FileOutputStream(outputFile.toFile()))) {
                     writer.write(clipboard);
                 }
