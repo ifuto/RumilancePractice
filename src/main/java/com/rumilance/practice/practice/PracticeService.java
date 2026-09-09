@@ -1453,7 +1453,7 @@ public final class PracticeService {
     /** Zeroes equipment drop chances — only for Mob equipment. Paper's Mannequin equipment
      * rejects drop chances (CraftBukkit: "Cannot set drop chance for non-Mob entity"), and a
      * Mannequin never drops gear anyway. */
-    private static void zeroDropChances(LivingEntity owner, EntityEquipment eq) {
+    private static void zeroDropChances(org.bukkit.entity.LivingEntity owner, EntityEquipment eq) {
         if (!(owner instanceof org.bukkit.entity.Mob)) {
             return;
         }
@@ -1465,8 +1465,8 @@ public final class PracticeService {
         eq.setItemInOffHandDropChance(0f);
     }
 
-    private boolean applyBoundBotKit(PracticeType type, LivingEntity owner, EntityEquipment eq,
-                                     boolean shieldUp, ItemStack fallbackWeapon) {
+    private boolean applyBoundBotKit(PracticeType type, org.bukkit.entity.LivingEntity owner,
+                                     EntityEquipment eq, boolean shieldUp, ItemStack fallbackWeapon) {
         if (eq == null || kitService == null) {
             return false;
         }
