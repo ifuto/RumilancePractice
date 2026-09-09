@@ -210,6 +210,135 @@ public final class PracticeService {
     }
 
     /** Toggleable disruption kinds (Quantum options/toggles — default OFF). */
+    // ---- item-bounded bot abilities ("もってるアイテムだけ使う": botgear/neth stocks) ----
+
+    /** Re-stocks the session bot from the Quantum botgear/neth hotbars (per-type). Called on
+     * every spawn/reset — after this, chaos moves/potions/rails can ONLY fire while stock lasts. */
+    private void stockBotInventory(PracticeSession session, PracticeType type) {
+        if (session == null || type == null) {
+            return;
+        }
+        java.util.Map<Material, Integer> stock = session.botStock();
+        stock.clear();
+        switch (type) {
+            case SWORD -> {
+                stock.put(Material.COBWEB, 64);
+                stock.put(Material.LAVA_BUCKET, 8);
+                stock.put(Material.NETHERITE_AXE, 1);
+                stock.put(Material.WATER_BUCKET, 1);
+                stock.put(Material.ENDER_PEARL, 16);
+            }
+            case NETHERITE_POT -> {
+                stock.put(Material.COBWEB, 64);
+                stock.put(Material.LAVA_BUCKET, 8);
+                stock.put(Material.NETHERITE_AXE, 1);
+                stock.put(Material.WATER_BUCKET, 1);
+                stock.put(Material.ENDER_PEARL, 16);
+                stock.put(Material.SPLASH_POTION, 99);
+            }
+            case CRYSTAL -> {
+                stock.put(Material.END_CRYSTAL, 64);
+                stock.put(Material.OBSIDIAN, 64);
+                stock.put(Material.RESPAWN_ANCHOR, 16);
+                stock.put(Material.GLOWSTONE, 64);
+                stock.put(Material.WATER_BUCKET, 1);
+                stock.put(Material.ENDER_PEARL, 16);
+            }
+            case CART -> {
+                stock.put(Material.POWERED_RAIL, 99);
+                stock.put(Material.TNT_MINECART, 99);
+                stock.put(Material.OAK_LOG, 64);
+            }
+            case MACE -> {
+                stock.put(Material.WIND_CHARGE, 99);
+                stock.put(Material.ENDER_PEARL, 32);
+                stock.put(Material.WATER_BUCKET, 1);
+            }
+            default -> { }
+        }
+    }
+
+    /** Stock check for reusable tools (axe/bucket): presence only, not consumed. */
+    private static boolean botHas(PracticeSession session, Material material) {
+        Integer left = session.botStock().get(material);
+        return left != null && left > 0;
+    }
+
+    /** World adapter for the A* engine: stand = solid floor + two free blocks of headroom. */
+    private static BotPathFinder.Passable botWorldGrid(org.bukkit.World world) {
+        return (x, y, z) -> {
+            org.bukkit.block.Block feet = world.getBlockAt(x, y, z);
+            org.bukkit.block.Block head = world.getBlockAt(x, y + 1, z);
+            org.bukkit.block.Block floor = world.getBlockAt(x, y - 1, z);
+            return !feet.getType().isOccluding() && !head.getType().isOccluding()
+                    && floor.getType().isSolid();
+        };
+    }
+
+    private static final long BOT_PATH_REFRESH_MS = 600L;
+
+    /**
+     * Direction to follow the current A* path toward the target (herobot-style steering):
+     * recomputes at most every 600ms or when the goal moved 2+ blocks; returns {@code null}
+     * when pathing is exhausted/unavailable so the caller falls back to direct chasing.
+     * Jump-up waypoints get the vanilla hop velocity baked into the returned vector's Y.
+     */
+    private org.bukkit.util.Vector botPathDirection(PracticeSession session, Mannequin bot,
+                                                    Location target, long now) {
+        if (session == null || bot == null || target == null || target.getWorld() == null) {
+            return null;
+        }
+        org.bukkit.World world = target.getWorld();
+        Location bLoc = bot.getLocation();
+        int gx = target.getBlockX();
+        int gy = target.getBlockY();
+        int gz = target.getBlockZ();
+        int[] last = session.botPathLastGoal();
+        boolean goalStale = !session.botPathGoalSet()
+                || Math.abs(last[0] - gx) + Math.abs(last[1] - gy) + Math.abs(last[2] - gz) >= 2;
+        if (now >= session.botPathRefreshMs() || goalStale) {
+            session.setBotPathRefreshMs(now + BOT_PATH_REFRESH_MS);
+            last[0] = gx;
+            last[1] = gy;
+            last[2] = gz;
+            session.setBotPathGoalSet(true);
+            session.setBotPath(BotPathFinder.find(botWorldGrid(world),
+                    new BotPathFinder.Node(bLoc.getBlockX(), bLoc.getBlockY(), bLoc.getBlockZ()),
+                    new BotPathFinder.Node(gx, gy, gz), 700));
+        }
+        java.util.List<BotPathFinder.Node> path = session.botPath();
+        int idx = session.botPathIndex();
+        while (idx < path.size()) {
+            BotPathFinder.Node n = path.get(idx);
+            double dx = n.x() + 0.5d - bLoc.getX();
+            double dz = n.z() + 0.5d - bLoc.getZ();
+            double dyy = n.y() - bLoc.getY();
+            if (dx * dx + dz * dz < 0.3d * 0.3d && Math.abs(dyy) < 1.6d) {
+                idx++;
+            } else {
+                break;
+            }
+        }
+        if (idx >= path.size()) {
+            session.setBotPathIndex(idx);
+            return null;
+        }
+        session.setBotPathIndex(idx);
+        BotPathFinder.Node n = path.get(idx);
+        org.bukkit.util.Vector toward = new org.bukkit.util.Vector(
+                n.x() + 0.5d - bLoc.getX(), 0, n.z() + 0.5d - bLoc.getZ());
+        if (toward.lengthSquared() < 1.0e-6) {
+            return null;
+        }
+        toward.normalize();
+        if (n.y() > bLoc.getBlockY() && bot.isOnGround()) {
+            toward.setY(0.45d); // hop the 1-block step the path says to climb
+        } else {
+            toward.setY(bot.getVelocity().getY());
+        }
+        return toward;
+    }
+
     public static final java.util.Set<String> DISRUPTION_KINDS = java.util.Set.of("cobweb", "lava");
 
     /** Whether a disruption kind is enabled for a practice type (default OFF). */
@@ -1485,6 +1614,7 @@ public final class PracticeService {
             m.setHealth(maxHp);
             equipMaceBot(m, session.botShieldRaised());
         });
+        stockBotInventory(session, PracticeType.MACE);
         session.setMaceBot(bot);
         session.setBotHome(botLoc.clone());
         long now = System.currentTimeMillis();
@@ -1732,7 +1862,7 @@ public final class PracticeService {
             // 2) WIND CHARGE (HARD and up): blast itself skyward and smash on the way down.
             if (grounded && flat >= MACE_WIND_MIN_RANGE && now >= session.botNextWindMs()
                     && diff.preset().ordinal() >= BotDifficulty.Preset.HARD.ordinal()) {
-                launchMaceWindCharge(bot);
+                launchMaceWindCharge(session, bot);
                 session.setBotNextWindMs(now + MACE_WIND_COOLDOWN_MS
                         + java.util.concurrent.ThreadLocalRandom.current().nextInt(1200));
                 return;
@@ -1742,7 +1872,7 @@ public final class PracticeService {
             //     plus a forward shove, so the bot sails over the gap into a big smash.
             if (grounded && flat >= 4.5d && dist <= 9.0d && now >= maceAb.nextWindPearlMs()
                     && diff.preset().ordinal() >= BotDifficulty.Preset.HARD.ordinal()) {
-                launchMaceWindCharge(bot);
+                launchMaceWindCharge(session, bot);
                 bot.setVelocity(new Vector(dx / flat * 0.55d, 0.35d, dz / flat * 0.55d));
                 maceAb.nextWindPearlMs(now + WIND_PEARL_COOLDOWN_MS);
                 return;
@@ -1752,7 +1882,7 @@ public final class PracticeService {
                     && now >= maceAb.nextFarPearlMs() && diff.attackDamage() > 0.0d && flat > 0.0001) {
                 Vector toward = new Vector(dx / flat, 0, dz / flat);
                 Location landing = findPearlLanding(session, botLoc, toward, dist - 2.5d);
-                if (landing != null) {
+                if (landing != null && session.botConsume(Material.ENDER_PEARL, 1)) {
                     maceAb.nextFarPearlMs(now + FAR_PEARL_COOLDOWN_MS);
                     pearlTeleportFx(bot, landing);
                     return;
@@ -1792,6 +1922,18 @@ public final class PracticeService {
             //    and step up one-block ledges instead of grinding into them.
             if (grounded && flat > 0.0001) {
                 Vector dir = new Vector(dx / flat, 0, dz / flat);
+                // herobot-style steering: follow the A* path when it exists (obstacle escape),
+                // hop one-block steps the path calls for.
+                org.bukkit.util.Vector pathDir = (dist > 4.0d && !session.botShieldRaised())
+                        ? botPathDirection(session, bot, player.getLocation(), now) : null;
+                boolean pathHop = false;
+                if (pathDir != null) {
+                    pathHop = pathDir.getY() > 0.4d;
+                    org.bukkit.util.Vector pd = pathDir.clone().setY(0);
+                    if (pd.lengthSquared() > 0.0001) {
+                        dir = pd.normalize();
+                    }
+                }
                 Location ahead = botLoc.clone().add(dir.clone().multiply(0.9d));
                 boolean ledge = ahead.getBlock().getType().isSolid()
                         && ahead.getBlock().getRelative(0, 1, 0).getType().isAir();
@@ -1807,7 +1949,7 @@ public final class PracticeService {
                 Vector side = new Vector(-dir.getZ(), 0, dir.getX())
                         .multiply(diff.moveSpeed() * 0.5d * session.botStrafeDir());
                 bot.setVelocity(dir.multiply(speed).add(side).setY(bot.getVelocity().getY()));
-                if (ledge) {
+                if (ledge || pathHop) {
                     bot.setVelocity(bot.getVelocity().setY(0.45d));
                 }
             }
@@ -1829,7 +1971,10 @@ public final class PracticeService {
      * the burst upward, trading the height for a bigger smash on the way down. Wind charges deal
      * no damage and break no blocks, so the burst only moves entities.
      */
-    private void launchMaceWindCharge(Mannequin bot) {
+    private void launchMaceWindCharge(PracticeSession session, Mannequin bot) {
+        if (session != null && !session.botConsume(Material.WIND_CHARGE, 1)) {
+            return; // no wind charges left in this bot's stock
+        }
         World world = bot.getWorld();
         if (world == null) {
             return;
@@ -2085,6 +2230,7 @@ public final class PracticeService {
             m.setHealth(maxHp);
             equipCombatBot(m, type, session.botShieldRaised());
         });
+        stockBotInventory(session, type);
         session.setCombatBot(bot);
         session.setBotHome(botLoc.clone());
         session.setBotNextAttackMs(System.currentTimeMillis() + 2000L);
@@ -2260,6 +2406,16 @@ public final class PracticeService {
             }
             if (distSq > 2.2d * 2.2d) {
                 Vector dir = to.setY(0);
+                // herobot steering: prefer an A* path (wall/ledge escapes) over straight line.
+                org.bukkit.util.Vector pathDir = (!blocking && dist > 4.0d)
+                        ? botPathDirection(session, bot, player.getLocation(), now) : null;
+                boolean pathHop = pathDir != null && pathDir.getY() > 0.4d;
+                if (pathDir != null) {
+                    org.bukkit.util.Vector pd = pathDir.clone().setY(0);
+                    if (pd.lengthSquared() > 0.0001) {
+                        dir = pd.normalize();
+                    }
+                }
                 if (dir.lengthSquared() > 0.0001) {
                     dir.normalize();
                     // Strafe flips every 1.5-3s, mixing orbits into the approach.
@@ -2275,7 +2431,7 @@ public final class PracticeService {
                     // one-block lip ahead — hop over it instead of grinding.
                     if (bot.isOnGround() && !blocking) {
                         Vector vel = bot.getVelocity();
-                        if (vel.getX() * vel.getX() + vel.getZ() * vel.getZ() < 0.05d * 0.05d) {
+                        if (pathHop || vel.getX() * vel.getX() + vel.getZ() * vel.getZ() < 0.05d * 0.05d) {
                             move.setY(0.42d);
                         }
                     }
@@ -2328,6 +2484,9 @@ public final class PracticeService {
     private void tickNethPotPotions(Player player, PracticeSession session, Mannequin bot, long now) {
         if (now < session.botPotionUntilMs()) {
             return;
+        }
+        if (!session.botConsume(Material.SPLASH_POTION, 1)) {
+            return; // out of potions — no phantom healing/harming
         }
         BotDifficulty diff = session.difficulty();
         PracticeSession.BotAbilityState ab = session.abilities();
@@ -2407,7 +2566,7 @@ public final class PracticeService {
             session.setBotNextAttackMs(now + Math.max(700L, diff.attackIntervalMs() * 2L) + jitter);
         }
         // Rolling TNT "cart" every combo cooldown (on a rail, like the map's cart tracks).
-        if (now >= session.botNextCartMs()) {
+        if (now >= session.botNextCartMs() && session.botConsume(Material.TNT_MINECART, 1)) {
             org.bukkit.entity.TNTPrimed tnt = bot.getWorld().spawn(
                     botLoc.add(0, 1.1, 0), org.bukkit.entity.TNTPrimed.class, t -> {
                         t.setFuseTicks(26);
@@ -2417,8 +2576,10 @@ public final class PracticeService {
             tnt.setVelocity(dir.clone().normalize().multiply(0.85d).setY(0.18d));
             session.botTnt().add(tnt.getUniqueId());
             session.setBotNextCartMs(now + diff.comboCooldownMs());
-            placeTrackedBlock(session, tnt.getLocation().getBlock(),
-                    Material.POWERED_RAIL, CART_RAIL_TTL_MS);
+            if (session.botConsume(Material.POWERED_RAIL, 1)) {
+                placeTrackedBlock(session, tnt.getLocation().getBlock(),
+                        Material.POWERED_RAIL, CART_RAIL_TTL_MS);
+            }
         }
         // Defensive oak-log block when the player is on top of it (map: cart/defenseplace).
         if (dist < 3.5d && bot.getHealth() < diff.botMaxHp() * 0.6d
@@ -2512,6 +2673,9 @@ public final class PracticeService {
             return;
         }
         Location loc = bot.getLocation();
+        if (!botHas(session, Material.WATER_BUCKET)) {
+            return;
+        }
         if (bot.getFireTicks() > 0) {
             bot.setFireTicks(0);
             placeTrackedBlock(session, loc.getBlock(), Material.WATER, WATER_TTL_MS);
@@ -2567,6 +2731,9 @@ public final class PracticeService {
             return false;
         }
         ab.nextPearlMs(now + ESCAPE_PEARL_COOLDOWN_MS);
+        if (!session.botConsume(Material.ENDER_PEARL, 1)) {
+            return false;
+        }
         pearlTeleportFx(bot, landing);
         return true;
     }
@@ -2642,8 +2809,9 @@ public final class PracticeService {
         // Cobweb at the player's feet — Quantum toggle, OFF unless the admin enabled it.
         if (disruptionEnabled(type, "cobweb")
                 && now >= ab.nextCobwebMs() && dist <= 4.0d && !inCobweb(player.getLocation())) {
-            if (placeTrackedBlock(session, player.getLocation().getBlock(),
-                    Material.COBWEB, COBWEB_TTL_MS)) {
+            if (session.botConsume(Material.COBWEB, 1)
+                    && placeTrackedBlock(session, player.getLocation().getBlock(),
+                            Material.COBWEB, COBWEB_TTL_MS)) {
                 bot.swingMainHand();
                 if (bot.getWorld() != null) {
                     bot.getWorld().playSound(player.getLocation(),
@@ -2654,7 +2822,7 @@ public final class PracticeService {
         }
         // Lava bucket dropped where an airborne player comes down (fire-immune targets are
         // not worth the bucket, same as the map's predicate check).
-        // Lava punish — Quantum toggle, OFF unless the admin enabled it.
+        // Lava punish (stocked bucket) — Quantum toggle, OFF unless the admin enabled it.
         if (disruptionEnabled(type, "lava")
                 && now >= ab.nextLavaMs() && dist <= 6.5d && isAirborne(player)
                 && !player.isInWater()
@@ -2665,8 +2833,9 @@ public final class PracticeService {
                 if (!column.getType().isSolid()) {
                     continue;
                 }
-                if (placeTrackedBlock(session, column.getRelative(org.bukkit.block.BlockFace.UP),
-                        Material.LAVA, LAVA_TTL_MS)) {
+                if (session.botConsume(Material.LAVA_BUCKET, 1)
+                        && placeTrackedBlock(session, column.getRelative(
+                                org.bukkit.block.BlockFace.UP), Material.LAVA, LAVA_TTL_MS)) {
                     if (bot.getWorld() != null) {
                         bot.getWorld().playSound(player.getLocation(),
                                 Sound.ITEM_BUCKET_EMPTY_LAVA, 1.0f, 1.0f);
@@ -2679,7 +2848,7 @@ public final class PracticeService {
         // Axe swing that disables the player's raised shield (vanilla shield-cooldown trick).
         if ((type == PracticeType.SWORD || type == PracticeType.NETHERITE_POT)
                 && now >= ab.nextAxeMs() && dist <= diff.reachBlocks() + 1.0d
-                && player.isBlocking()) {
+                && player.isBlocking() && botHas(session, Material.NETHERITE_AXE)) {
             ab.nextAxeMs(now + AXE_COOLDOWN_MS);
             EntityEquipment eq = bot.getEquipment();
             if (eq != null) {
@@ -2778,6 +2947,10 @@ public final class PracticeService {
         if (spot == null) {
             return false;
         }
+        if (!session.botConsume(Material.RESPAWN_ANCHOR, 1)
+                || !session.botConsume(Material.GLOWSTONE, 4)) {
+            return false;
+        }
         org.bukkit.block.data.type.RespawnAnchor data =
                 (org.bukkit.block.data.type.RespawnAnchor)
                         Material.RESPAWN_ANCHOR.createBlockData();
@@ -2811,6 +2984,9 @@ public final class PracticeService {
                                   Material type, long now) {
         PracticeSession.BotAbilityState ab = session.abilities();
         if (dirFlat.lengthSquared() < 0.0001) {
+            return;
+        }
+        if (!session.botConsume(type, 2)) {
             return;
         }
         Vector toward = dirFlat.clone().setY(0).normalize();
@@ -2961,6 +3137,10 @@ public final class PracticeService {
      * immune to the blasts of the crystals it placed itself.
      */
     private boolean launchCrystalAttack(Player player, PracticeSession session) {
+        if (!session.botConsume(Material.OBSIDIAN, 1)
+                || !session.botConsume(Material.END_CRYSTAL, 1)) {
+            return false;
+        }
         org.bukkit.block.Block foot = player.getLocation().getBlock();
         int[] dx = {1, -1, 0, 0};
         int[] dz = {0, 0, 1, -1};

@@ -54,6 +54,16 @@ public final class PracticeSession {
     private final java.util.Map<org.bukkit.block.Block, BotBlock> botPlacedBlocks = new java.util.LinkedHashMap<>();
     /** Cooldowns / counters for the Quantum-parity combat abilities. */
     private final BotAbilityState abilities = new BotAbilityState();
+    /** Quantum parity ("もってるアイテムだけ使う"): every special item the bot may use is a
+     * COUNTED stock restocked on spawn — no phantom webs/lava/potions/rails appear anymore. */
+    private final java.util.Map<org.bukkit.Material, Integer> botStock =
+            new java.util.EnumMap<>(org.bukkit.Material.class);
+    /** Current A* waypoints followed by the bot (from {@link BotPathFinder}). */
+    private transient java.util.List<BotPathFinder.Node> botPath = java.util.List.of();
+    private transient int botPathIndex;
+    private transient long botPathRefreshMs;
+    private transient final int[] botPathLastGoal = new int[3];
+    private transient boolean botPathGoalSet;
 
     /** A block a bot placed mid-fight: after {@code ttlMs} it is reverted to AIR. */
     public record BotBlock(org.bukkit.Material type, long atMs, long ttlMs) {
@@ -358,6 +368,66 @@ public final class PracticeSession {
 
     public BotAbilityState abilities() {
         return abilities;
+    }
+
+    // ---- item-bounded abilities & path state ----
+
+    public java.util.Map<org.bukkit.Material, Integer> botStock() {
+        return botStock;
+    }
+
+    /** Consumes {@code count} of {@code material} from the bot's stock; false when out. */
+    public boolean botConsume(org.bukkit.Material material, int count) {
+        if (material == null || count <= 0) {
+            return false;
+        }
+        Integer left = botStock.get(material);
+        if (left == null || left < count) {
+            return false;
+        }
+        if (left == count) {
+            botStock.remove(material);
+        } else {
+            botStock.put(material, left - count);
+        }
+        return true;
+    }
+
+    public java.util.List<BotPathFinder.Node> botPath() {
+        return botPath;
+    }
+
+    public void setBotPath(java.util.List<BotPathFinder.Node> path) {
+        this.botPath = path == null ? java.util.List.of() : path;
+        this.botPathIndex = 0;
+    }
+
+    public int botPathIndex() {
+        return botPathIndex;
+    }
+
+    public void setBotPathIndex(int botPathIndex) {
+        this.botPathIndex = botPathIndex;
+    }
+
+    public long botPathRefreshMs() {
+        return botPathRefreshMs;
+    }
+
+    public void setBotPathRefreshMs(long botPathRefreshMs) {
+        this.botPathRefreshMs = botPathRefreshMs;
+    }
+
+    public int[] botPathLastGoal() {
+        return botPathLastGoal;
+    }
+
+    public boolean botPathGoalSet() {
+        return botPathGoalSet;
+    }
+
+    public void setBotPathGoalSet(boolean botPathGoalSet) {
+        this.botPathGoalSet = botPathGoalSet;
     }
 
     public long botRetreatUntilMs() {
