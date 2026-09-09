@@ -764,6 +764,8 @@ gui:
   start-effects-duration: "Duration: <secs>s (splash)"
   start-effects-remove: "Click to remove"
   preset-admin-title: "Preset candidates"
+  preset-admin-kits-hint: "Pick the kit whose preset pool you want to edit (presets are per-kit)"
+  preset-admin-global: "All kits (global fallback pool)"
   preset-admin-cat: "Preset: <cat> (<page>/<pages>)"
   preset-admin-back: "Back to categories"
   preset-admin-free: "Free placement"

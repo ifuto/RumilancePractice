@@ -764,6 +764,8 @@ gui:
   start-effects-duration: "Duration: <secs>s (splash)"
   start-effects-remove: "Click to remove"
   preset-admin-title: "Preset candidates"
+  preset-admin-kits-hint: "편집할 프리셋의 킷을 선택하세요 (프리셋은 킷별)"
+  preset-admin-global: "전체 킷 공통 (글로벌 기본 풀)"
   preset-admin-cat: "Preset: <cat> (<page>/<pages>)"
   preset-admin-back: "Back to categories"
   preset-admin-free: "Free placement"

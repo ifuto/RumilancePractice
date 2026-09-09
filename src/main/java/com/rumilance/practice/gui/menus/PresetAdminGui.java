@@ -10,6 +10,7 @@ import com.rumilance.practice.gui.GuiType;
 import com.rumilance.practice.gui.ItemBuilder;
 import com.rumilance.practice.gui.MenuScaffold;
 import com.rumilance.practice.gui.UiTheme;
+import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.kit.PresetItems;
 import com.rumilance.practice.sound.SoundService;
 import net.kyori.adventure.text.Component;
@@ -34,6 +35,9 @@ public final class PresetAdminGui extends AbstractGui implements FreeInventoryEd
     private static final String VIEW = "preset_admin_view";
     private static final String CAT = "preset_admin_cat";
     private static final String PAGE = "preset_admin_page";
+    private static final String KIT = "preset_admin_kit";
+    /** Sentinel: edits go to the global fallback pool instead of one kit. */
+    private static final String GLOBAL_KIT = "@global";
     private static final int BACK_SLOT = 36;
     private static final int PREV_SLOT = 37;
     private static final int PAGE_SLOT = 39;
@@ -43,11 +47,20 @@ public final class PresetAdminGui extends AbstractGui implements FreeInventoryEd
     private static final int CLOSE_SLOT = 44;
 
     private final PresetItems presetItems;
+    private final KitService kitService;
     private Consumer<Player> returnTo = p -> { };
 
-    public PresetAdminGui(GuiSessionRegistry registry, SoundService sounds, PresetItems presetItems) {
+    public PresetAdminGui(GuiSessionRegistry registry, SoundService sounds, PresetItems presetItems,
+                          KitService kitService) {
         super(registry, sounds, GuiType.PRESET_ADMIN, 5, false);
         this.presetItems = presetItems;
+        this.kitService = kitService;
+    }
+
+    /** Kit whose preset pool this session edits, or {@code null} for the global fallback. */
+    private static String kitIdOf(GuiSession session) {
+        String kit = session == null ? null : session.get(KIT, String.class);
+        return (kit == null || kit.isBlank() || GLOBAL_KIT.equals(kit)) ? null : kit;
     }
 
     public void setReturnTo(Consumer<Player> returnTo) {
@@ -56,7 +69,7 @@ public final class PresetAdminGui extends AbstractGui implements FreeInventoryEd
 
     public void openAdmin(Player player) {
         GuiSession session = registry.open(player.getUniqueId(), type(), rows);
-        session.put(VIEW, "categories");
+        session.put(VIEW, "kits");
         PracticeGuiOpen.open(this, player, session);
         sounds.play(player, "gui-open");
     }
@@ -97,13 +110,19 @@ public final class PresetAdminGui extends AbstractGui implements FreeInventoryEd
     }
 
     /** Highest page index holding at least one entry, or -1 when the category is empty. */
-    private int lastContentPage(String category) {
+    private int lastContentPage(GuiSession session, String category) {
         if (category == null) {
             return -1;
         }
-        Map<Integer, String> slots = presetItems.slots(category);
+        Map<Integer, String> slots = contentSlots(session, category);
         int maxSlot = slots.keySet().stream().mapToInt(Integer::intValue).max().orElse(-1);
         return maxSlot < 0 ? -1 : maxSlot / PresetItems.SLOTS_PER_PAGE;
+    }
+
+    /** Slot map for the session's kit (global fallback when no kit / @global chosen). */
+    private Map<Integer, String> contentSlots(GuiSession session, String category) {
+        String kitId = kitIdOf(session);
+        return kitId == null ? presetItems.slots(category) : presetItems.slots(kitId, category);
     }
 
     /**
@@ -116,13 +135,13 @@ public final class PresetAdminGui extends AbstractGui implements FreeInventoryEd
         if (page >= PresetItems.MAX_PAGES - 1) {
             return false;
         }
-        int last = lastContentPage(session.get(CAT, String.class));
+        int last = lastContentPage(session, session.get(CAT, String.class));
         return page <= last;
     }
 
     private int effectivePages(GuiSession session) {
         int page = pageOf(session);
-        int last = lastContentPage(session.get(CAT, String.class));
+        int last = lastContentPage(session, session.get(CAT, String.class));
         return Math.min(PresetItems.MAX_PAGES, Math.max(page + 1, last + 1));
     }
 
@@ -130,9 +149,40 @@ public final class PresetAdminGui extends AbstractGui implements FreeInventoryEd
     protected void render(Player player, GuiSession session, Inventory inventory) {
         if ("chest".equals(session.get(VIEW, String.class))) {
             renderChest(player, session, inventory);
-        } else {
+        } else if ("categories".equals(session.get(VIEW, String.class))) {
             renderCategories(player, inventory);
+        } else {
+            renderKits(player, inventory);
         }
+    }
+
+    /** First screen: pick WHICH kit's preset pool to edit (global fallback included). */
+    private void renderKits(Player player, Inventory inventory) {
+        com.rumilance.practice.gui.GuiFrame.frame(inventory, theme());
+        List<com.rumilance.practice.model.KitDefinition> kits =
+                kitService == null ? List.of() : kitService.all().stream()
+                        .filter(com.rumilance.practice.model.KitDefinition::presetEnabled)
+                        .toList();
+        int i = 0;
+        for (com.rumilance.practice.model.KitDefinition kit : kits) {
+            if (i >= 21) {
+                break;
+            }
+            int slot = 10 + (i % 7) + 9 * (i / 7); // inner rows 1..3, columns 1..7
+            String displayName = kit.displayName();
+            Material icon = Material.matchMaterial(kit.icon() == null ? "" : kit.icon());
+            inventory.setItem(slot, GuiDecorator.button(icon != null ? icon : Material.CHEST,
+                    Component.text(displayName, UiTheme.PRIMARY)
+                            .decoration(TextDecoration.ITALIC, false),
+                    "kit:" + kit.name(), false));
+            i++;
+        }
+        inventory.setItem(HINT_SLOT, GuiDecorator.button(Material.BOOK,
+                t(player, "gui.preset-admin-kits-hint"), "noop"));
+        inventory.setItem(SAVE_SLOT, GuiDecorator.button(Material.NETHER_STAR,
+                t(player, "gui.preset-admin-global"), "kit:" + GLOBAL_KIT));
+        inventory.setItem(CLOSE_SLOT, ItemBuilder.action(UiTheme.CLOSE,
+                t(player, "menu.close"), "close"));
     }
 
     private void renderCategories(Player player, Inventory inventory) {
@@ -144,6 +194,8 @@ public final class PresetAdminGui extends AbstractGui implements FreeInventoryEd
                             .decoration(TextDecoration.ITALIC, false),
                     "cat:" + category, false));
         }
+        inventory.setItem(BACK_SLOT, GuiDecorator.button(Material.ARROW,
+                t(player, "gui.preset-admin-back"), "kits"));
         inventory.setItem(CLOSE_SLOT, ItemBuilder.action(UiTheme.CLOSE,
                 t(player, "menu.close"), "close"));
     }
@@ -159,7 +211,7 @@ public final class PresetAdminGui extends AbstractGui implements FreeInventoryEd
         }
         int page = pageOf(session);
         int base = page * PresetItems.SLOTS_PER_PAGE;
-        Map<Integer, String> slots = presetItems.slots(cat);
+        Map<Integer, String> slots = contentSlots(session, cat);
         for (int local = 0; local < PresetItems.SLOTS_PER_PAGE; local++) {
             String entry = slots.get(base + local);
             if (entry != null) {
@@ -172,11 +224,21 @@ public final class PresetAdminGui extends AbstractGui implements FreeInventoryEd
             inventory.setItem(PREV_SLOT, GuiDecorator.button(Material.ORANGE_STAINED_GLASS_PANE,
                     t(player, "gui.page-prev"), "prev"));
         }
-        inventory.setItem(PAGE_SLOT, GuiDecorator.button(Material.PAPER,
+        ItemStack pageTag = GuiDecorator.button(Material.PAPER,
                 t(player, "menu.page-of", com.rumilance.practice.locale.MessageService.tags(
                         "page", String.valueOf(page + 1),
                         "pages", String.valueOf(effectivePages(session)))),
-                "noop"));
+                "noop");
+        ItemMeta pageMeta = pageTag.getItemMeta();
+        if (pageMeta != null) {
+            String kitId = kitIdOf(session);
+            pageMeta.lore(java.util.List.of(Component.text(
+                    kitId == null ? line(player, "gui.preset-admin-global")
+                            : "kit: " + kitId, UiTheme.VALUE)
+                    .decoration(TextDecoration.ITALIC, false)));
+            pageTag.setItemMeta(pageMeta);
+        }
+        inventory.setItem(PAGE_SLOT, pageTag);
         if (canGoNext(session)) {
             inventory.setItem(NEXT_SLOT, GuiDecorator.button(Material.LIME_STAINED_GLASS_PANE,
                     t(player, "gui.page-next"), "next"));
@@ -230,7 +292,12 @@ public final class PresetAdminGui extends AbstractGui implements FreeInventoryEd
         for (int i = 0; i < PresetItems.SLOTS_PER_PAGE; i++) {
             snap[i] = top.getItem(i);
         }
-        presetItems.replacePageFromInventory(cat, pageOf(session), snap);
+        String kitId = kitIdOf(session);
+        if (kitId == null) {
+            presetItems.replacePageFromInventory(cat, pageOf(session), snap);
+        } else {
+            presetItems.replacePageFromInventory(kitId, cat, pageOf(session), snap);
+        }
     }
 
     @Override
@@ -295,6 +362,18 @@ public final class PresetAdminGui extends AbstractGui implements FreeInventoryEd
             session.put(VIEW, "chest");
             session.put(CAT, action.substring(4));
             session.put(PAGE, 0);
+            refresh(player, session, inventory);
+            return;
+        }
+        if (action.startsWith("kit:")) {
+            session.put(KIT, action.substring(4));
+            session.put(VIEW, "categories");
+            sounds.play(player, "gui-click");
+            refresh(player, session, inventory);
+            return;
+        }
+        if ("kits".equals(action)) {
+            session.put(VIEW, "kits");
             refresh(player, session, inventory);
         }
     }

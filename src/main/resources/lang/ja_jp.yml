@@ -765,6 +765,8 @@ gui:
   start-effects-duration: "時間: <secs>秒 (スプラッシュ)"
   start-effects-remove: "クリックで削除"
   preset-admin-title: "プリセット候補 管理"
+  preset-admin-kits-hint: "# 編集するキットの選択（プリセットはキットごと）"
+  preset-admin-global: "# 全キット共通（フォールバック・既定プール）"
   preset-admin-cat: "プリセット: <cat> (<page>/<pages>)"
   preset-admin-back: "カテゴリ一覧に戻る"
   preset-admin-free: "自由配置"

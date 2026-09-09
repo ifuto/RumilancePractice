@@ -764,6 +764,8 @@ gui:
   start-effects-duration: "持续：<secs>秒 (喷溅)"
   start-effects-remove: "点击移除"
   preset-admin-title: "预设候选"
+  preset-admin-kits-hint: "选择要编辑预设的装备包（预设按装备包独立）"
+  preset-admin-global: "全部装备包（全局默认池）"
   preset-admin-cat: "预设：<cat> (<page>/<pages>)"
   preset-admin-back: "返回分类"
   preset-admin-free: "自由放置"

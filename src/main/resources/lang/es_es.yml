@@ -764,6 +764,8 @@ gui:
   start-effects-duration: "Duración: <secs>s (arrojadiza)"
   start-effects-remove: "Clic para quitar"
   preset-admin-title: "Candidatos de preset"
+  preset-admin-kits-hint: "Elige el kit cuyo preset quieres editar (los presets son por kit)"
+  preset-admin-global: "Todos los kits (pool global por defecto)"
   preset-admin-cat: "Preset: <cat> (<page>/<pages>)"
   preset-admin-back: "Volver a categorías"
   preset-admin-free: "Colocación libre"

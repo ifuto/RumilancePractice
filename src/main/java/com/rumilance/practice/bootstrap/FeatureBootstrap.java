@@ -862,7 +862,7 @@ public final class FeatureBootstrap {
         ekitSelectGui.setOriginalKitGui(originalKitGui);
         editKitGui.setEkitSelectGui(ekitSelectGui);
         EkitAdminGui ekitAdminGui = new EkitAdminGui(guiSessions, soundService, ekitItems);
-        PresetAdminGui presetAdminGui = new PresetAdminGui(guiSessions, soundService, presetItems);
+        PresetAdminGui presetAdminGui = new PresetAdminGui(guiSessions, soundService, presetItems, kitService);
         KitAdminGui kitAdminGui = new KitAdminGui(guiSessions, soundService, kitService, messageService);
         kitAdminGui.setArenaNames(() -> arenaStore.templates().stream().map(ArenaTemplate::name).toList());
         KitStartEffectsGui kitStartEffectsGui = new KitStartEffectsGui(guiSessions, soundService, kitService);

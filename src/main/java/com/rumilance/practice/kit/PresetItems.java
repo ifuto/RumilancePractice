@@ -63,18 +63,15 @@ public final class PresetItems {
         migrateGlobalToPerKit();
     }
 
+    /**
+     * Idempotent per-kit seeding: every preset kit without its own {@code kits.<id>.categories}
+     * section gets a full copy of the global pool. Runs on every wiring, so kits created later
+     * are seeded too. The old implementation refused to run as soon as ANY kit section existed
+     * (or the marker was set), leaving most kits permanently bound to the shared global pool —
+     * that is exactly the "why are presets the same for every kit" failure.
+     */
     private synchronized void migrateGlobalToPerKit() {
         FileConfiguration yaml = configService.presetItems();
-        if (yaml.getBoolean(MIGRATION_KEY, false)) {
-            return;
-        }
-        ConfigurationSection kits = yaml.getConfigurationSection(KITS_ROOT);
-        boolean anyKitSection = kits != null && !kits.getKeys(false).isEmpty();
-        if (anyKitSection) {
-            yaml.set(MIGRATION_KEY, true);
-            configService.save(ConfigService.PRESET_ITEMS);
-            return;
-        }
         if (kitIdProvider == null) {
             return;
         }
@@ -90,15 +87,18 @@ public final class PresetItems {
             }
         }
         if (global.isEmpty()) {
-            yaml.set(MIGRATION_KEY, true);
-            configService.save(ConfigService.PRESET_ITEMS);
             return;
         }
+        boolean seeded = false;
         for (String kitId : kitIds) {
             if (kitId == null || kitId.isBlank()) {
                 continue;
             }
             String key = kitId.toLowerCase(java.util.Locale.ROOT);
+            if (yaml.getConfigurationSection(KITS_ROOT + "." + key + ".categories") != null) {
+                continue; // kit already owns its preset pool — never overwrite it
+            }
+            seeded = true;
             for (Map.Entry<String, Map<Integer, String>> e : global.entrySet()) {
                 String canonical = e.getKey();
                 String yamlCat = yamlKeyByCategory.getOrDefault(canonical, canonical);
@@ -110,8 +110,10 @@ public final class PresetItems {
                         .put(canonical, new TreeMap<>(e.getValue()));
             }
         }
-        yaml.set(MIGRATION_KEY, true);
-        configService.save(ConfigService.PRESET_ITEMS);
+        if (seeded) {
+            yaml.set(MIGRATION_KEY, true);
+            configService.save(ConfigService.PRESET_ITEMS);
+        }
     }
 
     public void reload() {
@@ -170,35 +172,6 @@ public final class PresetItems {
             yamlKeyByCategory.putIfAbsent("Armor", "Armor");
         }
         reloadKitOverrides(yaml);
-        resyncKitOverridesFromGlobal(yaml);
-    }
-
-    /**
-     * One-shot repair (marker: {@code _global-resynced}): per-kit overrides are seeded once by
-     * the per-kit migration and the preset admin GUI only ever edits the global pool, so any
-     * divergence is stale migration-era data. Re-copy every non-empty global category over the
-     * existing per-kit overrides so what the admin sees is exactly what the ekit palette shows.
-     * Kits overriding a category the global pool left empty keep their contents.
-     */
-    private void resyncKitOverridesFromGlobal(FileConfiguration yaml) {
-        if (yaml.getBoolean(GLOBAL_RESYNC_KEY, false) || kitItems.isEmpty()) {
-            return;
-        }
-        for (Map.Entry<String, Map<String, Map<Integer, String>>> kitEntry : kitItems.entrySet()) {
-            for (Map.Entry<String, Map<Integer, String>> catEntry : kitEntry.getValue().entrySet()) {
-                Map<Integer, String> globalMap = items.get(catEntry.getKey());
-                if (globalMap == null || globalMap.isEmpty()) {
-                    continue;
-                }
-                catEntry.setValue(new TreeMap<>(globalMap));
-                String yamlCat = findKitYamlKey(yaml, kitEntry.getKey(), catEntry.getKey());
-                yaml.set(KITS_ROOT + "." + kitEntry.getKey() + ".categories." + yamlCat + ".slots",
-                        serializeSlots(globalMap));
-            }
-        }
-        // Persist the marker (and any resynced sections) so this repair runs exactly once.
-        yaml.set(GLOBAL_RESYNC_KEY, true);
-        configService.save(ConfigService.PRESET_ITEMS);
     }
 
     private static Map<String, Object> serializeSlots(Map<Integer, String> map) {
@@ -367,6 +340,45 @@ public final class PresetItems {
         return slots(category);
     }
 
+    /** Per-kit variant of {@link #replacePageFromInventory(String,int,ItemStack[])}: writes into
+     * the kit's own preset pool ({@code kits.<kitId>.categories}) and never touches the global
+     * pool or other kits. First save seeds the kit's category from the current global pool so
+     * other pages keep working. Returns false when the kit id is blank. */
+    public boolean replacePageFromInventory(String kitId, String category, int page,
+                                            ItemStack[] contents) {
+        if (kitId == null || kitId.isBlank()) {
+            return false;
+        }
+        String canonical = CategoryKeys.canonicalPreset(category);
+        String key = kitId.toLowerCase(java.util.Locale.ROOT);
+        Map<String, Map<Integer, String>> byCategory =
+                kitItems.computeIfAbsent(key, k -> new ConcurrentHashMap<>());
+        Map<Integer, String> map = byCategory.get(canonical);
+        if (map == null) {
+            map = new TreeMap<>(items.getOrDefault(canonical, Map.of()));
+            byCategory.put(canonical, map);
+        }
+        int p = Math.max(0, Math.min(MAX_PAGES - 1, page));
+        int base = p * SLOTS_PER_PAGE;
+        for (int i = 0; i < SLOTS_PER_PAGE; i++) {
+            map.remove(base + i);
+        }
+        if (contents != null) {
+            int limit = Math.min(SLOTS_PER_PAGE, contents.length);
+            for (int i = 0; i < limit; i++) {
+                String encoded = encodeItem(contents[i]);
+                if (encoded != null) {
+                    map.put(base + i, encoded);
+                }
+            }
+        }
+        FileConfiguration yaml = configService.presetItems();
+        String yamlCat = findKitYamlKey(yaml, key, canonical);
+        yaml.set(KITS_ROOT + "." + key + ".categories." + yamlCat + ".slots", serializeSlots(map));
+        configService.save(ConfigService.PRESET_ITEMS);
+        return true;
+    }
+
     public List<String> items(String category) {
         return List.copyOf(slots(category).values());
     }
@@ -462,50 +474,6 @@ public final class PresetItems {
             }
         }
         persist(canonical);
-        propagatePageToKitOverrides(canonical, base);
-    }
-
-    /**
-     * The preset admin GUI edits the global pool, but the ekit palette reads per-kit overrides
-     * first — without mirroring, an admin save is never reflected in the kit editors (every kit
-     * received a one-time copy at migration time and would keep showing that stale copy). Kits
-     * that do not override the category fall through to the global pool on their own.
-     */
-    private void propagatePageToKitOverrides(String canonical, int base) {
-        if (kitItems.isEmpty()) {
-            return;
-        }
-        Map<Integer, String> globalMap = items.getOrDefault(canonical, Map.of());
-        FileConfiguration yaml = configService.presetItems();
-        boolean changed = false;
-        for (Map.Entry<String, Map<String, Map<Integer, String>>> kitEntry : kitItems.entrySet()) {
-            Map<Integer, String> kitMap = kitEntry.getValue().get(canonical);
-            if (kitMap == null) {
-                continue;
-            }
-            for (int i = 0; i < SLOTS_PER_PAGE; i++) {
-                kitMap.remove(base + i);
-            }
-            for (Map.Entry<Integer, String> e : globalMap.entrySet()) {
-                if (e.getKey() >= base && e.getKey() < base + SLOTS_PER_PAGE) {
-                    kitMap.put(e.getKey(), e.getValue());
-                }
-            }
-            String yamlCat = findKitYamlKey(yaml, kitEntry.getKey(), canonical);
-            String slotBase = KITS_ROOT + "." + kitEntry.getKey() + ".categories." + yamlCat + ".slots";
-            for (int i = 0; i < SLOTS_PER_PAGE; i++) {
-                yaml.set(slotBase + "." + (base + i), null);
-            }
-            for (Map.Entry<Integer, String> e : kitMap.entrySet()) {
-                if (e.getKey() >= base && e.getKey() < base + SLOTS_PER_PAGE) {
-                    yaml.set(slotBase + "." + e.getKey(), e.getValue());
-                }
-            }
-            changed = true;
-        }
-        if (changed) {
-            configService.save(ConfigService.PRESET_ITEMS);
-        }
     }
 
     /** The YAML key a kit's section actually uses for {@code canonical} (Japanese keys allowed). */
