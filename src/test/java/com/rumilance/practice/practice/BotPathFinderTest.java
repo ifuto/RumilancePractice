@@ -44,8 +44,8 @@ class BotPathFinderTest {
     @Test
     void jumpsOneBlockWall() {
         Set<String> solid = new HashSet<>();
-        // 1-block high wall at x=2 (z=-1..1)
-        for (int z = -1; z <= 1; z++) {
+        // 1-block high wall at x=2 spanning z=-5..5 — long enough that hopping beats detouring
+        for (int z = -5; z <= 5; z++) {
             solid.add("2," + z + ",1");
         }
         List<BotPathFinder.Node> path = BotPathFinder.find(flat(solid),
