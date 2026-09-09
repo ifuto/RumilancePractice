@@ -64,6 +64,17 @@ public final class PracticeSession {
     private transient long botPathRefreshMs;
     private transient final int[] botPathLastGoal = new int[3];
     private transient boolean botPathGoalSet;
+    /** Active practice drill (Quantum mech_train mode), or {@link PracticeMode#NONE}. */
+    private PracticeMode botMode = PracticeMode.NONE;
+    /** Drill loop timers: next attempt may start after this epoch ms. */
+    private long drillNextAtMs;
+    /** Drill stage within the current attempt (mode-specific). */
+    private int drillStage;
+    /** Pops counted at the beginning of the current attempt (result comparison). */
+    private int drillPopsAtStart;
+    /** Player's chest item swapped away by the divebomb drill (restored on teardown). */
+    private org.bukkit.inventory.ItemStack drillSavedChest;
+    private boolean drillElytraDressed;
 
     /** A block a bot placed mid-fight: after {@code ttlMs} it is reverted to AIR. */
     public record BotBlock(org.bukkit.Material type, long atMs, long ttlMs) {
@@ -391,6 +402,54 @@ public final class PracticeSession {
             botStock.put(material, left - count);
         }
         return true;
+    }
+
+    public PracticeMode botMode() {
+        return botMode;
+    }
+
+    public void setBotMode(PracticeMode botMode) {
+        this.botMode = botMode == null ? PracticeMode.NONE : botMode;
+    }
+
+    public long drillNextAtMs() {
+        return drillNextAtMs;
+    }
+
+    public void setDrillNextAtMs(long drillNextAtMs) {
+        this.drillNextAtMs = drillNextAtMs;
+    }
+
+    public int drillStage() {
+        return drillStage;
+    }
+
+    public void setDrillStage(int drillStage) {
+        this.drillStage = drillStage;
+    }
+
+    public int drillPopsAtStart() {
+        return drillPopsAtStart;
+    }
+
+    public void setDrillPopsAtStart(int drillPopsAtStart) {
+        this.drillPopsAtStart = drillPopsAtStart;
+    }
+
+    public org.bukkit.inventory.ItemStack drillSavedChest() {
+        return drillSavedChest;
+    }
+
+    public void setDrillSavedChest(org.bukkit.inventory.ItemStack drillSavedChest) {
+        this.drillSavedChest = drillSavedChest;
+    }
+
+    public boolean drillElytraDressed() {
+        return drillElytraDressed;
+    }
+
+    public void setDrillElytraDressed(boolean drillElytraDressed) {
+        this.drillElytraDressed = drillElytraDressed;
     }
 
     public java.util.List<BotPathFinder.Node> botPath() {

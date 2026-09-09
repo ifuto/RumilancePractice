@@ -87,6 +87,8 @@ public final class PracticeService {
      * the map's cobweb & lava buckets are menu toggles that default to disabled). */
     private final java.util.Map<PracticeType, java.util.Map<String, Boolean>> practiceToggles =
             new java.util.EnumMap<>(PracticeType.class);
+    /** Per-room practice drill (Quantum mech_train mode); absent = aggregate fight. */
+    private final java.util.Map<String, PracticeMode> roomModes = new java.util.concurrent.ConcurrentHashMap<>();
     private com.rumilance.practice.kit.KitService kitService;
 
     private BukkitTask dailyPurgeTask;
@@ -186,6 +188,17 @@ public final class PracticeService {
         yaml.set("bot-mode-rooms", null);
         botModeRooms.forEach((type, roomId) ->
                 yaml.set("bot-mode-rooms." + type.name(), roomId));
+        configService.save(ConfigService.PRACTICES);
+    }
+
+    private void persistRoomModes() {
+        FileConfiguration yaml = configService.practices();
+        yaml.set("practice-modes", null);
+        roomModes.forEach((roomId, mode) -> {
+            if (roomId != null && mode != null && mode != PracticeMode.NONE) {
+                yaml.set("practice-modes." + roomId, mode.name());
+            }
+        });
         configService.save(ConfigService.PRACTICES);
     }
 
@@ -374,6 +387,39 @@ public final class PracticeService {
         return true;
     }
 
+    /** Drill assigned to a room (aggregate fight when unset/NONE). */
+    public PracticeMode practiceModeOf(PracticeRoom room) {
+        if (room == null) {
+            return PracticeMode.NONE;
+        }
+        PracticeMode mode = roomModes.get(room.id());
+        if (mode == null || mode.family() != room.type()) {
+            return PracticeMode.NONE; // stale binding after the room type changed
+        }
+        return mode;
+    }
+
+    /** Binds a drill to a room; {@code NONE} clears the binding. Persists immediately. */
+    public boolean setPracticeMode(String roomId, PracticeMode mode) {
+        if (roomId == null || roomId.isBlank()) {
+            return false;
+        }
+        PracticeRoom room = get(roomId).orElse(null);
+        if (room == null) {
+            return false;
+        }
+        if (mode == null || mode == PracticeMode.NONE) {
+            roomModes.remove(room.id());
+        } else {
+            if (mode.family() != room.type()) {
+                return false; // mode family must match the room type
+            }
+            roomModes.put(room.id(), mode);
+        }
+        persistRoomModes();
+        return true;
+    }
+
     private void persistDifficulties() {
         FileConfiguration yaml = configService.practices();
         yaml.set("bot-difficulty", null);
@@ -432,6 +478,16 @@ public final class PracticeService {
         savedDifficulty.clear();
         FileConfiguration yaml = configService.practices();
         practiceToggles.clear();
+        roomModes.clear();
+        ConfigurationSection modes = yaml.getConfigurationSection("practice-modes");
+        if (modes != null) {
+            for (String roomId : modes.getKeys(false)) {
+                PracticeMode parsed = PracticeMode.parse(modes.getString(roomId, ""));
+                if (parsed != null && parsed != PracticeMode.NONE) {
+                    roomModes.put(roomId, parsed);
+                }
+            }
+        }
         ConfigurationSection toggles = yaml.getConfigurationSection("practice-toggles");
         if (toggles != null) {
             for (String typeKey : toggles.getKeys(false)) {
@@ -930,6 +986,7 @@ public final class PracticeService {
         }
         preferredDurations.put(player.getUniqueId(), session.durationSeconds());
         session.cancelTimer();
+        restoreDrillSideEffects(player, session);
         removeMaceBot(session);
         removeCombatBot(session);
         UUID cloneId = session.cloneInstanceId();
@@ -1192,6 +1249,8 @@ public final class PracticeService {
         } else {
             spawnCombatBot(player, session, room, room.type());
         }
+        session.setBotMode(practiceModeOf(room));
+        beginDrill(player, session, room);
         player.playSound(player.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 0.6f, 1.4f);
         player.sendActionBar(messages.render(player, "practice.match-started",
                 MessageService.tags("mode", modeName(player, room.type()))));
@@ -1218,6 +1277,236 @@ public final class PracticeService {
             default -> "gui.room-type-mace";
         };
         return messages.raw(player, key);
+    }
+
+
+    // ============ PRACTICE DRILLS (Quantum mech_train / mech mode port) ============
+
+    private static final long DRILL_INTERMISSION_MS = 2200L;
+    private static final long DRILL_ATTEMPT_MAX_MS = 9000L;
+
+    /** Initialises a room-bound drill (title, player-side setup). No-op for NONE. */
+    private void beginDrill(Player player, PracticeSession session, PracticeRoom room) {
+        PracticeMode mode = session.botMode();
+        if (mode == PracticeMode.NONE) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        session.setDrillStage(0);
+        session.setDrillNextAtMs(now + 600L);
+        session.setDrillPopsAtStart(session.botPops());
+        player.showTitle(Title.title(
+                Component.text(mode.label(), NamedTextColor.GRAY),
+                Component.text(""),
+                Title.Times.times(Duration.ZERO, Duration.ofMillis(1200), Duration.ofMillis(400))));
+        Mannequin bot = session.combatBot() != null ? session.combatBot() : session.maceBot();
+        switch (mode) {
+            case MACE_FAR_PEARL -> {
+                if (bot != null && bot.getAttribute(Attribute.MAX_HEALTH) != null) {
+                    bot.getAttribute(Attribute.MAX_HEALTH).setBaseValue(2.0d);
+                    bot.setHealth(2.0d);
+                }
+            }
+            case MACE_DIVEBOMB -> {
+                session.setDrillSavedChest(player.getInventory().getChestplate());
+                player.getInventory().setChestplate(new ItemStack(Material.ELYTRA));
+                session.setDrillElytraDressed(true);
+            }
+            case CRYSTAL_LEDGE ->
+                player.addPotionEffect(new org.bukkit.potion.PotionEffect(
+                        org.bukkit.potion.PotionEffectType.SLOW_FALLING,
+                        org.bukkit.potion.PotionEffect.INFINITE_DURATION, 0, false, false, true));
+            default -> { }
+        }
+    }
+
+    /** Undoes player-side drill sculpting (elytra swap, effects). Safe at any time. */
+    private void restoreDrillSideEffects(Player player, PracticeSession session) {
+        if (session != null && session.drillElytraDressed()) {
+            if (session.drillSavedChest() != null) {
+                player.getInventory().setChestplate(session.drillSavedChest());
+            }
+            session.setDrillElytraDressed(false);
+            session.setDrillSavedChest(null);
+        }
+    }
+
+    private void drillResult(Player player, PracticeSession session) {
+        boolean success = session.botPops() > session.drillPopsAtStart();
+        player.sendActionBar(Component.text(success ? "Slam!" : "Failed!",
+                success ? NamedTextColor.GREEN : NamedTextColor.RED));
+    }
+
+    /** Sequence a drill attempt window: grade on close, then intermission, then re-arm. */
+    private void drillCycle(Player player, PracticeSession session, long now,
+                            java.lang.Runnable attempt) {
+        switch (session.drillStage()) {
+            case 0 -> {
+                if (now >= session.drillNextAtMs()) {
+                    session.setDrillPopsAtStart(session.botPops());
+                    attempt.run();
+                    session.setDrillStage(1);
+                    session.setDrillNextAtMs(now + DRILL_ATTEMPT_MAX_MS);
+                }
+            }
+            case 1 -> {
+                if (now >= session.drillNextAtMs()
+                        || session.botPops() > session.drillPopsAtStart()) {
+                    drillResult(player, session);
+                    session.setDrillStage(0);
+                    session.setDrillNextAtMs(now + DRILL_INTERMISSION_MS);
+                }
+            }
+            default -> session.setDrillStage(0);
+        }
+    }
+
+    /** Mace drill attempt dispatch (elytra / far-pearl / stun-slam / divebomb). */
+    private void tickMaceDrill(Player player, PracticeSession session, Mannequin bot,
+                               PracticeRoom room, BotDifficulty diff, long now, PracticeMode mode,
+                               Vector to) {
+        session.setBotNextAttackMs(Math.max(session.botNextAttackMs(), now + 3000L));
+        switch (mode) {
+            case MACE_FAR_PEARL -> drillCycle(player, session, now,
+                    () -> tickFarPearlAttempt(player, session, bot, room));
+            case MACE_ELYTRA -> drillCycle(player, session, now, () -> {
+                Location home = session.botHome() != null ? session.botHome() : bot.getLocation();
+                Location start = home.clone().add(0, 18, 10);
+                player.teleport(LocationUtil.safeTeleportLocation(start.setDirection(
+                        to.clone().setY(0))));
+            });
+            case MACE_STUN_SLAM -> drillCycle(player, session, now,
+                    () -> tickStunSlamAttempt(player, session, bot));
+            case MACE_DIVEBOMB -> drillCycle(player, session, now, () -> {
+                if (!session.drillElytraDressed()) {
+                    session.setDrillSavedChest(player.getInventory().getChestplate());
+                    player.getInventory().setChestplate(new ItemStack(Material.ELYTRA));
+                    session.setDrillElytraDressed(true);
+                }
+                if (player.isOnGround()) {
+                    Location home = session.botHome() != null ? session.botHome() : bot.getLocation();
+                    Location start = home.clone().add(0, 20, 15);
+                    Vector facing = safeFlatForward(start, player).multiply(-1);
+                    player.teleport(LocationUtil.safeTeleportLocation(
+                            start.setDirection(facing)));
+                }
+            });
+            default -> { }
+        }
+    }
+
+    /** FAR PEARL attempt: materialise 10 up scattered sideways and glide in. */
+    private void tickFarPearlAttempt(Player player, PracticeSession session,
+                                    Mannequin bot, PracticeRoom room) {
+        java.util.concurrent.ThreadLocalRandom rng = java.util.concurrent.ThreadLocalRandom.current();
+        Location base = player.getLocation();
+        Location spot = base.clone().add(rng.nextInt(-14, 15), 10, rng.nextInt(-14, 15));
+        Location safe = LocationUtil.safeTeleportLocation(spot);
+        bot.teleport(safe);
+        Vector toward = base.toVector().subtract(safe.toVector()).setY(0);
+        if (toward.lengthSquared() > 0.0001) {
+            bot.setVelocity(toward.normalize().multiply(0.35d).setY(0.3d));
+        }
+    }
+
+    /** STUN SLAM attempt: both launch from behind the player; stun window decides the trade. */
+    private void tickStunSlamAttempt(Player player, PracticeSession session, Mannequin bot) {
+        Vector behind = player.getLocation().getDirection().setY(0);
+        if (behind.lengthSquared() < 0.0001) {
+            behind = new Vector(0, 0, 1);
+        }
+        behind.normalize().multiply(-2.2d);
+        bot.teleport(player.getLocation().clone().add(behind));
+        player.setVelocity(player.getVelocity().add(new Vector(0, 0.95d, 0)));
+        bot.setVelocity(new Vector(0, 0.9d, 0));
+        if (bot.getWorld() != null) {
+            bot.getWorld().playSound(player.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 0.7f, 1.6f);
+        }
+    }
+
+    /** Pot drills: repot self-heals / refill drums for the player's potion rows. */
+    private void tickPotDrill(Player player, PracticeSession session, Mannequin bot, long now) {
+        PracticeSession.BotAbilityState ab = session.abilities();
+        BotDifficulty diff = session.difficulty();
+        switch (session.botMode()) {
+            case POT_REPOT -> {
+                if (now >= ab.nextAnchorMs() && bot.getHealth() < diff.botMaxHp() * 0.65d
+                        && session.botConsume(Material.SPLASH_POTION, 1)) {
+                    bot.setHealth(Math.min(diff.botMaxHp(), bot.getHealth() + 6.0d));
+                    ab.nextAnchorMs(now + 2500L);
+                    if (bot.getWorld() != null) {
+                        bot.getWorld().playSound(bot.getLocation(),
+                                Sound.ENTITY_GENERIC_SPLASH, 1.0f, 1.2f);
+                    }
+                }
+            }
+            case POT_REFILL_HOTBAR -> {
+                if (now >= ab.nextAnchorMs()) {
+                    player.getInventory().setItem(1, new ItemStack(Material.SPLASH_POTION, 16));
+                    ab.nextAnchorMs(now + 4000L);
+                }
+            }
+            case POT_REFILL_INVENTORY -> {
+                if (now >= ab.nextAnchorMs()) {
+                    player.getInventory().setItem(1, new ItemStack(Material.SPLASH_POTION, 16));
+                    player.getInventory().setItem(12, new ItemStack(Material.SPLASH_POTION, 16));
+                    ab.nextAnchorMs(now + 4000L);
+                }
+            }
+            default -> { }
+        }
+    }
+
+    /** Crystal drills: D-tap resets / Ledge dashes / Hit-anchor storms. */
+    private void tickCrystalDrill(Player player, PracticeSession session, Mannequin bot,
+                                  PracticeRoom room, BotDifficulty diff, long now,
+                                  PracticeMode mode, double dist) {
+        PracticeSession.BotAbilityState ab = session.abilities();
+        switch (mode) {
+            case CRYSTAL_DTAP -> drillCycle(player, session, now, () -> {
+                Location home = session.botHome() != null ? session.botHome() : bot.getLocation();
+                Vector forward = safeFlatForward(home, player);
+                Location startP = home.clone().add(forward.clone().multiply(10));
+                player.teleport(LocationUtil.safeTeleportLocation(
+                        startP.setDirection(forward.clone().multiply(-1))));
+            });
+            case CRYSTAL_LEDGE -> {
+                if (!player.hasPotionEffect(org.bukkit.potion.PotionEffectType.SLOW_FALLING)) {
+                    player.addPotionEffect(new org.bukkit.potion.PotionEffect(
+                            org.bukkit.potion.PotionEffectType.SLOW_FALLING, 20 * 30, 0,
+                            false, false, true));
+                }
+                drillCycle(player, session, now, () -> {
+                    if (dist > 2.0d && session.botConsume(Material.ENDER_PEARL, 1)) {
+                        Location landing = player.getLocation().clone().add(
+                                safeFlatForward(bot.getLocation(), player).multiply(1.2d));
+                        Vector aiming = player.getLocation().toVector()
+                                .subtract(bot.getLocation().toVector()).setY(0);
+                        pearlTeleportFx(bot, LocationUtil.safeTeleportLocation(
+                                landing.setDirection(aiming)));
+                    }
+                });
+            }
+            case CRYSTAL_HIT_ANCHOR -> {
+                if (now >= ab.nextAnchorMs() - 2000L && diff.attackDamage() > 0.0d) {
+                    launchAnchorStrike(player, session, bot);
+                    ab.nextAnchorMs(now + Math.max(1500L, ANCHOR_MIN_COOLDOWN_MS / 2));
+                }
+            }
+            default -> { }
+        }
+    }
+
+    /** Unit horizontal vector from 'from' toward 'to' (fallback +Z on zero). */
+    private static Vector safeFlatForward(Location from, Player to) {
+        Vector v = to.getLocation().toVector().subtract(from.toVector()).setY(0);
+        return v.lengthSquared() < 0.0001 ? new Vector(0, 0, 1) : v.normalize();
+    }
+
+    /** Overload landing on a Location origin. */
+    private static Vector safeFlatForward(Location from, Location to) {
+        Vector v = to.toVector().subtract(from.toVector()).setY(0);
+        return v.lengthSquared() < 0.0001 ? new Vector(0, 0, 1) : v.normalize();
     }
 
     /**
@@ -1280,6 +1569,9 @@ public final class PracticeService {
         }
         session.setPhase(PracticeSession.Phase.ENDED);
         session.cancelTimer();
+        if (player.isOnline()) {
+            restoreDrillSideEffects(player, session);
+        }
         long seconds = session.matchStartMs() <= 0 ? 0
                 : (System.currentTimeMillis() - session.matchStartMs()) / 1000L;
         PracticeRoom room = get(session.practiceId()).orElse(null);
@@ -1837,6 +2129,12 @@ public final class PracticeService {
                 return;
             }
             BotDifficulty diff = session.difficulty();
+            if (session.botMode() != PracticeMode.NONE) {
+                // Drill rooms are graded loops, not brawls: the mode drives everything.
+                Vector mto = player.getLocation().toVector().subtract(bot.getLocation().toVector());
+                tickMaceDrill(player, session, bot, room, diff, now, session.botMode(), mto);
+                return;
+            }
             if (now - session.botLastDamagedMs() > BotDifficulty.REGEN_DELAY_MS
                     && diff.regenPerSecond() > 0) {
                 healToward(bot, diff.botMaxHp(), diff.regenPerSecond() / 20.0d);
@@ -2399,7 +2697,15 @@ public final class PracticeService {
             double distSq = bot.getLocation().distanceSquared(player.getLocation());
             double dist = Math.sqrt(distSq);
 
-            // Quantum passive layer: gap healing, water saves, escape pearls (map state3
+            // Crystal drills ride on top of the shared combat tick.
+        if (type == PracticeType.CRYSTAL && session.botMode() != PracticeMode.NONE) {
+            PracticeRoom drillRoom = get(session.practiceId()).orElse(null);
+            if (drillRoom != null) {
+                tickCrystalDrill(player, session, bot, drillRoom, session.difficulty(), now,
+                        session.botMode(), dist);
+            }
+        }
+        // Quantum passive layer: gap healing, water saves, escape pearls (map state3
             // passives run before the fight loop each tick).
             tickBotGap(session, bot, diff.botMaxHp(), now);
             tickBotWaterSave(session, bot, now);
@@ -2481,6 +2787,9 @@ public final class PracticeService {
             }
             if (type == PracticeType.NETHERITE_POT) {
                 tickNethPotPotions(player, session, bot, now);
+                if (session.botMode() != PracticeMode.NONE) {
+                    tickPotDrill(player, session, bot, now);
+                }
             }
         }
     }
@@ -2569,21 +2878,25 @@ public final class PracticeService {
         // Full-draw speed like a player bow, damage and spread from the difficulty ladder.
         if (now >= session.botNextAttackMs() && diff.attackDamage() > 0.0d) {
             bot.swingMainHand();
-            botShootArrow(bot, diff, dir, diff.attackDamage() * 0.7d);
+            botShootArrow(bot, diff, dir, diff.attackDamage() * (0.7d + 0.18d * cartTier));
             long jitter = java.util.concurrent.ThreadLocalRandom.current().nextInt(400);
             session.setBotNextAttackMs(now + Math.max(700L, diff.attackIntervalMs() * 2L) + jitter);
         }
         // Rolling TNT "cart" every combo cooldown (on a rail, like the map's cart tracks).
+        int cartTier = session.botMode().tier();
         if (now >= session.botNextCartMs() && session.botConsume(Material.TNT_MINECART, 1)) {
+            int fuse = Math.max(12, 26 - 2 * cartTier);          // T3 fastest fuses
+            float yield = (float) (4.0d + 0.6d * cartTier);      // T3 heaviest blasts
             org.bukkit.entity.TNTPrimed tnt = bot.getWorld().spawn(
                     botLoc.add(0, 1.1, 0), org.bukkit.entity.TNTPrimed.class, t -> {
-                        t.setFuseTicks(26);
-                        t.setYield(4.0f);
+                        t.setFuseTicks(fuse);
+                        t.setYield(yield);
                         t.setSource(bot);
                     });
             tnt.setVelocity(dir.clone().normalize().multiply(0.85d).setY(0.18d));
             session.botTnt().add(tnt.getUniqueId());
-            session.setBotNextCartMs(now + diff.comboCooldownMs());
+            session.setBotNextCartMs(now + Math.max(700L,
+                    (long) (diff.comboCooldownMs() * (1.0d - 0.12d * cartTier))));
             if (session.botConsume(Material.POWERED_RAIL, 1)) {
                 placeTrackedBlock(session, tnt.getLocation().getBlock(),
                         Material.POWERED_RAIL, CART_RAIL_TTL_MS);

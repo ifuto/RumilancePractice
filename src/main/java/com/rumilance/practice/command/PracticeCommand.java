@@ -3,6 +3,7 @@ package com.rumilance.practice.command;
 import com.rumilance.practice.admin.AdminTools;
 import com.rumilance.practice.model.PracticeRoom;
 import com.rumilance.practice.practice.PracticeDraft;
+import com.rumilance.practice.practice.PracticeMode;
 import com.rumilance.practice.practice.PracticeService;
 import com.rumilance.practice.practice.PracticeType;
 import com.rumilance.practice.util.Cuboid;
@@ -242,6 +243,35 @@ public final class PracticeCommand implements CommandExecutor, TabCompleter {
                 }
                 yield true;
             }
+            case "mode" -> {
+                // Bind a Quantum drill to a room: /practice mode <room> <MODE|auto>
+                if (args.length < 3) {
+                    player.sendMessage(Component.text(
+                            "Usage: /practice mode <room> <" +
+                                    java.util.Arrays.stream(PracticeMode.values())
+                                            .filter(m -> m != PracticeMode.NONE)
+                                            .map(Enum::name).collect(java.util.stream.Collectors.joining("|"))
+                                    + "|auto>", NamedTextColor.YELLOW));
+                    yield true;
+                }
+                PracticeMode pm = PracticeMode.parse(args[2]);
+                if (pm == null) {
+                    player.sendMessage(Component.text("Unknown mode: " + args[2], NamedTextColor.RED));
+                    yield true;
+                }
+                if (!practiceService.setPracticeMode(args[1], pm)) {
+                    player.sendMessage(Component.text(
+                            "Failed (room missing, or the drill's family doesn't match the room type).",
+                            NamedTextColor.RED));
+                    yield true;
+                }
+                player.sendMessage(Component.text(
+                        pm == PracticeMode.NONE
+                                ? "Room '" + args[1] + "' back to the aggregate fight."
+                                : "Room '" + args[1] + "' now runs drill " + pm + " (" + pm.label() + ").",
+                        NamedTextColor.GREEN));
+                yield true;
+            }
             case "save" -> {
                 if (args.length < 2) {
                     player.sendMessage(Component.text("Usage: /practice save <Name>", NamedTextColor.YELLOW));
@@ -366,6 +396,14 @@ public final class PracticeCommand implements CommandExecutor, TabCompleter {
             return switch (sub) {
                 case "draft" -> List.of();
                 case "selection" -> TabCompletions.filter(current, "apply");
+                case "mode" -> {
+                    if (args.length == 2) {
+                        yield TabCompletions.filter(current,
+                                practiceService.list().stream().map(PracticeRoom::id).toArray(String[]::new));
+                    }
+                    yield TabCompletions.filter(current,
+                            java.util.Arrays.stream(PracticeMode.values()).map(Enum::name).toArray(String[]::new));
+                }
                 case "toggles" -> {
                     if (args.length == 2) {
                         yield TabCompletions.filter(current, "SWORD", "MACE", "CRYSTAL", "NETHERITE_POT", "CART", "ANKER");
