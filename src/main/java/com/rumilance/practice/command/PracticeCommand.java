@@ -202,6 +202,46 @@ public final class PracticeCommand implements CommandExecutor, TabCompleter {
                         : mode + " now fights in '" + roomId + "'.", NamedTextColor.GREEN));
                 yield true;
             }
+            case "toggles" -> {
+                // Quantum options/toggles parity: cobweb & lava disruption is a per-type
+                // operator opt-in (default OFF). Axe shield-strip stays core sword behaviour.
+                if (args.length < 3) {
+                    player.sendMessage(Component.text(
+                            "Usage: /practice toggles <SWORD|MACE|CRYSTAL|NETHERITE_POT|CART> <cobweb|lava> [on|off|status]",
+                            NamedTextColor.YELLOW));
+                    yield true;
+                }
+                PracticeType tt;
+                try {
+                    tt = PracticeType.parse(args[1]);
+                } catch (Exception e) {
+                    player.sendMessage(Component.text("Unknown type: " + args[1], NamedTextColor.RED));
+                    yield true;
+                }
+                String kind = args[2].toLowerCase(Locale.ROOT);
+                if (!PracticeService.DISRUPTION_KINDS.contains(kind)) {
+                    player.sendMessage(Component.text(
+                            "Kind must be cobweb or lava.", NamedTextColor.RED));
+                    yield true;
+                }
+                String modeArg = args.length >= 4 ? args[3].toLowerCase(Locale.ROOT) : "status";
+                switch (modeArg) {
+                    case "on", "true" -> {
+                        practiceService.setDisruption(tt, kind, true);
+                        player.sendMessage(Component.text(
+                                tt + " practice: " + kind + " disruption ENABLED (saved).", NamedTextColor.GREEN));
+                    }
+                    case "off", "false" -> {
+                        practiceService.setDisruption(tt, kind, false);
+                        player.sendMessage(Component.text(
+                                tt + " practice: " + kind + " disruption DISABLED (default).", NamedTextColor.GREEN));
+                    }
+                    default -> player.sendMessage(Component.text(
+                            tt + " " + kind + " = " + (practiceService.disruptionEnabled(tt, kind) ? "ON" : "OFF"),
+                            NamedTextColor.YELLOW));
+                }
+                yield true;
+            }
             case "save" -> {
                 if (args.length < 2) {
                     player.sendMessage(Component.text("Usage: /practice save <Name>", NamedTextColor.YELLOW));
@@ -326,6 +366,12 @@ public final class PracticeCommand implements CommandExecutor, TabCompleter {
             return switch (sub) {
                 case "draft" -> List.of();
                 case "selection" -> TabCompletions.filter(current, "apply");
+                case "toggles" -> {
+                    if (args.length == 2) {
+                        yield TabCompletions.filter(current, "SWORD", "MACE", "CRYSTAL", "NETHERITE_POT", "CART", "ANKER");
+                    }
+                    yield TabCompletions.filter(current, "cobweb", "lava");
+                }
                 case "bindkit" -> TabCompletions.filter(current,
                         "SWORD", "CRYSTAL", "MACE", "NETHERITE_POT", "CART");
                 case "bindmap" -> TabCompletions.filter(current,

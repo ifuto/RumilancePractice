@@ -83,6 +83,10 @@ public final class PracticeService {
             new java.util.EnumMap<>(PracticeType.class);
     /** Saved per-player difficulty (serialized), keyed by UUID string. */
     private final java.util.Map<String, String> savedDifficulty = new java.util.LinkedHashMap<>();
+    /** Per-type opt-in disruption toggles (Quantum options/toggles parity — OFF by default:
+     * the map's cobweb & lava buckets are menu toggles that default to disabled). */
+    private final java.util.Map<PracticeType, java.util.Map<String, Boolean>> practiceToggles =
+            new java.util.EnumMap<>(PracticeType.class);
     private com.rumilance.practice.kit.KitService kitService;
 
     private BukkitTask dailyPurgeTask;
@@ -185,6 +189,54 @@ public final class PracticeService {
         configService.save(ConfigService.PRACTICES);
     }
 
+    private void persistToggles() {
+        FileConfiguration yaml = configService.practices();
+        yaml.set("practice-toggles", null);
+        practiceToggles.forEach((type, kinds) -> {
+            if (type == null || kinds == null) {
+                return;
+            }
+            java.util.Map<String, Boolean> out = new java.util.LinkedHashMap<>();
+            kinds.forEach((kind, value) -> {
+                if (Boolean.TRUE.equals(value)) {
+                    out.put(kind, true); // only persist enabled entries (false = default)
+                }
+            });
+            if (!out.isEmpty()) {
+                yaml.set("practice-toggles." + type.name(), out);
+            }
+        });
+        configService.save(ConfigService.PRACTICES);
+    }
+
+    /** Toggleable disruption kinds (Quantum options/toggles — default OFF). */
+    public static final java.util.Set<String> DISRUPTION_KINDS = java.util.Set.of("cobweb", "lava");
+
+    /** Whether a disruption kind is enabled for a practice type (default OFF). */
+    public boolean disruptionEnabled(PracticeType type, String kind) {
+        java.util.Map<String, Boolean> map = practiceToggles.get(type);
+        return map != null && Boolean.TRUE.equals(map.get(kind.toLowerCase(java.util.Locale.ROOT)));
+    }
+
+    /** Sets one disruption toggle for a type and persists it. False unsets (back to default). */
+    public boolean setDisruption(PracticeType type, String kind, boolean value) {
+        if (type == null || !DISRUPTION_KINDS.contains(kind == null ? "" : kind.toLowerCase(java.util.Locale.ROOT))) {
+            return false;
+        }
+        String key = kind.toLowerCase(java.util.Locale.ROOT);
+        java.util.Map<String, Boolean> map = practiceToggles.computeIfAbsent(type, t -> new java.util.HashMap<>());
+        if (value) {
+            map.put(key, true);
+        } else {
+            map.remove(key);
+            if (map.isEmpty()) {
+                practiceToggles.remove(type);
+            }
+        }
+        persistToggles();
+        return true;
+    }
+
     private void persistDifficulties() {
         FileConfiguration yaml = configService.practices();
         yaml.set("bot-difficulty", null);
@@ -242,6 +294,26 @@ public final class PracticeService {
         botModeRooms.clear();
         savedDifficulty.clear();
         FileConfiguration yaml = configService.practices();
+        practiceToggles.clear();
+        ConfigurationSection toggles = yaml.getConfigurationSection("practice-toggles");
+        if (toggles != null) {
+            for (String typeKey : toggles.getKeys(false)) {
+                try {
+                    PracticeType type = PracticeType.parse(typeKey);
+                    ConfigurationSection sec = yaml.getConfigurationSection(
+                            "practice-toggles." + typeKey);
+                    if (sec != null) {
+                        java.util.Map<String, Boolean> map = new java.util.HashMap<>();
+                        for (String kind : sec.getKeys(false)) {
+                            map.put(kind.toLowerCase(java.util.Locale.ROOT),
+                                    sec.getBoolean(kind, false));
+                        }
+                        practiceToggles.put(type, map);
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+        }
         ConfigurationSection kits = yaml.getConfigurationSection("bot-mode-kits");
         if (kits != null) {
             for (String key : kits.getKeys(false)) {
@@ -2033,13 +2105,28 @@ public final class PracticeService {
         if (applyBoundBotKit(type, bot, eq, shieldUp, fallbackWeapon)) {
             return;
         }
-        eq.setHelmet(new ItemStack(Material.NETHERITE_HELMET));
-        eq.setChestplate(new ItemStack(Material.NETHERITE_CHESTPLATE));
-        eq.setLeggings(new ItemStack(Material.NETHERITE_LEGGINGS));
-        eq.setBoots(new ItemStack(Material.NETHERITE_BOOTS));
+        // Quantum botgear/neth parity: protection 4 netherite (legs blast-protection on cart),
+        // feather-falling 4 + protection 4 boots; cart gets the power 5 / punch 1 / flame bow.
+        ItemStack helmet = new ItemStack(Material.NETHERITE_HELMET);
+        helmet.addUnsafeEnchantment(org.bukkit.enchantments.Enchantment.PROTECTION, 4);
+        ItemStack chest = new ItemStack(Material.NETHERITE_CHESTPLATE);
+        chest.addUnsafeEnchantment(org.bukkit.enchantments.Enchantment.PROTECTION, 4);
+        ItemStack legs = new ItemStack(Material.NETHERITE_LEGGINGS);
+        legs.addUnsafeEnchantment(type == PracticeType.CART
+                ? org.bukkit.enchantments.Enchantment.BLAST_PROTECTION
+                : org.bukkit.enchantments.Enchantment.PROTECTION, 4);
+        ItemStack boots = new ItemStack(Material.NETHERITE_BOOTS);
+        boots.addUnsafeEnchantment(org.bukkit.enchantments.Enchantment.FEATHER_FALLING, 4);
+        boots.addUnsafeEnchantment(org.bukkit.enchantments.Enchantment.PROTECTION, 4);
+        eq.setHelmet(helmet);
+        eq.setChestplate(chest);
+        eq.setLeggings(legs);
+        eq.setBoots(boots);
         switch (type) {
             case SWORD, NETHERITE_POT -> {
-                eq.setItemInMainHand(new ItemStack(Material.NETHERITE_SWORD));
+                ItemStack sword = new ItemStack(Material.NETHERITE_SWORD);
+                sword.addUnsafeEnchantment(org.bukkit.enchantments.Enchantment.SHARPNESS, 5);
+                eq.setItemInMainHand(sword);
                 // Quantum passive/main: shield down means a totem rides the offhand.
                 eq.setItemInOffHand(type == PracticeType.NETHERITE_POT
                         ? new ItemStack(Material.SPLASH_POTION)
@@ -2047,7 +2134,12 @@ public final class PracticeService {
                                 : new ItemStack(Material.TOTEM_OF_UNDYING)));
             }
             case CART -> {
-                eq.setItemInMainHand(new ItemStack(Material.BOW));
+                ItemStack bow = new ItemStack(Material.BOW);
+                bow.addUnsafeEnchantment(org.bukkit.enchantments.Enchantment.POWER, 5);
+                bow.addUnsafeEnchantment(org.bukkit.enchantments.Enchantment.PUNCH, 1);
+                bow.addUnsafeEnchantment(org.bukkit.enchantments.Enchantment.FLAME, 1);
+                bow.addUnsafeEnchantment(org.bukkit.enchantments.Enchantment.INFINITY, 1);
+                eq.setItemInMainHand(bow);
                 eq.setItemInOffHand(new ItemStack(Material.ARROW));
             }
             default -> { // CRYSTAL
@@ -2547,8 +2639,9 @@ public final class PracticeService {
         if (diff.attackDamage() <= 0.0d) {
             return; // NPC rung never fights dirty
         }
-        // Cobweb at the player's feet (skip if they already sit in one).
-        if (now >= ab.nextCobwebMs() && dist <= 4.0d && !inCobweb(player.getLocation())) {
+        // Cobweb at the player's feet — Quantum toggle, OFF unless the admin enabled it.
+        if (disruptionEnabled(type, "cobweb")
+                && now >= ab.nextCobwebMs() && dist <= 4.0d && !inCobweb(player.getLocation())) {
             if (placeTrackedBlock(session, player.getLocation().getBlock(),
                     Material.COBWEB, COBWEB_TTL_MS)) {
                 bot.swingMainHand();
@@ -2561,7 +2654,9 @@ public final class PracticeService {
         }
         // Lava bucket dropped where an airborne player comes down (fire-immune targets are
         // not worth the bucket, same as the map's predicate check).
-        if (now >= ab.nextLavaMs() && dist <= 6.5d && isAirborne(player)
+        // Lava punish — Quantum toggle, OFF unless the admin enabled it.
+        if (disruptionEnabled(type, "lava")
+                && now >= ab.nextLavaMs() && dist <= 6.5d && isAirborne(player)
                 && !player.isInWater()
                 && !player.hasPotionEffect(org.bukkit.potion.PotionEffectType.FIRE_RESISTANCE)) {
             Location base = player.getLocation();
