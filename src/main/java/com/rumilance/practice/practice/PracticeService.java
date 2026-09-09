@@ -2842,6 +2842,8 @@ public final class PracticeService {
      */
     private void tickCartBot(Player player, PracticeSession session, Mannequin bot, long now) {
         BotDifficulty diff = session.difficulty();
+        // Power-tier drills (CART_M3..CART_P3): scales volley cadence, TNT fuse & blast.
+        int cartTier = session.botMode().tier();
         PracticeSession.BotAbilityState ab = session.abilities();
         if (now - session.botLastDamagedMs() > BotDifficulty.REGEN_DELAY_MS
                 && diff.regenPerSecond() > 0) {
@@ -2883,7 +2885,6 @@ public final class PracticeService {
             session.setBotNextAttackMs(now + Math.max(700L, diff.attackIntervalMs() * 2L) + jitter);
         }
         // Rolling TNT "cart" every combo cooldown (on a rail, like the map's cart tracks).
-        int cartTier = session.botMode().tier();
         if (now >= session.botNextCartMs() && session.botConsume(Material.TNT_MINECART, 1)) {
             int fuse = Math.max(12, 26 - 2 * cartTier);          // T3 fastest fuses
             float yield = (float) (4.0d + 0.6d * cartTier);      // T3 heaviest blasts

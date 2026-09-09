@@ -399,7 +399,7 @@ public final class PracticeCommand implements CommandExecutor, TabCompleter {
                 case "mode" -> {
                     if (args.length == 2) {
                         yield TabCompletions.filter(current,
-                                practiceService.list().stream().map(PracticeRoom::id).toArray(String[]::new));
+                                practiceService.list().stream().map(r -> r.id()).toArray(String[]::new));
                     }
                     yield TabCompletions.filter(current,
                             java.util.Arrays.stream(PracticeMode.values()).map(Enum::name).toArray(String[]::new));
