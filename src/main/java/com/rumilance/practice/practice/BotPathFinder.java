@@ -21,6 +21,12 @@ public final class BotPathFinder {
     @FunctionalInterface
     public interface Passable {
         boolean standable(int x, int y, int z);
+
+        /** Whether the block at (x,y,z) is solid (used only for jump headroom checks;
+         *  test grids may leave the default). */
+        default boolean solid(int x, int y, int z) {
+            return false;
+        }
     }
 
     /** One waypoint: feet block coordinates. */
@@ -98,8 +104,9 @@ public final class BotPathFinder {
                     relax(open, gScores, parent, cKey, nx, cy, nz, g + stepCost, goal);
                     continue;
                 }
-                // jump up one
-                if (offer(world, nx, cy + 1, nz) && world.standable(cx, cy + 1, cz)) {
+                // jump up one: the target tile is standable one higher AND there is free
+                // headroom above the bot's head in its current column (block at cy+2 clear).
+                if (offer(world, nx, cy + 1, nz) && !world.solid(cx, cy + 2, cz)) {
                     relax(open, gScores, parent, cKey, nx, cy + 1, nz, g + stepCost + 0.3d, goal);
                     continue;
                 }

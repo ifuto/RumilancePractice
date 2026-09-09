@@ -266,12 +266,20 @@ public final class PracticeService {
 
     /** World adapter for the A* engine: stand = solid floor + two free blocks of headroom. */
     private static BotPathFinder.Passable botWorldGrid(org.bukkit.World world) {
-        return (x, y, z) -> {
-            org.bukkit.block.Block feet = world.getBlockAt(x, y, z);
-            org.bukkit.block.Block head = world.getBlockAt(x, y + 1, z);
-            org.bukkit.block.Block floor = world.getBlockAt(x, y - 1, z);
-            return !feet.getType().isOccluding() && !head.getType().isOccluding()
-                    && floor.getType().isSolid();
+        return new BotPathFinder.Passable() {
+            @Override
+            public boolean standable(int x, int y, int z) {
+                org.bukkit.block.Block feet = world.getBlockAt(x, y, z);
+                org.bukkit.block.Block head = world.getBlockAt(x, y + 1, z);
+                org.bukkit.block.Block floor = world.getBlockAt(x, y - 1, z);
+                return !feet.getType().isOccluding() && !head.getType().isOccluding()
+                        && floor.getType().isSolid();
+            }
+
+            @Override
+            public boolean solid(int x, int y, int z) {
+                return world.getBlockAt(x, y, z).getType().isSolid();
+            }
         };
     }
 
