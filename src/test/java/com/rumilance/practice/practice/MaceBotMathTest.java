@@ -25,21 +25,21 @@ class MaceBotMathTest {
     @Test
     void smashScalesWithFallDistanceButStaysCapped() {
         // No fall, or a fall below the smash threshold: a plain melee hit, no bonus.
-        assertEquals(1.0d, PracticeService.maceSmashScale(0.0d), 1e-9);
-        assertEquals(1.0d, PracticeService.maceSmashScale(-3.0d), 1e-9);
-        assertEquals(1.0d, PracticeService.maceSmashScale(0.9d), 1e-9);
+        assertEquals(1.0d, BotMath.maceSmashScale(0.0d), 1e-9);
+        assertEquals(1.0d, BotMath.maceSmashScale(-3.0d), 1e-9);
+        assertEquals(1.0d, BotMath.maceSmashScale(0.9d), 1e-9);
         // A normal jump (about 1.25 blocks of fall) is a small smash.
-        assertEquals(1.0d + 0.35d * 0.35d, PracticeService.maceSmashScale(1.25d), 1e-9);
+        assertEquals(1.0d + 0.35d * 0.35d, BotMath.maceSmashScale(1.25d), 1e-9);
         // A wind-charge launch (about 5 blocks of fall) is a big one ...
-        assertEquals(1.0d + 0.35d * 4.1d, PracticeService.maceSmashScale(5.0d), 1e-9);
+        assertEquals(1.0d + 0.35d * 4.1d, BotMath.maceSmashScale(5.0d), 1e-9);
         // ... but even falling out of the sky cannot exceed the cap, so one smash can never
         // delete a full-health player.
-        assertEquals(3.0d, PracticeService.maceSmashScale(50.0d), 1e-9);
-        assertEquals(3.0d, PracticeService.maceSmashScale(1000.0d), 1e-9);
+        assertEquals(3.0d, BotMath.maceSmashScale(50.0d), 1e-9);
+        assertEquals(3.0d, BotMath.maceSmashScale(1000.0d), 1e-9);
         // Monotonic: more height is never weaker.
         double previous = 0.0d;
         for (double fall = 0.0d; fall <= 20.0d; fall += 0.5d) {
-            double scale = PracticeService.maceSmashScale(fall);
+            double scale = BotMath.maceSmashScale(fall);
             assertTrue(scale >= previous, "fall " + fall);
             previous = scale;
         }

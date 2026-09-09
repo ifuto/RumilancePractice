@@ -1282,8 +1282,6 @@ public final class PracticeService {
 
     // ============ PRACTICE DRILLS (Quantum mech_train / mech mode port) ============
 
-    private static final long DRILL_INTERMISSION_MS = 2200L;
-    private static final long DRILL_ATTEMPT_MAX_MS = 9000L;
 
     /** Initialises a room-bound drill (title, player-side setup). No-op for NONE. */
     private void beginDrill(Player player, PracticeSession session, PracticeRoom room) {
@@ -1303,8 +1301,9 @@ public final class PracticeService {
         switch (mode) {
             case MACE_FAR_PEARL -> {
                 if (bot != null && bot.getAttribute(Attribute.MAX_HEALTH) != null) {
-                    bot.getAttribute(Attribute.MAX_HEALTH).setBaseValue(2.0d);
-                    bot.setHealth(2.0d);
+                    // far_pearl/init:9 — glass cannon (kernel constant).
+                    bot.getAttribute(Attribute.MAX_HEALTH).setBaseValue(DrillKernel.FAR_PEARL_BOT_MAX_HEALTH);
+                    bot.setHealth(DrillKernel.FAR_PEARL_BOT_MAX_HEALTH);
                 }
             }
             case MACE_DIVEBOMB -> {
@@ -1333,31 +1332,43 @@ public final class PracticeService {
 
     private void drillResult(Player player, PracticeSession session) {
         boolean success = session.botPops() > session.drillPopsAtStart();
-        player.sendActionBar(Component.text(success ? "Slam!" : "Failed!",
+        player.sendActionBar(Component.text(
+                DrillKernel.gradeText(session.botMode(), success),
                 success ? NamedTextColor.GREEN : NamedTextColor.RED));
     }
 
-    /** Sequence a drill attempt window: grade on close, then intermission, then re-arm. */
+    /** Sequence a drill attempt window through the pure kernel state machine. */
     private void drillCycle(Player player, PracticeSession session, long now,
                             java.lang.Runnable attempt) {
-        switch (session.drillStage()) {
-            case 0 -> {
-                if (now >= session.drillNextAtMs()) {
-                    session.setDrillPopsAtStart(session.botPops());
-                    attempt.run();
-                    session.setDrillStage(1);
-                    session.setDrillNextAtMs(now + DRILL_ATTEMPT_MAX_MS);
-                }
-            }
-            case 1 -> {
-                if (now >= session.drillNextAtMs()
-                        || session.botPops() > session.drillPopsAtStart()) {
-                    drillResult(player, session);
-                    session.setDrillStage(0);
-                    session.setDrillNextAtMs(now + DRILL_INTERMISSION_MS);
-                }
-            }
-            default -> session.setDrillStage(0);
+        DrillKernel.Step step = DrillKernel.advance(session.drillStage(),
+                session.drillNextAtMs(), session.drillPopsAtStart(), session.botPops(), now);
+        if (step.fireAttempt()) {
+            attempt.run();
+        }
+        session.setDrillStage(step.stage());
+        session.setDrillNextAtMs(step.nextAtMs());
+        session.setDrillPopsAtStart(step.popsAtStart());
+        if (step.gradeNow()) {
+            drillResult(player, session);
+        }
+    }
+
+    /** Ledge variant: reposition, wait pearlcd2, dash-pearl, grade window. */
+    private void drillCycleLedge(Player player, PracticeSession session, long now,
+                                 java.lang.Runnable reposition, java.lang.Runnable pearl) {
+        DrillKernel.LedgeStep step = DrillKernel.advanceLedge(session.drillStage(),
+                session.drillNextAtMs(), session.drillPopsAtStart(), session.botPops(), now);
+        if (step.fireReposition()) {
+            reposition.run();
+        }
+        if (step.firePearl()) {
+            pearl.run();
+        }
+        session.setDrillStage(step.stage());
+        session.setDrillNextAtMs(step.nextAtMs());
+        session.setDrillPopsAtStart(step.popsAtStart());
+        if (step.gradeNow()) {
+            drillResult(player, session);
         }
     }
 
@@ -1371,7 +1382,7 @@ public final class PracticeService {
                     () -> tickFarPearlAttempt(player, session, bot, room));
             case MACE_ELYTRA -> drillCycle(player, session, now, () -> {
                 Location home = session.botHome() != null ? session.botHome() : bot.getLocation();
-                Location start = home.clone().add(0, 18, 10);
+                Location start = home.clone().add(0, DrillKernel.ELYTRA_PLAYER_Y, DrillKernel.ELYTRA_PLAYER_Z);
                 player.teleport(LocationUtil.safeTeleportLocation(start.setDirection(
                         to.clone().setY(0))));
             });
@@ -1384,11 +1395,13 @@ public final class PracticeService {
                     session.setDrillElytraDressed(true);
                 }
                 if (player.isOnGround()) {
+                    // divebomb/loop: tp player ~ ~30 ~15 FACING THE BOT (kernel offsets).
                     Location home = session.botHome() != null ? session.botHome() : bot.getLocation();
-                    Location start = home.clone().add(0, 20, 15);
-                    Vector facing = safeFlatForward(start, player).multiply(-1);
+                    Location start = home.clone().add(0, DrillKernel.DIVEBOMB_PLAYER_Y,
+                            DrillKernel.DIVEBOMB_PLAYER_Z);
+                    Vector towards = safeFlatForward(start, bot.getLocation());
                     player.teleport(LocationUtil.safeTeleportLocation(
-                            start.setDirection(facing)));
+                            start.setDirection(towards)));
                 }
             });
             default -> { }
@@ -1398,12 +1411,16 @@ public final class PracticeService {
     /** FAR PEARL attempt: materialise 10 up scattered sideways and glide in. */
     private void tickFarPearlAttempt(Player player, PracticeSession session,
                                     Mannequin bot, PracticeRoom room) {
-        java.util.concurrent.ThreadLocalRandom rng = java.util.concurrent.ThreadLocalRandom.current();
-        Location base = player.getLocation();
-        Location spot = base.clone().add(rng.nextInt(-14, 15), 10, rng.nextInt(-14, 15));
+        // far_pearl/loop:7 — vanilla spreadplayers square (radius 15) around the anchor at +10y,
+        // hitched to the drill home rather than the player's current position.
+        java.util.Random rng = new java.util.Random();
+        Location base = session.botHome() != null ? session.botHome() : player.getLocation();
+        Location spot = base.clone().add(
+                DrillKernel.farPearlScatter(rng, 0), DrillKernel.FAR_PEARL_HEIGHT,
+                DrillKernel.farPearlScatter(rng, 1));
         Location safe = LocationUtil.safeTeleportLocation(spot);
         bot.teleport(safe);
-        Vector toward = base.toVector().subtract(safe.toVector()).setY(0);
+        Vector toward = player.getLocation().toVector().subtract(safe.toVector()).setY(0);
         if (toward.lengthSquared() > 0.0001) {
             bot.setVelocity(toward.normalize().multiply(0.35d).setY(0.3d));
         }
@@ -1417,8 +1434,8 @@ public final class PracticeService {
         }
         behind.normalize().multiply(-2.2d);
         bot.teleport(player.getLocation().clone().add(behind));
-        player.setVelocity(player.getVelocity().add(new Vector(0, 0.95d, 0)));
-        bot.setVelocity(new Vector(0, 0.9d, 0));
+        player.setVelocity(player.getVelocity().add(new Vector(0, DrillKernel.STUN_SLAM_PLAYER_LAUNCH, 0)));
+        bot.setVelocity(new Vector(0, DrillKernel.STUN_SLAM_BOT_LAUNCH, 0));
         if (bot.getWorld() != null) {
             bot.getWorld().playSound(player.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 0.7f, 1.6f);
         }
@@ -1430,10 +1447,11 @@ public final class PracticeService {
         BotDifficulty diff = session.difficulty();
         switch (session.botMode()) {
             case POT_REPOT -> {
-                if (now >= ab.nextAnchorMs() && bot.getHealth() < diff.botMaxHp() * 0.65d
+                if (now >= ab.nextAnchorMs()
+                        && bot.getHealth() < diff.botMaxHp() * DrillKernel.REPOT_HEALTH_FRACTION
                         && session.botConsume(Material.SPLASH_POTION, 1)) {
-                    bot.setHealth(Math.min(diff.botMaxHp(), bot.getHealth() + 6.0d));
-                    ab.nextAnchorMs(now + 2500L);
+                    bot.setHealth(Math.min(diff.botMaxHp(), bot.getHealth() + DrillKernel.REPOT_HEAL));
+                    ab.nextAnchorMs(now + DrillKernel.REPOT_COOLDOWN_MS);
                     if (bot.getWorld() != null) {
                         bot.getWorld().playSound(bot.getLocation(),
                                 Sound.ENTITY_GENERIC_SPLASH, 1.0f, 1.2f);
@@ -1442,15 +1460,18 @@ public final class PracticeService {
             }
             case POT_REFILL_HOTBAR -> {
                 if (now >= ab.nextAnchorMs()) {
-                    player.getInventory().setItem(1, new ItemStack(Material.SPLASH_POTION, 16));
-                    ab.nextAnchorMs(now + 4000L);
+                    player.getInventory().setItem(DrillKernel.REFILL_HOTBAR_SLOT,
+                            new ItemStack(Material.SPLASH_POTION, DrillKernel.REFILL_QUANTITY));
+                    ab.nextAnchorMs(now + DrillKernel.REFILL_COOLDOWN_MS);
                 }
             }
             case POT_REFILL_INVENTORY -> {
                 if (now >= ab.nextAnchorMs()) {
-                    player.getInventory().setItem(1, new ItemStack(Material.SPLASH_POTION, 16));
-                    player.getInventory().setItem(12, new ItemStack(Material.SPLASH_POTION, 16));
-                    ab.nextAnchorMs(now + 4000L);
+                    player.getInventory().setItem(DrillKernel.REFILL_HOTBAR_SLOT,
+                            new ItemStack(Material.SPLASH_POTION, DrillKernel.REFILL_QUANTITY));
+                    player.getInventory().setItem(DrillKernel.REFILL_INV_SLOT,
+                            new ItemStack(Material.SPLASH_POTION, DrillKernel.REFILL_QUANTITY));
+                    ab.nextAnchorMs(now + DrillKernel.REFILL_COOLDOWN_MS);
                 }
             }
             default -> { }
@@ -1464,9 +1485,10 @@ public final class PracticeService {
         PracticeSession.BotAbilityState ab = session.abilities();
         switch (mode) {
             case CRYSTAL_DTAP -> drillCycle(player, session, now, () -> {
+                // crystal/dtap/loop: pair reset DTAP_RESET_DISTANCE apart on the home line.
                 Location home = session.botHome() != null ? session.botHome() : bot.getLocation();
                 Vector forward = safeFlatForward(home, player);
-                Location startP = home.clone().add(forward.clone().multiply(10));
+                Location startP = home.clone().add(forward.clone().multiply(DrillKernel.DTAP_RESET_DISTANCE));
                 player.teleport(LocationUtil.safeTeleportLocation(
                         startP.setDirection(forward.clone().multiply(-1))));
             });
@@ -1476,7 +1498,14 @@ public final class PracticeService {
                             org.bukkit.potion.PotionEffectType.SLOW_FALLING, 20 * 30, 0,
                             false, false, true));
                 }
-                drillCycle(player, session, now, () -> {
+                drillCycleLedge(player, session, now, () -> {
+                    // crystal/ledge/loop: bot shifts ~30 ~ ~ so the dash crosses a real gap.
+                    Vector sideways = safeFlatForward(bot.getLocation(), player)
+                            .rotateAroundY(Math.PI / 2).multiply(DrillKernel.LEDGE_BOT_SHIFT);
+                    bot.teleport(LocationUtil.safeTeleportLocation(
+                            bot.getLocation().clone().add(sideways)));
+                }, () -> {
+                    // pearlcd2 15 ticks later the bot dash-pearls onto the player.
                     if (dist > 2.0d && session.botConsume(Material.ENDER_PEARL, 1)) {
                         Location landing = player.getLocation().clone().add(
                                 safeFlatForward(bot.getLocation(), player).multiply(1.2d));
@@ -1490,7 +1519,8 @@ public final class PracticeService {
             case CRYSTAL_HIT_ANCHOR -> {
                 if (now >= ab.nextAnchorMs() - 2000L && diff.attackDamage() > 0.0d) {
                     launchAnchorStrike(player, session, bot);
-                    ab.nextAnchorMs(now + Math.max(1500L, ANCHOR_MIN_COOLDOWN_MS / 2));
+                    ab.nextAnchorMs(now + Math.max(DrillKernel.HIT_ANCHOR_CADENCE_MIN_MS,
+                            ANCHOR_MIN_COOLDOWN_MS / 2));
                 }
             }
             default -> { }
@@ -2267,9 +2297,9 @@ public final class PracticeService {
      * (Density and Breach then modify that again). Approximated linearly and capped, so a bot
      * launched by a wind charge hurts a lot but cannot one-shot a full-health player.
      */
+    /** Delegates to {@link BotMath#maceSmashScale} (pure kernel; locally testable). */
     static double maceSmashScale(double fallDistance) {
-        double extra = Math.max(0.0d, fallDistance - MACE_SMASH_FALL_BLOCKS) * MACE_SMASH_PER_BLOCK;
-        return Math.min(MACE_SMASH_MAX_SCALE, 1.0d + extra);
+        return BotMath.maceSmashScale(fallDistance);
     }
 
     /**
@@ -2880,24 +2910,23 @@ public final class PracticeService {
         // Full-draw speed like a player bow, damage and spread from the difficulty ladder.
         if (now >= session.botNextAttackMs() && diff.attackDamage() > 0.0d) {
             bot.swingMainHand();
-            botShootArrow(bot, diff, dir, diff.attackDamage() * (0.7d + 0.18d * cartTier));
+            botShootArrow(bot, diff, dir, diff.attackDamage() * DrillKernel.cartBowFactor(cartTier));
             long jitter = java.util.concurrent.ThreadLocalRandom.current().nextInt(400);
             session.setBotNextAttackMs(now + Math.max(700L, diff.attackIntervalMs() * 2L) + jitter);
         }
-        // Rolling TNT "cart" every combo cooldown (on a rail, like the map's cart tracks).
+        // Rolling TNT "cart" every combo cooldown (on a rail, like the map's cart tracks);
+        // fuse / yield / cadence scalars are kernel-pinned cart tier formulas.
         if (now >= session.botNextCartMs() && session.botConsume(Material.TNT_MINECART, 1)) {
-            int fuse = Math.max(12, 26 - 2 * cartTier);          // T3 fastest fuses
-            float yield = (float) (4.0d + 0.6d * cartTier);      // T3 heaviest blasts
             org.bukkit.entity.TNTPrimed tnt = bot.getWorld().spawn(
                     botLoc.add(0, 1.1, 0), org.bukkit.entity.TNTPrimed.class, t -> {
-                        t.setFuseTicks(fuse);
-                        t.setYield(yield);
+                        t.setFuseTicks(DrillKernel.cartFuseTicks(cartTier));
+                        t.setYield(DrillKernel.cartYield(cartTier));
                         t.setSource(bot);
                     });
             tnt.setVelocity(dir.clone().normalize().multiply(0.85d).setY(0.18d));
             session.botTnt().add(tnt.getUniqueId());
-            session.setBotNextCartMs(now + Math.max(700L,
-                    (long) (diff.comboCooldownMs() * (1.0d - 0.12d * cartTier))));
+            session.setBotNextCartMs(now + DrillKernel.cartCooldownMs(
+                    diff.comboCooldownMs(), cartTier));
             if (session.botConsume(Material.POWERED_RAIL, 1)) {
                 placeTrackedBlock(session, tnt.getLocation().getBlock(),
                         Material.POWERED_RAIL, CART_RAIL_TTL_MS);
