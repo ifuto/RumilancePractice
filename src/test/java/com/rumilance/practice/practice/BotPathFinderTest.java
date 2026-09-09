@@ -19,9 +19,6 @@ class BotPathFinderTest {
             if (y <= 0) {
                 return false; // inside the floor
             }
-            if (solidExtra.contains(x + "," + z + "," + (y - 1))) {
-                return false; // floating headroom over obstacle column isn't standable
-            }
             // standable when: floor solid (y-1<0 default OR listed) and feet/head free
             boolean floorSolid = (y - 1) <= 0 || solidExtra.contains(x + "," + z + "," + (y - 1));
             boolean feetFree = !solidExtra.contains(x + "," + z + "," + y);
