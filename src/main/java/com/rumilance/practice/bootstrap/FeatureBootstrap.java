@@ -525,12 +525,6 @@ public final class FeatureBootstrap {
         services.register(com.rumilance.practice.tier.TierService.class, tierService);
         tierService.start();
 
-        // Client anti-cheat back-end (rumilance:ac handshake with the optional Fabric mod;
-        // per-player mandate via /anticheat require).
-        com.rumilance.practice.anticheat.AntiCheatService antiCheatService =
-                new com.rumilance.practice.anticheat.AntiCheatService(plugin, messageService);
-        services.register(com.rumilance.practice.anticheat.AntiCheatService.class, antiCheatService);
-        antiCheatService.start();
 
         StatsResetService statsResetService = new StatsResetService(
                 rankedStatsRepository, ffaStatsRepository, dailyRankedStatsRepository,
@@ -1539,8 +1533,6 @@ public final class FeatureBootstrap {
         bind("team", new TeamCommand(teamService, kitService, teamHubGui, teamsBrowserGui, messageService));
         bind("prac", new PracCommand(practiceService));
         bind("tier", new com.rumilance.practice.command.TierCommand(tierService, messageService));
-        bind("anticheat", new com.rumilance.practice.anticheat.AntiCheatCommand(
-                antiCheatService, messageService));
         // Server-wide crafting restriction: log -> planks only (lobby OPs exempt).
         plugin.getServer().getPluginManager().registerEvents(
                 new com.rumilance.practice.craft.CraftRestrictionListener(stateManager), plugin);
@@ -1660,8 +1652,6 @@ public final class FeatureBootstrap {
         }
         services.find(com.rumilance.practice.tier.TierService.class)
                 .ifPresent(com.rumilance.practice.tier.TierService::saveAll);
-        services.find(com.rumilance.practice.anticheat.AntiCheatService.class)
-                .ifPresent(com.rumilance.practice.anticheat.AntiCheatService::stop);
         if (practiceService != null) {
             practiceService.stop();
         }

@@ -439,7 +439,12 @@ public final class FfaService {
         killStreaks.put(player.getUniqueId(), 0);
         combatUntil.remove(player.getUniqueId());
         player.setCanPickupItems(true);
-        Location dest = pickSpawn(arena, player.getUniqueId());
+        // Spawn the joining player at a RANDOM spot on grass in the arena (top-down
+        // column scan); fall back to the indexed/configured spawn when no grass is found.
+        Location dest = randomGrassSpawn(arena);
+        if (dest == null) {
+            dest = pickSpawn(arena, player.getUniqueId());
+        }
         if (dest == null || dest.getWorld() == null) {
             leave(player);
             messageService.send(player, "ffa.unavailable");
@@ -811,6 +816,41 @@ public final class FfaService {
                     player.setCanPickupItems(true);
                     applySight(player);
                 }));
+    }
+
+    /**
+     * Random join spawn: pick a random column inside the arena, scan it top-down for a
+     * grass block ("上からチェック"), and drop the player on it when the two blocks above
+     * are passable. Returns {@code null} after 24 attempts (the caller falls back to the
+     * classic spawn logic).
+     */
+    private Location randomGrassSpawn(FfaArena arena) {
+        if (arena == null || arena.region() == null || arena.region().world() == null) {
+            return null;
+        }
+        World world = arena.region().world();
+        int minY = Math.max(world.getMinHeight() + 1, arena.region().minY());
+        int maxY = Math.min(world.getMaxHeight() - 2, arena.region().maxY());
+        if (minY >= maxY) {
+            return null;
+        }
+        java.util.concurrent.ThreadLocalRandom rng = java.util.concurrent.ThreadLocalRandom.current();
+        for (int attempt = 0; attempt < 24; attempt++) {
+            int x = rng.nextInt(arena.region().minX(), arena.region().maxX() + 1);
+            int z = rng.nextInt(arena.region().minZ(), arena.region().maxZ() + 1);
+            int top = Math.min(world.getHighestBlockYAt(x, z), maxY);
+            for (int y = top; y > minY; y--) {
+                if (world.getBlockAt(x, y - 1, z).getType() != org.bukkit.Material.GRASS_BLOCK) {
+                    continue;
+                }
+                if (world.getBlockAt(x, y, z).getType().isOccluding()
+                        || world.getBlockAt(x, y + 1, z).getType().isOccluding()) {
+                    break; // grass under a ceiling: give this column up
+                }
+                return new Location(world, x + 0.5, y, z + 0.5);
+            }
+        }
+        return null;
     }
 
     private Location pickSpawn(FfaArena arena, UUID joining) {
