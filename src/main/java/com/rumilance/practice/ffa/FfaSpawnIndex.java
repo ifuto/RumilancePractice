@@ -190,7 +190,25 @@ public final class FfaSpawnIndex implements Listener {
         if (!head.isPassable() || head.isLiquid()) {
             return false;
         }
-        return true;
+        return floorSupportLive(world, x, feetY - 1, z);
+    }
+
+    /** Same sheet-wall guard against the live world (index validation path). */
+    private static boolean floorSupportLive(World world, int x, int groundY, int z) {
+        String[] ground = new String[8];
+        String[] below = new String[8];
+        int i = 0;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (dx == 0 && dz == 0) {
+                    continue;
+                }
+                ground[i] = world.getBlockAt(x + dx, groundY, z + dz).getType().name();
+                below[i] = world.getBlockAt(x + dx, groundY - 1, z + dz).getType().name();
+                i++;
+            }
+        }
+        return FfaSpawnMath.hasFloorSupport(ground, below);
     }
 
     private void evictSpot(String arenaId, Spot spot) {
@@ -368,12 +386,38 @@ public final class FfaSpawnIndex implements Listener {
                     }
                     return snap.getBlockType(localX, y, localZ).name();
                 });
-                if (feetY != Integer.MIN_VALUE) {
+                if (feetY != Integer.MIN_VALUE
+                        && floorSupportAround(snap, localX, feetY, localZ)) {
                     spots.add(new Spot(x, feetY, z));
                 }
             }
         }
         return spots;
+    }
+
+    /**
+     * Border-wall guard: the 8 columns around (x,z) at ground level plus one block deeper
+     * must look like a floor (grass/snow/soil spreads pass; 1-wide wall sheets fail).
+     * Samples outside this chunk count as supported (chunk-edge passthrough).
+     */
+    static boolean floorSupportAround(ChunkSnapshot snap, int lx, int groundY, int lz) {
+        String[] ground = new String[8];
+        String[] below = new String[8];
+        int i = 0;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (dx == 0 && dz == 0) {
+                    continue;
+                }
+                int sx = lx + dx;
+                int sz = lz + dz;
+                boolean inside = sx >= 0 && sx < 16 && sz >= 0 && sz < 16;
+                ground[i] = inside ? snap.getBlockType(sx, groundY, sz).name() : null;
+                below[i] = inside ? snap.getBlockType(sx, groundY - 1, sz).name() : null;
+                i++;
+            }
+        }
+        return FfaSpawnMath.hasFloorSupport(ground, below);
     }
 
     static boolean overlaps(Cuboid region, Chunk chunk) {

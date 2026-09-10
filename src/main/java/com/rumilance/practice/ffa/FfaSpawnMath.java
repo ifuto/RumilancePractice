@@ -181,6 +181,44 @@ public final class FfaSpawnMath {
         };
     }
 
+    /**
+     * Minimum number of solid-ish samples (out of 16) a genuinely floored column shows.
+     * Below this, the candidate is a wall sheet top / tree canopy / pillar — not a floor.
+     */
+    public static final int FLOOR_SUPPORT_MIN = 6;
+
+    /**
+     * Guards against "spawn on a border wall top / floating lip": a real floor carries
+     * support in its neighbourhood, a 1-wide shell does not. Callers sample the 8 block
+     * columns around the candidate at the ground level (grass/snow counts), and the 8
+     * columns one block deeper; {@code null} means "outside the loaded snapshot" and is
+     * counted as supported (chunk-edge passthrough; full confidence needs no neighbour).
+     */
+    public static boolean hasFloorSupport(String[] groundLevel, String[] belowLevel) {
+        int supported = 0;
+        if (groundLevel != null) {
+            for (String name : groundLevel) {
+                if (!isVoidSample(name)) {
+                    supported++;
+                }
+            }
+        }
+        if (belowLevel != null) {
+            for (String name : belowLevel) {
+                if (!isVoidSample(name)) {
+                    supported++;
+                }
+            }
+        }
+        return supported >= FLOOR_SUPPORT_MIN;
+    }
+
+    /** "No support" sample: true-air or unknown treated as supported (null = passthrough). */
+    static boolean isVoidSample(String materialName) {
+        return "AIR".equals(materialName) || "CAVE_AIR".equals(materialName)
+                || "VOID_AIR".equals(materialName);
+    }
+
     public static boolean isUnsafeFeet(String materialName) {
         if (materialName == null) {
             return true;

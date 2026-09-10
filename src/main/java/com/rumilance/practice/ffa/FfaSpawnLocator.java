@@ -153,9 +153,33 @@ public final class FfaSpawnLocator {
             if (!head.isPassable() || head.isLiquid()) {
                 continue;
             }
+            // Border-wall guard: top of a 1-wide shell is air-adjacent, floors are not.
+            if (!floorSupport(world, x, y, z)) {
+                continue;
+            }
             return new Location(world, x + 0.5d, feetY, z + 0.5d, 0f, 0f);
         }
         return null;
+    }
+
+    /** 8-neighbour support probe shared with the index (wall tops fail, floors pass). */
+    static boolean floorSupport(World world, int x, int groundY, int z) {
+        String[] ground = new String[8];
+        String[] below = new String[8];
+        int i = 0;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (dx == 0 && dz == 0) {
+                    continue;
+                }
+                Block g = world.getBlockAt(x + dx, groundY, z + dz);
+                Block b = world.getBlockAt(x + dx, groundY - 1, z + dz);
+                ground[i] = g.getType().name();
+                below[i] = b.getType().name();
+                i++;
+            }
+        }
+        return FfaSpawnMath.hasFloorSupport(ground, below);
     }
 
     private static void randomYaw(Location location) {
