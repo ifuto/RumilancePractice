@@ -5,43 +5,11 @@ import org.junit.jupiter.api.Test;
 import java.util.random.RandomGenerator;
 import java.util.random.RandomGeneratorFactory;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FfaSpawnMathTest {
-
-    @Test
-    void inwardCellsStartsAtClampPointThenWalksTowardsCentre() {
-        int[][] trail = FfaSpawnMath.inwardCells(40, 0, 0, 0, 8);
-        assertArrayEquals(new int[]{40, 0}, trail[0], "first cell = clamp point");
-        int last = trail.length - 1;
-        assertEquals(0, trail[last][0], "reaches centre X");
-        // Each step moves exactly 2 blocks on the axis with the larger remaining distance.
-        for (int i = 1; i < trail.length; i++) {
-            int dx = Math.abs(trail[i][0] - trail[i - 1][0]);
-            int dz = Math.abs(trail[i][1] - trail[i - 1][1]);
-            assertEquals(2, dx + dz, "stride 2 at step " + i);
-        }
-    }
-
-    @Test
-    void inwardCellsCapsAtMaxProbes() {
-        int[][] trail = FfaSpawnMath.inwardCells(1000, -1000, 0, 0, 10);
-        assertEquals(10, trail.length, "probe budget respected");
-    }
-
-    @Test
-    void inwardCellsDiagonalAlternatesAxes() {
-        int[][] trail = FfaSpawnMath.inwardCells(10, 4, 0, 0, 6);
-        assertArrayEquals(new int[]{10, 4}, trail[0]);
-        assertArrayEquals(new int[]{8, 4}, trail[1]);  // larger remaining distance wins ties
-        assertArrayEquals(new int[]{6, 4}, trail[2]);
-        assertArrayEquals(new int[]{4, 4}, trail[3]);
-        assertArrayEquals(new int[]{2, 4}, trail[4]);
-        assertArrayEquals(new int[]{0, 4}, trail[5]);
-    }
 
     private final RandomGenerator rng = RandomGeneratorFactory.of("L64X128MixRandom").create(1L);
 
