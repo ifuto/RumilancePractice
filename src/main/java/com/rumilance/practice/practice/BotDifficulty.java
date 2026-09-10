@@ -37,7 +37,9 @@ public final class BotDifficulty {
     public static final long REGEN_DELAY_MS = 5_000L;
 
     private Preset preset = Preset.INTERMEDIATE;
-    private double botMaxHp = 50.0d;
+    // Field defaults ARE the INTERMEDIATE rung; hp follows the map's 20-HP bot base
+    // (mech_train/common: attribute quantumbot max_health base set 20).
+    private double botMaxHp = 20.0d;
     private double attackDamage = 4.0d;
     private long attackIntervalMs = 750L;
     private double moveSpeed = 0.22d;
@@ -142,37 +144,37 @@ public final class BotDifficulty {
             }
             case EASY -> {
                 // Map rung 1: hitcd 23t, reach 1.3, aim 5, combos 5-6s, totem_cd 40t.
-                botMaxHp = 30; attackDamage = 3; attackIntervalMs = 1150; moveSpeed = 0.16;
+                botMaxHp = 20; attackDamage = 3; attackIntervalMs = 1150; moveSpeed = 0.16;
                 regenPerSecond = 1.5; comboCooldownMs = 4000; shieldStun = false;
                 shieldReduction = 0.4; totemGoal = 2; reachBlocks = 2.8; aimSpreadDegrees = 8;
             }
             case INTERMEDIATE -> {
                 // Map rung 2 ("Intermediate"): hitcd 15t, reach 1.6, aim 4, combos 4-6s.
-                botMaxHp = 50; attackDamage = 4; attackIntervalMs = 750; moveSpeed = 0.22;
+                botMaxHp = 20; attackDamage = 4; attackIntervalMs = 750; moveSpeed = 0.22;
                 regenPerSecond = 3; comboCooldownMs = 2400; shieldStun = true;
                 shieldReduction = 0.5; totemGoal = 3; reachBlocks = 3.0; aimSpreadDegrees = 5;
             }
             case HARD -> {
                 // Map rung 3: hitcd 10t, reach 2.0, aim 3, combos 3-6s.
-                botMaxHp = 70; attackDamage = 5; attackIntervalMs = 500; moveSpeed = 0.26;
+                botMaxHp = 20; attackDamage = 5; attackIntervalMs = 500; moveSpeed = 0.26;
                 regenPerSecond = 4; comboCooldownMs = 1800; shieldStun = true;
                 shieldReduction = 0.6; totemGoal = 4; reachBlocks = 3.2; aimSpreadDegrees = 3;
             }
             case CRAZY -> {
                 // Map rung 4 ("CRAZY"): hitcd 5t, reach 2.3, aim 2, combos 2-3s.
-                botMaxHp = 90; attackDamage = 6; attackIntervalMs = 300; moveSpeed = 0.30;
+                botMaxHp = 20; attackDamage = 6; attackIntervalMs = 300; moveSpeed = 0.30;
                 regenPerSecond = 5; comboCooldownMs = 1300; shieldStun = true;
                 shieldReduction = 0.7; totemGoal = 5; reachBlocks = 3.4; aimSpreadDegrees = 2;
             }
             case MASTER -> {
                 // Map rung 5 ("MASTER"): hitcd 0 (every tick it can), reach 2.9, totem_cd 0.
-                botMaxHp = 110; attackDamage = 7; attackIntervalMs = 250; moveSpeed = 0.34;
+                botMaxHp = 20; attackDamage = 7; attackIntervalMs = 250; moveSpeed = 0.34;
                 regenPerSecond = 6; comboCooldownMs = 1000; shieldStun = true;
                 shieldReduction = 0.75; totemGoal = 6; reachBlocks = 3.6; aimSpreadDegrees = 1;
             }
             case SURVIVAL_MASTER -> {
                 // Map rung 6: the map's final boss — fastest combos, longest reach, no mercy.
-                botMaxHp = 140; attackDamage = 8; attackIntervalMs = 200; moveSpeed = 0.38;
+                botMaxHp = 20; attackDamage = 8; attackIntervalMs = 200; moveSpeed = 0.38;
                 regenPerSecond = 8; comboCooldownMs = 800; shieldStun = true;
                 shieldReduction = 0.8; totemGoal = 8; reachBlocks = 3.8; aimSpreadDegrees = 0;
             }

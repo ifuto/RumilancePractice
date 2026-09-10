@@ -69,6 +69,32 @@ public final class FfaSpawnMath {
         return true;
     }
 
+    /**
+     * Footing-repair probe trail: starting at a (possibly stale) clamped point, step in
+     * 2-block strides toward the region centre until the centre is reached or
+     * {@code maxProbes} cells were emitted. The first cell is the clamp point itself.
+     * Pure math so the walk order is pinned by unit tests; the Bukkit glue re-resolves
+     * the standing height in each emitted column.
+     */
+    public static int[][] inwardCells(int startX, int startZ, int centerX, int centerZ, int maxProbes) {
+        java.util.List<int[]> out = new java.util.ArrayList<>();
+        int x = startX;
+        int z = startZ;
+        out.add(new int[]{x, z});
+        for (int i = 1; i < maxProbes && (x != centerX || z != centerZ); i++) {
+            int dx = Integer.compare(centerX, x);
+            int dz = Integer.compare(centerZ, z);
+            // Advance the axis with the larger remaining distance first (Manhattan trail).
+            if (Math.abs(centerX - x) >= Math.abs(centerZ - z)) {
+                x += dx * 2;
+            } else {
+                z += dz * 2;
+            }
+            out.add(new int[]{x, z});
+        }
+        return out.toArray(new int[0][]);
+    }
+
     public static int minDistSqToOccupied(int x, int z, int[] occupantX, int[] occupantZ) {
         if (occupantX == null || occupantX.length == 0) {
             return Integer.MAX_VALUE;

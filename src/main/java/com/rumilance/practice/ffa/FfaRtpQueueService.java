@@ -188,7 +188,13 @@ public final class FfaRtpQueueService {
             return; // No safe spot in the whole arena: keep both where they are.
         }
         if (arena.region() != null) {
-            anchor = LocationUtil.safeTeleportLocation(anchor, arena.region());
+            // Same border-edge floating fix: clamped X/Z must regain a standable Y.
+            Location standable = SpawnFooting.standableWithin(anchor, arena.region());
+            if (standable != null) {
+                anchor = standable;
+            } else {
+                anchor = LocationUtil.safeTeleportLocation(anchor, arena.region());
+            }
         }
         Location placeA = anchor;
         Location placeB = null;
