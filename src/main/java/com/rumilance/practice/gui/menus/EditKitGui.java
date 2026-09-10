@@ -369,6 +369,8 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         }
         inventory.setItem(GuiSlots.slot(0, 0),
                 ItemBuilder.action(UiTheme.BACK, t(player, "menu.back"), "back"));
+        inventory.setItem(GuiSlots.slot(0, 5),
+                ItemBuilder.action(UiTheme.CLOSE, t(player, "gui.kit-reset"), "reset"));
         inventory.setItem(GuiSlots.slot(0, 8),
                 ItemBuilder.action(UiTheme.CONFIRM, t(player, "gui.save"), "save"));
         session.put("layout", layout);
@@ -487,15 +489,8 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
                 Component.text(name, UiTheme.SUCCESS), action);
     }
 
-    private ItemStack[] loadLayout(UUID uuid, KitDefinition kit) {
-        try {
-            var snap = layoutRepository.find(uuid, kit.name());
-            if (snap.isPresent()) {
-                return KitLayoutDelta.decode(snap.get().itemDataBase64(), kit);
-            }
-        } catch (Exception ignored) {
-            // fall through
-        }
+    /** The pristine official layout (what a brand-new player receives). */
+    private ItemStack[] defaultLayout(KitDefinition kit) {
         ItemStack[] layout = new ItemStack[41];
         for (KitItemEntry entry : kit.items()) {
             ItemStack stack = kitEntryStack(entry);
@@ -513,6 +508,18 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         layout[38] = material(kit.armor().get("leggings"));
         layout[39] = material(kit.armor().get("boots"));
         return layout;
+    }
+
+    private ItemStack[] loadLayout(UUID uuid, KitDefinition kit) {
+        try {
+            var snap = layoutRepository.find(uuid, kit.name());
+            if (snap.isPresent()) {
+                return KitLayoutDelta.decode(snap.get().itemDataBase64(), kit);
+            }
+        } catch (Exception ignored) {
+            // fall through
+        }
+        return defaultLayout(kit);
     }
 
     /** Full-NBT kit entry when available; plain material+amount otherwise. */
@@ -648,6 +655,37 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             save(player, session);
             return;
         }
+        if ("reset".equals(action)) {
+            resetLayout(player, session, inventory);
+            return;
+        }
+    }
+
+    /**
+     * "初期状態にリセット": discard every user rearrangement, rebuild the pristine
+     * official kit layout in-session, and drop the stored delta row so the default
+     * loads everywhere else too.
+     */
+    private void resetLayout(Player player, GuiSession session, Inventory inventory) {
+        String kitId = session == null ? null : session.selectedKit();
+        KitDefinition kit = kitId == null ? null : kitService.get(kitId).orElse(null);
+        if (kit == null) {
+            return;
+        }
+        ItemStack[] fresh = defaultLayout(kit);
+        session.put("layout", fresh);
+        stashCurrentLayout(player, session);
+        layoutCache.put(player.getUniqueId(), kitId, fresh);
+        asyncExecutor.execute(() -> {
+            try {
+                layoutRepository.delete(player.getUniqueId(), kitId);
+            } catch (Exception ignored) {
+                // Deleting a not-yet-saved row failing silently is fine: default loads anyway.
+            }
+        });
+        render(player, session, inventory);
+        sounds.play(player, "gui-click");
+        player.sendMessage(t(player, "gui.kit-reset-done"));
     }
 
     @Override
@@ -780,6 +818,15 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
                 instanceof com.rumilance.practice.gui.PracticeGuiHolder holder
                 && holder.type() == GuiType.EDIT_KIT) {
             KitLayoutEditor.syncLayoutFromTopInventory(player.getOpenInventory().getTopInventory(), layout);
+            // BUGFIX: a save clicked while an item rides the cursor used to drop that
+            // item from the kit entirely. Absorb it into a free slot (armor slots win,
+            // then storage, then hotbar) and take it off the cursor instead.
+            ItemStack cursor = player.getOpenInventory().getCursor();
+            if (cursor != null && !cursor.getType().isAir()) {
+                if (KitLayoutEditor.addToLayout(layout, KitLayoutEditor.stripEditorTags(cursor.clone()))) {
+                    player.getOpenInventory().setCursor(null);
+                }
+            }
         }
         if (session != null) {
             session.put("layout", layout);

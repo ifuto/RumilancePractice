@@ -541,6 +541,12 @@ public final class FeatureBootstrap {
                 false, true, messageService);
         services.register(QueueCoordinator.class, queueCoordinator);
         queueCoordinator.start();
+        // One shared anti-click-spam guard for every queue entry point: menu joins AND
+        // queue signs both draw from the same 800ms cadence, so alternating between them
+        // cannot tunnel under the two guards individually.
+        com.rumilance.practice.queue.QueueClickGuard queueClickGuard =
+                new com.rumilance.practice.queue.QueueClickGuard();
+        queueCoordinator.setClickGuard(queueClickGuard);
         matchService.setQueueCoordinator(queueCoordinator);
         matchService.setFfaService(ffaService);
         if (practiceService != null) {
@@ -809,6 +815,7 @@ public final class FeatureBootstrap {
                 new com.rumilance.practice.signqueue.SignQueueService(plugin, kitService,
                         queueService, matchService, stateManager, lobbyService, soundService,
                         messageService, originalKitService, runtimeFlags);
+        signQueueService.setClickGuard(queueClickGuard);
         signQueueService.setFfaService(ffaService);
         signQueueService.setTeamService(teamService);
         signQueueService.start();

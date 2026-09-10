@@ -46,6 +46,8 @@ public final class QueueCoordinator {
     private final PlayerStateManager stateManager;
     private final SoundService soundService;
     private final MessageService messageService;
+    /** Shared anti-spam cadence (wired in FeatureBootstrap together with the sign queue). */
+    private QueueClickGuard clickGuard = new QueueClickGuard();
     private final RankedStatsRepository rankedStatsRepository;
     private final AsyncExecutor asyncExecutor;
     private final RuntimeFlags runtimeFlags;
@@ -117,7 +119,25 @@ public final class QueueCoordinator {
         this.signQueueService = signQueueService;
     }
 
+    /** FeatureBootstrap injects the guard shared with the sign-queue service. */
+    public void setClickGuard(QueueClickGuard clickGuard) {
+        if (clickGuard != null) {
+            this.clickGuard = clickGuard;
+        }
+    }
+
     public void join(Player player, String kitId, MatchMode mode) {
+        if (player == null) {
+            return;
+        }
+        QueueClickGuard.Decision gate = clickGuard.evaluate(player.getUniqueId(),
+                System.currentTimeMillis());
+        if (!gate.allowed()) {
+            if (gate.notify()) {
+                player.sendActionBar(messageService.render(player, "queue.slow-down"));
+            }
+            return;
+        }
         if (teamService != null && teamService.teamOf(player.getUniqueId()).isPresent()) {
             messageService.send(player, "party.solo-only");
             return;

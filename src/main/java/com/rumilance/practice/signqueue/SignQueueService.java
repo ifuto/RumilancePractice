@@ -9,6 +9,7 @@ import com.rumilance.practice.match.MatchService;
 import com.rumilance.practice.model.KitDefinition;
 import com.rumilance.practice.model.OriginalKitSnapshot;
 import com.rumilance.practice.originalkit.OriginalKitService;
+import com.rumilance.practice.queue.QueueClickGuard;
 import com.rumilance.practice.queue.QueueService;
 import com.rumilance.practice.session.PlayerStateManager;
 import com.rumilance.practice.sound.SoundService;
@@ -258,7 +259,24 @@ public final class SignQueueService implements Listener {
         return false;
     }
 
+    /** Anti-click-spam cadence (shared with the queue coordinator via FeatureBootstrap). */
+    private QueueClickGuard clickGuard = new QueueClickGuard();
+
+    public void setClickGuard(QueueClickGuard clickGuard) {
+        if (clickGuard != null) {
+            this.clickGuard = clickGuard;
+        }
+    }
+
     private void handleClick(Player player, String kitId) {
+        QueueClickGuard.Decision gate = clickGuard.evaluate(player.getUniqueId(),
+                System.currentTimeMillis());
+        if (!gate.allowed()) {
+            if (gate.notify()) {
+                player.sendActionBar(messageService.render(player, "queue.slow-down"));
+            }
+            return;
+        }
         if (isQueued(player.getUniqueId())) {
             leave(player);
             return;

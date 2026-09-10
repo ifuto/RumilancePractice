@@ -123,24 +123,18 @@ public final class KitLayoutEditor {
         if (layout == null || item == null || item.getType().isAir()) {
             return false;
         }
-        int armorSlot = armorSlotIndex(item);
-        if (armorSlot >= 0 && armorSlot < layout.length) {
-            layout[armorSlot] = item.clone();
-            return true;
+        // Slot picking is ruled by the pure kernel so the absorb-on-save behaviour is
+        // test-pinned without a server (placeholders read as empty slots).
+        String[] names = new String[layout.length];
+        for (int i = 0; i < layout.length; i++) {
+            names[i] = isEmpty(layout[i]) ? null : layout[i].getType().name();
         }
-        for (int i = 9; i <= 35; i++) {
-            if (isEmpty(layout[i])) {
-                layout[i] = item.clone();
-                return true;
-            }
+        int target = KitEditorMath.cursorTarget(item.getType().name(), names);
+        if (target < 0 || target >= layout.length) {
+            return false;
         }
-        for (int i = 0; i < 9; i++) {
-            if (isEmpty(layout[i])) {
-                layout[i] = item.clone();
-                return true;
-            }
-        }
-        return false;
+        layout[target] = item.clone();
+        return true;
     }
 
     private static boolean isEmpty(ItemStack stack) {
