@@ -133,7 +133,7 @@ public final class QueueCoordinator {
         QueueClickGuard.Decision gate = clickGuard.evaluate(player.getUniqueId(),
                 System.currentTimeMillis());
         if (!gate.allowed()) {
-            if (gate.notify()) {
+            if (gate.warning()) {
                 player.sendActionBar(messageService.render(player, "queue.slow-down"));
             }
             return;

@@ -886,12 +886,6 @@ public final class FfaService {
             footing = FfaSpawnLocator.find(arena, occupied);
         }
         Location base = footing != null && footing.getWorld() != null ? footing : arena.spawn();
-        // X/Z-only clamping keeps a stale Y and can strand the player mid-air at the arena
-        // border — re-resolve real footing inside the region (walk-in repair included).
-        Location standable = com.rumilance.practice.util.SpawnFooting.standableWithin(base, arena.region());
-        if (standable != null) {
-            return standable;
-        }
         return LocationUtil.safeTeleportLocation(base, arena.region());
     }
 

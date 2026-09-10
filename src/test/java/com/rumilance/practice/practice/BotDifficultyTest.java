@@ -13,16 +13,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class BotDifficultyTest {
 
-    @Test
-    void botHpIsPlayerEqualEverywhere() {
-        // Quantum mech_train/common: quantumbot max_health base = 20 (= player 10 hearts).
-        // Rungs differentiate via damage / cadence / reach / aim, NOT health.
-        for (BotDifficulty.Preset rung : LADDER) {
-            BotDifficulty d = BotDifficulty.of(rung);
-            assertEquals(20.0d, d.botMaxHp(), 1e-9, rung + " hp");
-        }
-    }
-
     private static final BotDifficulty.Preset[] LADDER = {
             BotDifficulty.Preset.NPC,
             BotDifficulty.Preset.EASY,

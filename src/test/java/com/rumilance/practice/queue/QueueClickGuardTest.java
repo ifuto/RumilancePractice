@@ -21,7 +21,7 @@ class QueueClickGuardTest {
     void firstClickAlwaysPasses() {
         QueueClickGuard.Decision d = guard.evaluate(id, 1_000L);
         assertTrue(d.allowed());
-        assertFalse(d.notify());
+        assertFalse(d.warning());
     }
 
     @Test
@@ -29,14 +29,18 @@ class QueueClickGuardTest {
         assertTrue(guard.evaluate(id, 0L).allowed());
         QueueClickGuard.Decision d1 = guard.evaluate(id, 100L);
         assertFalse(d1.allowed());
-        assertTrue(d1.notify(), "first violation -> warn once");
+        assertTrue(d1.warning(), "first violation -> warn once");
         QueueClickGuard.Decision d2 = guard.evaluate(id, 200L);
         assertFalse(d2.allowed());
-        assertFalse(d2.notify(), "spam loop stays silent after the first warning");
-        // Once the nag window elapses, a fresh warning is allowed again.
+        assertFalse(d2.warning(), "spam loop stays silent after the first warning");
+        // Clicks become legal again once the interaction window elapses.
         QueueClickGuard.Decision d3 = guard.evaluate(id, 100L + QueueClickGuard.FEEDBACK_INTERVAL_MS);
-        assertFalse(d3.allowed());
-        assertTrue(d3.notify());
+        assertTrue(d3.allowed(), "the only punishment is dropping the pulse, never the player");
+        assertFalse(d3.warning());
+        // ...and a fresh burst after that earns a fresh warning (nag re-armed).
+        QueueClickGuard.Decision d4 = guard.evaluate(id, 100L + QueueClickGuard.FEEDBACK_INTERVAL_MS + 1);
+        assertFalse(d4.allowed());
+        assertTrue(d4.warning(), "nag re-arms once the feedback window has passed");
     }
 
     @Test

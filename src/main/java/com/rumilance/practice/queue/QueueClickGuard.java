@@ -21,7 +21,7 @@ public final class QueueClickGuard {
     public static final long FEEDBACK_INTERVAL_MS = 1500L;
 
     /** Decision for one interaction attempt. */
-    public record Decision(boolean allowed, boolean notify) { }
+    public record Decision(boolean allowed, boolean warning) { }
 
     private final ConcurrentHashMap<UUID, Long> nextAllowedAt = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, Long> nextFeedbackAt = new ConcurrentHashMap<>();
@@ -37,13 +37,13 @@ public final class QueueClickGuard {
                 verdict.set(new Decision(true, false));
                 return nowMs + INTERVAL_MS;
             }
-            verdict.set(new Decision(false, shouldNotify(playerId, nowMs)));
+            verdict.set(new Decision(false, shouldWarn(playerId, nowMs)));
             return allowed;
         });
         return verdict.get();
     }
 
-    private boolean shouldNotify(UUID playerId, long nowMs) {
+    private boolean shouldWarn(UUID playerId, long nowMs) {
         Long at = nextFeedbackAt.get(playerId);
         if (at == null || nowMs >= at) {
             nextFeedbackAt.put(playerId, nowMs + FEEDBACK_INTERVAL_MS);

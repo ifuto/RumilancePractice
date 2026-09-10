@@ -17,45 +17,6 @@ import java.util.function.IntPredicate;
  */
 public final class SpawnFooting {
 
-    private static final int STANDABLE_WITHIN_PROBES = 48;
-
-    /**
-     * Clamps {@code desired} horizontally into {@code region} AND guarantees a standable
-     * landing: X/Z clamping alone (alias safeTeleportLocation(desired, region)) keeps the
-     * source column's Y, which leaves players floating against the arena/border edge when
-     * the source column sat outside over void. After the horizontal clamp we re-resolve the
-     * footing in the clamped column, then walk inward toward the region centre in 2-block
-     * strides (FfaSpawnMath.inwardCells) until a column with real ground appears. Returns
-     * {@code null} only when nothing standable exists on the whole inward trail.
-     */
-    public static Location standableWithin(Location desired, com.rumilance.practice.util.Cuboid region) {
-        if (desired == null || region == null) {
-            return null;
-        }
-        Location clamped = region.clampHorizontal(desired);
-        if (clamped.getWorld() == null) {
-            return null;
-        }
-        int minY = region.world() != null
-                ? Math.max(region.world().getMinHeight(), region.minY())
-                : region.minY();
-        int centerX = (region.minX() + region.maxX()) / 2;
-        int centerZ = (region.minZ() + region.maxZ()) / 2;
-        int[][] trail = com.rumilance.practice.ffa.FfaSpawnMath.inwardCells(
-                clamped.getBlockX(), clamped.getBlockZ(), centerX, centerZ, STANDABLE_WITHIN_PROBES);
-        for (int[] cell : trail) {
-            Location probe = new Location(clamped.getWorld(), cell[0] + 0.5d, desired.getY(), cell[1] + 0.5d);
-            Location standing = standClearDeep(probe, minY);
-            if (standing != null) {
-                standing.setYaw(desired.getYaw());
-                standing.setPitch(desired.getPitch());
-                return standing;
-            }
-        }
-        return null;
-    }
-
-
     /** Same-column: the block underfoot, or one more if YAML stored standing height. */
     static final int PIN_DOWN = 2;
     /** Same-column: pop out of a thick floor after schematic paste; not a cave hunt. */
