@@ -2,1699 +2,1303 @@
   "version": 2,
   "saves": [
     {
-      "id": "42e60a2b-da18-4385-89b9-588c6847142c",
-      "name": "Team List",
-      "createdAt": 1788675324728,
+      "id": "a794e530-73da-4f1e-8d26-c547304b192f",
+      "name": "Game Menu",
+      "createdAt": 1760000001000,
       "main": [
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
       ],
       "equipment": {},
       "container": {
         "columns": 9,
-        "pos": {
-          "x": 86,
-          "y": -22,
-          "z": -26
-        },
+        "pos": {"x":86,"y":-22,"z":-26},
         "items": [
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:netherite_upgrade_smithing_template",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Team List"
-            }
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:red_wool",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Red Team (3Players) Click to view Red Members"
-            }
-          },
-          {
-            "id": "minecraft:blue_wool",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Blue Team (12Players) Click to View blue members"
-            }
-          },
-          {
-            "id": "minecraft:lime_stained_glass_pane",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Add Team"
-            }
-          },
-          {
-            "id": "minecraft:barrier",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "VIP can only add team more"
-            }
-          },
-          {
-            "id": "minecraft:barrier",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "VIP can only add team more"
-            }
-          },
-          {
-            "id": "minecraft:barrier",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "VIP+ can only add team more"
-            }
-          },
-          {
-            "id": "minecraft:barrier",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "VIP+ can only add team more"
-            }
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:golden_apple",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Max Health"
-            }
-          },
-          {
-            "id": "minecraft:golden_apple",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Max Health"
-            }
-          },
-          {
-            "id": "minecraft:light_gray_stained_glass_pane",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Not Avalible Team"
-            }
-          },
-          {
-            "id": "minecraft:light_gray_stained_glass_pane",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Not Avalible Team"
-            }
-          },
-          {
-            "id": "minecraft:light_gray_stained_glass_pane",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Not Avalible Team"
-            }
-          },
-          {
-            "id": "minecraft:light_gray_stained_glass_pane",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Not Avalible Team"
-            }
-          },
-          {
-            "id": "minecraft:light_gray_stained_glass_pane",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Not Avalible Team"
-            }
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:leather_chestplate",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Body Size"
-            }
-          },
-          {
-            "id": "minecraft:leather_chestplate",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Body Size"
-            }
-          },
-          {
-            "id": "minecraft:light_gray_stained_glass_pane",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Not Avalible Team"
-            }
-          },
-          {
-            "id": "minecraft:light_gray_stained_glass_pane",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Not Avalible Team"
-            }
-          },
-          {
-            "id": "minecraft:light_gray_stained_glass_pane",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Not Avalible Team"
-            }
-          },
-          {
-            "id": "minecraft:light_gray_stained_glass_pane",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Not Avalible Team"
-            }
-          },
-          {
-            "id": "minecraft:light_gray_stained_glass_pane",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Not Avalible Team"
-            }
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:potion",
-            "count": 1,
-            "components": {
-              "minecraft:potion_contents": {
-                "potion": "minecraft:water"
-              },
-              "minecraft:custom_name": "Effect"
-            }
-          },
-          {
-            "id": "minecraft:potion",
-            "count": 1,
-            "components": {
-              "minecraft:potion_contents": {
-                "potion": "minecraft:water"
-              },
-              "minecraft:custom_name": "Effect"
-            }
-          },
-          {
-            "id": "minecraft:light_gray_stained_glass_pane",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Not Avalible Team"
-            }
-          },
-          {
-            "id": "minecraft:light_gray_stained_glass_pane",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Not Avalible Team"
-            }
-          },
-          {
-            "id": "minecraft:light_gray_stained_glass_pane",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Not Avalible Team"
-            }
-          },
-          {
-            "id": "minecraft:light_gray_stained_glass_pane",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Not Avalible Team"
-            }
-          },
-          {
-            "id": "minecraft:light_gray_stained_glass_pane",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Not Avalible Team"
-            }
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:arrow",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Back"
-            }
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          }
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},null,{"id":"minecraft:diamond_sword","count":1,"components":{"minecraft:custom_name":"Battle"}},null,{"id":"minecraft:crafting_table","count":1,"components":{"minecraft:custom_name":"Original Kits"}},null,{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Your Profile"}},null,null,
+          null,{"id":"minecraft:comparator","count":1,"components":{"minecraft:custom_name":"Settings"}},null,{"id":"minecraft:spyglass","count":1,"components":{"minecraft:custom_name":"Spectate Matches"}},null,{"id":"minecraft:blue_banner","count":1,"components":{"minecraft:custom_name":"Teams"}},null,{"id":"minecraft:name_tag","count":1,"components":{"minecraft:custom_name":"Titles"}},null,
+          {"id":"minecraft:barrier","count":1,"components":{"minecraft:custom_name":"Close"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
         ]
       }
     },
     {
-      "id": "fc58eb7e-f9b8-4d01-ab11-f86ae8226d45",
-      "name": "Player List",
-      "createdAt": 1788675317206,
-      "main": [
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null
-      ],
-      "equipment": {},
-      "container": {
-        "columns": 9,
-        "pos": {
-          "x": 86,
-          "y": -22,
-          "z": -24
-        },
-        "items": [
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:red_wool",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Red Team"
-            }
-          },
-          {
-            "id": "minecraft:blue_wool",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Blue Team"
-            }
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:diamond_sword",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Random Team"
-            }
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:player_head",
-            "count": 1
-          },
-          {
-            "id": "minecraft:player_head",
-            "count": 1
-          },
-          {
-            "id": "minecraft:player_head",
-            "count": 1
-          },
-          {
-            "id": "minecraft:player_head",
-            "count": 1
-          },
-          {
-            "id": "minecraft:player_head",
-            "count": 1
-          },
-          {
-            "id": "minecraft:player_head",
-            "count": 1
-          },
-          {
-            "id": "minecraft:player_head",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:player_head",
-            "count": 1
-          },
-          {
-            "id": "minecraft:player_head",
-            "count": 1
-          },
-          {
-            "id": "minecraft:player_head",
-            "count": 1
-          },
-          {
-            "id": "minecraft:player_head",
-            "count": 1
-          },
-          {
-            "id": "minecraft:player_head",
-            "count": 1
-          },
-          {
-            "id": "minecraft:player_head",
-            "count": 1
-          },
-          {
-            "id": "minecraft:player_head",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:player_head",
-            "count": 1
-          },
-          {
-            "id": "minecraft:player_head",
-            "count": 1
-          },
-          {
-            "id": "minecraft:player_head",
-            "count": 1
-          },
-          {
-            "id": "minecraft:player_head",
-            "count": 1
-          },
-          {
-            "id": "minecraft:player_head",
-            "count": 1
-          },
-          {
-            "id": "minecraft:player_head",
-            "count": 1
-          },
-          {
-            "id": "minecraft:player_head",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:arrow",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "←"
-            }
-          },
-          {
-            "id": "minecraft:player_head",
-            "count": 1
-          },
-          {
-            "id": "minecraft:player_head",
-            "count": 1
-          },
-          {
-            "id": "minecraft:player_head",
-            "count": 1
-          },
-          {
-            "id": "minecraft:player_head",
-            "count": 1
-          },
-          {
-            "id": "minecraft:player_head",
-            "count": 1
-          },
-          {
-            "id": "minecraft:arrow",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "→"
-            }
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:arrow",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Back"
-            }
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          }
-        ]
-      }
-    },
-    {
-      "id": "470d1506-4727-470c-a81a-b57f659a7c5f",
-      "name": "Party Hub",
-      "createdAt": 1788675305666,
-      "main": [
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null
-      ],
-      "equipment": {},
-      "container": {
-        "columns": 9,
-        "pos": {
-          "x": 86,
-          "y": -22,
-          "z": -22
-        },
-        "items": [
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:player_head",
-            "count": 1,
-            "components": {
-              "minecraft:profile": {
-                "name": "owner"
-              },
-              "minecraft:custom_name": "Party Hoster's Head"
-            }
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          null,
-          null,
-          {
-            "id": "minecraft:player_head",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Player List"
-            }
-          },
-          null,
-          {
-            "id": "minecraft:netherite_upgrade_smithing_template",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Team List"
-            }
-          },
-          null,
-          null,
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          null,
-          null,
-          {
-            "id": "minecraft:book",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Select Kit"
-            }
-          },
-          null,
-          {
-            "id": "minecraft:diamond_sword",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Start Battle"
-            }
-          },
-          null,
-          null,
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:barrier",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Close"
-            }
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          }
-        ]
-      }
-    },
-    {
-      "id": "a5dc63f0-b7a1-4108-bd6e-e54b1faa78b7",
-      "name": "Party",
-      "createdAt": 1788675298525,
-      "main": [
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null
-      ],
-      "equipment": {},
-      "container": {
-        "columns": 9,
-        "pos": {
-          "x": 86,
-          "y": -22,
-          "z": -20
-        },
-        "items": [
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:name_tag",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Party"
-            }
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          null,
-          {
-            "id": "minecraft:lime_dye",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Create Public Team"
-            }
-          },
-          null,
-          {
-            "id": "minecraft:oak_sign",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Public Team List"
-            }
-          },
-          null,
-          {
-            "id": "minecraft:gray_dye",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Create Private Team"
-            }
-          },
-          null,
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:barrier",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Close"
-            }
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:white_stained_glass_pane",
-            "count": 1
-          }
-        ]
-      }
-    },
-    {
-      "id": "84bd35cb-440b-425a-88a1-aa926d375ca6",
-      "name": "Kit Editor",
-      "createdAt": 1788675235229,
-      "main": [
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null
-      ],
-      "equipment": {},
-      "container": {
-        "columns": 9,
-        "pos": {
-          "x": 86,
-          "y": -22,
-          "z": -18
-        },
-        "items": [
-          {
-            "id": "minecraft:yellow_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:yellow_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:yellow_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:yellow_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:book",
-            "count": 1
-          },
-          {
-            "id": "minecraft:yellow_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:yellow_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:yellow_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:yellow_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:yellow_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:diamond_sword",
-            "count": 1
-          },
-          {
-            "id": "minecraft:diamond_axe",
-            "count": 1
-          },
-          {
-            "id": "minecraft:netherite_sword",
-            "count": 1
-          },
-          {
-            "id": "minecraft:netherite_axe",
-            "count": 1
-          },
-          {
-            "id": "minecraft:golden_apple",
-            "count": 1
-          },
-          {
-            "id": "minecraft:ender_pearl",
-            "count": 1
-          },
-          {
-            "id": "minecraft:end_crystal",
-            "count": 1
-          },
-          {
-            "id": "minecraft:yellow_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:yellow_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:mace",
-            "count": 1
-          },
-          {
-            "id": "minecraft:paper",
-            "count": 1
-          },
-          null,
-          null,
-          null,
-          null,
-          null,
-          {
-            "id": "minecraft:yellow_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:yellow_stained_glass_pane",
-            "count": 1
-          },
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          {
-            "id": "minecraft:yellow_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:yellow_stained_glass_pane",
-            "count": 1
-          },
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          {
-            "id": "minecraft:yellow_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:arrow",
-            "count": 1
-          },
-          {
-            "id": "minecraft:yellow_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:yellow_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:yellow_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:barrier",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Close"
-            }
-          },
-          {
-            "id": "minecraft:yellow_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:yellow_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:yellow_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:arrow",
-            "count": 1
-          }
-        ]
-      }
-    },
-    {
-      "id": "a5c7bc0f-0506-4a7a-9440-984f6d53704a",
+      "id": "b02c1479-ae63-48b5-918f-6d9329ec705a",
       "name": "Battle Menu",
-      "createdAt": 1788675228402,
+      "createdAt": 1760000002000,
       "main": [
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
       ],
       "equipment": {},
       "container": {
         "columns": 9,
-        "pos": {
-          "x": 86,
-          "y": -22,
-          "z": -16
-        },
+        "pos": {"x":86,"y":-22,"z":-26},
         "items": [
-          {
-            "id": "minecraft:light_blue_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:light_blue_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:light_blue_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:light_blue_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:nether_star",
-            "count": 1
-          },
-          {
-            "id": "minecraft:light_blue_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:light_blue_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:light_blue_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:light_blue_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:light_blue_stained_glass_pane",
-            "count": 1
-          },
-          null,
-          {
-            "id": "minecraft:diamond_sword",
-            "count": 1
-          },
-          null,
-          null,
-          null,
-          {
-            "id": "minecraft:iron_sword",
-            "count": 1
-          },
-          null,
-          {
-            "id": "minecraft:light_blue_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:light_blue_stained_glass_pane",
-            "count": 1
-          },
-          null,
-          null,
-          null,
-          {
-            "id": "minecraft:player_head",
-            "count": 1,
-            "components": {
-              "minecraft:profile": {
-                "name": "Ifuto_mitai"
-              }
-            }
-          },
-          null,
-          null,
-          null,
-          {
-            "id": "minecraft:light_blue_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:light_blue_stained_glass_pane",
-            "count": 1
-          },
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          {
-            "id": "minecraft:light_blue_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:light_blue_stained_glass_pane",
-            "count": 1
-          },
-          null,
-          {
-            "id": "minecraft:end_crystal",
-            "count": 1
-          },
-          null,
-          null,
-          null,
-          {
-            "id": "minecraft:book",
-            "count": 1
-          },
-          null,
-          {
-            "id": "minecraft:light_blue_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:light_blue_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:light_blue_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:light_blue_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:light_blue_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:barrier",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Close"
-            }
-          },
-          {
-            "id": "minecraft:light_blue_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:light_blue_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:light_blue_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:light_blue_stained_glass_pane",
-            "count": 1
-          }
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},null,{"id":"minecraft:golden_sword","count":1,"components":{"minecraft:custom_name":"Ranked Queue"}},null,{"id":"minecraft:iron_sword","count":1,"components":{"minecraft:custom_name":"Unranked Queue"}},null,{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Challenge a Player"}},null,null,
+          null,{"id":"minecraft:netherite_axe","count":1,"components":{"minecraft:custom_name":"Free-for-All"}},null,{"id":"minecraft:armor_stand","count":1,"components":{"minecraft:custom_name":"Bot Practice"}},null,{"id":"minecraft:book","count":1,"components":{"minecraft:custom_name":"Match History"}},null,{"id":"minecraft:red_dye","count":1,"components":{"minecraft:custom_name":"Leave Queue — Searching: Sword"}},null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
         ]
       }
     },
     {
-      "id": "693ff586-3ec3-4cba-a4ac-2637943279b2",
-      "name": "Spectate",
-      "createdAt": 1788675221490,
+      "id": "cf582639-140e-40ab-a8c1-7539fdeb26a4",
+      "name": "Queue Kit Select",
+      "createdAt": 1760000003000,
       "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:diamond_sword","count":1,"components":{"minecraft:custom_name":"Queue: Sword"}},{"id":"minecraft:diamond_axe","count":1,"components":{"minecraft:custom_name":"Queue: Axe"}},{"id":"minecraft:end_crystal","count":1,"components":{"minecraft:custom_name":"Queue: Crystal"}},{"id":"minecraft:mace","count":1,"components":{"minecraft:custom_name":"Queue: Mace"}},{"id":"minecraft:bow","count":1,"components":{"minecraft:custom_name":"Queue: Bow"}},{"id":"minecraft:golden_apple","count":1,"components":{"minecraft:custom_name":"Queue: UHC"}},{"id":"minecraft:splash_potion","count":1,"components":{"minecraft:custom_name":"Queue: NoDebuff"}},null,
+          null,null,null,null,null,null,null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "d346bec8-7901-4fd2-b553-0ae4927c1386",
+      "name": "Player Duel",
+      "createdAt": 1760000004000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Challenge Nova — Online"}},{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Challenge Ember — Online"}},{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Challenge Finch — Online"}},null,{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Challenge Atlas — Online"}},{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Challenge Willow — Online"}},{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Challenge Orbit — Online"}},null,
+          null,null,null,null,null,null,null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,{"id":"minecraft:paper","count":1,"components":{"minecraft:custom_name":"Previous Page"}},{"id":"minecraft:orange_stained_glass_pane","count":1},{"id":"minecraft:paper","count":1,"components":{"minecraft:custom_name":"Next Page"}},null,null,null
+        ]
+      }
+    },
+    {
+      "id": "ec879524-361b-4a60-967e-bd8420f53ac9",
+      "name": "Duel Request",
+      "createdAt": 1760000005000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:diamond_sword","count":1,"components":{"minecraft:custom_name":"Choose Kit: Sword"}},null,{"id":"minecraft:map","count":1,"components":{"minecraft:custom_name":"Choose Map: Random"}},null,{"id":"minecraft:blue_banner","count":1,"components":{"minecraft:custom_name":"Choose Mode: Standard"}},null,{"id":"minecraft:gold_nugget","count":3,"components":{"minecraft:custom_name":"Best-of: 3 Rounds"}},null,
+          null,null,{"id":"minecraft:lime_concrete","count":1,"components":{"minecraft:custom_name":"Send Duel Request"}},null,null,null,{"id":"minecraft:red_concrete","count":1,"components":{"minecraft:custom_name":"Cancel Duel Request"}},null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "f126d80b-4e97-42c3-a06d-935bfa7128e4",
+      "name": "Duel Map Select",
+      "createdAt": 1760000006000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},null,null,null,{"id":"minecraft:compass","count":1,"components":{"minecraft:custom_name":"Random Map"}},null,null,null,null,
+          null,{"id":"minecraft:stone_bricks","count":1,"components":{"minecraft:custom_name":"Courtyard"}},{"id":"minecraft:sandstone","count":1,"components":{"minecraft:custom_name":"Sunspire"}},{"id":"minecraft:packed_ice","count":1,"components":{"minecraft:custom_name":"Frostline"}},null,{"id":"minecraft:cherry_log","count":1,"components":{"minecraft:custom_name":"Blossom"}},{"id":"minecraft:prismarine","count":1,"components":{"minecraft:custom_name":"Tidal"}},{"id":"minecraft:deepslate_tiles","count":1,"components":{"minecraft:custom_name":"Foundry"}},null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "04a9c673-5bd2-4e88-8f10-e6d390a25b47",
+      "name": "Spectate List",
+      "createdAt": 1760000007000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},null,{"id":"minecraft:golden_sword","count":1,"components":{"minecraft:custom_name":"Filter: Ranked — Selected"}},null,{"id":"minecraft:iron_sword","count":1,"components":{"minecraft:custom_name":"Filter: Unranked"}},null,{"id":"minecraft:netherite_axe","count":1,"components":{"minecraft:custom_name":"Filter: FFA"}},null,null,
+          null,null,{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Watch Nova vs Ember — Sword • 1:24"}},null,{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Watch Finch vs Atlas — Axe • 0:48"}},null,{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Watch Willow vs Orbit — Crystal • 2:10"}},null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "159eb402-c8f3-4691-94ad-07bc6e2358f0",
+      "name": "Kit Select",
+      "createdAt": 1760000008000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:diamond_sword","count":1,"components":{"minecraft:custom_name":"Select Sword Kit"}},{"id":"minecraft:diamond_axe","count":1,"components":{"minecraft:custom_name":"Select Axe Kit"}},{"id":"minecraft:end_crystal","count":1,"components":{"minecraft:custom_name":"Select Crystal Kit"}},{"id":"minecraft:mace","count":1,"components":{"minecraft:custom_name":"Select Mace Kit"}},{"id":"minecraft:bow","count":1,"components":{"minecraft:custom_name":"Select Bow Kit"}},{"id":"minecraft:golden_apple","count":1,"components":{"minecraft:custom_name":"Select UHC Kit"}},{"id":"minecraft:splash_potion","count":1,"components":{"minecraft:custom_name":"Select NoDebuff Kit"}},null,
+          null,null,null,null,null,null,null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "26d5038e-9a71-4bc4-a268-f05381de97b6",
+      "name": "Kit Editor",
+      "createdAt": 1760000009000,
+      "main": [
+        {"id":"minecraft:diamond_sword","count":1},
+        {"id":"minecraft:diamond_axe","count":1},
+        {"id":"minecraft:bow","count":1},
+        {"id":"minecraft:ender_pearl","count":8},
+        {"id":"minecraft:golden_apple","count":8},
+        {"id":"minecraft:cobweb","count":8},
+        {"id":"minecraft:water_bucket","count":1},
+        {"id":"minecraft:splash_potion","count":1},
+        {"id":"minecraft:cooked_beef","count":16},
+        {"id":"minecraft:arrow","count":16},
+        {"id":"minecraft:splash_potion","count":1},
+        {"id":"minecraft:splash_potion","count":1},
+        {"id":"minecraft:splash_potion","count":1},
+        {"id":"minecraft:splash_potion","count":1},
+        {"id":"minecraft:potion","count":1},
+        {"id":"minecraft:lava_bucket","count":1},
+        {"id":"minecraft:oak_planks","count":16},
         null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
+        null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,
+        {"id":"minecraft:diamond_boots","count":1},
+        {"id":"minecraft:diamond_leggings","count":1},
+        {"id":"minecraft:diamond_chestplate","count":1},
+        {"id":"minecraft:diamond_helmet","count":1},
+        {"id":"minecraft:shield","count":1}
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:diamond_sword","count":1,"components":{"minecraft:custom_name":"Gear — Selected"}},null,{"id":"minecraft:diamond_chestplate","count":1,"components":{"minecraft:custom_name":"Armor"}},null,{"id":"minecraft:golden_apple","count":1,"components":{"minecraft:custom_name":"Consumables"}},null,{"id":"minecraft:brewing_stand","count":1,"components":{"minecraft:custom_name":"Potions"}},null,
+          null,null,{"id":"minecraft:lime_concrete","count":1,"components":{"minecraft:custom_name":"Save Kit"}},null,null,null,{"id":"minecraft:flint","count":1,"components":{"minecraft:custom_name":"Reset to Default"}},null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "37fb9620-612a-480d-b9e7-24c853af10d6",
+      "name": "Kit Preview",
+      "createdAt": 1760000010000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:diamond_sword","count":1,"components":{"minecraft:custom_name":"Sword Kit Preview: Diamond Sword — Read Only"}},{"id":"minecraft:diamond_axe","count":1,"components":{"minecraft:custom_name":"Diamond Axe — Read Only"}},{"id":"minecraft:bow","count":1,"components":{"minecraft:custom_name":"Bow — Read Only"}},{"id":"minecraft:arrow","count":16,"components":{"minecraft:custom_name":"16 Arrows — Read Only"}},{"id":"minecraft:ender_pearl","count":8,"components":{"minecraft:custom_name":"8 Ender Pearls — Read Only"}},{"id":"minecraft:golden_apple","count":8,"components":{"minecraft:custom_name":"8 Golden Apples — Read Only"}},{"id":"minecraft:shield","count":1,"components":{"minecraft:custom_name":"Shield — Read Only"}},null,
+          null,{"id":"minecraft:diamond_helmet","count":1,"components":{"minecraft:custom_name":"Diamond Helmet — Read Only"}},{"id":"minecraft:diamond_chestplate","count":1,"components":{"minecraft:custom_name":"Diamond Chestplate — Read Only"}},{"id":"minecraft:diamond_leggings","count":1,"components":{"minecraft:custom_name":"Diamond Leggings — Read Only"}},{"id":"minecraft:diamond_boots","count":1,"components":{"minecraft:custom_name":"Diamond Boots — Read Only"}},{"id":"minecraft:water_bucket","count":1,"components":{"minecraft:custom_name":"Water Bucket — Read Only"}},{"id":"minecraft:splash_potion","count":1,"components":{"minecraft:custom_name":"Healing Potion — Read Only"}},{"id":"minecraft:cooked_beef","count":16,"components":{"minecraft:custom_name":"16 Steak — Read Only"}},null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "485ae713-f290-43b6-8c14-d9a076eb5328",
+      "name": "Original Kits",
+      "createdAt": 1760000011000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},null,{"id":"minecraft:diamond_sword","count":1,"components":{"minecraft:custom_name":"Original Slot 1: Duelist — Unlocked"}},null,{"id":"minecraft:mace","count":1,"components":{"minecraft:custom_name":"Original Slot 2: Skyfall — Unlocked"}},null,{"id":"minecraft:chest","count":1,"components":{"minecraft:custom_name":"Original Slot 3: Empty — Create Kit"}},null,null,
+          null,null,{"id":"minecraft:gray_dye","count":1,"components":{"minecraft:custom_name":"Original Slot 4 — Locked"}},null,{"id":"minecraft:gray_dye","count":1,"components":{"minecraft:custom_name":"Original Slot 5 — Locked"}},null,{"id":"minecraft:gray_dye","count":1,"components":{"minecraft:custom_name":"Original Slot 6 — Locked"}},null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "596ec824-07ad-45f9-913b-6c2d84a170ef",
+      "name": "Original Kit Editor",
+      "createdAt": 1760000012000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:bricks","count":1,"components":{"minecraft:custom_name":"Blocks — Selected"}},null,{"id":"minecraft:shield","count":1,"components":{"minecraft:custom_name":"Offhand"}},null,{"id":"minecraft:brewing_stand","count":1,"components":{"minecraft:custom_name":"Potions"}},null,{"id":"minecraft:lime_concrete","count":1,"components":{"minecraft:custom_name":"Save Original Kit"}},null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "6a18f935-b64c-4217-ab50-9380de72c4f6",
+      "name": "Ekit Select",
+      "createdAt": 1760000013000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:diamond_sword","count":1,"components":{"minecraft:custom_name":"Edit Category: Sword"}},{"id":"minecraft:diamond_axe","count":1,"components":{"minecraft:custom_name":"Edit Category: Axe"}},{"id":"minecraft:end_crystal","count":1,"components":{"minecraft:custom_name":"Edit Category: Crystal"}},{"id":"minecraft:mace","count":1,"components":{"minecraft:custom_name":"Edit Category: Mace"}},{"id":"minecraft:bow","count":1,"components":{"minecraft:custom_name":"Edit Category: Bow"}},{"id":"minecraft:golden_apple","count":1,"components":{"minecraft:custom_name":"Edit Category: UHC"}},{"id":"minecraft:splash_potion","count":1,"components":{"minecraft:custom_name":"Edit Category: NoDebuff"}},null,
+          null,null,null,null,null,null,null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "7be32046-d195-4c8a-b267-50f9a31e68cd",
+      "name": "Ekit Choice",
+      "createdAt": 1760000014000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},null,null,{"id":"minecraft:crafting_table","count":1,"components":{"minecraft:custom_name":"Create New Ekit"}},null,{"id":"minecraft:writable_book","count":1,"components":{"minecraft:custom_name":"Copy Existing Ekit"}},null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "8c4d7157-3ea2-409b-8578-f02c694da31e",
+      "name": "Ekit Copy",
+      "createdAt": 1760000015000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:diamond_sword","count":1,"components":{"minecraft:custom_name":"Copy Source: Sword Default"}},{"id":"minecraft:diamond_axe","count":1,"components":{"minecraft:custom_name":"Copy Source: Axe Default"}},{"id":"minecraft:end_crystal","count":1,"components":{"minecraft:custom_name":"Copy Source: Crystal Default"}},{"id":"minecraft:mace","count":1,"components":{"minecraft:custom_name":"Copy Source: Mace Default"}},{"id":"minecraft:bow","count":1,"components":{"minecraft:custom_name":"Copy Source: Bow Default"}},{"id":"minecraft:golden_apple","count":1,"components":{"minecraft:custom_name":"Copy Source: UHC Default"}},{"id":"minecraft:splash_potion","count":1,"components":{"minecraft:custom_name":"Copy Source: NoDebuff Default"}},null,
+          null,null,null,null,null,null,null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "9d605268-8fb3-47ec-9689-c14a7e0532bd",
+      "name": "Ekit Admin",
+      "createdAt": 1760000016000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:diamond_sword","count":1,"components":{"minecraft:custom_name":"Sword — Left: Deposit / Right: Withdraw"}},{"id":"minecraft:diamond_axe","count":1,"components":{"minecraft:custom_name":"Axe — Left: Deposit / Right: Withdraw"}},{"id":"minecraft:end_crystal","count":1,"components":{"minecraft:custom_name":"Crystal — Left: Deposit / Right: Withdraw"}},{"id":"minecraft:mace","count":1,"components":{"minecraft:custom_name":"Mace — Left: Deposit / Right: Withdraw"}},{"id":"minecraft:bow","count":1,"components":{"minecraft:custom_name":"Bow — Left: Deposit / Right: Withdraw"}},{"id":"minecraft:golden_apple","count":1,"components":{"minecraft:custom_name":"UHC — Left: Deposit / Right: Withdraw"}},{"id":"minecraft:splash_potion","count":1,"components":{"minecraft:custom_name":"NoDebuff — Left: Deposit / Right: Withdraw"}},null,
+          null,null,null,null,null,null,null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "ae7f039a-2c54-48d1-a79b-06e5b384fc12",
+      "name": "Preset Admin",
+      "createdAt": 1760000017000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},null,{"id":"minecraft:diamond_chestplate","count":1,"components":{"minecraft:custom_name":"Default Layout: Armor — Selected"}},null,{"id":"minecraft:diamond_sword","count":1,"components":{"minecraft:custom_name":"Default Layout: Gear"}},null,{"id":"minecraft:brewing_stand","count":1,"components":{"minecraft:custom_name":"Default Layout: Potions"}},null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "bf8124ab-5d06-432e-b80c-719f46a2e395",
+      "name": "Practice Bot Select",
+      "createdAt": 1760000018000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:diamond_sword","count":1,"components":{"minecraft:custom_name":"Practice: Sword Bot"}},{"id":"minecraft:diamond_axe","count":1,"components":{"minecraft:custom_name":"Practice: Axe Bot"}},{"id":"minecraft:end_crystal","count":1,"components":{"minecraft:custom_name":"Practice: Crystal Bot"}},{"id":"minecraft:respawn_anchor","count":1,"components":{"minecraft:custom_name":"Practice: Anchor Bot"}},{"id":"minecraft:mace","count":1,"components":{"minecraft:custom_name":"Practice: Mace Bot"}},{"id":"minecraft:bow","count":1,"components":{"minecraft:custom_name":"Practice: Bow Bot"}},{"id":"minecraft:slime_ball","count":1,"components":{"minecraft:custom_name":"Practice: Combo Bot"}},null,
+          null,null,null,null,null,null,null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "c09235bc-6e17-4a4f-891d-ae3085c7b264",
+      "name": "Bot Difficulty",
+      "createdAt": 1760000019000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
         null
       ],
       "equipment": {},
       "container": {
         "columns": 9,
-        "pos": {
-          "x": 86,
-          "y": -22,
-          "z": -14
-        },
+        "pos": {"x":86,"y":-22,"z":-26},
         "items": [
-          {
-            "id": "minecraft:lime_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:lime_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:lime_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:lime_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:ender_eye",
-            "count": 1
-          },
-          {
-            "id": "minecraft:lime_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:lime_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:lime_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:lime_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:lime_stained_glass_pane",
-            "count": 1
-          },
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          {
-            "id": "minecraft:lime_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:lime_stained_glass_pane",
-            "count": 1
-          },
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          {
-            "id": "minecraft:lime_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:lime_stained_glass_pane",
-            "count": 1
-          },
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          {
-            "id": "minecraft:lime_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:lime_stained_glass_pane",
-            "count": 1
-          },
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          {
-            "id": "minecraft:lime_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:arrow",
-            "count": 1
-          },
-          {
-            "id": "minecraft:lime_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:lime_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:green_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:barrier",
-            "count": 1,
-            "components": {
-              "minecraft:custom_name": "Close"
-            }
-          },
-          {
-            "id": "minecraft:green_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:lime_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:lime_stained_glass_pane",
-            "count": 1
-          },
-          {
-            "id": "minecraft:arrow",
-            "count": 1
-          }
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:target","count":1,"components":{"minecraft:custom_name":"Aim: 65% — Left + / Right −"}},{"id":"minecraft:clock","count":1,"components":{"minecraft:custom_name":"Attack Speed: 2.0/s — Left + / Right −"}},{"id":"minecraft:shield","count":1,"components":{"minecraft:custom_name":"Block Chance: 40% — Left + / Right −"}},{"id":"minecraft:chain","count":1,"components":{"minecraft:custom_name":"Combo: 3 Hits — Left + / Right −"}},{"id":"minecraft:iron_sword","count":1,"components":{"minecraft:custom_name":"Damage: 1.0x — Left + / Right −"}},{"id":"minecraft:compass","count":1,"components":{"minecraft:custom_name":"Goal: Duel — Click to Cycle"}},null,null,
+          null,{"id":"minecraft:apple","count":1,"components":{"minecraft:custom_name":"HP: 20 — Left + / Right −"}},{"id":"minecraft:stick","count":1,"components":{"minecraft:custom_name":"Reach: 3.0 Blocks — Left + / Right −"}},{"id":"minecraft:ghast_tear","count":1,"components":{"minecraft:custom_name":"Regen: 1 HP/s — Left + / Right −"}},{"id":"minecraft:sugar","count":1,"components":{"minecraft:custom_name":"Speed: 1.0x — Left + / Right −"}},{"id":"minecraft:anvil","count":1,"components":{"minecraft:custom_name":"Stun: 5 Ticks — Left + / Right −"}},null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
         ]
       }
     },
+    {
+      "id": "d1a346cd-7f28-4b50-9a2e-63d8f091ce75",
+      "name": "Practice Bot Settings",
+      "createdAt": 1760000020000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:shield","count":1,"components":{"minecraft:custom_name":"Sword Bot: Shield Raised — ON"}},null,{"id":"minecraft:mace","count":1,"components":{"minecraft:custom_name":"Mace Bot: Shield Raised — OFF"}},null,{"id":"minecraft:end_crystal","count":1,"components":{"minecraft:custom_name":"Crystal Bot: Shield Raised — OFF"}},null,{"id":"minecraft:diamond_axe","count":1,"components":{"minecraft:custom_name":"Axe Bot: Shield Raised — ON"}},null,
+          null,{"id":"minecraft:respawn_anchor","count":1,"components":{"minecraft:custom_name":"Anchor Bot: Auto Refill — ON"}},null,{"id":"minecraft:bow","count":1,"components":{"minecraft:custom_name":"Bow Bot: Strafe — ON"}},null,{"id":"minecraft:slime_ball","count":1,"components":{"minecraft:custom_name":"Combo Bot: Knockback — ON"}},null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "e2b457de-8039-4c61-ab3f-7f1649d205a8",
+      "name": "Practice Layout",
+      "createdAt": 1760000021000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},null,null,{"id":"minecraft:respawn_anchor","count":1,"components":{"minecraft:custom_name":"Anchor-first Layout — Selected"}},null,{"id":"minecraft:glowstone","count":1,"components":{"minecraft:custom_name":"Glowstone-first Layout"}},null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "f3c568ef-914a-4d72-bc40-8a2750e316b9",
+      "name": "Practice Mace",
+      "createdAt": 1760000022000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},null,{"id":"minecraft:iron_chestplate","count":1,"components":{"minecraft:custom_name":"Breach — ON"}},null,{"id":"minecraft:heavy_core","count":1,"components":{"minecraft:custom_name":"Density — OFF"}},null,{"id":"minecraft:wind_charge","count":1,"components":{"minecraft:custom_name":"Wind — ON"}},null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "14d679f0-a25b-4e83-8d51-9b3861f427ca",
+      "name": "Teams Browser",
+      "createdAt": 1760000023000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},null,null,{"id":"minecraft:lime_banner","count":1,"components":{"minecraft:custom_name":"Create Public Team"}},null,{"id":"minecraft:iron_door","count":1,"components":{"minecraft:custom_name":"Create Private Team"}},null,null,null,
+          null,null,{"id":"minecraft:cyan_banner","count":1,"components":{"minecraft:custom_name":"Join Aurora — 4 Members"}},null,{"id":"minecraft:orange_banner","count":1,"components":{"minecraft:custom_name":"Join Cinder — 3 Members"}},null,{"id":"minecraft:purple_banner","count":1,"components":{"minecraft:custom_name":"Join Violet — 6 Members"}},null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,{"id":"minecraft:paper","count":1,"components":{"minecraft:custom_name":"Previous Page"}},{"id":"minecraft:orange_stained_glass_pane","count":1},{"id":"minecraft:paper","count":1,"components":{"minecraft:custom_name":"Next Page"}},null,null,null
+        ]
+      }
+    },
+    {
+      "id": "25e78a01-b36c-4f94-9e62-ac49720538db",
+      "name": "Team Hub",
+      "createdAt": 1760000024000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Nova — Leader • Cyan Side"}},null,{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Ember — Orange Side"}},null,{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Finch — Cyan Side"}},null,{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Atlas — Orange Side"}},null,
+          null,{"id":"minecraft:firework_rocket","count":1,"components":{"minecraft:custom_name":"Quick Invite"}},{"id":"minecraft:shears","count":1,"components":{"minecraft:custom_name":"Auto Split Members"}},{"id":"minecraft:diamond_sword","count":1,"components":{"minecraft:custom_name":"Choose Team Kit"}},null,{"id":"minecraft:comparator","count":1,"components":{"minecraft:custom_name":"Team Settings"}},null,{"id":"minecraft:red_dye","count":1,"components":{"minecraft:custom_name":"Leave Team"}},null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,{"id":"minecraft:paper","count":1,"components":{"minecraft:custom_name":"Previous Members Page"}},{"id":"minecraft:orange_stained_glass_pane","count":1},{"id":"minecraft:paper","count":1,"components":{"minecraft:custom_name":"Next Members Page"}},null,null,null
+        ]
+      }
+    },
+    {
+      "id": "36f89b12-c47d-40a5-af73-bd5a831649ec",
+      "name": "Team Settings",
+      "createdAt": 1760000025000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:shears","count":1,"components":{"minecraft:custom_name":"Auto Split Sides"}},null,{"id":"minecraft:sponge","count":1,"components":{"minecraft:custom_name":"Clear All Sides"}},null,{"id":"minecraft:cyan_banner","count":1,"components":{"minecraft:custom_name":"Open Team Config"}},null,{"id":"minecraft:map","count":1,"components":{"minecraft:custom_name":"Select Team Map"}},null,
+          null,{"id":"minecraft:shield","count":1,"components":{"minecraft:custom_name":"Friendly Fire — OFF"}},null,{"id":"minecraft:oak_door","count":1,"components":{"minecraft:custom_name":"Public Team — ON"}},null,null,null,{"id":"minecraft:tnt","count":1,"components":{"minecraft:custom_name":"Disband Team"}},null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "4709ac23-d58e-41b6-b084-ce6b94275afd",
+      "name": "Team Config",
+      "createdAt": 1760000026000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},null,{"id":"minecraft:lime_banner","count":1,"components":{"minecraft:custom_name":"Add Team Side"}},null,null,null,{"id":"minecraft:red_banner","count":1,"components":{"minecraft:custom_name":"Remove Team Side: Orange"}},null,null,
+          null,{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Nova — Click to Move from Cyan to Orange"}},{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Ember — Click to Move from Orange to Cyan"}},{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Finch — Click to Move from Cyan to Orange"}},{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Atlas — Click to Move from Orange to Cyan"}},{"id":"minecraft:red_dye","count":1,"components":{"minecraft:custom_name":"Remove Member: Ember"}},{"id":"minecraft:red_dye","count":1,"components":{"minecraft:custom_name":"Remove Member: Finch"}},{"id":"minecraft:red_dye","count":1,"components":{"minecraft:custom_name":"Remove Member: Atlas"}},null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "581abd34-e69f-42c7-8195-df7ca5386b0e",
+      "name": "Team Kit Select",
+      "createdAt": 1760000027000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:diamond_sword","count":1,"components":{"minecraft:custom_name":"Team Kit: Sword"}},{"id":"minecraft:diamond_axe","count":1,"components":{"minecraft:custom_name":"Team Kit: Axe"}},{"id":"minecraft:end_crystal","count":1,"components":{"minecraft:custom_name":"Team Kit: Crystal"}},{"id":"minecraft:mace","count":1,"components":{"minecraft:custom_name":"Team Kit: Mace"}},{"id":"minecraft:bow","count":1,"components":{"minecraft:custom_name":"Team Kit: Bow"}},{"id":"minecraft:golden_apple","count":1,"components":{"minecraft:custom_name":"Team Kit: UHC"}},{"id":"minecraft:splash_potion","count":1,"components":{"minecraft:custom_name":"Team Kit: NoDebuff"}},null,
+          null,null,null,null,null,null,null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "692bce45-f7a0-43d8-92a6-e08db6497c1f",
+      "name": "Party Invite",
+      "createdAt": 1760000028000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Invite Nova — Online"}},{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Invite Ember — Online"}},{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Invite Finch — Online"}},null,{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Invite Atlas — Online"}},{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Invite Willow — Online"}},{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Invite Orbit — Online"}},null,
+          null,null,null,null,null,null,null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "7a3cdf56-08b1-44e9-a3b7-f19ec75a8d20",
+      "name": "Party Map Select",
+      "createdAt": 1760000029000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},null,{"id":"minecraft:stone_bricks","count":1,"components":{"minecraft:custom_name":"Party Arena: Grand Courtyard — 16 Players"}},null,{"id":"minecraft:sandstone","count":1,"components":{"minecraft:custom_name":"Party Arena: Sunspire Plaza — 12 Players"}},null,{"id":"minecraft:packed_ice","count":1,"components":{"minecraft:custom_name":"Party Arena: Frostline Lake — 16 Players"}},null,null,
+          null,null,{"id":"minecraft:cherry_log","count":1,"components":{"minecraft:custom_name":"Party Arena: Blossom Field — 12 Players"}},null,{"id":"minecraft:prismarine","count":1,"components":{"minecraft:custom_name":"Party Arena: Tidal Basin — 20 Players"}},null,{"id":"minecraft:deepslate_tiles","count":1,"components":{"minecraft:custom_name":"Party Arena: Foundry Hall — 16 Players"}},null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "8b4de067-19c2-45fa-b4c8-02afd86b9e31",
+      "name": "Profile",
+      "createdAt": 1760000030000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},null,null,null,{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Nova — Champion • Member Since 2024"}},null,null,null,null,
+          null,{"id":"minecraft:gold_ingot","count":1,"components":{"minecraft:custom_name":"Ranked Rating: 1,640"}},{"id":"minecraft:lime_dye","count":1,"components":{"minecraft:custom_name":"Ranked Wins: 128"}},{"id":"minecraft:red_dye","count":1,"components":{"minecraft:custom_name":"Ranked Losses: 72"}},{"id":"minecraft:target","count":1,"components":{"minecraft:custom_name":"Ranked Win Rate: 64%"}},null,null,{"id":"minecraft:book","count":1,"components":{"minecraft:custom_name":"View Per-Kit Stats"}},null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "9c5ef178-2ad3-460b-85d9-13b0e97caf42",
+      "name": "Per-Kit Stats",
+      "createdAt": 1760000031000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:diamond_sword","count":1,"components":{"minecraft:custom_name":"Sword — 1,710 Rating • 42W / 18L"}},{"id":"minecraft:diamond_axe","count":1,"components":{"minecraft:custom_name":"Axe — 1,590 Rating • 21W / 14L"}},{"id":"minecraft:end_crystal","count":1,"components":{"minecraft:custom_name":"Crystal — 1,680 Rating • 19W / 11L"}},{"id":"minecraft:mace","count":1,"components":{"minecraft:custom_name":"Mace — 1,740 Rating • 15W / 5L"}},{"id":"minecraft:bow","count":1,"components":{"minecraft:custom_name":"Bow — 1,530 Rating • 8W / 7L"}},{"id":"minecraft:golden_apple","count":1,"components":{"minecraft:custom_name":"UHC — 1,600 Rating • 13W / 7L"}},{"id":"minecraft:splash_potion","count":1,"components":{"minecraft:custom_name":"NoDebuff — 1,630 Rating • 10W / 10L"}},null,
+          null,null,null,null,null,null,null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "ad6f0289-3be4-471c-96ea-24c1fa8db053",
+      "name": "Match History",
+      "createdAt": 1760000032000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:golden_sword","count":1,"components":{"minecraft:custom_name":"Filter: Ranked — Selected"}},null,{"id":"minecraft:iron_sword","count":1,"components":{"minecraft:custom_name":"Filter: Unranked"}},null,{"id":"minecraft:blue_banner","count":1,"components":{"minecraft:custom_name":"Filter: Team"}},null,{"id":"minecraft:netherite_axe","count":1,"components":{"minecraft:custom_name":"Filter: FFA"}},null,
+          null,null,{"id":"minecraft:lime_dye","count":1,"components":{"minecraft:custom_name":"View Match #204 — Won vs Ember • Sword • 2m Ago"}},null,{"id":"minecraft:red_dye","count":1,"components":{"minecraft:custom_name":"View Match #203 — Lost vs Finch • Axe • 8m Ago"}},null,{"id":"minecraft:lime_dye","count":1,"components":{"minecraft:custom_name":"View Match #202 — Won vs Atlas • Mace • 15m Ago"}},null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "be70139a-4cf5-482d-a7fb-35d20b9ec164",
+      "name": "Match Report",
+      "createdAt": 1760000033000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},null,{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Nova — Winner • View Inventory"}},null,{"id":"minecraft:clock","count":1,"components":{"minecraft:custom_name":"Match #204 — Sword • Courtyard • 2:34"}},null,{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Ember — Defeated • View Inventory"}},null,null,
+          null,{"id":"minecraft:diamond_sword","count":1,"components":{"minecraft:custom_name":"Nova: Damage Dealt — 84.0"}},{"id":"minecraft:target","count":1,"components":{"minecraft:custom_name":"Nova: Hits — 36 • Accuracy 72%"}},{"id":"minecraft:chain","count":1,"components":{"minecraft:custom_name":"Nova: Longest Combo — 7"}},null,{"id":"minecraft:iron_sword","count":1,"components":{"minecraft:custom_name":"Ember: Damage Dealt — 61.5"}},{"id":"minecraft:target","count":1,"components":{"minecraft:custom_name":"Ember: Hits — 29 • Accuracy 58%"}},{"id":"minecraft:chain","count":1,"components":{"minecraft:custom_name":"Ember: Longest Combo — 4"}},null,
+          null,{"id":"minecraft:apple","count":1,"components":{"minecraft:custom_name":"Nova: Remaining Health — 8 HP"}},{"id":"minecraft:golden_apple","count":1,"components":{"minecraft:custom_name":"Nova: Golden Apples Used — 5"}},{"id":"minecraft:gold_nugget","count":1,"components":{"minecraft:custom_name":"Nova: Rating Change — +18"}},null,{"id":"minecraft:apple","count":1,"components":{"minecraft:custom_name":"Ember: Remaining Health — 0 HP"}},{"id":"minecraft:golden_apple","count":1,"components":{"minecraft:custom_name":"Ember: Golden Apples Used — 6"}},{"id":"minecraft:iron_nugget","count":1,"components":{"minecraft:custom_name":"Ember: Rating Change — −18"}},null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "cf8124ab-5d06-493e-b80c-46e31cafd275",
+      "name": "Match Inventory",
+      "createdAt": 1760000034000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:diamond_sword","count":1,"components":{"minecraft:custom_name":"Nova: Stored Diamond Sword"}},{"id":"minecraft:diamond_axe","count":1,"components":{"minecraft:custom_name":"Nova: Stored Diamond Axe"}},{"id":"minecraft:bow","count":1,"components":{"minecraft:custom_name":"Nova: Stored Bow"}},{"id":"minecraft:ender_pearl","count":3,"components":{"minecraft:custom_name":"Nova: 3 Ender Pearls Remaining"}},{"id":"minecraft:golden_apple","count":3,"components":{"minecraft:custom_name":"Nova: 3 Golden Apples Remaining"}},{"id":"minecraft:cobweb","count":2,"components":{"minecraft:custom_name":"Nova: 2 Cobwebs Remaining"}},{"id":"minecraft:water_bucket","count":1,"components":{"minecraft:custom_name":"Nova: Stored Water Bucket"}},null,{"id":"minecraft:cooked_beef","count":12,"components":{"minecraft:custom_name":"Nova: 12 Steak Remaining"}},
+          {"id":"minecraft:arrow","count":7,"components":{"minecraft:custom_name":"Nova: 7 Arrows Remaining"}},{"id":"minecraft:splash_potion","count":1,"components":{"minecraft:custom_name":"Nova: Stored Healing Potion"}},null,null,null,null,null,{"id":"minecraft:oak_planks","count":9,"components":{"minecraft:custom_name":"Nova: 9 Oak Planks Remaining"}},null,
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:diamond_helmet","count":1,"components":{"minecraft:custom_name":"Nova: Stored Helmet • 71% Durability"}},{"id":"minecraft:diamond_chestplate","count":1,"components":{"minecraft:custom_name":"Nova: Stored Chestplate • 78% Durability"}},{"id":"minecraft:diamond_leggings","count":1,"components":{"minecraft:custom_name":"Nova: Stored Leggings • 74% Durability"}},{"id":"minecraft:diamond_boots","count":1,"components":{"minecraft:custom_name":"Nova: Stored Boots • 68% Durability"}},{"id":"minecraft:shield","count":1,"components":{"minecraft:custom_name":"Nova: Stored Offhand Shield • 56% Durability"}},null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Cycle Participants: Nova → Ember"}},null
+        ]
+      }
+    },
+    {
+      "id": "d09235bc-6e17-4a4f-891d-57f42db0e386",
+      "name": "Settings",
+      "createdAt": 1760000035000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:ender_pearl","count":1,"components":{"minecraft:custom_name":"Auto Requeue — ON"}},{"id":"minecraft:shield","count":1,"components":{"minecraft:custom_name":"Deny Duels — OFF"}},{"id":"minecraft:paper","count":1,"components":{"minecraft:custom_name":"Hide Chat — OFF"}},{"id":"minecraft:book","count":1,"components":{"minecraft:custom_name":"Match Report — ON"}},{"id":"minecraft:oak_sign","count":1,"components":{"minecraft:custom_name":"Scoreboard — ON"}},null,null,null,
+          null,{"id":"minecraft:note_block","count":1,"components":{"minecraft:custom_name":"Sounds — ON"}},{"id":"minecraft:spyglass","count":1,"components":{"minecraft:custom_name":"Allow Spectators — ON"}},{"id":"minecraft:leather_chestplate","count":1,"components":{"minecraft:custom_name":"Team Armor Colors — ON"}},{"id":"minecraft:glow_ink_sac","count":1,"components":{"minecraft:custom_name":"Team Glow — OFF"}},null,null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "e1a346cd-7f28-4b50-9a2e-68053ec1f497",
+      "name": "Locale Select",
+      "createdAt": 1760000036000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:cherry_sapling","count":1,"components":{"minecraft:custom_name":"日本語"}},{"id":"minecraft:blue_dye","count":1,"components":{"minecraft:custom_name":"English (US)"}},{"id":"minecraft:red_dye","count":1,"components":{"minecraft:custom_name":"English (UK)"}},{"id":"minecraft:yellow_dye","count":1,"components":{"minecraft:custom_name":"Español"}},{"id":"minecraft:cornflower","count":1,"components":{"minecraft:custom_name":"Français"}},{"id":"minecraft:white_dye","count":1,"components":{"minecraft:custom_name":"한국어"}},{"id":"minecraft:bamboo","count":1,"components":{"minecraft:custom_name":"简体中文"}},null,
+          null,null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "f2b457de-8039-4c61-ab3f-79164fd205a8",
+      "name": "Title Select",
+      "createdAt": 1760000037000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:wooden_sword","count":1,"components":{"minecraft:custom_name":"01 Rookie — Unlocked"}},{"id":"minecraft:leather_boots","count":1,"components":{"minecraft:custom_name":"02 Scout — Unlocked"}},{"id":"minecraft:stone_sword","count":1,"components":{"minecraft:custom_name":"03 Fighter — Unlocked"}},{"id":"minecraft:iron_sword","count":1,"components":{"minecraft:custom_name":"04 Veteran — Unlocked"}},{"id":"minecraft:golden_sword","count":1,"components":{"minecraft:custom_name":"05 Elite — Unlocked"}},null,null,null,
+          null,{"id":"minecraft:diamond_sword","count":1,"components":{"minecraft:custom_name":"06 Champion — Selected"}},{"id":"minecraft:gray_dye","count":1,"components":{"minecraft:custom_name":"07 Master — Locked • 250 Wins"}},{"id":"minecraft:gray_dye","count":1,"components":{"minecraft:custom_name":"08 Grandmaster — Locked • 500 Wins"}},{"id":"minecraft:gray_dye","count":1,"components":{"minecraft:custom_name":"09 Legend — Locked • 1,000 Wins"}},{"id":"minecraft:gray_dye","count":1,"components":{"minecraft:custom_name":"10 Mythic — Locked • 2,000 Wins"}},null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "03c568ef-914a-4d72-bc40-8a2760e316b9",
+      "name": "Name Color Studio",
+      "createdAt": 1760000038000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},null,{"id":"minecraft:gray_dye","count":1,"components":{"minecraft:custom_name":"Name Color Mode: Off"}},null,{"id":"minecraft:flower_pot","count":1,"components":{"minecraft:custom_name":"Name Color Mode: Single Color"}},null,{"id":"minecraft:amethyst_shard","count":1,"components":{"minecraft:custom_name":"Name Color Mode: Gradient — Selected"}},null,null,
+          null,{"id":"minecraft:white_dye","count":1,"components":{"minecraft:custom_name":"White — Left: Start / Right: End"}},{"id":"minecraft:light_gray_dye","count":1,"components":{"minecraft:custom_name":"Silver — Left: Start / Right: End"}},{"id":"minecraft:black_dye","count":1,"components":{"minecraft:custom_name":"Black — Left: Start / Right: End"}},{"id":"minecraft:red_dye","count":1,"components":{"minecraft:custom_name":"Red — Left: Start / Right: End"}},{"id":"minecraft:orange_dye","count":1,"components":{"minecraft:custom_name":"Orange — End Selected"}},{"id":"minecraft:yellow_dye","count":1,"components":{"minecraft:custom_name":"Yellow — Left: Start / Right: End"}},{"id":"minecraft:lime_dye","count":1,"components":{"minecraft:custom_name":"Lime — Left: Start / Right: End"}},null,
+          null,{"id":"minecraft:green_dye","count":1,"components":{"minecraft:custom_name":"Green — Left: Start / Right: End"}},{"id":"minecraft:cyan_dye","count":1,"components":{"minecraft:custom_name":"Cyan — Start Selected"}},{"id":"minecraft:light_blue_dye","count":1,"components":{"minecraft:custom_name":"Sky — Left: Start / Right: End"}},{"id":"minecraft:blue_dye","count":1,"components":{"minecraft:custom_name":"Blue — Left: Start / Right: End"}},{"id":"minecraft:purple_dye","count":1,"components":{"minecraft:custom_name":"Purple — Left: Start / Right: End"}},{"id":"minecraft:magenta_dye","count":1,"components":{"minecraft:custom_name":"Magenta — Left: Start / Right: End"}},{"id":"minecraft:pink_dye","count":1,"components":{"minecraft:custom_name":"Pink — Left: Start / Right: End"}},null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,{"id":"minecraft:lime_concrete","count":1,"components":{"minecraft:custom_name":"Save Name Color: Cyan → Orange"}},null
+        ]
+      }
+    },
+    {
+      "id": "14d679f0-a25b-4e83-8d51-9b3871f427ca",
+      "name": "Arrow Effect",
+      "createdAt": 1760000039000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:feather","count":1,"components":{"minecraft:custom_name":"Arrow Trail: Cloud"}},{"id":"minecraft:blaze_powder","count":1,"components":{"minecraft:custom_name":"Arrow Trail: Flame"}},{"id":"minecraft:soul_torch","count":1,"components":{"minecraft:custom_name":"Arrow Trail: Soul — Selected"}},{"id":"minecraft:ender_eye","count":1,"components":{"minecraft:custom_name":"Arrow Trail: Portal"}},{"id":"minecraft:glowstone_dust","count":1,"components":{"minecraft:custom_name":"Arrow Trail: Spark"}},{"id":"minecraft:pink_petals","count":1,"components":{"minecraft:custom_name":"Arrow Trail: Petals"}},{"id":"minecraft:snowball","count":1,"components":{"minecraft:custom_name":"Arrow Trail: Snow"}},null,
+          null,null,null,null,null,null,null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "25e78a01-b36c-4f94-9e62-ac49820538db",
+      "name": "Kill Effect",
+      "createdAt": 1760000040000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},null,null,null,{"id":"minecraft:barrier","count":1,"components":{"minecraft:custom_name":"Kill Effect: None"}},null,null,null,null,
+          null,{"id":"minecraft:firework_rocket","count":1,"components":{"minecraft:custom_name":"Firework Burst — Owned"}},{"id":"minecraft:soul_lantern","count":1,"components":{"minecraft:custom_name":"Soul Rise — Selected • Owned"}},{"id":"minecraft:pink_petals","count":1,"components":{"minecraft:custom_name":"Petal Bloom — Owned"}},null,{"id":"minecraft:gray_dye","count":1,"components":{"minecraft:custom_name":"Lightning Strike — Locked"}},{"id":"minecraft:gray_dye","count":1,"components":{"minecraft:custom_name":"Dragon Breath — Locked"}},{"id":"minecraft:gray_dye","count":1,"components":{"minecraft:custom_name":"Supernova — Locked"}},null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "36f89b12-c47d-40a5-af73-bd5a931649ec",
+      "name": "Shield Pattern",
+      "createdAt": 1760000041000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:white_dye","count":1,"components":{"minecraft:custom_name":"Pattern Dye: White"}},{"id":"minecraft:light_gray_dye","count":1,"components":{"minecraft:custom_name":"Pattern Dye: Light Gray"}},{"id":"minecraft:gray_dye","count":1,"components":{"minecraft:custom_name":"Pattern Dye: Gray"}},{"id":"minecraft:black_dye","count":1,"components":{"minecraft:custom_name":"Pattern Dye: Black"}},{"id":"minecraft:brown_dye","count":1,"components":{"minecraft:custom_name":"Pattern Dye: Brown"}},{"id":"minecraft:red_dye","count":1,"components":{"minecraft:custom_name":"Pattern Dye: Red"}},{"id":"minecraft:orange_dye","count":1,"components":{"minecraft:custom_name":"Pattern Dye: Orange — Selected"}},null,
+          null,{"id":"minecraft:yellow_dye","count":1,"components":{"minecraft:custom_name":"Pattern Dye: Yellow"}},{"id":"minecraft:lime_dye","count":1,"components":{"minecraft:custom_name":"Pattern Dye: Lime"}},{"id":"minecraft:green_dye","count":1,"components":{"minecraft:custom_name":"Pattern Dye: Green"}},{"id":"minecraft:cyan_dye","count":1,"components":{"minecraft:custom_name":"Pattern Dye: Cyan"}},{"id":"minecraft:light_blue_dye","count":1,"components":{"minecraft:custom_name":"Pattern Dye: Light Blue"}},{"id":"minecraft:blue_dye","count":1,"components":{"minecraft:custom_name":"Pattern Dye: Blue"}},{"id":"minecraft:purple_dye","count":1,"components":{"minecraft:custom_name":"Pattern Dye: Purple"}},null,
+          null,{"id":"minecraft:magenta_dye","count":1,"components":{"minecraft:custom_name":"Pattern Dye: Magenta"}},{"id":"minecraft:pink_dye","count":1,"components":{"minecraft:custom_name":"Pattern Dye: Pink"}},{"id":"minecraft:orange_banner","count":1,"components":{"minecraft:custom_name":"Add Center Stripe — Layer 3 of 6"}},{"id":"minecraft:orange_banner","count":1,"components":{"minecraft:custom_name":"Add Cross — Layer 3 of 6"}},{"id":"minecraft:orange_banner","count":1,"components":{"minecraft:custom_name":"Add Border — Layer 3 of 6"}},{"id":"minecraft:creeper_banner_pattern","count":1,"components":{"minecraft:custom_name":"Add Creeper — Layer 3 of 6"}},{"id":"minecraft:flower_banner_pattern","count":1,"components":{"minecraft:custom_name":"Add Flower — Layer 3 of 6"}},null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "4709ac23-d58e-41b6-b084-ce6ba4275afd",
+      "name": "Smithing Trim",
+      "createdAt": 1760000042000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:amethyst_shard","count":1,"components":{"minecraft:custom_name":"Trim Material: Amethyst"}},{"id":"minecraft:copper_ingot","count":1,"components":{"minecraft:custom_name":"Trim Material: Copper"}},{"id":"minecraft:diamond","count":1,"components":{"minecraft:custom_name":"Trim Material: Diamond — Selected"}},{"id":"minecraft:emerald","count":1,"components":{"minecraft:custom_name":"Trim Material: Emerald"}},{"id":"minecraft:gold_ingot","count":1,"components":{"minecraft:custom_name":"Trim Material: Gold"}},{"id":"minecraft:iron_ingot","count":1,"components":{"minecraft:custom_name":"Trim Material: Iron"}},null,null,
+          null,{"id":"minecraft:lapis_lazuli","count":1,"components":{"minecraft:custom_name":"Trim Material: Lapis"}},{"id":"minecraft:netherite_ingot","count":1,"components":{"minecraft:custom_name":"Trim Material: Netherite"}},{"id":"minecraft:quartz","count":1,"components":{"minecraft:custom_name":"Trim Material: Quartz"}},{"id":"minecraft:redstone","count":1,"components":{"minecraft:custom_name":"Trim Material: Redstone"}},{"id":"minecraft:resin_brick","count":1,"components":{"minecraft:custom_name":"Trim Material: Resin"}},null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "581abd34-e69f-42c7-8195-df7cb5386b0e",
+      "name": "Enchant Editor",
+      "createdAt": 1760000043000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:diamond_sword","count":1,"components":{"minecraft:custom_name":"Sharpness: V — Left + / Right −"}},{"id":"minecraft:blaze_powder","count":1,"components":{"minecraft:custom_name":"Fire Aspect: II — Left + / Right −"}},{"id":"minecraft:slime_ball","count":1,"components":{"minecraft:custom_name":"Knockback: OFF — Left + / Right −"}},{"id":"minecraft:iron_ingot","count":1,"components":{"minecraft:custom_name":"Unbreaking: III — Left + / Right −"}},{"id":"minecraft:experience_bottle","count":1,"components":{"minecraft:custom_name":"Mending: I — Left + / Right −"}},{"id":"minecraft:feather","count":1,"components":{"minecraft:custom_name":"Sweeping Edge: III — Left + / Right −"}},{"id":"minecraft:emerald","count":1,"components":{"minecraft:custom_name":"Looting: OFF — Left + / Right −"}},null,
+          null,null,null,null,{"id":"minecraft:lime_concrete","count":1,"components":{"minecraft:custom_name":"Continue"}},null,null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "692bce45-f7a0-43d8-92a6-e08dc6497c1f",
+      "name": "Potion Editor",
+      "createdAt": 1760000044000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:sugar","count":1,"components":{"minecraft:custom_name":"Potion Type: Swiftness — Click to Cycle"}},null,{"id":"minecraft:splash_potion","count":1,"components":{"minecraft:custom_name":"Potion Variant: Splash — Click to Cycle"}},null,{"id":"minecraft:glowstone_dust","count":1,"components":{"minecraft:custom_name":"Potion Level: I — Click to Adjust"}},null,{"id":"minecraft:redstone","count":1,"components":{"minecraft:custom_name":"Extended Duration — ON"}},null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "7a3cdf56-08b1-44e9-a3b7-f19ed75a8d20",
+      "name": "Confirm",
+      "createdAt": 1760000045000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},null,null,{"id":"minecraft:lime_concrete","count":1,"components":{"minecraft:custom_name":"Yes — Confirm Action"}},null,{"id":"minecraft:red_concrete","count":1,"components":{"minecraft:custom_name":"No — Cancel Action"}},null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "8b4de067-19c2-45fa-b4c8-02afe86b9e31",
+      "name": "Report Player",
+      "createdAt": 1760000046000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:target","count":1,"components":{"minecraft:custom_name":"Report Reason: Combat Cheats"}},{"id":"minecraft:feather","count":1,"components":{"minecraft:custom_name":"Report Reason: Movement Cheats"}},{"id":"minecraft:redstone","count":1,"components":{"minecraft:custom_name":"Report Reason: Exploiting Bugs"}},{"id":"minecraft:paper","count":1,"components":{"minecraft:custom_name":"Report Reason: Harassment"}},{"id":"minecraft:oak_sign","count":1,"components":{"minecraft:custom_name":"Report Reason: Chat Spam"}},{"id":"minecraft:name_tag","count":1,"components":{"minecraft:custom_name":"Report Reason: Inappropriate Name or Skin"}},{"id":"minecraft:book","count":1,"components":{"minecraft:custom_name":"Report Reason: Other"}},null,
+          null,null,null,null,null,null,null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "9c5ef178-2ad3-460b-85d9-13b0f97caf42",
+      "name": "Report List",
+      "createdAt": 1760000047000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Review Report #42: Orbit — Combat Cheats • 2m Ago"}},null,{"id":"minecraft:spyglass","count":1,"components":{"minecraft:custom_name":"Replay Report #42"}},null,null,null,{"id":"minecraft:gray_dye","count":1,"components":{"minecraft:custom_name":"Dismiss Report #42"}},null,
+          null,{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Review Report #41: Willow — Movement Cheats • 11m Ago"}},null,{"id":"minecraft:spyglass","count":1,"components":{"minecraft:custom_name":"Replay Report #41"}},null,null,null,{"id":"minecraft:gray_dye","count":1,"components":{"minecraft:custom_name":"Dismiss Report #41"}},null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "ad6f0289-3be4-471c-96ea-24c10a8db053",
+      "name": "Ban List",
+      "createdAt": 1760000048000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Active Ban: Flint — 2025-10-09 07:20 UTC • Cheating • Permanent"}},null,{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Active Ban: Quartz — 2025-10-08 18:40 UTC • Exploiting • 30 Days"}},null,{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Active Ban: Sable — 2025-10-07 12:15 UTC • Cheating • Permanent"}},null,{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Active Ban: Drift — 2025-10-06 09:05 UTC • Harassment • 7 Days"}},null,
+          null,null,null,null,null,null,null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "be70139a-4cf5-482d-a7fb-35d21b9ec164",
+      "name": "Admin Menu",
+      "createdAt": 1760000049000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:diamond_sword","count":1,"components":{"minecraft:custom_name":"Kits Admin"}},null,{"id":"minecraft:structure_block","count":1,"components":{"minecraft:custom_name":"Arena Source"}},null,{"id":"minecraft:chest","count":1,"components":{"minecraft:custom_name":"Ekit Admin"}},null,{"id":"minecraft:netherite_axe","count":1,"components":{"minecraft:custom_name":"FFA Settings"}},null,
+          null,{"id":"minecraft:bundle","count":1,"components":{"minecraft:custom_name":"Resource Pack Policy"}},null,{"id":"minecraft:player_head","count":1,"components":{"minecraft:custom_name":"Player Data"}},null,{"id":"minecraft:lectern","count":1,"components":{"minecraft:custom_name":"Presets"}},null,{"id":"minecraft:oak_sign","count":1,"components":{"minecraft:custom_name":"Sign Kit"}},null,
+          {"id":"minecraft:barrier","count":1,"components":{"minecraft:custom_name":"Close"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "cf8124ab-5d06-493e-b80c-46e32cafd275",
+      "name": "Arena Admin",
+      "createdAt": 1760000050000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:stone_bricks","count":1,"components":{"minecraft:custom_name":"Courtyard — Manage Arena"}},{"id":"minecraft:lime_dye","count":1,"components":{"minecraft:custom_name":"Courtyard: Enabled — ON"}},{"id":"minecraft:tnt","count":1,"components":{"minecraft:custom_name":"Courtyard: Delete Arena"}},null,{"id":"minecraft:sandstone","count":1,"components":{"minecraft:custom_name":"Sunspire — Manage Arena"}},{"id":"minecraft:lime_dye","count":1,"components":{"minecraft:custom_name":"Sunspire: Enabled — ON"}},{"id":"minecraft:tnt","count":1,"components":{"minecraft:custom_name":"Sunspire: Delete Arena"}},null,
+          null,{"id":"minecraft:packed_ice","count":1,"components":{"minecraft:custom_name":"Frostline — Manage Arena"}},{"id":"minecraft:gray_dye","count":1,"components":{"minecraft:custom_name":"Frostline: Enabled — OFF"}},{"id":"minecraft:tnt","count":1,"components":{"minecraft:custom_name":"Frostline: Delete Arena"}},null,null,null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "d09235bc-6e17-4a4f-891d-57f43db0e386",
+      "name": "Arena Sources",
+      "createdAt": 1760000051000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:stone_bricks","count":1,"components":{"minecraft:custom_name":"Template Source: Courtyard — Local World"}},null,{"id":"minecraft:sandstone","count":1,"components":{"minecraft:custom_name":"Template Source: Sunspire — Schematic"}},null,{"id":"minecraft:packed_ice","count":1,"components":{"minecraft:custom_name":"Template Source: Frostline — Schematic"}},null,{"id":"minecraft:cherry_log","count":1,"components":{"minecraft:custom_name":"Template Source: Blossom — Local World"}},null,
+          null,null,null,null,null,null,null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "e1a346cd-7f28-4b50-9a2e-68054ec1f497",
+      "name": "Kit Admin",
+      "createdAt": 1760000052000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:diamond_sword","count":1,"components":{"minecraft:custom_name":"Manage Kit: Sword — Selected"}},{"id":"minecraft:diamond_axe","count":1,"components":{"minecraft:custom_name":"Manage Kit: Axe"}},{"id":"minecraft:end_crystal","count":1,"components":{"minecraft:custom_name":"Manage Kit: Crystal"}},{"id":"minecraft:mace","count":1,"components":{"minecraft:custom_name":"Manage Kit: Mace"}},{"id":"minecraft:bow","count":1,"components":{"minecraft:custom_name":"Manage Kit: Bow"}},{"id":"minecraft:golden_apple","count":1,"components":{"minecraft:custom_name":"Manage Kit: UHC"}},{"id":"minecraft:splash_potion","count":1,"components":{"minecraft:custom_name":"Manage Kit: NoDebuff"}},null,
+          null,{"id":"minecraft:lime_dye","count":1,"components":{"minecraft:custom_name":"Sword: Enabled — ON"}},{"id":"minecraft:gold_ingot","count":1,"components":{"minecraft:custom_name":"Sword: Ranked — ON"}},{"id":"minecraft:ender_pearl","count":1,"components":{"minecraft:custom_name":"Sword: Pearls — ON"}},{"id":"minecraft:totem_of_undying","count":1,"components":{"minecraft:custom_name":"Sword: Totems — OFF"}},{"id":"minecraft:cooked_beef","count":1,"components":{"minecraft:custom_name":"Sword: Auto Food — OFF"}},{"id":"minecraft:ghast_tear","count":1,"components":{"minecraft:custom_name":"Sword: Auto Regen — ON"}},{"id":"minecraft:iron_pickaxe","count":1,"components":{"minecraft:custom_name":"Sword: Block Break — OFF"}},null,
+          null,{"id":"minecraft:bricks","count":1,"components":{"minecraft:custom_name":"Sword: Block Place — ON"}},{"id":"minecraft:cobblestone","count":1,"components":{"minecraft:custom_name":"Sword: Break Player-Placed Blocks — ON"}},{"id":"minecraft:map","count":1,"components":{"minecraft:custom_name":"Sword: Adventure Mode — OFF"}},{"id":"minecraft:red_bed","count":1,"components":{"minecraft:custom_name":"Sword: Bed Explosion — OFF"}},{"id":"minecraft:shield","count":1,"components":{"minecraft:custom_name":"Sword: Sword/Shield Breaking — OFF"}},{"id":"minecraft:lectern","count":1,"components":{"minecraft:custom_name":"Sword: Use Preset — ON"}},null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "f2b457de-8039-4c61-ab3f-79165fd205a8",
+      "name": "Kit Start Effects",
+      "createdAt": 1760000053000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:sugar","count":1,"components":{"minecraft:custom_name":"Start Effect: Speed — ON"}},{"id":"minecraft:blaze_powder","count":1,"components":{"minecraft:custom_name":"Start Effect: Strength — OFF"}},{"id":"minecraft:ghast_tear","count":1,"components":{"minecraft:custom_name":"Start Effect: Regeneration — OFF"}},{"id":"minecraft:rabbit_foot","count":1,"components":{"minecraft:custom_name":"Start Effect: Jump Boost — OFF"}},{"id":"minecraft:magma_cream","count":1,"components":{"minecraft:custom_name":"Start Effect: Fire Resistance — ON"}},null,null,null,
+          null,{"id":"minecraft:golden_carrot","count":1,"components":{"minecraft:custom_name":"Start Effect: Night Vision — ON"}},{"id":"minecraft:pufferfish","count":1,"components":{"minecraft:custom_name":"Start Effect: Water Breathing — OFF"}},{"id":"minecraft:fermented_spider_eye","count":1,"components":{"minecraft:custom_name":"Start Effect: Invisibility — OFF"}},{"id":"minecraft:phantom_membrane","count":1,"components":{"minecraft:custom_name":"Start Effect: Slow Falling — OFF"}},null,null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "03c568ef-914a-4d72-bc40-8a2770e316b9",
+      "name": "Kit Arena Select",
+      "createdAt": 1760000054000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},null,{"id":"minecraft:stone_bricks","count":1,"components":{"minecraft:custom_name":"Duel Pool: Courtyard — ON"}},null,{"id":"minecraft:sandstone","count":1,"components":{"minecraft:custom_name":"Duel Pool: Sunspire — ON"}},null,{"id":"minecraft:gray_dye","count":1,"components":{"minecraft:custom_name":"Duel Pool: Frostline — OFF"}},null,null,
+          null,null,{"id":"minecraft:stone_bricks","count":1,"components":{"minecraft:custom_name":"Party Pool: Grand Courtyard — ON"}},null,{"id":"minecraft:gray_dye","count":1,"components":{"minecraft:custom_name":"Party Pool: Sunspire Plaza — OFF"}},null,{"id":"minecraft:packed_ice","count":1,"components":{"minecraft:custom_name":"Party Pool: Frostline Lake — ON"}},null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "14d679f0-a25b-4e83-8d51-9b3881f427ca",
+      "name": "Kit Block Rules",
+      "createdAt": 1760000055000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:iron_pickaxe","count":1,"components":{"minecraft:custom_name":"Allow Block Breaking — OFF"}},null,{"id":"minecraft:bricks","count":1,"components":{"minecraft:custom_name":"Allow Block Placing — ON"}},null,{"id":"minecraft:cobblestone","count":1,"components":{"minecraft:custom_name":"Break Player-Placed Blocks — ON"}},null,{"id":"minecraft:red_bed","count":1,"components":{"minecraft:custom_name":"Allow Bed Explosions — OFF"}},null,
+          null,null,{"id":"minecraft:cobweb","count":1,"components":{"minecraft:custom_name":"Breakable Exception: Cobweb — ON"}},null,{"id":"minecraft:oak_leaves","count":1,"components":{"minecraft:custom_name":"Breakable Exception: Oak Leaves — ON"}},null,{"id":"minecraft:glass","count":1,"components":{"minecraft:custom_name":"Breakable Exception: Glass — OFF"}},null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "25e78a01-b36c-4f94-9e62-ac49920538db",
+      "name": "Kit Item Rules",
+      "createdAt": 1760000056000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},null,{"id":"minecraft:ghast_tear","count":1,"components":{"minecraft:custom_name":"Automatic Regeneration — ON"}},null,{"id":"minecraft:cooked_beef","count":1,"components":{"minecraft:custom_name":"Automatic Food — OFF"}},null,{"id":"minecraft:ender_pearl","count":1,"components":{"minecraft:custom_name":"Allow Ender Pearls — ON"}},null,null,
+          null,null,{"id":"minecraft:totem_of_undying","count":1,"components":{"minecraft:custom_name":"Allow Totems — OFF"}},null,{"id":"minecraft:shield","count":1,"components":{"minecraft:custom_name":"Shield Breaking — ON"}},null,{"id":"minecraft:clock","count":1,"components":{"minecraft:custom_name":"Match Timeout — ON • 10 Minutes"}},null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "36f89b12-c47d-40a5-af73-bd5aa31649ec",
+      "name": "FFA List",
+      "createdAt": 1760000057000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:diamond_sword","count":1,"components":{"minecraft:custom_name":"Join Courtyard FFA — Sword • 12 Playing"}},null,{"id":"minecraft:end_crystal","count":1,"components":{"minecraft:custom_name":"Join Obsidian FFA — Crystal • 8 Playing"}},null,{"id":"minecraft:mace","count":1,"components":{"minecraft:custom_name":"Join Skyforge FFA — Mace • 6 Playing"}},null,{"id":"minecraft:bow","count":1,"components":{"minecraft:custom_name":"Join Tidal FFA — Bow • 3 Playing"}},null,
+          null,null,null,{"id":"minecraft:barrier","count":1,"components":{"minecraft:custom_name":"Frostline FFA — Disabled • Cannot Join"}},null,{"id":"minecraft:barrier","count":1,"components":{"minecraft:custom_name":"Foundry FFA — Disabled • Cannot Join"}},null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "4709ac23-d58e-41b6-b084-ce6bb4275afd",
+      "name": "FFA Settings",
+      "createdAt": 1760000058000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},null,null,{"id":"minecraft:compass","count":1,"components":{"minecraft:custom_name":"RTP Queue Settings"}},null,{"id":"minecraft:ender_pearl","count":1,"components":{"minecraft:custom_name":"TPA Settings"}},null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "581abd34-e69f-42c7-8195-df7cc5386b0e",
+      "name": "Admin Player Data",
+      "createdAt": 1760000059000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},null,{"id":"minecraft:white_dye","count":1,"components":{"minecraft:custom_name":"Nova: Clear Name Color"}},null,{"id":"minecraft:chest","count":1,"components":{"minecraft:custom_name":"Nova: Reset Player Ekits"}},null,{"id":"minecraft:book","count":1,"components":{"minecraft:custom_name":"Nova: Reset Locale"}},null,null,
+          null,null,null,null,null,null,null,{"id":"minecraft:tnt","count":1,"components":{"minecraft:custom_name":"Reset ALL Players' Ekits — Destructive"}},null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "692bce45-f7a0-43d8-92a6-e08dd6497c1f",
+      "name": "Sign Kit Select",
+      "createdAt": 1760000060000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:diamond_sword","count":1,"components":{"minecraft:custom_name":"Get Sword Queue Sign"}},{"id":"minecraft:diamond_axe","count":1,"components":{"minecraft:custom_name":"Get Axe Queue Sign"}},{"id":"minecraft:end_crystal","count":1,"components":{"minecraft:custom_name":"Get Crystal Queue Sign"}},{"id":"minecraft:mace","count":1,"components":{"minecraft:custom_name":"Get Mace Queue Sign"}},{"id":"minecraft:bow","count":1,"components":{"minecraft:custom_name":"Get Bow Queue Sign"}},{"id":"minecraft:golden_apple","count":1,"components":{"minecraft:custom_name":"Get UHC Queue Sign"}},{"id":"minecraft:splash_potion","count":1,"components":{"minecraft:custom_name":"Get NoDebuff Queue Sign"}},null,
+          null,null,null,null,null,null,null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    },
+    {
+      "id": "7a3cdf56-08b1-44e9-a3b7-f19ee75a8d20",
+      "name": "Custom Shield Admin",
+      "createdAt": 1760000061000,
+      "main": [
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,
+        null,null,null,null,null,null,null,null,null,null,null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {"x":86,"y":-22,"z":-26},
+        "items": [
+          {"id":"minecraft:cyan_stained_glass_pane","count":1},{"id":"minecraft:shield","count":1,"components":{"minecraft:custom_name":"Shield Holder 1: Aurora — Assign Custom Model Data: 1001"}},{"id":"minecraft:shield","count":1,"components":{"minecraft:custom_name":"Shield Holder 2: Cinder — Assign Custom Model Data: 1002"}},{"id":"minecraft:shield","count":1,"components":{"minecraft:custom_name":"Shield Holder 3: Tidal — Assign Custom Model Data: 1003"}},null,{"id":"minecraft:shield","count":1,"components":{"minecraft:custom_name":"Shield Holder 4: Empty — Assign Custom Model Data"}},null,{"id":"minecraft:shield","count":1,"components":{"minecraft:custom_name":"Shield Holder 5: Empty — Assign Custom Model Data"}},null,
+          null,null,null,null,null,null,null,null,null,
+          {"id":"minecraft:arrow","count":1,"components":{"minecraft:custom_name":"Back"}},null,null,null,{"id":"minecraft:orange_stained_glass_pane","count":1},null,null,null,null
+        ]
+      }
+    }
+  ]
+}
