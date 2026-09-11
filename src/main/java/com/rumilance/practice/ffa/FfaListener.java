@@ -100,35 +100,30 @@ public final class FfaListener implements Listener {
             return;
         }
 
-        // After a totem pop, stale HP frames can LOOK lethal; the grace window shields those
-        // frames. A GENUINE killing blow inside the window must still resolve - cancelling it
-        // unconditionally (the old behaviour) made the hit vanish entirely, so the victim got
-        // one free "invincible" hit after every totem pop.
-        if (PracticeDeath.isInResurrectGrace(victim)) {
-            if (PracticeDeath.remainingAfter(victim, event) <= 0) {
-                event.setCancelled(true);
-                event.setDamage(0);
-                ffaService.handleLethal(victim, resolveKiller(event));
-            }
-            return;
-        }
-        double remaining = PracticeDeath.remainingAfter(victim, event);
-        if (remaining > 0) {
-            return;
-        }
-        event.setCancelled(true);
-        event.setDamage(0);
-        UUID killerId = resolveKiller(event);
-        ffaService.handleLethal(victim, killerId);
+        // Lethal frames are NOT intercepted or predicted: vanilla kills the player for real
+        // and the death catch (see onDeath) scores it on the resurrected player — an HP-0
+        // prediction can diverge from vanilla's true application; a real death cannot.
     }
 
+    /**
+     * Death catch: server-side authority for FFA deaths. No inventory loss is part of the
+     * respawn flow; DeathBridge revives without the death screen and the existing lethal
+     * handler (respawn + lobby return) runs on the living player right after.
+     */
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onDeath(PlayerDeathEvent event) {
-        if (ffaService.isInFfa(event.getEntity().getUniqueId())) {
-            event.setCancelled(true);
-            event.getDrops().clear();
-            event.setKeepInventory(true);
+        Player victim = event.getEntity();
+        if (!ffaService.isInFfa(victim.getUniqueId()) || event.isCancelled()) {
+            return;
         }
+        event.setKeepInventory(true);
+        event.getDrops().clear();
+        event.setShouldDropExperience(false);
+        event.deathMessage(null);
+        EntityDamageEvent last = victim.getLastDamageCause();
+        UUID killerId = last == null ? null : resolveKiller(last);
+        com.rumilance.practice.combat.DeathBridge.plan(victim, victim.getLocation(),
+                () -> ffaService.handleLethal(victim, killerId));
     }
 
     @EventHandler

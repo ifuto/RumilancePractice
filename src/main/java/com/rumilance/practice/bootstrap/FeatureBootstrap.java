@@ -1247,6 +1247,11 @@ public final class FeatureBootstrap {
                 })));
         pm.registerEvents(totemGuard, plugin);
 
+        // Death catch: combat modes let vanilla actually kill a player, then rule the outcome
+        // on the revived player (no HP-0 prediction anywhere) — death screens are suppressed
+        // via ProtocolLib when available. See DeathBridge / MatchListener.onDeath.
+        com.rumilance.practice.combat.DeathBridge.start(plugin);
+
         pm.registerEvents(new com.rumilance.practice.replay.ReplayControlListener(replayService), plugin);
         pm.registerEvents(new BanLoginListener(banService), plugin);
         pm.registerEvents(new com.rumilance.practice.listener.ChatBanGuardListener(chatBanService), plugin);

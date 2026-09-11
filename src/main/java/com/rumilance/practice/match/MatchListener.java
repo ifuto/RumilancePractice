@@ -138,26 +138,10 @@ public final class MatchListener implements Listener {
             return;
         }
 
-        // After a totem pop, stale HP frames can LOOK lethal; the grace window shields those
-        // frames. A GENUINE killing blow inside the window must still resolve: skipping it used
-        // to let vanilla run a real death that onDeath cancels, leaving a "dead but alive"
-        // player the team alive-check still counts - party fights then never ended even at 0
-        // opponents.
-        if (PracticeDeath.isInResurrectGrace(victim)) {
-            if (remaining <= 0) {
-                event.setCancelled(true);
-                event.setDamage(0);
-                matchService.handleLethal(session, victimId, attackerId);
-            }
-            return;
-        }
-        if (remaining > 0) {
-            return;
-        }
-
-        event.setCancelled(true);
-        event.setDamage(0);
-        matchService.handleLethal(session, victimId, attackerId);
+        // Lethal frames are NOT intercepted or predicted: vanilla kills the player for real
+        // and the death catch (see onDeath) rules the outcome on the resurrected player. An
+        // HP-0 prediction can always diverge from vanilla's true application (the suffocation
+        // class of bug); a real death cannot.
     }
 
     private void recordCombatHit(MatchSession session, Player attacker, Player victim,
@@ -201,13 +185,27 @@ public final class MatchListener implements Listener {
         // would stack on top of the external plugin's shaped knockback.
     }
 
+    /**
+     * Death catch: the server-side authority for a match death. The player really died; keep
+     * their inventory (duels are no-loot), then let DeathBridge revive them without ever
+     * showing a death screen and run the existing lethal ruling on the resurrected fighter.
+     */
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onDeath(PlayerDeathEvent event) {
-        if (matchService.registry().byPlayer(event.getEntity().getUniqueId()).isPresent()) {
-            event.setCancelled(true);
-            event.getDrops().clear();
-            event.setKeepInventory(true);
+        Player victim = event.getEntity();
+        MatchSession session = matchService.registry().byPlayer(victim.getUniqueId()).orElse(null);
+        if (session == null || event.isCancelled()) {
+            return;
         }
+        event.setKeepInventory(true);
+        event.getDrops().clear();
+        event.setShouldDropExperience(false);
+        event.deathMessage(null);
+        EntityDamageEvent last = victim.getLastDamageCause();
+        UUID attackerId = last == null ? null : resolveAttacker(last).playerId();
+        UUID victimId = victim.getUniqueId();
+        com.rumilance.practice.combat.DeathBridge.plan(victim, victim.getLocation(),
+                () -> matchService.handleLethal(session, victimId, attackerId));
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)

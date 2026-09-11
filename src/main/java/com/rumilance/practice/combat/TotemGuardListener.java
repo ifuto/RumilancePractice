@@ -143,9 +143,33 @@ public final class TotemGuardListener implements Listener {
         }
     }
 
+    /**
+     * Kit-rule enforcement for the death-catch world: when damage now flows all the way to
+     * {@code LivingEntity#die}, vanilla will resurrect anyone holding a totem regardless of
+     * kit settings (the kit rule is invisible to vanilla). A kit that forbids totems must
+     * therefore veto the resurrect, letting the death proceed to the death catch.
+     */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onResurrectKitRule(EntityResurrectEvent event) {
+        if (!(event.getEntity() instanceof Player player)) {
+            return;
+        }
+        UUID id = player.getUniqueId();
+        Context context = contextOf(id);
+        if (context == null || context.kit() == null) {
+            return;
+        }
+        KitDefinition kit = context.kit().apply(id);
+        if (kit != null && !kit.totem()) {
+            event.setCancelled(true);
+            Bukkit.getLogger().warning("[N Arena][TotemGuard] kit forbids totems; vanilla resurrect"
+                    + " denied, death proceeds to the death catch: " + player.getName());
+        }
+    }
+
     // ------------------------------------------------------------------- death failsafe
 
-    @EventHandler(priority = EventPriority.HIGHEST)
+    @EventHandler(priority = EventPriority.HIGH)
     public void onDeath(PlayerDeathEvent event) {
         Player player = event.getEntity();
         UUID id = player.getUniqueId();

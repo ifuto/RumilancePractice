@@ -358,7 +358,10 @@ public final class PracticeListener implements Listener {
         event.deathMessage(null);
         session.setBotNextAttackMs(System.currentTimeMillis() + 2_000L);
         if (session.type().botMode() && session.phase() == PracticeSession.Phase.ACTIVE) {
-            // A real match: death is the loss. endBotMatch handles result + lobby return.
+            // A real match: death is the loss. Arm the death catch first so the defeat screen
+            // never flashes; endBotMatch returns the (soon-respawned) player to the lobby.
+            com.rumilance.practice.combat.DeathBridge.plan(player, player.getLocation(), () -> {
+            });
             practiceService.endBotMatch(player, session, PracticeService.BotMatchResult.LOSE);
             return;
         }
@@ -369,47 +372,38 @@ public final class PracticeListener implements Listener {
             session.setPhase(PracticeSession.Phase.WAIT);
             session.setPlaceBlocked(false);
         }
-        var plugin = org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(PracticeListener.class);
-        if (plugin == null) {
-            return;
-        }
-        org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
-            if (!player.isOnline()) {
-                return;
-            }
-            player.spigot().respawn();
-            org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                if (!player.isOnline()) {
-                    return;
-                }
-                org.bukkit.Location spawn = session.activeSpawn();
-                if (spawn != null) {
-                    player.teleport(spawn);
-                }
-                player.setHealth(20.0);
-                player.setFoodLevel(20);
-                player.setSaturation(10.0f);
-                player.setFireTicks(0);
-                player.getInventory().clear();
-                if (session.phase() == PracticeSession.Phase.WAIT) {
-                    if (session.type() == PracticeType.ANKER) {
-                        practiceService.giveWaitHotbar(player, session);
+        // Drill death: the bridge revives the player onto the room spawn with no death screen;
+        // the hook below then restores the room loadout (the old hand-rolled respawn flow).
+        org.bukkit.Location spawn = session.activeSpawn();
+        com.rumilance.practice.combat.DeathBridge.plan(player,
+                spawn != null ? spawn : player.getLocation(),
+                () -> {
+                    if (!player.isOnline()) {
+                        return;
+                    }
+                    player.setHealth(20.0d);
+                    player.setFoodLevel(20);
+                    player.setSaturation(10.0f);
+                    player.setFireTicks(0);
+                    player.getInventory().clear();
+                    if (session.phase() == PracticeSession.Phase.WAIT) {
+                        if (session.type() == PracticeType.ANKER) {
+                            practiceService.giveWaitHotbar(player, session);
+                        } else {
+                            practiceService.giveBotWaitHotbar(player, session);
+                        }
                     } else {
-                        practiceService.giveBotWaitHotbar(player, session);
+                        switch (session.type()) {
+                            case MACE -> practiceService.giveMaceLoadout(player, session);
+                            case SWORD -> practiceService.giveSwordLoadout(player, session);
+                            case CRYSTAL -> practiceService.giveCrystalLoadout(player, session);
+                            case NETHERITE_POT -> practiceService.giveNethPotLoadout(player, session);
+                            case CART -> practiceService.giveCartLoadout(player, session);
+                            default -> { }
+                        }
                     }
-                } else {
-                    switch (session.type()) {
-                        case MACE -> practiceService.giveMaceLoadout(player, session);
-                        case SWORD -> practiceService.giveSwordLoadout(player, session);
-                        case CRYSTAL -> practiceService.giveCrystalLoadout(player, session);
-                        case NETHERITE_POT -> practiceService.giveNethPotLoadout(player, session);
-                        case CART -> practiceService.giveCartLoadout(player, session);
-                        default -> { }
-                    }
-                }
-                player.updateInventory();
-            }, 2L);
-        });
+                    player.updateInventory();
+                });
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
