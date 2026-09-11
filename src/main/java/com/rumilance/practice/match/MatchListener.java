@@ -129,14 +129,6 @@ public final class MatchListener implements Listener {
             recordCombatHit(session, attackerPlayer, victim, byEntity, event.getFinalDamage());
         }
 
-        // Totem of undying: pop it OURSELVES. Deferring to vanilla used to leave players dead
-        // with a totem in hand, because vanilla only resurrects when the lethal damage actually
-        // reaches LivingEntity#die - and practice cancels / re-routes lethal damage in several
-        // places (void rescue, explosion self-damage one tick later, other plugins). A pop here
-        // is unconditional: the hit is cancelled, one totem is consumed, vanilla effects apply.
-        if (PracticeDeath.tryPopTotem(victim, kit, event)) {
-            return;
-        }
 
         // Lethal frames are NOT intercepted or predicted: vanilla kills the player for real
         // and the death catch (see onDeath) rules the outcome on the resurrected player. An

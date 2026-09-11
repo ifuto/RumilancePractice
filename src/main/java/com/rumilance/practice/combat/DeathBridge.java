@@ -36,6 +36,9 @@ public final class DeathBridge implements Listener {
     }
 
     private static final DeathRegistry<RespawnPlan> REGISTRY = new DeathRegistry<>();
+    /** Planned players whose imminent respawn packet must be seamless (no "Loading terrain"). */
+    private static final java.util.Map<java.util.UUID, Long> seamlessRespawnUntil =
+            new java.util.concurrent.ConcurrentHashMap<>();
     private static volatile Plugin pluginRef;
 
     private DeathBridge() {
@@ -66,6 +69,23 @@ public final class DeathBridge implements Listener {
         return REGISTRY.isMarked(playerId);
     }
 
+    /**
+     * True for a short window around the bridged revive: the outgoing respawn packet then gets
+     * the 1.20.2+ keep-all-data byte so the client keeps its chunks instead of flashing the
+     * "Loading terrain" screen between the killing blow and the revive teleport.
+     */
+    public static boolean wantsSeamlessRespawn(java.util.UUID playerId) {
+        Long until = seamlessRespawnUntil.get(playerId);
+        if (until == null) {
+            return false;
+        }
+        if (System.currentTimeMillis() > until) {
+            seamlessRespawnUntil.remove(playerId, until);
+            return false;
+        }
+        return true;
+    }
+
     @EventHandler(priority = EventPriority.MONITOR)
     public void onDeath(PlayerDeathEvent event) {
         Player player = event.getEntity();
@@ -73,6 +93,9 @@ public final class DeathBridge implements Listener {
             return;
         }
         event.deathMessage(null);
+        // The bridge respawns this player within the next ticks: their outgoing respawn packet
+        // must not trigger a client-side world reload ("Loading terrain" flash).
+        seamlessRespawnUntil.put(player.getUniqueId(), System.currentTimeMillis() + 4_000L);
         Plugin plugin = pluginRef;
         if (plugin != null) {
             Bukkit.getScheduler().runTask(plugin, () -> tryRespawn(player, 1));
@@ -141,5 +164,6 @@ public final class DeathBridge implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         REGISTRY.clear(event.getPlayer().getUniqueId());
+        seamlessRespawnUntil.remove(event.getPlayer().getUniqueId());
     }
 }

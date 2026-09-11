@@ -81,14 +81,6 @@ public final class PracticeListener implements Listener {
             return;
         }
         PracticeSession session = sessionOpt.get();
-        // Totem of undying: a practice player holding a totem in a hand can never die, whatever
-        // the room type is (crystal self-blasts and TNT carts are the lethal sources here). The
-        // pop runs before every exemption below so the totem is consumed exactly like vanilla.
-        if (com.rumilance.practice.combat.PracticeDeath.wouldDie(player, event)
-                && com.rumilance.practice.combat.PracticeDeath.tryPopTotem(
-                        player, practiceService.kitOf(session), event)) {
-            return;
-        }
         // Whoever fights back in this session: the combat bot for sword / crystal / nethpot /
         // cart, the mace dummy for MACE (it lunges, wind-charges and smashes like the map's bot).
         Mannequin combatBot = session.combatBot() != null ? session.combatBot() : session.maceBot();

@@ -7,7 +7,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityResurrectEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.plugin.Plugin;
@@ -17,24 +16,22 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
- * Last line of defence for the one rule practice PvP must never break:
- * <strong>a player holding a totem of undying in a hand cannot die.</strong>
- *
- * <p>The mode listeners (match / FFA / practice / void rescue) pop totems themselves on the
- * lethal {@link EntityDamageEvent}. This listener catches whatever still slips through — a hit
- * another plugin left uncancelled, a damage cause no mode listener covers, a death arriving
- * from a path that never produced a damage event we could see:</p>
+ * Totem handling in the death-catch world is <strong>vanilla-first</strong>: lethal damage
+ * reaches {@code LivingEntity#die}, vanilla consumes the totem, fires
+ * {@link org.bukkit.event.entity.EntityResurrectEvent}, and restores the player with the exact
+ * vanilla effects and invulnerability window. This listener only polices the edges:
  *
  * <ol>
- *   <li>{@link EventPriority#MONITOR} on damage: lethal + uncancelled + totem in hand ⇒ cancel
- *       the hit and pop the totem (a MONITOR handler may still cancel; nothing has been applied
- *       yet, so the victim simply survives).</li>
- *   <li>{@link PlayerDeathEvent}: cancel, consume the held totem and bring the player back
- *       (health top-up, or a forced respawn + teleport home when Paper keeps them downed).</li>
+ *   <li>{@code EntityResurrectEvent} (MONITOR): a successful vanilla pop marks the resurrect
+ *       grace window so no lethal-frame bookkeeping can misread it.</li>
+ *   <li>{@code EntityResurrectEvent} (HIGHEST, kit rule): a kit that forbids totems must veto
+ *       the vanilla resurrect — vanilla cannot see kit settings — so the death proceeds to the
+ *       death catch and is scored even while the player holds a totem.</li>
+ *   <li>{@code PlayerDeathEvent} failsafe: a death that still arrives with a totem in hand
+ *       (resurrect denied by something else, or a path that never produced a damage event we
+ *       could observe) is cancelled, one totem consumed, and the player revived — a totem
+ *       holder can never lose.</li>
  * </ol>
- *
- * <p>Register this listener <em>first</em> so its MONITOR handler runs before any other plugin
- * listener that would treat the same frame as a death.</p>
  */
 public final class TotemGuardListener implements Listener {
 
@@ -100,39 +97,6 @@ public final class TotemGuardListener implements Listener {
     /** True when this player is inside any guarded practice context. */
     public boolean guards(UUID playerId) {
         return contextOf(playerId) != null;
-    }
-
-    // ------------------------------------------------------------------ damage failsafe
-
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onLethalDamage(EntityDamageEvent event) {
-        if (event.isCancelled() || !(event.getEntity() instanceof Player player)) {
-            return;
-        }
-        UUID id = player.getUniqueId();
-        Context context = contextOf(id);
-        if (context == null) {
-            return;
-        }
-        if (!PracticeDeath.wouldDie(player, event)) {
-            return;
-        }
-        KitDefinition kit = context.kit() == null ? null : context.kit().apply(id);
-        if (!PracticeDeath.canPopTotem(player, kit)) {
-            return;
-        }
-        // Nothing was applied yet (MONITOR still runs before the damage lands), so cancelling
-        // here is a clean save: the totem pops, the killing blow disappears.
-        event.setCancelled(true);
-        event.setDamage(0);
-        if (PracticeDeath.tryPopTotem(player, kit)) {
-            Bukkit.getLogger().warning("[N Arena][TotemGuard] caught a lethal hit the mode listeners missed: "
-                    + player.getName() + " cause=" + event.getCause());
-            return;
-        }
-        // No consumable totem after all (race): keep the player alive anyway — a totem holder
-        // must never die — by nulling the hit. The next real hit decides the fight.
-        PracticeDeath.markResurrected(player);
     }
 
     /** Vanilla popped one for us (another plugin / a path we did not cover): stay consistent. */

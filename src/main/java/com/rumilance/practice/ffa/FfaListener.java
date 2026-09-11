@@ -1,6 +1,5 @@
 package com.rumilance.practice.ffa;
 
-import com.rumilance.practice.combat.PracticeDeath;
 import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.model.KitDefinition;
 import com.rumilance.practice.session.PlayerStateManager;
@@ -92,12 +91,6 @@ public final class FfaListener implements Listener {
             if (attackerId != null) {
                 ffaService.tagCombat(victim.getUniqueId(), attackerId);
             }
-        }
-        // Totem of undying: pop it OURSELVES (mirrors MatchListener). Deferring to vanilla left
-        // players dead with a totem in hand whenever the lethal frame never reached
-        // LivingEntity#die (void rescue, explosion self-damage, another plugin cancelling).
-        if (PracticeDeath.tryPopTotem(victim, kit, event)) {
-            return;
         }
 
         // Lethal frames are NOT intercepted or predicted: vanilla kills the player for real
