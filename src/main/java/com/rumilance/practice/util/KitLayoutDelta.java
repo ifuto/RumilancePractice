@@ -38,39 +38,16 @@ public final class KitLayoutDelta {
             return ItemSerializer.toBase64(layout);
         }
         ItemStack[] defaults = baseline(kit);
-        boolean[] sourceUsed = new boolean[KitLoadout.SIZE];
-        String[] slotOps = new String[KitLoadout.SIZE];
-        // Pass 1: moves and foreign items. A moved default item consumes its source slot, so
-        // that slot must not also be reported as emptied.
+        // Identity keys drive the pure slot planner (KitDeltaPlanner): full-NBT serialization
+        // is equality-complete for baseline comparisons, so plan-vs-emit cannot disagree.
+        String[] layoutKeys = new String[KitLoadout.SIZE];
+        String[] defaultKeys = new String[KitLoadout.SIZE];
         for (int i = 0; i < KitLoadout.SIZE; i++) {
             ItemStack target = i < layout.length ? layout[i] : null;
-            if (target == null || stackEquals(defaults[i], target)) {
-                continue;
-            }
-            int movedFrom = -1;
-            for (int j = 0; j < KitLoadout.SIZE; j++) {
-                if (j == i || sourceUsed[j] || defaults[j] == null) {
-                    continue;
-                }
-                if (stackEquals(defaults[j], target)) {
-                    movedFrom = j;
-                    break;
-                }
-            }
-            if (movedFrom >= 0) {
-                sourceUsed[movedFrom] = true;
-                slotOps[i] = "M" + movedFrom + ">" + i;
-            } else {
-                slotOps[i] = "F" + i + ":" + ItemSerializer.singleToBase64(target);
-            }
+            layoutKeys[i] = target == null ? null : ItemSerializer.singleToBase64(target);
+            defaultKeys[i] = defaults[i] == null ? null : ItemSerializer.singleToBase64(defaults[i]);
         }
-        // Pass 2: default items the player dropped (unless their slot fed a move).
-        for (int i = 0; i < KitLoadout.SIZE; i++) {
-            ItemStack target = i < layout.length ? layout[i] : null;
-            if (target == null && defaults[i] != null && !sourceUsed[i]) {
-                slotOps[i] = "E" + i;
-            }
-        }
+        String[] slotOps = KitDeltaPlanner.plan(layoutKeys, defaultKeys);
         StringBuilder out = new StringBuilder(PREFIX);
         boolean first = true;
         for (String op : slotOps) {
@@ -80,7 +57,13 @@ public final class KitLayoutDelta {
             if (!first) {
                 out.append(';');
             }
-            out.append(op);
+            if (op.charAt(0) == 'F') {
+                // Foreign item: the planner emits the marker; the payload is the slot's key.
+                int slot = Integer.parseInt(op.substring(1));
+                out.append(op).append(':').append(layoutKeys[slot]);
+            } else {
+                out.append(op);
+            }
             first = false;
         }
         return out.toString();
@@ -174,16 +157,5 @@ public final class KitLayoutDelta {
         ItemStack[] defaults = KitLoadout.fromOfficial(kit);
         KitLayoutContents.stripPlaceholders(defaults);
         return defaults;
-    }
-
-    /** ItemStack#equals semantics (type + amount + meta). */
-    private static boolean stackEquals(ItemStack a, ItemStack b) {
-        if (a == b) {
-            return true;
-        }
-        if (a == null || b == null) {
-            return false;
-        }
-        return a.equals(b);
     }
 }
