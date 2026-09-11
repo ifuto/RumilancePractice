@@ -5,6 +5,7 @@ import com.rumilance.practice.database.repository.AnnualStreakRepository;
 import com.rumilance.practice.database.repository.DailyRankedStatsRepository;
 import com.rumilance.practice.database.repository.PlayerRepository;
 import com.rumilance.practice.locale.MessageService;
+import com.rumilance.practice.util.CompetitionRanks;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
@@ -51,12 +52,11 @@ import java.util.logging.Level;
  * rendered on a translucent black background panel ({@code setBackgroundColor} ARGB — the
  * vanilla text-display backdrop).</p>
  *
- * <p><b>Player tracking is left to the client.</b> Every viewer inside
- * {@link #TRIGGER_RADIUS} gets a PRIVATE copy with {@link Display.Billboard#VERTICAL}:
- * the client turns the display toward its own player every frame (smooth vanilla
- * animation, no server-side easing). Several players near one board therefore each see the
- * board facing themselves — one duplicate per nearby viewer, position never moves. Outside
- * the radius the shared copy stands at its saved yaw.</p>
+ * <p><b>Facing is FIXED.</b> Every copy always faces the lobby spawn; players close enough
+ * to walk around a board do NOT see it swing toward them. Viewers inside
+ * {@link #TRIGGER_RADIUS} still get a PRIVATE copy (same position, same yaw) purely so the
+ * text renders in their own locale; outside the radius the shared default-locale copy
+ * stands at its saved yaw.</p>
  */
 public final class KillLeaderboardService implements Listener {
 
@@ -173,7 +173,10 @@ public final class KillLeaderboardService implements Listener {
         viewers.clear();
     }
 
-    /** Places (or replaces) a board at the executor's feet, yawed toward the lobby spawn. */
+    /**
+     * Places (or replaces) a board at {@code feet} — {@code /lbspawn} passes the block the
+     * executor is looking at plus one block up — yawed toward the lobby spawn.
+     */
     public void place(String type, Location feet) {
         Board board = boards.get(type);
         if (board == null) {
@@ -301,9 +304,9 @@ public final class KillLeaderboardService implements Listener {
     }
 
     /**
-     * Spawns the viewer's private copy at the board's position. Billboard VERTICAL lets the
-     * CLIENT rotate it toward that viewer every frame — the vanilla tracking animation, no
-     * server-side easing or teleports.
+     * Spawns the viewer's private copy at the board's position. It exists only to carry the
+     * viewer's locale: the board ALWAYS faces the lobby spawn ({@code FIXED} billboard), for
+     * near viewers exactly as for far ones.
      */
     private void spawnPersonal(Board board, UUID playerId, ViewerState state) {
         World world = board.base.getWorld();
@@ -315,7 +318,7 @@ public final class KillLeaderboardService implements Listener {
         at.setYaw(board.yaw);
         at.setPitch(0f);
         TextDisplay display = world.spawn(at, TextDisplay.class, d -> configure(d,
-                String.join("\n", lines), PERSONAL_MARKER, board.scale, Display.Billboard.VERTICAL));
+                String.join("\n", lines), PERSONAL_MARKER, board.scale, Display.Billboard.FIXED));
         state.display = display.getUniqueId();
         state.lineVersion = board.lineVersion;
     }
@@ -481,16 +484,18 @@ public final class KillLeaderboardService implements Listener {
                 if (top.isEmpty()) {
                     out.add(raw(locale, "lb.no-records"));
                 }
-                int rank = 0;
+                // Competition ranking: equal kill counts share a rank (1, 2, 2, 4, ...);
+                // the repository already lists earlier achievers first inside a tie.
+                int[] killRanks = CompetitionRanks.ranks(killValues(top));
+                int killRow = 0;
                 for (DailyRankedStatsRepository.MonthlyEntry entry : top) {
-                    rank++;
                     double kd = entry.deaths() <= 0 ? entry.kills()
                             : (double) entry.kills() / entry.deaths();
                     String row = raw(locale, "lb.kill-row")
                             .replace("{name}", resolveName(entry.playerId()))
                             .replace("{kills}", String.valueOf(entry.kills()))
                             .replace("{kd}", String.format(java.util.Locale.ROOT, "%.2f", kd));
-                    out.add(rankPrefix(rank) + row);
+                    out.add(rankPrefix(killRanks[killRow++]) + row);
                 }
             } else {
                 out.add(raw(locale, "lb.streak-title"));
@@ -499,13 +504,13 @@ public final class KillLeaderboardService implements Listener {
                 if (top.isEmpty()) {
                     out.add(raw(locale, "lb.no-records"));
                 }
-                int rank = 0;
+                int[] streakRanks = CompetitionRanks.ranks(streakValues(top));
+                int streakRow = 0;
                 for (AnnualStreakRepository.StreakEntry entry : top) {
-                    rank++;
                     String row = raw(locale, "lb.streak-row")
                             .replace("{name}", resolveName(entry.playerId()))
                             .replace("{streak}", String.valueOf(entry.bestStreak()));
-                    out.add(rankPrefix(rank) + row);
+                    out.add(rankPrefix(streakRanks[streakRow++]) + row);
                 }
             }
         } catch (Exception e) {
@@ -520,6 +525,22 @@ public final class KillLeaderboardService implements Listener {
 
     private String raw(String locale, String key) {
         return messageService.localeService().rawMessage(locale, key);
+    }
+
+    private static long[] killValues(List<DailyRankedStatsRepository.MonthlyEntry> top) {
+        long[] values = new long[top.size()];
+        for (int i = 0; i < top.size(); i++) {
+            values[i] = top.get(i).kills();
+        }
+        return values;
+    }
+
+    private static long[] streakValues(List<AnnualStreakRepository.StreakEntry> top) {
+        long[] values = new long[top.size()];
+        for (int i = 0; i < top.size(); i++) {
+            values[i] = top.get(i).bestStreak();
+        }
+        return values;
     }
 
     /** Colored rank prefix: gold / silver / bronze medals for the top three. */

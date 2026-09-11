@@ -415,6 +415,13 @@ public final class SchemaMigrator {
                         + ")"
         )));
 
+        migrations.add(new Migration(31, "add best_reached column to annual_streak_stats", connection -> {
+            // Day the record-best streak was (re)achieved - ties on the leaderboard list
+            // the earlier reacher first. NULL for legacy rows sorts as the oldest on purpose.
+            String table = databaseService.table("annual_streak_stats");
+            databaseService.ensureColumn(connection, table, "best_reached", "CHAR(10)");
+        }));
+
         return migrations;
     }
 }

@@ -64,9 +64,15 @@ public final class DailyRankedStatsRepository {
 
     /** @param monthPrefix {@code yyyy-MM} selecting the month */
     public List<MonthlyEntry> topKillsOfMonth(String monthPrefix, int limit) throws SQLException {
+        // Ties share one displayed rank on the leaderboard; WITHIN a tie the player who
+        // reached their current total first wins ("first-come first"). The day their total
+        // last increased = the day they REACHED the total, so earliest last-kill day first.
+        // player_uuid ASC keeps any fully-degenerate tie deterministic.
         String sql = "SELECT player_uuid, SUM(kills) AS kills, SUM(deaths) AS deaths FROM "
                 + databaseService.table("daily_ranked_stats")
-                + " WHERE stat_date LIKE ? GROUP BY player_uuid ORDER BY kills DESC LIMIT ?";
+                + " WHERE stat_date LIKE ? GROUP BY player_uuid"
+                + " ORDER BY kills DESC,"
+                + " MAX(CASE WHEN kills > 0 THEN stat_date END) ASC, player_uuid ASC LIMIT ?";
         List<MonthlyEntry> result = new java.util.ArrayList<>();
         try (Connection connection = databaseService.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {

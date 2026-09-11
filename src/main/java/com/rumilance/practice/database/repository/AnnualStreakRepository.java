@@ -26,25 +26,35 @@ public final class AnnualStreakRepository {
         this.databaseService = databaseService;
     }
 
-    /** Extends the player's current streak by one win for the current year. */
+    /**
+     * Extends the player's current streak by one win for the current year. {@code best_reached}
+     * stamps the day the record-best streak was (re)achieved; the leaderboard breaks value
+     * ties by WHO reached the value first.
+     */
     public void recordWin(UUID playerId) throws SQLException {
         String year = String.valueOf(Year.now().getValue());
+        String today = java.time.LocalDate.now().toString();
         try (Connection connection = databaseService.getConnection()) {
             try (PreparedStatement insert = connection.prepareStatement(
                     "INSERT INTO " + databaseService.table("annual_streak_stats")
-                            + " (player_uuid, stat_year, current_streak, best_streak) VALUES (?, ?, 1, 1)")) {
+                            + " (player_uuid, stat_year, current_streak, best_streak, best_reached)"
+                            + " VALUES (?, ?, 1, 1, ?)")) {
                 insert.setString(1, playerId.toString());
                 insert.setString(2, year);
+                insert.setString(3, today);
                 insert.executeUpdate();
             } catch (SQLException duplicate) {
                 try (PreparedStatement update = connection.prepareStatement(
                         "UPDATE " + databaseService.table("annual_streak_stats")
                                 + " SET current_streak = current_streak + 1, "
                                 + "best_streak = CASE WHEN current_streak + 1 > best_streak "
-                                + "THEN current_streak + 1 ELSE best_streak END "
+                                + "THEN current_streak + 1 ELSE best_streak END, "
+                                + "best_reached = CASE WHEN current_streak + 1 > best_streak "
+                                + "THEN ? ELSE best_reached END "
                                 + "WHERE player_uuid = ? AND stat_year = ?")) {
-                    update.setString(1, playerId.toString());
-                    update.setString(2, year);
+                    update.setString(1, today);
+                    update.setString(2, playerId.toString());
+                    update.setString(3, year);
                     update.executeUpdate();
                 }
             }
@@ -70,8 +80,13 @@ public final class AnnualStreakRepository {
     }
 
     public List<StreakEntry> topBestStreaks(String year, int limit) throws SQLException {
+        // Ties share one displayed rank on the leaderboard; WITHIN a tie the player who
+        // reached the streak first wins. Rows predating the best_reached column (NULL) are
+        // treated as the oldest: they were certainly achieved before any new record.
         String sql = "SELECT player_uuid, best_streak FROM " + databaseService.table("annual_streak_stats")
-                + " WHERE stat_year = ? AND best_streak > 0 ORDER BY best_streak DESC LIMIT ?";
+                + " WHERE stat_year = ? AND best_streak > 0"
+                + " ORDER BY best_streak DESC, COALESCE(best_reached, '0000-00-00') ASC,"
+                + " player_uuid ASC LIMIT ?";
         List<StreakEntry> result = new ArrayList<>();
         try (Connection connection = databaseService.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {

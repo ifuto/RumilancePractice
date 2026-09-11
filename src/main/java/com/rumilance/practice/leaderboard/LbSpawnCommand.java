@@ -14,10 +14,14 @@ import java.util.Locale;
 
 /**
  * {@code /lbspawn <kill|streak>} — places the floating monthly-kill or annual-win-streak
- * leaderboard at the executor's feet, yawed toward the lobby spawn (no pitch).
+ * leaderboard one block above the block the executor is looking at, yawed toward the lobby
+ * spawn (the board always faces the spawn, never tracks viewers).
  * {@code /lbspawn remove <kill|streak|all>} deletes boards.
  */
 public final class LbSpawnCommand implements CommandExecutor, TabCompleter {
+
+    /** How far along the executor's sight line a target block is accepted. */
+    private static final int LOOK_RANGE = 100;
 
     private final KillLeaderboardService leaderboardService;
 
@@ -35,15 +39,15 @@ public final class LbSpawnCommand implements CommandExecutor, TabCompleter {
         String sub = args.length == 0 ? "kill" : args[0].toLowerCase(Locale.ROOT);
         switch (sub) {
             case "kill" -> {
-                leaderboardService.place("kill", player.getLocation());
+                leaderboardService.place("kill", sightSpot(player));
                 player.sendMessage(Component.text(
-                        "月間キルリーダーボードを足元に設置しました(ロビースポーン向き)。",
+                        "月間キルリーダーボードを視線の先のブロックの上に設置しました(ロビースポーン向き)。",
                         NamedTextColor.GREEN));
             }
             case "streak" -> {
-                leaderboardService.place("streak", player.getLocation());
+                leaderboardService.place("streak", sightSpot(player));
                 player.sendMessage(Component.text(
-                        "年間最大連勝リーダーボードを足元に設置しました(ロビースポーン向き)。",
+                        "年間最大連勝リーダーボードを視線の先のブロックの上に設置しました(ロビースポーン向き)。",
                         NamedTextColor.GREEN));
             }
             case "remove" -> {
@@ -65,6 +69,20 @@ public final class LbSpawnCommand implements CommandExecutor, TabCompleter {
                     "Usage: /lbspawn <kill|streak|remove <kill|streak|all>>", NamedTextColor.YELLOW));
         }
         return true;
+    }
+
+    /**
+     * The board goes ONE block above the block the executor is looking at (horizontally
+     * centred). Looking at the sky (no block in range) falls back to the executor's feet.
+     */
+    private static org.bukkit.Location sightSpot(Player player) {
+        org.bukkit.block.Block target = player.getTargetBlockExact(LOOK_RANGE,
+                org.bukkit.FluidCollisionMode.NEVER);
+        if (target == null) {
+            return player.getLocation();
+        }
+        return new org.bukkit.Location(player.getWorld(),
+                target.getX() + 0.5, target.getY() + 1.0, target.getZ() + 0.5);
     }
 
     @Override
