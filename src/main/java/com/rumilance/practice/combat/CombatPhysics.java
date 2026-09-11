@@ -294,4 +294,29 @@ public final class CombatPhysics {
                 && !passenger
                 && !blindness;
     }
+
+    /**
+     * Raw-damage rescale factor for the ping-rewind crit sync ({@code CombatSyncListener}):
+     * <ul>
+     *   <li>{@code 1.0} — leave the vanilla amount alone (no amplification is ever invented
+     *       when client and server agree).</li>
+     *   <li>{@code 1.5} — the rewound client snapshot is a crit the server did not flag
+     *       (a missed falling crit).</li>
+     *   <li>{@code 2/3} (== ÷1.5) — the server flagged a crit but the snapshot proves the
+     *       attacker stood on solid ground with zero fall distance and no sprint intent;
+     *       that desync strips the bonus back to a plain hit. The intentional sprint-crit
+     *       desync (MC-69459) is preserved: a sprinting client's server crit stays.</li>
+     * </ul>
+     */
+    public static double critRescale(boolean clientCrit, boolean serverCrit,
+                                     boolean snapOnGround, float snapFallDistance,
+                                     boolean wantsSprint) {
+        if (clientCrit && !serverCrit) {
+            return 1.5d;
+        }
+        if (!clientCrit && serverCrit && snapOnGround && snapFallDistance <= 0.0f && !wantsSprint) {
+            return 2.0d / 3.0d;
+        }
+        return 1.0d;
+    }
 }

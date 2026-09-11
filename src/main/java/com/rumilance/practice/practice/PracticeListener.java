@@ -119,9 +119,18 @@ public final class PracticeListener implements Listener {
                         || event.getCause() == EntityDamageEvent.DamageCause.HOT_FLOOR)) {
             return;
         }
-        event.setCancelled(true);
-        player.setFireTicks(0);
-        player.setVelocity(new Vector());
+        // Theoretical guarantee (PracticeRoomDamagePolicy): the room protection may only
+        // silence NON-lethal, non-suffocation damage. Suffocation / drowning always tick — a
+        // player buried in their own obsidian used to become an unhittable, unkillable wall
+        // because the finishing suffocation tick could never land. Any lethal frame the totem
+        // did not absorb resolves to a real death, which the practice death flow handles.
+        if (com.rumilance.practice.combat.PracticeRoomDamagePolicy.mayCancelRoomDamage(
+                event.getCause() == null ? "" : event.getCause().name(),
+                com.rumilance.practice.combat.PracticeDeath.remainingAfter(player, event))) {
+            event.setCancelled(true);
+            player.setFireTicks(0);
+            player.setVelocity(new Vector());
+        }
     }
 
     /** Cancel knockback applied to practice players — except in live bot fights. */

@@ -99,4 +99,44 @@ class CombatPhysicsTest {
         assertEquals(0.91d * 0.91d, two, 0.0001d);
         assertTrue(CombatPhysics.compensatedHorizontal(1.0d, 5) < two);
     }
+
+    // -- critRescale: the full decision table (no crit amplification is ever invented) --
+
+    @Test
+    void critRescaleLeavesAgreedCritsAlone() {
+        assertEquals(1.0d, CombatPhysics.critRescale(true, true, false, 0.6f, false), 0.0d,
+                "client and server both crit: vanilla amount already carries x1.5");
+    }
+
+    @Test
+    void critRescaleLeavesAgreedNonCritsAlone() {
+        assertEquals(1.0d, CombatPhysics.critRescale(false, false, true, 0.0f, false), 0.0d,
+                "a standing hit must never silently gain damage");
+    }
+
+    @Test
+    void critRescaleFillsOnlyMissedFallingCrits() {
+        assertEquals(1.5d, CombatPhysics.critRescale(true, false, false, 0.8f, false), 0.0d,
+                "client-side crit the server dropped -> fill the x1.5 exactly once");
+    }
+
+    @Test
+    void critRescaleStripsProvenOnGroundCrits() {
+        assertEquals(2.0d / 3.0d, CombatPhysics.critRescale(false, true, true, 0.0f, false), 0.0d,
+                "server crit the rewind disproves (on ground, no fall, no sprint) -> back to x1.0");
+    }
+
+    @Test
+    void critRescaleKeepsSprintCritDesync() {
+        assertEquals(1.0d, CombatPhysics.critRescale(false, true, true, 0.0f, true), 0.0d,
+                "MC-69459 sprint-crit desync is intentional: no stripping while sprinting");
+    }
+
+    @Test
+    void critRescaleNeverUsesTheStripBranchWithFallDistance() {
+        assertEquals(1.0d, CombatPhysics.critRescale(false, true, true, 0.2f, false), 0.0d,
+                "any positive fall distance means the server may be right: leave it alone");
+        assertEquals(1.0d, CombatPhysics.critRescale(false, true, false, 0.0f, false), 0.0d,
+                "airborne snapshot means the server may be right: leave it alone");
+    }
 }

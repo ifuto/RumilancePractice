@@ -213,11 +213,14 @@ public final class CombatSyncListener implements Listener {
         // Keep the vanilla sprint-crit desync (MC-69459) when the client is holding sprint:
         // that is an intentional PvP mechanic. Only fill in *missed* falling crits, or strip
         // a server crit that the rewound snapshot says was on-ground with no fall.
-        if (clientCrit && !serverCrit) {
-            event.setDamage(event.getDamage() * 1.5d);
-        } else if (!clientCrit && serverCrit && snap.onGround() && snap.fallDistance() <= 0.0f
-                && !tracker.wantsSprint(attacker.getUniqueId())) {
-            event.setDamage(event.getDamage() / 1.5d);
+        double rescale = CombatPhysics.critRescale(
+                clientCrit,
+                serverCrit,
+                snap.onGround(),
+                snap.fallDistance(),
+                tracker.wantsSprint(attacker.getUniqueId()));
+        if (rescale != 1.0d) {
+            event.setDamage(event.getDamage() * rescale);
         }
     }
 
