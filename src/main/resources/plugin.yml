@@ -145,6 +145,13 @@ commands:
     description: Manage practice rooms (admin).
     usage: /practice <draft|pos1|selection|p1|save|enable|disable|delete|list|info|tp>
     permission: rumilance.admin
+  bot:
+    description: Open the bot-select screen.
+    usage: /bot
+  botadmin:
+    description: Bind a bot fight kit to the arena kit hosting its fights.
+    usage: /botadmin <botkit> <arenakit|off>
+    permission: rumilance.admin
   team:
     description: Owner-invite style teams with public/private visibility and red-blue team battles.
     usage: /team <gui|create|invite|join|decline|leave|kick|public|list|info|side|autosplit|clearsides|start|disband>

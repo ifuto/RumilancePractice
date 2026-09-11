@@ -20,8 +20,12 @@ import java.util.Locale;
  */
 public final class LbSpawnCommand implements CommandExecutor, TabCompleter {
 
-    /** How far along the executor's sight line a target block is accepted. */
-    private static final int LOOK_RANGE = 100;
+    /**
+     * How far along the executor's sight line a target block is accepted. Vanilla interaction
+     * reach: 100 blocks used to accept distant walls/ceilings along an upward gaze, so the
+     * board materialised ~10 blocks above the executor instead of at their feet.
+     */
+    private static final int LOOK_RANGE = 5;
 
     private final KillLeaderboardService leaderboardService;
 

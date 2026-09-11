@@ -76,6 +76,8 @@ public final class PracticeService {
     private volatile java.util.function.BiConsumer<Player, PracticeSession> openBotGui;
     private volatile java.util.function.BiConsumer<Player, PracticeSession> openDifficultyGui;
     /** Admin kit binding per bot mode (Quantum's 5 fight modes -> server kits). */
+    /** /botadmin: bot fight kit -> arena kit whose arenas host the fight (BOT fights are NOT practice rooms). */
+    private final java.util.Map<String, String> botArenaKitBindings = new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.Map<PracticeType, String> botModeKits =
             new java.util.EnumMap<>(PracticeType.class);
     /** Admin map binding per bot mode: fights run in the room tied to the mode's kit. */
@@ -199,11 +201,71 @@ public final class PracticeService {
         if (boundKit == null || boundKit.isBlank()) {
             return null;
         }
-        com.rumilance.practice.model.KitDefinition kit = kitService.get(boundKit).orElse(null);
+        // Explicit /botadmin binding first (fight loadout stays the bot kit; VENUE follows the
+        // arena kit), else the bot kit's own arenas (bare kit-with-arenas wiring).
+        String arenaKit = botArenaKitOf(boundKit);
+        String venueKit = arenaKit != null ? arenaKit : boundKit;
+        com.rumilance.practice.model.KitDefinition kit = kitService.get(venueKit).orElse(null);
         if (kit == null || kit.arenas() == null || kit.arenas().isEmpty()) {
             return null;
         }
         return kit.arenas();
+    }
+
+    /** Case-insensitive lookup of the /botadmin bot-kit->arena-kit binding; null when unbound. */
+    public String botArenaKitOf(String botKit) {
+        if (botKit == null) {
+            return null;
+        }
+        String hit = botArenaKitBindings.get(botKit);
+        if (hit != null) {
+            return hit;
+        }
+        for (java.util.Map.Entry<String, String> entry : botArenaKitBindings.entrySet()) {
+            if (entry.getKey().equalsIgnoreCase(botKit)) {
+                return entry.getValue();
+            }
+        }
+        return null;
+    }
+
+    /** Live view of the /botadmin bindings for the admin list command. */
+    public java.util.Map<String, String> botArenaKitBindings() {
+        return java.util.Collections.unmodifiableMap(botArenaKitBindings);
+    }
+
+    /** /botadmin set: binds a bot fight kit to the arena kit hosting its fights. */
+    public void setBotArenaKit(String botKit, String arenaKit) {
+        botArenaKitBindings.put(botKit, arenaKit);
+        persistBotArenaBindings();
+    }
+
+    /** /botadmin off: removes the binding so the bot kit's own arenas (or rooms) serve again. */
+    public boolean clearBotArenaKit(String botKit) {
+        String removed = botArenaKitBindings.remove(botKit);
+        if (removed == null) {
+            // Keys are stored as typed; try a case-insensitive sweep before giving up.
+            String key = null;
+            for (String candidate : botArenaKitBindings.keySet()) {
+                if (candidate.equalsIgnoreCase(botKit)) {
+                    key = candidate;
+                    break;
+                }
+            }
+            removed = key == null ? null : botArenaKitBindings.remove(key);
+        }
+        if (removed != null) {
+            persistBotArenaBindings();
+        }
+        return removed != null;
+    }
+
+    private void persistBotArenaBindings() {
+        FileConfiguration yaml = configService.practices();
+        yaml.set("bot-arena-kits", null);
+        botArenaKitBindings.forEach((botKit, arenaKit) ->
+                yaml.set("bot-arena-kits." + botKit, arenaKit));
+        configService.save(ConfigService.PRACTICES);
     }
 
     /** Enabled-and-idle templates inside the mode's arena pool (0 when the pool is busy). */
@@ -303,11 +365,12 @@ public final class PracticeService {
         stock.clear();
         switch (type) {
             case SWORD -> {
+                // Sword = melee only (no pearls, no bow/arrows) - per server ruling, a Sword
+                // bot that turns ranged stops being the mode's namesake.
                 stock.put(Material.COBWEB, 64);
                 stock.put(Material.LAVA_BUCKET, 8);
                 stock.put(Material.NETHERITE_AXE, 1);
                 stock.put(Material.WATER_BUCKET, 1);
-                stock.put(Material.ENDER_PEARL, 16);
             }
             case NETHERITE_POT -> {
                 stock.put(Material.COBWEB, 64);
@@ -543,6 +606,7 @@ public final class PracticeService {
         rooms.clear();
         botModeKits.clear();
         botModeRooms.clear();
+        botArenaKitBindings.clear();
         savedDifficulty.clear();
         FileConfiguration yaml = configService.practices();
         practiceToggles.clear();
@@ -581,6 +645,15 @@ public final class PracticeService {
                 try {
                     botModeKits.put(PracticeType.parse(key), kits.getString(key, ""));
                 } catch (Exception ignored) {
+                }
+            }
+        }
+        ConfigurationSection arenaKits = yaml.getConfigurationSection("bot-arena-kits");
+        if (arenaKits != null) {
+            for (String key : arenaKits.getKeys(false)) {
+                String arenaKit = arenaKits.getString(key, "");
+                if (arenaKit != null && !arenaKit.isBlank()) {
+                    botArenaKitBindings.put(key, arenaKit);
                 }
             }
         }
@@ -2901,7 +2974,8 @@ public final class PracticeService {
             // passives run before the fight loop each tick).
             tickBotGap(session, bot, diff.botMaxHp(), now);
             tickBotWaterSave(session, bot, now);
-            boolean escaped = tickEscapePearl(player, session, bot, diff.botMaxHp(), now);
+            boolean escaped = type != PracticeType.SWORD
+                    && tickEscapePearl(player, session, bot, diff.botMaxHp(), now);
 
             // Quantum disruption layer (cobwebs/fluid_main + shield/disable): webs at the
             // player's feet, lava under an airborne player, and axe swings that strip shields.
@@ -2945,7 +3019,8 @@ public final class PracticeService {
                     // Long-range bow pressure (map sword bowcharge / passive bow): pokes while
                     // walking into melee range. (Fresh direction: dir/to were scaled in-place
                     // by the movement math above.)
-                    if (!blocking && dist >= 8.0d && dist <= 18.0d && now >= ab.nextBowMs()
+                    if (!blocking && type != PracticeType.SWORD
+                            && dist >= 8.0d && dist <= 18.0d && now >= ab.nextBowMs()
                             && diff.attackDamage() > 0.0d) {
                         botShootArrow(bot, diff, player.getLocation().toVector()
                                         .subtract(bot.getLocation().toVector()).setY(0),
@@ -3137,6 +3212,28 @@ public final class PracticeService {
     }
 
     /** Vanilla-style arrow shot shared by the sword bow, cart bow and crystal crossbow. */
+    /**
+     * Briefly shows an item in the bot's main hand (visible item-switch animation for the
+     * mannequin), then restores whatever it was holding after {@code restoreTicks}.
+     */
+    private void holdItemBriefly(Mannequin bot, ItemStack item, long restoreTicks) {
+        EntityEquipment eq = bot.getEquipment();
+        if (eq == null) {
+            return;
+        }
+        ItemStack previous = eq.getItemInMainHand();
+        eq.setItemInMainHand(item == null ? null : item.clone());
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (!bot.isValid()) {
+                return;
+            }
+            EntityEquipment later = bot.getEquipment();
+            if (later != null) {
+                later.setItemInMainHand(previous);
+            }
+        }, Math.max(2L, restoreTicks));
+    }
+
     private void botShootArrow(Mannequin bot, BotDifficulty diff, Vector flatDir,
                                double damage) {
         if (bot.getWorld() == null || flatDir.lengthSquared() < 0.0001) {
@@ -3151,6 +3248,7 @@ public final class PracticeService {
                 bot.getEyeLocation(), arrowDir.multiply(1.9d), 3.0f, 0.0f);
         arrow.setShooter(bot);
         arrow.setDamage(Math.max(1.0d, damage));
+        holdItemBriefly(bot, new ItemStack(Material.BOW), 8L);
         bot.swingMainHand();
     }
 
@@ -3291,9 +3389,14 @@ public final class PracticeService {
     }
 
     /** Pearl blink with the tell-tale purple trail at both ends. */
-    private static void pearlTeleportFx(Mannequin bot, Location landing) {
+    private void pearlTeleportFx(Mannequin bot, Location landing) {
         World world = bot.getWorld();
         Location from = bot.getLocation();
+        if (landing == null || landing.getWorld() == null) {
+            return;
+        }
+        holdItemBriefly(bot, new ItemStack(Material.ENDER_PEARL), 8L);
+        bot.swingMainHand();
         if (world != null) {
             world.playSound(from, Sound.ENTITY_ENDER_PEARL_THROW, 1.0f, 1.0f);
             world.spawnParticle(org.bukkit.Particle.PORTAL, from.add(0, 1, 0), 40, 0.3, 0.6, 0.3, 0.6d);

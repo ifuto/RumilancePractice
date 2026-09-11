@@ -982,6 +982,9 @@ public final class FeatureBootstrap {
         practiceService.setKitService(kitService);
         // Bot fights bound to a kit own the kit's duel arena (BOT fights are NOT practice rooms).
         practiceService.setArenaService(arenaService);
+        // /bot opens the bot-select screen; /botadmin binds bot fight kits to arena kits.
+        bind("bot", new com.rumilance.practice.practice.BotGuiCommand(practiceService, botSelectGui));
+        bind("botadmin", new com.rumilance.practice.practice.BotAdminCommand(practiceService, kitService));
 
         GuiListener guiListener = new GuiListener(guiSessions, stateManager, originalKitService, messageService);
         guiListener.register(rankedGui);

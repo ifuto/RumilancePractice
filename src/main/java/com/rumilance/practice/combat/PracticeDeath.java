@@ -284,5 +284,12 @@ public final class PracticeDeath {
         player.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, TOTEM_FIRE_RES_TICKS, 0, false, true, true));
         player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, TOTEM_ABSORPTION_TICKS, 3, false, true, true));
         player.playEffect(EntityEffect.TOTEM_RESURRECT);
+        // Vanilla parity: a totem pops inside LivingEntity#hurt, so the player exits the pop
+        // with vanilla's 20-tick invulnerability window intact. Our pop CANCELS the damage
+        // event before vanilla applies it, so hurt() never ran and no i-frames were set - any
+        // follow-up hit in the same tick (same-tick double crystals, or the one-tick-delayed
+        // self-blast replay of ExplosionSelfDamageListener) then dealt FULL damage and killed
+        // the player the instant the totem broke. Grant the window vanilla would have granted.
+        player.setNoDamageTicks(Math.max(player.getNoDamageTicks(), 20));
     }
 }
