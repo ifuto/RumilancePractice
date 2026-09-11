@@ -1169,6 +1169,7 @@ lb:
 practice:
   preparing-room: "<gray>練習ルームを準備中..."
   copy-failed: "<red>練習用のコピーを準備できませんでした。もう一度お試しください。"
+  arena-unavailable: "<red>このキットのアリーナは現在すべて使用中です。少し待ってからお試しください。"
   spawn-invalid: "<red>練習ルームのスポーンが無効です。"
   teleport-unsafe: "<red>練習ルームへテレポートできませんでした(危険なスポーン)。"
   joined: "<green>練習に参加しました: <name>"

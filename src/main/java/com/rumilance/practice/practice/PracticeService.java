@@ -90,6 +90,8 @@ public final class PracticeService {
     /** Per-room practice drill (Quantum mech_train mode); absent = aggregate fight. */
     private final java.util.Map<String, PracticeMode> roomModes = new java.util.concurrent.ConcurrentHashMap<>();
     private com.rumilance.practice.kit.KitService kitService;
+    /** Duel arenas: BOT fights linked to a kit with arenas run inside them (never Prac rooms). */
+    private com.rumilance.practice.arena.ArenaService arenaService;
 
     private BukkitTask dailyPurgeTask;
     private BukkitTask maceAiTask;
@@ -138,6 +140,11 @@ public final class PracticeService {
         this.kitService = kitService;
     }
 
+    /** Duel-arena venue wiring (BOT fights fight in the kit's arenas, not practice rooms). */
+    public void setArenaService(com.rumilance.practice.arena.ArenaService arenaService) {
+        this.arenaService = arenaService;
+    }
+
     // ------------------------------------------------------- bot mode kit binding (admin)
 
     /** Binds a server kit to a bot fight mode; {@code kitName} null clears the binding. */
@@ -174,6 +181,67 @@ public final class PracticeService {
 
     public String botRoomFor(PracticeType type) {
         return botModeRooms.get(type);
+    }
+
+    // ------------------------------------------------------- bot fight venue (arena vs room)
+
+    /**
+     * The kit arenas this bot mode fights in, or {@code null} when the mode has no kit bound
+     * or that kit has no arenas configured — in those cases the fight keeps using the
+     * classic practice-room venue. BOT fights bound to a kit with arenas are NOT practice:
+     * they run inside the kit's duel arena.
+     */
+    public java.util.List<String> botArenaPool(PracticeType type) {
+        if (!type.botMode() || arenaService == null || kitService == null) {
+            return null;
+        }
+        String boundKit = botModeKits.get(type);
+        if (boundKit == null || boundKit.isBlank()) {
+            return null;
+        }
+        com.rumilance.practice.model.KitDefinition kit = kitService.get(boundKit).orElse(null);
+        if (kit == null || kit.arenas() == null || kit.arenas().isEmpty()) {
+            return null;
+        }
+        return kit.arenas();
+    }
+
+    /** Enabled-and-idle templates inside the mode's arena pool (0 when the pool is busy). */
+    public int botArenaFreeCount(PracticeType type) {
+        java.util.List<String> pool = botArenaPool(type);
+        if (pool == null || pool.isEmpty()) {
+            return 0;
+        }
+        int free = 0;
+        for (String template : pool) {
+            if (arenaService.arenaTemplateFree(template)) {
+                free++;
+            }
+        }
+        return free;
+    }
+
+    /** Releases a session's reserved duel arena (idempotent, null-safe). */
+    private void releaseArena(PracticeSession session) {
+        if (arenaService == null || session == null || session.arenaInstanceId() == null) {
+            return;
+        }
+        UUID instanceId = session.arenaInstanceId();
+        session.setArenaInstanceId(null);
+        arenaService.release(instanceId);
+    }
+
+    /** Side-B spawn of the session's arena venue — the bot's duel spawn. {@code null} otherwise. */
+    private Location arenaSpawnB(PracticeSession session) {
+        if (arenaService == null || session == null || session.arenaInstanceId() == null) {
+            return null;
+        }
+        return arenaService.get(session.arenaInstanceId())
+                .map(instance -> {
+                    Location spawn = arenaService.spawnB(instance);
+                    return spawn == null || spawn.getWorld() == null ? null : spawn;
+                })
+                .orElse(null);
     }
 
     public boolean kitExists(String kitName) {
@@ -906,6 +974,84 @@ public final class PracticeService {
         finishJoinTeleport(player, session, joinedRoom, spawn);
     }
 
+    /**
+     * BOT fight entry: when the mode's bound kit owns arenas, the fight is NOT practice — it
+     * runs inside one of the kit's duel arenas (reserved + released like a duel). When no
+     * arena is configured for the bound kit, the classic practice-room venue still serves.
+     *
+     * @param configRoom the room that carries the mode's configuration (drills/bot-home);
+     *                   arena sessions use it for config only, never for position/space
+     */
+    public void joinBotMode(Player player, PracticeType mode, PracticeRoom configRoom) {
+        if (configRoom == null || !configRoom.enabled()) {
+            player.sendMessage(messages.render(player, "practice.room-not-found"));
+            return;
+        }
+        java.util.List<String> arenaPool = botArenaPool(mode);
+        if (arenaPool == null || arenaPool.isEmpty()) {
+            join(player, configRoom.id());
+            return;
+        }
+        if (sessions.containsKey(player.getUniqueId())) {
+            player.sendMessage(messages.render(player, "practice.already-in"));
+            return;
+        }
+        PlayerState state = stateManager.getState(player.getUniqueId());
+        if (state != PlayerState.LOBBY && state != PlayerState.OPENING_GUI) {
+            player.sendMessage(messages.render(player, "practice.join-from-lobby"));
+            return;
+        }
+        try {
+            stateManager.transition(player.getUniqueId(), PlayerState.PRACTICE_WAIT);
+        } catch (Exception e) {
+            player.sendMessage(messages.render(player, "practice.cannot-enter"));
+            return;
+        }
+        String chosen = arenaPool.size() == 1
+                ? arenaPool.getFirst()
+                : arenaPool.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(arenaPool.size()));
+        // The player owns the reservation: one bot fight per player, released on leave/quit.
+        arenaService.reserveNamed(chosen, player.getUniqueId()).whenComplete((opt, err) ->
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (!player.isOnline()) {
+                        if (opt != null && opt.isPresent()) {
+                            arenaService.release(opt.get().id());
+                        }
+                        stateManager.resetToLobby(player.getUniqueId());
+                        return;
+                    }
+                    if (err != null || opt == null || opt.isEmpty()) {
+                        try {
+                            stateManager.resetToLobby(player.getUniqueId());
+                        } catch (Exception ignored) {
+                        }
+                        player.sendMessage(messages.render(player, "practice.arena-unavailable"));
+                        plugin.getLogger().info("[N Arena][BotMatch] arena venue unavailable for "
+                                + player.getName() + " mode=" + mode + " template=" + chosen);
+                        return;
+                    }
+                    com.rumilance.practice.model.ArenaInstance instance = opt.get();
+                    if (sessions.containsKey(player.getUniqueId())) {
+                        arenaService.release(instance.id());
+                        return;
+                    }
+                    PracticeSession session = new PracticeSession(
+                            player.getUniqueId(), configRoom.id(), mode);
+                    int preferred = preferredDurations.getOrDefault(player.getUniqueId(), 10);
+                    session.setDurationSeconds(preferred);
+                    applySavedDifficulty(session);
+                    session.setArenaInstanceId(instance.id());
+                    session.setActiveRegion(instance.bounds());
+                    session.setActiveSpawn(arenaService.spawnA(instance));
+                    sessions.put(player.getUniqueId(), session);
+                    joinGraceUntilMs.put(player.getUniqueId(), System.currentTimeMillis() + 8000L);
+                    purgeLayoutsAsync();
+                    player.getInventory().clear();
+                    player.getInventory().setArmorContents(null);
+                    finishJoinTeleport(player, session, configRoom, session.activeSpawn());
+                }));
+    }
+
     private void finishJoinTeleport(Player player, PracticeSession session, PracticeRoom joinedRoom, Location spawn) {
         if (spawn == null || spawn.getWorld() == null) {
             abortJoin(player, session, "practice.spawn-invalid");
@@ -997,6 +1143,7 @@ public final class PracticeService {
         if (cloneId != null && cloneService != null) {
             cloneService.release(cloneId);
         }
+        releaseArena(session);
         if (announce) {
             player.sendMessage(messages.render(player, "practice.left"));
         }
@@ -1014,6 +1161,7 @@ public final class PracticeService {
             if (cloneId != null && cloneService != null) {
                 cloneService.release(cloneId);
             }
+            releaseArena(session);
         }
         stateManager.remove(playerId);
     }
@@ -1029,6 +1177,7 @@ public final class PracticeService {
             if (cloneId != null && cloneService != null) {
                 cloneService.release(cloneId);
             }
+            releaseArena(session);
         }
     }
 
@@ -1249,7 +1398,13 @@ public final class PracticeService {
         } else {
             spawnCombatBot(player, session, room, room.type());
         }
-        session.setBotMode(practiceModeOf(room));
+        // Drills are practice-room content (room markers); an arena-venue BOT fight is the
+        // plain aggregate duel against the kit-bound arena, so drills stay off there.
+        if (session.arenaInstanceId() == null) {
+            session.setBotMode(practiceModeOf(room));
+        } else {
+            session.setBotMode(PracticeMode.NONE);
+        }
         beginDrill(player, session, room);
         player.playSound(player.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 0.6f, 1.4f);
         player.sendActionBar(messages.render(player, "practice.match-started",
@@ -1918,6 +2073,9 @@ public final class PracticeService {
         }
         Location botLoc = resolveConfiguredBotSpawn(session, room);
         if (botLoc == null) {
+            botLoc = arenaSpawnB(session);
+        }
+        if (botLoc == null) {
             botLoc = base.clone().add(player.getLocation().getDirection().setY(0).normalize().multiply(3));
             botLoc.setY(base.getY());
         }
@@ -2530,8 +2688,12 @@ public final class PracticeService {
             }
             base.setWorld(world);
         }
-        // Operator-configured bot home first (/practice botpos); else 4 blocks ahead.
+        // Operator-configured bot home first (/practice botpos); arena venue fights start the
+        // bot on the arena's side-B spawn like a real duel; else 4 blocks ahead.
         Location botLoc = resolveConfiguredBotSpawn(session, room);
+        if (botLoc == null) {
+            botLoc = arenaSpawnB(session);
+        }
         if (botLoc == null) {
             botLoc = base.clone()
                     .add(player.getLocation().getDirection().setY(0).normalize().multiply(4));

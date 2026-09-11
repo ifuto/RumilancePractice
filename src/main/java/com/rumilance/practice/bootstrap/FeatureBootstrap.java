@@ -980,6 +980,8 @@ public final class FeatureBootstrap {
         practiceService.setOpenBotGui(practiceBotGui::openFor);
         practiceService.setOpenDifficultyGui(botDifficultyGui::openFor);
         practiceService.setKitService(kitService);
+        // Bot fights bound to a kit own the kit's duel arena (BOT fights are NOT practice rooms).
+        practiceService.setArenaService(arenaService);
 
         GuiListener guiListener = new GuiListener(guiSessions, stateManager, originalKitService, messageService);
         guiListener.register(rankedGui);

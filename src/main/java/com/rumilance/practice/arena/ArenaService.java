@@ -77,4 +77,13 @@ public interface ArenaService {
      * @return the second configured spawn point ("side B") of {@code instance}'s template.
      */
     Location spawnB(ArenaInstance instance);
+
+    /**
+     * Cheap availability probe for GUI gating: {@code true} when a template with this
+     * (case-insensitive) name exists, is enabled, and its backing instance is idle. Missing
+     * or busy templates report {@code false} — callers fall back to "busy" messaging.
+     */
+    default boolean arenaTemplateFree(String templateName) {
+        return true;
+    }
 }

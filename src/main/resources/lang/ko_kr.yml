@@ -1167,6 +1167,7 @@ lb:
 practice:
   preparing-room: "<gray>연습실을 준비하는 중..."
   copy-failed: "<red>연습용 복사를 준비하지 못했습니다. 다시 시도해 주세요."
+  arena-unavailable: "<red>이 키트에 연결된 아레나가 모두 사용 중입니다. 잠시 후 다시 시도해 주세요."
   spawn-invalid: "<red>연습실 스폰이 잘못되었습니다."
   teleport-unsafe: "<red>연습실로 텔레포트할 수 없습니다(위험한 스폰)."
   joined: "<green>연습에 참가했습니다: <name>"

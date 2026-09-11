@@ -92,9 +92,15 @@ public final class PracticeBotSelectGui extends AbstractGui {
             default -> "gui.bot-room-lore-sword";
         };
         List<PracticeRoom> rooms = roomsOf(mode);
-        long free = rooms.stream().filter(r -> !practiceService.isRoomBusy(r.id())).count();
+        // Kit-bound arenas win as the fight venue (BOT duels are NOT practice rooms);
+        // availability then means an idle arena instance, not a free room.
+        List<String> arenaPool = practiceService.botArenaPool(mode);
+        boolean arenaVenue = arenaPool != null;
+        long free = arenaVenue
+                ? practiceService.botArenaFreeCount(mode)
+                : rooms.stream().filter(r -> !practiceService.isRoomBusy(r.id())).count();
         String kit = practiceService.botKitFor(mode);
-        String map = practiceService.botRoomFor(mode);
+        String map = arenaVenue ? String.join(" / ", arenaPool) : practiceService.botRoomFor(mode);
         ItemBuilder builder = ItemBuilder.of(icon)
                 .name(t(player, typeKey).color(rooms.isEmpty() ? UiTheme.MUTED : UiTheme.SUCCESS)
                         .decoration(TextDecoration.ITALIC, false))
@@ -172,14 +178,27 @@ public final class PracticeBotSelectGui extends AbstractGui {
                                 .filter(r -> !practiceService.isRoomBusy(r.id()))
                                 .findFirst().orElse(null);
                     }
-                    if (target == null || practiceService.isRoomBusy(target.id())) {
+                    boolean arenaVenue = practiceService.botArenaPool(mode) != null;
+                    if (target == null && arenaVenue) {
+                        // Arena venue only needs a config anchor room (drills/bot-home):
+                        // room-busy does not block it, any enabled room of the type serves.
+                        target = roomsOf(mode).stream().filter(PracticeRoom::enabled)
+                                .findFirst().orElse(null);
+                    }
+                    if (!arenaVenue
+                            && (target == null || practiceService.isRoomBusy(target.id()))) {
                         sounds.play(player, "error");
                         player.sendMessage(t(player, "gui.practice-room-busy").color(UiTheme.WARNING));
                         return;
                     }
+                    if (target == null) {
+                        sounds.play(player, "error");
+                        return;
+                    }
                     sounds.play(player, "select");
                     player.closeInventory();
-                    practiceService.join(player, target.id());
+                    // PracticeService routes bot fights to the kit's arena when wired so.
+                    practiceService.joinBotMode(player, mode, target);
                 }
             }
         }

@@ -1167,6 +1167,7 @@ lb:
 practice:
   preparing-room: "<gray>正在准备练习室..."
   copy-failed: "<red>无法准备练习副本,请重试。"
+  arena-unavailable: "<red>该套件绑定的竞技场目前都在使用中，请稍后再试。"
   spawn-invalid: "<red>练习室出生点无效。"
   teleport-unsafe: "<red>无法传送到练习室(出生点不安全)。"
   joined: "<green>已加入练习: <name>"

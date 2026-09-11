@@ -1167,6 +1167,7 @@ lb:
 practice:
   preparing-room: "<gray>Préparation de la salle d'entraînement..."
   copy-failed: "<red>Impossible de préparer la copie d'entraînement. Réessaie."
+  arena-unavailable: "<red>Toutes les arènes liées à ce kit sont occupées. Réessaie dans un instant."
   spawn-invalid: "<red>Le point d'apparition de la salle est invalide."
   teleport-unsafe: "<red>Impossible de te téléporter dans la salle (apparition dangereuse)."
   joined: "<green>Tu as rejoint l'entraînement : <name>"

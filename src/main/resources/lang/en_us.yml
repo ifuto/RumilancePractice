@@ -1170,6 +1170,7 @@ lb:
 practice:
   preparing-room: "<gray>Preparing practice room..."
   copy-failed: "<red>Could not prepare a practice copy. Try again."
+  arena-unavailable: "<red>Every arena bound to this kit is currently in use. Try again in a moment."
   spawn-invalid: "<red>Practice spawn is invalid."
   teleport-unsafe: "<red>Could not teleport into the practice room (unsafe spawn)."
   joined: "<green>Joined practice: <name>"

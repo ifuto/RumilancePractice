@@ -112,6 +112,26 @@ public abstract class AbstractArenaService implements ArenaService {
                 reserveInstanceNamed(templateName, matchId));
     }
 
+    @Override
+    public boolean arenaTemplateFree(String templateName) {
+        if (templateName == null || templateName.isBlank()) {
+            return false;
+        }
+        reservationLock.lock();
+        try {
+            for (ArenaTemplate template : templates) {
+                if (!template.enabled() || !template.name().equalsIgnoreCase(templateName)) {
+                    continue;
+                }
+                ArenaInstance instance = instancesByTemplate.get(template.id());
+                return instance == null || instance.isAvailable();
+            }
+            return false;
+        } finally {
+            reservationLock.unlock();
+        }
+    }
+
     protected final void markRegenerating(ArenaInstance instance) {
         instance.setState(ArenaInstanceState.REGENERATING);
     }

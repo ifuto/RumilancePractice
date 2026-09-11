@@ -185,6 +185,12 @@ public final class PracticeSession {
 
     /** Disposable FAWE copy id; null when using shared template teleport. */
     private UUID cloneInstanceId;
+    /**
+     * Duel-arena venue: BOT fights bound to a kit with arenas run inside that kit's arena
+     * (BOT fights are NOT practice rooms). Holds the reserved {@code ArenaInstance} id —
+     * released on leave/quit. {@code null} = classic practice-room venue.
+     */
+    private UUID arenaInstanceId;
     /** Active playable cuboid (pasted copy or shared template region). */
     private Cuboid activeRegion;
     /** Remapped spawn for this session's copy (or template spawn). */
@@ -579,6 +585,14 @@ public final class PracticeSession {
 
     public void setCloneInstanceId(UUID cloneInstanceId) {
         this.cloneInstanceId = cloneInstanceId;
+    }
+
+    public UUID arenaInstanceId() {
+        return arenaInstanceId;
+    }
+
+    public void setArenaInstanceId(UUID arenaInstanceId) {
+        this.arenaInstanceId = arenaInstanceId;
     }
 
     public Cuboid activeRegion() {
