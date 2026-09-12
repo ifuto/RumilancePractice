@@ -460,7 +460,12 @@ public final class PracticeListener implements Listener {
                     com.rumilance.practice.util.SafeTeleport.teleport(player, spawn);
                 }
                 if (session.phase() == PracticeSession.Phase.ACTIVE) {
-                    practiceService.refreshBotLoadout(player, session);
+                    // Live bot match: the totem saved you ONCE — no mid-fight restock. A
+                    // full refreshBotLoadout here topped up totems every pop and put the
+                    // player at full health with a fresh loadout indefinitely: the match
+                    // could literally never end (the crystal endless-pop loop). Vanilla runs
+                    // totems dry; the next lethal blast then routes to onPracticeDeath ->
+                    // LOSE, which is also how a real duel plays out.
                 } else {
                     practiceService.giveBotWaitHotbar(player, session);
                 }

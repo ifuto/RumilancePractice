@@ -2615,7 +2615,7 @@ public final class MatchService {
         // sees the saved toast) and closes the window — edits are never eaten.
         try {
             if (editKitGui != null) {
-                editKitGui.forceSaveForMatch(player);
+                editKitGui.closeAnyForMatch(player);
             }
         } catch (RuntimeException ignored) {
         }

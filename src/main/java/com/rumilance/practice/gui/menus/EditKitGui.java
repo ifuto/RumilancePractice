@@ -152,6 +152,24 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         player.closeInventory();
     }
 
+    /**
+     * Universal "leaving for a fight" sweep for whatever GUI state this player is in:
+     * force-saves an open edit session ({@link #forceSaveForMatch}), drops a rename typed
+     * mid-prompt, and closes any still-open window. The kit GUI layers hold nothing else
+     * that could survive into the match after this (menus persist nothing on close).
+     */
+    public void closeAnyForMatch(Player player) {
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+        forceSaveForMatch(player);
+        if (kitAnvilRenameService != null
+                && kitAnvilRenameService.isRenaming(player.getUniqueId())) {
+            kitAnvilRenameService.cancelForMatch(player.getUniqueId());
+        }
+        player.closeInventory();
+    }
+
     public EditKitGui(
             GuiSessionRegistry registry,
             SoundService sounds,

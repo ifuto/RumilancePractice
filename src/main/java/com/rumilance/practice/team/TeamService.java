@@ -645,7 +645,7 @@ public final class TeamService {
                     originalKitService.forceSaveAndExitForMatch(member);
                 }
                 if (editKitGui != null) {
-                    editKitGui.forceSaveForMatch(member);
+                    editKitGui.closeAnyForMatch(member);
                 }
                 if (stateManager != null) {
                     stateManager.resetToLobby(memberId);

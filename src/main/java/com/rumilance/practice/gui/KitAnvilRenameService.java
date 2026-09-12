@@ -67,6 +67,19 @@ public final class KitAnvilRenameService implements Listener {
         return pending.containsKey(playerId);
     }
 
+    /**
+     * Drops any in-flight rename when a match/party pulls the player out mid-prompt:
+     * without this, a name typed into chat AFTER the fight started would still apply the
+     * rename (and reopen editors) inside the match. Silent - nothing to save, the anvil
+     * prompt itself already closed.
+     */
+    public void cancelForMatch(UUID playerId) {
+        if (playerId == null) {
+            return;
+        }
+        pending.remove(playerId);
+    }
+
     /** Max rename length for this player's rank: VIP = 5, VIP+ / above = 15. */
     public int maxRenameLength(Player player) {
         return rankService.isVipPlusOrAbove(player) ? VIP_PLUS_MAX_LENGTH : VIP_MAX_LENGTH;
