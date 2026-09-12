@@ -123,10 +123,11 @@ Paper 1.21.11 向け Practice PvP プラグイン **N Arena**(プラグイン名
   **エンダーアイで選択中の番号のキット編集開始**。各スロットは同じcrystalキットの
   **別々の配置**を保存できる。選択は `crystal-ffa.yml` に永続化、配置は
   `<kit>#v<1..9>` として保存。
-- **セルフダメージはバニラに一本化**: MC-11154(爆発が発生源を無視する)は解決済み。
-  自前の再爆発/自己ダメージ再現リスナー(CrystalSelfBlastListener /
-  ExplosionSelfDamageListener / ExplosionPhysics)は削除。キル加入は
-  ExplosionSourceTracker(設置PDC+最後のパンチ記録)が担当。
+- **爆発ダメージはバニラそのものに**: クリーパーは `Creeper#explode()` の
+  **本物のバニラ爆発**(クリーパー自身が爆発源)で起爆。旧来の
+  `remove() + createExplosion` 手動再現経路はダメージが消える
+  **プラグイン側の欠陥**だったため廃止。クリスタル/TNT/ベッドもバニラ準拠。
+  キル加入は ExplosionSourceTracker(設置PDC+最後のパンチ記録+getIgniter)が担当。
 - **死亡検知の新方式(デス画面・ローディング画面ゼロ)**: トーテムは完全バニラ
   (EntityResurrectEvent には触らない)。本当に死んだときだけ PlayerDeathEvent をキャンセル
   (Paper の cancel + setReviveHealth 契約)して蘇生 — combat-kill パケットも強制リスポーンも

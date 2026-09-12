@@ -157,27 +157,16 @@ public final class PracticeTntListener implements Listener {
         int delay = PracticeTnt.creeperExplodeDelayTicks(maxFuse, 0);
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (creeper.isValid() && !creeper.isDead()) {
-                // Vanilla Hard-difficulty creeper blast. Custom logic is block-only (glass / FFA
-                // restore); entity damage must stay vanilla  EcreateExplosion scales with difficulty.
-                    Location at = creeper.getLocation();
-                    World world = at.getWorld();
-                    Player source = creeper.getIgniter() instanceof Player p ? p : igniter;
-                    float power = creeper.isPowered() ? 6.0f : 3.0f;
-                    creeper.remove();
-                    if (world != null) {
-                        if (world.getDifficulty() != org.bukkit.Difficulty.HARD) {
-                            world.setDifficulty(org.bukkit.Difficulty.HARD);
-                        }
-                        // Source-less blast: paper exempts the explosion's source entity
-                        // (PaperMC/Paper#11167), so a source-bearing blast would spare the
-                        // igniter. With no source the creeper blast hurts everyone in radius -
-                        // igniter included, like vanilla - while kill attribution rides on the
-                        // recorded blast owner (ExplosionSourceTracker).
-                        if (explosionSources != null && source != null) {
-                            explosionSources.recordBlastOwner(at, source.getUniqueId());
-                        }
-                        world.createExplosion(at, power, false, true, null);
-                    }
+                // The REAL vanilla creeper explosion (Creeper#explode): the creeper itself is
+                // the source, so entity damage is exactly vanilla — everyone in radius, the
+                // igniter included — and the damage event carries the creeper as the damager
+                // with getIgniter() intact for kill attribution (ExplosionSourceTracker). The
+                // old remove() + createExplosion re-detonation was a plugin defect: that
+                // hand-rolled source-less blast could lose entity damage entirely.
+                if (creeper.getWorld().getDifficulty() != org.bukkit.Difficulty.HARD) {
+                    creeper.getWorld().setDifficulty(org.bukkit.Difficulty.HARD);
+                }
+                creeper.explode();
             }
         }, delay);
     }
