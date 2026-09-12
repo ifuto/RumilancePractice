@@ -27,10 +27,8 @@ import java.util.function.Predicate;
  * Overworld too (that is the point: End-style bed bombing on an End-style practice map).</p>
  *
  * <p>The blast is a real explosion with the vanilla bed power of 5 (71 raw damage point blank,
- * before armor), so it damages everyone nearby — including the player who clicked it. Vanilla
- * never damages the source of an explosion, so the clicker's own share is restored by
- * {@link ExplosionSelfDamageListener} (registered before this listener's blast is created), which
- * gives bed bombs the same self-damage / self-knockback trade-off as crystals and anchors.</p>
+ * before armor). Self-explosion damage follows vanilla server semantics exactly (no plugin
+ * replay): whatever this Paper build does to the clicker is what happens.</p>
  *
  * <p>Terrain: the explosion is created with {@code breakBlocks = false} and {@code setFire =
  * false}, matching how practice crystals and creepers already behave — the map survives, the
@@ -51,18 +49,12 @@ public final class BedExplosionListener implements Listener {
     }
 
     private final java.util.List<Context> contexts = new java.util.concurrent.CopyOnWriteArrayList<>();
-    /** Optional hook so the blast can restore the clicker's skipped self-damage. */
-    private volatile ExplosionSelfDamageListener selfDamage;
 
     public BedExplosionListener addContext(Context context) {
         if (context != null) {
             contexts.add(context);
         }
         return this;
-    }
-
-    public void setSelfDamage(ExplosionSelfDamageListener selfDamage) {
-        this.selfDamage = selfDamage;
     }
 
     /** Kit rule lookup used by {@link com.rumilance.practice.util.KitBlockRules} callers/tests. */
@@ -118,11 +110,6 @@ public final class BedExplosionListener implements Listener {
             other.setType(Material.AIR, false);
         }
         block.setType(Material.AIR, false);
-        if (selfDamage != null) {
-            // Vanilla skips the explosion's source entity: remember the clicker so their own
-            // blast damage + knockback is restored a tick later (crystal-style bed bombing).
-            selfDamage.rememberPluginBlast(center, BED_POWER, player.getUniqueId());
-        }
         world.createExplosion(center, BED_POWER, false, false, player);
     }
 

@@ -20,7 +20,12 @@ import org.bukkit.potion.PotionEffectType;
  */
 public final class PracticeDeath {
 
-    /** Vanilla totem: Regeneration II 45s, Fire Resistance 40s, Absorption IV 5s. */
+    /**
+     * Vanilla Java totem activation, exact values (LivingEntity#checkTotemDeathProtection,
+     * minecraft.wiki): health=1 (0.5 hearts), all totem-curable effects cleared, then
+     * Regeneration II for 900t (45s), Absorption II for 100t (5s = 4 golden hearts, NOT
+     * Absorption IV), Fire Resistance I for 800t (40s), entity status 35 broadcast.
+     */
     private static final int TOTEM_REGEN_TICKS = 45 * 20;
     private static final int TOTEM_FIRE_RES_TICKS = 40 * 20;
     private static final int TOTEM_ABSORPTION_TICKS = 5 * 20;
@@ -276,20 +281,30 @@ public final class PracticeDeath {
         markResurrected(player);
         player.setFireTicks(0);
         player.setFreezeTicks(0);
-        // Hard cap  Enever leave the victim at max HP after a totem pop.
+        // Vanilla removes the totem-curable status effects on activation (milk cure set minus
+        // the omen family, which vanilla keeps through both milk and totem pops).
+        for (PotionEffect active : player.getActivePotionEffects()) {
+            org.bukkit.potion.PotionEffectType type = active.getType();
+            if (type.equals(PotionEffectType.BAD_OMEN)
+                    || type.equals(PotionEffectType.TRIAL_OMEN)
+                    || type.equals(PotionEffectType.RAID_OMEN)) {
+                continue;
+            }
+            player.removePotionEffect(type);
+        }
+        // Hard cap - never leave the victim at max HP after a totem pop.
         double max = Math.max(1.0d, player.getMaxHealth());
         player.setHealth(Math.min(1.0d, max));
         player.setAbsorptionAmount(0.0d);
         player.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, TOTEM_REGEN_TICKS, 1, false, true, true));
         player.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, TOTEM_FIRE_RES_TICKS, 0, false, true, true));
-        player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, TOTEM_ABSORPTION_TICKS, 3, false, true, true));
+        player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, TOTEM_ABSORPTION_TICKS, 1, false, true, true));
         player.playEffect(EntityEffect.TOTEM_RESURRECT);
         // Vanilla parity: a totem pops inside LivingEntity#hurt, so the player exits the pop
         // with vanilla's 20-tick invulnerability window intact. Our pop CANCELS the damage
         // event before vanilla applies it, so hurt() never ran and no i-frames were set - any
-        // follow-up hit in the same tick (same-tick double crystals, or the one-tick-delayed
-        // self-blast replay of ExplosionSelfDamageListener) then dealt FULL damage and killed
-        // the player the instant the totem broke. Grant the window vanilla would have granted.
+        // follow-up hit in the same tick (a same-tick double crystal) then dealt FULL damage
+        // and killed the player the instant the totem broke. Grant the window vanilla granted.
         player.setNoDamageTicks(Math.max(player.getNoDamageTicks(), 20));
     }
 }

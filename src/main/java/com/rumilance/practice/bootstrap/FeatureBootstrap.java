@@ -1299,19 +1299,13 @@ public final class FeatureBootstrap {
         pm.registerEvents(new InstantExpCollectListener(), plugin);
         PracticeTntListener practiceTntListener =
                 new PracticeTntListener(practiceTnt, matchService, ffaService, plugin);
-        // Vanilla skips explosion damage for the blast's source entity (Paper #11167): on
-        // modern versions that is the crystal detonator / creeper igniter / TNT lighter, so
-        // own-crystal & own-creeper self-damage silently disappears. This listener restores
-        // the skipped share (damage + knockback) without touching anything vanilla applied.
-        com.rumilance.practice.combat.ExplosionSelfDamageListener explosionSelfDamage =
-                new com.rumilance.practice.combat.ExplosionSelfDamageListener(plugin);
-        practiceTntListener.setSelfDamage(explosionSelfDamage);
-        pm.registerEvents(explosionSelfDamage, plugin);
+        // Self-explosion damage is VANILLA behavior now (server choosing: no one-tick-delayed
+        // replay listener): whatever this Paper build does to the blast's source is what the
+        // player gets - crystal detonator, creeper igniter, TNT lighter, anchor clicker.
         // "Bed Explosion" kit rule (/kit -> item rules): a bed placed in the fight detonates on
         // right click like a Nether / End bed (power 5, clicker takes the self-blast too).
         com.rumilance.practice.combat.BedExplosionListener bedExplosion =
                 new com.rumilance.practice.combat.BedExplosionListener();
-        bedExplosion.setSelfDamage(explosionSelfDamage);
         bedExplosion.addContext(new com.rumilance.practice.combat.BedExplosionListener.Context(
                 id -> {
                     com.rumilance.practice.session.MatchSession s =
