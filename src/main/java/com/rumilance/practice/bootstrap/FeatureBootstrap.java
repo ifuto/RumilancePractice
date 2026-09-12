@@ -893,6 +893,18 @@ public final class FeatureBootstrap {
         ekitSelectGui.setEditKitGui(editKitGui);
         ekitSelectGui.setOriginalKitGui(originalKitGui);
         editKitGui.setEkitSelectGui(ekitSelectGui);
+        // Crystal FFA: the declared crystal FFA kit edits through the 4-row KIT1..9 picker;
+        // each slot keeps its own layout and FFA spawns the selected variant.
+        com.rumilance.practice.kit.CrystalFfaStore crystalFfaStore =
+                new com.rumilance.practice.kit.CrystalFfaStore(plugin);
+        com.rumilance.practice.gui.menus.CrystalKitSlotsGui crystalKitSlotsGui =
+                new com.rumilance.practice.gui.menus.CrystalKitSlotsGui(
+                        guiSessions, soundService, kitService, kitLayoutRepository, layoutCache,
+                        crystalFfaStore);
+        crystalKitSlotsGui.setEditKitGui(editKitGui);
+        crystalKitSlotsGui.setEkitSelectGui(ekitSelectGui);
+        ekitSelectGui.setCrystalKitSlotsGui(crystalKitSlotsGui);
+        ffaService.setCrystalFfaStore(crystalFfaStore);
         EkitAdminGui ekitAdminGui = new EkitAdminGui(guiSessions, soundService, ekitItems);
         PresetAdminGui presetAdminGui = new PresetAdminGui(guiSessions, soundService, presetItems, kitService);
         KitAdminGui kitAdminGui = new KitAdminGui(guiSessions, soundService, kitService, messageService);
@@ -1026,6 +1038,7 @@ public final class FeatureBootstrap {
         guiListener.register(reportListGui);
         guiListener.register(playersGui);
         guiListener.register(ekitSelectGui);
+        guiListener.register(crystalKitSlotsGui);
         guiListener.register(originalKitGui);
         guiListener.register(confirmGui);
         guiListener.register(ekitChoiceGui);
@@ -1285,11 +1298,6 @@ public final class FeatureBootstrap {
                 })));
         pm.registerEvents(totemGuard, plugin);
 
-        // Death catch: combat modes let vanilla actually kill a player, then rule the outcome
-        // on the revived player (no HP-0 prediction anywhere) — death screens are suppressed
-        // via ProtocolLib when available. See DeathBridge / MatchListener.onDeath.
-        com.rumilance.practice.combat.DeathBridge.start(plugin);
-
         pm.registerEvents(new com.rumilance.practice.replay.ReplayControlListener(replayService), plugin);
         pm.registerEvents(new BanLoginListener(banService), plugin);
         pm.registerEvents(new com.rumilance.practice.listener.ChatBanGuardListener(chatBanService), plugin);
@@ -1332,22 +1340,14 @@ public final class FeatureBootstrap {
         pm.registerEvents(new InstantExpCollectListener(), plugin);
         PracticeTntListener practiceTntListener =
                 new PracticeTntListener(practiceTnt, matchService, ffaService, plugin);
-        // Vanilla skips explosion damage for the blast's source entity (Paper #11167): on
-        // modern versions that is the crystal detonator / creeper igniter / TNT lighter, so
-        // own-crystal & own-creeper self-damage silently disappears. This listener restores
-        // the skipped share (damage + knockback) without touching anything vanilla applied.
-        com.rumilance.practice.combat.ExplosionSelfDamageListener explosionSelfDamage =
-                new com.rumilance.practice.combat.ExplosionSelfDamageListener(plugin);
-        practiceTntListener.setSelfDamage(explosionSelfDamage);
         practiceTntListener.setExplosionSourceTracker(explosionSources);
-        pm.registerEvents(explosionSelfDamage, plugin);
+        // Self-damage is vanilla's job: MC-11154 (explosions sparing their source) is resolved,
+        // so crystal / creeper / TNT blasts hurt their detonator natively. No hand-rolled
+        // restore listeners — kill attribution rides on ExplosionSourceTracker's PDC stamps.
         // "Bed Explosion" kit rule (/kit -> item rules): a bed placed in the fight detonates on
         // right click like a Nether / End bed (power 5, clicker takes the self-blast too).
         com.rumilance.practice.combat.BedExplosionListener bedExplosion =
                 new com.rumilance.practice.combat.BedExplosionListener(explosionSources);
-        // Your own crystal hurts you again: player-caused crystal blasts are re-detonated
-        // source-less so nobody is exempt (vanilla self-blast), owner recorded for kill credit.
-        pm.registerEvents(new com.rumilance.practice.combat.CrystalSelfBlastListener(explosionSources), plugin);
         bedExplosion.addContext(new com.rumilance.practice.combat.BedExplosionListener.Context(
                 id -> {
                     com.rumilance.practice.session.MatchSession s =
@@ -1459,6 +1459,12 @@ public final class FeatureBootstrap {
         pm.registerEvents(new com.rumilance.practice.cosmetic.namecolor.NameColorChatListener(
                 nameColorService), plugin);
         pm.registerEvents(new PracticeListener(practiceService), plugin);
+        // Death catch: totem pops stay 100% vanilla (EntityResurrectEvent is never touched);
+        // only a REAL death reaches PlayerDeathEvent, which the bridge cancels (Paper
+        // cancel+revive-health) so no combat-kill packet, no respawn and no "Loading terrain"
+        // screen ever happen. Registered LAST so the mode planners (HIGHEST) plan first and
+        // the bridge cancels after them. See DeathBridge / MatchListener.onDeath.
+        com.rumilance.practice.combat.DeathBridge.start(plugin);
         pm.registerEvents(new BedrockJoinListener(plugin), plugin);
         pm.registerEvents(new SmithingTrimListener(rankService, smithingTrimGui, stateManager, messageService), plugin);
 

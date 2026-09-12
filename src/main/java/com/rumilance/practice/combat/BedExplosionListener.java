@@ -27,10 +27,8 @@ import java.util.function.Predicate;
  * Overworld too (that is the point: End-style bed bombing on an End-style practice map).</p>
  *
  * <p>The blast is a real explosion with the vanilla bed power of 5 (71 raw damage point blank,
- * before armor), so it damages everyone nearby — including the player who clicked it. Vanilla
- * never damages the source of an explosion, so the clicker's own share is restored by
- * {@link ExplosionSelfDamageListener} (registered before this listener's blast is created), which
- * gives bed bombs the same self-damage / self-knockback trade-off as crystals and anchors.</p>
+ * before armor), so it damages everyone nearby — including the player who clicked it (the blast
+ * is created source-less on purpose, so nobody is exempt from it).</p>
  *
  * <p>Terrain: the explosion is created with {@code breakBlocks = false} and {@code setFire =
  * false}, matching how practice crystals and creepers already behave — the map survives, the
@@ -39,7 +37,7 @@ import java.util.function.Predicate;
 public final class BedExplosionListener implements Listener {
 
     /** Vanilla bed blast power (minecraft.wiki: beds in the Nether/End = 5). */
-    public static final float BED_POWER = ExplosionPhysics.BED_POWER;
+    public static final float BED_POWER = 5.0f;
 
     private final ExplosionSourceTracker explosionSources;
 

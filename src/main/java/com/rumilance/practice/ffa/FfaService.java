@@ -155,6 +155,8 @@ public final class FfaService {
     private final ConfigService configService;
     private final KitService kitService;
     private final KitLayoutCache layoutCache;
+    /** Selected KIT slot per player for the declared crystal FFA kit (null = feature off). */
+    private volatile com.rumilance.practice.kit.CrystalFfaStore crystalFfaStore;
     private final LobbyService lobbyService;
     private final PlayerStateManager stateManager;
     private final FfaStatsRepository ffaStatsRepository;
@@ -761,6 +763,11 @@ public final class FfaService {
         player.setCanPickupItems(true);
         teleportIntoArena(player, arena, kit);
         player.setCanPickupItems(true);
+    }
+
+    /** Wires the crystal FFA variant store (KIT1..9 selections). */
+    public void setCrystalFfaStore(com.rumilance.practice.kit.CrystalFfaStore store) {
+        this.crystalFfaStore = store;
     }
 
     /** Spawn coordinate for the vanilla respawn event — kit apply happens in {@link #respawn}. */
@@ -1403,8 +1410,20 @@ public final class FfaService {
     }
 
     private void applyKit(Player player, KitDefinition kit) {
-        layoutCache.loadSyncIfAbsent(player.getUniqueId(), kit.name());
-        ItemStack[] layout = layoutCache.get(player.getUniqueId(), kit.name()).orElse(null);
+        String layoutKey = kit.name();
+        if (kit.crystalFfa() && crystalFfaStore != null) {
+            // Crystal FFA kit: spawn the player with the KIT slot they selected (falls back
+            // to the kit's official layout when that slot was never saved).
+            int variant = crystalFfaStore.selectedVariant(player.getUniqueId());
+            String variantKey = com.rumilance.practice.kit.CrystalFfaStore.variantKey(
+                    kit.name(), variant);
+            layoutCache.loadSyncIfAbsent(player.getUniqueId(), variantKey);
+            if (layoutCache.get(player.getUniqueId(), variantKey).isPresent()) {
+                layoutKey = variantKey;
+            }
+        }
+        layoutCache.loadSyncIfAbsent(player.getUniqueId(), layoutKey);
+        ItemStack[] layout = layoutCache.get(player.getUniqueId(), layoutKey).orElse(null);
         kitService.apply(player, kit, layout);
         PlayerVitals.applyCombatStart(player, kit.maxHealth());
         if (kit.totem()) {

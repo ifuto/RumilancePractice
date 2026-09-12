@@ -1,6 +1,6 @@
 package com.rumilance.practice.combat;
 
-import com.rumilance.practice.util.PlayerVitals;
+import com.rumilance.practice.util.SafeTeleport;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
@@ -17,41 +17,37 @@ import java.util.logging.Level;
 /**
  * Death-catch bridge: the authoritative "died on the server, never saw a death screen" path.
  *
- * <p>Combat modes no longer PREDICT lethal damage (the old HP-0 catch diverged from vanilla's
- * real application — the suffocation class of bug). Instead they let vanilla actually kill the
- * player, then inside their {@link PlayerDeathEvent} handler register a {@link RespawnPlan}
- * here. This bridge revives the player on the next tick; {@code DeathBridgePackets} suppresses
- * {@code ClientboundPlayerCombatKillPacket} for planned players so the client never flashes the
- * death screen, vitals hygiene runs, and only THEN the mode's ruling hook executes on a live,
- * bona-fide resurrected player. A death is a one-shot server event, so the ruling cannot ever
- * double-fire and a "0 HP zombie the world refuses to kill" state is theoretically impossible.</p>
+ * <p>Totems stay 100% vanilla: a totem pop is an {@link org.bukkit.event.entity.EntityResurrectEvent}
+ * upstream of this bridge and is never touched. Only a REAL death — damage that survived every
+ * totem — reaches {@link PlayerDeathEvent}, and the bridge cancels it right there using Paper's
+ * cancel + revive-health contract: the player never actually dies, so there is no
+ * combat-kill packet, no forced respawn, and no "Loading terrain" screen — not even for a
+ * frame. The mode's ruling hook then runs on the living player.</p>
  *
  * <p>Static service: wiring one constructor parameter through three mode listeners is churn
- * this small bridge does not need (mirrors {@code PracticeDeath}).</p>
+ * this small bridge does not need (mirrors {@code PracticeDeath}). Mode death handlers that
+ * {@link #plan} a death MUST register BEFORE this bridge (bootstrap calls {@link #start} last),
+ * so the cancel lands after the plan within the same {@code HIGHEST} priority wave.</p>
  */
 public final class DeathBridge implements Listener {
 
-    /** Where to respawn + what to run right after the revive lands (ruling, re-kit, ...). */
+    /** Where to put the revived player + what to run right after (ruling, re-kit, ...). */
     public record RespawnPlan(Location respawnAt, Runnable onRevived) {
     }
 
     private static final DeathRegistry<RespawnPlan> REGISTRY = new DeathRegistry<>();
-    /** Planned players whose imminent respawn packet must be seamless (no "Loading terrain"). */
-    private static final java.util.Map<java.util.UUID, Long> seamlessRespawnUntil =
-            new java.util.concurrent.ConcurrentHashMap<>();
+
     private static volatile Plugin pluginRef;
 
     private DeathBridge() {
     }
 
-    /** Registers the death/respawn listeners and arms packet suppression (best effort). */
+    /** Registers the death listener. Call AFTER every mode death handler (see class javadoc). */
     public static void start(Plugin plugin) {
         pluginRef = plugin;
         Bukkit.getPluginManager().registerEvents(new DeathBridge(), plugin);
-        boolean suppressed = DeathBridgePackets.install(plugin);
-        plugin.getLogger().info("[N Arena][DeathBridge] death-catch armed; death screen="
-                + (suppressed ? "suppressed (player-combat-kill filtered)"
-                        : "FALLBACK instant-respawn (ProtocolLib missing - one-frame flash possible)"));
+        plugin.getLogger().info("[N Arena][DeathBridge] death-catch armed (cancel+revive:"
+                + " vanilla totems untouched, real deaths cancelled, no death/loading screen)");
     }
 
     /** Called by mode death handlers AFTER their ruling inputs are frozen. */
@@ -64,71 +60,98 @@ public final class DeathBridge implements Listener {
         REGISTRY.mark(victim.getUniqueId(), new RespawnPlan(at, onRevived));
     }
 
-    /** {@code DeathBridgePackets} consults this per outgoing combat-kill packet. */
+    /** True while a planned death is pending for this player. */
     public static boolean isPlanned(java.util.UUID playerId) {
         return REGISTRY.isMarked(playerId);
     }
 
     /**
-     * True for a short window around the bridged revive: the outgoing respawn packet then gets
-     * the 1.20.2+ keep-all-data byte so the client keeps its chunks instead of flashing the
-     * "Loading terrain" screen between the killing blow and the revive teleport.
+     * The real-death catch: cancel the death (Paper revives the player with reviveHealth,
+     * max health by default) and run hygiene + the mode ruling next tick on the living player.
      */
-    public static boolean wantsSeamlessRespawn(java.util.UUID playerId) {
-        Long until = seamlessRespawnUntil.get(playerId);
-        if (until == null) {
-            return false;
-        }
-        if (System.currentTimeMillis() > until) {
-            seamlessRespawnUntil.remove(playerId, until);
-            return false;
-        }
-        return true;
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR)
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onDeath(PlayerDeathEvent event) {
         Player player = event.getEntity();
         if (!REGISTRY.isMarked(player.getUniqueId())) {
             return;
         }
+        event.setCancelled(true);
         event.deathMessage(null);
-        // The bridge respawns this player within the next ticks: their outgoing respawn packet
-        // must not trigger a client-side world reload ("Loading terrain" flash).
-        seamlessRespawnUntil.put(player.getUniqueId(), System.currentTimeMillis() + 4_000L);
+        event.getDrops().clear();
+        event.setKeepInventory(true);
+        event.setShouldDropExperience(false);
         Plugin plugin = pluginRef;
-        if (plugin != null) {
-            Bukkit.getScheduler().runTask(plugin, () -> tryRespawn(player, 1));
+        if (plugin == null) {
+            return;
         }
+        Bukkit.getScheduler().runTask(plugin, () -> revivePlanned(player));
     }
 
-    private void tryRespawn(Player player, int attempt) {
+    /** Next-tick: place the revived player and run the ruling (exactly-once via consume). */
+    private void revivePlanned(Player player) {
         Plugin plugin = pluginRef;
         if (plugin == null || !player.isOnline()) {
             REGISTRY.clear(player.getUniqueId());
             return;
         }
-        if (!REGISTRY.isMarked(player.getUniqueId())) {
+        RespawnPlan plan = REGISTRY.consume(player.getUniqueId());
+        if (plan == null) {
             return;
         }
-        if (player.isDead()) {
-            try {
-                player.spigot().respawn();
-            } catch (IllegalStateException | IllegalArgumentException e) {
-                plugin.getLogger().fine("[N Arena][DeathBridge] respawn already handled: " + e.getMessage());
-            }
+        if (player.isDead() || player.getHealth() <= 0.0d) {
+            // Defensive: another plugin un-cancelled the death. Fall back to the legacy
+            // respawn path so the ruling still runs instead of stranding a 0-HP client.
+            forceLegacyRespawn(player, plan);
+            return;
         }
-        // Fail-survivable ladder: a dropped client tick can leave the revive pending; retry a
-        // couple of times, then give up quietly (vanilla death flow remains consistent anyway).
-        if (attempt < 3) {
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                if (player.isOnline() && player.isDead() && REGISTRY.isMarked(player.getUniqueId())) {
-                    tryRespawn(player, attempt + 1);
+        if (plan.respawnAt() != null && plan.respawnAt().getWorld() != null) {
+            SafeTeleport.teleport(player, plan.respawnAt());
+        }
+        player.setFallDistance(0f);
+        player.setFireTicks(0);
+        player.setFreezeTicks(0);
+        player.setArrowsInBody(0);
+        runRuling(player, plan);
+    }
+
+    /** Fallback for a death that could not be cancelled: vanilla respawn, then the ruling. */
+    private void forceLegacyRespawn(Player player, RespawnPlan plan) {
+        Plugin plugin = pluginRef;
+        if (plugin == null) {
+            return;
+        }
+        try {
+            player.spigot().respawn();
+        } catch (IllegalStateException | IllegalArgumentException e) {
+            plugin.getLogger().fine("[N Arena][DeathBridge] legacy respawn unavailable: " + e.getMessage());
+        }
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (player.isOnline()) {
+                if (plan.respawnAt() != null && plan.respawnAt().getWorld() != null) {
+                    SafeTeleport.teleport(player, plan.respawnAt());
                 }
-            }, 2L);
+                runRuling(player, plan);
+            }
+        });
+    }
+
+    private void runRuling(Player player, RespawnPlan plan) {
+        Plugin plugin = pluginRef;
+        if (plugin == null || !player.isOnline()) {
+            return;
+        }
+        try {
+            plan.onRevived().run();
+        } catch (RuntimeException e) {
+            plugin.getLogger().log(Level.WARNING,
+                    "[N Arena][DeathBridge] revive hook failed for " + player.getName(), e);
         }
     }
 
+    /**
+     * Legacy safety net: if a planned death slips through uncancelled (another plugin fought
+     * the cancellation), the vanilla respawn still routes through the plan.
+     */
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onRespawn(PlayerRespawnEvent event) {
         Player player = event.getPlayer();
@@ -147,23 +170,15 @@ public final class DeathBridge implements Listener {
             if (!player.isOnline()) {
                 return;
             }
-            PlayerVitals.fakeDeathReset(player);
             player.setFallDistance(0f);
             player.setFireTicks(0);
             player.setFreezeTicks(0);
-            player.setArrowsInBody(0);
-            try {
-                plan.onRevived().run();
-            } catch (RuntimeException e) {
-                plugin.getLogger().log(Level.WARNING,
-                        "[N Arena][DeathBridge] revive hook failed for " + player.getName(), e);
-            }
+            runRuling(player, plan);
         });
     }
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         REGISTRY.clear(event.getPlayer().getUniqueId());
-        seamlessRespawnUntil.remove(event.getPlayer().getUniqueId());
     }
 }

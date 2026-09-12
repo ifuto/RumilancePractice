@@ -39,7 +39,6 @@ public final class PracticeTntListener implements Listener {
     private final FfaService ffaService;
     private final Plugin plugin;
     private final NamespacedKey lockedFuseKey;
-    private volatile com.rumilance.practice.combat.ExplosionSelfDamageListener selfDamage;
     private volatile com.rumilance.practice.combat.ExplosionSourceTracker explosionSources;
 
     public void setExplosionSourceTracker(
@@ -57,9 +56,6 @@ public final class PracticeTntListener implements Listener {
     }
 
     /** Blast recorder that restores vanilla self-damage skipped for explosion sources. */
-    public void setSelfDamage(com.rumilance.practice.combat.ExplosionSelfDamageListener selfDamage) {
-        this.selfDamage = selfDamage;
-    }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onTntPlace(BlockPlaceEvent event) {

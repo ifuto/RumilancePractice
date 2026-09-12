@@ -9,7 +9,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
-public record KitDefinition(String name, String displayName, String icon, KitCategory category, boolean ranked, boolean ffaEnabled, double maxHealth, boolean naturalHealthRegen, double knockbackMultiplier, List<KitItemEntry> items, Map<String, String> armor, boolean enabled, boolean autoFood, boolean swordShieldBreak, boolean blockPlace, boolean blockBreak, boolean breakPlayerPlacedOnly, List<String> canBreak, boolean pearl, boolean totem, boolean forceAdventure, int timeoutSeconds, List<String> arenas, List<String> partyArenas, List<String> startCommands, List<KitStartEffect> startEffects, boolean presetEnabled, boolean bedExplosion) {
+public record KitDefinition(String name, String displayName, String icon, KitCategory category, boolean ranked, boolean ffaEnabled, double maxHealth, boolean naturalHealthRegen, double knockbackMultiplier, List<KitItemEntry> items, Map<String, String> armor, boolean enabled, boolean autoFood, boolean swordShieldBreak, boolean blockPlace, boolean blockBreak, boolean breakPlayerPlacedOnly, List<String> canBreak, boolean pearl, boolean totem, boolean forceAdventure, int timeoutSeconds, List<String> arenas, List<String> partyArenas, List<String> startCommands, List<KitStartEffect> startEffects, boolean presetEnabled, boolean bedExplosion, boolean crystalFfa) {
     public KitDefinition {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(displayName, "displayName");
@@ -134,6 +134,12 @@ public record KitDefinition(String name, String displayName, String icon, KitCat
          * default so existing kits keep plain vanilla bed behaviour (sleep / spawn point).
          */
         private boolean bedExplosion;
+        /**
+         * "Crystal FFA" declaration: this kit is THE crystal FFA kit. Editing it opens the
+         * 9-slot KIT1..KIT9 variant picker (each slot keeps its own layout); FFA spawns the
+         * player with the variant they selected. At most one kit carries the flag.
+         */
+        private boolean crystalFfa;
 
         private Builder(String name) {
             this.name = Objects.requireNonNull(name, "name");
@@ -169,6 +175,7 @@ public record KitDefinition(String name, String displayName, String icon, KitCat
             this.startEffects = new ArrayList<KitStartEffect>(source.startEffects);
             this.presetEnabled = source.presetEnabled;
             this.bedExplosion = source.bedExplosion;
+            this.crystalFfa = source.crystalFfa;
         }
 
         public Builder name(String value) {
@@ -368,13 +375,18 @@ public record KitDefinition(String name, String displayName, String icon, KitCat
             return this;
         }
 
+        public Builder crystalFfa(boolean value) {
+            this.crystalFfa = value;
+            return this;
+        }
+
         public Builder bedExplosion(boolean value) {
             this.bedExplosion = value;
             return this;
         }
 
         public KitDefinition build() {
-            return new KitDefinition(this.name, this.displayName, this.icon, this.category, this.ranked, this.ffaEnabled, this.maxHealth, this.naturalHealthRegen, this.knockbackMultiplier, this.items, this.armor, this.enabled, this.autoFood, this.swordShieldBreak, this.blockPlace, this.blockBreak, this.breakPlayerPlacedOnly, this.canBreak, this.pearl, this.totem, this.forceAdventure, this.timeoutSeconds, this.arenas, this.partyArenas, this.startCommands, this.startEffects, this.presetEnabled, this.bedExplosion);
+            return new KitDefinition(this.name, this.displayName, this.icon, this.category, this.ranked, this.ffaEnabled, this.maxHealth, this.naturalHealthRegen, this.knockbackMultiplier, this.items, this.armor, this.enabled, this.autoFood, this.swordShieldBreak, this.blockPlace, this.blockBreak, this.breakPlayerPlacedOnly, this.canBreak, this.pearl, this.totem, this.forceAdventure, this.timeoutSeconds, this.arenas, this.partyArenas, this.startCommands, this.startEffects, this.presetEnabled, this.bedExplosion, this.crystalFfa);
         }
     }
 }

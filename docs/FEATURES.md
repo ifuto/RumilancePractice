@@ -116,6 +116,23 @@ Paper 1.21.11 向け Practice PvP プラグイン **N Arena**(プラグイン名
 
 ## キット・アイテム
 
+- **Crystal FFA Kit 申告(存在する場合のみ)**: 管理GUIの設定画面に「Crystal FFA」タイル
+  (エンドクリスタル)。1キットだけ申告でき、申告したキットは `/ekit` で選ぶと専用の
+  **縦4GUI**(行1=灰色板ガラス / 行2=**KIT1〜KIT9 の看板(太字水色)** / 行3=エンダーアイ /
+  行4=板ガラス)が出る。看板クリックでスロット選択(選択分はFFA参加時に適用)、
+  **エンダーアイで選択中の番号のキット編集開始**。各スロットは同じcrystalキットの
+  **別々の配置**を保存できる。選択は `crystal-ffa.yml` に永続化、配置は
+  `<kit>#v<1..9>` として保存。
+- **セルフダメージはバニラに一本化**: MC-11154(爆発が発生源を無視する)は解決済み。
+  自前の再爆発/自己ダメージ再現リスナー(CrystalSelfBlastListener /
+  ExplosionSelfDamageListener / ExplosionPhysics)は削除。キル加入は
+  ExplosionSourceTracker(設置PDC+最後のパンチ記録)が担当。
+- **死亡検知の新方式(デス画面・ローディング画面ゼロ)**: トーテムは完全バニラ
+  (EntityResurrectEvent には触らない)。本当に死んだときだけ PlayerDeathEvent をキャンセル
+  (Paper の cancel + setReviveHealth 契約)して蘇生 — combat-kill パケットも強制リスポーンも
+  発生しないので「Loading terrain」画面は出ない。ProtocolLib のパケット抑制
+  (DeathBridgePackets)は不要のため削除。
+
 - **キット**: `/kit` 選択GUI、キット編集、プレビュー、金床リネーム(制限あり)、プリセット
 - **Main Kits / Sub Kits の2分割**: 各キットは `kits.yml` の `category: MAIN|SUB` で
   どちらのセクションに出るか決まる(未設定=MAIN)。全キット選択GUI(デュエル/キュー/パーティ/看板キット)は

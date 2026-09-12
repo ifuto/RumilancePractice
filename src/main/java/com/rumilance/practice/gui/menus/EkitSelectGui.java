@@ -28,6 +28,7 @@ public final class EkitSelectGui extends AbstractGui {
     private final KitService kitService;
     private EditKitGui editKitGui;
     private OriginalKitGui originalKitGui;
+    private CrystalKitSlotsGui crystalKitSlotsGui;
 
     public EkitSelectGui(GuiSessionRegistry registry, SoundService sounds, KitService kitService) {
         super(registry, sounds, GuiType.EKIT_SELECT, 6, false);
@@ -40,6 +41,10 @@ public final class EkitSelectGui extends AbstractGui {
 
     public void setOriginalKitGui(OriginalKitGui originalKitGui) {
         this.originalKitGui = originalKitGui;
+    }
+
+    public void setCrystalKitSlotsGui(CrystalKitSlotsGui crystalKitSlotsGui) {
+        this.crystalKitSlotsGui = crystalKitSlotsGui;
     }
 
     @Override
@@ -85,7 +90,9 @@ public final class EkitSelectGui extends AbstractGui {
                 .name(MiniMessage.miniMessage().deserialize(kit.prettyDisplayName())
                         .decoration(TextDecoration.ITALIC, false))
                 .lore(UiTheme.divider(),
-                        UiTheme.line(line(player, "gui.kit-edit-hint")),
+                        kit.crystalFfa()
+                                ? UiTheme.status("Crystal FFA Kit", UiTheme.SUCCESS)
+                                : UiTheme.line(line(player, "gui.kit-edit-hint")),
                         UiTheme.blank(),
                         UiTheme.hint(line(player, "menu.click")))
                 .action("kit:" + kit.name())
@@ -122,7 +129,12 @@ public final class EkitSelectGui extends AbstractGui {
             String kitId = action.substring(4);
             sounds.play(player, "select");
             session.setNavigatingAway(true);
-            if (editKitGui != null) {
+            // The declared crystal FFA kit edits through the KIT1..9 slot picker instead of
+            // the plain editor: each slot keeps its own layout of the same kit.
+            boolean crystal = kitService.get(kitId).map(KitDefinition::crystalFfa).orElse(false);
+            if (crystal && crystalKitSlotsGui != null) {
+                crystalKitSlotsGui.open(player, kitId);
+            } else if (editKitGui != null) {
                 editKitGui.openKitEditor(player, kitId);
             }
         }

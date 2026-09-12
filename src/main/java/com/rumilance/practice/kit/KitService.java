@@ -72,7 +72,9 @@ public final class KitService {
                     .canBreak(section.getStringList("can-break"))
                     .presetEnabled(section.getBoolean("preset-enabled", false))
                     // "Bed Explosion" kit rule: beds detonate on right click like Nether/End beds.
-                    .bedExplosion(section.getBoolean("bed-explosion", false));
+                    .bedExplosion(section.getBoolean("bed-explosion", false))
+                    // "Crystal FFA" declaration: THE crystal FFA kit gets the KIT1..9 variant editor.
+                    .crystalFfa(section.getBoolean("crystal-ffa", false));
 
             List<String> arenaList = section.getStringList("arenas");
             if (arenaList.isEmpty()) {
@@ -122,6 +124,37 @@ public final class KitService {
                 .map(s -> s.toLowerCase(Locale.ROOT))
                 .filter(kits::containsKey)
                 .toList());
+        enforceCrystalFfaExclusivity();
+    }
+
+    /**
+     * At most one kit is THE crystal FFA kit. Hand-edited configs with several flagged kits
+     * keep the first (kit-order order) and silently unflag the rest.
+     */
+    private void enforceCrystalFfaExclusivity() {
+        KitDefinition winner = null;
+        for (String id : orderedIds()) {
+            KitDefinition kit = kits.get(id);
+            if (kit == null || !kit.crystalFfa()) {
+                continue;
+            }
+            if (winner == null) {
+                winner = kit;
+            } else {
+                save(kit.toBuilder().crystalFfa(false).build());
+            }
+        }
+    }
+
+    /** All kit ids in display order, then any unlisted ones (stable). */
+    private java.util.List<String> orderedIds() {
+        java.util.List<String> out = new ArrayList<>(sortOrder);
+        for (String id : kits.keySet()) {
+            if (!out.contains(id)) {
+                out.add(id);
+            }
+        }
+        return out;
     }
 
     public Optional<KitDefinition> get(String id) {
@@ -211,6 +244,35 @@ public final class KitService {
             save(kit.toBuilder().category(category).build());
             return true;
         }).orElse(false);
+    }
+
+    /**
+     * Declares (or undeclares) THE crystal FFA kit. Declaring one kit un-declares every
+     * other kit — the flag is exclusive by definition.
+     */
+    public boolean setCrystalFfa(String kitId, boolean value) {
+        return get(kitId).map(kit -> {
+            save(kit.toBuilder().crystalFfa(value).build());
+            if (value) {
+                clearCrystalFfaExcept(kit.name());
+            }
+            return true;
+        }).orElse(false);
+    }
+
+    /** Un-flags every crystal FFA kit except {@code keepId} (persists each change). */
+    public void clearCrystalFfaExcept(String keepId) {
+        String keep = keepId == null ? "" : keepId.toLowerCase(Locale.ROOT);
+        for (KitDefinition kit : List.copyOf(kits.values())) {
+            if (kit.crystalFfa() && !kit.name().toLowerCase(Locale.ROOT).equals(keep)) {
+                save(kit.toBuilder().crystalFfa(false).build());
+            }
+        }
+    }
+
+    /** The declared crystal FFA kit, if the server has one. */
+    public Optional<KitDefinition> crystalFfaKit() {
+        return kits.values().stream().filter(KitDefinition::crystalFfa).findFirst();
     }
 
     public void save(KitDefinition kit) {
@@ -418,6 +480,7 @@ public final class KitService {
         yaml.set(path + ".party-arenas", kit.partyArenas());
         yaml.set(path + ".preset-enabled", kit.presetEnabled());
         yaml.set(path + ".bed-explosion", kit.bedExplosion());
+        yaml.set(path + ".crystal-ffa", kit.crystalFfa());
         yaml.set(path + ".can-break", kit.canBreak());
         yaml.set(path + ".start-commands", kit.startCommands());
         List<Map<String, Object>> startEffectMaps = new ArrayList<>();

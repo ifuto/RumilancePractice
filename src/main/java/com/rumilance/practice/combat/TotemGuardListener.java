@@ -146,6 +146,7 @@ public final class TotemGuardListener implements Listener {
             return;
         }
         event.setCancelled(true);
+        event.setReviveHealth(1.0d);
         event.getDrops().clear();
         event.setKeepInventory(true);
         event.setShouldDropExperience(false);
