@@ -107,6 +107,7 @@ public final class ResourcePackService implements Listener {
         for (Player online : Bukkit.getOnlinePlayers()) {
             applyTo(online);
         }
+        startLiveHashCheck();
     }
 
     /** Whether plugin-side distribution is enabled at all. */
@@ -318,6 +319,14 @@ public final class ResourcePackService implements Listener {
         }
         String url = configService.config().getString("resource-pack.url", DEFAULT_URL);
         String sha1Hex = configService.config().getString("resource-pack.sha1", DEFAULT_SHA1);
+        return buildRequest(url, sha1Hex);
+    }
+
+    /**
+     * Builds the pack request with explicit url/hash (also used by the live-hash check when
+     * it heals a stale configured SHA-1). Returns {@code null} when disabled/misconfigured.
+     */
+    private ResourcePackRequest buildRequest(String url, String sha1Hex) {
         String prompt = configService.config().getString("resource-pack.prompt",
                 "Required for N Arena icons.");
         if (url == null || url.isBlank()) {
@@ -353,5 +362,94 @@ public final class ResourcePackService implements Listener {
                 .prompt(Component.text(prompt))
                 .required(required())
                 .build();
+    }
+
+    /**
+     * Startup self-heal (server owner's idea): the SHA-1 announced to clients is re-verified
+     * against the ACTUAL zip at the configured URL, asynchronously after every reload. A
+     * hash that silently drifted from the zip was the exact "pack can never be applied on
+     * the server" breakage this used to have — now, when the live zip's hash differs from
+     * the configured one, the live hash wins for this session (with a loud warning so the
+     * config/dist drift gets fixed). An unreachable URL only logs at INFO: offline/LAN
+     * setups keep using the configured hash.
+     */
+    private void startLiveHashCheck() {
+        ResourcePackRequest built = this.request;
+        if (built == null) {
+            return;
+        }
+        String url = configService.config().getString("resource-pack.url", DEFAULT_URL);
+        String configured = configService.config()
+                .getString("resource-pack.sha1", DEFAULT_SHA1);
+        if (url == null || url.isBlank() || !url.startsWith("http")) {
+            return; // file:-style or blank URLs cannot be re-hashed from here
+        }
+        String trimmedUrl = url.trim();
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            String actual = fetchSha1(trimmedUrl);
+            if (actual == null) {
+                logger.info(() -> "resource-pack.live-hash: could not fetch " + trimmedUrl
+                        + " to verify the announced SHA-1 — keeping the configured value"
+                        + " (offline/LAN environment?).");
+                return;
+            }
+            if (actual.equalsIgnoreCase(configured)) {
+                return; // config and zip agree — nothing to heal
+            }
+            logger.warning("resource-pack.sha1 is STALE: config announces " + configured
+                    + " but the zip at the URL hashes to " + actual
+                    + ". Every client download was being rejected by the hash check until"
+                    + " now — this session uses the LIVE hash. Persist the fix by syncing"
+                    + " config.yml with dist/ (the localtest guard blocks future drift).");
+            ResourcePackRequest healed = buildRequest(trimmedUrl, actual);
+            if (healed == null) {
+                return;
+            }
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                this.request = healed;
+                for (Player online : Bukkit.getOnlinePlayers()) {
+                    applyTo(online);
+                }
+            });
+        });
+    }
+
+    /**
+     * Downloads the zip at {@code url} and returns its SHA-1 as 40 lowercase hex chars, or
+     * {@code null} when the fetch fails / hash cannot be computed. Runs off the main thread.
+     */
+    private String fetchSha1(String url) {
+        java.net.HttpURLConnection conn = null;
+        try {
+            conn = (java.net.HttpURLConnection) URI.create(url).toURL().openConnection();
+            conn.setConnectTimeout(10_000);
+            conn.setReadTimeout(20_000);
+            conn.setUseCaches(false);
+            conn.setInstanceFollowRedirects(true);
+            if (conn.getResponseCode() >= 400) {
+                return null;
+            }
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-1");
+            try (java.io.InputStream in = conn.getInputStream()) {
+                byte[] buf = new byte[16 * 1024];
+                int read;
+                while ((read = in.read(buf)) != -1) {
+                    digest.update(buf, 0, read);
+                }
+            }
+            byte[] hash = digest.digest();
+            StringBuilder hex = new StringBuilder(40);
+            for (byte b : hash) {
+                hex.append(Character.forDigit((b >> 4) & 0xF, 16))
+                        .append(Character.forDigit(b & 0xF, 16));
+            }
+            return hex.toString();
+        } catch (Exception e) {
+            return null;
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
+        }
     }
 }

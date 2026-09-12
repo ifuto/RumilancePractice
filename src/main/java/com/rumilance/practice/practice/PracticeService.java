@@ -2589,6 +2589,14 @@ public final class PracticeService {
         }
         session.setBotLastDamagedMs(System.currentTimeMillis());
         if (bot.getHealth() - event.getFinalDamage() > 0.5d) {
+            // Same rule as the combat bots: the dummy is silent — the hurt audio is spelled
+            // out manually so reads on hit connect like a real opponent.
+            if (event.getFinalDamage() > 0.0d && bot.getWorld() != null) {
+                float pitch = 0.95f + java.util.concurrent.ThreadLocalRandom.current()
+                        .nextFloat() * 0.1f;
+                bot.getWorld().playSound(bot.getLocation(),
+                        Sound.ENTITY_PLAYER_HURT, 1.0f, pitch);
+            }
             return false;
         }
         event.setCancelled(true);
@@ -2620,7 +2628,51 @@ public final class PracticeService {
             player.sendActionBar(messages.render(player, "practice.bot-miss"));
             return;
         }
-        player.damage(damage, bot);
+        botMeleeHit(player, bot, damage, true);
+    }
+
+    /**
+     * Applies a bot hit so it actually LANDS like vanilla melee. A Mannequin is NOT a Bukkit
+     * Player, so plain {@code player.damage(dmg, bot)} arrives as cause CUSTOM with no
+     * by-entity event: the practice-room protection saw anonymous ambient damage, cancelled
+     * the frame and zeroed velocities — bot swings silently evaporated (no damage, no
+     * knockback, even though the bot visibly swung). Paper's DamageSource API instead fires
+     * a real ENTITY_ATTACK by-entity event with the bot as damager: the room's sparring
+     * exemption recognises it and lets the frame through, vanilla renders the hurt
+     * animation/sound on the victim, and i-frames stay vanilla-exact. {@code damage}() never
+     * knocks, so vanilla melee knockback (0.4 horizontal / 0.36 upward) is applied manually
+     * — but only when the health actually dropped (cancelled frames must not shove).
+     */
+    private void botMeleeHit(Player player, Mannequin bot, double damage, boolean knockback) {
+        if (player == null || !player.isOnline() || damage <= 0.0d) {
+            return;
+        }
+        double before = player.getHealth();
+        try {
+            org.bukkit.damage.DamageSource source = org.bukkit.damage.DamageSource.builder(
+                            org.bukkit.damage.DamageType.PLAYER_ATTACK)
+                    .withCausingEntity(bot)
+                    .withDirectEntity(bot)
+                    .build();
+            player.damage(damage, source);
+        } catch (Throwable t) {
+            // Compat fallback (DamageSource API missing/refused): plain call it. Some rooms
+            // may swallow this as before — never crash the fight loop over it.
+            botMeleeHit(player, bot, damage, true);
+        }
+        boolean landed = player.getHealth() < before - 1.0e-9d && !player.isDead();
+        if (!landed || !knockback) {
+            return;
+        }
+        Vector push = player.getLocation().toVector()
+                .subtract(bot.getLocation().toVector()).setY(0);
+        if (push.lengthSquared() > 0.001d) {
+            push.normalize().multiply(0.4d);
+            Vector v = player.getVelocity();
+            player.setVelocity(new Vector(v.getX() + push.getX(),
+                    Math.max(v.getY() * 0.5d, 0.35999998474121094d),
+                    v.getZ() + push.getZ()));
+        }
     }
 
     /**
@@ -3089,7 +3141,7 @@ public final class PracticeService {
             // Splash of harming at the player (map cap: two pots before a restock drink).
             BotDifficulty potDiff = session.difficulty();
             double potDamage = Math.max(1.0d, potDiff.attackDamage() * 0.6d);
-            player.damage(potDamage, bot);
+            botMeleeHit(player, bot, potDamage, false); // splash hit: no melee knockback
             ab.potUses(ab.potUses() + 1);
             player.sendActionBar(messages.render(player, "practice.bot-pot-hit"));
             if (player.getWorld() != null) {
@@ -3481,7 +3533,7 @@ public final class PracticeService {
             if (bot.getWorld() != null) {
                 bot.getWorld().playSound(bot.getLocation(), Sound.ITEM_SHIELD_BREAK, 1.0f, 1.0f);
             }
-            player.damage(Math.max(1.0d, diff.attackDamage() * 0.6d), bot);
+            botMeleeHit(player, bot, Math.max(1.0d, diff.attackDamage() * 0.6d), true);
         }
     }
 
@@ -3902,6 +3954,14 @@ public final class PracticeService {
             }
         }
         if (bot.getHealth() - event.getFinalDamage() > 0.5d) {
+            // Mannequins are setSilent(true) — vanilla will not broadcast the hurt sound
+            // for them, so the swing LOOKED dead. Spell it out like a real opponent sounds.
+            if (event.getFinalDamage() > 0.0d && bot.getWorld() != null) {
+                float pitch = 0.95f + java.util.concurrent.ThreadLocalRandom.current()
+                        .nextFloat() * 0.1f;
+                bot.getWorld().playSound(bot.getLocation(),
+                        Sound.ENTITY_PLAYER_HURT, 1.0f, pitch);
+            }
             if (session.type() == PracticeType.CRYSTAL && explosion) {
                 session.setBotRetreatUntilMs(System.currentTimeMillis() + 1200L);
             }
