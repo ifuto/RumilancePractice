@@ -39,6 +39,7 @@ public final class PracticeTntListener implements Listener {
     private final FfaService ffaService;
     private final Plugin plugin;
     private final NamespacedKey lockedFuseKey;
+    private volatile com.rumilance.practice.combat.ExplosionSelfDamageListener selfDamage;
 
     public PracticeTntListener(PracticeTntSettings settings, MatchService matchService, FfaService ffaService,
                                Plugin plugin) {
@@ -50,7 +51,10 @@ public final class PracticeTntListener implements Listener {
     }
 
     /** Blast recorder that restores vanilla self-damage skipped for explosion sources. */
-    
+    public void setSelfDamage(com.rumilance.practice.combat.ExplosionSelfDamageListener selfDamage) {
+        this.selfDamage = selfDamage;
+    }
+
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onTntPlace(BlockPlaceEvent event) {
         if (!settings.enabled() || event.getBlock().getType() != Material.TNT) {
@@ -161,6 +165,13 @@ public final class PracticeTntListener implements Listener {
                     if (world != null) {
                         if (world.getDifficulty() != org.bukkit.Difficulty.HARD) {
                             world.setDifficulty(org.bukkit.Difficulty.HARD);
+                        }
+                        // Vanilla never damages the explosion's source entity (Paper #11167), so
+                        // createExplosion(..., source) alone would leave the igniter unharmed by
+                        // their own creeper. Record the blast so the igniter's skipped share of
+                        // the damage/knockback is restored a tick later.
+                        if (selfDamage != null && source != null) {
+                            selfDamage.rememberPluginBlast(at, power, source.getUniqueId());
                         }
                         world.createExplosion(at, power, false, true, source);
                     }
