@@ -334,11 +334,12 @@ public final class CombatSyncListener implements Listener {
     }
 
     /**
-     * Void damage in a fight is never lethal: the hit is cancelled and the player is rescued to
-     * the last safe spot. A totem holder pops their totem first (vanilla does the same), so the
-     * void can never be used to burn - or to lose - a totem, and no deferral to vanilla is left
-     * anywhere: a deferred void death used to be a real death whenever vanilla's resurrect did
-     * not fire (totem not yet in the hand server-side, another plugin cancelling the frame).
+     * Void damage during a LIVE fight is LETHAL now: crystal/mace arenas are floorless by
+     * design, so winning by blasting the opponent into the void is the canonical end — but
+     * this handler used to cancel every void tick and rescue the falling player back up, so
+     * whoever fell came back at full health forever and the match could never end (the
+     * endless full-HP loop, which crystal matches hit constantly). Totem pops resolve BEFORE
+     * the fall kills (vanilla order), non-combat contexts keep the old never-lethal rescue.
      */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onVoidDamage(EntityDamageEvent event) {
@@ -348,9 +349,13 @@ public final class CombatSyncListener implements Listener {
         if (event.getCause() != EntityDamageEvent.DamageCause.VOID) {
             return;
         }
-        if (isCombatant(player.getUniqueId())) {
+        if (isLiveCombatant(player.getUniqueId())) {
+            // Live fight: totem-if-held first, then the void kills for real. The venue's
+            // death handlers (match / FFA) score it on the real death.
             PracticeDeath.tryPopTotem(player, kitForCombatant(player), event);
+            return;
         }
+        // Lobby / spectators / warmup: the void stays non-lethal exactly as before.
         event.setCancelled(true);
         event.setDamage(0);
         if (isCombatant(player.getUniqueId())) {
@@ -377,6 +382,13 @@ public final class CombatSyncListener implements Listener {
         Player player = event.getEntity();
         if (player.getLastDamageCause() != null
                 && player.getLastDamageCause().getCause() == EntityDamageEvent.DamageCause.VOID) {
+            if (isLiveCombatant(player.getUniqueId())) {
+                // Live fight: do NOT touch the death — MatchListener/FfaListener plan the
+                // death-bridge revive and rule the outcome. Cancelling it here swallowed
+                // every void kill (the venue saw isCancelled and returned), so the fallen
+                // player just re-materialised and matches never ended.
+                return;
+            }
             event.setCancelled(true);
             event.getDrops().clear();
             event.setKeepInventory(true);
@@ -384,6 +396,19 @@ public final class CombatSyncListener implements Listener {
                 rescue(player);
             }
         }
+    }
+
+    /**
+     * True when the player is in a context whose venue scores deaths itself: an ACTIVE match
+     * or the FFA. Anything weaker (countdown / ending / lobby) keeps the old rescue-only
+     * void handling so a void misfortune outside a rulable death never looks like a cheat.
+     */
+    private boolean isLiveCombatant(UUID playerId) {
+        MatchSession session = matchService.registry().byPlayer(playerId).orElse(null);
+        if (session != null) {
+            return session.state() == MatchState.ACTIVE;
+        }
+        return ffaService.isInFfa(playerId);
     }
 
     @EventHandler
