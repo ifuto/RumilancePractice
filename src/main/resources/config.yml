@@ -43,13 +43,14 @@ icons:
 resource-pack:
   # Master switch. When false the plugin does not send any resource pack.
   enabled: true
-  # Direct download URL of the pack zip. Defaults to the repository main branch's
-  # dist/ zip; point this at your own hosting (Cloudflare Pages etc.) for reliability
-  # if the branch layout changes.
+  # Direct download URL of the pack zip. Defaults to the dist/ zip of THIS distribution
+  # branch (jar and zip ship together, so their sha1 always agree); point this at your own
+  # hosting (Cloudflare Pages etc.) for reliability if the branch layout changes.
   url: "https://raw.githubusercontent.com/ifuto/RumilancePractice/arena/01a07b2c-rumilancepractice/dist/RumilanceResourcePack.zip"
   # SHA-1 of the zip as 40 hex characters (must match the file exactly; see
-  # dist/RumilanceResourcePack.sha1). The client rejects a hash mismatch.
-  sha1: "711b242f2cb7467b33b830d25e50e6a7d3f0bdaa"
+  # dist/RumilanceResourcePack.sha1). The client rejects a hash mismatch — the localtest
+  # guard (tools/localtest/localtest.sh) refuses a build whose sha1 drifts from the zip.
+  sha1: "2ad094674379fb5cc9e1f224647b9f30c26e2072"
   # true  = REQUIRED: kick players who decline the pack or fail to download it.
   # false = RECOMMENDED: they may decline and keep playing (text rank badges instead of
   #         the icon glyphs). Switchable at runtime from the admin GUI; that choice is

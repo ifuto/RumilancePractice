@@ -90,7 +90,8 @@ public final class RankIconNameTags {
         return "2r" + hex.substring(0, Math.min(12, hex.length()));
     }
 
-    private static PlayerRank effectiveRank(RankService ranks, Player player) {
+    /** Effective rank used for the badge (admin > VIP+ > VIP > NORM); shared with TabBridge. */
+    public static PlayerRank effectiveRank(RankService ranks, Player player) {
         if (ranks.isAdmin(player)) {
             return PlayerRank.ADMIN;
         }

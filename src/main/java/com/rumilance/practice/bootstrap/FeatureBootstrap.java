@@ -1155,6 +1155,14 @@ public final class FeatureBootstrap {
         scoreboardService.setIconFontService(iconFontService);
         scoreboardService.setResourcePackService(resourcePackService);
         scoreboardService.setRankService(rankService);
+        // NEZNAMY/TAB co-existence: while TAB ships the tablist sorting teams, this plugin
+        // must not create ANY scoreboard teams (see integration/TabBridge.java for the
+        // protocol-level reasoning). Icons still reach the tablist as TAB placeholders.
+        final com.rumilance.practice.integration.TabBridge tabBridge =
+                new com.rumilance.practice.integration.TabBridge(plugin, services, resourcePackService);
+        scoreboardService.setTabListDelegated(tabBridge::tabActive);
+        plugin.getServer().getPluginManager().registerEvents(tabBridge, plugin);
+        tabBridge.detect();
         TabVisibilityService tabVisibilityService =
                 new TabVisibilityService(plugin, stateManager, matchRegistry);
         tabVisibilityService.setSpectatorService(spectatorService);

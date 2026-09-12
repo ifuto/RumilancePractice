@@ -80,6 +80,21 @@ ecj_compile "$OUT/work/runner.txt" "$OUT/classes" > /dev/null
 # Resource files live on the classpath too (lang yml, config defaults, plugin.yml).
 cp -R "$ROOT/src/main/resources/." "$OUT/classes/" 2>/dev/null || true
 
+# Guard: resource-pack.sha1 in the bundled config MUST equal the shipped zip's SHA-1 —
+# a mismatch makes every client reject the pack (FAILED_DOWNLOAD) and the previously-shipped
+# build shipped exactly that silent breakage (stale hash after a pack rebuild).
+PACK_ZIP="$ROOT/dist/RumilanceResourcePack.zip"
+PACK_CFG="$ROOT/src/main/resources/config.yml"
+if [ -f "$PACK_ZIP" ] && [ -f "$PACK_CFG" ]; then
+  actual=$(sha1sum "$PACK_ZIP" | awk '{print $1}')
+  cfg_sha=$(sed -n 's/^  sha1: *"\([0-9a-fA-F]*\)".*/\1/p' "$PACK_CFG" | head -1)
+  if [ -n "$cfg_sha" ] && [ "$actual" != "$cfg_sha" ]; then
+    echo "local-test: FAIL — resource-pack.sha1 (config.yml: $cfg_sha) != dist zip ($actual)" >&2
+    exit 1
+  fi
+  echo "local-test: resource-pack.sha1 matches dist zip ($actual)"
+fi
+
 "$JAVA" -ea -cp "$OUT/classes" LocalTestRunner "$OUT/classes"
 RC=$?
 echo "local-test: exit=$RC"
