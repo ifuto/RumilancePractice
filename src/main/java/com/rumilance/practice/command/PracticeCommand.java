@@ -434,6 +434,11 @@ public final class PracticeCommand implements CommandExecutor, TabCompleter {
                 options.add("clear");
                 return TabCompletions.filter(current, options);
             }
+            if (sub.equals("bindkit")) {
+                List<String> options = new ArrayList<>(practiceService.kitNames());
+                options.add("clear");
+                return TabCompletions.filter(current, options);
+            }
         }
         return List.of();
     }

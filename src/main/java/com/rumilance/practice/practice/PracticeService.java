@@ -24,6 +24,7 @@ import org.bukkit.GameMode;
 import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.block.Block;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -234,6 +235,13 @@ public final class PracticeService {
         return java.util.Collections.unmodifiableMap(botArenaKitBindings);
     }
 
+    /** Live view of the mode -> kit loadout bindings (/practice bindkit) for admin lists. */
+    public java.util.Map<String, String> botModeKitsView() {
+        java.util.Map<String, String> view = new java.util.LinkedHashMap<>();
+        botModeKits.forEach((type, kit) -> view.put(type.name(), kit));
+        return java.util.Collections.unmodifiableMap(view);
+    }
+
     /** /botadmin set: binds a bot fight kit to the arena kit hosting its fights. */
     public void setBotArenaKit(String botKit, String arenaKit) {
         botArenaKitBindings.put(botKit, arenaKit);
@@ -304,6 +312,15 @@ public final class PracticeService {
                     return spawn == null || spawn.getWorld() == null ? null : spawn;
                 })
                 .orElse(null);
+    }
+
+    /** Sorted kit names for tab completion (bindkit candidates etc.). */
+    public java.util.List<String> kitNames() {
+        return kitService == null ? java.util.List.of()
+                : kitService.all().stream()
+                        .map(com.rumilance.practice.model.KitDefinition::name)
+                        .sorted(String.CASE_INSENSITIVE_ORDER)
+                        .collect(java.util.stream.Collectors.toList());
     }
 
     public boolean kitExists(String kitName) {
@@ -2639,15 +2656,27 @@ public final class PracticeService {
      * knockback, even though the bot visibly swung). Paper's DamageSource API instead fires
      * a real ENTITY_ATTACK by-entity event with the bot as damager: the room's sparring
      * exemption recognises it and lets the frame through, vanilla renders the hurt
-     * animation/sound on the victim, and i-frames stay vanilla-exact. {@code damage}() never
-     * knocks, so vanilla melee knockback (0.4 horizontal / 0.36 upward) is applied manually
-     * — but only when the health actually dropped (cancelled frames must not shove).
+     * animation/sound on the victim. {@code damage}() never knocks, so vanilla melee
+     * knockback (0.4 horizontal / 0.36 upward) is applied manually — but only when the
+     * health actually dropped (cancelled frames must not shove).
+     *
+     * <p>Belt and braces so a swing can never degrade into a knockback-only shove:
+     * the victim's i-frames are cleared before the swing (the map's 0-hitcd rungs swing
+     * faster than vanilla's 10-tick invulnerability and expect every hit to count), the
+     * fallback for a missing DamageSource API is a REAL attributed call (it used to recurse
+     * into itself and never deal damage), and if some pipeline still swallows the frame a
+     * direct health registration registers the rung's tuned damage — except against a
+     * genuinely raised shield, which blocks like vanilla.</p>
      */
     private void botMeleeHit(Player player, Mannequin bot, double damage, boolean knockback) {
-        if (player == null || !player.isOnline() || damage <= 0.0d) {
+        if (player == null || !player.isOnline() || damage <= 0.0d || player.isDead()) {
             return;
         }
         double before = player.getHealth();
+        boolean blocked = player.isBlocking();
+        if (!blocked) {
+            player.setNoDamageTicks(0); // bot swings never i-frame-whiff
+        }
         try {
             org.bukkit.damage.DamageSource source = org.bukkit.damage.DamageSource.builder(
                             org.bukkit.damage.DamageType.PLAYER_ATTACK)
@@ -2656,11 +2685,26 @@ public final class PracticeService {
                     .build();
             player.damage(damage, source);
         } catch (Throwable t) {
-            // Compat fallback (DamageSource API missing/refused): plain call it. Some rooms
-            // may swallow this as before — never crash the fight loop over it.
-            botMeleeHit(player, bot, damage, true);
+            // Compat fallback (DamageSource API missing/refused): the plain call still carries
+            // the bot as the damage source (it used to recurse into itself — no damage ever).
+            try {
+                player.damage(damage, bot);
+            } catch (Throwable ignored) {
+                return;
+            }
         }
         boolean landed = player.getHealth() < before - 1.0e-9d && !player.isDead();
+        if (!landed && !blocked && !player.isDead()) {
+            // The attributed frame was swallowed: register the rung's tuned damage directly
+            // so the exchange keeps dealing real damage instead of shove-only hits.
+            AttributeInstance maxAttr = player.getAttribute(Attribute.MAX_HEALTH);
+            double max = maxAttr != null ? maxAttr.getValue() : 20.0d;
+            player.setHealth(Math.max(0.0d, Math.min(max, player.getHealth() - damage)));
+            landed = player.getHealth() < before - 1.0e-9d && !player.isDead();
+            if (landed) {
+                player.getWorld().playSound(player.getLocation(), Sound.ENTITY_PLAYER_HURT, 1.0f, 1.0f);
+            }
+        }
         if (!landed || !knockback) {
             return;
         }

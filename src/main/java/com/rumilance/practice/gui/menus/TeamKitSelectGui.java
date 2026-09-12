@@ -20,6 +20,7 @@ import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemStack;
 
 import java.util.List;
 
@@ -126,23 +127,37 @@ public final class TeamKitSelectGui extends AbstractGui {
                         .glintIf(ready)
                         .action("decorate").build());
 
-        List<KitDefinition> kits = kitService.enabled();
+        // Two labelled sections, matching the duel/queue kit pickers: row 1 = Main Kits
+        // (azalea header), row 2 = Sub Kits (iron-trapdoor header), rows 3-4 continue Main.
+        List<KitDefinition> main = kitService.enabled(com.rumilance.practice.model.KitCategory.MAIN);
+        List<KitDefinition> sub = kitService.enabled(com.rumilance.practice.model.KitCategory.SUB);
         int index = 0;
-        for (KitDefinition kit : kits) {
+        inventory.setItem(MenuScaffold.gridSlot(index++), com.rumilance.practice.gui.KitSections.header(
+                com.rumilance.practice.model.KitCategory.MAIN, main.size(),
+                line(player, "gui.party-start-click")));
+        for (KitDefinition kit : main) {
+            if (index >= com.rumilance.practice.gui.KitSections.ROW1_END) {
+                break;
+            }
+            inventory.setItem(MenuScaffold.gridSlot(index++), partyKitTile(player, kit));
+        }
+        if (!sub.isEmpty()) {
+            inventory.setItem(MenuScaffold.gridSlot(index++), com.rumilance.practice.gui.KitSections.header(
+                    com.rumilance.practice.model.KitCategory.SUB, sub.size(),
+                    line(player, "gui.party-start-click")));
+            for (KitDefinition kit : sub) {
+                if (index >= com.rumilance.practice.gui.KitSections.ROW2_END) {
+                    break;
+                }
+                inventory.setItem(MenuScaffold.gridSlot(index++), partyKitTile(player, kit));
+            }
+        }
+        for (KitDefinition kit : main.subList(Math.min(
+                com.rumilance.practice.gui.KitSections.PER_ROW, main.size()), main.size())) {
             if (index >= MenuScaffold.gridPageSize()) {
                 break;
             }
-            inventory.setItem(MenuScaffold.gridSlot(index++),
-                    ItemBuilder.of(ItemBuilder.materialOr(kit.icon(), Material.DIAMOND_SWORD))
-                            .nameMini(kit.prettyDisplayName())
-                            .lore(UiTheme.divider(),
-                                    UiTheme.labelValue(line(player, "gui.party-arena"), kit.hasFixedArena()
-                                            ? com.rumilance.practice.util.KitNames.pretty(kit.arenaName())
-                                            : line(player, "gui.queue-random")),
-                                    UiTheme.blank(),
-                                    UiTheme.hint(line(player, "gui.party-start-click")))
-                            .action("kit:" + kit.name())
-                            .build());
+            inventory.setItem(MenuScaffold.gridSlot(index++), partyKitTile(player, kit));
         }
 
         // The owner's own original kits are also selectable for the party battle: everyone
@@ -171,6 +186,19 @@ public final class TeamKitSelectGui extends AbstractGui {
         }
 
         MenuScaffold.returnButton(inventory, t(player, "menu.back"));
+    }
+
+    private ItemStack partyKitTile(Player player, KitDefinition kit) {
+        return ItemBuilder.of(ItemBuilder.materialOr(kit.icon(), Material.DIAMOND_SWORD))
+                .nameMini(kit.prettyDisplayName())
+                .lore(UiTheme.divider(),
+                        UiTheme.labelValue(line(player, "gui.party-arena"), kit.hasFixedArena()
+                                ? com.rumilance.practice.util.KitNames.pretty(kit.arenaName())
+                                : line(player, "gui.queue-random")),
+                        UiTheme.blank(),
+                        UiTheme.hint(line(player, "gui.party-start-click")))
+                .action("kit:" + kit.name())
+                .build();
     }
 
     @Override

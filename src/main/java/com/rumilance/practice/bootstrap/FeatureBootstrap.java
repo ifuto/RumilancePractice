@@ -251,6 +251,7 @@ public final class FeatureBootstrap {
     private ReplayService replayService;
     private PracticeService practiceService;
     private com.rumilance.practice.practice.afk.AfkPracticeManager afkPracticeManager;
+    private com.rumilance.practice.practice.afk.AfkCrystalManager afkCrystalManager;
     private TeamGlowLosService teamGlowLosService;
 
     public FeatureBootstrap(RumilancePractice plugin, ServiceRegistry services) {
@@ -469,6 +470,21 @@ public final class FeatureBootstrap {
         afkPracticeManager.start();
         services.register(com.rumilance.practice.practice.afk.AfkPracticeManager.class, afkPracticeManager);
         bind("afkpractice", afkPracticeManager);
+
+        afkCrystalManager = new com.rumilance.practice.practice.afk.AfkCrystalManager(
+                plugin, configService, services.get(MessageService.class));
+        afkCrystalManager.start();
+        services.register(com.rumilance.practice.practice.afk.AfkCrystalManager.class, afkCrystalManager);
+        bind("afkcrystal", afkCrystalManager);
+        // The two AFK rooms are mutually exclusive per player.
+        afkPracticeManager.setOtherSessionGuard(afkCrystalManager::hasSession);
+        afkCrystalManager.setOtherSessionGuard(afkPracticeManager::hasSession);
+        afkCrystalManager.setKitService(kitService);
+        // /hub / /lobby during an AFK BOT Crystal session must really end it: hand the
+        // manager LobbyService's full lobby return (state reset + spawn teleport).
+        afkCrystalManager.setLobbySender((player, reason) -> lobbyService.sendToLobby(player));
+
+
 
         SightSettings sightSettings = SightSettings.from(configService.config());
         services.register(SightSettings.class, sightSettings);
@@ -1647,6 +1663,9 @@ public final class FeatureBootstrap {
     public void disable() {
         if (afkPracticeManager != null) {
             afkPracticeManager.shutdown();
+        }
+        if (afkCrystalManager != null) {
+            afkCrystalManager.shutdown();
         }
         if (queueCoordinator != null) {
             queueCoordinator.stop();

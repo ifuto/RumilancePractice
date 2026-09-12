@@ -9,11 +9,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
-public record KitDefinition(String name, String displayName, String icon, boolean ranked, boolean ffaEnabled, double maxHealth, boolean naturalHealthRegen, double knockbackMultiplier, List<KitItemEntry> items, Map<String, String> armor, boolean enabled, boolean autoFood, boolean swordShieldBreak, boolean blockPlace, boolean blockBreak, boolean breakPlayerPlacedOnly, List<String> canBreak, boolean pearl, boolean totem, boolean forceAdventure, int timeoutSeconds, List<String> arenas, List<String> partyArenas, List<String> startCommands, List<KitStartEffect> startEffects, boolean presetEnabled, boolean bedExplosion) {
+public record KitDefinition(String name, String displayName, String icon, KitCategory category, boolean ranked, boolean ffaEnabled, double maxHealth, boolean naturalHealthRegen, double knockbackMultiplier, List<KitItemEntry> items, Map<String, String> armor, boolean enabled, boolean autoFood, boolean swordShieldBreak, boolean blockPlace, boolean blockBreak, boolean breakPlayerPlacedOnly, List<String> canBreak, boolean pearl, boolean totem, boolean forceAdventure, int timeoutSeconds, List<String> arenas, List<String> partyArenas, List<String> startCommands, List<KitStartEffect> startEffects, boolean presetEnabled, boolean bedExplosion) {
     public KitDefinition {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(displayName, "displayName");
         Objects.requireNonNull(icon, "icon");
+        category = category == null ? KitCategory.MAIN : category;
         maxHealth = maxHealth <= 0.0 ? 20.0 : maxHealth;
         knockbackMultiplier = knockbackMultiplier <= 0.0 ? 1.0 : knockbackMultiplier;
         items = List.copyOf(items);
@@ -103,6 +104,7 @@ public record KitDefinition(String name, String displayName, String icon, boolea
         private String name;
         private String displayName;
         private String icon = "STONE";
+        private KitCategory category = KitCategory.MAIN;
         private boolean ranked = true;
         private boolean ffaEnabled = true;
         private double maxHealth = 20.0;
@@ -142,6 +144,7 @@ public record KitDefinition(String name, String displayName, String icon, boolea
             this.name = source.name;
             this.displayName = source.displayName;
             this.icon = source.icon;
+            this.category = source.category;
             this.ranked = source.ranked;
             this.ffaEnabled = source.ffaEnabled;
             this.maxHealth = source.maxHealth;
@@ -180,6 +183,11 @@ public record KitDefinition(String name, String displayName, String icon, boolea
 
         public Builder icon(String value) {
             this.icon = Objects.requireNonNull(value, "icon");
+            return this;
+        }
+
+        public Builder category(KitCategory value) {
+            this.category = value == null ? KitCategory.MAIN : value;
             return this;
         }
 
@@ -366,7 +374,7 @@ public record KitDefinition(String name, String displayName, String icon, boolea
         }
 
         public KitDefinition build() {
-            return new KitDefinition(this.name, this.displayName, this.icon, this.ranked, this.ffaEnabled, this.maxHealth, this.naturalHealthRegen, this.knockbackMultiplier, this.items, this.armor, this.enabled, this.autoFood, this.swordShieldBreak, this.blockPlace, this.blockBreak, this.breakPlayerPlacedOnly, this.canBreak, this.pearl, this.totem, this.forceAdventure, this.timeoutSeconds, this.arenas, this.partyArenas, this.startCommands, this.startEffects, this.presetEnabled, this.bedExplosion);
+            return new KitDefinition(this.name, this.displayName, this.icon, this.category, this.ranked, this.ffaEnabled, this.maxHealth, this.naturalHealthRegen, this.knockbackMultiplier, this.items, this.armor, this.enabled, this.autoFood, this.swordShieldBreak, this.blockPlace, this.blockBreak, this.breakPlayerPlacedOnly, this.canBreak, this.pearl, this.totem, this.forceAdventure, this.timeoutSeconds, this.arenas, this.partyArenas, this.startCommands, this.startEffects, this.presetEnabled, this.bedExplosion);
         }
     }
 }

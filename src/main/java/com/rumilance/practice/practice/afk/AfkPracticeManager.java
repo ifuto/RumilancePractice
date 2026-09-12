@@ -2,6 +2,8 @@ package com.rumilance.practice.practice.afk;
 
 import com.rumilance.practice.config.ConfigService;
 import com.rumilance.practice.locale.MessageService;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
+import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
@@ -100,6 +102,7 @@ public final class AfkPracticeManager implements Listener, CommandExecutor {
     private ItemStack[] prototypeKit;                                 // admin-set default kit
     private final Deque<PendingRestore> restores = new ArrayDeque<>();
     private BukkitTask ticker;
+    private java.util.function.Predicate<UUID> otherSessionGuard;
     private int boxSequence = 0;
     private World world;
     private File statsFile;
@@ -119,6 +122,16 @@ public final class AfkPracticeManager implements Listener, CommandExecutor {
         loadKits();
         Bukkit.getPluginManager().registerEvents(this, plugin);
         ticker = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 20L, 20L);
+    }
+
+    /** True while the player owns a room here (used as the cross-room guard). */
+    public boolean hasSession(UUID playerId) {
+        return sessions.containsKey(playerId);
+    }
+
+    /** Set by the bootstrap so the AFK room and the AFK BOT Crystal room never overlap. */
+    public void setOtherSessionGuard(java.util.function.Predicate<UUID> guard) {
+        this.otherSessionGuard = guard;
     }
 
     public void shutdown() {
@@ -170,6 +183,10 @@ public final class AfkPracticeManager implements Listener, CommandExecutor {
     private void beginSession(Player player) {
         if (sessions.containsKey(player.getUniqueId())) {
             msg(player, "afk.already");
+            return;
+        }
+        if (otherSessionGuard != null && otherSessionGuard.test(player.getUniqueId())) {
+            msg(player, "afk.crystal-busy");
             return;
         }
         if (world == null) {
@@ -1171,7 +1188,12 @@ public final class AfkPracticeManager implements Listener, CommandExecutor {
     }
 
     private void msg(Player player, String key, Map<String, String> tags) {
-        player.sendMessage(messages.render(player, key, tags));
+        List<TagResolver> resolvers = new ArrayList<>();
+        for (Map.Entry<String, String> e : tags.entrySet()) {
+            resolvers.add(Placeholder.unparsed(e.getKey(), e.getValue()));
+        }
+        player.sendMessage(messages.render(player, key,
+                resolvers.toArray(new TagResolver[0])));
     }
 
     private Map<String, String> msgTags(String... kv) {

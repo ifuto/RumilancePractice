@@ -23,6 +23,11 @@ commands:
     usage: /afkpractice [start|stop|kit|top]
     aliases: [afk]
     permission: rumilance.user
+  afkcrystal:
+    description: AFK BOT Crystal — armored totem bot on a 100x100 netherite floor.
+    usage: /afkcrystal [start|stop|kit|settings|reset|bindkit|unbindkit]
+    aliases: [afkc]
+    permission: rumilance.user
   duel:
     description: Unranked queue, or challenge a player (GUI / kit).
     usage: /duel [player [kit]|cancel|accept|deny]
@@ -156,7 +161,7 @@ commands:
     usage: /bot
   botadmin:
     description: Bind a bot fight kit to the arena kit hosting its fights.
-    usage: /botadmin <botkit> <arenakit|off>
+    usage: /botadmin <SWORD|MACE|CRYSTAL|NETHERITE_POT|CART|botkit> <kit|arenakit|off>
     permission: rumilance.admin
   team:
     description: Owner-invite style teams with public/private visibility and red-blue team battles.

@@ -416,7 +416,7 @@ public final class TeamConfigGui extends AbstractGui {
 
     /** Cycles to the next (or previous) enabled kit; null current starts with the first. */
     private String nextKit(String currentKitId, int direction) {
-        List<KitDefinition> kits = kitService.enabled();
+        List<KitDefinition> kits = com.rumilance.practice.gui.KitSections.ordered(kitService);
         if (kits.isEmpty()) {
             return null;
         }

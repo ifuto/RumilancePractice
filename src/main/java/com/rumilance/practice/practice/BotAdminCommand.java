@@ -7,7 +7,6 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
-import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -17,10 +16,18 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * {@code /botadmin <botkit> <arenakit>} — binds a bot fight kit to the arena kit whose arenas
- * host the fight (BOT fights are NOT practice rooms: once bound, clicking the bot mode takes
- * the fight straight into that arena kit's arenas). {@code off} removes the binding, no
- * arguments lists the active bindings.
+ * {@code /botadmin} — two binding forms, told apart by the first argument:
+ *
+ * <ol>
+ *   <li><b>/botadmin &lt;SWORD|MACE|CRYSTAL|NETHERITE_POT|CART&gt; &lt;kit|off&gt;</b> — the
+ *   LOADOUT binding the admin actually expects: that bot mode fights with the named server
+ *   kit (applied to the player at match start; the bot wears the matching gear). Same store
+ *   as {@code /practice bindkit}, so the two commands are interchangeable.</li>
+ *   <li><b>/botadmin &lt;botkit&gt; &lt;arenakit|off&gt;</b> — the VENUE binding: fights that
+ *   run with the named bot kit are hosted in the arena kit's arenas (instead of the kit's
+ *   own). Same kit on both sides is allowed and is an explicit no-op.</li>
+ * </ol>
+ * No arguments lists both binding tables.
  */
 public final class BotAdminCommand implements CommandExecutor, TabCompleter {
 
@@ -42,29 +49,63 @@ public final class BotAdminCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         if (args.length == 0) {
-            Map<String, String> bindings = practiceService.botArenaKitBindings();
-            if (bindings.isEmpty()) {
+            Map<String, String> modeBindings = practiceService.botModeKitsView();
+            Map<String, String> arenaBindings = practiceService.botArenaKitBindings();
+            if (modeBindings.isEmpty() && arenaBindings.isEmpty()) {
                 sender.sendMessage(Component.text(
-                        "BOT↔アリーナの紐づけはありません。/botadmin <botkit> <arenakit>", NamedTextColor.YELLOW));
+                        "紐づけはありません。/botadmin <SWORD|MACE|CRYSTAL|NETHERITE_POT|CART> <kit>",
+                        NamedTextColor.YELLOW));
                 return true;
             }
-            sender.sendMessage(Component.text("BOT↔アリーナ紐づけ:", NamedTextColor.GOLD));
-            bindings.forEach((botKit, arenaKit) -> sender.sendMessage(Component.text(
-                    " - " + botKit + " → " + arenaKit, NamedTextColor.YELLOW)));
+            sender.sendMessage(Component.text("BOT戦の紐づけ:", NamedTextColor.GOLD));
+            modeBindings.forEach((mode, kit) -> sender.sendMessage(Component.text(
+                    " - " + mode + " BOT → キット '" + kit + "'（装備）", NamedTextColor.YELLOW)));
+            arenaBindings.forEach((botKit, arenaKit) -> sender.sendMessage(Component.text(
+                    " - " + botKit + " → " + arenaKit + "（開催アリーナ）", NamedTextColor.YELLOW)));
             return true;
         }
         if (args.length == 1) {
             sender.sendMessage(Component.text(
-                    "Usage: /botadmin <botkit> <arenakit|off>", NamedTextColor.YELLOW));
+                    "Usage: /botadmin <SWORD|MACE|CRYSTAL|NETHERITE_POT|CART|botkit> <kit|arenakit|off>",
+                    NamedTextColor.YELLOW));
             return true;
         }
+
+        // ---- form 1: <BOT MODE> <kit|off> — the loadout binding ----
+        PracticeType mode = modeOrNull(args[0]);
+        if (mode != null && mode.botMode()) {
+            if ("off".equalsIgnoreCase(args[1]) || "clear".equalsIgnoreCase(args[1])) {
+                boolean had = practiceService.botKitFor(mode) != null;
+                practiceService.bindBotKit(mode, null);
+                sender.sendMessage(Component.text(had
+                        ? mode + " BOT のキット紐づけを解除しました（モード標準装備に戻ります）。"
+                        : mode + " BOT にはキット紐づけがありません。",
+                        had ? NamedTextColor.YELLOW : NamedTextColor.RED));
+                return true;
+            }
+            String kitName = args[1];
+            if (!kitExists(kitName)) {
+                sender.sendMessage(Component.text(
+                        "キット '" + kitName + "' が見つかりません。", NamedTextColor.RED));
+                return true;
+            }
+            practiceService.bindBotKit(mode, kitName);
+            sender.sendMessage(Component.text(
+                    "紐づけました: " + mode + " BOT → キット '" + kitName
+                            + "'（試合開始時にこのキットを適用。開催地はキットのアリーナ、未設定なら練習部屋）",
+                    NamedTextColor.GREEN));
+            return true;
+        }
+
+        // ---- form 2: <botkit> <arenakit|off> — the venue binding ----
         String botKit = args[0];
         if (!kitExists(botKit)) {
             sender.sendMessage(Component.text(
-                    "BOTキット '" + botKit + "' が見つかりません。", NamedTextColor.RED));
+                    "'" + botKit + "' はBOTモードでもキットでもありません。BOTモード: SWORD, MACE, "
+                            + "CRYSTAL, NETHERITE_POT, CART", NamedTextColor.RED));
             return true;
         }
-        if (args.length >= 2 && "off".equalsIgnoreCase(args[1])) {
+        if ("off".equalsIgnoreCase(args[1])) {
             if (practiceService.clearBotArenaKit(botKit)) {
                 sender.sendMessage(Component.text(
                         botKit + " のアリーナ紐づけを解除しました（Prac部屋/キット自身のアリーナに戻ります）。",
@@ -76,11 +117,8 @@ public final class BotAdminCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         String arenaKit = args[1];
-        if (arenaKit.equalsIgnoreCase(botKit)) {
-            sender.sendMessage(Component.text(
-                    "同じキット同士は紐づけできません（そのままでOK）。", NamedTextColor.RED));
-            return true;
-        }
+        // Same kit is ALLOWED (e.g. /botadmin mace mace): an explicit no-op binding — the
+        // fight loadout stays the bot kit and the venue is the kit's own arenas.
         if (!kitExists(arenaKit)) {
             sender.sendMessage(Component.text(
                     "アリーナキット '" + arenaKit + "' が見つかりません。", NamedTextColor.RED));
@@ -96,10 +134,23 @@ public final class BotAdminCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         practiceService.setBotArenaKit(botKit, arenaKit);
+        boolean same = arenaKit.equalsIgnoreCase(botKit);
         sender.sendMessage(Component.text(
                 "紐づけました: " + botKit + " → " + arenaKit + "（アリーナ" + arenas.size()
-                        + "件。このBOT対戦はそのアリーナで開催されます）", NamedTextColor.GREEN));
+                        + "件。このBOT対戦はそのアリーナで開催されます"
+                        + (same ? "。同一キットなので装備もこのキットのままです" : "") + "）",
+                NamedTextColor.GREEN));
         return true;
+    }
+
+    /** {@code SWORD}/{@code MACE}/… as a bot mode, or {@code null} when it is not one. */
+    private static PracticeType modeOrNull(String raw) {
+        try {
+            PracticeType type = PracticeType.parse(raw);
+            return type.botMode() ? type : null;
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     private boolean kitExists(String name) {
@@ -109,23 +160,32 @@ public final class BotAdminCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command,
                                       @NotNull String alias, @NotNull String[] args) {
-        if (!(sender instanceof Player) || !sender.hasPermission(PERMISSION)) {
+        if (!sender.hasPermission(PERMISSION)) {
             return List.of();
         }
         List<String> kits = kitService == null ? List.of()
                 : kitService.all().stream()
                         .map(com.rumilance.practice.model.KitDefinition::name)
+                        .sorted(String.CASE_INSENSITIVE_ORDER)
                         .collect(Collectors.toCollection(ArrayList::new));
         if (args.length == 1) {
-            String prefix = args[0].toLowerCase(Locale.ROOT);
-            return kits.stream().filter(k -> k.toLowerCase(Locale.ROOT).startsWith(prefix)).toList();
+            List<String> options = new ArrayList<>(List.of(
+                    "SWORD", "MACE", "CRYSTAL", "NETHERITE_POT", "CART"));
+            options.addAll(kits);
+            return filter(args[0], options);
         }
         if (args.length == 2) {
-            String prefix = args[1].toLowerCase(Locale.ROOT);
             List<String> options = new ArrayList<>(kits);
             options.add("off");
-            return options.stream().filter(k -> k.toLowerCase(Locale.ROOT).startsWith(prefix)).toList();
+            return filter(args[1], options);
         }
         return List.of();
+    }
+
+    private static List<String> filter(String prefix, List<String> options) {
+        String p = prefix.toLowerCase(Locale.ROOT);
+        return options.stream()
+                .filter(o -> o.toLowerCase(Locale.ROOT).startsWith(p))
+                .toList();
     }
 }

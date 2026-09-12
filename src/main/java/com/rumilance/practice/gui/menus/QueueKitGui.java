@@ -95,8 +95,34 @@ public final class QueueKitGui extends AbstractGui {
         paintFrame(player, session, inventory);
 
         List<KitDefinition> kits = kitService.enabled();
+        // Two labelled sections: row 1 = Main Kits (azalea header), row 2 = Sub Kits
+        // (iron-trapdoor header); rows 3-4 continue the Main line-up when it is long.
+        List<KitDefinition> main = kitService.enabled(com.rumilance.practice.model.KitCategory.MAIN);
+        List<KitDefinition> sub = kitService.enabled(com.rumilance.practice.model.KitCategory.SUB);
         int index = 0;
-        for (KitDefinition kit : kits) {
+        inventory.setItem(MenuScaffold.gridSlot(index++),
+                com.rumilance.practice.gui.KitSections.header(
+                        com.rumilance.practice.model.KitCategory.MAIN, main.size(),
+                        line(player, "gui.queue-join-hint")));
+        for (KitDefinition kit : main) {
+            if (index >= 7) {
+                break; // row 1: header column + up to 6 main kits
+            }
+            inventory.setItem(MenuScaffold.gridSlot(index++), kitIcon(player, kit));
+        }
+        if (!sub.isEmpty()) {
+            inventory.setItem(MenuScaffold.gridSlot(index++),
+                    com.rumilance.practice.gui.KitSections.header(
+                            com.rumilance.practice.model.KitCategory.SUB, sub.size(),
+                            line(player, "gui.queue-join-hint")));
+            for (KitDefinition kit : sub) {
+                if (index >= 14) {
+                    break; // row 2: header column + up to 6 sub kits
+                }
+                inventory.setItem(MenuScaffold.gridSlot(index++), kitIcon(player, kit));
+            }
+        }
+        for (KitDefinition kit : main.subList(Math.min(6, main.size()), main.size())) {
             if (index >= MenuScaffold.gridPageSize()) {
                 break;
             }

@@ -57,9 +57,31 @@ public final class SignKitSelectGui extends AbstractGui {
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
         paintFrame(player, session, inventory);
-        List<KitDefinition> kits = kitService.enabled();
+        // Two labelled sections, matching the other kit pickers: row 1 = Main Kits
+        // (azalea header), row 2 = Sub Kits (iron-trapdoor header), rows 3-4 continue Main.
+        List<KitDefinition> main = kitService.enabled(com.rumilance.practice.model.KitCategory.MAIN);
+        List<KitDefinition> sub = kitService.enabled(com.rumilance.practice.model.KitCategory.SUB);
         int index = 0;
-        for (KitDefinition kit : kits) {
+        inventory.setItem(MenuScaffold.gridSlot(index++), com.rumilance.practice.gui.KitSections.header(
+                com.rumilance.practice.model.KitCategory.MAIN, main.size(), line(player, "menu.click")));
+        for (KitDefinition kit : main) {
+            if (index >= com.rumilance.practice.gui.KitSections.ROW1_END) {
+                break;
+            }
+            inventory.setItem(MenuScaffold.gridSlot(index++), kitTile(player, kit));
+        }
+        if (!sub.isEmpty()) {
+            inventory.setItem(MenuScaffold.gridSlot(index++), com.rumilance.practice.gui.KitSections.header(
+                    com.rumilance.practice.model.KitCategory.SUB, sub.size(), line(player, "menu.click")));
+            for (KitDefinition kit : sub) {
+                if (index >= com.rumilance.practice.gui.KitSections.ROW2_END) {
+                    break;
+                }
+                inventory.setItem(MenuScaffold.gridSlot(index++), kitTile(player, kit));
+            }
+        }
+        for (KitDefinition kit : main.subList(Math.min(
+                com.rumilance.practice.gui.KitSections.PER_ROW, main.size()), main.size())) {
             if (index >= MenuScaffold.gridPageSize()) {
                 break;
             }

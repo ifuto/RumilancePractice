@@ -93,7 +93,7 @@ public final class StatsKitGui extends AbstractGui {
                         .action("decorate")
                         .build());
 
-        List<KitDefinition> kits = kitService.enabled();
+        List<KitDefinition> kits = com.rumilance.practice.gui.KitSections.ordered(kitService);
         int perPage = MenuScaffold.gridPageSize();
         int page = session.page();
         int offset = page * perPage;
