@@ -41,7 +41,7 @@ public final class CrystalKitSlotsGui extends AbstractGui {
     private EditKitGui editKitGui;
     private EkitSelectGui ekitSelectGui;
 
-    /** Kit id handed to {@link #open(Player, String)} and parked until the session exists. */
+    /** Kit id handed to openPicker and parked until the session exists. */
     private String pendingKitId;
 
     public CrystalKitSlotsGui(GuiSessionRegistry registry, SoundService sounds,
@@ -63,7 +63,7 @@ public final class CrystalKitSlotsGui extends AbstractGui {
     }
 
     /** Opens the picker for one kit (the kit must be the declared crystal FFA kit). */
-    public void open(Player player, String kitId) {
+    public void openPicker(Player player, String kitId) {
         this.pendingKitId = kitId;
         open(player);
     }
@@ -124,7 +124,7 @@ public final class CrystalKitSlotsGui extends AbstractGui {
             inventory.setItem(GuiSlots.slot(2, col), filler(Material.GLASS_PANE));
         }
         inventory.setItem(GuiSlots.slot(2, 4),
-                ItemBuilder.of(Material.EYE_OF_ENDER)
+                ItemBuilder.of(Material.ENDER_EYE)
                         .name(Component.text("Edit Kit", NamedTextColor.AQUA, TextDecoration.BOLD)
                                 .decoration(TextDecoration.ITALIC, false))
                         .lore(

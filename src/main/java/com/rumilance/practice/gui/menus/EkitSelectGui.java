@@ -133,7 +133,7 @@ public final class EkitSelectGui extends AbstractGui {
             // the plain editor: each slot keeps its own layout of the same kit.
             boolean crystal = kitService.get(kitId).map(KitDefinition::crystalFfa).orElse(false);
             if (crystal && crystalKitSlotsGui != null) {
-                crystalKitSlotsGui.open(player, kitId);
+                crystalKitSlotsGui.openPicker(player, kitId);
             } else if (editKitGui != null) {
                 editKitGui.openKitEditor(player, kitId);
             }
