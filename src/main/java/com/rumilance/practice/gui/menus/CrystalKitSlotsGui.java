@@ -44,9 +44,12 @@ public final class CrystalKitSlotsGui extends AbstractGui {
     /** Kit id handed to openPicker and parked until the session exists. */
     private String pendingKitId;
 
-    public CrystalKitSlotsGui(GuiSessionRegistry registry, SoundService sounds,
-                              KitService kitService, KitLayoutRepository layoutRepository,
-                              KitLayoutCache layoutCache, CrystalFfaStore store) {
+    public CrystalKitSlotsGui(com.rumilance.practice.gui.GuiSessionRegistry registry,
+                              com.rumilance.practice.sound.SoundService sounds,
+                              com.rumilance.practice.kit.KitService kitService,
+                              com.rumilance.practice.database.repository.KitLayoutRepository layoutRepository,
+                              com.rumilance.practice.kit.KitLayoutCache layoutCache,
+                              com.rumilance.practice.kit.CrystalFfaStore store) {
         super(registry, sounds, GuiType.CRYSTAL_KIT_SLOTS, 4, false);
         this.kitService = kitService;
         this.layoutRepository = layoutRepository;
