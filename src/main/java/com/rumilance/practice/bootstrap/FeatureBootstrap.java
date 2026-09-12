@@ -250,6 +250,7 @@ public final class FeatureBootstrap {
     private MatchActionRecorder matchActionRecorder;
     private ReplayService replayService;
     private PracticeService practiceService;
+    private com.rumilance.practice.practice.afk.AfkPracticeManager afkPracticeManager;
     private TeamGlowLosService teamGlowLosService;
 
     public FeatureBootstrap(RumilancePractice plugin, ServiceRegistry services) {
@@ -462,6 +463,12 @@ public final class FeatureBootstrap {
                 asyncExecutor, practiceCloneService, services.get(MessageService.class));
         practiceService.start();
         services.register(PracticeService.class, practiceService);
+
+        afkPracticeManager = new com.rumilance.practice.practice.afk.AfkPracticeManager(
+                plugin, configService, services.get(MessageService.class));
+        afkPracticeManager.start();
+        services.register(com.rumilance.practice.practice.afk.AfkPracticeManager.class, afkPracticeManager);
+        bind("afkpractice", afkPracticeManager);
 
         SightSettings sightSettings = SightSettings.from(configService.config());
         services.register(SightSettings.class, sightSettings);
@@ -1638,6 +1645,9 @@ public final class FeatureBootstrap {
     }
 
     public void disable() {
+        if (afkPracticeManager != null) {
+            afkPracticeManager.shutdown();
+        }
         if (queueCoordinator != null) {
             queueCoordinator.stop();
         }

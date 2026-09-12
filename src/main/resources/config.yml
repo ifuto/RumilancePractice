@@ -353,3 +353,8 @@ sign-guard:
       - "Sodium|sodium.options.buttons.donate|TRANSLATE"
       - "Iris Shaders|options.iris.shaderPackSelection|TRANSLATE"
       - "Just Enough Items|key.jei.toggleOverlay|KEYBIND"
+
+# AFK practice (never-ending solo duel vs the totem bot)
+afk:
+  # Cosmetic ancient-debris blocks scattered around the floor rim on every (re)build.
+  netherite-ore-pool: 6

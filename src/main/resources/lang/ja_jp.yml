@@ -1295,3 +1295,24 @@ tier:
   unranked-progress: "<gray>各キット <yellow><n></yellow> 戦でプレースメント開始。"
   bands-title: "<gold>ティア・ラダー（各キットのランク戦プレイヤー上位%）:"
   hint: "<gray>ティアはキット別・対人戦成績（そのキットのランクELO）で決定。順位は HT1>LT1>HT2>…>LT5、HT1 = 上位0.1%。"
+
+# --- AFK practice ---
+afk:
+  welcome: "<gold>[AFK練習]</gold> <yellow>9x9ネザライト床・中央ボタンの部屋へようこそ。</yellow><newline><gray>床のボタン(またはスロット9のボタン)でキットメニュー。メニューを開く度に12個のアイテムがランダム補充されます。</gray><newline><gray>キットに無いトーテムは再装備で0になります。床は24時間毎に再生成されます。</gray>"
+  already: "<gold>[AFK練習]</gold> <red>すでにAFK練習中です。/afkpractice stop で終了できます。</red>"
+  stopped: "<gold>[AFK練習]</gold> <yellow>AFK練習を終了しました。</yellow>"
+  not-in-session: "<gold>[AFK練習]</gold> <red>AFK練習を開始していません。/afkpractice start</red>"
+  usage: "<gold>[AFK練習]</gold> <yellow>/afkpractice [start|stop|kit|top]</yellow>"
+  boundary: "<gold>[AFK練習]</gold> <red>キューブの外には出られません。中央へ戻ります。</red>"
+  protected: "<gold>[AFK練習]</gold> <red>ネザライト床・ボタン・墓標ビーコンは破壊できません。</red>"
+  kit-saved: "<gold>[AFK練習]</gold> <green>キットを保存して装備しました。</green>"
+  prototype-saved: "<gold>[AFK練習]</gold> <light_purple>サーバー既定キット(プロトタイプ)を保存しました。</light_purple>"
+  prototype-loaded: "<gold>[AFK練習]</gold> <aqua>既定キットを読み込みました。</aqua>"
+  bot-failed: "<gold>[AFK練習]</gold> <red>BOTの出現に失敗しました。</red>"
+  bot-killed: "<gold>[AFK練習]</gold> <green>BOTを倒しました! <gray>(通算キル: <kills>)</gray></green>"
+  you-died: "<gold>[AFK練習]</gold> <red>死亡…墓標ビーコンが増えました <gray>(通算デス: <deaths>)</gray></red>"
+  inactive-death: "<gold>[AFK練習]</gold> <dark_red>10分間ダメージのやり取りが無かったため、切断と同様に死亡判定となりました。</dark_red>"
+  top-header: "<gold>--- AFK練習 キル数トップ ---</gold>"
+  top-row: "<yellow><player></yellow> <gray>キル:</gray><green><kills></green> <gray>デス:</gray><red><deaths></red>"
+  top-self: "<gray>あなた: キル </gray><green><kills></green><gray> / デス </gray><red><deaths></red>"
+

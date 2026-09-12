@@ -18,6 +18,11 @@ softdepend:
   - GSit
 
 commands:
+  afkpractice:
+    description: AFK practice — endless duel vs the totem bot.
+    usage: /afkpractice [start|stop|kit|top]
+    aliases: [afk]
+    permission: rumilance.user
   duel:
     description: Unranked queue, or challenge a player (GUI / kit).
     usage: /duel [player [kit]|cancel|accept|deny]

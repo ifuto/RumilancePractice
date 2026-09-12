@@ -1293,3 +1293,24 @@ tier:
   unranked-progress: "<gray>Each kit needs <yellow><n></yellow> ranked matches to place."
   bands-title: "<gold>Tier ladder (share of each kit’s ranked players):"
   hint: "<gray>Tiers are per kit, from real PvP (that kit’s ranked ELO). HT1 = top 0.1% — one in a thousand."
+
+# --- AFK practice ---
+afk:
+  welcome: "<gold>[AFK]</gold> <yellow>Welcome to the 9x9 netherite-floor room.</yellow><newline><gray>Click the floor button (or hotbar slot 9) for the kit menu; each open restocks 12 random items. Totems outside your kit are zeroed on re-equip. The floor rebuilds every 24h.</gray>"
+  already: "<gold>[AFK]</gold> <red>You are already in AFK practice. /afkpractice stop to leave.</red>"
+  stopped: "<gold>[AFK]</gold> <yellow>AFK practice ended.</yellow>"
+  not-in-session: "<gold>[AFK]</gold> <red>No AFK session. Use /afkpractice start</red>"
+  usage: "<gold>[AFK]</gold> <yellow>/afkpractice [start|stop|kit|top]</yellow>"
+  boundary: "<gold>[AFK]</gold> <red>You cannot leave the cube. Returning to the centre.</red>"
+  protected: "<gold>[AFK]</gold> <red>The netherite floor, button and grave beacons are protected.</red>"
+  kit-saved: "<gold>[AFK]</gold> <green>Kit saved and equipped.</green>"
+  prototype-saved: "<gold>[AFK]</gold> <light_purple>Server prototype kit saved.</light_purple>"
+  prototype-loaded: "<gold>[AFK]</gold> <aqua>Prototype kit loaded.</aqua>"
+  bot-failed: "<gold>[AFK]</gold> <red>Failed to spawn the bot.</red>"
+  bot-killed: "<gold>[AFK]</gold> <green>Bot slain! <gray>(total kills: <kills>)</gray></green>"
+  you-died: "<gold>[AFK]</gold> <red>You died - another grave beacon. <gray>(total deaths: <deaths>)</gray></red>"
+  inactive-death: "<gold>[AFK]</gold> <dark_red>No damage exchanged for 10 minutes - judged dead like a disconnect.</dark_red>"
+  top-header: "<gold>--- AFK practice kill top ---</gold>"
+  top-row: "<yellow><player></yellow> <gray>kills:</gray><green><kills></green> <gray>deaths:</gray><red><deaths></red>"
+  top-self: "<gray>You: kills </gray><green><kills></green><gray> / deaths </gray><red><deaths></red>"
+
