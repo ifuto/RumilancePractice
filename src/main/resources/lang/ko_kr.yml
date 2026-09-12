@@ -2,6 +2,7 @@
 welcome:
   subtitle: "<yellow>환영합니다"
   record-tip: "<yellow>경기를 녹화하세요. 클립은 부정행위 신고의 가장 강력한 증거입니다."
+  discord-tip: "<gray>버그 신고와 개선 아이디어는 Discord에서 보귌 수 있습니다. <click:open_url:'https://discord.gg/uVB6vkTdhS'><hover:show_text:'Discord 열기'><aqua><underlined>discord.gg/uVB6vkTdhS</underlined></aqua></hover></click></gray>"
 
 menu:
   game-title: "게임 메뉴"

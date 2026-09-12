@@ -265,6 +265,11 @@ public final class MatchService {
     private com.rumilance.practice.ffa.FfaService ffaService;
     private com.rumilance.practice.combat.CombatNetTracker combatNet;
     private com.rumilance.practice.originalkit.OriginalKitService originalKitService;
+    private com.rumilance.practice.gui.menus.EditKitGui editKitGui;
+
+    public void setEditKitGui(com.rumilance.practice.gui.menus.EditKitGui editKitGui) {
+        this.editKitGui = editKitGui;
+    }
     private com.rumilance.practice.database.repository.DailyRankedStatsRepository dailyStatsRepository;
 
     public void setOriginalKitService(com.rumilance.practice.originalkit.OriginalKitService originalKitService) {
@@ -2603,6 +2608,14 @@ public final class MatchService {
         try {
             if (originalKitService != null) {
                 originalKitService.forceSaveAndExitForMatch(player);
+            }
+        } catch (RuntimeException ignored) {
+        }
+        // Main kit editor too: a match/pull while editing force-saves the draft (player
+        // sees the saved toast) and closes the window — edits are never eaten.
+        try {
+            if (editKitGui != null) {
+                editKitGui.forceSaveForMatch(player);
             }
         } catch (RuntimeException ignored) {
         }

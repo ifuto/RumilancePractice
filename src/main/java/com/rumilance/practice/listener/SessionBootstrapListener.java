@@ -164,6 +164,7 @@ public final class SessionBootstrapListener implements Listener {
                     WelcomeTitle.play(plugin, player,
                             messageService.render(messageService.resolveLocale(player), "welcome.subtitle"));
                     messageService.sendRaw(player, "welcome.record-tip");
+                    messageService.sendRaw(player, "welcome.discord-tip");
                 } catch (Exception e) {
                     WelcomeTitle.play(plugin, player);
                 }

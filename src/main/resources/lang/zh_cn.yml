@@ -2,6 +2,7 @@
 welcome:
   subtitle: "<yellow>欢迎"
   record-tip: "<yellow>录制你的对局。录像是举报作弊者最有力的证据。"
+  discord-tip: "<gray>BUG 报告和改进建议都可以在 Discord 上提交。 <click:open_url:'https://discord.gg/uVB6vkTdhS'><hover:show_text:'打开 Discord'><aqua><underlined>discord.gg/uVB6vkTdhS</underlined></aqua></hover></click></gray>"
 
 menu:
   game-title: "游戏菜单"

@@ -92,6 +92,11 @@ public final class TeamService {
     private volatile String lastSelfBusyStateKey;
 
     private com.rumilance.practice.originalkit.OriginalKitService originalKitService;
+    private com.rumilance.practice.gui.menus.EditKitGui editKitGui;
+
+    public void setEditKitGui(com.rumilance.practice.gui.menus.EditKitGui editKitGui) {
+        this.editKitGui = editKitGui;
+    }
 
     public void setStateManager(com.rumilance.practice.session.PlayerStateManager stateManager) {
         this.stateManager = stateManager;
@@ -638,6 +643,9 @@ public final class TeamService {
                 // the edit room and return the member to the lobby, then fight.
                 if (originalKitService != null) {
                     originalKitService.forceSaveAndExitForMatch(member);
+                }
+                if (editKitGui != null) {
+                    editKitGui.forceSaveForMatch(member);
                 }
                 if (stateManager != null) {
                     stateManager.resetToLobby(memberId);

@@ -126,6 +126,32 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         reopenWithLayout(player, snapshot.kitId(), snapshot.layout());
     }
 
+    /**
+     * Emergency save when a match/party pulls an editing player out of the kit editor -
+     * the main GUI twin of {@code OriginalKitService#forceSaveAndExitForMatch}. The draft
+     * persists through the normal save path (with the "kit-saved" toast, so the player SEES
+     * the pull did not eat their edit), the lobby inventory comes back, the overlay stash is
+     * cleared, and the editor session + window close cleanly. No-op for picker-mode opens
+     * (they hold no layout) or players not in the editor at all.
+     */
+    public void forceSaveForMatch(Player player) {
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+        GuiSession session = registry.get(player.getUniqueId()).orElse(null);
+        if (session == null || session.type() != type()
+                || !"edit".equals(session.get("mode", String.class))) {
+            return;
+        }
+        persistLayout(player, session, true);
+        restoreLobbyHands(player);
+        if (kitEditStash != null) {
+            kitEditStash.clear(player.getUniqueId());
+        }
+        registry.close(player.getUniqueId());
+        player.closeInventory();
+    }
+
     public EditKitGui(
             GuiSessionRegistry registry,
             SoundService sounds,

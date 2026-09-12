@@ -2,6 +2,7 @@
 welcome:
   subtitle: "<yellow>Welcome"
   record-tip: "<yellow>Record your fights. Clips are the best evidence against cheaters."
+  discord-tip: "<gray>Bug reports and improvement ideas can be shared on Discord. <click:open_url:'https://discord.gg/uVB6vkTdhS'><hover:show_text:'Open Discord'><aqua><underlined>discord.gg/uVB6vkTdhS</underlined></aqua></hover></click></gray>"
 
 menu:
   game-title: "Game Menu"

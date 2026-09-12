@@ -3,6 +3,7 @@
 welcome:
   subtitle: "<yellow>ようこそ"
   record-tip: "<yellow>対戦は録画をおすすめします。不正の証拠になります。"
+  discord-tip: "<gray>バグの報告や改善案はDiscordにて報告可能です。 <click:open_url:'https://discord.gg/uVB6vkTdhS'><hover:show_text:'Discordを開く'><aqua><underlined>discord.gg/uVB6vkTdhS</underlined></aqua></hover></click></gray>"
 
 menu:
   game-title: "ゲームメニュー"

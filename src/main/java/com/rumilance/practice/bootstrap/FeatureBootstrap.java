@@ -804,6 +804,8 @@ public final class FeatureBootstrap {
         services.register(com.rumilance.practice.originalkit.OriginalKitRoomService.class, originalKitRoomService);
         originalKitService.setRoomService(originalKitRoomService);
         matchService.setOriginalKitService(originalKitService);
+        matchService.setEditKitGui(editKitGui);
+        teamService.setEditKitGui(editKitGui);
         // Party battles may fight with the owner's original kit as the shared loadout.
         teamKitSelectGui.setOriginalKitService(originalKitService);
         // Party start force-saves any member still editing a kit (never blocks the start).
