@@ -40,6 +40,12 @@ public final class PracticeTntListener implements Listener {
     private final Plugin plugin;
     private final NamespacedKey lockedFuseKey;
     private volatile com.rumilance.practice.combat.ExplosionSelfDamageListener selfDamage;
+    private volatile com.rumilance.practice.combat.ExplosionSourceTracker explosionSources;
+
+    public void setExplosionSourceTracker(
+            com.rumilance.practice.combat.ExplosionSourceTracker tracker) {
+        this.explosionSources = tracker;
+    }
 
     public PracticeTntListener(PracticeTntSettings settings, MatchService matchService, FfaService ffaService,
                                Plugin plugin) {
@@ -166,14 +172,15 @@ public final class PracticeTntListener implements Listener {
                         if (world.getDifficulty() != org.bukkit.Difficulty.HARD) {
                             world.setDifficulty(org.bukkit.Difficulty.HARD);
                         }
-                        // Vanilla never damages the explosion's source entity (Paper #11167), so
-                        // createExplosion(..., source) alone would leave the igniter unharmed by
-                        // their own creeper. Record the blast so the igniter's skipped share of
-                        // the damage/knockback is restored a tick later.
-                        if (selfDamage != null && source != null) {
-                            selfDamage.rememberPluginBlast(at, power, source.getUniqueId());
+                        // Source-less blast: paper exempts the explosion's source entity
+                        // (PaperMC/Paper#11167), so a source-bearing blast would spare the
+                        // igniter. With no source the creeper blast hurts everyone in radius -
+                        // igniter included, like vanilla - while kill attribution rides on the
+                        // recorded blast owner (ExplosionSourceTracker).
+                        if (explosionSources != null && source != null) {
+                            explosionSources.recordBlastOwner(at, source.getUniqueId());
                         }
-                        world.createExplosion(at, power, false, true, source);
+                        world.createExplosion(at, power, false, true, null);
                     }
             }
         }, delay);

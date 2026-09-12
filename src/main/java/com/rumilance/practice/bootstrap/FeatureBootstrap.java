@@ -1306,12 +1306,15 @@ public final class FeatureBootstrap {
         com.rumilance.practice.combat.ExplosionSelfDamageListener explosionSelfDamage =
                 new com.rumilance.practice.combat.ExplosionSelfDamageListener(plugin);
         practiceTntListener.setSelfDamage(explosionSelfDamage);
+        practiceTntListener.setExplosionSourceTracker(explosionSources);
         pm.registerEvents(explosionSelfDamage, plugin);
         // "Bed Explosion" kit rule (/kit -> item rules): a bed placed in the fight detonates on
         // right click like a Nether / End bed (power 5, clicker takes the self-blast too).
         com.rumilance.practice.combat.BedExplosionListener bedExplosion =
-                new com.rumilance.practice.combat.BedExplosionListener();
-        bedExplosion.setSelfDamage(explosionSelfDamage);
+                new com.rumilance.practice.combat.BedExplosionListener(explosionSources);
+        // Your own crystal hurts you again: player-caused crystal blasts are re-detonated
+        // source-less so nobody is exempt (vanilla self-blast), owner recorded for kill credit.
+        pm.registerEvents(new com.rumilance.practice.combat.CrystalSelfBlastListener(explosionSources), plugin);
         bedExplosion.addContext(new com.rumilance.practice.combat.BedExplosionListener.Context(
                 id -> {
                     com.rumilance.practice.session.MatchSession s =

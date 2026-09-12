@@ -41,6 +41,12 @@ public final class BedExplosionListener implements Listener {
     /** Vanilla bed blast power (minecraft.wiki: beds in the Nether/End = 5). */
     public static final float BED_POWER = ExplosionPhysics.BED_POWER;
 
+    private final ExplosionSourceTracker explosionSources;
+
+    public BedExplosionListener(ExplosionSourceTracker explosionSources) {
+        this.explosionSources = explosionSources;
+    }
+
     /**
      * One context the rule can fire in.
      *
@@ -51,8 +57,6 @@ public final class BedExplosionListener implements Listener {
     }
 
     private final java.util.List<Context> contexts = new java.util.concurrent.CopyOnWriteArrayList<>();
-    /** Optional hook so the blast can restore the clicker's skipped self-damage. */
-    private volatile ExplosionSelfDamageListener selfDamage;
 
     public BedExplosionListener addContext(Context context) {
         if (context != null) {
@@ -61,9 +65,6 @@ public final class BedExplosionListener implements Listener {
         return this;
     }
 
-    public void setSelfDamage(ExplosionSelfDamageListener selfDamage) {
-        this.selfDamage = selfDamage;
-    }
 
     /** Kit rule lookup used by {@link com.rumilance.practice.util.KitBlockRules} callers/tests. */
     public static boolean enabledFor(KitDefinition kit) {
@@ -118,12 +119,12 @@ public final class BedExplosionListener implements Listener {
             other.setType(Material.AIR, false);
         }
         block.setType(Material.AIR, false);
-        if (selfDamage != null) {
-            // Vanilla skips the explosion's source entity: remember the clicker so their own
-            // blast damage + knockback is restored a tick later (crystal-style bed bombing).
-            selfDamage.rememberPluginBlast(center, BED_POWER, player.getUniqueId());
-        }
-        world.createExplosion(center, BED_POWER, false, false, player);
+        // Source-less blast: paper exempts the explosion's source entity (PaperMC/Paper#11167),
+        // so a source-bearing blast would leave the clicker unharmed. With no source the bed
+        // bomb hurts everyone in radius - clicker included, exactly like a real Nether bed.
+        // Ownership is recorded for kill attribution (ExplosionSourceTracker).
+        explosionSources.recordBlastOwner(center, player.getUniqueId());
+        world.createExplosion(center, BED_POWER, false, false, null);
     }
 
     /** Vanilla {@code BedBlock#getConnectedDirection}: head → behind, foot → ahead. */

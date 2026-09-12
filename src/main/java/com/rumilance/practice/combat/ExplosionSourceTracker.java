@@ -36,8 +36,61 @@ public final class ExplosionSourceTracker implements Listener {
 
     private final NamespacedKey ownerKey;
 
+    /** How long a source-less blast remembers its owner (kill attribution window). */
+    private static final long BLAST_OWNER_TTL_MS = 4_000L;
+    /** Source-less explosions (bed bombs, converted crystal blasts) remember their owner so
+     * kill credit still works even though the damage event carries no damager entity. */
+    private final java.util.Map<String, BlastOwner> blastOwners = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private record BlastOwner(java.util.UUID playerId, long atMillis,
+                              org.bukkit.World world, double x, double y, double z) {
+    }
+
     public ExplosionSourceTracker(Plugin plugin) {
         this.ownerKey = new NamespacedKey(PluginIdentity.PDC_NAMESPACE, "explosion_owner");
+    }
+
+    /** Record who is responsible for a source-less blast about to be created at {@code at}. */
+    public void recordBlastOwner(org.bukkit.Location at, java.util.UUID playerId) {
+        if (at == null || at.getWorld() == null || playerId == null) {
+            return;
+        }
+        String key = at.getWorld().getName() + "|" + at.getBlockX() + "|" + at.getBlockY()
+                + "|" + at.getBlockZ();
+        blastOwners.put(key, new BlastOwner(playerId, System.currentTimeMillis(),
+                at.getWorld(), at.getX(), at.getY(), at.getZ()));
+        if (blastOwners.size() > 256) {
+            long cutoff = System.currentTimeMillis() - BLAST_OWNER_TTL_MS;
+            blastOwners.values().removeIf(o -> o.atMillis() < cutoff);
+        }
+    }
+
+    /** Owner of the closest recent recorded blast to {@code near}, or null. */
+    private java.util.UUID lookupBlastOwner(org.bukkit.Location near) {
+        if (near == null || near.getWorld() == null) {
+            return null;
+        }
+        long now = System.currentTimeMillis();
+        BlastOwner best = null;
+        double bestDist = Double.MAX_VALUE;
+        for (BlastOwner owner : blastOwners.values()) {
+            if (now - owner.atMillis() > BLAST_OWNER_TTL_MS) {
+                continue;
+            }
+            if (!near.getWorld().equals(owner.world())) {
+                continue;
+            }
+            double dx = near.getX() - owner.x();
+            double dy = near.getY() - owner.y();
+            double dz = near.getZ() - owner.z();
+            double dist = dx * dx + dy * dy + dz * dz;
+            // Biggest blast here is crystal power 6 -> damage radius ~7.8 blocks.
+            if (dist <= 8.5d * 8.5d && dist < bestDist) {
+                bestDist = dist;
+                best = owner;
+            }
+        }
+        return best == null ? null : best.playerId();
     }
 
     /** Stamp an end crystal with the player who placed it. */
@@ -68,8 +121,9 @@ public final class ExplosionSourceTracker implements Listener {
             return null;
         }
         if (!(event instanceof EntityDamageByEntityEvent byEntity)) {
-            // Respawn-anchor / bed block explosion: no entity owner tracked yet.
-            return null;
+            // Source-less blasts (converted crystal blasts / bed bombs / guest TNT): ownership
+            // was recorded where the blast was created.
+            return lookupBlastOwner(event.getEntity().getLocation());
         }
         Entity damager = byEntity.getDamager();
         if (damager instanceof TNTPrimed tnt && tnt.getSource() instanceof Player source) {
@@ -84,7 +138,7 @@ public final class ExplosionSourceTracker implements Listener {
         return null;
     }
 
-    private UUID ownerOf(Entity entity) {
+    public UUID ownerOf(Entity entity) {
         if (entity == null) {
             return null;
         }
