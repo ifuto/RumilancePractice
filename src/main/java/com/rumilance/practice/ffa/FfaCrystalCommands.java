@@ -11,6 +11,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.potion.PotionEffect;
 import net.kyori.adventure.text.Component;
+import org.jetbrains.annotations.NotNull;
 import net.kyori.adventure.text.format.NamedTextColor;
 
 import java.util.List;
@@ -111,7 +112,7 @@ public final class FfaCrystalCommands implements CommandExecutor, TabCompleter {
 
     /** No arguments anywhere in this family — swallow vanilla's player-name completion. */
     @Override
-    public java.util.@NotNull List<String> onTabComplete(@NotNull CommandSender sender,
+    public @NotNull List<String> onTabComplete(@NotNull CommandSender sender,
                                                          @NotNull Command command,
                                                          @NotNull String alias,
                                                          @NotNull String[] args) {
