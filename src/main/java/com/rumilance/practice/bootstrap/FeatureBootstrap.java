@@ -1341,9 +1341,12 @@ public final class FeatureBootstrap {
         PracticeTntListener practiceTntListener =
                 new PracticeTntListener(practiceTnt, matchService, ffaService, plugin);
         practiceTntListener.setExplosionSourceTracker(explosionSources);
-        // Self-damage is vanilla's job: MC-11154 (explosions sparing their source) is resolved,
-        // so crystal / creeper / TNT blasts hurt their detonator natively. No hand-rolled
-        // restore listeners — kill attribution rides on ExplosionSourceTracker's PDC stamps.
+        // Self-damage: Paper never damages an explosion's source entity (PaperMC/Paper#11167,
+        // intended) and passes the punching player as the crystal blast's source — so crystal
+        // self-damage needs the hit -> source-less re-detonation conversion. Creepers
+        // (Creeper#explode) and TNT stay pure vanilla: their source is the mob/block entity
+        // itself, the igniter is never exempt.
+        pm.registerEvents(new com.rumilance.practice.combat.CrystalSelfBlastListener(explosionSources), plugin);
         // "Bed Explosion" kit rule (/kit -> item rules): a bed placed in the fight detonates on
         // right click like a Nether / End bed (power 5, clicker takes the self-blast too).
         com.rumilance.practice.combat.BedExplosionListener bedExplosion =
