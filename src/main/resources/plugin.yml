@@ -124,6 +124,18 @@ commands:
     description: Open FFA list GUI or manage FFA arenas.
     usage: /ffa [draft|pos1|pos2|selection|spawn|deletespawn|kit|save|enable|disable|delete|reset|resettime|leave]
     permission: rumilance.user
+  regear:
+    description: Crystal FFA only, out of combat - refill consumables from your last selected KIT slot (no armor/totems).
+    usage: /regear
+    permission: rumilance.user
+  repair:
+    description: Crystal FFA only, out of combat - restore the held item's durability to full.
+    usage: /repair
+    permission: rumilance.user
+  heal:
+    description: Crystal FFA only, out of combat - max health, extinguish fire, clear all potion effects.
+    usage: /heal
+    permission: rumilance.user
   tpa:
     description: Ask a player in your FFA arena to teleport you to them (needs the arena's TPA setting).
     usage: /tpa <player>
@@ -391,3 +403,39 @@ permissions:
   rumilance.user.vip_plus:
     description: VIP+ plan.
     default: false
+  k1:
+    description: Crystal FFA only, out of combat - replace your inventory with KIT1's contents.
+    usage: /k1
+    permission: rumilance.user
+  k2:
+    description: Crystal FFA only, out of combat - replace your inventory with KIT2's contents.
+    usage: /k2
+    permission: rumilance.user
+  k3:
+    description: Crystal FFA only, out of combat - replace your inventory with KIT3's contents.
+    usage: /k3
+    permission: rumilance.user
+  k4:
+    description: Crystal FFA only, out of combat - replace your inventory with KIT4's contents.
+    usage: /k4
+    permission: rumilance.user
+  k5:
+    description: Crystal FFA only, out of combat - replace your inventory with KIT5's contents.
+    usage: /k5
+    permission: rumilance.user
+  k6:
+    description: Crystal FFA only, out of combat - replace your inventory with KIT6's contents.
+    usage: /k6
+    permission: rumilance.user
+  k7:
+    description: Crystal FFA only, out of combat - replace your inventory with KIT7's contents.
+    usage: /k7
+    permission: rumilance.user
+  k8:
+    description: Crystal FFA only, out of combat - replace your inventory with KIT8's contents.
+    usage: /k8
+    permission: rumilance.user
+  k9:
+    description: Crystal FFA only, out of combat - replace your inventory with KIT9's contents.
+    usage: /k9
+    permission: rumilance.user

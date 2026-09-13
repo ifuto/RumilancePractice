@@ -1571,6 +1571,15 @@ public final class FeatureBootstrap {
         bind("giveitem", new GiveItemCommand());
         bind("matchreport", new MatchReportCommand(matchService, settingsService));
         bind("ffa", ffaCommand);
+        // Crystal FFA quality-of-life commands (out of combat, crystal FFA arenas only).
+        com.rumilance.practice.ffa.FfaCrystalCommands ffaCrystalCommands =
+                new com.rumilance.practice.ffa.FfaCrystalCommands(ffaService);
+        bind("regear", ffaCrystalCommands);
+        bind("repair", ffaCrystalCommands);
+        bind("heal", ffaCrystalCommands);
+        for (int i = 1; i <= 9; i++) {
+            bind("k" + i, ffaCrystalCommands);
+        }
         FfaTpaService ffaTpaService = new FfaTpaService(ffaService, messageService);
         FfaTpaCommand ffaTpaCommand = new FfaTpaCommand(ffaTpaService);
         bind("tpa", ffaTpaCommand);

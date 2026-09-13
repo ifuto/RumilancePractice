@@ -148,7 +148,7 @@ public final class FfaService {
                     net.kyori.adventure.text.format.NamedTextColor.RED);
     /** Shown when the combat tag ends (expiry or death). */
     private static final net.kyori.adventure.text.Component COMBAT_END =
-            net.kyori.adventure.text.Component.text("You are no longer in combat",
+            net.kyori.adventure.text.Component.text("You are no longer in Combat",
                     net.kyori.adventure.text.format.NamedTextColor.GREEN);
 
     /** Invoked with the arena id right after a reset evicts the fighters — lets the spectator
@@ -668,6 +668,106 @@ public final class FfaService {
         return true;
     }
 
+    // ------------------------------------------------------- crystal FFA kit commands
+
+    /** Tiny success blip shared by the crystal FFA commands (/regear //k../heal/repair). */
+    public void playSelect(Player player) {
+        soundService.play(player, "select");
+    }
+
+    /**
+     * The kit of the FFA arena the player is in, but ONLY when it is THE declared crystal
+     * FFA kit — every /regear //k1../k9 command exists only for that arena type.
+     */
+    public KitDefinition crystalFfaKitOf(Player player) {
+        if (player == null || !playerArena.containsKey(player.getUniqueId())) {
+            return null;
+        }
+        return arenaOf(player.getUniqueId())
+                .flatMap(this::get)
+                .map(arena -> kitService.get(arena.kitId()).orElse(null))
+                .filter(KitDefinition::crystalFfa)
+                .orElse(null);
+    }
+
+    /** The variant (KIT1..9) layout, falling back to the kit's official layout when unsaved. */
+    private ItemStack[] variantLayout(java.util.UUID playerId, KitDefinition kit, int variant) {
+        String key = com.rumilance.practice.kit.CrystalFfaStore.variantKey(kit.name(), variant);
+        layoutCache.loadSyncIfAbsent(playerId, key);
+        ItemStack[] layout = layoutCache.get(playerId, key).orElse(null);
+        if (layout == null) {
+            layoutCache.loadSyncIfAbsent(playerId, kit.name());
+            layout = layoutCache.get(playerId, kit.name()).orElse(null);
+        }
+        return layout;
+    }
+
+    /**
+     * /regear: top the player's storage + hotbar back up to their last selected KIT slot's
+     * contents. Equipment (armor/shield) and totems are deliberately NOT replenished —
+     * regear refills consumables only, exactly like the classic crystal-FFA command.
+     */
+    public boolean regearCrystal(Player player) {
+        KitDefinition kit = crystalFfaKitOf(player);
+        if (kit == null || crystalFfaStore == null) {
+            return false;
+        }
+        int variant = crystalFfaStore.selectedVariant(player.getUniqueId());
+        ItemStack[] layout = variantLayout(player.getUniqueId(), kit, variant);
+        if (layout == null) {
+            return false;
+        }
+        org.bukkit.inventory.PlayerInventory inv = player.getInventory();
+        boolean gave = false;
+        for (int slot = 0; slot < 36; slot++) { // hotbar + storage; armor/offhand excluded
+            ItemStack desired = slot < layout.length ? layout[slot] : null;
+            if (desired == null || desired.getType().isAir() || isEquipmentOrTotem(desired)) {
+                continue;
+            }
+            int have = 0;
+            for (ItemStack content : inv.getStorageContents()) {
+                if (content != null && content.isSimilar(desired)) {
+                    have += content.getAmount();
+                }
+            }
+            int missing = desired.getAmount() - have;
+            if (missing > 0) {
+                ItemStack give = desired.clone();
+                give.setAmount(missing);
+                inv.addItem(give);
+                gave = true;
+            }
+        }
+        soundService.play(player, gave ? "select" : "gui-click");
+        return true;
+    }
+
+    /** Armor pieces, elytra, shield and totems are out of scope for /regear. */
+    private static boolean isEquipmentOrTotem(ItemStack item) {
+        String name = item.getType().name();
+        return name.endsWith("_HELMET") || name.endsWith("_CHESTPLATE")
+                || name.endsWith("_LEGGINGS") || name.endsWith("_BOOTS")
+                || name.equals("ELYTRA") || name.equals("SHIELD")
+                || name.equals("TOTEM_OF_UNDYING");
+    }
+
+    /**
+     * /k1../k9: replace the player's inventory with the KIT slot's contents (the same apply
+     * the arena spawn uses) and remember the slot as their crystal FFA loadout.
+     */
+    public boolean applyCrystalVariant(Player player, int variant) {
+        KitDefinition kit = crystalFfaKitOf(player);
+        if (kit == null || crystalFfaStore == null) {
+            return false;
+        }
+        int v = Math.min(com.rumilance.practice.kit.CrystalFfaStore.SLOTS, Math.max(1, variant));
+        ItemStack[] layout = variantLayout(player.getUniqueId(), kit, v);
+        kitService.apply(player, kit, layout);
+        crystalFfaStore.selectVariant(player.getUniqueId(), v);
+        soundService.play(player, "select");
+        return true;
+    }
+
     // ----------------------------------------------------------------- command gate
 
     /** True when the admin turned the FFA out-of-combat command whitelist on. */
@@ -813,6 +913,15 @@ public final class FfaService {
             }
         });
         if (killerId != null && !killerId.equals(victim.getUniqueId()) && playerArena.containsKey(killerId)) {
+            // Killing your (combat-tagged) opponent frees you immediately — no reason to sit
+            // out the rest of the 30s window after a confirmed kill.
+            if (inCombat(killerId)) {
+                combatUntil.remove(killerId);
+                Player killerOnline = Bukkit.getPlayer(killerId);
+                if (killerOnline != null && killerOnline.isOnline()) {
+                    killerOnline.sendMessage(COMBAT_END);
+                }
+            }
             addKill(killerId);
             int streak = killStreaks.merge(killerId, 1, Integer::sum);
             Player killer = Bukkit.getPlayer(killerId);
