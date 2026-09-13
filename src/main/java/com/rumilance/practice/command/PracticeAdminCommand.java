@@ -106,7 +106,7 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
         }
 
         if (args.length == 0) {
-            sender.sendMessage(Component.text("/practiceadmin <menu|tool|sign|reload|status|matches|cleanup|maintenance>",
+            sender.sendMessage(Component.text("/practiceadmin <menu|tool|sign|reload|status|matches|cleanup|maintenance|ffacommand>",
                     NamedTextColor.YELLOW));
             return true;
         }
@@ -203,11 +203,79 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
                 sender.sendMessage(Component.text("Maintenance " + (on ? "ON" : "OFF"), NamedTextColor.GOLD));
                 yield true;
             }
+            case "ffacommand" -> {
+                yield handleFfaCommand(sender, args);
+            }
             default -> {
                 sender.sendMessage(Component.text("Unknown subcommand.", NamedTextColor.RED));
                 yield true;
             }
         };
+    }
+
+    /**
+     * /practiceadmin ffacommand — the FFA out-of-combat command whitelist. Off by default:
+     * while OFF, FFA command behaviour is untouched; while ON, FFA occupants can only run
+     * the whitelisted commands and only while NOT combat-tagged.
+     */
+    private boolean handleFfaCommand(CommandSender sender, String[] args) {
+        String sub = args.length > 1 ? args[1].toLowerCase(Locale.ROOT) : "";
+        switch (sub) {
+            case "on", "off" -> {
+                boolean on = sub.equals("on");
+                ffaService.setCommandGate(on);
+                sender.sendMessage(Component.text("FFA command whitelist " + (on ? "ENABLED" : "DISABLED")
+                        + (on ? " — whitelisted commands work out of combat only." : "."),
+                        on ? NamedTextColor.GREEN : NamedTextColor.YELLOW));
+            }
+            case "add" -> {
+                if (args.length < 3) {
+                    sender.sendMessage(Component.text("Usage: /practiceadmin ffacommand add <command>",
+                            NamedTextColor.YELLOW));
+                    break;
+                }
+                String label = ffaService.whitelistCommand(args[2])
+                        ? args[2] : null;
+                sender.sendMessage(Component.text(label != null
+                                ? "Whitelisted: /" + label
+                                : "Already whitelisted: /" + args[2],
+                        label != null ? NamedTextColor.GREEN : NamedTextColor.YELLOW));
+            }
+            case "remove" -> {
+                if (args.length < 3) {
+                    sender.sendMessage(Component.text("Usage: /practiceadmin ffacommand remove <command>",
+                            NamedTextColor.YELLOW));
+                    break;
+                }
+                sender.sendMessage(Component.text(ffaService.unwhitelistCommand(args[2])
+                                ? "Removed from whitelist: /" + args[2]
+                                : "Not on the whitelist: /" + args[2],
+                        NamedTextColor.YELLOW));
+            }
+            case "list" -> {
+                sender.sendMessage(Component.text(
+                        "FFA command whitelist: " + (ffaService.commandGateEnabled() ? "ON" : "OFF"),
+                        NamedTextColor.AQUA));
+                java.util.Set<String> commands = ffaService.whitelistedCommands();
+                if (commands.isEmpty()) {
+                    sender.sendMessage(Component.text("  (empty — every command is blocked in FFA"
+                            + " while the gate is on)", NamedTextColor.GRAY));
+                } else {
+                    sender.sendMessage(Component.text("  /" + String.join(", /",
+                            new java.util.TreeSet<>(commands)), NamedTextColor.GRAY));
+                }
+            }
+            case "clear" -> {
+                ffaService.clearWhitelistedCommands();
+                sender.sendMessage(Component.text("FFA command whitelist cleared.", NamedTextColor.YELLOW));
+            }
+            default -> {
+                sender.sendMessage(Component.text(
+                        "Usage: /practiceadmin ffacommand <on|off|add|remove|list|clear> [command]",
+                        NamedTextColor.YELLOW));
+            }
+        }
+        return true;
     }
 
     private boolean handleSlobby(CommandSender sender, String[] args) {
@@ -270,10 +338,22 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
             return TabCompletions.filter(current, "pos1", "pos2", "spawn", "info", "validate");
         }
         if (args.length == 1) {
-            return TabCompletions.filter(current, "menu", "sign", "tool", "reload", "status", "matches", "cleanup", "maintenance");
+            return TabCompletions.filter(current, "menu", "sign", "tool", "reload", "status", "matches", "cleanup", "maintenance", "ffacommand");
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("maintenance")) {
             return TabCompletions.filter(current, "on", "off");
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("ffacommand")) {
+            return TabCompletions.filter(current, "on", "off", "add", "remove", "list", "clear");
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("ffacommand")
+                && args[1].equalsIgnoreCase("remove")) {
+            return TabCompletions.filter(current,
+                    ffaService.whitelistedCommands().toArray(String[]::new));
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("ffacommand")
+                && args[1].equalsIgnoreCase("add")) {
+            return TabCompletions.filter(current, "spawn", "msg", "baltop", "pay");
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("sign")) {
             return TabCompletions.filter(current,

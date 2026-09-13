@@ -1335,6 +1335,10 @@ public final class FeatureBootstrap {
                 spectatorService, matchRegistry, arenaService, ffaService), plugin);
         pm.registerEvents(new FfaListener(ffaService, kitService, stateManager, combatNet, practiceTnt, playerPlacedBlockTracker, explosionSources), plugin);
         pm.registerEvents(new FfaBlockTracker(ffaService), plugin);
+        // FFA command gate (default OFF): when an admin enables it via /practiceadmin
+        // ffacommand, FFA occupants may only run the whitelisted commands and only while
+        // not combat-tagged. See FfaCommandGateListener / FfaService.
+        pm.registerEvents(new com.rumilance.practice.ffa.FfaCommandGateListener(ffaService), plugin);
         pm.registerEvents(new ItemFlowGuardListener(stateManager, ffaService), plugin);
         pm.registerEvents(ffaSpawnIndex, plugin);
         pm.registerEvents(new InstantExpCollectListener(), plugin);

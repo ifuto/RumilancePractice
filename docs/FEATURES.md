@@ -116,6 +116,13 @@ Paper 1.21.11 向け Practice PvP プラグイン **N Arena**(プラグイン名
 
 ## キット・アイテム
 
+- **FFA コマンドゲート(デフォルトOFF)**: `/practiceadmin ffacommand <on|off|add|remove|list|clear> [command]`
+  で管理。ONにするとFFA中は**ホワイトリスト登録コマンドのみ**使用でき、しかも**コンバットタグ外のときだけ**
+  (戦闘中は全コマンドブロック)。OFFならFFAのコマンドは従来通り無規制。設定は ffa.yml の
+  `command-whitelist` に永続化。
+- **コンバットタグ通知**: FFAで戦闗状態に入ると赤文字で **You are now in Combat**、
+  タイマー切れまたは死亡で解除されると **You are no longer in combat**(緑)。
+
 - **Crystal FFA Kit 申告(存在する場合のみ)**: 管理GUIの設定画面に「Crystal FFA」タイル
   (エンドクリスタル)。1キットだけ申告でき、申告したキットは `/ekit` で選ぶと専用の
   **縦4GUI**(行1=灰色板ガラス / 行2=**KIT1〜KIT9 の看板(太字水色)** / 行3=エンダーアイ /

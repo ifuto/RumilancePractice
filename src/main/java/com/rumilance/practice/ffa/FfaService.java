@@ -142,6 +142,15 @@ public final class FfaService {
 
     private static final long COMBAT_MS = 30_000L;
 
+    /** Shown once when a fighter is combat-tagged (exact wording requested). */
+    private static final net.kyori.adventure.text.Component COMBAT_ENTER =
+            net.kyori.adventure.text.Component.text("You are now in Combat",
+                    net.kyori.adventure.text.format.NamedTextColor.RED);
+    /** Shown when the combat tag ends (expiry or death). */
+    private static final net.kyori.adventure.text.Component COMBAT_END =
+            net.kyori.adventure.text.Component.text("You are no longer in combat",
+                    net.kyori.adventure.text.format.NamedTextColor.GREEN);
+
     /** Invoked with the arena id right after a reset evicts the fighters — lets the spectator
      *  service bail cameras that were watching this FFA (otherwise they'd float over the
      *  terrain while it is being restored). */
@@ -203,6 +212,9 @@ public final class FfaService {
     private final Map<UUID, FfaStats> sessionStats = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> killStreaks = new ConcurrentHashMap<>();
     private final Map<UUID, CombatTag> combatUntil = new ConcurrentHashMap<>();
+    /** Admin-configured FFA command gate: out-of-combat-only whitelist (default off). */
+    private volatile boolean commandGateEnabled;
+    private final java.util.Set<String> commandWhitelist = java.util.concurrent.ConcurrentHashMap.newKeySet();
     /** Last server tick each player went lethal — guards against double-processing a death. */
     private final Map<UUID, Integer> lastLethalTick = new ConcurrentHashMap<>();
     private static final int LETHAL_DEDUPE_TICKS = 20;
@@ -283,6 +295,14 @@ public final class FfaService {
         nextResetAtMillis.clear();
         lastResetRemaining.clear();
         FileConfiguration yaml = configService.ffa();
+        // FFA command gate (admin-managed via /practiceadmin ffacommand): off by default.
+        commandGateEnabled = yaml.getBoolean("command-whitelist.enabled", false);
+        commandWhitelist.clear();
+        for (String cmd : yaml.getStringList("command-whitelist.commands")) {
+            if (cmd != null && !cmd.isBlank()) {
+                commandWhitelist.add(normalizeCommand(cmd));
+            }
+        }
         ConfigurationSection section = yaml.getConfigurationSection("arenas");
         if (section == null) {
             return;
@@ -572,9 +592,25 @@ public final class FfaService {
         if (!playerArena.containsKey(victimId) || !playerArena.containsKey(attackerId)) {
             return;
         }
+        boolean victimWasInCombat = inCombat(victimId);
+        boolean attackerWasInCombat = inCombat(attackerId);
         long until = System.currentTimeMillis() + COMBAT_MS;
         combatUntil.put(victimId, new CombatTag(attackerId, until));
         combatUntil.put(attackerId, new CombatTag(victimId, until));
+        // Announce the transition into combat (red), once per fighter per tag window.
+        if (!victimWasInCombat) {
+            notifyCombatState(victimId, COMBAT_ENTER);
+        }
+        if (!attackerWasInCombat) {
+            notifyCombatState(attackerId, COMBAT_ENTER);
+        }
+    }
+
+    private void notifyCombatState(UUID playerId, net.kyori.adventure.text.Component message) {
+        Player player = Bukkit.getPlayer(playerId);
+        if (player != null && player.isOnline()) {
+            player.sendMessage(message);
+        }
     }
 
     public boolean inCombat(UUID playerId) {
@@ -632,6 +668,84 @@ public final class FfaService {
         return true;
     }
 
+    // ----------------------------------------------------------------- command gate
+
+    /** True when the admin turned the FFA out-of-combat command whitelist on. */
+    public boolean commandGateEnabled() {
+        return commandGateEnabled;
+    }
+
+    /** The whitelisted command labels (lowercase, no slash). */
+    public java.util.Set<String> whitelistedCommands() {
+        return java.util.Collections.unmodifiableSet(commandWhitelist);
+    }
+
+    public boolean isCommandWhitelisted(String label) {
+        return label != null && commandWhitelist.contains(label);
+    }
+
+    public void setCommandGate(boolean enabled) {
+        this.commandGateEnabled = enabled;
+        persistCommandGate();
+    }
+
+    /** @return true when the label was newly added */
+    public boolean whitelistCommand(String label) {
+        String normalized = normalizeCommand(label);
+        if (normalized.isEmpty()) {
+            return false;
+        }
+        boolean added = commandWhitelist.add(normalized);
+        if (added) {
+            persistCommandGate();
+        }
+        return added;
+    }
+
+    /** @return true when the label was actually on the list and got removed */
+    public boolean unwhitelistCommand(String label) {
+        String normalized = normalizeCommand(label);
+        if (normalized.isEmpty()) {
+            return false;
+        }
+        boolean removed = commandWhitelist.remove(normalized);
+        if (removed) {
+            persistCommandGate();
+        }
+        return removed;
+    }
+
+    public void clearWhitelistedCommands() {
+        if (commandWhitelist.isEmpty()) {
+            return;
+        }
+        commandWhitelist.clear();
+        persistCommandGate();
+    }
+
+    private void persistCommandGate() {
+        FileConfiguration yaml = configService.ffa();
+        yaml.set("command-whitelist.enabled", commandGateEnabled);
+        yaml.set("command-whitelist.commands", new java.util.ArrayList<>(commandWhitelist));
+        configService.save(ConfigService.FFA);
+    }
+
+    /** Lowercase, slash and {@code plugin:} prefix stripped ({@code /Plug:Spawn} -> {@code spawn}). */
+    private static String normalizeCommand(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        String label = raw.trim().toLowerCase(java.util.Locale.ROOT);
+        if (label.startsWith("/")) {
+            label = label.substring(1);
+        }
+        int colon = label.indexOf(':');
+        if (colon >= 0) {
+            label = label.substring(colon + 1);
+        }
+        return label.trim();
+    }
+
     private void tickCombat() {
         if (combatUntil.isEmpty()) {
             return;
@@ -641,6 +755,9 @@ public final class FfaService {
             CombatTag tag = entry.getValue();
             if (tag.untilMillis() <= now) {
                 combatUntil.remove(entry.getKey(), tag);
+                if (playerArena.containsKey(entry.getKey())) {
+                    notifyCombatState(entry.getKey(), COMBAT_END);
+                }
                 continue;
             }
             Player online = Bukkit.getPlayer(entry.getKey());
@@ -682,6 +799,9 @@ public final class FfaService {
             return;
         }
         soundService.play(victim, "death");
+        if (inCombat(victim.getUniqueId())) {
+            victim.sendMessage(COMBAT_END);
+        }
         combatUntil.remove(victim.getUniqueId());
         killStreaks.put(victim.getUniqueId(), 0);
         addDeath(victim.getUniqueId());
