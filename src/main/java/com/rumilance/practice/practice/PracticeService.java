@@ -4232,7 +4232,7 @@ public final class PracticeService {
             session.botPlacedBlocks().remove(anchor);
             anchor.setType(Material.AIR, false);
             if (boom.getWorld() != null) {
-                boom.getWorld().createExplosion(boom, 5.0f, true, false, bot);
+                boom.getWorld().createExplosion(boom, 5.0f, true, false, bot.entity());
             }
             ab.anchorStage(0);
             ab.anchorBlock(null);

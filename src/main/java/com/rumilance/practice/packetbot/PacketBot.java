@@ -17,12 +17,18 @@ import net.minecraft.world.entity.Entity;
 public final class PacketBot extends ServerPlayer {
 
     private final MinecraftServer owningServer;
+    private final String profileName;
     private Runnable deathCallback = () -> { };
 
     public PacketBot(MinecraftServer server, ServerLevel level, GameProfile profile,
                      ClientInformation information) {
         super(server, level, profile, information);
         this.owningServer = server;
+        this.profileName = profile.getName();
+    }
+
+    public String profileName() {
+        return profileName;
     }
 
     public MinecraftServer owningServer() {

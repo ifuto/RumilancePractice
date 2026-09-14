@@ -34,14 +34,12 @@ public final class PacketBotFactory {
         // The bot wears the template player's skin: copy the signed textures property.
         GameProfile profile = new GameProfile(UUID.randomUUID(), botName);
         for (ProfileProperty prop : template.getPlayerProfile().getProperties()) {
-            profile.getProperties().put(prop.getName(),
+            profile.properties().put(prop.getName(),
                     new Property(prop.getName(), prop.getValue(), prop.getSignature()));
         }
 
         ClientInformation information = ClientInformation.createDefault();
         PacketBot bot = new PacketBot(server, level, profile, information);
-        bot.fixStartingPosition = () -> bot.snapTo(location.getX(), location.getY(),
-                location.getZ(), location.getYaw(), location.getPitch());
         server.getPlayerList().placeNewPlayer(
                 new FakePlayerConnection(PacketFlow.SERVERBOUND),
                 bot,
@@ -50,7 +48,6 @@ public final class PacketBotFactory {
         bot.teleportTo(level, location.getX(), location.getY(), location.getZ(),
                 Set.of(), location.getYaw(), location.getPitch(), true);
         bot.setHealth((float) Math.max(1.0f, Math.min(20.0f, maxHp)));
-        bot.unsetRemoved();
         bot.gameMode.changeGameModeForPlayer(
                 net.minecraft.world.level.GameType.SURVIVAL);
         return new PacketBotBody(bot);

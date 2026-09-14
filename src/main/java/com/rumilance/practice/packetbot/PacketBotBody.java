@@ -90,6 +90,6 @@ public final class PacketBotBody implements BotBody {
     @Override public boolean owns(Entity entity) {
         return entity != null && entity.getUniqueId().equals(bot.getUUID());
     }
-    @Override public String displayName() { return bot.getGameProfile().getName(); }
+    @Override public String displayName() { return bot.profileName(); }
     @Override public boolean isPacket() { return true; }
 }
