@@ -82,3 +82,5 @@ cd /tmp/mcserver && /tmp/jdk21/bin/java -Xmx2400M -jar fabric-server-launch.jar 
   失敗時は起動ログの head/tail/マーカーを ::error:: アノテーションで出す。
 
 - 2026-09-14: 石の地面+通常戦闘でのクリスタル&アンカー実測(v1.75.7)を反映 — CI 再検証。
+
+- 2026-09-14: アンカー突き合わせ(構造/ラダー/難易度ゲート一致)を doc に追記 — CI 再検証。
