@@ -2218,24 +2218,31 @@ public final class PracticeService {
         // The dummy is a fighter: it walks in, lunges and smashes, so it needs the same body
         // as every other bot - movable, and as tanky as the rung says.
         double maxHp = session.difficulty().botMaxHp();
-        Mannequin spawned = botLoc.getWorld().spawn(botLoc, Mannequin.class, m -> {
-            m.setImmovable(false);
-            m.setGravity(true);
-            m.setSilent(true);
-            m.setCanPickupItems(false);
-            m.setRemoveWhenFarAway(false);
-            m.setPersistent(false);
-            m.setCollidable(true);
-            m.customName(messages.render(player, "practice.mace-bot-name"));
-            m.setCustomNameVisible(true);
-            m.setProfile(ResolvableProfile.resolvableProfile(player.getPlayerProfile()));
-            if (m.getAttribute(Attribute.MAX_HEALTH) != null) {
-                m.getAttribute(Attribute.MAX_HEALTH).setBaseValue(maxHp);
-            }
-            m.setHealth(maxHp);
-            equipMaceBot(m, session.botShieldRaised());
-        });
-        BotBody bot = new MannequinBody(spawned);
+        BotBody bot;
+        if (packetBots) {
+            String botName = "mace-" + java.util.concurrent.ThreadLocalRandom.current().nextInt(10, 99);
+            bot = PacketBotFactory.spawnCombat(botLoc, botName, player, maxHp,
+                    session.botShieldRaised());
+        } else {
+            Mannequin spawned = botLoc.getWorld().spawn(botLoc, Mannequin.class, m -> {
+                m.setImmovable(false);
+                m.setGravity(true);
+                m.setSilent(true);
+                m.setCanPickupItems(false);
+                m.setRemoveWhenFarAway(false);
+                m.setPersistent(false);
+                m.setCollidable(true);
+                m.customName(messages.render(player, "practice.mace-bot-name"));
+                m.setCustomNameVisible(true);
+                m.setProfile(ResolvableProfile.resolvableProfile(player.getPlayerProfile()));
+                if (m.getAttribute(Attribute.MAX_HEALTH) != null) {
+                    m.getAttribute(Attribute.MAX_HEALTH).setBaseValue(maxHp);
+                }
+                m.setHealth(maxHp);
+            });
+            bot = new MannequinBody(spawned);
+        }
+        equipMaceBot(bot, session.botShieldRaised());
         stockBotInventory(session, PracticeType.MACE);
         session.setMaceBot(bot);
         session.setBotHome(botLoc.clone());
@@ -2246,13 +2253,13 @@ public final class PracticeService {
         session.setBotStrafeFlipMs(now + 1500L);
     }
 
-    private void equipMaceBot(Mannequin bot, boolean shieldUp) {
+    private void equipMaceBot(BotBody bot, boolean shieldUp) {
         EntityEquipment eq = bot.getEquipment();
         if (eq == null) {
             return;
         }
         // Admin binding first: the dummy wears the same kit the player fights with.
-        if (applyBoundBotKit(PracticeType.MACE, bot, eq, shieldUp, new ItemStack(Material.MACE))) {
+        if (applyBoundBotKit(PracticeType.MACE, bot.living(), eq, shieldUp, new ItemStack(Material.MACE))) {
             return;
         }
         eq.setHelmet(new ItemStack(Material.NETHERITE_HELMET));
@@ -2263,7 +2270,7 @@ public final class PracticeService {
         // to swing the weapon the mode is about.
         eq.setItemInMainHand(new ItemStack(Material.MACE));
         eq.setItemInOffHand(shieldUp ? new ItemStack(Material.SHIELD) : null);
-        zeroDropChances(bot, eq);
+        zeroDropChances(bot.living(), eq);
     }
 
     /**
@@ -2793,27 +2800,25 @@ public final class PracticeService {
      */
     private static void turnToward(BotBody bot, Location eye, Vector direction, BotDifficulty diff) {
         Location look = eye.clone().setDirection(direction);
-        double rate = turnRatePerTick(diff);
-        Location self = bot.getLocation();
-        bot.setRotation((float) stepAngle(self.getYaw(), look.getYaw(), rate),
-                (float) stepValue(self.getPitch(),
-                        Math.max(-89.0f, Math.min(89.0f, look.getPitch())), rate));
+        // The map looks with 'player @s look upon <target> closest [delta N]' — an INSTANT
+        // snap with an aim error of (aim rung - 1) degrees. The slowcast.* rotation scoreboard
+        // is never read by any combat function, so the old per-tick turn ladder made low rungs
+        // spin uselessly instead of fighting (that was the 'weird bot that never swings').
+        double deltaDeg = lookDeltaDegrees(diff);
+        double yaw = look.getYaw()
+                + (java.util.concurrent.ThreadLocalRandom.current().nextDouble() * 2.0d - 1.0d) * deltaDeg;
+        double pitch = look.getPitch()
+                + (java.util.concurrent.ThreadLocalRandom.current().nextDouble() * 2.0d - 1.0d) * deltaDeg;
+        bot.setRotation((float) yaw, (float) Math.max(-89.0f, Math.min(89.0f, pitch)));
     }
 
     /**
-     * Turn rate in degrees per tick — the map's {@code slowcast.step.max_rotation_per_tick}
-     * ladder (quantum:difficulty/1..6 = 1, 4, 10, 14, 20, rung 6 inheriting 20). A bad rung
-     * literally cannot track a strafe; that human slowness IS the difficulty.
+     * Look error in degrees: map aim rung N snaps with delta N-1 (aim 5 -> 4 degrees off,
+     * aim 2 -> 1, aim 1/NPC-mode -> perfect). Tracking is instant; the difficulty lives in
+     * how crooked the snap is, plus the swing miss chance on top.
      */
-    static double turnRatePerTick(BotDifficulty diff) {
-        return switch (diff.preset()) {
-            case EASY -> 1.0d;
-            case INTERMEDIATE -> 4.0d;
-            case HARD -> 10.0d;
-            case CRAZY -> 14.0d;
-            case MASTER, SURVIVAL_MASTER -> 20.0d;
-            default -> 8.0d; // NPC wander and hand-tuned CUSTOM keep the old default
-        };
+    static double lookDeltaDegrees(BotDifficulty diff) {
+        return Math.max(0.0d, diff.aimSpreadDegrees() - 1.0d);
     }
 
     /** The crystal bot's sword swing: map g1gc/hit sets hitcd 7 on EVERY rung (7 ticks = 350 ms). */
@@ -4039,7 +4044,14 @@ public final class PracticeService {
      * guaranteed hit or a guaranteed miss.
      */
     private static double missChancePercent(BotDifficulty diff) {
-        return Math.max(0.0d, Math.min(35.0d, diff.aimSpreadDegrees() * 2.5d));
+        // Map parity: the crooked snap IS the miss mechanic, and at <=3 blocks even a 4
+        // degree error still lands on a 0.6-wide hitbox — melee effectively never whiffs
+        // once in reach (Easy hits rarely because it rarely CLOSES distance, not because
+        // it swings air). Hand-tuned CUSTOM keeps the slider-driven whiff chance.
+        if (diff.preset() == BotDifficulty.Preset.CUSTOM) {
+            return Math.max(0.0d, Math.min(35.0d, diff.aimSpreadDegrees() * 2.5d));
+        }
+        return 0.0d;
     }
 
     private static java.util.concurrent.ThreadLocalRandom aimRoll() {

@@ -245,3 +245,27 @@
 - Phase 1 対象: 戦闘ボット(sword/crystal/nethpot/cart)。メイス・AFKボットは
   Phase 2。死亡は `PacketBot.die()` オーバーライドでバニラ落下/ドロップを迂回し
   コールバック経由(プレイヤー死亡画面も出ない)。
+
+---
+
+## 2026-09: 「戦わないBOT」の根本原因修正(v1.72.0)
+
+ユーザー報告「昔のクリスタルBOTは死ぬほど変で、まともに戦わなかった」→ 全行照合の結果、
+**戦闘フローの根幹を2つ誤実装していた**ことが確定:
+
+1. **回転速度梯子は実在しなかった**: `slowcast.step.max_rotation_per_tick` は
+   difficulty関数が値を設定するだけで、**戦闘関数はどこも読んでいない**(全mcfunction照合)。
+   マップの視線は `quantum:look` = **`player @s look upon <target> closest [delta N]`**
+   の**即時スナップ**(delta = aimラング-1 度の歪み)。旧実装は Easy 1°/tick = 20°/秒で
+   回すためストレイフを追跡できず、**剣を振る前に視線が外れたまま**だった。
+   → `turnToward` をスナップ式に全面修正 + `lookDeltaDegrees` 梯子(4/3/2/1/1/1°)。
+2. **近接ミス率は二重罰だった**: マップは視線の歪みがそのままミス機構(近距離では
+   0.6mヒットボックスに当たるので実質ミス0)。旧実装はさらに aim×2.5% の乱数ミスを
+   上乗せ(Easy 12.5%)→ プリセットは0%、CUSTOMのみスライダー反映に修正。
+
+「Easyが弱い」の正体も確定: マップのEasyは**追いつけないから当たらない**
+(ゆっくり前進・クリスタル6t間隔)のであって、当てる技術が劣るわけではない。
+
+メイスBOTも packet branch 対応(Phase 2の一部)。AFKボットのPacket移行は次工程
+(AfkCrystalManager/AfkPracticeManager の BotBody 化 + setGlowing/ポーズ API の
+BotBody 追加が必要)。

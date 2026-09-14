@@ -81,3 +81,4 @@ mkdir -p /tmp/jdk21 && tar -xzf /tmp/jdk21.tar.gz -C /tmp/jdk21 --strip-componen
 - 2026-09-13(深夜2): アンカー経路も全行照合 → g1gc anchor chain(place→charge→爆発)を全ラングの梯子で実装(v1.68.0)。crystal_cd の初回抽出誤り(6/4/3/2/2/3→正6/6/6/3/2/3)も訂正。
 - 2026-09-13(深夜3): 全モジュール監査表を docs/bot-combat-parity.md に作成。金リンゴ80%実食・ボット採掘・可視ホットバー切替を実装(v1.69.0)。次フェーズ=マネキン→パケットプレイヤー(NMS ServerPlayer)。
 - 2026-09-14: パケットプレイヤー移行Phase1(v1.71.0)。paperweight-userdev導入+BotBodyシーム+Carpet式フェイクプレイヤー実装。トグル bot.packet-bots は既定false(サーバー検証後に切替)。yml更新は不要。
+- 2026-09-14(2): 「戦わないBOT」根本原因2件を修正 — slowcast梯子は戦闘未使用(視線はスナップ+delta)/近接ミス二重罰。メイスもpacket branch。AFK packet化は次工程(v1.72.0)。
