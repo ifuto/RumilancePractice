@@ -62,7 +62,8 @@ class MaceBotMathTest {
                 BotDifficulty.of(BotDifficulty.Preset.MASTER)), 1e-9);
         assertEquals(1.0d, PracticeService.lookDeltaDegrees(
                 BotDifficulty.of(BotDifficulty.Preset.SURVIVAL_MASTER)), 1e-9);
-        assertEquals(19.0d, PracticeService.lookDeltaDegrees(
+        // CUSTOM defaults to the INTERMEDIATE-like aim 4 -> delta 3 (the editor slider moves it).
+        assertEquals(3.0d, PracticeService.lookDeltaDegrees(
                 BotDifficulty.of(BotDifficulty.Preset.CUSTOM)), 1e-9);
     }
 
