@@ -76,9 +76,7 @@ public final class PracticeListener implements Listener {
     /** The practice bot popped its totem: pause its fight for the map's totem_cd rung. */
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onBotResurrect(EntityResurrectEvent event) {
-        if (event.getEntity() instanceof Mannequin mannequin) {
-            practiceService.markBotTotemPop(mannequin);
-        }
+        practiceService.markBotTotemPop(event.getEntity());
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -93,14 +91,13 @@ public final class PracticeListener implements Listener {
         PracticeSession session = sessionOpt.get();
         // Whoever fights back in this session: the combat bot for sword / crystal / nethpot /
         // cart, the mace dummy for MACE (it lunges, wind-charges and smashes like the map's bot).
-        Mannequin combatBot = session.combatBot() != null ? session.combatBot() : session.maceBot();
+        BotBody combatBot = session.combatBot() != null ? session.combatBot() : session.maceBot();
         if (event instanceof EntityDamageByEntityEvent byEntity && combatBot != null) {
             Entity damager = byEntity.getDamager();
-            boolean botHit = damager instanceof Mannequin bot
-                    && bot.getUniqueId().equals(combatBot.getUniqueId());
+            boolean botHit = combatBot.owns(damager);
             boolean botProjectile = damager instanceof org.bukkit.entity.Projectile proj
                     && proj.getShooter() instanceof Entity shooter
-                    && shooter.getUniqueId().equals(combatBot.getUniqueId());
+                    && shooter.getUniqueId().equals(combatBot.uuid());
             if (botHit || botProjectile) {
                 return; // sparring hit (melee swing or arrow volley): allow it
             }
@@ -160,12 +157,15 @@ public final class PracticeListener implements Listener {
      */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onBotDamaged(EntityDamageEvent event) {
-        if (!(event.getEntity() instanceof Mannequin bot)) {
+        // Mannequins and packet fake players both land here: match by body uuid, so a real
+        // player's damage event never routes into the bot logic.
+        if (!(event.getEntity() instanceof org.bukkit.entity.LivingEntity victim)) {
             return;
         }
+        java.util.UUID hurt = victim.getUniqueId();
         for (PracticeSession session : practiceService.sessionsWithCombatBot()) {
-            Mannequin cb = session.combatBot();
-            if (cb == null || !cb.getUniqueId().equals(bot.getUniqueId())) {
+            BotBody cb = session.combatBot();
+            if (cb == null || !cb.uuid().equals(hurt)) {
                 continue;
             }
             Player player = org.bukkit.Bukkit.getPlayer(session.playerId());
@@ -176,8 +176,8 @@ public final class PracticeListener implements Listener {
         }
         // The mace dummy is tracked separately from the combat bots: dropping it wins the match.
         for (PracticeSession session : practiceService.activeSessions()) {
-            Mannequin maceBot = session.maceBot();
-            if (maceBot == null || !maceBot.getUniqueId().equals(bot.getUniqueId())) {
+            BotBody maceBot = session.maceBot();
+            if (maceBot == null || !maceBot.uuid().equals(hurt)) {
                 continue;
             }
             Player player = org.bukkit.Bukkit.getPlayer(session.playerId());
@@ -460,7 +460,7 @@ public final class PracticeListener implements Listener {
         if (session.type() != PracticeType.MACE || session.maceBot() == null) {
             return;
         }
-        if (!victim.getUniqueId().equals(session.maceBot().getUniqueId())) {
+        if (!victim.getUniqueId().equals(session.maceBot().uuid())) {
             return;
         }
         practiceService.onMaceHitBot(session);

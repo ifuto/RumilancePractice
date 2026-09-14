@@ -2,7 +2,6 @@ package com.rumilance.practice.practice;
 
 import com.rumilance.practice.util.Cuboid;
 import org.bukkit.Location;
-import org.bukkit.entity.Mannequin;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.UUID;
@@ -29,14 +28,14 @@ public final class PracticeSession {
     private long activeEndsAtMs;
     private boolean placeBlocked;
     private BukkitTask timerTask;
-    private Mannequin maceBot;
+    private BotBody maceBot;
     private boolean botShieldRaised;
     private long botStunUntilMs;
     private int maceDensity;
     private int maceBreach;
     private int maceWindBurst;
     /** Sword / crystal combat bot (ITEM 41, Quantum-style practice bots). */
-    private Mannequin combatBot;
+    private BotBody combatBot;
     /** Totem pops on the crystal bot / kills on the sword bot. */
     private int botPops;
     /** Last time the combat bot took damage (regen tag). */
@@ -326,19 +325,19 @@ public final class PracticeSession {
         }
     }
 
-    public Mannequin maceBot() {
+    public BotBody maceBot() {
         return maceBot;
     }
 
-    public void setMaceBot(Mannequin maceBot) {
+    public void setMaceBot(BotBody maceBot) {
         this.maceBot = maceBot;
     }
 
-    public Mannequin combatBot() {
+    public BotBody combatBot() {
         return combatBot;
     }
 
-    public void setCombatBot(Mannequin combatBot) {
+    public void setCombatBot(BotBody combatBot) {
         this.combatBot = combatBot;
     }
 

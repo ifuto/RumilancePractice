@@ -218,3 +218,30 @@
 **今回の監査で修正した追加差分**: 金リンゴ閾値50%→**80%(Health..16)**+実食(手に持って1.75s咀嚼→+8HP/5s・吸収2)・**ボットのブロック破壊**(ヘッド上/足元の床/間の壁を1.5sで採掘)・全アクションに**可視スロット切替+スイング**(マップ`player @s hotbar N`+`swing once`の再現)。
 
 **次フェーズ(宣言済み)**: マネキン→**Carpet式パケットプレイヤー**(NMS `ServerPlayer`+擬似接続。paperweight-userdevで実NMS型を使用。本物のインベントリ・スキン・当たり判定・音声を得る。paper 1.21.11 mojang-mappedランタイム前提)。
+
+---
+
+## 2026-09: パケットプレイヤー移行(Phase 1・v1.71.0)
+
+マネキン→**Carpet式パケットフェイクプレイヤー**(本物の `ServerPlayer`)への移行基盤:
+
+- **ビルド**: `io.papermc.paperweight.userdev` 2.0.0-beta.23 + dev-bundle 1.21.11
+  (1.20.5以降はランタイムがMojangマップなのでreobf不要)。
+- **生成パターン**(fabric-carpet `EntityPlayerMPFake.createFake` 準拠・ソース照合済み):
+  `placeNewPlayer(FakePlayerConnection, PacketBot, CommonListenerCookie)` →
+  `teleportTo(...)` → `setHealth` → `unsetRemoved` → GameType.SURVIVAL。
+  `FakePlayerConnection` は Carpet の `FakeClientConnection` 同型
+  (send廃棄+EmbeddedChannel+ハンドシェイクno-op)。
+- **`BotBody` シーム**: `PracticeSession.combatBot/maceBot` を介した全AI(51参照)を
+  `BotBody` インターフェース越しに駆動。`MannequinBody`(従来・既定)と
+  `PacketBotBody`(新)が実装。ダメージ帰属は `instanceof Mannequin` から
+  `body.owns(entity)`(uuid照合)へ全面移行 — パケットボットの攻撃は
+  本物のプレイヤー damager としてイベントに乗るため。
+- **移行の本質**: パケットボットの近接は**バニラの近接パイプライン**(ダメージ・
+  ノックバック・クリティカル・無敵時間・見た目の方向)がそのまま走るので、
+  `botSwing/botMeleeHit` は `isPacket()` で早期リターン(二重ダメージ防止)。
+- **トグル**: `bot.packet-bots`(既定 **false**)= 従来のマネキンで動作。
+  有効化はサーバー側検証後。
+- Phase 1 対象: 戦闘ボット(sword/crystal/nethpot/cart)。メイス・AFKボットは
+  Phase 2。死亡は `PacketBot.die()` オーバーライドでバニラ落下/ドロップを迂回し
+  コールバック経由(プレイヤー死亡画面も出ない)。

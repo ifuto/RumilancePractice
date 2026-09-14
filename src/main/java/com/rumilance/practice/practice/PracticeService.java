@@ -28,6 +28,7 @@ import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.block.Block;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
+import com.rumilance.practice.packetbot.PacketBotFactory;
 import org.bukkit.entity.Mannequin;
 import org.bukkit.entity.Player;
 import org.bukkit.event.entity.EntityDamageEvent;
@@ -99,11 +100,23 @@ public final class PracticeService {
     private BukkitTask dailyPurgeTask;
     private BukkitTask maceAiTask;
 
+    /** Opt-in packet fake players for the combat bot (carpet-style ServerPlayer bodies). */
+    private volatile boolean packetBots;
+
+    public boolean packetBots() {
+        return packetBots;
+    }
+
+    public void setPacketBots(boolean enabled) {
+        this.packetBots = enabled;
+    }
+
     public PracticeService(Plugin plugin, ConfigService configService, PlayerStateManager stateManager,
                            LobbyService lobbyService, PracticeLayoutRepository layoutRepository,
                            AsyncExecutor asyncExecutor, PracticeCloneService cloneService,
                            MessageService messages) {
         this.plugin = plugin;
+        this.packetBots = plugin.getConfig().getBoolean("bot.packet-bots", false);
         this.configService = configService;
         this.stateManager = stateManager;
         this.lobbyService = lobbyService;
@@ -460,7 +473,7 @@ public final class PracticeService {
      * when pathing is exhausted/unavailable so the caller falls back to direct chasing.
      * Jump-up waypoints get the vanilla hop velocity baked into the returned vector's Y.
      */
-    private org.bukkit.util.Vector botPathDirection(PracticeSession session, Mannequin bot,
+    private org.bukkit.util.Vector botPathDirection(PracticeSession session, BotBody bot,
                                                     Location target, long now) {
         if (session == null || bot == null || target == null || target.getWorld() == null) {
             return null;
@@ -1572,7 +1585,7 @@ public final class PracticeService {
                 Component.text(mode.label(), NamedTextColor.GRAY),
                 Component.text(""),
                 Title.Times.times(Duration.ZERO, Duration.ofMillis(1200), Duration.ofMillis(400))));
-        Mannequin bot = session.combatBot() != null ? session.combatBot() : session.maceBot();
+        BotBody bot = session.combatBot() != null ? session.combatBot() : session.maceBot();
         switch (mode) {
             case MACE_FAR_PEARL -> {
                 if (bot != null && bot.getAttribute(Attribute.MAX_HEALTH) != null) {
@@ -1648,7 +1661,7 @@ public final class PracticeService {
     }
 
     /** Mace drill attempt dispatch (elytra / far-pearl / stun-slam / divebomb). */
-    private void tickMaceDrill(Player player, PracticeSession session, Mannequin bot,
+    private void tickMaceDrill(Player player, PracticeSession session, BotBody bot,
                                PracticeRoom room, BotDifficulty diff, long now, PracticeMode mode,
                                Vector to) {
         session.setBotNextAttackMs(Math.max(session.botNextAttackMs(), now + 3000L));
@@ -1685,7 +1698,7 @@ public final class PracticeService {
 
     /** FAR PEARL attempt: materialise 10 up scattered sideways and glide in. */
     private void tickFarPearlAttempt(Player player, PracticeSession session,
-                                    Mannequin bot, PracticeRoom room) {
+                                    BotBody bot, PracticeRoom room) {
         // far_pearl/loop:7 — vanilla spreadplayers square (radius 15) around the anchor at +10y,
         // hitched to the drill home rather than the player's current position.
         java.util.Random rng = new java.util.Random();
@@ -1702,7 +1715,7 @@ public final class PracticeService {
     }
 
     /** STUN SLAM attempt: both launch from behind the player; stun window decides the trade. */
-    private void tickStunSlamAttempt(Player player, PracticeSession session, Mannequin bot) {
+    private void tickStunSlamAttempt(Player player, PracticeSession session, BotBody bot) {
         Vector behind = player.getLocation().getDirection().setY(0);
         if (behind.lengthSquared() < 0.0001) {
             behind = new Vector(0, 0, 1);
@@ -1717,7 +1730,7 @@ public final class PracticeService {
     }
 
     /** Pot drills: repot self-heals / refill drums for the player's potion rows. */
-    private void tickPotDrill(Player player, PracticeSession session, Mannequin bot, long now) {
+    private void tickPotDrill(Player player, PracticeSession session, BotBody bot, long now) {
         PracticeSession.BotAbilityState ab = session.abilities();
         BotDifficulty diff = session.difficulty();
         switch (session.botMode()) {
@@ -1754,7 +1767,7 @@ public final class PracticeService {
     }
 
     /** Crystal drills: D-tap resets / Ledge dashes / Hit-anchor storms. */
-    private void tickCrystalDrill(Player player, PracticeSession session, Mannequin bot,
+    private void tickCrystalDrill(Player player, PracticeSession session, BotBody bot,
                                   PracticeRoom room, BotDifficulty diff, long now,
                                   PracticeMode mode, double dist) {
         PracticeSession.BotAbilityState ab = session.abilities();
@@ -2205,7 +2218,7 @@ public final class PracticeService {
         // The dummy is a fighter: it walks in, lunges and smashes, so it needs the same body
         // as every other bot - movable, and as tanky as the rung says.
         double maxHp = session.difficulty().botMaxHp();
-        Mannequin bot = botLoc.getWorld().spawn(botLoc, Mannequin.class, m -> {
+        Mannequin spawned = botLoc.getWorld().spawn(botLoc, Mannequin.class, m -> {
             m.setImmovable(false);
             m.setGravity(true);
             m.setSilent(true);
@@ -2222,6 +2235,7 @@ public final class PracticeService {
             m.setHealth(maxHp);
             equipMaceBot(m, session.botShieldRaised());
         });
+        BotBody bot = new MannequinBody(spawned);
         stockBotInventory(session, PracticeType.MACE);
         session.setMaceBot(bot);
         session.setBotHome(botLoc.clone());
@@ -2376,7 +2390,7 @@ public final class PracticeService {
     }
 
     public void applyBotShield(PracticeSession session) {
-        Mannequin bot = session.maceBot();
+        BotBody bot = session.maceBot();
         if (bot == null || !bot.isValid()) {
             return;
         }
@@ -2387,7 +2401,7 @@ public final class PracticeService {
     }
 
     private void removeMaceBot(PracticeSession session) {
-        Mannequin bot = session.maceBot();
+        BotBody bot = session.maceBot();
         if (bot != null && bot.isValid()) {
             bot.remove();
         }
@@ -2423,7 +2437,7 @@ public final class PracticeService {
                 return;
             }
             PracticeRoom room = get(session.practiceId()).orElse(null);
-            Mannequin bot = session.maceBot();
+            BotBody bot = session.maceBot();
             if (bot == null || !bot.isValid() || bot.isDead()) {
                 // Chunk unloads or a stray kill must not leave an empty arena behind. The
                 // room may be null (arena-venue fights have no config room) — spawnMaceBot
@@ -2585,7 +2599,7 @@ public final class PracticeService {
      * the burst upward, trading the height for a bigger smash on the way down. Wind charges deal
      * no damage and break no blocks, so the burst only moves entities.
      */
-    private void launchMaceWindCharge(PracticeSession session, Mannequin bot) {
+    private void launchMaceWindCharge(PracticeSession session, BotBody bot) {
         if (session != null && !session.botConsume(Material.WIND_CHARGE, 1)) {
             return; // no wind charges left in this bot's stock
         }
@@ -2624,7 +2638,7 @@ public final class PracticeService {
      * dropping it wins the match. Outside a live match it simply comes back at its home spot.
      */
     public boolean onMaceBotDamaged(Player player, PracticeSession session, EntityDamageEvent event) {
-        Mannequin bot = session.maceBot();
+        BotBody bot = session.maceBot();
         if (bot == null || !bot.isValid()) {
             return false;
         }
@@ -2666,8 +2680,13 @@ public final class PracticeService {
      * One bot swing: the rung's aim error decides whether it connects (the map's "aim" score -
      * sloppy rungs whiff often, MASTER almost never does).
      */
-    private void botSwing(Player player, Mannequin bot, BotDifficulty diff, double damage) {
+    private void botSwing(Player player, BotBody bot, BotDifficulty diff, double damage) {
         bot.swingMainHand();
+        if (bot.isPacket()) {
+            // The fake player IS a server player: its swing already ran the vanilla melee
+            // pipeline (damage, knockback, crit, i-frames, aim from its real look).
+            return;
+        }
         if (damage <= 0.0d) {
             return;
         }
@@ -2698,7 +2717,10 @@ public final class PracticeService {
      * direct health registration registers the rung's tuned damage — except against a
      * genuinely raised shield, which blocks like vanilla.</p>
      */
-    private void botMeleeHit(Player player, Mannequin bot, double damage, boolean knockback) {
+    private void botMeleeHit(Player player, BotBody bot, double damage, boolean knockback) {
+        if (bot.isPacket()) {
+            return; // vanilla already applied this swing's damage and knockback
+        }
         if (player == null || !player.isOnline() || damage <= 0.0d || player.isDead()) {
             return;
         }
@@ -2769,7 +2791,7 @@ public final class PracticeService {
      * {@code max_rotation_per_tick}, 4 deg/tick on Intermediate), and an instant snap makes every
      * rung feel identical: a slow turner can be circled, a precise one tracks a strafing player.
      */
-    private static void turnToward(Mannequin bot, Location eye, Vector direction, BotDifficulty diff) {
+    private static void turnToward(BotBody bot, Location eye, Vector direction, BotDifficulty diff) {
         Location look = eye.clone().setDirection(direction);
         double rate = turnRatePerTick(diff);
         Location self = bot.getLocation();
@@ -3006,23 +3028,42 @@ public final class PracticeService {
         };
         // Crystal bot dies to one combo (totem pops win the match); the rest tank by difficulty.
         double maxHp = type == PracticeType.CRYSTAL ? 20.0d : session.difficulty().botMaxHp();
-        Mannequin bot = botLoc.getWorld().spawn(botLoc, Mannequin.class, m -> {
-            m.setImmovable(false); // every fighter moves: orbit, chase, retreat
-            m.setGravity(true);
-            m.setSilent(true);
-            m.setCanPickupItems(false);
-            m.setRemoveWhenFarAway(false);
-            m.setPersistent(false);
-            m.setCollidable(true);
-            m.customName(messages.render(player, nameKey));
-            m.setCustomNameVisible(true);
-            m.setProfile(ResolvableProfile.resolvableProfile(player.getPlayerProfile()));
-            if (m.getAttribute(Attribute.MAX_HEALTH) != null) {
-                m.getAttribute(Attribute.MAX_HEALTH).setBaseValue(maxHp);
+        BotBody bot;
+        if (packetBots) {
+            // Carpet-style fake player: a real ServerPlayer with the fighter's skin, name
+            // and vanilla pipeline. Off by default (bot.packet-bots), flipped per-server.
+            String botName = messages.raw(player, nameKey);
+            if (botName == null || botName.isBlank()) {
+                botName = type.name().toLowerCase() + "bot";
             }
-            m.setHealth(maxHp);
-            equipCombatBot(m, player, session, type, session.botShieldRaised());
-        });
+            botName = botName.replace(' ', '_');
+            if (botName.length() > 10) {
+                botName = botName.substring(0, 10);
+            }
+            botName = botName + "-" + java.util.concurrent.ThreadLocalRandom.current().nextInt(10, 99);
+            bot = PacketBotFactory.spawnCombat(botLoc, botName, player, maxHp,
+                    session.botShieldRaised());
+            equipCombatBot(bot, player, session, type, session.botShieldRaised());
+        } else {
+            Mannequin spawned = botLoc.getWorld().spawn(botLoc, Mannequin.class, m -> {
+                m.setImmovable(false); // every fighter moves: orbit, chase, retreat
+                m.setGravity(true);
+                m.setSilent(true);
+                m.setCanPickupItems(false);
+                m.setRemoveWhenFarAway(false);
+                m.setPersistent(false);
+                m.setCollidable(true);
+                m.customName(messages.render(player, nameKey));
+                m.setCustomNameVisible(true);
+                m.setProfile(ResolvableProfile.resolvableProfile(player.getPlayerProfile()));
+                if (m.getAttribute(Attribute.MAX_HEALTH) != null) {
+                    m.getAttribute(Attribute.MAX_HEALTH).setBaseValue(maxHp);
+                }
+                m.setHealth(maxHp);
+                equipCombatBot(new MannequinBody(m), player, session, type, session.botShieldRaised());
+            });
+            bot = new MannequinBody(spawned);
+        }
         stockBotInventory(session, type);
         session.setCombatBot(bot);
         session.setBotHome(botLoc.clone());
@@ -3030,7 +3071,7 @@ public final class PracticeService {
         session.setBotStrafeFlipMs(System.currentTimeMillis() + 1500L);
     }
 
-    private void equipCombatBot(Mannequin bot, Player player, PracticeSession session,
+    private void equipCombatBot(BotBody bot, Player player, PracticeSession session,
                                 PracticeType type, boolean shieldUp) {
         EntityEquipment eq = bot.getEquipment();
         if (eq == null) {
@@ -3122,7 +3163,7 @@ public final class PracticeService {
 
     private void removeCombatBot(PracticeSession session) {
         clearBotArtifacts(session);
-        Mannequin bot = session.combatBot();
+        BotBody bot = session.combatBot();
         if (bot != null && bot.isValid()) {
             bot.remove();
         }
@@ -3171,7 +3212,7 @@ public final class PracticeService {
             if (session.phase() != PracticeSession.Phase.ACTIVE) {
                 return;
             }
-            Mannequin bot = session.combatBot();
+            BotBody bot = session.combatBot();
             Player player = Bukkit.getPlayer(session.playerId());
             if (player == null || !player.isOnline() || player.isDead()) {
                 return;
@@ -3318,7 +3359,7 @@ public final class PracticeService {
      * Netherite-pot fighter extras (map "NETHERITE POT" mode): drinks a healing splash
      * when hurt, hurls harming splashes at a close-range player.
      */
-    private void tickNethPotPotions(Player player, PracticeSession session, Mannequin bot, long now) {
+    private void tickNethPotPotions(Player player, PracticeSession session, BotBody bot, long now) {
         if (now < session.botPotionUntilMs()) {
             return;
         }
@@ -3360,7 +3401,7 @@ public final class PracticeService {
      * Cart PvP fighter (map "TNT MINECART" mode): the bot kites with a bow and rolls
      * primed TNT at the player — our native take on rail-cart detonation practice.
      */
-    private void tickCartBot(Player player, PracticeSession session, Mannequin bot, long now) {
+    private void tickCartBot(Player player, PracticeSession session, BotBody bot, long now) {
         BotDifficulty diff = session.difficulty();
         // Power-tier drills (CART_M3..CART_P3): scales volley cadence, TNT fuse & blast.
         int cartTier = session.botMode().tier();
@@ -3469,7 +3510,7 @@ public final class PracticeService {
      * Briefly shows an item in the bot's main hand (visible item-switch animation for the
      * mannequin), then restores whatever it was holding after {@code restoreTicks}.
      */
-    private void holdItemBriefly(Mannequin bot, ItemStack item, long restoreTicks) {
+    private void holdItemBriefly(BotBody bot, ItemStack item, long restoreTicks) {
         EntityEquipment eq = bot.getEquipment();
         if (eq == null) {
             return;
@@ -3487,7 +3528,7 @@ public final class PracticeService {
         }, Math.max(2L, restoreTicks));
     }
 
-    private void botShootArrow(Mannequin bot, BotDifficulty diff, Vector flatDir,
+    private void botShootArrow(BotBody bot, BotDifficulty diff, Vector flatDir,
                                double damage) {
         if (bot.getWorld() == null || flatDir.lengthSquared() < 0.0001) {
             return;
@@ -3510,7 +3551,7 @@ public final class PracticeService {
      * HP, chew a gap — 40% heal with the golden sparkle, at most twice per bot life so a
      * committed combo still finishes the bot.
      */
-    private void tickBotGap(PracticeSession session, Mannequin bot, double maxHp, long now) {
+    private void tickBotGap(PracticeSession session, BotBody bot, double maxHp, long now) {
         PracticeSession.BotAbilityState ab = session.abilities();
         // Regen-II tail of a just-eaten apple (vanilla golden apple: +8 HP over 5 s).
         if (now < ab.gapRegenUntilMs()) {
@@ -3537,7 +3578,7 @@ public final class PracticeService {
      * bot actually stands still and chomps (map: {@code player @s stop} + gap_timer 35t)
      * instead of fighting with an apple in its mouth.
      */
-    private boolean tickBotGapEating(PracticeSession session, Mannequin bot, long now) {
+    private boolean tickBotGapEating(PracticeSession session, BotBody bot, long now) {
         PracticeSession.BotAbilityState ab = session.abilities();
         if (now >= ab.gapEatUntilMs()) {
             return false;
@@ -3558,7 +3599,7 @@ public final class PracticeService {
      * slots from the bot's own kit stock: sword 4, obsidian 2, crystal 3, gap 5, pearl 7,
      * anchor 8, glowstone 9. A no-op while the item is already held.
      */
-    private void selectBotSlot(PracticeSession session, Mannequin bot, Material material) {
+    private void selectBotSlot(PracticeSession session, BotBody bot, Material material) {
         EntityEquipment eq = bot.getEquipment();
         if (eq == null || eq.getItemInMainHand().getType() == material) {
             return;
@@ -3586,7 +3627,7 @@ public final class PracticeService {
      * 1.5 s per block with progressive crack particles and swings; bedrock and obsidian are
      * refused (obsidian is pedestal material, not something to chew through mid-fight).
      */
-    private void tickBotMining(Player player, PracticeSession session, Mannequin bot,
+    private void tickBotMining(Player player, PracticeSession session, BotBody bot,
                                double dist, long now) {
         PracticeSession.BotAbilityState ab = session.abilities();
         if (ab.miningUntilMs() > 0L) {
@@ -3641,7 +3682,7 @@ public final class PracticeService {
      * Self water bucket (Quantum parity: cobwebs/water_main): douse the bot when ablaze,
      * wash cobwebs off itself. Leaves a brief soak block that the reverter clears.
      */
-    private void tickBotWaterSave(PracticeSession session, Mannequin bot, long now) {
+    private void tickBotWaterSave(PracticeSession session, BotBody bot, long now) {
         PracticeSession.BotAbilityState ab = session.abilities();
         if (now < ab.nextWaterMs()) {
             return;
@@ -3671,7 +3712,7 @@ public final class PracticeService {
         }
     }
 
-    private static void waterSplashFx(Mannequin bot) {
+    private static void waterSplashFx(BotBody bot) {
         if (bot.getWorld() == null) {
             return;
         }
@@ -3686,7 +3727,7 @@ public final class PracticeService {
      *
      * @return true when the pearl happened this tick (caller should skip the attack loop)
      */
-    private boolean tickEscapePearl(Player player, PracticeSession session, Mannequin bot,
+    private boolean tickEscapePearl(Player player, PracticeSession session, BotBody bot,
                                     double maxHp, long now) {
         PracticeSession.BotAbilityState ab = session.abilities();
         if (now < ab.nextPearlMs() || session.difficulty().attackDamage() <= 0.0d
@@ -3752,7 +3793,7 @@ public final class PracticeService {
     }
 
     /** Pearl blink with the tell-tale purple trail at both ends. */
-    private void pearlTeleportFx(Mannequin bot, Location landing) {
+    private void pearlTeleportFx(BotBody bot, Location landing) {
         World world = bot.getWorld();
         Location from = bot.getLocation();
         if (landing == null || landing.getWorld() == null) {
@@ -3778,7 +3819,7 @@ public final class PracticeService {
      * shield/disable): webs under the feet, lava where an airborne player will land, and an
      * axe swing that strips a raised shield.
      */
-    private void tickSwordDisruption(Player player, PracticeSession session, Mannequin bot,
+    private void tickSwordDisruption(Player player, PracticeSession session, BotBody bot,
                                      PracticeType type, double dist, long now) {
         PracticeSession.BotAbilityState ab = session.abilities();
         BotDifficulty diff = session.difficulty();
@@ -3853,7 +3894,7 @@ public final class PracticeService {
      * connect on the way down for a 1.5x critical hit, then scrit backpedal — and from HARD
      * upward occasionally chain straight back in with a sprint jump-reset.
      */
-    private void swordJumpCrit(Player player, PracticeSession session, Mannequin bot,
+    private void swordJumpCrit(Player player, PracticeSession session, BotBody bot,
                                BotDifficulty diff, double reach, long now) {
         PracticeSession.BotAbilityState ab = session.abilities();
         ab.nextCritMs(now + Math.max(CRIT_MIN_INTERVAL_MS, diff.attackIntervalMs() * 5L)
@@ -3908,7 +3949,7 @@ public final class PracticeService {
      * Respawn-anchor strike (Quantum parity: g1gc/anchor): charged anchor materialises beside
      * the player and is detonated a beat later — the overworld makes that a bomb.
      */
-    private boolean launchAnchorStrike(Player player, PracticeSession session, Mannequin bot) {
+    private boolean launchAnchorStrike(Player player, PracticeSession session, BotBody bot) {
         org.bukkit.block.Block foot = player.getLocation().getBlock();
         int[] dx = {1, -1, 0, 0};
         int[] dz = {0, 0, 1, -1};
@@ -3959,7 +4000,7 @@ public final class PracticeService {
      * cart/defenseplace) plus a backwards hop, buying the bot breathing room. Blocks melt
      * away via the tracked-block reverter.
      */
-    private void placeDefenseWall(PracticeSession session, Mannequin bot, Vector dirFlat,
+    private void placeDefenseWall(PracticeSession session, BotBody bot, Vector dirFlat,
                                   Material type, long now) {
         PracticeSession.BotAbilityState ab = session.abilities();
         if (dirFlat.lengthSquared() < 0.0001) {
@@ -4005,7 +4046,7 @@ public final class PracticeService {
         return java.util.concurrent.ThreadLocalRandom.current();
     }
 
-    private static void healToward(Mannequin bot, double max, double step) {
+    private static void healToward(BotBody bot, double max, double step) {
         if (bot.getHealth() < max) {
             bot.setHealth(Math.min(max, bot.getHealth() + step));
         }
@@ -4029,7 +4070,7 @@ public final class PracticeService {
      * range, sprints away while recovering after a hit, and runs full crystal combos —
      * obsidian pedestal down, crystal on top, detonate near the player.
      */
-    private void tickCrystalBot(Player player, PracticeSession session, Mannequin bot, long now) {
+    private void tickCrystalBot(Player player, PracticeSession session, BotBody bot, long now) {
         refillCrystals(player);
         BotDifficulty crystalDiff = session.difficulty();
         PracticeSession.BotAbilityState ab = session.abilities();
@@ -4154,7 +4195,7 @@ public final class PracticeService {
      * guards each stage with the player's hurt frames on rung 6 only — we gate every stage
      * on the anchor block still existing, so a player anchor-break aborts the cycle.
      */
-    private void tickAnchorCycle(Player player, PracticeSession session, Mannequin bot,
+    private void tickAnchorCycle(Player player, PracticeSession session, BotBody bot,
                                  BotDifficulty diff, long now, double dist) {
         PracticeSession.BotAbilityState ab = session.abilities();
         // Advance the running cycle first — the stages run wherever the fight has moved to.
@@ -4232,9 +4273,13 @@ public final class PracticeService {
      * The practice bot's own totem popped: pause its fight for the map's totem_cd rung
      * (quantum:crystal/totmain reloads totem_timer with it on every pop).
      */
-    public void markBotTotemPop(Mannequin bot) {
+    public void markBotTotemPop(org.bukkit.entity.Entity botEntity) {
+        if (botEntity == null) {
+            return;
+        }
         for (PracticeSession session : sessions.values()) {
-            if (bot.equals(session.combatBot())) {
+            BotBody body = session.combatBot();
+            if (body != null && body.owns(botEntity)) {
                 session.abilities().totemPauseUntilMs(
                         System.currentTimeMillis() + crystalTotemPauseMs(session.difficulty()));
                 return;
@@ -4248,7 +4293,7 @@ public final class PracticeService {
      * immune to the blasts of the crystals it placed itself.
      */
     private boolean launchCrystalAttack(Player player, PracticeSession session,
-                                        Mannequin bot) {
+                                        BotBody bot) {
         if (!session.botConsume(Material.OBSIDIAN, 1)
                 || !session.botConsume(Material.END_CRYSTAL, 1)) {
             return false;
@@ -4358,7 +4403,7 @@ public final class PracticeService {
      */
     public boolean onCombatBotDamaged(Player player, PracticeSession session,
                                       EntityDamageEvent event) {
-        Mannequin bot = session.combatBot();
+        BotBody bot = session.combatBot();
         if (bot == null || !bot.isValid()) {
             return false;
         }
@@ -4448,7 +4493,7 @@ public final class PracticeService {
 
     /** Puts the bot back at its home spot with full health after a pop / kill. */
     private void respawnCombatBot(Player player, PracticeSession session) {
-        Mannequin bot = session.combatBot();
+        BotBody bot = session.combatBot();
         if (bot == null) {
             return;
         }
@@ -4468,7 +4513,7 @@ public final class PracticeService {
 
     /** Sword-bot shield stance toggle (shared GUI hook with the mace bot). */
     public void applyCombatBotShield(PracticeSession session) {
-        Mannequin bot = session.combatBot();
+        BotBody bot = session.combatBot();
         if (bot == null || !bot.isValid() || session.type() != PracticeType.SWORD) {
             return;
         }

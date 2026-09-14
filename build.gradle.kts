@@ -6,6 +6,10 @@ import java.security.MessageDigest
 plugins {
     java
     id("com.gradleup.shadow") version "9.6.0"
+    // Packet-bot parity work needs the real NMS (ServerPlayer fake players, carpet-style).
+    // Since 1.20.5 the Paper runtime IS Mojang-mapped, so the dev bundle compiles and runs
+    // without any reobfuscation step.
+    id("io.papermc.paperweight.userdev") version "2.0.0-beta.23"
 }
 
 group = "com.rumilance.practice"
@@ -51,6 +55,9 @@ val junitVersion = "6.1.2"
 dependencies {
     // Paper API - provided by the server at runtime
     compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
+
+    // Mojang-mapped server internals (net.minecraft.*) for the packet player bots.
+    paperweight.paperDevBundle("1.21.11-R0.1-SNAPSHOT")
 
     // WorldEdit / FastAsyncWorldEdit soft-dependency - only used if present on server
     compileOnly("com.sk89q.worldedit:worldedit-bukkit:$worldeditVersion") {
