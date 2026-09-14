@@ -330,3 +330,108 @@ BotBody 追加が必要)。
    - **統計的一致(±10%目安)**: 平均/最大平面速度、ストライド分布、視線スナップ頻度、
      エイム歪み幅(±3°@INT)
    - 一致しない行が修正対象 → 修正 → 再測定(完全一致までループ)
+
+
+---
+
+## 2026-09-14: 参照BOT 実測キャプチャ成功 → 数値ループ開始
+
+Fabric 参照サーバー上で **QuantumBOT を実戦させ、`[q]` 生データを取得できた**
+(60秒 / 1201行 = 毎tick)。フィクスチャは `docs/parity/fabric_crystal_int2_60s.log.gz`、
+抽出は `python3 tools/parity_report.py <log>`。
+
+### なぜ今まで「戦わないBOT」だったか(確定原因)
+
+1. `Pos1` スコア(=**Y座標**)が未更新だった。`xaniclelib:mark` の台クリスタル経路は
+   `@s[tag=!airplace] Pos1_difference=..0` でゲートされ、`Pos1_difference` は
+   `bot.y - target.y`。未更新(=既定0のまま、または差>0)だと **マーカーが1つも作られず**、
+   BOTは `g1gc/pearl` を無限に撃つだけになる。更新主体は `mech_train:tick`
+   (mode 100+ 専用)なので、mode 2 では毎tick回す必要がある。
+2. `main_tick` のハブ判定 + `load.mcfunction:315` の `schedule map/reset 30t` により
+   放置すると必ずハブへ戻る(.start=0 → map/passive)。
+3. BOT が奈落・自爆で死ぬと respawn がハブ → `death=0` 維持と位置の戻しが必要。
+
+→ 対策は `tools/qlog-datapack` の **keepalive + ハーネス**(毎tick: `.start=1` /
+`Pos1` 更新 / `eval:stats/pos1` / `init/mode` 駆動 / 相手のピン留めと延命)。
+マップ側は `quantum:tick` の `main_tick` と `load` の `schedule map/reset` を停止して計測した。
+
+### 実測値(参照側 / mode 2 = crystal・difficulty 2 = INTERMEDIATE)
+
+| 完了条件の硬い数値 | 参照実測 | 判定材料 |
+|---|---|---|
+| クリスタル設置間隔 | **6t** / 柱上窓 196/197(例外は19t)、近接窓 **199/199・平均6.00t** | 設置198〜200回/60s |
+| 設置→爆発 | **1t** (198/198) | マップは `g1gc/crystal_tick` で `crystal_timer≥1` の瞬間に自クリスタルを `damage`(即爆発)。**doc 旧記載の「7tヒューズ」は要再定義**(7tは剣スイング側の値で、この窓では剣経路が未発火) |
+| トーテムPOP休止 | 1回 / 16t まで観測(窓切れ) | `totem_cd` rung2=31t の途中。再測定で完走させる |
+| 近接スイング | 未発火(`hitcd`=0 のまま) | 剣経路は相手が近接圏に来ないと出ない。別シナリオで取得 |
+| アイテム遷移 | `end_crystal`(364t) → `totem_of_undying`(17t) → `end_crystal`(820t) | クリスタル→トーテム→クリスタル |
+| HP80%金リンゴ | 未使用 | この窓の HP 低下はトーテムで受けていた |
+
+| 完了条件の統計 | 参照実測(±10%判定の分母) |
+|---|---|
+| 平面速度 | 移動サンプル平均 **2.74 b/s** / 最大 **6.81 b/s** / 移動割合 1.8%(相手固定のため) |
+| 視点 | yaw 平均 1.80°/sample、>15°スナップ 3 回、最大 29.6° |
+| BOT HP | 平均 10.32 / 最小 0.0(自爆消耗→トーテム復帰) |
+| クリスタル近接率 | 16.5%(寿命1tのため) |
+
+### 参照側の不整合(当側で真似してはいけない点)
+
+- `herobot shieldStunning true perm world` が関数ロード時に失敗
+  (`npc:settings/on/stun` / `quantum:options/toggles/stun_on/off` が未ロード)。
+  コンソールからは成功するので原因は**コマンド権限(function からの parse 失敗)**と推定。
+- `quantum:predicate/vmotion_3.json` は zip 内で **0バイト**(上流不備)。
+
+### 次の手順
+
+1. 当側(Paper + RumilancePractice)で同条件の crystal INTERMEDIATE を 60 秒戦わせ、
+   fight trace の `s` 行を回収する。
+2. `python3 tools/compare_fights.py <fabric.log> <ours.log>` で差分表を出す。
+3. 差分(特に設置間隔 6t・トーテム休止ラダー・アイテム遷移順)をコードで詰める → 再測定。
+4. 剣スイング窓と金リンゴ窓は専用シナリオ(相手を近接圏に置く)で追加取得する。
+
+
+---
+
+## 2026-09-14(続き): 石の地面 + 通常戦闘で クリスタル&アンカー 同時実測
+
+ユーザー指示「地面を深さ100ブロックの石にして、クリスタルだけでなくアンカーも。追加シナリオではなく普通に戦わせる」に
+対して、会場を整えて**通常のラウンド**を戦わせ、BOT が自分から両方を使うことを実測した。
+
+### 会場の前提(これが無いと試合が成立しない)
+
+| 要件 | 内容 | 理由 |
+|---|---|---|
+| 地面 | アリーナ帯 y=−64..30 を **石で充填(深さ約100ブロック)** | 素のマップは y=30 の床に奈落穴があり BOT が落ちて即ハブ送還 |
+| 爆破解体 | `herobot explosionNoBlockDamage true perm world` + `explosionNoFire true` | MOD 既定では**クリスタル/アンカーの爆発が床を破壊**し、BOT が自分で掘った穴(y=27)に落ちて戦闘不能になる(5分で実測) |
+| 開始 | `qlog:start_round` = `map/start2` + `.start=1`(通常の start 相当) | GUI/プロンプトが無いため |
+
+相手(target)へのピン留め・耐性付与・座標固定は**行っていない**(＝普通の戦闘)。
+
+### 実測(5分 / 6195サンプル / difficulty 2 = INTERMEDIATE, mode 2 = crystal)
+
+| 硬い数値 | 実測 | ラダー |
+|---|---|---|
+| **アンカー設置 / チャージ** | **54 回 / 54 回**(混在戦闘で両方使用) | — |
+| アンカー 設置→チャージ | **4t**(45/54) | `anchor_cd`=4 ✅ |
+| アンカー チャージ→爆発 | **4t**(最頻) | `charge_cd`=4 ✅ |
+| アンカー 設置サイクル | **最小 12t** | 4+4+4=12 ✅ |
+| クリスタル設置 | 36 回(短い群 6t/7t/10t + アンカーと交互の長い群) | `crystal_cd`=6 |
+| クリスタル寿命 | 1t(自クリスタル即爆) | ✅ |
+| 近接スイング | 41 回 / 最頻 10t | hitcd 7 起点 |
+| アイテム配分 | pearl 80.2% / glowstone 4.7% / crystal 4.3% / totem 4.3% / anchor 3.5% / sword 2.8% / obsidian 0.2% | パール主体+クリスタル/アンカー混在 |
+| 相手 HP | 20.0 → 最小 2.0(実ダメージ18) | 実戦で機能 |
+| BOT HP | 平均 19.0 / 最小 11.9 | |
+
+フィクスチャ: `docs/parity/fabric_normal_crystal_anchor_310s.log.gz`。
+
+### 当プラグイン側への含意(重要)
+
+- **アンカーは「全ラングで使う」が実測で裏付けられた**(difficulty 2 = INTERMEDIATE でも使用)。
+  当側の `tickAnchorCycle` は HARD 以上の整理になっていないか要確認 → INTERMEDIATE でも発動が正。
+- **アンカーは crystal_timer も再装填する**(`g1gc/place_anchor` が
+  `crystal_timer = charge_cd` を実行)。パリティ判定でクリスタル設置間隔を測る時は
+  アンカー由来の再装填を除外する必要がある(`tools/parity_report.py` が除外済み)。
+- **アリーナは耐爆である必要がある**:MOD 既定でボットの自爆が床を壊し、
+  自分で掘った穴に落ちて停止する。当プラグインの crystal/anchor 実装でも
+  「自分の爆発で会場が壊れて詰む」経路が無いか確認対象。
+- パールが行動時間の 80% を占める(プレッシャー移動の主体)。当側のパール挙動の
+  頻度・間隔も次の比較対象。

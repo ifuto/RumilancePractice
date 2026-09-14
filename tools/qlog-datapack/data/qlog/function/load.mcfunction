@@ -1,3 +1,4 @@
-# qlog: full-parity sampler for the real QuantumBOT (every 2 ticks = 0.1 s)
+# qlog: 毎tickサンプラ(参照BOT比較用)
 scoreboard objectives add qlog_t dummy
-scoreboard players set #qlog_t qlog_t 2
+scoreboard players set #qlog_tick qlog_t 0
+scoreboard players set #qlog_round qlog_t 0
