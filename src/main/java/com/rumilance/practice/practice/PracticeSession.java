@@ -55,6 +55,9 @@ public final class PracticeSession {
     private final BotAbilityState abilities = new BotAbilityState();
     /** Quantum parity ("もってるアイテムだけ使う"): every special item the bot may use is a
      * COUNTED stock restocked on spawn — no phantom webs/lava/potions/rails appear anymore. */
+    /** Objective timeline of the fight (bot swings/hits/combos/totems) for the end report. */
+    private final java.util.List<String> fightLog = new java.util.ArrayList<>();
+    private final long fightLogStart = System.currentTimeMillis();
     /** Materials present in the kit the bot cloned from the player (visible slot selects). */
     private final java.util.Set<org.bukkit.Material> botKitMaterials =
             java.util.EnumSet.noneOf(org.bukkit.Material.class);
@@ -429,6 +432,18 @@ public final class PracticeSession {
 
     public java.util.Set<org.bukkit.Material> botKitMaterials() {
         return botKitMaterials;
+    }
+
+    /** Records one fight event with its second-offset; capped so a long fight cannot leak. */
+    public void fightLog(String event) {
+        if (fightLog.size() < 240) {
+            long t = (System.currentTimeMillis() - fightLogStart) / 1000L;
+            fightLog.add(t + "s " + event);
+        }
+    }
+
+    public java.util.List<String> fightLog() {
+        return fightLog;
     }
 
     /** Consumes {@code count} of {@code material} from the bot's stock; false when out. */

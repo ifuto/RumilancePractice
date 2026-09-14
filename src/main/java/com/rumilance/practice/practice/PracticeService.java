@@ -1896,6 +1896,25 @@ public final class PracticeService {
                 + " mode=" + mode + " room=" + roomId + " result=" + result
                 + " pops=" + session.botPops() + " duration=" + seconds + "s"
                 + " difficulty=" + session.difficulty().preset());
+        // Objective fight trace: whether the bot fought NORMALLY is a judgement over the
+        // whole timeline (closed in, swung at map cadence, placed/broke crystals, popped
+        // and paused, ate, pearled) — dump it for the player and the console.
+        java.util.List<String> trace = session.fightLog();
+        if (!trace.isEmpty()) {
+            Bukkit.getLogger().info("[N Arena][BotMatch] trace (" + trace.size() + " events):");
+            for (String line : trace) {
+                Bukkit.getLogger().info("[N Arena][BotMatch]   " + line);
+            }
+            if (player.isOnline()) {
+                player.sendMessage(net.kyori.adventure.text.Component.text(
+                        "--- Bot fight trace (" + trace.size() + " events) — also in console ---",
+                        NamedTextColor.GRAY));
+                for (String line : trace) {
+                    player.sendMessage(net.kyori.adventure.text.Component.text(line,
+                            NamedTextColor.GRAY));
+                }
+            }
+        }
         NamedTextColor color = switch (result) {
             case WIN -> NamedTextColor.GREEN;
             case LOSE -> NamedTextColor.RED;
@@ -2688,6 +2707,7 @@ public final class PracticeService {
      * sloppy rungs whiff often, MASTER almost never does).
      */
     private void botSwing(Player player, BotBody bot, BotDifficulty diff, double damage) {
+        session.fightLog("swing " + diff.preset());
         if (bot.isPacket()) {
             // A swing is only an animation in vanilla — the ATTACK is gameMode.attack().
             // Run the fake player's real attack: vanilla damage from the cloned kit's
@@ -2749,14 +2769,17 @@ public final class PracticeService {
         // crits, knockback, mace smash, i-frames) without touching the packet listener.
         nmsBot.attack(nmsTarget);
         nmsBot.swing(net.minecraft.world.InteractionHand.MAIN_HAND);
+        session.fightLog("attack(packet) vanilla");
     }
 
     private void botMeleeHit(Player player, BotBody bot, double damage, boolean knockback) {
         if (bot.isPacket()) {
             // Custom damage pipeline is mannequin-only; packet bodies attack for real via
             // packetMeleeAttack (their call sites route there before reaching this method).
+            session.fightLog(String.format("hit(packet) %.1f", damage));
             return;
         }
+        session.fightLog(String.format("hit %.1f", damage));
         if (player == null || !player.isOnline() || damage <= 0.0d || player.isDead()) {
             return;
         }
@@ -3604,6 +3627,7 @@ public final class PracticeService {
         ab.nextGapMs(now + 1750L);
         ab.gapEatUntilMs(now + 1750L);
         ab.gapRegenUntilMs(now + 6750L);
+        session.fightLog("gap eat (hp " + String.format("%.0f", bot.getHealth()) + ")");
         selectBotSlot(session, bot, Material.GOLDEN_APPLE);
     }
 
@@ -4271,6 +4295,7 @@ public final class PracticeService {
                 }
                 ab.anchorStage(2);
                 ab.nextAnchorMs(now + anchorChargeCdMs(diff));
+                session.fightLog("anchor charge");
                 return;
             }
             // Stage 2 -> detonate (vanilla anchor blast: power 5 + fire).
@@ -4283,6 +4308,7 @@ public final class PracticeService {
             ab.anchorStage(0);
             ab.anchorBlock(null);
             ab.nextAnchorMs(now + anchorExplodeCdMs(diff));
+            session.fightLog("anchor detonate");
             return;
         }
         // Engage: outside melee range only (the map answers close range with the sword).
@@ -4313,6 +4339,7 @@ public final class PracticeService {
         ab.anchorBlock(spot.getLocation());
         ab.anchorStage(1);
         ab.nextAnchorMs(now + anchorPlaceCdMs(diff));
+        session.fightLog("anchor place");
     }
 
     /**
@@ -4328,6 +4355,8 @@ public final class PracticeService {
             if (body != null && body.owns(botEntity)) {
                 session.abilities().totemPauseUntilMs(
                         System.currentTimeMillis() + crystalTotemPauseMs(session.difficulty()));
+                session.fightLog("totem POP (pause "
+                        + crystalTotemPauseMs(session.difficulty()) + "ms)");
                 return;
             }
         }
@@ -4376,6 +4405,7 @@ public final class PracticeService {
                 .spawn(crystalLoc, org.bukkit.entity.EnderCrystal.class,
                         c -> c.setShowingBottom(false));
         session.botCrystals().add(crystal.getUniqueId());
+        session.fightLog("crystal place");
         bot.swingMainHand(); // map: player @s swing once (g1gc/spawncrystal)
         // One beat later: boom (if the crystal is still alive).
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
