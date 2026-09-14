@@ -75,3 +75,8 @@ cd /tmp/mcserver && /tmp/jdk21/bin/java -Xmx2400M -jar fabric-server-launch.jar 
 - 2026-09-14(深夜3): 初回の Fabric 配送は line 69 (meta.fabricmc.net の loader/1.21.11 解決) で失敗。
   ログ本体が読めないため、ci/java-env.sh に HTTP ステータス / ボディ先頭 / 既知 game versions を
   ::error:: アノテーションで吐く診断と、全ローダー一覧・maven metadata へのフォールバックを追加。
+- 2026-09-14(深夜4): 2件目の失敗を修正 — (1) loader/1.21.11 は `[{"loader":{"version":…}}]` の
+  ネスト構造でパース対象が `loader.version` だった(旧コードは `version` を見て空 → 偽の「空応答」判定)。
+  (2) 起動検証の FIFO を読み取り専用で開いていたため open がブロックし、Java が一度も起動していなかった
+  (`< fifo` は `> log` より先に処理されるのでログファイルすら作られない) → `exec 8<>` の読み書き両開きへ。
+  失敗時は起動ログの head/tail/マーカーを ::error:: アノテーションで出す。

@@ -76,8 +76,8 @@ api_get() { # api_get <url> <outfile>
   echo "  GET $url -> $HTTP_STATUS ($(wc -c <"$out" 2>/dev/null | tr -d ' ') bytes)"
 }
 
-pick_json() { # pick_json <file> <key> — 配列の先頭 stable(無ければ先頭)の <key>
-  python3 - "$1" "$2" <<'PY' 2>/dev/null || true
+pick_json() { # pick_json <file> <dotted.key> — 配列の先頭 stable(無ければ先頭)から点パスで取出す
+  python3 - "$1" "$2" <<'PYX' 2>/dev/null || true
 import json, sys
 try:
     a = json.load(open(sys.argv[1]))
@@ -85,13 +85,20 @@ except Exception:
     raise SystemExit
 if isinstance(a, list) and a:
     s = [v for v in a if v.get("stable")] or a
-    print(s[0].get(sys.argv[2], ""))
-PY
+    cur = s[0]
+    for part in sys.argv[2].split("."):
+        if not isinstance(cur, dict):
+            cur = None
+            break
+        cur = cur.get(part)
+    if isinstance(cur, (str, int)):
+        print(cur)
+PYX
 }
 
 # loader: ゲーム版つき一覧 → 空/失敗なら全ローダー一覧へフォールバック(loader 自体は版非依存)
 api_get "https://meta.fabricmc.net/v2/versions/loader/1.21.11" "$WORK/loader.json"
-LOADER=$(pick_json "$WORK/loader.json" version)
+LOADER=$(pick_json "$WORK/loader.json" loader.version)
 if [ -z "$LOADER" ]; then
   BODY=$(head -c 200 "$WORK/loader.json" 2>/dev/null | tr '\n' ' ')
   echo "::warning::loader/1.21.11 が空 (http=$HTTP_STATUS body=$BODY) — 全体リストへフォールバック"
@@ -103,8 +110,7 @@ try:
     a=json.load(sys.stdin); print(",".join(str(v.get("version","?")) for v in a[:20]))
 except Exception as e:
     print("game-list-unavailable:"+type(e).__name__)' 2>&1 | tr '\n' ' ')
-  echo "::error::fabric loader 未解決 — loader/1.21.11 http=$HTTP_STATUS body=$BODY / 既知 game versions(先頭20): $GAMES"
-  [ -n "$LOADER" ] || exit 1
+  [ -n "$LOADER" ] || die "fabric loader 未解決 — loader/1.21.11 http=$HTTP_STATUS body=$BODY / 既知 game versions(先頭20): $GAMES"
   echo "::warning::fallback loader=$LOADER (1.21.11 用のサーバー jar は取れない可能性がある)"
 fi
 
@@ -189,33 +195,55 @@ echo "eula=true" > "$MCS/eula.txt"
 
 # 起動検証: ここで一度起動しておくと、バニラ server.jar / Mojang ライブラリ / リマップ済みジャーが
 # すべて .fabric と libraries に落ちる = サンドボックス(オフライン)でもそのまま起動できる。
-step "起動検証(Done まで最大 6 分 → コンソール stop で正常終了)"
+step "起動検証(Done まで最大 8 分 → stop で正常終了)"
+# FIFO は「読み書き両開き (exec 8<>)」。読み取り専用で開くと書き手が現れるまで open が
+# ブロックし、さらに "< fifo" を先に処理するリダイレクト順の都合で、ログファイルすら
+# 作られないまま Java が起動しない(初回実行で踏んだ罠)。両開きなら誰も待たない。
 rm -f /tmp/boot_ctl; mkfifo /tmp/boot_ctl
+exec 8<>/tmp/boot_ctl
 ( cd "$MCS" && exec "$JAVA" -Xmx2400M -jar fabric-server-launch.jar nogui ) \
-  < /tmp/boot_ctl > "$MCS/server_boot.log" 2>&1 &
+  <&8 > "$MCS/server_boot.log" 2>&1 &
 BOOT_PID=$!
-for _ in $(seq 1 72); do
+for _ in $(seq 1 96); do
   grep -q "Done (" "$MCS/server_boot.log" 2>/dev/null && break
   kill -0 "$BOOT_PID" 2>/dev/null || break
   sleep 5
 done
+
+boot_report() { # 起動ログの中身を数行のアノテーションに畳む(ログ本体は読めない前提)
+  local size head_ tail_ mark_ listing_
+  size=$(wc -c < "$MCS/server_boot.log" 2>/dev/null || echo 0)
+  head_=$(head -c 700 "$MCS/server_boot.log" 2>/dev/null || true)
+  tail_=$(tail -c 1600 "$MCS/server_boot.log" 2>/dev/null || true)
+  mark_=$(grep -aoE "Exception|Incompatible mod set|UnsupportedClassVersion|Downloading|Loading [0-9]+ mods|Failed to|NoSuchMethodError|ClassNotFound" "$MCS/server_boot.log" 2>/dev/null | sort -u || true)
+  listing_=$(ls -1 "$MCS" 2>/dev/null || true)
+  echo "size=${size}B files=[$(echo "$listing_" | tr '\n' ' ')]"
+  echo "markers=[$(echo "$mark_" | tr '\n' ' ')]"
+  echo "HEAD>>> ${head_//$'\n'/ | }"
+  echo "TAIL>>> ${tail_//$'\n'/ | }"
+}
+
 if ! grep -q "Done (" "$MCS/server_boot.log" 2>/dev/null; then
-  echo "::error::Fabric サーバーが Done に到達しません / ログ末尾: $(tail -c 1200 "$MCS/server_boot.log" | tr '\n' '|')"
+  BOOT_EXIT=alive
+  if ! kill -0 "$BOOT_PID" 2>/dev/null; then BOOT_EXIT=$(wait "$BOOT_PID" 2>/dev/null; echo $?); fi
+  echo "::error::Fabric サーバーが Done に到達しません (exit=$BOOT_EXIT)"
+  boot_report | while IFS= read -r line; do echo "::error::$line"; done
   exit 1
 fi
 if ! grep -qi "herobot" "$MCS/server_boot.log"; then
-  echo "::error::herobot MOD がロードされていません / mods 行: $(grep -iE 'mods' "$MCS/server_boot.log" | head -3 | tr '\n' '|' | head -c 800)"
+  echo "::error::herobot MOD がロードされていません"
+  grep -aiE "mods|herobot|fabric" "$MCS/server_boot.log" 2>/dev/null | head -c 900 | while IFS= read -r line; do echo "::error::$line"; done
   exit 1
 fi
 grep -E "Done \(|Loading .* mods" "$MCS/server_boot.log" | tail -3
-echo "::notice::boot ok mods=$(grep -oE '[0-9]+ mods' "$MCS/server_boot.log" | head -1) done_line=$(grep -m1 "Done (" "$MCS/server_boot.log" | cut -c1-140)"
-if grep -qi "herobot" "$MCS/server_boot.log"; then echo "::notice::herobot loaded"; else echo "::warning::herobot の文字列がログに無い(mods 一覧を確認)"; fi
+echo "::notice::boot ok mods=$(grep -aoE '[0-9]+ mods' "$MCS/server_boot.log" 2>/dev/null | head -1) done=$(grep -am1 "Done (" "$MCS/server_boot.log" 2>/dev/null | cut -c1-120)"
 
 if kill -0 "$BOOT_PID" 2>/dev/null; then
-  timeout 20 bash -c 'echo stop > /tmp/boot_ctl' || kill "$BOOT_PID" 2>/dev/null || true
+  printf 'stop\n' >&8 2>/dev/null || true
   for _ in $(seq 1 60); do kill -0 "$BOOT_PID" 2>/dev/null || break; sleep 1; done
 fi
 if kill -0 "$BOOT_PID" 2>/dev/null; then kill "$BOOT_PID" 2>/dev/null || true; sleep 3; fi
+exec 8>&-
 wait "$BOOT_PID" 2>/dev/null || true
 rm -f /tmp/boot_ctl
 tail -3 "$MCS/server_boot.log"
