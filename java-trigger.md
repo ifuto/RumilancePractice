@@ -80,3 +80,5 @@ cd /tmp/mcserver && /tmp/jdk21/bin/java -Xmx2400M -jar fabric-server-launch.jar 
   (2) 起動検証の FIFO を読み取り専用で開いていたため open がブロックし、Java が一度も起動していなかった
   (`< fifo` は `> log` より先に処理されるのでログファイルすら作られない) → `exec 8<>` の読み書き両開きへ。
   失敗時は起動ログの head/tail/マーカーを ::error:: アノテーションで出す。
+
+- 2026-09-14: 石の地面+通常戦闘でのクリスタル&アンカー実測(v1.75.7)を反映 — CI 再検証。
