@@ -4090,7 +4090,7 @@ public final class PracticeService {
         if (now >= session.botNextAttackMs() && dist <= 9.0d
                 && session.botCrystals().size() < 2 && ab.anchorStage() == 0) {
             long combo = crystalPlaceIntervalMs(crystalDiff);
-            if (launchCrystalAttack(player, session)) {
+            if (launchCrystalAttack(player, session, bot)) {
                 session.setBotNextAttackMs(now + combo);
             } else {
                 session.setBotNextAttackMs(now + 500L); // no valid spot: retry soon
@@ -4199,7 +4199,8 @@ public final class PracticeService {
      * on top, detonated a beat later. Pedestals are tracked and reverted, and the bot is
      * immune to the blasts of the crystals it placed itself.
      */
-    private boolean launchCrystalAttack(Player player, PracticeSession session) {
+    private boolean launchCrystalAttack(Player player, PracticeSession session,
+                                        Mannequin bot) {
         if (!session.botConsume(Material.OBSIDIAN, 1)
                 || !session.botConsume(Material.END_CRYSTAL, 1)) {
             return false;
