@@ -2,7 +2,6 @@ package com.rumilance.practice.packetbot;
 
 import com.rumilance.practice.practice.BotBody;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.phys.Vec3;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
@@ -42,10 +41,38 @@ public final class PacketBotBody implements BotBody {
     }
 
     @Override public void setVelocity(Vector velocity) {
-        // No client overrides server-side player physics, so delta movement drives the body
-        // exactly like knockback does — the AI's velocity nudges work unchanged.
-        bot.setDeltaMovement(new Vec3(velocity.getX(), velocity.getY(), velocity.getZ()));
-        view().setSprinting(false);
+        // Normal fighting needs normal movement: the map drives its fake player with
+        // 'player @s move / sprint / jump' — vanilla movement INPUTS — not velocity shoves.
+        // Translate the AI's planar wish into the same inputs (xxa/zza + sprint + jump) so
+        // the body walks with real acceleration, friction and sprint physics, exactly like
+        // the fake players on the Quantum map. AI call sites stay unchanged.
+        double x = velocity.getX();
+        double z = velocity.getZ();
+        double planar = Math.hypot(x, z);
+        float forward = 0.0f;
+        float strafe = 0.0f;
+        boolean sprint = false;
+        boolean jump = velocity.getY() > 0.2d;
+        if (planar > 0.02d) {
+            double yawRad = Math.toRadians(bot.getYRot());
+            double lx = -Math.sin(yawRad);
+            double lz = Math.cos(yawRad);
+            double f = (x * lx + z * lz) / planar;
+            double r = (x * -lz + z * lx) / planar; // component along the body-right vector
+            if (Math.abs(f) >= Math.abs(r)) {
+                forward = (float) Math.signum(f);
+            } else {
+                // vanilla xxa is LEFT-positive, so pressing right is a negative input
+                strafe = -(float) Math.signum(r);
+            }
+            // the map bots hold sprint whenever they push forward ('player @s sprint' every
+            // tick); orbiting side steps stay at walk speed
+            sprint = forward > 0.0f && planar >= 0.22d;
+        }
+        bot.xxa = strafe;
+        bot.zza = forward;
+        bot.setSprinting(sprint);
+        bot.setJumping(jump);
     }
 
     @Override public double getHealth() { return view().getHealth(); }
