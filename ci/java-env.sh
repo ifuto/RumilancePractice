@@ -383,4 +383,82 @@ else
   echo "::warning::プラグイン成果物が無いため plugin-delivery を省略"
 fi
 
-step "done — delivered mc-server-delivery + java-env-delivery + plugin-delivery"
+step "paper-server: 起動可能な Paper 一式を作る(サンドボックスは Mojang に接続できないため)"
+if compgen -G "$BUNDLE/paper-*.jar" >/dev/null; then
+  PSRV="$WORK/paper-run"
+  rm -rf "$PSRV"; mkdir -p "$PSRV/plugins"
+  cp "$BUNDLE"/paper-*.jar "$PSRV/server.jar"
+  echo "eula=true" > "$PSRV/eula.txt"
+  cat > "$PSRV/server.properties" <<'EOT'
+online-mode=false
+enable-rcon=true
+rcon.port=25576
+rcon.password=rumilance
+gamemode=creative
+spawn-protection=0
+max-players=40
+view-distance=8
+simulation-distance=6
+motd=RumilancePractice parity sandbox
+EOT
+  cd "$PSRV"
+  mkfifo "$WORK/paperin"
+  exec 9<>"$WORK/paperin"
+  ( "$JAVA" -Xmx2G -jar server.jar nogui <&9 > "$WORK/paper-run.log" 2>&1 ) &
+  PAPER_PID=$!
+  ok=0
+  for i in $(seq 1 90); do
+    sleep 2
+    if grep -q "Done (" "$WORK/paper-run.log" 2>/dev/null; then ok=1; break; fi
+    if ! kill -0 $PAPER_PID 2>/dev/null; then break; fi
+  done
+  if [ "$ok" = "1" ]; then
+    echo "stop" >&9
+    for i in $(seq 1 30); do sleep 1; kill -0 $PAPER_PID 2>/dev/null || break; done
+    kill $PAPER_PID 2>/dev/null || true
+    echo "::notice::paper server boot ok (patched jar + libraries 取得済み)"
+  else
+    echo "::error::paper server の起動に失敗(生成ログ tail):"
+    tail -15 "$WORK/paper-run.log" | sed 's/^/::error::paper: /' || true
+  fi
+  exec 9>&-
+  cd "$WS"
+  rm -rf "$PSRV/logs" "$PSRV/world" "$PSRV/world_nether" "$PSRV/world_the_end" 2>/dev/null || true
+  rm -f "$PSRV/usercache.json" "$PSRV/banned-*.json" 2>/dev/null || true
+  tar -czf "$BUNDLE/paper-server.tar.gz" -C "$WORK" paper-run
+  sha256sum "$BUNDLE/paper-server.tar.gz" | awk '{print $1"  paper-server.tar.gz"}' > "$BUNDLE/paper-server.sha256"
+  ls -lh "$BUNDLE/paper-server.tar.gz"
+fi
+
+step "deliver: paper-server-delivery"
+git branch -D paper-server-delivery >/dev/null 2>&1 || true
+git checkout -q --orphan paper-server-delivery
+git rm -rfq . 2>/dev/null || true
+if [ -f "$BUNDLE/paper-server.tar.gz" ]; then
+  mkdir -p paperserver
+  split -b 90m -d "$BUNDLE/paper-server.tar.gz" paperserver/paper-server.tar.gz.part-
+  cp "$BUNDLE/paper-server.sha256" paperserver/sha256s.txt
+  cat > paperserver/README.txt <<'EOT'
+paper-server-delivery — 起動可能な Paper 一式 (run __RUN__)
+
+  git clone --depth 1 --branch paper-server-delivery \
+    https://github.com/ifuto/RumilancePractice.git /tmp/papership
+  cd /tmp/papership && cat paperserver/paper-server.tar.gz.part-* > paper-server.tar.gz
+  tar xzf paper-server.tar.gz        # -> paper-run/ (server.jar + libraries + versions)
+  cd paper-run && /tmp/jdk21/bin/java -Xmx2G -jar server.jar nogui
+
+plugins/ に plugin-delivery の jar を置けば当プラグイン検証ができる。
+Mojang から vanilla を再取得しないよう patched jar と libraries を同梱している。
+EOT
+  sed -i "s/__RUN__/$RUN/" paperserver/README.txt
+  ls -lh paperserver
+  git add -A paperserver
+  git commit -qm "paper-server delivery (run $RUN): 起動可能な Paper 一式"
+  if ! git push -f origin paper-server-delivery 2>/tmp/push4.err; then
+    echo "::error::push paper-server-delivery failed: $(tr '\n' ' ' < /tmp/push4.err | head -c 900)"
+  fi
+  git ls-remote --heads origin paper-server-delivery
+  echo "::notice::delivered paper-server-delivery $(git rev-parse HEAD)"
+fi
+
+step "done — delivered mc-server-delivery + java-env-delivery + plugin-delivery + paper-server-delivery"
