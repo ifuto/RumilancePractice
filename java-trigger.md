@@ -88,3 +88,4 @@ mkdir -p /tmp/jdk21 && tar -xzf /tmp/jdk21.tar.gz -C /tmp/jdk21 --strip-componen
 - 2026-09-14(6): qlog データパック作成(tools/qlog-datapack)— QuantumBOTの行動(位置/hp/hitcd/totem_timer/crystal_timer/近傍クリスタル)を0.5s間隔でコンソールへ。ユーザーのFabricログと当側traceで比較する観測器。
 - 2026-09-14(7): マップ開始はコンソールで完全自動化可能と実データ確認(options/crystal→/player spawn→.start=1・タグ自動・2体目別名でBOTvsBOT可)。
 - 2026-09-14(8): 数値完全一致ループの道具一式 — qlogを2tick全軸サンプラに拡張(pos/vel/yaw/pitch/hp/ground/item/全タイマ)、当側fightSamples(0.1s・コンソールのみ)、tools/compare_fights.py(両ログを同軸化して差分レポート)。サーバー受領後に実測→比較→修正ループ開始(v1.75.0)。
+- 2026-09-14(9): 標準測定シナリオ確定(硬い数値=タイマ系は一致必須/統計=±10%)、当側サンプルに速度追加・クリスタル爆発をtrace化(v1.75.1)。

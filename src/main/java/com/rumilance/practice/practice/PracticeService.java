@@ -3299,9 +3299,12 @@ public final class PracticeService {
                 Location bl = bot.getLocation();
                 EntityEquipment seq = bot.getEquipment();
                 String hand = seq == null ? "-" : seq.getItemInMainHand().getType().name();
+                Vector bv = bot.getVelocity();
                 session.fightSample(String.format(
-                        "s p=%.2f,%.2f,%.2f y=%.1f pi=%.1f hp=%.1f g=%d i=%s",
-                        bl.getX(), bl.getY(), bl.getZ(), bl.getYaw(), bl.getPitch(),
+                        "s p=%.2f,%.2f,%.2f v=%.2f,%.2f,%.2f y=%.1f pi=%.1f hp=%.1f g=%d i=%s",
+                        bl.getX(), bl.getY(), bl.getZ(),
+                        bv.getX(), bv.getY(), bv.getZ(),
+                        bl.getYaw(), bl.getPitch(),
                         bot.getHealth(), bot.isOnGround() ? 1 : 0, hand));
             }
             Location eye = bot.getEyeLocation();
@@ -4437,6 +4440,7 @@ public final class PracticeService {
                     boom.getWorld().createExplosion(boom, 6.0f, false, false, crystal);
                 }
                 crystal.remove();
+                session.fightLog("crystal detonate (7t fuse)");
             }
             session.botCrystals().remove(crystal.getUniqueId());
         }, 7L);
