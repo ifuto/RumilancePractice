@@ -2745,7 +2745,9 @@ public final class PracticeService {
         net.minecraft.server.level.ServerPlayer nmsBot = packetBody.bot();
         net.minecraft.world.entity.LivingEntity nmsTarget =
                 ((org.bukkit.craftbukkit.entity.CraftLivingEntity) player).getHandle();
-        nmsBot.gameMode.attack(nmsBot, nmsTarget);
+        // Same call fabric-carpet's action pack makes: the full vanilla melee (sweep,
+        // crits, knockback, mace smash, i-frames) without touching the packet listener.
+        nmsBot.attack(nmsTarget);
         nmsBot.swing(net.minecraft.world.InteractionHand.MAIN_HAND);
     }
 
