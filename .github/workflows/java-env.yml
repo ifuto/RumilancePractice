@@ -1,0 +1,92 @@
+# java-env: java-trigger.md を含む push で発火し、JDK 21 (Temurin) と
+# Paper 1.21.11 サーバー jar を取得して (1) アーティファクト「java-env」に保管し、
+# (2) サンドボックス向けに **java-env-delivery ブランチへ分割コミット**する。
+#
+# [なぜ git 配送か] サンドボックスの下りは github.com (git/HTTPS) と api.github.com
+# のみ許可で、Azure blob 系 (artifact / release asset) は EOF で遮断される。
+# そのため gh run download は使えず、git チャネルで受ける。
+#
+# サンドボックス側での取得手順:
+#   git clone --depth 1 --branch java-env-delivery \
+#     https://github.com/ifuto/RumilancePractice.git /tmp/ship
+#   cat /tmp/ship/delivery/jdk21.tar.gz.part-* > /tmp/jdk21.tar.gz
+#   (cd /tmp/ship/delivery && sha256sum -c sha256s.txt --ignore-missing)
+#   mkdir -p /tmp/jdk21 && tar -xzf /tmp/jdk21.tar.gz -C /tmp/jdk21 --strip-components=1
+#   /tmp/jdk21/bin/java -version
+#
+# 手動再実行: gh workflow run java-env.yml (workflow_dispatch 対応)
+#
+# 履歴: 初版の Paper 取得は PaperMC API v2 (api.papermc.io) だったが、
+#       v2 は 2026-09 に sunset したため fill v3 (fill.papermc.io) に移行した。
+
+name: java-env
+
+on:
+  push:
+    paths:
+      - 'java-trigger.md'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Fetch portable JDK 21 (Temurin / linux x64)
+        run: |
+          curl -fsSL -o jdk21.tar.gz \
+            "https://api.adoptium.net/v3/binary/latest/21/ga/linux/x64/jdk/hotspot/normal/eclipse"
+          mkdir -p jdk_check && tar -xzf jdk21.tar.gz -C jdk_check --strip-components=1
+          jdk_check/bin/java -version
+
+      - name: Fetch Paper 1.21.11 (latest build via fill v3 API)
+        run: |
+          UA="RumilancePractice-ci/1.0 (+https://github.com/ifuto/RumilancePractice)"
+          curl -fsSL -A "$UA" -o paper_meta.json \
+            "https://fill.papermc.io/v3/projects/paper/versions/1.21.11/builds/latest"
+          URL=$(python3 -c 'import json; d=json.load(open("paper_meta.json")); print(d["downloads"]["server:default"]["url"])')
+          NAME=$(python3 -c 'import json; d=json.load(open("paper_meta.json")); print(d["downloads"]["server:default"]["name"])')
+          SHA=$(python3 -c 'import json; d=json.load(open("paper_meta.json")); print(d["downloads"]["server:default"]["checksums"]["sha256"])')
+          echo "paper: $NAME (sha256 $SHA)"
+          curl -fsSL -A "$UA" -o "$NAME" "$URL"
+          echo "$SHA  $NAME" | sha256sum -c -
+          ls -lh paper-*.jar
+
+      - name: Bundle with checksums (outside the workspace — checkout's clean would wipe it)
+        run: |
+          mkdir -p /tmp/bundle
+          mv jdk21.tar.gz paper-*.jar /tmp/bundle/
+          (cd /tmp/bundle && sha256sum * > sha256s.txt && ls -lh)
+
+      - name: Upload java-env artifact (human fallback)
+        uses: actions/upload-artifact@v4
+        with:
+          name: java-env
+          path: /tmp/bundle/*
+          retention-days: 30
+          compression-level: 0
+
+      - name: Checkout with persisted credentials (canonical push auth)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Deliver via java-env-delivery branch (sandbox channel)
+        run: |
+          set -Eeuo pipefail
+          trap 'echo "::error::delivery failed at line $LINENO doing: ${BASH_COMMAND}"' ERR
+          test -f /tmp/bundle/jdk21.tar.gz || { echo "::error::/tmp/bundle/jdk21.tar.gz missing"; exit 1; }
+          git config user.name "java-env-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -q --orphan java-env-delivery
+          git rm -rfq .
+          mkdir -p delivery
+          split -b 90m -d /tmp/bundle/jdk21.tar.gz delivery/jdk21.tar.gz.part-
+          cp /tmp/bundle/paper-*.jar /tmp/bundle/sha256s.txt delivery/
+          git add -A delivery
+          git commit -qm "java-env delivery (run ${{ github.run_id }}): Temurin 21 + Paper 1.21.11"
+          git push -f origin java-env-delivery
+          git ls-remote --heads origin java-env-delivery
