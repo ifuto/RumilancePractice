@@ -2,6 +2,7 @@ package com.rumilance.practice.packetbot;
 
 import com.rumilance.practice.practice.BotBody;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.Vec3;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
