@@ -408,6 +408,10 @@ public final class PracticeService {
                 stock.put(Material.GLOWSTONE, 64);
                 stock.put(Material.WATER_BUCKET, 1);
                 stock.put(Material.ENDER_PEARL, 16);
+                // The map's crystal bot hotbar: 1 totem, 2 obsidian, 3 crystal, 4 sword,
+                // 5 golden apple, 6 crossbow, 7 pearl, 8 anchor, 9 glowstone. We mirror the
+                // slots (and their counts) so the bot visibly selects and consumes them.
+                stock.put(Material.GOLDEN_APPLE, 2);
             }
             case CART -> {
                 stock.put(Material.POWERED_RAIL, 99);
@@ -1425,8 +1429,6 @@ public final class PracticeService {
     /** Cooldown for the escape pearl (map: pearlcd 20 ticks + spread reacquire time). */
     private static final long ESCAPE_PEARL_COOLDOWN_MS = 9000L;
     /** Golden apple: eaten below half HP, heals 40%, at most twice per bot life. */
-    private static final long GAP_COOLDOWN_MS = 500L;
-    private static final double GAP_HEAL_FRACTION = 0.4d;
     private static final int GAP_MAX_USES = 2;
     /** Cobweb trick: placed under the player, melts away after TTL. */
     private static final long COBWEB_COOLDOWN_MS = 6000L;
@@ -3174,6 +3176,9 @@ public final class PracticeService {
             boolean blocking = session.botShieldRaised();
             double distSq = bot.getLocation().distanceSquared(player.getLocation());
             double dist = Math.sqrt(distSq);
+            if (tickBotGapEating(session, bot, now)) {
+                return; // chomping an apple: stand still like the map's gap_timer pause
+            }
 
             // Crystal drills ride on top of the shared combat tick.
         if (type == PracticeType.CRYSTAL && session.botMode() != PracticeMode.NONE) {
@@ -3472,18 +3477,115 @@ public final class PracticeService {
      */
     private void tickBotGap(PracticeSession session, Mannequin bot, double maxHp, long now) {
         PracticeSession.BotAbilityState ab = session.abilities();
+        // Regen-II tail of a just-eaten apple (vanilla golden apple: +8 HP over 5 s).
+        if (now < ab.gapRegenUntilMs()) {
+            healToward(bot, maxHp, 0.08d);
+        }
         if (now < ab.nextGapMs() || ab.gapUses() >= GAP_MAX_USES
-                || bot.getHealth() >= maxHp * 0.5d) {
+                || bot.getHealth() >= maxHp * 0.8d) {
+            return;
+        }
+        // Map crystal/passive/gap: eat at <=80% HP, visible apple in hand, 35 ticks of
+        // chomping while standing still, then the heal lands. Two apples per life.
+        if (!session.botConsume(Material.GOLDEN_APPLE, 1)) {
             return;
         }
         ab.gapUses(ab.gapUses() + 1);
-        ab.nextGapMs(now + GAP_COOLDOWN_MS);
-        healToward(bot, maxHp, maxHp * GAP_HEAL_FRACTION);
-        if (bot.getWorld() != null) {
-            bot.getWorld().playSound(bot.getLocation(), Sound.ENTITY_GENERIC_EAT, 1.0f, 1.1f);
+        ab.nextGapMs(now + 1750L);
+        ab.gapEatUntilMs(now + 1750L);
+        ab.gapRegenUntilMs(now + 6750L);
+        selectBotSlot(bot, Material.GOLDEN_APPLE);
+    }
+
+    /**
+     * The eating half of {@link #tickBotGap}: called first thing in the combat tick so the
+     * bot actually stands still and chomps (map: {@code player @s stop} + gap_timer 35t)
+     * instead of fighting with an apple in its mouth.
+     */
+    private boolean tickBotGapEating(PracticeSession session, Mannequin bot, long now) {
+        PracticeSession.BotAbilityState ab = session.abilities();
+        if (now >= ab.gapEatUntilMs()) {
+            return false;
+        }
+        bot.setVelocity(new Vector(0, bot.getVelocity().getY(), 0));
+        if (now / 100L != (now - 50L) / 100L && bot.getWorld() != null) {
+            bot.getWorld().playSound(bot.getLocation(), Sound.ENTITY_GENERIC_EAT, 0.7f, 0.9f);
             bot.getWorld().spawnParticle(org.bukkit.Particle.ENTITY_EFFECT,
-                    bot.getLocation().add(0, 1.2, 0), 26, 0.4, 0.6, 0.4, 1.0d,
+                    bot.getLocation().add(0, 1.2, 0), 8, 0.3, 0.4, 0.3, 1.0d,
                     org.bukkit.Color.fromRGB(0xF5C72C));
+        }
+        return true;
+    }
+
+    /**
+     * Visible hotbar selection — the map drives its bot with {@code player @s hotbar N}, so
+     * every action shows the right item in the bot's hand before it acts. We mirror the map's
+     * slots from the bot's own kit stock: sword 4, obsidian 2, crystal 3, gap 5, pearl 7,
+     * anchor 8, glowstone 9. A no-op while the item is already held.
+     */
+    private void selectBotSlot(Mannequin bot, Material material) {
+        EntityEquipment eq = bot.getEquipment();
+        if (eq == null || eq.getItemInMainHand().getType() == material) {
+            return;
+        }
+        eq.setItemInMainHand(new ItemStack(material));
+    }
+
+    /**
+     * The map bot never mines, but a real crystal player digs out cover and floors — and the
+     * bot must stay dangerous when the player boxes in. Mine the block that blocks the combo:
+     * head cover above the player, the floor under them, or the wall between bot and player.
+     * 1.5 s per block with progressive crack particles and swings; bedrock and obsidian are
+     * refused (obsidian is pedestal material, not something to chew through mid-fight).
+     */
+    private void tickBotMining(Player player, PracticeSession session, Mannequin bot,
+                               double dist, long now) {
+        PracticeSession.BotAbilityState ab = session.abilities();
+        if (ab.miningUntilMs() > 0L) {
+            org.bukkit.block.Block target = ab.miningBlock() == null
+                    ? null : ab.miningBlock().getBlock();
+            if (target == null || target.getType().isAir()
+                    || target.getType() == Material.BEDROCK) {
+                ab.miningUntilMs(0L);
+                ab.miningBlock(null);
+                return;
+            }
+            if (now >= ab.miningUntilMs()) {
+                target.setType(Material.AIR, false);
+                if (bot.getWorld() != null) {
+                    bot.getWorld().playSound(target.getLocation(),
+                            Sound.BLOCK_STONE_BREAK, 1.0f, 1.0f);
+                }
+                ab.miningUntilMs(0L);
+                ab.miningBlock(null);
+                session.setBotNextAttackMs(0L); // combo spot may exist now — retry immediately
+                return;
+            }
+            bot.swingMainHand();
+            if (bot.getWorld() != null) {
+                bot.getWorld().spawnParticle(org.bukkit.Particle.CRIT,
+                        target.getLocation().add(0.5d, 0.5d, 0.5d), 6, 0.3d, 0.3d, 0.3d, 0.0d);
+            }
+            return;
+        }
+        if (dist > 6.0d) {
+            return;
+        }
+        org.bukkit.block.Block foot = player.getLocation().getBlock();
+        org.bukkit.block.Block[] candidates = {
+                foot.getRelative(org.bukkit.block.BlockFace.UP, 2),   // the box lid
+                foot.getRelative(org.bukkit.block.BlockFace.DOWN),    // the floor out from under them
+                foot.getRelative(org.bukkit.block.BlockFace.UP)
+        };
+        for (org.bukkit.block.Block cand : candidates) {
+            Material type = cand.getType();
+            if (!type.isAir() && type.isSolid() && type != Material.BEDROCK
+                    && type != Material.OBSIDIAN && type != Material.RESPAWN_ANCHOR
+                    && type != Material.END_CRYSTAL && type.isBlock()) {
+                ab.miningBlock(cand.getLocation());
+                ab.miningUntilMs(now + 1500L);
+                return;
+            }
         }
     }
 
@@ -3899,6 +4001,11 @@ public final class PracticeService {
             return;
         }
 
+        // Mid-apple: the bot stands still and chomps (map gap_timer) — no fighting until done.
+        if (tickBotGapEating(session, bot, now)) {
+            return;
+        }
+
         // --- movement: the map bot holds its ground (g1gc/botlogic stops every tick) and only
         // pushes forward when the player is beyond 2 blocks; it never backs away — a losing
         // trade is answered with a pearl instead.
@@ -3941,6 +4048,7 @@ public final class PracticeService {
                 && player.getNoDamageTicks() <= 0
                 && now >= ab.nextMeleeMs()
                 && bot.hasLineOfSight(player)) {
+            selectBotSlot(bot, Material.NETHERITE_SWORD); // map hotbar 4
             botSwing(player, bot, crystalDiff, crystalDiff.attackDamage());
             ab.nextMeleeMs(now + CRYSTAL_MELEE_INTERVAL_MS);
             bot.setVelocity(new Vector(0, bot.getVelocity().getY(), 0)); // map: player @s stop
@@ -3969,6 +4077,11 @@ public final class PracticeService {
         // anchor stage, so the two weapons alternate instead of stacking.
         if (fights) {
             tickAnchorCycle(player, session, bot, crystalDiff, now, dist);
+        }
+
+        // Dig out cover/floor when the player boxes in (real crystal-pvP behaviour).
+        if (fights) {
+            tickBotMining(player, session, bot, dist, now);
         }
 
         // --- attack: place a crystal combo near the player ---
@@ -4015,6 +4128,7 @@ public final class PracticeService {
                         (org.bukkit.block.data.type.RespawnAnchor) anchor.getBlockData();
                 data.setCharges(1);
                 anchor.setBlockData(data, false);
+                selectBotSlot(bot, Material.GLOWSTONE); // map hotbar 9 for the charge
                 bot.swingMainHand();
                 if (bot.getWorld() != null) {
                     bot.getWorld().playSound(anchor.getLocation(),
@@ -4059,6 +4173,7 @@ public final class PracticeService {
                 || !placeTrackedBlock(session, spot, Material.RESPAWN_ANCHOR, 3000L)) {
             return; // nowhere to place: retry next tick, the crystal path keeps firing
         }
+        selectBotSlot(bot, Material.RESPAWN_ANCHOR); // map hotbar 8
         bot.swingMainHand();
         ab.anchorBlock(spot.getLocation());
         ab.anchorStage(1);
@@ -4108,6 +4223,7 @@ public final class PracticeService {
         if (spot == null) {
             return false;
         }
+        selectBotSlot(bot, Material.END_CRYSTAL); // map hotbar 3
         boolean pedestal = spot.getRelative(org.bukkit.block.BlockFace.DOWN).getType() != Material.OBSIDIAN
                 && spot.getRelative(org.bukkit.block.BlockFace.DOWN).getType() != Material.BEDROCK;
         if (pedestal) {
@@ -4120,6 +4236,7 @@ public final class PracticeService {
                 .spawn(crystalLoc, org.bukkit.entity.EnderCrystal.class,
                         c -> c.setShowingBottom(false));
         session.botCrystals().add(crystal.getUniqueId());
+        bot.swingMainHand(); // map: player @s swing once (g1gc/spawncrystal)
         // One beat later: boom (if the crystal is still alive).
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (crystal.isValid()) {

@@ -173,3 +173,48 @@
 ### 訂正(2026-09 深夜の全行再抽出)
 - crystal_cd の正確値は **6/6/6/3/2/3**(初回抽出の 6/4/3/2/2/3 は誤り)→ v1.68.0 で修正。
 - アンカーは HARD+ のトグルではなく **g1gc の通常経路(全ラング)**。
+
+---
+
+## 2026-09: 全モジュール監査(Anchor漏れの再発防止・モジュール単位の対応表)
+
+`data/quantum/function/` の**全サブモジュール**を棚卸しし、当プラグインの対応を宣言する:
+
+| マップモジュール | 内容 | 当プラグイン | 判定 |
+|---|---|---|---|
+| `difficulty/0..6` | 難易度梯子(hitcd/aim/回転/_cd類) | `BotDifficulty` 梯子+各梯子switch | ✅ |
+| `cooldowns` | タイマ減算体・非シャープhitcd13 | msタイマ体系(`BotAbilityState`) | ✅ |
+| `crystal/tick` → `g1gc/*` | クリスタルBOT本体 | `tickCrystalBot`+`tickAnchorCycle` | ✅ |
+| `crystal/hardcode/*` | 代替実装(トグル・非既定) | 対象外(g1gcが既定のため) | ➖ |
+| `crystal/passive/gap` | HP≤16で金リンゴ・35t咀嚼・2個/命 | `tickBotGap`(80%閾値・実食・HP20想定) | ✅ |
+| `crystal/passive/escape/pearl` | 瀕死パール(後方15blk) | `tickEscapePearl` | ✅ |
+| `crystal/passive/block` | 防衛黒曜石 | `placeDefenseWall` | ✅ |
+| `crystal/passive/crossbow` | 20〜40+m狙撃(0.65s) | 中距離poke(アリーナ前提で意図的差分) | △ |
+| `crystal/passive/shield` | 盾構え(トグル) | ボット設定GUIの盾トグル | ✅ |
+| `g1gc/hit`+`can_hit` | 剣撃(hitcd7t・hurtTime0ゲート) | 350ms固定剣撃+無敵時間ゲート | ✅ |
+| `g1gc/spawncrystal`→`breakcrystal` | クリスタル設置→剣で爆発 | `launchCrystalAttack` | ✅ |
+| `g1gc/anchor_tick`→bin/14/15 | アンカー3段(全ラング) | `tickAnchorCycle`(place→charge→爆発) | ✅ |
+| `g1gc/defenceplace` | 爆発前グロウストーンの盾 | 省略(自爆免疫済み・意図的差分) | ➖ |
+| `g1gc/movement`+`botlogic` | 毎tick足止め+前進+壁ジャンプ | 足止め+前進+ホップ | ✅ |
+| `g1gc/pearl` | 敵近接時の攻めパール(pearlcd20) | ドリルCRYSTAL_HIT_ANCHOR+escape | △ |
+| `sword/*`(crit/jump/scrit/combo) | 剣BOT本体 | `tickCombatBot`剣経路 | ✅ |
+| `sword/bot_mech/{strafe,jump}` | ストレイフ・障害物ジャンプ | ストレイフ反転+停滞ホップ | ✅ |
+| `sword/passive/bow/*` | 弓チャージ射撃 | 削除(サーバー裁定: 剣BOTは近接専用) | ➖ |
+| `mace_new/*` | メイスBOT一式 | `tickMaceBots` | ✅ |
+| `cobwebs/*` | クモの巣/水/溶岩 | disruption+waterSave+lava | ✅ |
+| `pot/*` | ネザポットBOT | NETHERITE_POT | ✅ |
+| `cart/*` | カートBOT(レール/TNT) | CART | ✅ |
+| `binomial_dist/{reach,aim}` | 着弾分布の二項ランダム | ミス率+リーチジッター | △(分布近似) |
+| `holeoffense/*` | 穴攻めダッシュ | 穴コンテキスト無しの為部分 | △ |
+| `adaptivedifficulty` | 死亡連続数でラング自動シフト(2/3/6/8/10) | **未実装** | ❌次候補 |
+| `treats` | ご褒美エンチャント金リンゴ | 未実装(戦闘外) | ❌ |
+| `eval`/`allstats`/`prac_stats` | 統計 | `PracticeAnkerStats`(一部) | △ |
+| `kits`/`botgear` | BOTキット(ホットバー1-9) | 在庫+**可視スロット選択**(今回) | ✅ |
+| `options`/`toggles` | 設定トグル群 | /botadmin+ボット設定GUI | ✅(部分) |
+| `rtp`/`hub`/`map`/`init`/`reset` | 空間管理 | 部屋/GUI/コマンドで同等 | ✅ |
+| `mark`/`xaniclelib`/`ray` | マーカー/レイキャスト内部lib | Bukkit直操作で代替 | ✅ |
+| `npc/function`(群) | BOT生成・テレポート本体 | `spawnCombatBot`/`botPathDirection` | ✅ |
+
+**今回の監査で修正した追加差分**: 金リンゴ閾値50%→**80%(Health..16)**+実食(手に持って1.75s咀嚼→+8HP/5s・吸収2)・**ボットのブロック破壊**(ヘッド上/足元の床/間の壁を1.5sで採掘)・全アクションに**可視スロット切替+スイング**(マップ`player @s hotbar N`+`swing once`の再現)。
+
+**次フェーズ(宣言済み)**: マネキン→**Carpet式パケットプレイヤー**(NMS `ServerPlayer`+擬似接続。paperweight-userdevで実NMS型を使用。本物のインベントリ・スキン・当たり判定・音声を得る。paper 1.21.11 mojang-mappedランタイム前提)。
