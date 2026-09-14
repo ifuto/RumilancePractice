@@ -264,6 +264,18 @@ git config http.postBuffer 524288000
 git config --get-regexp '^http\.' | grep -q extraheader \
   || echo "::warning::checkout に push 資格情報(http.*.extraheader)が見あたりません(persist-credentials 未設定?)"
 
+step "build: 当プラグイン (./gradlew test shadowJar)"
+if [ -x ./gradlew ]; then
+  ./gradlew --no-daemon -q test shadowJar 2>&1 | tail -40 || die "gradlew test shadowJar に失敗"
+  ls -lh build/libs/ || die "build/libs がありません"
+  mkdir -p "$BUNDLE/plugin"
+  cp build/libs/*.jar "$BUNDLE/plugin/" 2>/dev/null || die "shadowJar の成果物をコピーできません"
+  ( cd "$BUNDLE/plugin" && sha256sum ./*.jar > sha256s.txt && cat sha256s.txt )
+  echo "::notice::plugin built: $(ls "$BUNDLE/plugin" | tr '\n' ' ')"
+else
+  echo "::warning::gradlew が見つからないためプラグインのビルドを省略します"
+fi
+
 step "deliver: mc-server-delivery"
 git branch -D mc-server-delivery >/dev/null 2>&1 || true
 git checkout -q --orphan mc-server-delivery
@@ -322,18 +334,6 @@ if ! git push -f origin java-env-delivery 2>/tmp/push2.err; then
 fi
 git ls-remote --heads origin java-env-delivery
 echo "::notice::delivered java-env-delivery $(git rev-parse HEAD)"
-
-step "build: 当プラグイン (./gradlew test shadowJar)"
-if [ -x ./gradlew ]; then
-  ./gradlew --no-daemon -q test shadowJar 2>&1 | tail -40 || die "gradlew test shadowJar に失敗"
-  ls -lh build/libs/ || die "build/libs がありません"
-  mkdir -p "$BUNDLE/plugin"
-  cp build/libs/*.jar "$BUNDLE/plugin/" 2>/dev/null || die "shadowJar の成果物をコピーできません"
-  ( cd "$BUNDLE/plugin" && sha256sum ./*.jar > sha256s.txt && cat sha256s.txt )
-  echo "::notice::plugin built: $(ls "$BUNDLE/plugin" | tr '\n' ' ')"
-else
-  echo "::warning::gradlew が見つからないためプラグインのビルドを省略します"
-fi
 
 step "deliver: plugin-delivery"
 git branch -D plugin-delivery >/dev/null 2>&1 || true
