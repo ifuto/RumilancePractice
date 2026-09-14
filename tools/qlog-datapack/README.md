@@ -23,3 +23,22 @@ Practicebot と同じ world に入れるだけで、QuantumBOT の行動タイ�
 
 これで「マップの本物のBOTがどう戦うか」の実測タイムラインが手に入り、
 RumilancePractice 側の fight trace と並べて比較できる。
+
+## 試合開始の自動化(開始ボタンは要らない・実データ確認済み)
+
+マップのメインループ(main_tick)は毎tick `.start` スコアを見ていて、1なら
+`quantum:init/mode` = 戦闘ループ。`map/start.mcfunction` は prompt_activation
+トグル既定(0)なら 3.5秒後に自動で `.start=1`。コンソールから:
+
+```
+/function quantum:options/crystal                                  # モード選択(ボタンの代わり)
+/player quantumbot spawn at 11 34 10 facing 0 0 in survival        # HeroBot のスポーン(マップ自身も同一コマンド)
+/scoreboard players set .start start 1                             # 開始(プロンプトの代わり)
+```
+
+タグは自動: `miscellaneous/tags` が毎tick、quantumbot/Quantum/Notch/Herobrine を
+`xlib_bot` へ、**それ以外の名前を `xlib_target`** へ。
+
+- 人が戦う場合: 普通に入るだけ(自動で xlib_target)
+- **BOT vs BOT**: 2体目を別名(例 `BotB`)でスポーン → 自動でターゲット扱い、
+  quantumbot が本物のマップAIで戦いかける
