@@ -96,3 +96,5 @@ cd /tmp/mcserver && /tmp/jdk21/bin/java -Xmx2400M -jar fabric-server-launch.jar 
 - 2026-09-14: java-env のプラグインビルドに Temurin21(JAVA_HOME)+GRADLE_USER_HOME を明示、失敗時は tail を notice で annotation へ。
 
 - 2026-09-14: サンドボックスで Paper を起動できるよう paper-server-delivery(Mojang取得済みパッチ済みjar+libraries)を追加。
+
+- 2026-09-14: ラダー値を参照実測に錠する BotLadderParityTest を追加。
