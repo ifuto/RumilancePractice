@@ -57,6 +57,8 @@ public final class PracticeSession {
      * COUNTED stock restocked on spawn — no phantom webs/lava/potions/rails appear anymore. */
     /** Objective timeline of the fight (bot swings/hits/combos/totems) for the end report. */
     private final java.util.List<String> fightLog = new java.util.ArrayList<>();
+    /** 0.1 s state samples of the bot (pos/look/hp/hand) — console-only, parity comparison. */
+    private final java.util.List<String> fightSamples = new java.util.ArrayList<>();
     private final long fightLogStart = System.currentTimeMillis();
     /** Materials present in the kit the bot cloned from the player (visible slot selects). */
     private final java.util.Set<org.bukkit.Material> botKitMaterials =
@@ -444,6 +446,18 @@ public final class PracticeSession {
 
     public java.util.List<String> fightLog() {
         return fightLog;
+    }
+
+    /** Records one 0.1 s state sample; capped at ~3 minutes of fighting. */
+    public void fightSample(String sample) {
+        if (fightSamples.size() < 1800) {
+            long t = (System.currentTimeMillis() - fightLogStart) / 100L;
+            fightSamples.add(t + " " + sample);
+        }
+    }
+
+    public java.util.List<String> fightSamples() {
+        return fightSamples;
     }
 
     /** Consumes {@code count} of {@code material} from the bot's stock; false when out. */

@@ -1,44 +1,36 @@
-# qlog — QuantumBOT 行動ロガー(比較実験用)
+# qlog — QuantumBOT 完全比較用サンプラ(0.1秒粒度)
 
-Practicebot と同じ world に入れるだけで、QuantumBOT の行動タイムラインが
-サーバーコンソールに流れます(0.5秒間隔):
-
-```
-[qlog] pos=12.34,64.00,-5.67 hp=17.3 hitcd=6 totem=0 ct=4 cry=1
-```
-
-- `hitcd` が頻繁に小さい値=剣を振っている/コンボ中
-- `totem` がラング値(totem_cd)から減る=ポップ後の休止
-- `ct`(crystal_timer)の減算サイクル=クリスタル設置間隔
-- `cry`=?  近く(8blk)にエンドクリスタルが存在
-- `pos` の推移=前進・足止め・後退の判定
-
-## 使い方(Fabricサーバー)
-
-1. この `qlog` フォルダごと `<ワールド>/datapacks/` にコピー
-   (Quantumマップのworldルートに `datapacks/Practicebot` がある階層)
-2. サーバーコンソールで `/reload`(または再起動)
-3. ボットをスポーンして 30〜60 秒戦う
-4. `latest.log` の `[qlog]` 行をエージェントに貼る/リポジトリに push
-
-これで「マップの本物のBOTがどう戦うか」の実測タイムラインが手に入り、
-RumilancePractice 側の fight trace と並べて比較できる。
-
-## 試合開始の自動化(開始ボタンは要らない・実データ確認済み)
-
-マップのメインループ(main_tick)は毎tick `.start` スコアを見ていて、1なら
-`quantum:init/mode` = 戦闘ループ。`map/start.mcfunction` は prompt_activation
-トグル既定(0)なら 3.5秒後に自動で `.start=1`。コンソールから:
+Practicebot と同じ world の `datapacks/` に置くだけで、QuantumBOT の全行動が
+0.1秒間隔(2tick毎)でサーバーコンソールに流れる:
 
 ```
-/function quantum:options/crystal                                  # モード選択(ボタンの代わり)
-/player quantumbot spawn at 11 34 10 facing 0 0 in survival        # HeroBot のスポーン(マップ自身も同一コマンド)
-/scoreboard players set .start start 1                             # 開始(プロンプトの代わり)
+[q] 12.345,64.000,-5.678 v=0.216,0.078,0.000 y=178.5 p=12.3 hp=19.6 g=1 i=minecraft:netherite_sword hit=4 tot=0 ct=3 ob=0 pc=0 cry=1
 ```
 
-タグは自動: `miscellaneous/tags` が毎tick、quantumbot/Quantum/Notch/Herobrine を
-`xlib_bot` へ、**それ以外の名前を `xlib_target`** へ。
+| 項目 | 意味 |
+|---|---|
+| `p= x,y,z` | 位置(0.001 blk分解能)= 一歩一歩の移動軌跡 |
+| `v= vx,vy,vz` | 速度ベクトル(加速・摩擦・ジャンプ放物線がそのまま出る) |
+| `y= / p=` | 視点 yaw/pitch(スナップ+エイム歪みの実測) |
+| `hp / g` | 体力 / 接地 |
+| `i=` | 手持ちアイテム(使うアイテムの遷移) |
+| `hit / tot / ct / ob / pc` | マップ自身のタイマ(hitcd/トーテム/クリスタル/オブシディアン/パール) |
+| `cry` | 近傍(9blk)にエンドクリスタルが存在 |
 
-- 人が戦う場合: 普通に入るだけ(自動で xlib_target)
-- **BOT vs BOT**: 2体目を別名(例 `BotB`)でスポーン → 自動でターゲット扱い、
-  quantumbot が本物のマップAIで戦いかける
+## 試合開始の自動化(実データ確認済み)
+
+```
+/function quantum:options/crystal                          # モード選択
+/player quantumbot spawn at 11 34 10 facing 0 0 in survival
+/scoreboard players set .start start 1                     # (promptトグル既定なら自動でも開始)
+```
+
+タグは自動(quantumbot等=xlib_bot、他=xlib_target)。**BOT vs BOT** は2体目を別名で
+スポーンするだけ。`latest.log` の `[q]` 行をエージェントに渡す = 実測データ完成。
+
+## 比較手順(数値完全一致ループ)
+
+1. Fabric側: 上記で30〜60秒戦う → `[q]` 行を回収
+2. 当側: RumilancePractice で同条件(難易度/モード)を戦う → fight trace の `s` 行を回収
+3. `tools/compare_fights.py fabric.log ours.log` → 軸を揃えた差分レポート
+4. 差分がある箇所をコードで直す → 3へ(完全一致まで)

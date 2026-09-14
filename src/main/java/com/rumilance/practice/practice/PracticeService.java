@@ -100,6 +100,8 @@ public final class PracticeService {
     private BukkitTask dailyPurgeTask;
     private BukkitTask maceAiTask;
 
+    /** Alternates every AI tick so the parity sampler runs at 0.1 s. */
+    private long botSampleParity;
     /** Opt-in packet fake players for the combat bot (carpet-style ServerPlayer bodies). */
     private volatile boolean packetBots;
 
@@ -1915,6 +1917,15 @@ public final class PracticeService {
                 }
             }
         }
+        // 0.1 s state samples go to the console only (they are for numeric diffing against
+        // the qlog datapack's timeline of the real QuantumBOT).
+        java.util.List<String> samples = session.fightSamples();
+        if (!samples.isEmpty()) {
+            Bukkit.getLogger().info("[N Arena][BotMatch] samples (" + samples.size() + " @0.1s):");
+            for (String line : samples) {
+                Bukkit.getLogger().info("[N Arena][BotMatch]   " + line);
+            }
+        }
         NamedTextColor color = switch (result) {
             case WIN -> NamedTextColor.GREEN;
             case LOSE -> NamedTextColor.RED;
@@ -3282,6 +3293,17 @@ public final class PracticeService {
             }
             // Bot-placed block reverts (pedestals, webs, lava, rails...) share one sweeper.
             revertAgedBotBlocks(session, now);
+            // 0.1 s parity sampling: same axes as the qlog datapack (pos/look/hp/ground/item)
+            // so the two timelines can be diffed numerically.
+            if ((botSampleParity++ & 1L) == 0L) {
+                Location bl = bot.getLocation();
+                EntityEquipment seq = bot.getEquipment();
+                String hand = seq == null ? "-" : seq.getItemInMainHand().getType().name();
+                session.fightSample(String.format(
+                        "s p=%.2f,%.2f,%.2f y=%.1f pi=%.1f hp=%.1f g=%d i=%s",
+                        bl.getX(), bl.getY(), bl.getZ(), bl.getYaw(), bl.getPitch(),
+                        bot.getHealth(), bot.isOnGround() ? 1 : 0, hand));
+            }
             Location eye = bot.getEyeLocation();
             Location target = player.getLocation().add(0, 1.0, 0);
             Vector to = target.toVector().subtract(eye.toVector());

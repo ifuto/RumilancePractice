@@ -293,3 +293,23 @@ BotBody 追加が必要)。
 - 前進wish(≥0.22)=前進入力+スプリント(マップは毎tick `sprint`)/ 後退=後ろ入力/
   横=ストレイフ(歩速)/ Y上向き=ジャンプ入力 / ゼロ=全入力解放(マップの `stop`)。
 - マネキン経路は従来の速度押し出しのまま(既定・無効化なし)。
+
+---
+
+## 2026-09: 数値完全一致ループ(完了条件の正式合意)
+
+完了条件=**QuantumBOT実測との数値完全一致**(一歩一歩の移動・設置/破壊タイミング・
+使用アイテム・視点まで)。道具は全部用意済み:
+
+1. **qlog**(tools/qlog-datapack): Fabric側観測器。2tick毎に pos/vel/yaw/pitch/hp/
+   ground/手持ち + マップのタイマ(hitcd/totem/crystal/obby/pearl)+近傍クリスタルを
+   `[q]` 行でコンソールへ。開始はコンソール3行(options/crystal → /player spawn →
+   .start=1・タグ自動)。BOT vs BOT も2体目を別名スポーンするだけ。
+2. **当側 0.1s サンプラ**: fight trace の `s` 行(同軸: pos/yaw/pitch/hp/ground/hand)。
+   試合終了時にコンソールへ全件ダンプ。
+3. **tools/compare_fights.py**: 両ログを同軸化し、平均/最大速度・ストライド・視線
+   ジャンプ数・アイテム遷移列・クリスタル設置サイクル・トーテムPOP・side-by-side表を
+   出力。差分行=修正対象。
+
+サーバー受領後の実行順: Fabric起動→qlog導入→コンソールで試合→[q]回収→
+当側で同条件→samples回収→compare→差分修正→(数値一致まで繰り返し)。
