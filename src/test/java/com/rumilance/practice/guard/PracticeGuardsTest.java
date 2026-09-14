@@ -86,19 +86,20 @@ class PracticeGuardsTest {
 
     // --- Trim editor state ---
 
+    /** Trim is Kit-Editor-only: right-clicking armour in the lobby must never open it. */
     @ParameterizedTest
-    @EnumSource(value = PlayerState.class, names = {"LOBBY", "OPENING_GUI", "IDLE", "EDITING_KIT"})
-    void trimEditorAllowedInSafeStates(PlayerState state) {
+    @EnumSource(value = PlayerState.class, names = {"EDITING_KIT"})
+    void trimEditorAllowedOnlyInsideTheKitEditor(PlayerState state) {
         assertTrue(PracticeGuards.trimEditorAllowedInState(state));
     }
 
     @ParameterizedTest
     @EnumSource(
             value = PlayerState.class,
-            names = {"LOBBY", "OPENING_GUI", "IDLE", "EDITING_KIT"},
+            names = {"EDITING_KIT"},
             mode = EnumSource.Mode.EXCLUDE
     )
-    void trimEditorBlockedInCombatStates(PlayerState state) {
+    void trimEditorBlockedEverywhereElse(PlayerState state) {
         assertFalse(PracticeGuards.trimEditorAllowedInState(state));
     }
 
