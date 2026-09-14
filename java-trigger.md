@@ -69,3 +69,6 @@ cd /tmp/mcserver && /tmp/jdk21/bin/java -Xmx2400M -jar fabric-server-launch.jar 
   再貼り付けが不要)。旧拡張にあった不具合も修正: `mcserver/` ディレクトリを作業ツリー内に作り
   配送コミットがサーバー丸ごと(未圧縮)を巻き込む問題 → 作業ツリー外 `/tmp/mcserver` で組み立て、
   stop 用 FIFO もツリー外へ。qlog データパックを配送サーバーに同梱。
+- 2026-09-14(深夜2): オーナーが **arena/01a09fda-rumilancepractice** に薄いディスパッチャを適用
+  (workflow blob = リポジトリ直下 `java-env.workflow.yml` と一致)。本書き換えで java-env を発火し、
+  Fabric 実測サーバーの `mc-server-delivery` 配送を初回実行する。
