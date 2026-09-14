@@ -159,22 +159,9 @@ public final class PracticeGuards {
     // --- Smithing trim ---
 
     public static boolean trimEditorAllowedInState(PlayerState state) {
-        if (state == null) {
-            return false;
-        }
-        if (state == PlayerState.LOBBY) {
-            return true;
-        }
-        if (state == PlayerState.OPENING_GUI) {
-            return true;
-        }
-        if (state == PlayerState.IDLE) {
-            return true;
-        }
-        if (state == PlayerState.EDITING_KIT) {
-            return true;
-        }
-        return false;
+        // Trim is a Kit-Editor-only feature: right-clicking armour anywhere else (the lobby,
+        // idle rooms, menus) must never yank the trim screen up.
+        return state == PlayerState.EDITING_KIT;
     }
 
     public static boolean isTrimmableArmorMaterial(String materialName) {

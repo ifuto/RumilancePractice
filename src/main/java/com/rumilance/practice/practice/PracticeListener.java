@@ -12,6 +12,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
@@ -257,6 +258,32 @@ public final class PracticeListener implements Listener {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * The cloned arena honours its room while the fight runs: blocks inside the room
+     * region are breakable (box-ins, pedestals, digs are part of the game), anything
+     * outside the region stays protected — the shared templates are not disposable.
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onBreak(BlockBreakEvent event) {
+        Player player = event.getPlayer();
+        var sessionOpt = practiceService.session(player.getUniqueId());
+        if (sessionOpt.isEmpty()) {
+            return;
+        }
+        PracticeSession session = sessionOpt.get();
+        if (session.phase() == PracticeSession.Phase.COUNTDOWN) {
+            event.setCancelled(true);
+            return;
+        }
+        var roomOpt = practiceService.get(session.practiceId());
+        if (roomOpt.isEmpty() && session.activeRegion() == null) {
+            return;
+        }
+        if (!practiceService.contains(session, roomOpt.orElse(null), event.getBlock().getLocation())) {
+            event.setCancelled(true);
         }
     }
 

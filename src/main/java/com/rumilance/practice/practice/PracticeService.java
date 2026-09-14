@@ -1507,6 +1507,9 @@ public final class PracticeService {
         // Arena-venue fights have no config room: the session's own type carries the mode.
         PracticeType fightType = room != null ? room.type() : session.type();
         session.setPhase(PracticeSession.Phase.ACTIVE);
+        // The cloned arena must honour its room: building is part of the fight (crystal
+        // pedestals, box-ins, digs). The countdown lock is over the moment ACTIVE starts.
+        session.setPlaceBlocked(false);
         session.setMatchStartMs(System.currentTimeMillis());
         session.setBotPops(0);
         giveBotLoadout(player, session, fightType);
@@ -2926,6 +2929,7 @@ public final class PracticeService {
         player.getInventory().setArmorContents(null);
         player.getInventory().setItem(0, new ItemStack(Material.END_CRYSTAL, 64));
         player.getInventory().setItem(1, new ItemStack(Material.OBSIDIAN, 16));
+        player.getInventory().setItem(2, new ItemStack(Material.GOLDEN_APPLE, 8));
         player.getInventory().setItem(8, PracticeItems.botSettings(messages, player, session.botShieldRaised()));
         player.getInventory().setItemInOffHand(new ItemStack(Material.TOTEM_OF_UNDYING));
         player.getInventory().setHelmet(new ItemStack(Material.NETHERITE_HELMET));
@@ -3017,7 +3021,7 @@ public final class PracticeService {
                 m.getAttribute(Attribute.MAX_HEALTH).setBaseValue(maxHp);
             }
             m.setHealth(maxHp);
-            equipCombatBot(m, type, session.botShieldRaised());
+            equipCombatBot(m, player, session, type, session.botShieldRaised());
         });
         stockBotInventory(session, type);
         session.setCombatBot(bot);
@@ -3026,12 +3030,43 @@ public final class PracticeService {
         session.setBotStrafeFlipMs(System.currentTimeMillis() + 1500L);
     }
 
-    private void equipCombatBot(Mannequin bot, PracticeType type, boolean shieldUp) {
+    private void equipCombatBot(Mannequin bot, Player player, PracticeSession session,
+                                PracticeType type, boolean shieldUp) {
         EntityEquipment eq = bot.getEquipment();
         if (eq == null) {
             return;
         }
-        // Admin binding first: the dummy wears the same kit the player fights with.
+        // The bot fights with the SAME kit the player brought: armour, offhand and the
+        // item actually in hand are cloned from the player's inventory. Its material set
+        // feeds the visible slot selects — the bot never shows an item the kit lacks.
+        org.bukkit.inventory.ItemStack pHelm = player.getInventory().getHelmet();
+        org.bukkit.inventory.ItemStack pChest = player.getInventory().getChestplate();
+        org.bukkit.inventory.ItemStack pLegs = player.getInventory().getLeggings();
+        org.bukkit.inventory.ItemStack pBoots = player.getInventory().getBoots();
+        org.bukkit.inventory.ItemStack pOff = player.getInventory().getItemInOffHand();
+        org.bukkit.inventory.ItemStack pMain = player.getInventory().getItemInMainHand();
+        boolean kitPresent = pHelm != null || pChest != null || pLegs != null || pBoots != null
+                || (pMain != null && !pMain.getType().isAir());
+        if (kitPresent) {
+            java.util.Set<org.bukkit.Material> kitMats = session.botKitMaterials();
+            kitMats.clear();
+            eq.setHelmet(pHelm == null ? null : kitCopy(pHelm));
+            eq.setChestplate(pChest == null ? null : kitCopy(pChest));
+            eq.setLeggings(pLegs == null ? null : kitCopy(pLegs));
+            eq.setBoots(pBoots == null ? null : kitCopy(pBoots));
+            eq.setItemInOffHand(pOff == null || pOff.getType().isAir()
+                    ? null : kitCopy(pOff));
+            eq.setItemInMainHand(pMain == null || pMain.getType().isAir()
+                    ? new ItemStack(Material.END_CRYSTAL) : kitCopy(pMain));
+            for (org.bukkit.inventory.ItemStack it : new org.bukkit.inventory.ItemStack[]{
+                    pHelm, pChest, pLegs, pBoots, pOff, pMain}) {
+                if (it != null && !it.getType().isAir()) {
+                    kitMats.add(it.getType());
+                }
+            }
+            return;
+        }
+        // No worn/held kit: fall back to the admin binding, then the type defaults.
         ItemStack fallbackWeapon = switch (type) {
             case SWORD, NETHERITE_POT -> new ItemStack(Material.NETHERITE_SWORD);
             case CART -> new ItemStack(Material.BOW);
@@ -3494,7 +3529,7 @@ public final class PracticeService {
         ab.nextGapMs(now + 1750L);
         ab.gapEatUntilMs(now + 1750L);
         ab.gapRegenUntilMs(now + 6750L);
-        selectBotSlot(bot, Material.GOLDEN_APPLE);
+        selectBotSlot(session, bot, Material.GOLDEN_APPLE);
     }
 
     /**
@@ -3523,12 +3558,25 @@ public final class PracticeService {
      * slots from the bot's own kit stock: sword 4, obsidian 2, crystal 3, gap 5, pearl 7,
      * anchor 8, glowstone 9. A no-op while the item is already held.
      */
-    private void selectBotSlot(Mannequin bot, Material material) {
+    private void selectBotSlot(PracticeSession session, Mannequin bot, Material material) {
         EntityEquipment eq = bot.getEquipment();
         if (eq == null || eq.getItemInMainHand().getType() == material) {
             return;
         }
+        // Kit fidelity: only select materials the cloned kit actually carries (or action
+        // blocks the bot legitimately places, like obsidian/anchors from its stock).
+        if (!session.botKitMaterials().contains(material)
+                && material != Material.OBSIDIAN && material != Material.END_CRYSTAL
+                && material != Material.RESPAWN_ANCHOR && material != Material.GLOWSTONE
+                && material != Material.NETHERITE_SWORD) {
+            return;
+        }
         eq.setItemInMainHand(new ItemStack(material));
+    }
+
+    /** Defensive copy for equipment slots (Paper mutates equipped stacks). */
+    private static org.bukkit.inventory.ItemStack kitCopy(org.bukkit.inventory.ItemStack it) {
+        return it.clone();
     }
 
     /**
@@ -4048,7 +4096,7 @@ public final class PracticeService {
                 && player.getNoDamageTicks() <= 0
                 && now >= ab.nextMeleeMs()
                 && bot.hasLineOfSight(player)) {
-            selectBotSlot(bot, Material.NETHERITE_SWORD); // map hotbar 4
+            selectBotSlot(session, bot, Material.NETHERITE_SWORD); // map hotbar 4
             botSwing(player, bot, crystalDiff, crystalDiff.attackDamage());
             ab.nextMeleeMs(now + CRYSTAL_MELEE_INTERVAL_MS);
             bot.setVelocity(new Vector(0, bot.getVelocity().getY(), 0)); // map: player @s stop
@@ -4128,7 +4176,7 @@ public final class PracticeService {
                         (org.bukkit.block.data.type.RespawnAnchor) anchor.getBlockData();
                 data.setCharges(1);
                 anchor.setBlockData(data, false);
-                selectBotSlot(bot, Material.GLOWSTONE); // map hotbar 9 for the charge
+                selectBotSlot(session, bot, Material.GLOWSTONE); // map hotbar 9 for the charge
                 bot.swingMainHand();
                 if (bot.getWorld() != null) {
                     bot.getWorld().playSound(anchor.getLocation(),
@@ -4173,7 +4221,7 @@ public final class PracticeService {
                 || !placeTrackedBlock(session, spot, Material.RESPAWN_ANCHOR, 3000L)) {
             return; // nowhere to place: retry next tick, the crystal path keeps firing
         }
-        selectBotSlot(bot, Material.RESPAWN_ANCHOR); // map hotbar 8
+        selectBotSlot(session, bot, Material.RESPAWN_ANCHOR); // map hotbar 8
         bot.swingMainHand();
         ab.anchorBlock(spot.getLocation());
         ab.anchorStage(1);
@@ -4224,7 +4272,7 @@ public final class PracticeService {
         if (spot == null) {
             return false;
         }
-        selectBotSlot(bot, Material.END_CRYSTAL); // map hotbar 3
+        selectBotSlot(session, bot, Material.END_CRYSTAL); // map hotbar 3
         boolean pedestal = spot.getRelative(org.bukkit.block.BlockFace.DOWN).getType() != Material.OBSIDIAN
                 && spot.getRelative(org.bukkit.block.BlockFace.DOWN).getType() != Material.BEDROCK;
         if (pedestal) {
@@ -4412,7 +4460,7 @@ public final class PracticeService {
             bot.setHealth(bot.getAttribute(Attribute.MAX_HEALTH).getValue());
         }
         bot.setVelocity(new Vector());
-        equipCombatBot(bot, session.type(), session.botShieldRaised());
+        equipCombatBot(bot, player, session, session.type(), session.botShieldRaised());
         session.setBotLastDamagedMs(System.currentTimeMillis());
         session.setBotNextAttackMs(System.currentTimeMillis() + 1500L);
         session.abilities().resetConsumables(); // a fresh life restocks gaps and pots

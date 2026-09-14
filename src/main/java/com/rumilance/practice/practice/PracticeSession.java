@@ -56,6 +56,9 @@ public final class PracticeSession {
     private final BotAbilityState abilities = new BotAbilityState();
     /** Quantum parity ("もってるアイテムだけ使う"): every special item the bot may use is a
      * COUNTED stock restocked on spawn — no phantom webs/lava/potions/rails appear anymore. */
+    /** Materials present in the kit the bot cloned from the player (visible slot selects). */
+    private final java.util.Set<org.bukkit.Material> botKitMaterials =
+            java.util.EnumSet.noneOf(org.bukkit.Material.class);
     private final java.util.Map<org.bukkit.Material, Integer> botStock =
             new java.util.EnumMap<>(org.bukkit.Material.class);
     /** Current A* waypoints followed by the bot (from {@link BotPathFinder}). */
@@ -423,6 +426,10 @@ public final class PracticeSession {
 
     public java.util.Map<org.bukkit.Material, Integer> botStock() {
         return botStock;
+    }
+
+    public java.util.Set<org.bukkit.Material> botKitMaterials() {
+        return botKitMaterials;
     }
 
     /** Consumes {@code count} of {@code material} from the bot's stock; false when out. */
