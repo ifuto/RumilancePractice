@@ -1,91 +1,71 @@
-# java-trigger — Java 実行環境アーティファクトの発火マーカー
+# java-trigger — Java 実行環境 / Fabric 実測サーバー配送の発火マーカー
 
-このファイルへの変更を含む push ごとに `.github/workflows/java-env.yml` が走り、
-GitHub Actions のアーティファクト **`java-env`** に以下を保管する:
+このファイルへの変更を含む push ごとに `.github/workflows/java-env.yml` が走ります。
+ワークフロー本体は **薄いディスパッチャ**で、実処理はすべてリポジトリ内の
+[`ci/java-env.sh`](ci/java-env.sh) にあります(サンドボックスのエージェントは
+`.github/workflows/**` を push できないため、ロジックを ci/ に置いて
+**再貼り付けなしで修正・再実行できる**ようにした)。
 
-| ファイル | 中身 |
-|---|---|
-| `jdk21.tar.gz` | Eclipse Temurin 21(linux x64・ポータブルJDK・tar展開するだけ) |
-| `paper-1.21.11-<build>.jar` | Paper 1.21.11 サーバー(最新ビルドをAPI解決) |
-| `sha256s.txt` | チェックサム一覧 |
+## 配送されるもの
 
-## 導入手順(オーナー操作・1回だけ)
+| ブランチ | 中身 | 用途 |
+|---|---|---|
+| `java-env-delivery` | `jdk21.tar.gz.part-*`(Temurin 21 ポータブル) + `paper-1.21.11-<build>.jar` + `sha256s.txt` | サンドボックスに Java が無い / Paper 側の検証 |
+| `mc-server-delivery` | `mcserver.tar.gz.part-*` + `sha256s.txt` + `README.txt` | **起動検証済み Fabric 実測サーバー**(fabric-server-launch + fabric-api + HeroBot MOD + Quantum マップ + qlog + eula/properties + 起動ログ) |
 
-サンドボックスの GitHub App トークンには `workflows` 権限がないため、
-エージェントは `.github/workflows/` への追加ができない(refused)。
-**リポジトリ直下の `java-env.workflow.yml` が本体**なので、それを配置する:
+artifact `java-env`(`/tmp/bundle/*`)も保存されるが、サンドボックスは Azure blob を
+読めない(EOF 遮断)ので、そちらへは git ブランチで渡す。
 
-1. GitHub web UI でブランチ `arena/01a0948b-rumilancepractice` を開く
-2. `Add file` → `Create new file` → パスに `.github/workflows/java-env.yml`
-3. 中身にリポジトリ直下 `java-env.workflow.yml` をコピペして Commit
-   (このコミット自体が java-trigger.md 初回作成を兼ねないなら、
-    `java-trigger.md` も同画面で 1 行編集すると即発火)
-4. 以降はエージェントが `java-trigger.md` を編集する push のたびに自動発火
-   (エージェント側は pull --rebase 済みの force push なので消さない)
+## オーナー操作(1回だけ)
 
-main に置いて `Run workflow` ボタン運用でも可(その場合は発火は手動クリック)。
+`.github/workflows/java-env.yml` の中身をリポジトリ直下の `java-env.workflow.yml` と
+同じにして Commit する(以後このファイルを触る必要はない)。
+
+1. GitHub web UI で対象ブランチの `java-env.workflow.yml` を開く
+2. 全文コピー → `.github/workflows/java-env.yml` を Edit して貼り付け → Commit
 
 ## サンドボックスでの取得手順
 
-サンドボックスの下りは github.com(git)と api.github.com のみで、Azure blob 系
-(アーティファクト/リリース資産)は EOF 遮断 → **`gh run download` は使えない**。
-そこで workflow が **`java-env-delivery` ブランチ**に分割コミットするので、git で受ける:
-
 ```bash
+# JDK (一度やれば以後は /tmp/jdk21 を使う)
 git clone --depth 1 --branch java-env-delivery \
   https://github.com/ifuto/RumilancePractice.git /tmp/ship
 cat /tmp/ship/delivery/jdk21.tar.gz.part-* > /tmp/jdk21.tar.gz
-(cd /tmp/ship/delivery && sha256sum -c sha256s.txt --ignore-missing)
+(cd /tmp && sha256sum -c /tmp/ship/delivery/sha256s.txt)   # paper jar はここで検証
 mkdir -p /tmp/jdk21 && tar -xzf /tmp/jdk21.tar.gz -C /tmp/jdk21 --strip-components=1
-/tmp/jdk21/bin/java -version
+
+# Fabric 実測サーバー
+git clone --depth 1 --branch mc-server-delivery \
+  https://github.com/ifuto/RumilancePractice.git /tmp/mcship
+cat /tmp/mcship/mcserver/mcserver.tar.gz.part-* > /tmp/mcserver.tar.gz
+(cd /tmp && sha256sum -c /tmp/mcship/mcserver/sha256s.txt)
+tar -xzf /tmp/mcserver.tar.gz -C /tmp
+cd /tmp/mcserver && /tmp/jdk21/bin/java -Xmx2400M -jar fabric-server-launch.jar nogui
 ```
 
-## 運用メモ
+## 測定(コンソール)
 
-- サンドボックスは JDK を持たないため、Java 実行環境はこのアーティファクト経由で調達する。
-- `/tmp` は非永続(サンドボックス再構築で消える)→ その都度上記コマンドで再取得。
-- アーティファクト保持は 30 日。期限切れ・手動再実行はどちらでも:
-  - `java-trigger.md` に何か 1 行追記して push(自動発火)
-  - `gh workflow run java-env.yml`(workflow_dispatch)
-- 用途: `bot/herobot-*.jar`(Fabric MOD)を `javap` で静的解析、Paper サーバー実行検証など。
-- 既存ワークフロー(build / build-mod)は一切変更していない。判定は従来どおり name=build のみ。
+```
+/function quantum:options/crystal
+/player quantumbot spawn at 11 34 10 facing 0 0 in survival
+/scoreboard players set .start start 1
+```
+
+`latest.log` の `[q]` 行(= qlog の 0.1 秒サンプル)を回収して、当側の
+`[N Arena][BotMatch]` trace / samples と `tools/compare_fights.py` で突き合わせる。
+手順は [docs/bot-combat-parity.md](docs/bot-combat-parity.md) の「標準測定シナリオ」。
 
 ## 発火ログ
 
 - 2026-09-13: ワークフロー導入(73b68ed)後の初回発火 → run 34760045775 は Paper 取得で失敗。
-  原因: api.papermc.io **v2 API が sunset**。fill v3 (fill.papermc.io/v3) へ移行した修正版を
-  `java-env.workflow.yml` に反映済み → オーナーが `.github/workflows/java-env.yml` へ適用済み(156ad77)。
-- 2026-09-13: v3 版での再発火(2回目)→ run 34760226363 は **成功**。
-  ただしサンドボックスからアーティファクトDLが blob 遮断(EOF)で取得不能と判明。
-  → **`java-env-delivery` ブランチ配送を追加した最終版**(3回目の貼り付けで確定)。
-- 2026-09-13: delivery ブランチ版を適用(6392c93)→ 3回目の発火は run 34760427888。
-  Steps 1-5 成功(JDK/Paper取得・アーティファクトOK)、**Step 6 のみ失敗**:
-  clone/push URL に GITHUB_TOKEN を埋め込んでいなかった(public なので clone は通り
-  push が 403)。トークン URL + `push -f`(孤儿ブランチ再作成)へ修正 → **4回目の貼り付け**。
-- 2026-09-13: トークン認証fix版を適用(85bf75c)→ 4回目の発火も Step 6 が 128。
-  ログ遮断のため失敗行は不明 → **actions/checkout@v4 の永続クレデンシャル方式へ全面切替**
-  (手動 clone 廃止・チェックアウト作業ツリーをそのまま orphan 化して push)+
-  ERR trap で失敗行を `::error::` annotation に出す。detached HEAD からの全路径を
-  ローカルベアリモートで検証済み → **5回目の貼り付け**。
-- 2026-09-13: checkout永続クレデンシャル版を適用(fe8f422)→ 5回目の発火も失敗。
-  ただし **ERR trap が原因を特定**: `actions/checkout` のデフォルト `clean: true`
-  (`git clean -ffdx`)が前ステップの `bundle/` を消していた → bundle先を
-  ワークスペース外の `/tmp/bundle` へ変更 → **6回目の貼り付け**。
-- 2026-09-13: /tmp/bundle 版を適用 → **6回目の発火で run 34761374376 成功**。
-  `java-env-delivery` ブランチを clone → 結合 → sha256 両 OK →
-  Temurin 21.0.12.1 で `java -version` 成功・herobot.jar へ `javap` 成功。
-  **Java環境の調達経路が確立**(サンドボックス再構築のたびに「取得手順」を実行)。
-- 2026-09-13(夜): QuantumBOT 実測フェーズ開始。起動検証済み Fabric サーバー一式(マップ+MOD+eula/properties 同梱)を mc-server-delivery ブランチへ配送するワークフローに拡張 → 貼り付け待ち。
-
-- 2026-09-13(深夜): Crystalボットをマップg1gc実装に全面一致させた(v1.67.0)。詳細は docs/bot-combat-parity.md。
-- 2026-09-13(深夜2): アンカー経路も全行照合 → g1gc anchor chain(place→charge→爆発)を全ラングの梯子で実装(v1.68.0)。crystal_cd の初回抽出誤り(6/4/3/2/2/3→正6/6/6/3/2/3)も訂正。
-- 2026-09-13(深夜3): 全モジュール監査表を docs/bot-combat-parity.md に作成。金リンゴ80%実食・ボット採掘・可視ホットバー切替を実装(v1.69.0)。次フェーズ=マネキン→パケットプレイヤー(NMS ServerPlayer)。
-- 2026-09-14: パケットプレイヤー移行Phase1(v1.71.0)。paperweight-userdev導入+BotBodyシーム+Carpet式フェイクプレイヤー実装。トグル bot.packet-bots は既定false(サーバー検証後に切替)。yml更新は不要。
-- 2026-09-14(2): 「戦わないBOT」根本原因2件を修正 — slowcast梯子は戦闘未使用(視線はスナップ+delta)/近接ミス二重罰。メイスもpacket branch。AFK packet化は次工程(v1.72.0)。
-- 2026-09-14(3): Packetボットの攻撃を gameMode.attack 実処理に修正(swing=アニメのみ問題)。クロスボウを回復フェーズ専用化(12-24blk)。
-- 2026-09-14(4): Packetボットの移動を入力駆動に(xxa/zza+sprint+jump=マップの move/sprint/jump と同機構)。setVelocityを入力変換層に(v1.73.0)。
-- 2026-09-14(5): 戦闘タイムライン記録を実装(swing/hit/crystal/anchor/POP/gapを秒オフセットで記録・試合終了時にプレイヤー+コンソールへ全件ダンプ)。「正常な戦い」の判定は主張ではなくこの証拠で行う(v1.74.0)。
-- 2026-09-14(6): qlog データパック作成(tools/qlog-datapack)— QuantumBOTの行動(位置/hp/hitcd/totem_timer/crystal_timer/近傍クリスタル)を0.5s間隔でコンソールへ。ユーザーのFabricログと当側traceで比較する観測器。
-- 2026-09-14(7): マップ開始はコンソールで完全自動化可能と実データ確認(options/crystal→/player spawn→.start=1・タグ自動・2体目別名でBOTvsBOT可)。
-- 2026-09-14(8): 数値完全一致ループの道具一式 — qlogを2tick全軸サンプラに拡張(pos/vel/yaw/pitch/hp/ground/item/全タイマ)、当側fightSamples(0.1s・コンソールのみ)、tools/compare_fights.py(両ログを同軸化して差分レポート)。サーバー受領後に実測→比較→修正ループ開始(v1.75.0)。
-- 2026-09-14(9): 標準測定シナリオ確定(硬い数値=タイマ系は一致必須/統計=±10%)、当側サンプルに速度追加・クリスタル爆発をtrace化(v1.75.1)。
+  原因: api.papermc.io v2 が sunset → fill v3 (fill.papermc.io/v3) へ移行。
+- 2026-09-13: v3 版での再発火 → run 34760226363 成功。ただしサンドボックスから artifact DL は
+  blob 遮断(EOF)で不能 → `java-env-delivery` ブランチ配送を追加。
+- 2026-09-13: 配送ブランチ版の試行錯誤(run 34760427888 → push 403 / checkout の clean が
+  bundle を消す)を経て、run 34761374376 で全緑。**Java 環境の調達経路が確立**。
+- 2026-09-13(夜): 起動検証済み Fabric サーバーを `mc-server-delivery` へ配送する拡張を書いたが、
+  サンドボックスは `.github/workflows/**` を push できないため**オーナーの貼り付け待ち**のまま。
+- 2026-09-14(夜): 配送を **薄いワークフロー + `ci/java-env.sh`** に作り替え(以後の修正に
+  再貼り付けが不要)。旧拡張にあった不具合も修正: `mcserver/` ディレクトリを作業ツリー内に作り
+  配送コミットがサーバー丸ごと(未圧縮)を巻き込む問題 → 作業ツリー外 `/tmp/mcserver` で組み立て、
+  stop 用 FIFO もツリー外へ。qlog データパックを配送サーバーに同梱。
