@@ -3398,7 +3398,7 @@ public final class PracticeService {
                 } else {
                     // Map "aim": the higher the aim error the more swings whiff, so low rungs
                     // punish a player who stands still far less than MASTER / SURVIVAL MASTER.
-                    botSwing(player, bot, diff, diff.attackDamage());
+                    botSwing(session, player, bot, diff, diff.attackDamage());
                 }
                 session.setBotNextAttackMs(now + diff.attackIntervalMs()
                         + java.util.concurrent.ThreadLocalRandom.current().nextInt(150));
