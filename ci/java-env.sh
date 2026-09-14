@@ -266,17 +266,24 @@ git config --get-regexp '^http\.' | grep -q extraheader \
 
 step "build: 当プラグイン (./gradlew test shadowJar)"
 if [ -x ./gradlew ]; then
+  # ランナー既定の JDK に依存しない(配送用に取得済みの Temurin 21 を使う)
+  export JAVA_HOME="$WORK/jdk"
+  export PATH="$JAVA_HOME/bin:$PATH"
+  export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$WORK/gradle-home}"
+  mkdir -p "$GRADLE_USER_HOME"
+  java -version 2>&1 | head -2
   set +e
   ./gradlew --no-daemon test shadowJar > "$WORK/plugin-build.log" 2>&1
   rc=$?
   set -e
-  tail -25 "$WORK/plugin-build.log" || true
   if [ "$rc" -ne 0 ]; then
-    # サンドボックスからログ本文は読めないので、失敗行だけアノテーションに載せる
-    grep -E "error:|FAILURE|What went wrong|Caused by|> Task .*FAILED|Could not" "$WORK/plugin-build.log" \
-      | tail -12 | sed 's/^/::error::gradle: /' || true
+    # サンドボックスからログ本文は読めないので、失敗付近を annotation に載せる
+    grep -E "error:|FAILURE|What went wrong|Caused by|> Task .*FAILED|Could not|Received status|Connection|PKIX|SSL|timed out" \
+      "$WORK/plugin-build.log" | tail -15 | sed 's/^/::error::gradle: /' || true
+    tail -30 "$WORK/plugin-build.log" | sed 's/^/::notice::gradle-tail: /' || true
     die "gradlew test shadowJar に失敗 (rc=$rc)"
   fi
+  tail -5 "$WORK/plugin-build.log" || true
   ls -lh build/libs/ || die "build/libs がありません"
   mkdir -p "$BUNDLE/plugin"
   cp build/libs/*.jar "$BUNDLE/plugin/" 2>/dev/null || die "shadowJar の成果物をコピーできません"

@@ -92,3 +92,5 @@ cd /tmp/mcserver && /tmp/jdk21/bin/java -Xmx2400M -jar fabric-server-launch.jar 
 - 2026-09-14: plugin-delivery のビルド順修正(orphan 前にビルド)を反映。
 
 - 2026-09-14: java-env のプラグインビルド失敗を診断可能に(gradle エラー行を ::error:: へ)。
+
+- 2026-09-14: java-env のプラグインビルドに Temurin21(JAVA_HOME)+GRADLE_USER_HOME を明示、失敗時は tail を notice で annotation へ。
