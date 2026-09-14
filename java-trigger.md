@@ -78,3 +78,4 @@ mkdir -p /tmp/jdk21 && tar -xzf /tmp/jdk21.tar.gz -C /tmp/jdk21 --strip-componen
 - 2026-09-13(夜): QuantumBOT 実測フェーズ開始。起動検証済み Fabric サーバー一式(マップ+MOD+eula/properties 同梱)を mc-server-delivery ブランチへ配送するワークフローに拡張 → 貼り付け待ち。
 
 - 2026-09-13(深夜): Crystalボットをマップg1gc実装に全面一致させた(v1.67.0)。詳細は docs/bot-combat-parity.md。
+- 2026-09-13(深夜2): アンカー経路も全行照合 → g1gc anchor chain(place→charge→爆発)を全ラングの梯子で実装(v1.68.0)。crystal_cd の初回抽出誤り(6/4/3/2/2/3→正6/6/6/3/2/3)も訂正。

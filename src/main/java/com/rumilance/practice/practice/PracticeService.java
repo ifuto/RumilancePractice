@@ -2796,18 +2796,49 @@ public final class PracticeService {
 
     /**
      * Crystal place cadence — the map's {@code crystal_cd} rung in ticks converted to ms
-     * (quantum:difficulty/1..6 = 6/4/3/2/2/3 ticks). No random spread: the map reloads the
+     * (quantum:difficulty/1..6 = 6/6/6/3/2/3 ticks). No random spread: the map reloads the
      * timer with the rung value verbatim. Hand-tuned CUSTOM keeps its own combo cadence.
      */
     static long crystalPlaceIntervalMs(BotDifficulty diff) {
         return switch (diff.preset()) {
-            case EASY -> 300L;
-            case INTERMEDIATE -> 200L;
-            case HARD -> 150L;
-            case CRAZY -> 100L;
+            case EASY, INTERMEDIATE, HARD -> 300L;
+            case CRAZY -> 150L;
             case MASTER -> 100L;
             case SURVIVAL_MASTER -> 150L;
             default -> diff.comboCooldownMs();
+        };
+    }
+
+    /** Map {@code anchor_cd} rung (ticks 5/4/4/3/1/1): place -> charge wait. */
+    static long anchorPlaceCdMs(BotDifficulty diff) {
+        return switch (diff.preset()) {
+            case EASY -> 250L;
+            case INTERMEDIATE, HARD -> 200L;
+            case CRAZY -> 150L;
+            case MASTER, SURVIVAL_MASTER -> 50L;
+            default -> 250L;
+        };
+    }
+
+    /** Map {@code charge_cd} rung (ticks 5/4/3/2/2/2): charge -> detonate wait. */
+    static long anchorChargeCdMs(BotDifficulty diff) {
+        return switch (diff.preset()) {
+            case EASY -> 250L;
+            case INTERMEDIATE -> 200L;
+            case HARD -> 150L;
+            case CRAZY, MASTER, SURVIVAL_MASTER -> 100L;
+            default -> 250L;
+        };
+    }
+
+    /** Map {@code explosion_cd} rung (ticks 5/4/3/2/2/2): cooldown before the next cycle. */
+    static long anchorExplodeCdMs(BotDifficulty diff) {
+        return switch (diff.preset()) {
+            case EASY -> 250L;
+            case INTERMEDIATE -> 200L;
+            case HARD -> 150L;
+            case CRAZY, MASTER, SURVIVAL_MASTER -> 100L;
+            default -> 2000L; // hand-tuned CUSTOM keeps the calmer legacy pacing
         };
     }
 
@@ -3931,21 +3962,22 @@ public final class PracticeService {
             placeDefenseWall(session, bot, dir, Material.OBSIDIAN, now);
         }
 
+        // --- respawn-anchor cycle (map g1gc anchor chain: place -> charge -> detonate) ---
+        // The map runs anchors on EVERY fighting rung and only outside melee range
+        // (g1gc/can_hit answers close-range fights with the sword instead). While an anchor
+        // cycle runs, crystal placement pauses — the map reloads crystal_timer after each
+        // anchor stage, so the two weapons alternate instead of stacking.
+        if (fights) {
+            tickAnchorCycle(player, session, bot, crystalDiff, now, dist);
+        }
+
         // --- attack: place a crystal combo near the player ---
-        // Map cadence: crystal_timer reloads with the crystal_cd rung verbatim (6/4/3/2/2/3
-        // ticks = 300/200/150/100/100/150 ms) — no random spread; combo speed IS the difficulty.
+        // Map cadence: crystal_timer reloads with the crystal_cd rung verbatim (6/6/6/3/2/3
+        // ticks = 300/300/300/150/100/150 ms) — no random spread; combo speed IS the difficulty.
         if (now >= session.botNextAttackMs() && dist <= 9.0d
-                && session.botCrystals().size() < 2) {
+                && session.botCrystals().size() < 2 && ab.anchorStage() == 0) {
             long combo = crystalPlaceIntervalMs(crystalDiff);
-            // g1gc anchor mixups (map .anchors playstyle): from HARD upward, about half of the
-            // close combos are respawn-anchor strikes instead of pedestal crystals.
-            boolean anchorMix = anchorCapable(crystalDiff) && dist <= 6.0d
-                    && now >= ab.nextAnchorMs()
-                    && java.util.concurrent.ThreadLocalRandom.current().nextDouble() < 0.5d;
-            if (anchorMix && launchAnchorStrike(player, session, bot)) {
-                ab.nextAnchorMs(now + Math.max(ANCHOR_MIN_COOLDOWN_MS, combo * 2L));
-                session.setBotNextAttackMs(now + combo);
-            } else if (launchCrystalAttack(player, session)) {
+            if (launchCrystalAttack(player, session)) {
                 session.setBotNextAttackMs(now + combo);
             } else {
                 session.setBotNextAttackMs(now + 500L); // no valid spot: retry soon
@@ -3953,12 +3985,84 @@ public final class PracticeService {
         }
     }
 
-    /** Map .anchors playstyle: respawn anchors enter the mix from the HARD rung upward. */
-    private static boolean anchorCapable(BotDifficulty diff) {
-        return switch (diff.preset()) {
-            case HARD, CRAZY, MASTER, SURVIVAL_MASTER -> true;
-            default -> false;
-        };
+    /**
+     * The map's g1gc anchor chain as a three-stage cycle: place a floating anchor near the
+     * player (charges 0), wait {@code anchor_cd}, charge it to 1 (with the charge sound),
+     * wait {@code charge_cd}, detonate it (vanilla anchor blast: power 5 + fire), then wait
+     * {@code explosion_cd} before the next cycle. Master detonates every ~250 ms; the map
+     * guards each stage with the player's hurt frames on rung 6 only — we gate every stage
+     * on the anchor block still existing, so a player anchor-break aborts the cycle.
+     */
+    private void tickAnchorCycle(Player player, PracticeSession session, Mannequin bot,
+                                 BotDifficulty diff, long now, double dist) {
+        PracticeSession.BotAbilityState ab = session.abilities();
+        // Advance the running cycle first — the stages run wherever the fight has moved to.
+        if (ab.anchorStage() > 0) {
+            org.bukkit.block.Block anchor = ab.anchorBlock() == null
+                    ? null : ab.anchorBlock().getBlock();
+            if (anchor == null || anchor.getType() != Material.RESPAWN_ANCHOR) {
+                // The player broke the anchor out of the chain (map: markers die, bot restarts).
+                ab.anchorStage(0);
+                ab.anchorBlock(null);
+                ab.nextAnchorMs(now + 1000L);
+                return;
+            }
+            if (now < ab.nextAnchorMs()) {
+                return; // mid-stage: wait for the rung timer
+            }
+            if (ab.anchorStage() == 1) {
+                org.bukkit.block.data.type.RespawnAnchor data =
+                        (org.bukkit.block.data.type.RespawnAnchor) anchor.getBlockData();
+                data.setCharges(1);
+                anchor.setBlockData(data, false);
+                bot.swingMainHand();
+                if (bot.getWorld() != null) {
+                    bot.getWorld().playSound(anchor.getLocation(),
+                            Sound.BLOCK_RESPAWN_ANCHOR_CHARGE, 1.0f, 1.0f);
+                }
+                ab.anchorStage(2);
+                ab.nextAnchorMs(now + anchorChargeCdMs(diff));
+                return;
+            }
+            // Stage 2 -> detonate (vanilla anchor blast: power 5 + fire).
+            Location boom = anchor.getLocation().add(0.5d, 0.5d, 0.5d);
+            session.botPlacedBlocks().remove(anchor);
+            anchor.setType(Material.AIR, false);
+            if (boom.getWorld() != null) {
+                boom.getWorld().createExplosion(boom, 5.0f, true, false, bot);
+            }
+            ab.anchorStage(0);
+            ab.anchorBlock(null);
+            ab.nextAnchorMs(now + anchorExplodeCdMs(diff));
+            return;
+        }
+        // Engage: outside melee range only (the map answers close range with the sword).
+        if (dist <= CRYSTAL_MELEE_REACH || now < ab.nextAnchorMs() || dist > 9.0d
+                || !bot.hasLineOfSight(player)) {
+            return;
+        }
+        org.bukkit.block.Block foot = player.getLocation().getBlock();
+        int[] dx = {1, -1, 0, 0, 0};
+        int[] dy = {0, 0, 0, 0, 1};
+        int[] dz = {0, 0, 1, -1, 0};
+        int start = java.util.concurrent.ThreadLocalRandom.current().nextInt(5);
+        org.bukkit.block.Block spot = null;
+        for (int k = 0; k < 5; k++) {
+            int i = (start + k) % 5;
+            org.bukkit.block.Block cand = foot.getRelative(dx[i], dy[i], dz[i]);
+            if (cand.getType().isAir() || cand.getBlockData().isReplaceable()) {
+                spot = cand;
+                break;
+            }
+        }
+        if (spot == null || !session.botConsume(Material.RESPAWN_ANCHOR, 1)
+                || !placeTrackedBlock(session, spot, Material.RESPAWN_ANCHOR, 3000L)) {
+            return; // nowhere to place: retry next tick, the crystal path keeps firing
+        }
+        bot.swingMainHand();
+        ab.anchorBlock(spot.getLocation());
+        ab.anchorStage(1);
+        ab.nextAnchorMs(now + anchorPlaceCdMs(diff));
     }
 
     /**

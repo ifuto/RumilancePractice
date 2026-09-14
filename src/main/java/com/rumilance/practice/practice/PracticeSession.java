@@ -121,6 +121,10 @@ public final class PracticeSession {
         private long nextMeleeMs;
         /** Fighting pause after the bot's own totem pop (Quantum totem_cd rung). */
         private long totemPauseUntilMs;
+        /** Anchor cycle stage: 0 = idle, 1 = placed, 2 = charged (Quantum g1gc anchor chain). */
+        private int anchorStage;
+        /** The tracked anchor block of the running cycle. */
+        private transient org.bukkit.Location anchorBlock;
         /** Golden apples eaten this life (map caps its sustain, so do we: max 2). */
         private int gapUses;
         /** Harming splashes thrown since the last restock drink (map cap: 2). */
@@ -160,6 +164,10 @@ public final class PracticeSession {
         public void nextMeleeMs(long v) { nextMeleeMs = v; }
         public long totemPauseUntilMs() { return totemPauseUntilMs; }
         public void totemPauseUntilMs(long v) { totemPauseUntilMs = v; }
+        public int anchorStage() { return anchorStage; }
+        public void anchorStage(int v) { anchorStage = v; }
+        public org.bukkit.Location anchorBlock() { return anchorBlock; }
+        public void anchorBlock(org.bukkit.Location v) { anchorBlock = v; }
         public int gapUses() { return gapUses; }
         public void gapUses(int v) { gapUses = v; }
         public int potUses() { return potUses; }

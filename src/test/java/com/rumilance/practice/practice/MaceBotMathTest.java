@@ -80,19 +80,45 @@ class MaceBotMathTest {
 
     @Test
     void crystalTimersFollowTheMapCrystalLadder() {
-        // crystal_cd rungs in ticks (quantum:difficulty/1..6), 50ms per tick, no spread.
+        // crystal_cd rungs in ticks (quantum:difficulty/1..6 = 6/6/6/3/2/3), 50ms per tick.
         assertEquals(300L, PracticeService.crystalPlaceIntervalMs(
                 BotDifficulty.of(BotDifficulty.Preset.EASY)));
-        assertEquals(200L, PracticeService.crystalPlaceIntervalMs(
+        assertEquals(300L, PracticeService.crystalPlaceIntervalMs(
                 BotDifficulty.of(BotDifficulty.Preset.INTERMEDIATE)));
-        assertEquals(150L, PracticeService.crystalPlaceIntervalMs(
+        assertEquals(300L, PracticeService.crystalPlaceIntervalMs(
                 BotDifficulty.of(BotDifficulty.Preset.HARD)));
-        assertEquals(100L, PracticeService.crystalPlaceIntervalMs(
+        assertEquals(150L, PracticeService.crystalPlaceIntervalMs(
                 BotDifficulty.of(BotDifficulty.Preset.CRAZY)));
         assertEquals(100L, PracticeService.crystalPlaceIntervalMs(
                 BotDifficulty.of(BotDifficulty.Preset.MASTER)));
         assertEquals(150L, PracticeService.crystalPlaceIntervalMs(
                 BotDifficulty.of(BotDifficulty.Preset.SURVIVAL_MASTER)));
+        // anchor_cd rungs (5/4/4/3/1/1): place -> charge wait.
+        assertEquals(250L, PracticeService.anchorPlaceCdMs(
+                BotDifficulty.of(BotDifficulty.Preset.EASY)));
+        assertEquals(200L, PracticeService.anchorPlaceCdMs(
+                BotDifficulty.of(BotDifficulty.Preset.INTERMEDIATE)));
+        assertEquals(200L, PracticeService.anchorPlaceCdMs(
+                BotDifficulty.of(BotDifficulty.Preset.HARD)));
+        assertEquals(150L, PracticeService.anchorPlaceCdMs(
+                BotDifficulty.of(BotDifficulty.Preset.CRAZY)));
+        assertEquals(50L, PracticeService.anchorPlaceCdMs(
+                BotDifficulty.of(BotDifficulty.Preset.MASTER)));
+        assertEquals(50L, PracticeService.anchorPlaceCdMs(
+                BotDifficulty.of(BotDifficulty.Preset.SURVIVAL_MASTER)));
+        // charge_cd / explosion_cd rungs (5/4/3/2/2/2): charge and re-cycle waits.
+        assertEquals(250L, PracticeService.anchorChargeCdMs(
+                BotDifficulty.of(BotDifficulty.Preset.EASY)));
+        assertEquals(200L, PracticeService.anchorChargeCdMs(
+                BotDifficulty.of(BotDifficulty.Preset.INTERMEDIATE)));
+        assertEquals(150L, PracticeService.anchorChargeCdMs(
+                BotDifficulty.of(BotDifficulty.Preset.HARD)));
+        assertEquals(100L, PracticeService.anchorChargeCdMs(
+                BotDifficulty.of(BotDifficulty.Preset.CRAZY)));
+        assertEquals(100L, PracticeService.anchorExplodeCdMs(
+                BotDifficulty.of(BotDifficulty.Preset.MASTER)));
+        assertEquals(2000L, PracticeService.anchorExplodeCdMs(
+                BotDifficulty.of(BotDifficulty.Preset.CUSTOM)));
         // Hand-tuned CUSTOM keeps its own combo cadence (the map has no custom rung).
         assertEquals(BotDifficulty.of(BotDifficulty.Preset.CUSTOM).comboCooldownMs(),
                 PracticeService.crystalPlaceIntervalMs(BotDifficulty.of(BotDifficulty.Preset.CUSTOM)));

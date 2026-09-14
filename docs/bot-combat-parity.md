@@ -139,7 +139,7 @@
 | 事象 | マップ実数値 | 出典 |
 |---|---|---|
 | 近接剣撃 | ≤3blk + 対象hurtTime=0 + 視線通過 → **hitcd 7t(350ms)固定**(全ラング) | g1gc/hit, g1gc/can_hit |
-| クリスタル設置 | crystal_timer≤0 で設置 → **crystal_timer=crystal_cd(6/4/3/2/2/3t)** | g1gc/spawncrystal + cooldowns |
+| クリスタル設置 | crystal_timer≤0 で設置 → **crystal_timer=crystal_cd(6/6/6/3/2/3t)** | g1gc/spawncrystal + cooldowns |
 | 台(オブシディアン) | obby_timer≤0 で setblock → **obby_cd(5/4/3/2/1/1t)** | g1gc/placeobsidian |
 | 爆発 | 自クリスタルへ `damage 1 player_attack` = **バニラ爆発** | g1gc/breakcrystal |
 | トーテム | pop後 **totem_timer=totem_cd(40/31/21/10/0/1t)** の休止・offhand再装填4t/9t | crystal/totmain |
@@ -147,6 +147,7 @@
 | 金リンゴ | HP≤16(80%)で gap(gap_timer 35t) | passive/aggression0 |
 | クロスボウ | HP17+ かつ距離20〜40+ で 0.65s間隔射撃 | passive/crossbow/load |
 | 移動 | 毎tick `move`(停止)が基本・対象>2blkで前進・壁でjump・後退しない | g1gc/botlogic+movement |
+| アンカー | **全戦闘ラングで使用**(近接圏外のみ)。place(anchor charges0)→anchor_cd(5/4/4/3/1/1t)→charge(charges1+音)→charge_cd(5/4/3/2/2/2t)→爆発→explosion_cd(同)→次サイクル。爆発はバニラ相当(威力5+着火)。アンカー進行中はクリスタル休止(crystal_timerが各段で再装填)・途中破壊でサイクル中止 | bin/13→anchor_tick→bin/14/15, g1gc/place_anchor+charge_anchor+defenceplace, xaniclelib:anchor/* |
 | NPC(rung 0) | 攻撃完全無し(クリスタルも設置しない・その場に立つ) | crystal/difficulty0 |
 | 回転 | max_rotation梯子 1/4/10/14/20/20°/t(sword共通) | difficulty/0..6 |
 
@@ -164,5 +165,11 @@
 - NPCのクリスタル攻撃を停止(マップ rung 0 は設置すらしない)。アンカー交ぜ込みは
   HARD以上に整理(map .anchors に対応)。
 
-既知の意図的差分: 爆発は Paper#11167 対策の源泉付き createExplosion(6f) 変換のまま
-(プロダクト決定)。クロスボウは40blk級の狩場がないアリーナ前提で中距離pokeのまま。
+既知の意図的差分: 爆発は Paper#11167 対策の源泉付き createExplosion 変換のまま
+(クリスタル6f/アンカー5f+着火・プロダクト決定)。クロスボウは40blk級の狩場がない
+アリーナ前提で中距離pokeのまま。マップの防衛グロウストーン(defenceplace)は当 bot が
+自爆ダメージ免除済みのため省略。アンカーの浮き設置(airplace)は 5 方位スキャンで再現。
+
+### 訂正(2026-09 深夜の全行再抽出)
+- crystal_cd の正確値は **6/6/6/3/2/3**(初回抽出の 6/4/3/2/2/3 は誤り)→ v1.68.0 で修正。
+- アンカーは HARD+ のトグルではなく **g1gc の通常経路(全ラング)**。
