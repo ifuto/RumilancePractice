@@ -85,3 +85,4 @@ mkdir -p /tmp/jdk21 && tar -xzf /tmp/jdk21.tar.gz -C /tmp/jdk21 --strip-componen
 - 2026-09-14(3): Packetボットの攻撃を gameMode.attack 実処理に修正(swing=アニメのみ問題)。クロスボウを回復フェーズ専用化(12-24blk)。
 - 2026-09-14(4): Packetボットの移動を入力駆動に(xxa/zza+sprint+jump=マップの move/sprint/jump と同機構)。setVelocityを入力変換層に(v1.73.0)。
 - 2026-09-14(5): 戦闘タイムライン記録を実装(swing/hit/crystal/anchor/POP/gapを秒オフセットで記録・試合終了時にプレイヤー+コンソールへ全件ダンプ)。「正常な戦い」の判定は主張ではなくこの証拠で行う(v1.74.0)。
+- 2026-09-14(6): qlog データパック作成(tools/qlog-datapack)— QuantumBOTの行動(位置/hp/hitcd/totem_timer/crystal_timer/近傍クリスタル)を0.5s間隔でコンソールへ。ユーザーのFabricログと当側traceで比較する観測器。
