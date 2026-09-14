@@ -17,6 +17,9 @@
 # 配送ブランチ:
 #   mc-server-delivery  ← mcserver.tar.gz (90MB 分割) + sha256s.txt + README.txt
 #   java-env-delivery   ← jdk21.tar.gz (90MB 分割) + paper jar + sha256s.txt
+#   plugin-delivery     ← shadowJar した当プラグイン (jar + sha256)。サンドボックスは
+#                         artifact を読めないので、当プラグインを Paper で走らせて
+#                         参照BOTと比較するにはこのブランチ経由で受け取る。
 #
 # 実行前提: GitHub Actions の ubuntu ランナー、actions/checkout の persist-credentials: true。
 # 進捗は [step] 行と、失敗時は ::error:: アノテーション(サンドボックスから API で読める唯一のログ経路)
@@ -320,4 +323,47 @@ fi
 git ls-remote --heads origin java-env-delivery
 echo "::notice::delivered java-env-delivery $(git rev-parse HEAD)"
 
-step "done — delivered mc-server-delivery + java-env-delivery"
+step "build: 当プラグイン (./gradlew test shadowJar)"
+if [ -x ./gradlew ]; then
+  ./gradlew --no-daemon -q test shadowJar 2>&1 | tail -40 || die "gradlew test shadowJar に失敗"
+  ls -lh build/libs/ || die "build/libs がありません"
+  mkdir -p "$BUNDLE/plugin"
+  cp build/libs/*.jar "$BUNDLE/plugin/" 2>/dev/null || die "shadowJar の成果物をコピーできません"
+  ( cd "$BUNDLE/plugin" && sha256sum ./*.jar > sha256s.txt && cat sha256s.txt )
+  echo "::notice::plugin built: $(ls "$BUNDLE/plugin" | tr '\n' ' ')"
+else
+  echo "::warning::gradlew が見つからないためプラグインのビルドを省略します"
+fi
+
+step "deliver: plugin-delivery"
+git branch -D plugin-delivery >/dev/null 2>&1 || true
+git checkout -q --orphan plugin-delivery
+git rm -rfq . 2>/dev/null || true
+if [ -d "$BUNDLE/plugin" ] && compgen -G "$BUNDLE/plugin/*.jar" >/dev/null; then
+  mkdir -p plugin
+  cp "$BUNDLE/plugin"/*.jar "$BUNDLE/plugin/sha256s.txt" plugin/
+  cat > plugin/README.txt <<'EOT'
+plugin-delivery — RumilancePractice の shadowJar (run __RUN__)
+
+  git clone --depth 1 --branch plugin-delivery \
+    https://github.com/ifuto/RumilancePractice.git /tmp/pluginship
+
+使い方(サンドボックス):
+  1) Paper サーバーを用意し plugins/ へ jar を置く
+  2) 起動 → /botadmin などで BOT を出し、参照側と同じシナリオを戦わせる
+  3) fight trace の s 行を回収 → tools/compare_fights.py で参照([q]行)と比較
+EOT
+  sed -i "s/__RUN__/$RUN/" plugin/README.txt
+  ls -lh plugin
+  git add -A plugin
+  git commit -qm "plugin delivery (run $RUN): RumilancePractice shadowJar"
+  if ! git push -f origin plugin-delivery 2>/tmp/push3.err; then
+    echo "::error::push plugin-delivery failed: $(tr '\n' ' ' < /tmp/push3.err | head -c 900)"
+  fi
+  git ls-remote --heads origin plugin-delivery
+  echo "::notice::delivered plugin-delivery $(git rev-parse HEAD)"
+else
+  echo "::warning::プラグイン成果物が無いため plugin-delivery を省略"
+fi
+
+step "done — delivered mc-server-delivery + java-env-delivery + plugin-delivery"

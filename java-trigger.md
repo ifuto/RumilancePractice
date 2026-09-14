@@ -86,3 +86,5 @@ cd /tmp/mcserver && /tmp/jdk21/bin/java -Xmx2400M -jar fabric-server-launch.jar 
 - 2026-09-14: アンカー突き合わせ(構造/ラダー/難易度ゲート一致)を doc に追記 — CI 再検証。
 
 - 2026-09-14: 通常戦闘のアンカー実測 2本目(4t×49/49・12tサイクル)を追記 — CI 再検証。
+
+- 2026-09-14: ci/java-env.sh に当プラグインの shadowJar ビルド + plugin-delivery 配送を追加(当側を Paper で走らせて参照と比較するため)。
