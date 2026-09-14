@@ -1588,9 +1588,9 @@ public final class PracticeService {
         BotBody bot = session.combatBot() != null ? session.combatBot() : session.maceBot();
         switch (mode) {
             case MACE_FAR_PEARL -> {
-                if (bot != null && bot.getAttribute(Attribute.MAX_HEALTH) != null) {
+                if (bot != null && bot.attribute(Attribute.MAX_HEALTH) != null) {
                     // far_pearl/init:9 — glass cannon (kernel constant).
-                    bot.getAttribute(Attribute.MAX_HEALTH).setBaseValue(DrillKernel.FAR_PEARL_BOT_MAX_HEALTH);
+                    bot.attribute(Attribute.MAX_HEALTH).setBaseValue(DrillKernel.FAR_PEARL_BOT_MAX_HEALTH);
                     bot.setHealth(DrillKernel.FAR_PEARL_BOT_MAX_HEALTH);
                 }
             }
@@ -2263,7 +2263,7 @@ public final class PracticeService {
         // to swing the weapon the mode is about.
         eq.setItemInMainHand(new ItemStack(Material.MACE));
         eq.setItemInOffHand(shieldUp ? new ItemStack(Material.SHIELD) : null);
-        zeroDropChances(bot, eq);
+        zeroDropChances(bot.living(), eq);
     }
 
     /**
@@ -2732,15 +2732,15 @@ public final class PracticeService {
         try {
             org.bukkit.damage.DamageSource source = org.bukkit.damage.DamageSource.builder(
                             org.bukkit.damage.DamageType.PLAYER_ATTACK)
-                    .withCausingEntity(bot)
-                    .withDirectEntity(bot)
+                    .withCausingEntity(bot.entity())
+                    .withDirectEntity(bot.entity())
                     .build();
             player.damage(damage, source);
         } catch (Throwable t) {
             // Compat fallback (DamageSource API missing/refused): the plain call still carries
             // the bot as the damage source (it used to recurse into itself — no damage ever).
             try {
-                player.damage(damage, bot);
+                player.damage(damage, bot.entity());
             } catch (Throwable ignored) {
                 return;
             }
@@ -3113,7 +3113,7 @@ public final class PracticeService {
             case CART -> new ItemStack(Material.BOW);
             default -> new ItemStack(Material.END_CRYSTAL);
         };
-        if (applyBoundBotKit(type, bot, eq, shieldUp, fallbackWeapon)) {
+        if (applyBoundBotKit(type, bot.living(), eq, shieldUp, fallbackWeapon)) {
             return;
         }
         // Quantum botgear/neth parity: protection 4 netherite (legs blast-protection on cart),
@@ -3452,7 +3452,7 @@ public final class PracticeService {
                     botLoc.add(0, 1.1, 0), org.bukkit.entity.TNTPrimed.class, t -> {
                         t.setFuseTicks(DrillKernel.cartFuseTicks(cartTier));
                         t.setYield(DrillKernel.cartYield(cartTier));
-                        t.setSource(bot);
+                        t.setSource(bot.entity());
                     });
             tnt.setVelocity(dir.clone().normalize().multiply(0.85d).setY(0.18d));
             session.botTnt().add(tnt.getUniqueId());
@@ -3540,7 +3540,7 @@ public final class PracticeService {
         }
         org.bukkit.entity.Arrow arrow = bot.getWorld().spawnArrow(
                 bot.getEyeLocation(), arrowDir.multiply(1.9d), 3.0f, 0.0f);
-        arrow.setShooter(bot);
+        arrow.setShooter(bot.living());
         arrow.setDamage(Math.max(1.0d, damage));
         holdItemBriefly(bot, new ItemStack(Material.BOW), 8L);
         bot.swingMainHand();
@@ -3989,7 +3989,7 @@ public final class PracticeService {
             session.botPlacedBlocks().remove(fuseBlock);
             fuseBlock.setType(Material.AIR, false);
             if (boom.getWorld() != null) {
-                boom.getWorld().createExplosion(boom, 5.0f, false, false, bot);
+                boom.getWorld().createExplosion(boom, 5.0f, false, false, bot.entity());
             }
         }, 8L);
         return true;
