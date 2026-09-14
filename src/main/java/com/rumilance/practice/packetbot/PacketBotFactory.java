@@ -43,7 +43,7 @@ public final class PacketBotFactory {
         server.getPlayerList().placeNewPlayer(
                 new FakePlayerConnection(PacketFlow.SERVERBOUND),
                 bot,
-                new CommonListenerCookie(profile, 0, information, false));
+                CommonListenerCookie.createInitial(profile, false));
         bot.stopRiding();
         bot.teleportTo(level, location.getX(), location.getY(), location.getZ(),
                 Set.of(), location.getYaw(), location.getPitch(), true);
