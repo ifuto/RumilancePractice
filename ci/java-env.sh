@@ -62,21 +62,83 @@ PY
 echo "paper: $P_NAME ($P_SHA)"
 curl -fsSL -A "$UA" -o "$BUNDLE/$P_NAME" "$P_URL"
 echo "$P_SHA  $P_NAME" | ( cd "$BUNDLE" && sha256sum -c - )
+echo "::notice::paper ok $P_NAME"
 
 # --------------------------------------------------- Fabric 実測サーバー -----
+# サンドボックスからは meta.fabricmc.net に到達できず、CI のログ本体も読めない。そこで
+# 各 API 呼び出しは HTTP ステータス + ボディ先頭 + 採用値を ::notice::/::error:: で外へ出す
+# (annotations API が唯一読める観測窓)。
 step "Fabric server launcher (MC 1.21.11)"
-LOADER=$(curl -fsSL "https://meta.fabricmc.net/v2/versions/loader/1.21.11" \
-  | python3 -c 'import sys,json; a=json.load(sys.stdin); s=[v for v in a if v.get("stable")]; print((s or a)[0]["version"] if (s or a) else "")')
-[ -n "$LOADER" ] || die "meta.fabricmc.net に 1.21.11 の loader がありません"
-INSTALLER=$(curl -fsSL "https://meta.fabricmc.net/v2/versions/installer" \
-  | python3 -c 'import sys,json; a=json.load(sys.stdin); s=[v for v in a if v.get("stable")]; print((s or a)[0]["version"] if (s or a) else "")')
-[ -n "$INSTALLER" ] || die "meta.fabricmc.net に installer バージョンがありません"
-echo "fabric: loader=$LOADER installer=$INSTALLER"
+HTTP_STATUS="?"
+api_get() { # api_get <url> <outfile>
+  local url="$1" out="$2"
+  HTTP_STATUS=$(curl -sSL -A "$UA" -w '%{http_code}' -o "$out" "$url" 2>"$out.err" || echo "curl-error")
+  echo "  GET $url -> $HTTP_STATUS ($(wc -c <"$out" 2>/dev/null | tr -d ' ') bytes)"
+}
+
+pick_json() { # pick_json <file> <key> — 配列の先頭 stable(無ければ先頭)の <key>
+  python3 - "$1" "$2" <<'PY' 2>/dev/null || true
+import json, sys
+try:
+    a = json.load(open(sys.argv[1]))
+except Exception:
+    raise SystemExit
+if isinstance(a, list) and a:
+    s = [v for v in a if v.get("stable")] or a
+    print(s[0].get(sys.argv[2], ""))
+PY
+}
+
+# loader: ゲーム版つき一覧 → 空/失敗なら全ローダー一覧へフォールバック(loader 自体は版非依存)
+api_get "https://meta.fabricmc.net/v2/versions/loader/1.21.11" "$WORK/loader.json"
+LOADER=$(pick_json "$WORK/loader.json" version)
+if [ -z "$LOADER" ]; then
+  BODY=$(head -c 200 "$WORK/loader.json" 2>/dev/null | tr '\n' ' ')
+  echo "::warning::loader/1.21.11 が空 (http=$HTTP_STATUS body=$BODY) — 全体リストへフォールバック"
+  api_get "https://meta.fabricmc.net/v2/versions/loader" "$WORK/loader_all.json"
+  LOADER=$(pick_json "$WORK/loader_all.json" version)
+  GAMES=$(curl -sSL -A "$UA" "https://meta.fabricmc.net/v2/versions/game" \
+    | python3 -c 'import sys,json
+try:
+    a=json.load(sys.stdin); print(",".join(str(v.get("version","?")) for v in a[:20]))
+except Exception as e:
+    print("game-list-unavailable:"+type(e).__name__)' 2>&1 | tr '\n' ' ')
+  echo "::error::fabric loader 未解決 — loader/1.21.11 http=$HTTP_STATUS body=$BODY / 既知 game versions(先頭20): $GAMES"
+  [ -n "$LOADER" ] || exit 1
+  echo "::warning::fallback loader=$LOADER (1.21.11 用のサーバー jar は取れない可能性がある)"
+fi
+
+api_get "https://meta.fabricmc.net/v2/versions/installer" "$WORK/installer.json"
+INSTALLER=$(pick_json "$WORK/installer.json" version)
+if [ -z "$INSTALLER" ]; then
+  # maven の maven-metadata.xml から installer 版を拾う第2経路
+  api_get "https://maven.fabricmc.net/net/fabricmc/fabric-installer/maven-metadata.xml" "$WORK/installer.xml"
+  INSTALLER=$(python3 - "$WORK/installer.xml" <<'PY' 2>/dev/null || true
+import re, sys
+try:
+    t = open(sys.argv[1], encoding="utf-8", errors="replace").read()
+except Exception:
+    raise SystemExit
+m = re.findall(r"<version>([^<]+)</version>", t)
+print(m[-1] if m else "")
+PY
+)
+fi
+[ -n "$INSTALLER" ] || die "fabric installer のバージョンを解決できません (installer API http=$HTTP_STATUS)"
+echo "::notice::fabric loader=$LOADER installer=$INSTALLER"
 
 rm -rf "$MCS"; mkdir -p "$MCS/mods"
-curl -fsSL -o "$MCS/fabric-server-launch.jar" \
-  "https://meta.fabricmc.net/v2/versions/loader/1.21.11/$LOADER/$INSTALLER/server/jar"
-[ -s "$MCS/fabric-server-launch.jar" ] || die "fabric-server-launch.jar の取得に失敗"
+JAR_URL="https://meta.fabricmc.net/v2/versions/loader/1.21.11/$LOADER/$INSTALLER/server/jar"
+HTTP_STATUS=$(curl -sSL -A "$UA" -w '%{http_code}' -o "$MCS/fabric-server-launch.jar" "$JAR_URL" 2>"$WORK/jar.err" || echo "curl-error")
+echo "  GET $JAR_URL -> $HTTP_STATUS ($(wc -c <"$MCS/fabric-server-launch.jar" 2>/dev/null | tr -d ' ') bytes)"
+if [ ! -s "$MCS/fabric-server-launch.jar" ]; then
+  echo "::error::fabric-server-launch.jar 取得失敗 http=$HTTP_STATUS stderr=$(head -c 300 "$WORK/jar.err" | tr '\n' ' ')"
+  exit 1
+fi
+if head -c 100 "$MCS/fabric-server-launch.jar" | grep -qi '<html\|<error\|not found'; then
+  echo "::error::fabric-server-launch.jar が HTML/エラー応答 http=$HTTP_STATUS body=$(head -c 200 "$MCS/fabric-server-launch.jar" | tr '\n' ' ')"
+  exit 1
+fi
 
 step "fabric-api (Modrinth / mc 1.21.11)"
 FA=$(curl -fsSL -A "$UA" \
@@ -146,6 +208,8 @@ if ! grep -qi "herobot" "$MCS/server_boot.log"; then
   exit 1
 fi
 grep -E "Done \(|Loading .* mods" "$MCS/server_boot.log" | tail -3
+echo "::notice::boot ok mods=$(grep -oE '[0-9]+ mods' "$MCS/server_boot.log" | head -1) done_line=$(grep -m1 "Done (" "$MCS/server_boot.log" | cut -c1-140)"
+if grep -qi "herobot" "$MCS/server_boot.log"; then echo "::notice::herobot loaded"; else echo "::warning::herobot の文字列がログに無い(mods 一覧を確認)"; fi
 
 if kill -0 "$BOOT_PID" 2>/dev/null; then
   timeout 20 bash -c 'echo stop > /tmp/boot_ctl' || kill "$BOOT_PID" 2>/dev/null || true
@@ -209,6 +273,7 @@ if ! git push -f origin mc-server-delivery 2>/tmp/push1.err; then
   exit 1
 fi
 git ls-remote --heads origin mc-server-delivery
+echo "::notice::delivered mc-server-delivery $(git rev-parse HEAD)"
 
 step "deliver: java-env-delivery"
 git branch -D java-env-delivery >/dev/null 2>&1 || true
@@ -225,5 +290,6 @@ if ! git push -f origin java-env-delivery 2>/tmp/push2.err; then
   exit 1
 fi
 git ls-remote --heads origin java-env-delivery
+echo "::notice::delivered java-env-delivery $(git rev-parse HEAD)"
 
 step "done — delivered mc-server-delivery + java-env-delivery"

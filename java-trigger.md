@@ -72,3 +72,6 @@ cd /tmp/mcserver && /tmp/jdk21/bin/java -Xmx2400M -jar fabric-server-launch.jar 
 - 2026-09-14(深夜2): オーナーが **arena/01a09fda-rumilancepractice** に薄いディスパッチャを適用
   (workflow blob = リポジトリ直下 `java-env.workflow.yml` と一致)。本書き換えで java-env を発火し、
   Fabric 実測サーバーの `mc-server-delivery` 配送を初回実行する。
+- 2026-09-14(深夜3): 初回の Fabric 配送は line 69 (meta.fabricmc.net の loader/1.21.11 解決) で失敗。
+  ログ本体が読めないため、ci/java-env.sh に HTTP ステータス / ボディ先頭 / 既知 game versions を
+  ::error:: アノテーションで吐く診断と、全ローダー一覧・maven metadata へのフォールバックを追加。
