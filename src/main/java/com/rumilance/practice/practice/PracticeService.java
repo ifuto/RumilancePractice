@@ -1458,8 +1458,8 @@ public final class PracticeService {
     /** Sword bow: used beyond melee range. */
     private static final long BOW_COOLDOWN_MS = 3500L;
     /** Crystal crossbow sniping: mid range poke between combos. */
-    private static final double CROSSBOW_MIN_RANGE = 5.5d;
-    private static final double CROSSBOW_MAX_RANGE = 15.0d;
+    private static final double CROSSBOW_MIN_RANGE = 12.0d;
+    private static final double CROSSBOW_MAX_RANGE = 24.0d;
     /** Respawn-anchor mixup (g1gc): only from HARD upward, every other combo at most. */
     private static final long ANCHOR_MIN_COOLDOWN_MS = 6500L;
     /** Defensive block wall (crystal obsidian / cart oak log). */
@@ -2688,12 +2688,14 @@ public final class PracticeService {
      * sloppy rungs whiff often, MASTER almost never does).
      */
     private void botSwing(Player player, BotBody bot, BotDifficulty diff, double damage) {
-        bot.swingMainHand();
         if (bot.isPacket()) {
-            // The fake player IS a server player: its swing already ran the vanilla melee
-            // pipeline (damage, knockback, crit, i-frames, aim from its real look).
+            // A swing is only an animation in vanilla — the ATTACK is gameMode.attack().
+            // Run the fake player's real attack: vanilla damage from the cloned kit's
+            // weapon, knockback, crits, sweeps, i-frames and hurt animation all vanilla.
+            packetMeleeAttack(bot, player);
             return;
         }
+        bot.swingMainHand();
         if (damage <= 0.0d) {
             return;
         }
@@ -2724,9 +2726,34 @@ public final class PracticeService {
      * direct health registration registers the rung's tuned damage — except against a
      * genuinely raised shield, which blocks like vanilla.</p>
      */
+    /**
+     * The packet bot's real melee: snap its look onto the target, then run the vanilla
+     * attack path ({@code gameMode.attack}) exactly like a client clicking on the player —
+     * damage from the cloned weapon, knockback, fall/mace bonuses, crits, i-frames.
+     * A bare {@code swing()} would only play the arm animation and hit nothing.
+     */
+    private void packetMeleeAttack(BotBody bot, Player player) {
+        if (!(bot instanceof com.rumilance.practice.packetbot.PacketBotBody packetBody)) {
+            return;
+        }
+        Location eye = bot.getEyeLocation();
+        Vector to = player.getLocation().add(0, 1.0, 0).toVector().subtract(eye.toVector());
+        if (to.lengthSquared() > 0.0001) {
+            Location look = eye.clone().setDirection(to.normalize());
+            bot.setRotation(look.getYaw(), look.getPitch());
+        }
+        net.minecraft.server.level.ServerPlayer nmsBot = packetBody.bot();
+        net.minecraft.world.entity.LivingEntity nmsTarget =
+                ((org.bukkit.craftbukkit.entity.CraftLivingEntity) player).getHandle();
+        nmsBot.gameMode.attack(nmsBot, nmsTarget);
+        nmsBot.swing(net.minecraft.world.InteractionHand.MAIN_HAND);
+    }
+
     private void botMeleeHit(Player player, BotBody bot, double damage, boolean knockback) {
         if (bot.isPacket()) {
-            return; // vanilla already applied this swing's damage and knockback
+            // Custom damage pipeline is mannequin-only; packet bodies attack for real via
+            // packetMeleeAttack (their call sites route there before reaching this method).
+            return;
         }
         if (player == null || !player.isOnline() || damage <= 0.0d || player.isDead()) {
             return;
@@ -3890,7 +3917,12 @@ public final class PracticeService {
             if (bot.getWorld() != null) {
                 bot.getWorld().playSound(bot.getLocation(), Sound.ITEM_SHIELD_BREAK, 1.0f, 1.0f);
             }
-            botMeleeHit(player, bot, Math.max(1.0d, diff.attackDamage() * 0.6d), true);
+            if (bot.isPacket()) {
+                // Vanilla computes the mace smash (fall-distance scaling) inside the attack.
+                packetMeleeAttack(bot, player);
+            } else {
+                botMeleeHit(player, bot, Math.max(1.0d, diff.attackDamage() * 0.6d), true);
+            }
         }
     }
 

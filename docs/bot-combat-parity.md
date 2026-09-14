@@ -269,3 +269,14 @@
 メイスBOTも packet branch 対応(Phase 2の一部)。AFKボットのPacket移行は次工程
 (AfkCrystalManager/AfkPracticeManager の BotBody 化 + setGlowing/ポーズ API の
 BotBody 追加が必要)。
+
+### v1.72.2 追記(正常な戦いの最後のピース)
+
+- **Packetボットの攻撃は `gameMode.attack`**: バニラで swing はアニメーションのみ。
+  以前の packet branch は swing して早期リターン=**空を殴るだけ**(「戦わないBOT」の
+  再現になっていた)。`packetMeleeAttack` を新設: 視線スナップ →
+  `ServerPlayer.gameMode.attack(bot, target)` → swing。クローンした武器の実ダメージ・
+  ノックバック・クリティカル・スイープ・無敵時間・被弾演出が全部本物どおり走る。
+  メイススマッシュもバニラが落下距離スケールを攻撃内で計算するので同経路。
+- **クロスボウは回復フェーズ専具に**(12〜24blk): マップは HP17+ かつ退避後の遠距離でしか
+  構えない。旧実装の5.5blkからの戦闘中pokeは「変な戦い方」の一部だった。
