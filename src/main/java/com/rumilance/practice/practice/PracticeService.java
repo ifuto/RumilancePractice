@@ -2509,7 +2509,7 @@ public final class PracticeService {
             //    fall distance, and the map only commits a slam once it has real height.
             if (!grounded && fall >= MACE_SMASH_FALL_BLOCKS && dist <= reach + 0.75d
                     && now >= session.botNextAttackMs()) {
-                botSwing(player, bot, diff, diff.attackDamage() * maceSmashScale(fall));
+                botSwing(session, player, bot, diff, diff.attackDamage() * maceSmashScale(fall));
                 session.setBotNextAttackMs(now + diff.attackIntervalMs() + MACE_LAND_RECOVERY_MS);
                 return;
             }
@@ -2567,7 +2567,7 @@ public final class PracticeService {
             }
             // 4) Plain melee when already inside reach with no height to smash from.
             if (grounded && dist <= reach && now >= session.botNextAttackMs()) {
-                botSwing(player, bot, diff, diff.attackDamage());
+                botSwing(session, player, bot, diff, diff.attackDamage());
                 session.setBotNextAttackMs(now + diff.attackIntervalMs()
                         + java.util.concurrent.ThreadLocalRandom.current().nextInt(150));
                 return;
@@ -2706,13 +2706,13 @@ public final class PracticeService {
      * One bot swing: the rung's aim error decides whether it connects (the map's "aim" score -
      * sloppy rungs whiff often, MASTER almost never does).
      */
-    private void botSwing(Player player, BotBody bot, BotDifficulty diff, double damage) {
+    private void botSwing(PracticeSession session, Player player, BotBody bot, BotDifficulty diff, double damage) {
         session.fightLog("swing " + diff.preset());
         if (bot.isPacket()) {
             // A swing is only an animation in vanilla — the ATTACK is gameMode.attack().
             // Run the fake player's real attack: vanilla damage from the cloned kit's
             // weapon, knockback, crits, sweeps, i-frames and hurt animation all vanilla.
-            packetMeleeAttack(bot, player);
+            packetMeleeAttack(session, bot, player);
             return;
         }
         bot.swingMainHand();
@@ -2723,7 +2723,7 @@ public final class PracticeService {
             player.sendActionBar(messages.render(player, "practice.bot-miss"));
             return;
         }
-        botMeleeHit(player, bot, damage, true);
+        botMeleeHit(session, player, bot, damage, true);
     }
 
     /**
@@ -2752,7 +2752,7 @@ public final class PracticeService {
      * damage from the cloned weapon, knockback, fall/mace bonuses, crits, i-frames.
      * A bare {@code swing()} would only play the arm animation and hit nothing.
      */
-    private void packetMeleeAttack(BotBody bot, Player player) {
+    private void packetMeleeAttack(PracticeSession session, BotBody bot, Player player) {
         if (!(bot instanceof com.rumilance.practice.packetbot.PacketBotBody packetBody)) {
             return;
         }
@@ -2772,7 +2772,7 @@ public final class PracticeService {
         session.fightLog("attack(packet) vanilla");
     }
 
-    private void botMeleeHit(Player player, BotBody bot, double damage, boolean knockback) {
+    private void botMeleeHit(PracticeSession session, Player player, BotBody bot, double damage, boolean knockback) {
         if (bot.isPacket()) {
             // Custom damage pipeline is mannequin-only; packet bodies attack for real via
             // packetMeleeAttack (their call sites route there before reaching this method).
@@ -3440,7 +3440,7 @@ public final class PracticeService {
             // Splash of harming at the player (map cap: two pots before a restock drink).
             BotDifficulty potDiff = session.difficulty();
             double potDamage = Math.max(1.0d, potDiff.attackDamage() * 0.6d);
-            botMeleeHit(player, bot, potDamage, false); // splash hit: no melee knockback
+            botMeleeHit(session, player, bot, potDamage, false); // splash hit: no melee knockback
             ab.potUses(ab.potUses() + 1);
             player.sendActionBar(messages.render(player, "practice.bot-pot-hit"));
             if (player.getWorld() != null) {
@@ -3945,9 +3945,9 @@ public final class PracticeService {
             }
             if (bot.isPacket()) {
                 // Vanilla computes the mace smash (fall-distance scaling) inside the attack.
-                packetMeleeAttack(bot, player);
+                packetMeleeAttack(session, bot, player);
             } else {
-                botMeleeHit(player, bot, Math.max(1.0d, diff.attackDamage() * 0.6d), true);
+                botMeleeHit(session, player, bot, Math.max(1.0d, diff.attackDamage() * 0.6d), true);
             }
         }
     }
@@ -3974,7 +3974,7 @@ public final class PracticeService {
                     > landedRange * landedRange) {
                 return; // knocked away mid-jump: the crit whiffs with the swing
             }
-            botSwing(player, bot, diff, diff.attackDamage() * 1.5d);
+            botSwing(session, player, bot, diff, diff.attackDamage() * 1.5d);
             if (player.getWorld() != null) {
                 player.getWorld().spawnParticle(org.bukkit.Particle.CRIT,
                         player.getLocation().add(0, 1.0, 0), 18, 0.3, 0.5, 0.3, 0.4d);
@@ -4208,7 +4208,7 @@ public final class PracticeService {
                 && now >= ab.nextMeleeMs()
                 && bot.hasLineOfSight(player)) {
             selectBotSlot(session, bot, Material.NETHERITE_SWORD); // map hotbar 4
-            botSwing(player, bot, crystalDiff, crystalDiff.attackDamage());
+            botSwing(session, player, bot, crystalDiff, crystalDiff.attackDamage());
             ab.nextMeleeMs(now + CRYSTAL_MELEE_INTERVAL_MS);
             bot.setVelocity(new Vector(0, bot.getVelocity().getY(), 0)); // map: player @s stop
         }
