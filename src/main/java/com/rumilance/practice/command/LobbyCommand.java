@@ -25,6 +25,8 @@ public final class LobbyCommand implements CommandExecutor {
     private final PracticeService practiceService;
     private com.rumilance.practice.queue.QueueCoordinator queueCoordinator;
     private com.rumilance.practice.match.MatchService matchService;
+    /** Ends an AFK BOT Crystal session before the lobby return; true when one was ended. */
+    private java.util.function.Predicate<Player> afkExit;
 
     public LobbyCommand(
             LobbyService lobbyService,
@@ -62,6 +64,15 @@ public final class LobbyCommand implements CommandExecutor {
     }
 
     /**
+     * {@code /hub} from inside an AFK BOT Crystal session must end the session first, or the
+     * arena's boundary guard teleports the player straight back the tick after the lobby
+     * teleport (the reported "afkcから/hubすると強制的に戻される").
+     */
+    public void setAfkExit(java.util.function.Predicate<Player> afkExit) {
+        this.afkExit = afkExit;
+    }
+
+    /**
      * Hub teleport + inventory only. Callers that already left a match/FFA must use this
      * instead of {@code /hub} so ENDING/FFA branches cannot re-enter those leave paths.
      */
@@ -75,6 +86,9 @@ public final class LobbyCommand implements CommandExecutor {
                 || state == PlayerState.SPECTATING || state == PlayerState.PRACTICE_WAIT
                 || state == PlayerState.PRACTICE_ACTIVE) {
             return;
+        }
+        if (afkExit != null && afkExit.test(player)) {
+            return; // the session end already sent the player to the lobby
         }
         if (queueCoordinator != null) {
             try {
@@ -102,6 +116,11 @@ public final class LobbyCommand implements CommandExecutor {
         if (state == PlayerState.SPECTATING) {
             spectatorService.leave(player);
             messageService.send(player, "ffa.left");
+            return true;
+        }
+        if (afkExit != null && afkExit.test(player)) {
+            // Ended an AFK BOT Crystal session, which already teleported to the lobby.
+            messageService.send(player, "lobby.teleported");
             return true;
         }
         if (queueCoordinator != null) {

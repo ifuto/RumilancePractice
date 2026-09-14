@@ -142,6 +142,15 @@ public final class FfaService {
 
     private static final long COMBAT_MS = 30_000L;
 
+    /** Shown once when a fighter is combat-tagged (exact wording requested). */
+    private static final net.kyori.adventure.text.Component COMBAT_ENTER =
+            net.kyori.adventure.text.Component.text("You are now in Combat",
+                    net.kyori.adventure.text.format.NamedTextColor.RED);
+    /** Shown when the combat tag ends (expiry or death). */
+    private static final net.kyori.adventure.text.Component COMBAT_END =
+            net.kyori.adventure.text.Component.text("You are no longer in Combat",
+                    net.kyori.adventure.text.format.NamedTextColor.GREEN);
+
     /** Invoked with the arena id right after a reset evicts the fighters — lets the spectator
      *  service bail cameras that were watching this FFA (otherwise they'd float over the
      *  terrain while it is being restored). */
@@ -155,6 +164,8 @@ public final class FfaService {
     private final ConfigService configService;
     private final KitService kitService;
     private final KitLayoutCache layoutCache;
+    /** Selected KIT slot per player for the declared crystal FFA kit (null = feature off). */
+    private volatile com.rumilance.practice.kit.CrystalFfaStore crystalFfaStore;
     private final LobbyService lobbyService;
     private final PlayerStateManager stateManager;
     private final FfaStatsRepository ffaStatsRepository;
@@ -201,6 +212,16 @@ public final class FfaService {
     private final Map<UUID, FfaStats> sessionStats = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> killStreaks = new ConcurrentHashMap<>();
     private final Map<UUID, CombatTag> combatUntil = new ConcurrentHashMap<>();
+    /** Rejects joins while the player sits in an AFK practice/crystal session. */
+    private java.util.function.Predicate<UUID> sessionGuard;
+
+    /** Wires the AFK-session guard (see {@link #join}). */
+    public void setSessionGuard(java.util.function.Predicate<UUID> guard) {
+        this.sessionGuard = guard;
+    }
+    /** Admin-configured FFA command gate: out-of-combat-only whitelist (default off). */
+    private volatile boolean commandGateEnabled;
+    private final java.util.Set<String> commandWhitelist = java.util.concurrent.ConcurrentHashMap.newKeySet();
     /** Last server tick each player went lethal — guards against double-processing a death. */
     private final Map<UUID, Integer> lastLethalTick = new ConcurrentHashMap<>();
     private static final int LETHAL_DEDUPE_TICKS = 20;
@@ -281,6 +302,14 @@ public final class FfaService {
         nextResetAtMillis.clear();
         lastResetRemaining.clear();
         FileConfiguration yaml = configService.ffa();
+        // FFA command gate (admin-managed via /practiceadmin ffacommand): off by default.
+        commandGateEnabled = yaml.getBoolean("command-whitelist.enabled", false);
+        commandWhitelist.clear();
+        for (String cmd : yaml.getStringList("command-whitelist.commands")) {
+            if (cmd != null && !cmd.isBlank()) {
+                commandWhitelist.add(normalizeCommand(cmd));
+            }
+        }
         ConfigurationSection section = yaml.getConfigurationSection("arenas");
         if (section == null) {
             return;
@@ -371,7 +400,12 @@ public final class FfaService {
         if (arena.spawn() == null) {
             return pickSpawn(arena, player.getUniqueId());
         }
-        return LocationUtil.safeTeleportLocation(arena.spawn(), arena.region());
+        Location clamped = LocationUtil.safeTeleportLocation(arena.spawn(), arena.region());
+        // Air-spawn hardening: the region clamp keeps the saved Y, so a spawn point saved
+        // while flying stayed floating (the reported "ボーダーよりの空中スポーン"). Snap the
+        // point onto a standable same-column surface before using it.
+        Location footing = com.rumilance.practice.util.SpawnFooting.standClearPearl(clamped, 6);
+        return footing != null ? footing : clamped;
     }
 
     /** Re-applies per-player border / view distance for the player's current FFA arena. */
@@ -408,6 +442,12 @@ public final class FfaService {
     public boolean join(Player player, String arenaId) {
         if (runtimeFlags.maintenance() && !player.hasPermission("rumilance.admin")) {
             messageService.send(player, "ffa.maintenance");
+            return false;
+        }
+        if (sessionGuard != null && sessionGuard.test(player.getUniqueId())) {
+            // An AFK practice/crystal session owns the player's inventory and position;
+            // joining FFA on top of it corrupted both (the mirror of the AFK-entry bug).
+            messageService.send(player, "ffa.cannot-join");
             return false;
         }
         if (teamService != null && teamService.teamOf(player.getUniqueId()).isPresent()) {
@@ -460,7 +500,23 @@ public final class FfaService {
                         messageService.send(player, "ffa.teleport-failed");
                         return;
                     }
-                    applyKit(player, kit);
+                    if (kit.crystalFfa()) {
+                        // Crystal FFA: nothing is handed out on entry. The player picks a
+                        // KIT slot themselves (/k or /k1../k9) — that is the whole point of
+                        // the KIT1..9 system, and it also means /regear works right after
+                        // re-entering following a death (empty inventory = full refill).
+                        org.bukkit.inventory.PlayerInventory inv = player.getInventory();
+                        inv.clear();
+                        inv.setArmorContents(null);
+                        inv.setItemInOffHand(null);
+                        player.setItemOnCursor(null);
+                        PlayerVitals.applyCombatStart(player, kit.maxHealth());
+                        player.sendMessage(net.kyori.adventure.text.Component.text(
+                                "Select your kit with /k",
+                                net.kyori.adventure.text.format.NamedTextColor.AQUA));
+                    } else {
+                        applyKit(player, kit);
+                    }
                     player.setCanPickupItems(true);
                     if (viewControl != null) {
                         viewControl.applyRegion(player, arena.region());
@@ -570,9 +626,25 @@ public final class FfaService {
         if (!playerArena.containsKey(victimId) || !playerArena.containsKey(attackerId)) {
             return;
         }
+        boolean victimWasInCombat = inCombat(victimId);
+        boolean attackerWasInCombat = inCombat(attackerId);
         long until = System.currentTimeMillis() + COMBAT_MS;
         combatUntil.put(victimId, new CombatTag(attackerId, until));
         combatUntil.put(attackerId, new CombatTag(victimId, until));
+        // Announce the transition into combat (red), once per fighter per tag window.
+        if (!victimWasInCombat) {
+            notifyCombatState(victimId, COMBAT_ENTER);
+        }
+        if (!attackerWasInCombat) {
+            notifyCombatState(attackerId, COMBAT_ENTER);
+        }
+    }
+
+    private void notifyCombatState(UUID playerId, net.kyori.adventure.text.Component message) {
+        Player player = Bukkit.getPlayer(playerId);
+        if (player != null && player.isOnline()) {
+            player.sendMessage(message);
+        }
     }
 
     public boolean inCombat(UUID playerId) {
@@ -630,6 +702,184 @@ public final class FfaService {
         return true;
     }
 
+    // ------------------------------------------------------- crystal FFA kit commands
+
+    /** Tiny success blip shared by the crystal FFA commands (/regear //k../heal/repair). */
+    public void playSelect(Player player) {
+        soundService.play(player, "select");
+    }
+
+    /**
+     * The kit of the FFA arena the player is in, but ONLY when it is THE declared crystal
+     * FFA kit — every /regear //k1../k9 command exists only for that arena type.
+     */
+    public KitDefinition crystalFfaKitOf(Player player) {
+        if (player == null || !playerArena.containsKey(player.getUniqueId())) {
+            return null;
+        }
+        return arenaOf(player.getUniqueId())
+                .flatMap(this::get)
+                .map(arena -> kitService.get(arena.kitId()).orElse(null))
+                .filter(KitDefinition::crystalFfa)
+                .orElse(null);
+    }
+
+    /** The variant (KIT1..9) layout, falling back to the kit's official layout when unsaved. */
+    private ItemStack[] variantLayout(java.util.UUID playerId, KitDefinition kit, int variant) {
+        String key = com.rumilance.practice.kit.CrystalFfaStore.variantKey(kit.name(), variant);
+        layoutCache.loadSyncIfAbsent(playerId, key);
+        ItemStack[] layout = layoutCache.get(playerId, key).orElse(null);
+        if (layout == null) {
+            layoutCache.loadSyncIfAbsent(playerId, kit.name());
+            layout = layoutCache.get(playerId, kit.name()).orElse(null);
+        }
+        return layout;
+    }
+
+    /**
+     * /regear: top the player's storage + hotbar back up to their last selected KIT slot's
+     * contents. Equipment (armor/shield) and totems are deliberately NOT replenished —
+     * regear refills consumables only, exactly like the classic crystal-FFA command.
+     */
+    public boolean regearCrystal(Player player) {
+        KitDefinition kit = crystalFfaKitOf(player);
+        if (kit == null || crystalFfaStore == null) {
+            return false;
+        }
+        int variant = crystalFfaStore.selectedVariant(player.getUniqueId());
+        ItemStack[] layout = variantLayout(player.getUniqueId(), kit, variant);
+        if (layout == null) {
+            return false;
+        }
+        org.bukkit.inventory.PlayerInventory inv = player.getInventory();
+        boolean gave = false;
+        for (int slot = 0; slot < 36; slot++) { // hotbar + storage; armor/offhand excluded
+            ItemStack desired = slot < layout.length ? layout[slot] : null;
+            if (desired == null || desired.getType().isAir() || isEquipmentOrTotem(desired)) {
+                continue;
+            }
+            int have = 0;
+            for (ItemStack content : inv.getStorageContents()) {
+                if (content != null && content.isSimilar(desired)) {
+                    have += content.getAmount();
+                }
+            }
+            int missing = desired.getAmount() - have;
+            if (missing > 0) {
+                ItemStack give = desired.clone();
+                give.setAmount(missing);
+                inv.addItem(give);
+                gave = true;
+            }
+        }
+        soundService.play(player, gave ? "select" : "gui-click");
+        return true;
+    }
+
+    /** Armor pieces, elytra, shield and totems are out of scope for /regear. */
+    private static boolean isEquipmentOrTotem(ItemStack item) {
+        String name = item.getType().name();
+        return name.endsWith("_HELMET") || name.endsWith("_CHESTPLATE")
+                || name.endsWith("_LEGGINGS") || name.endsWith("_BOOTS")
+                || name.equals("ELYTRA") || name.equals("SHIELD")
+                || name.equals("TOTEM_OF_UNDYING");
+    }
+
+    /**
+     * /k1../k9: replace the player's inventory with the KIT slot's contents (the same apply
+     * the arena spawn uses) and remember the slot as their crystal FFA loadout.
+     */
+    public boolean applyCrystalVariant(Player player, int variant) {
+        KitDefinition kit = crystalFfaKitOf(player);
+        if (kit == null || crystalFfaStore == null) {
+            return false;
+        }
+        int v = Math.min(com.rumilance.practice.kit.CrystalFfaStore.SLOTS, Math.max(1, variant));
+        ItemStack[] layout = variantLayout(player.getUniqueId(), kit, v);
+        kitService.apply(player, kit, layout);
+        crystalFfaStore.selectVariant(player.getUniqueId(), v);
+        soundService.play(player, "select");
+        return true;
+    }
+
+    // ----------------------------------------------------------------- command gate
+
+    /** True when the admin turned the FFA out-of-combat command whitelist on. */
+    public boolean commandGateEnabled() {
+        return commandGateEnabled;
+    }
+
+    /** The whitelisted command labels (lowercase, no slash). */
+    public java.util.Set<String> whitelistedCommands() {
+        return java.util.Collections.unmodifiableSet(commandWhitelist);
+    }
+
+    public boolean isCommandWhitelisted(String label) {
+        return label != null && commandWhitelist.contains(label);
+    }
+
+    public void setCommandGate(boolean enabled) {
+        this.commandGateEnabled = enabled;
+        persistCommandGate();
+    }
+
+    /** @return true when the label was newly added */
+    public boolean whitelistCommand(String label) {
+        String normalized = normalizeCommand(label);
+        if (normalized.isEmpty()) {
+            return false;
+        }
+        boolean added = commandWhitelist.add(normalized);
+        if (added) {
+            persistCommandGate();
+        }
+        return added;
+    }
+
+    /** @return true when the label was actually on the list and got removed */
+    public boolean unwhitelistCommand(String label) {
+        String normalized = normalizeCommand(label);
+        if (normalized.isEmpty()) {
+            return false;
+        }
+        boolean removed = commandWhitelist.remove(normalized);
+        if (removed) {
+            persistCommandGate();
+        }
+        return removed;
+    }
+
+    public void clearWhitelistedCommands() {
+        if (commandWhitelist.isEmpty()) {
+            return;
+        }
+        commandWhitelist.clear();
+        persistCommandGate();
+    }
+
+    private void persistCommandGate() {
+        FileConfiguration yaml = configService.ffa();
+        yaml.set("command-whitelist.enabled", commandGateEnabled);
+        yaml.set("command-whitelist.commands", new java.util.ArrayList<>(commandWhitelist));
+        configService.save(ConfigService.FFA);
+    }
+
+    /** Lowercase, slash and {@code plugin:} prefix stripped ({@code /Plug:Spawn} -> {@code spawn}). */
+    private static String normalizeCommand(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        String label = raw.trim().toLowerCase(java.util.Locale.ROOT);
+        if (label.startsWith("/")) {
+            label = label.substring(1);
+        }
+        int colon = label.indexOf(':');
+        if (colon >= 0) {
+            label = label.substring(colon + 1);
+        }
+        return label.trim();
+    }
+
     private void tickCombat() {
         if (combatUntil.isEmpty()) {
             return;
@@ -639,6 +889,9 @@ public final class FfaService {
             CombatTag tag = entry.getValue();
             if (tag.untilMillis() <= now) {
                 combatUntil.remove(entry.getKey(), tag);
+                if (playerArena.containsKey(entry.getKey())) {
+                    notifyCombatState(entry.getKey(), COMBAT_END);
+                }
                 continue;
             }
             Player online = Bukkit.getPlayer(entry.getKey());
@@ -680,6 +933,9 @@ public final class FfaService {
             return;
         }
         soundService.play(victim, "death");
+        if (inCombat(victim.getUniqueId())) {
+            victim.sendMessage(COMBAT_END);
+        }
         combatUntil.remove(victim.getUniqueId());
         killStreaks.put(victim.getUniqueId(), 0);
         addDeath(victim.getUniqueId());
@@ -691,6 +947,15 @@ public final class FfaService {
             }
         });
         if (killerId != null && !killerId.equals(victim.getUniqueId()) && playerArena.containsKey(killerId)) {
+            // Killing your (combat-tagged) opponent frees you immediately — no reason to sit
+            // out the rest of the 30s window after a confirmed kill.
+            if (inCombat(killerId)) {
+                combatUntil.remove(killerId);
+                Player killerOnline = Bukkit.getPlayer(killerId);
+                if (killerOnline != null && killerOnline.isOnline()) {
+                    killerOnline.sendMessage(COMBAT_END);
+                }
+            }
             addKill(killerId);
             int streak = killStreaks.merge(killerId, 1, Integer::sum);
             Player killer = Bukkit.getPlayer(killerId);
@@ -761,6 +1026,11 @@ public final class FfaService {
         player.setCanPickupItems(true);
         teleportIntoArena(player, arena, kit);
         player.setCanPickupItems(true);
+    }
+
+    /** Wires the crystal FFA variant store (KIT1..9 selections). */
+    public void setCrystalFfaStore(com.rumilance.practice.kit.CrystalFfaStore store) {
+        this.crystalFfaStore = store;
     }
 
     /** Spawn coordinate for the vanilla respawn event — kit apply happens in {@link #respawn}. */
@@ -1399,12 +1669,32 @@ public final class FfaService {
         if (arena == null) {
             return;
         }
-        kitService.get(arena.kitId()).ifPresent(kit -> applyKit(player, kit));
+        kitService.get(arena.kitId()).ifPresent(kit -> {
+            if (kit.crystalFfa()) {
+                // Crystal FFA: a kill is NOT a free re-kit. The winner keeps fighting with
+                // what they have (their own HP too) and tops consumables up with /regear
+                // once out of combat — that is the economy the KIT1..9 commands build on.
+                return;
+            }
+            applyKit(player, kit);
+        });
     }
 
     private void applyKit(Player player, KitDefinition kit) {
-        layoutCache.loadSyncIfAbsent(player.getUniqueId(), kit.name());
-        ItemStack[] layout = layoutCache.get(player.getUniqueId(), kit.name()).orElse(null);
+        String layoutKey = kit.name();
+        if (kit.crystalFfa() && crystalFfaStore != null) {
+            // Crystal FFA kit: spawn the player with the KIT slot they selected (falls back
+            // to the kit's official layout when that slot was never saved).
+            int variant = crystalFfaStore.selectedVariant(player.getUniqueId());
+            String variantKey = com.rumilance.practice.kit.CrystalFfaStore.variantKey(
+                    kit.name(), variant);
+            layoutCache.loadSyncIfAbsent(player.getUniqueId(), variantKey);
+            if (layoutCache.get(player.getUniqueId(), variantKey).isPresent()) {
+                layoutKey = variantKey;
+            }
+        }
+        layoutCache.loadSyncIfAbsent(player.getUniqueId(), layoutKey);
+        ItemStack[] layout = layoutCache.get(player.getUniqueId(), layoutKey).orElse(null);
         kitService.apply(player, kit, layout);
         PlayerVitals.applyCombatStart(player, kit.maxHealth());
         if (kit.totem()) {

@@ -117,6 +117,10 @@ public final class PracticeSession {
         private long nextWindPearlMs;
         /** Next elytra-style rocket engage (Quantum: mace_new/elytra). */
         private long nextElytraMs;
+        /** Next crystal-bot melee swing (Quantum g1gc/hit: a fixed 7-tick hitcd). */
+        private long nextMeleeMs;
+        /** Fighting pause after the bot's own totem pop (Quantum totem_cd rung). */
+        private long totemPauseUntilMs;
         /** Golden apples eaten this life (map caps its sustain, so do we: max 2). */
         private int gapUses;
         /** Harming splashes thrown since the last restock drink (map cap: 2). */
@@ -152,6 +156,10 @@ public final class PracticeSession {
         public void nextWindPearlMs(long v) { nextWindPearlMs = v; }
         public long nextElytraMs() { return nextElytraMs; }
         public void nextElytraMs(long v) { nextElytraMs = v; }
+        public long nextMeleeMs() { return nextMeleeMs; }
+        public void nextMeleeMs(long v) { nextMeleeMs = v; }
+        public long totemPauseUntilMs() { return totemPauseUntilMs; }
+        public void totemPauseUntilMs(long v) { totemPauseUntilMs = v; }
         public int gapUses() { return gapUses; }
         public void gapUses(int v) { gapUses = v; }
         public int potUses() { return potUses; }

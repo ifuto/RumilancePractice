@@ -26,6 +26,8 @@ public enum GuiType {
     EKIT_SELECT,
     EKIT_EDIT,
     EKIT_CHOICE,
+    CRYSTAL_KIT_SLOTS,
+    CRYSTAL_KIT_QUICK,
     EKIT_COPY,
     CONFIRM,
     ENCHANT,

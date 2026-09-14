@@ -145,7 +145,15 @@ public final class TotemGuardListener implements Listener {
         if (!PracticeDeath.hasTotemInHand(player) || (kit != null && !kit.totem())) {
             return;
         }
+        // Consume BEFORE cancelling: if no totem can actually be taken the death stays real
+        // and the normal handlers run (a bare cancel revived at max health forever).
+        if (!PracticeDeath.consumeTotemFromHand(player)) {
+            Bukkit.getLogger().warning("[N Arena][TotemGuard] totem vanished before consume; "
+                    + "letting the death stand: " + player.getName());
+            return;
+        }
         event.setCancelled(true);
+        event.setReviveHealth(1.0d);
         event.getDrops().clear();
         event.setKeepInventory(true);
         event.setShouldDropExperience(false);
@@ -153,7 +161,6 @@ public final class TotemGuardListener implements Listener {
         Bukkit.getLogger().warning("[N Arena][TotemGuard] cancelled a death with a totem in hand: "
                 + player.getName() + " cause="
                 + (player.getLastDamageCause() == null ? "?" : player.getLastDamageCause().getCause()));
-        PracticeDeath.consumeTotemFromHand(player);
         revive(player, context);
     }
 

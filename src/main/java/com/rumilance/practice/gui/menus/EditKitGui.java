@@ -11,6 +11,7 @@ import com.rumilance.practice.gui.ItemBuilder;
 import com.rumilance.practice.gui.MenuScaffold;
 import com.rumilance.practice.gui.PracticeGuiHolder;
 import com.rumilance.practice.gui.UiTheme;
+import com.rumilance.practice.kit.CrystalFfaStore;
 import com.rumilance.practice.kit.KitLayoutEditor;
 import com.rumilance.practice.kit.KitLayoutCache;
 import com.rumilance.practice.kit.KitLayoutContents;
@@ -275,7 +276,10 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
     }
 
     public void reopenWithLayout(Player player, String kitName, ItemStack[] layout) {
-        openKitEditor(player, kitName, null);
+        // Keep the crystal variant across reopens (anvil rename / trim apply relaunch the
+        // editor): without this a variant edit would land on the kit's base layout.
+        Integer crystal = crystalVariant(registry.get(player.getUniqueId()).orElse(null));
+        openKitEditor(player, kitName, null, crystal);
         GuiSession session = registry.get(player.getUniqueId()).orElse(null);
         if (session != null && layout != null) {
             session.put("layout", layout);
@@ -285,16 +289,28 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
 
     /** Opens the editor directly in edit mode for the given kit (/ekit select flow). */
     public void openKitEditor(Player player, String kitName) {
-        openKitEditor(player, kitName, null);
+        openKitEditor(player, kitName, null, null);
     }
 
     /** Opens the kit editor; {@code preset} is stored on the session when non-blank. */
     public void openKitEditor(Player player, String kitName, String preset) {
+        openKitEditor(player, kitName, preset, null);
+    }
+
+    /**
+     * Opens the kit editor. {@code crystalVariant} (1..9) edits a Crystal FFA variant slot
+     * instead of the kit's base layout — its layout is stored under
+     * {@link CrystalFfaStore#variantKey}.
+     */
+    public void openKitEditor(Player player, String kitName, String preset, Integer crystalVariant) {
         GuiSession session = registry.open(player.getUniqueId(), type(), rows);
         session.setSelectedKit(kitName);
         session.put("mode", "edit");
         if (preset != null && !preset.isBlank()) {
             session.put("preset", preset);
+        }
+        if (crystalVariant != null) {
+            session.put("crystal", crystalVariant);
         }
         initPresetSession(session);
         PlayerState state = stateManager.getState(player.getUniqueId());
@@ -355,8 +371,10 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
     @Override
     protected Component title(Player player, GuiSession session) {
         String kit = session.selectedKit();
+        Integer crystal = crystalVariant(session);
         return Component.text(kit == null ? "Edit Kit"
-                : "Edit: " + com.rumilance.practice.util.KitNames.pretty(kit), UiTheme.PRIMARY)
+                : "Edit: " + com.rumilance.practice.util.KitNames.pretty(kit)
+                        + (crystal == null ? "" : " (KIT" + crystal + ")"), UiTheme.PRIMARY)
                 .decoration(TextDecoration.ITALIC, false);
     }
 
@@ -392,7 +410,7 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         // Keep in-session rearranges across re-render; reloading from disk wiped swaps before Save.
         ItemStack[] layout = KitLayoutContents.retainOrLoad(
                 session.get("layout", ItemStack[].class),
-                loadLayout(player.getUniqueId(), kit));
+                loadLayout(player.getUniqueId(), kit, crystalVariant(session)));
         // armor row visually: helmet/chest/legs/boots + offhand
         inventory.setItem(GuiSlots.slot(0, 1), tagged(player, layout.length > 36 ? layout[36] : null, "slot:36"));
         inventory.setItem(GuiSlots.slot(0, 2), tagged(player, layout.length > 37 ? layout[37] : null, "slot:37"));
@@ -554,9 +572,21 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         return layout;
     }
 
+    /** The session's crystal variant slot (1..9), or null when editing the base layout. */
+    private static Integer crystalVariant(GuiSession session) {
+        return session == null ? null : session.get("crystal", Integer.class);
+    }
+
     private ItemStack[] loadLayout(UUID uuid, KitDefinition kit) {
+        return loadLayout(uuid, kit, null);
+    }
+
+    /** Variant-aware load: {@code crystal} 1..9 reads {@code <kit>#v<n>} (falls back to the
+     * kit's official layout when that slot was never saved). */
+    private ItemStack[] loadLayout(UUID uuid, KitDefinition kit, Integer crystal) {
+        String key = crystal == null ? kit.name() : CrystalFfaStore.variantKey(kit.name(), crystal);
         try {
-            var snap = layoutRepository.find(uuid, kit.name());
+            var snap = layoutRepository.find(uuid, key);
             if (snap.isPresent()) {
                 return KitLayoutDelta.decode(snap.get().itemDataBase64(), kit);
             }
@@ -810,19 +840,28 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         if (kitId == null) {
             return;
         }
-        persistLayout(player, kitId, resolveLayoutForSave(player, session), notify);
+        persistLayout(player, kitId, resolveLayoutForSave(player, session), notify,
+                crystalVariant(session));
     }
 
     public void persistLayout(Player player, String kitId, ItemStack[] layout, boolean notify) {
+        persistLayout(player, kitId, layout, notify,
+                crystalVariant(registry.get(player.getUniqueId()).orElse(null)));
+    }
+
+    public void persistLayout(Player player, String kitId, ItemStack[] layout, boolean notify,
+                              Integer crystalVariant) {
         KitDefinition kit = kitService.get(kitId).orElse(null);
         if (kit == null || layout == null) {
             return;
         }
+        String storeKey = crystalVariant == null
+                ? kitId : CrystalFfaStore.variantKey(kitId, crystalVariant);
         // Delta storage: only the differences from the kit's official layout are persisted,
         // which keeps the DB rows tiny (legacy full base64 still decodes fine).
         String base64 = KitLayoutDelta.encode(layout, kit);
-        KitLayoutSnapshot snap = KitLayoutSnapshot.create(player.getUniqueId(), kitId, base64);
-        layoutCache.put(player.getUniqueId(), kitId, layout);
+        KitLayoutSnapshot snap = KitLayoutSnapshot.create(player.getUniqueId(), storeKey, base64);
+        layoutCache.put(player.getUniqueId(), storeKey, layout);
         asyncExecutor.execute(() -> {
             try {
                 layoutRepository.upsert(snap);

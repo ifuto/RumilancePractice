@@ -92,3 +92,77 @@
 ---
 
 凡例: ✅ 実装済み △ 一部実装 ❌ 未実装
+
+---
+
+## 2026-09: 難易度梯子の完全解剖(quantum:difficulty/0..6 全行抽出)
+
+`Practicebot` datapack の `data/quantum/function/difficulty/*.mcfunction` を全行読んだ実数値。
+`BotDifficulty` 梯子はこれに一致させた(v1.64.0):
+
+| rung | map名 | hitcd | reach(コンボ開始距離) | aim | totem_cd | crystal/obby/anchor cd | max_rotation |
+|------|-------|-------|------------------------|-----|----------|-------------------------|--------------|
+| 0 | NPC | 攻撃なし | n/a | (binomial 1) | n/a | 0 | (既定) |
+| 1 | Easy | 23t (1.15s) | 1.3 | 5 | 40t | 6/5/5 | 1°/t |
+| 2 | Intermediate | 15t (0.75s) | 1.6 | 4 | 31t | 6/4/4 | 4°/t |
+| 3 | Hard | 10t (0.50s) | 2.0 | 3 | 21t | 6/3/4 | 10°/t |
+| 4 | CRAZY | 5t (0.25s) | 2.3 | 2 | 10t | 3/2/3 | 14°/t |
+| 5 | MASTER | 0 (バニラ連打) | 2.9 | 2 | 0t | 2/1/1 | 20°/t |
+| 6 | SURVIVAL MASTER | 0 | 3.0 | (5を引継) | 1t | 3/0/1 | (5を引継) |
+
+抽出で判明した本質:
+
+- マップBOTは **Carpet式フェイクプレイヤー** = 攻撃は本物のバニラスイング
+  (ネザライト剣=8ダメージ、本物の防具/無敵時間/攻撃クールダウンが乗る)。
+  **難易度が変えるのは間隔・エイム・回転速度・トーテム/クリスタルのクールダウンだけで、
+  1発の威力は全ラング同一**。
+- 体力は常に20(mapリセット関数のコメント "MAKE IT CHANGE ITS GENERIC HEALTH TO 20")。
+- 移動は常時バニラ走行速度(≈0.28 b/t)。`bot_speed` は任意トグルで梯子には出ない。
+- hitcd 5t 以下のラングもダメージはバニラ無敵時間(500ms)で頭打ち → 実効DPSは一緒。
+
+当プラグイン側の写像(v1.64.0):
+
+- `attackDamage = 8`(全攻撃ラング共通=バニラ武器相当) / `attackIntervalMs = max(hitcd×50, 500)`
+- `moveSpeed = 0.28`(全ラング=走行同等) / `turnRatePerTick` = 上表 max_rotation 梯子
+- `botMaxHp = 20` 固定(プレイヤー同等) / `aimSpreadDegrees` = map aim(Easy5/Int4/Hard3/Crazy2/Master2/Surv2)
+- reach はプレイヤーと同じ 3.0 固定(プロダクト決定)。マップの reach は「コンボ開始距離」で、
+  スイング自体は常にバニラ3.0 — 当プラグインも swing 判定を 3.0 に固定済み
+- regen は当プラグイン独自拡張(マップはモード別トグル: crystal=off / sword=on)→ 将来整列候補
+
+---
+
+## 2026-09: Crystalボット g1gc 実測照合(quantum:crystal/* 全行読了)
+
+クリスタルBOTの本体は `crystal/tick` → state判定 → **bin/27(戦闘) = `g1gc/*`**。
+`crystal/hardcode/*` はトグル切り替えの代替実装(既定は g1gc)。実測値:
+
+| 事象 | マップ実数値 | 出典 |
+|---|---|---|
+| 近接剣撃 | ≤3blk + 対象hurtTime=0 + 視線通過 → **hitcd 7t(350ms)固定**(全ラング) | g1gc/hit, g1gc/can_hit |
+| クリスタル設置 | crystal_timer≤0 で設置 → **crystal_timer=crystal_cd(6/4/3/2/2/3t)** | g1gc/spawncrystal + cooldowns |
+| 台(オブシディアン) | obby_timer≤0 で setblock → **obby_cd(5/4/3/2/1/1t)** | g1gc/placeobsidian |
+| 爆発 | 自クリスタルへ `damage 1 player_attack` = **バニラ爆発** | g1gc/breakcrystal |
+| トーテム | pop後 **totem_timer=totem_cd(40/31/21/10/0/1t)** の休止・offhand再装填4t/9t | crystal/totmain |
+| パール | pearlcd 20t・後方15blkへブリンク(crystal/passive/escape/pearl) | escape/pearl |
+| 金リンゴ | HP≤16(80%)で gap(gap_timer 35t) | passive/aggression0 |
+| クロスボウ | HP17+ かつ距離20〜40+ で 0.65s間隔射撃 | passive/crossbow/load |
+| 移動 | 毎tick `move`(停止)が基本・対象>2blkで前進・壁でjump・後退しない | g1gc/botlogic+movement |
+| NPC(rung 0) | 攻撃完全無し(クリスタルも設置しない・その場に立つ) | crystal/difficulty0 |
+| 回転 | max_rotation梯子 1/4/10/14/20/20°/t(sword共通) | difficulty/0..6 |
+
+旧実装からの修正(v1.67.0):
+
+- 周回オービット+3mで後退 → **足止め+前進型**へ全面改修(マップは後退しない。
+  ピンチはパールで答える)。壁詰まり時はホップで登る。
+- **近接剣撃を新設**: 3blk・対象の無敵時間expired・視線必須・350ms固定。
+  ダメージは他モードと同じく剣8(バニラ経路)。
+- クリスタルコンボ間隔を comboCooldownMs(秒オーダー) → **crystal_cd梯子(0.1〜0.3s)へ**。
+  ランダム振幅は撤去(マップは正確に rung 値を再装填)。
+- **トーテム休止を新設**: BOT自身のトーテムポップ(EntityResurrectEvent)で totem_cd梯子分
+  停戦。Easy 2秒 / Master は同tick復帰。
+- **クリスタルモードのリジェネを廃止**(マップは sword=on / crystal=off。回復は金リンゴのみ)。
+- NPCのクリスタル攻撃を停止(マップ rung 0 は設置すらしない)。アンカー交ぜ込みは
+  HARD以上に整理(map .anchors に対応)。
+
+既知の意図的差分: 爆発は Paper#11167 対策の源泉付き createExplosion(6f) 変換のまま
+(プロダクト決定)。クロスボウは40blk級の狩場がないアリーナ前提で中距離pokeのまま。

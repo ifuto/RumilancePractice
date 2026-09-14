@@ -35,11 +35,18 @@ public final class PracticeBotSelectGui extends AbstractGui {
             PracticeType.CART, PracticeType.SWORD};
 
     private final PracticeService practiceService;
+    /** Opens the AFK BOT Crystal room (the "No move bot" tile). */
+    private java.util.function.Consumer<Player> afkEntry;
 
     public PracticeBotSelectGui(GuiSessionRegistry registry, SoundService sounds,
                                 PracticeService practiceService) {
         super(registry, sounds, GuiType.PRACTICE_SELECT, 5, true);
         this.practiceService = practiceService;
+    }
+
+    /** Wires the AFK BOT Crystal entry (see {@link #afkEntry}). */
+    public void setAfkEntry(java.util.function.Consumer<Player> afkEntry) {
+        this.afkEntry = afkEntry;
     }
 
     @Override
@@ -66,6 +73,18 @@ public final class PracticeBotSelectGui extends AbstractGui {
         for (int i = 0; i < MODES.length; i++) {
             inventory.setItem(GuiSlots.slot(2, cols[i]), modeTile(player, MODES[i]));
         }
+        // Row 3 centre — the AFK BOT Crystal room ("No move bot"): a passive armored
+        // sparring partner on a private 100x100 floor (crystal combos, and mace swings too).
+        inventory.setItem(GuiSlots.slot(3, 4),
+                ItemBuilder.of(Material.CHERRY_BUTTON)
+                        .name(t(player, "gui.bot-nomove-name").color(UiTheme.SUCCESS)
+                                .decoration(TextDecoration.ITALIC, false))
+                        .lore(UiTheme.divider(),
+                                UiTheme.line(line(player, "gui.bot-nomove-lore")),
+                                UiTheme.blank(),
+                                UiTheme.hint(line(player, "gui.practice-join-hint")))
+                        .action("afkcrystal")
+                        .build());
         paintNav(player, session, inventory);
     }
 
@@ -93,9 +112,10 @@ public final class PracticeBotSelectGui extends AbstractGui {
         };
         List<PracticeRoom> rooms = roomsOf(mode);
         // Kit-bound arenas win as the fight venue (BOT duels are NOT practice rooms);
-        // availability then means an idle arena instance, not a free room.
+        // availability then means an idle arena instance, not a free room. A mode whose
+        // bound kit owns arenas is enterable even with zero same-type practice rooms.
         List<String> arenaPool = practiceService.botArenaPool(mode);
-        boolean arenaVenue = arenaPool != null;
+        boolean arenaVenue = arenaPool != null && !arenaPool.isEmpty();
         long free = arenaVenue
                 ? practiceService.botArenaFreeCount(mode)
                 : rooms.stream().filter(r -> !practiceService.isRoomBusy(r.id())).count();
@@ -114,7 +134,7 @@ public final class PracticeBotSelectGui extends AbstractGui {
                                 map == null || map.isBlank()
                                         ? line(player, "gui.bot-map-default")
                                         : map.replace('_', ' ')));
-        if (rooms.isEmpty()) {
+        if (rooms.isEmpty() && !arenaVenue) {
             builder.lore(UiTheme.blank(),
                     UiTheme.status(line(player, "gui.practice-none"), UiTheme.WARNING),
                     UiTheme.hint(line(player, "gui.practice-none-lore")));
@@ -152,6 +172,15 @@ public final class PracticeBotSelectGui extends AbstractGui {
                 sounds.play(player, "gui-back");
                 player.closeInventory();
             }
+            case "afkcrystal" -> {
+                if (afkEntry == null) {
+                    sounds.play(player, "error");
+                    return;
+                }
+                sounds.play(player, "select");
+                player.closeInventory();
+                afkEntry.accept(player);
+            }
             default -> {
                 if (action.startsWith("locked:")) {
                     sounds.play(player, "error");
@@ -178,10 +207,11 @@ public final class PracticeBotSelectGui extends AbstractGui {
                                 .filter(r -> !practiceService.isRoomBusy(r.id()))
                                 .findFirst().orElse(null);
                     }
-                    boolean arenaVenue = practiceService.botArenaPool(mode) != null;
+                    List<String> arenaPool = practiceService.botArenaPool(mode);
+                    boolean arenaVenue = arenaPool != null && !arenaPool.isEmpty();
                     if (target == null && arenaVenue) {
-                        // Arena venue only needs a config anchor room (drills/bot-home):
-                        // room-busy does not block it, any enabled room of the type serves.
+                        // Arena venue: an anchor room (drills/bot-home) is optional now —
+                        // joinBotMode runs the fight purely on the arena when none exists.
                         target = roomsOf(mode).stream().filter(PracticeRoom::enabled)
                                 .findFirst().orElse(null);
                     }
@@ -191,7 +221,7 @@ public final class PracticeBotSelectGui extends AbstractGui {
                         player.sendMessage(t(player, "gui.practice-room-busy").color(UiTheme.WARNING));
                         return;
                     }
-                    if (target == null) {
+                    if (target == null && !arenaVenue) {
                         sounds.play(player, "error");
                         return;
                     }

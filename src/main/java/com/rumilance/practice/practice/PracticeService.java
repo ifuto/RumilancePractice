@@ -24,6 +24,7 @@ import org.bukkit.GameMode;
 import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.block.Block;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -201,11 +202,15 @@ public final class PracticeService {
         if (boundKit == null || boundKit.isBlank()) {
             return null;
         }
-        // Explicit /botadmin binding first (fight loadout stays the bot kit; VENUE follows the
-        // arena kit), else the bot kit's own arenas (bare kit-with-arenas wiring).
+        // Venue priority: an explicit form2 binding (/botadmin <botkit> <arenakit>) wins,
+        // else the bound bot kit's own arenas — without this fallback a mode whose admin kit
+        // carries the arenas (e.g. "botadmin mace mace") has no venue at all and the select
+        // GUI locks the tile behind "No bot rooms yet".
         String arenaKit = botArenaKitOf(boundKit);
-        String venueKit = arenaKit != null ? arenaKit : boundKit;
-        com.rumilance.practice.model.KitDefinition kit = kitService.get(venueKit).orElse(null);
+        if (arenaKit == null || arenaKit.isBlank()) {
+            arenaKit = boundKit;
+        }
+        com.rumilance.practice.model.KitDefinition kit = kitService.get(arenaKit).orElse(null);
         if (kit == null || kit.arenas() == null || kit.arenas().isEmpty()) {
             return null;
         }
@@ -232,6 +237,13 @@ public final class PracticeService {
     /** Live view of the /botadmin bindings for the admin list command. */
     public java.util.Map<String, String> botArenaKitBindings() {
         return java.util.Collections.unmodifiableMap(botArenaKitBindings);
+    }
+
+    /** Live view of the mode -> kit loadout bindings (/practice bindkit) for admin lists. */
+    public java.util.Map<String, String> botModeKitsView() {
+        java.util.Map<String, String> view = new java.util.LinkedHashMap<>();
+        botModeKits.forEach((type, kit) -> view.put(type.name(), kit));
+        return java.util.Collections.unmodifiableMap(view);
     }
 
     /** /botadmin set: binds a bot fight kit to the arena kit hosting its fights. */
@@ -304,6 +316,15 @@ public final class PracticeService {
                     return spawn == null || spawn.getWorld() == null ? null : spawn;
                 })
                 .orElse(null);
+    }
+
+    /** Sorted kit names for tab completion (bindkit candidates etc.). */
+    public java.util.List<String> kitNames() {
+        return kitService == null ? java.util.List.of()
+                : kitService.all().stream()
+                        .map(com.rumilance.practice.model.KitDefinition::name)
+                        .sorted(String.CASE_INSENSITIVE_ORDER)
+                        .collect(java.util.stream.Collectors.toList());
     }
 
     public boolean kitExists(String kitName) {
@@ -845,6 +866,9 @@ public final class PracticeService {
      * clone offset when the session runs on a pasted copy. {@code null} when unconfigured.
      */
     private Location resolveConfiguredBotSpawn(PracticeSession session, PracticeRoom room) {
+        if (room == null) {
+            return null; // arena venue: the bot spawns on the arena's B side
+        }
         String configured = botSpawnFor(room.id());
         if (configured == null || configured.isBlank()) {
             return null;
@@ -1056,15 +1080,27 @@ public final class PracticeService {
      *                   arena sessions use it for config only, never for position/space
      */
     public void joinBotMode(Player player, PracticeType mode, PracticeRoom configRoom) {
-        if (configRoom == null || !configRoom.enabled()) {
-            player.sendMessage(messages.render(player, "practice.room-not-found"));
-            return;
-        }
         java.util.List<String> arenaPool = botArenaPool(mode);
-        if (arenaPool == null || arenaPool.isEmpty()) {
+        boolean arenaVenue = arenaPool != null && !arenaPool.isEmpty();
+        // A missing (or disabled) config room is fine when the fight runs in the bound kit's
+        // duel arenas: the room only carried drills/bot-home config, which arena fights don't
+        // use. Without this, "botadmin mace mace" on a server without a MACE practice room
+        // could never be entered.
+        if (configRoom == null || !configRoom.enabled()) {
+            if (!arenaVenue) {
+                player.sendMessage(messages.render(player, "practice.room-not-found"));
+                return;
+            }
+        } else if (!arenaVenue) {
             join(player, configRoom.id());
             return;
         }
+        startArenaBotMode(player, mode, configRoom, arenaPool);
+    }
+
+    /** The duel-arena bot fight entry (see {@link #joinBotMode}). */
+    private void startArenaBotMode(Player player, PracticeType mode, PracticeRoom configRoom,
+                                   java.util.List<String> arenaPool) {
         if (sessions.containsKey(player.getUniqueId())) {
             player.sendMessage(messages.render(player, "practice.already-in"));
             return;
@@ -1109,7 +1145,8 @@ public final class PracticeService {
                         return;
                     }
                     PracticeSession session = new PracticeSession(
-                            player.getUniqueId(), configRoom.id(), mode);
+                            player.getUniqueId(),
+                            configRoom != null ? configRoom.id() : mode.name(), mode);
                     int preferred = preferredDurations.getOrDefault(player.getUniqueId(), 10);
                     session.setDurationSeconds(preferred);
                     applySavedDifficulty(session);
@@ -1145,13 +1182,15 @@ public final class PracticeService {
                         return;
                     }
                     joinGraceUntilMs.put(player.getUniqueId(), System.currentTimeMillis() + 2000L);
-                    if (joinedRoom.type() == PracticeType.ANKER) {
+                    PracticeType joinedType = session.type();
+                    if (joinedType == PracticeType.ANKER) {
                         giveWaitHotbar(player, session);
                         player.sendMessage(messages.render(player, "practice.joined",
-                                MessageService.tags("name", joinedRoom.displayName())));
+                                MessageService.tags("name", joinedRoom != null
+                                        ? joinedRoom.displayName() : session.practiceId())));
                     } else {
                         giveBotWaitHotbar(player, session);
-                        String key = switch (joinedRoom.type()) {
+                        String key = switch (joinedType) {
                             case SWORD -> "practice.joined-sword";
                             case CRYSTAL -> "practice.joined-crystal";
                             case NETHERITE_POT -> "practice.joined-nethpot";
@@ -1159,7 +1198,8 @@ public final class PracticeService {
                             default -> "practice.joined-mace";
                         };
                         player.sendMessage(messages.render(player, key,
-                                MessageService.tags("name", joinedRoom.displayName())));
+                                MessageService.tags("name", joinedRoom != null
+                                        ? joinedRoom.displayName() : session.practiceId())));
                     }
                 }));
     }
@@ -1457,23 +1497,25 @@ public final class PracticeService {
             return;
         }
         PracticeRoom room = get(session.practiceId()).orElse(null);
-        if (room == null) {
+        if (room == null && session.arenaInstanceId() == null) {
             player.sendMessage(messages.render(player, "practice.room-missing"));
             leave(player, true);
             return;
         }
+        // Arena-venue fights have no config room: the session's own type carries the mode.
+        PracticeType fightType = room != null ? room.type() : session.type();
         session.setPhase(PracticeSession.Phase.ACTIVE);
         session.setMatchStartMs(System.currentTimeMillis());
         session.setBotPops(0);
-        giveBotLoadout(player, session, room);
-        if (room.type() == PracticeType.MACE) {
+        giveBotLoadout(player, session, fightType);
+        if (fightType == PracticeType.MACE) {
             spawnMaceBot(player, session, room);
         } else {
-            spawnCombatBot(player, session, room, room.type());
+            spawnCombatBot(player, session, room, fightType);
         }
         // Drills are practice-room content (room markers); an arena-venue BOT fight is the
         // plain aggregate duel against the kit-bound arena, so drills stay off there.
-        if (session.arenaInstanceId() == null) {
+        if (session.arenaInstanceId() == null && room != null) {
             session.setBotMode(practiceModeOf(room));
         } else {
             session.setBotMode(PracticeMode.NONE);
@@ -1481,9 +1523,9 @@ public final class PracticeService {
         beginDrill(player, session, room);
         player.playSound(player.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 0.6f, 1.4f);
         player.sendActionBar(messages.render(player, "practice.match-started",
-                MessageService.tags("mode", modeName(player, room.type()))));
+                MessageService.tags("mode", modeName(player, fightType))));
         Bukkit.getLogger().info("[N Arena][BotMatch] START player=" + player.getName()
-                + " mode=" + room.type() + " room=" + room.id()
+                + " mode=" + fightType + " room=" + (room != null ? room.id() : session.practiceId())
                 + " difficulty=" + session.difficulty().preset());
         // Time limit: ten minutes without a decision ends the match as a draw.
         BukkitTask timeout = Bukkit.getScheduler().runTaskLater(plugin, () -> {
@@ -1789,15 +1831,12 @@ public final class PracticeService {
             return;
         }
         PracticeRoom room = get(session.practiceId()).orElse(null);
-        if (room == null) {
-            return;
-        }
-        giveBotLoadout(player, session, room);
+        giveBotLoadout(player, session, room != null ? room.type() : session.type());
     }
 
     /** Player loadout: the admin-bound server kit wins, else the mode's built-in gear. */
-    private void giveBotLoadout(Player player, PracticeSession session, PracticeRoom room) {
-        String boundKit = botModeKits.get(room.type());
+    private void giveBotLoadout(Player player, PracticeSession session, PracticeType type) {
+        String boundKit = botModeKits.get(type);
         if (boundKit != null && !boundKit.isBlank() && kitService != null) {
             var kitOpt = kitService.get(boundKit);
             if (kitOpt.isPresent()) {
@@ -1809,9 +1848,9 @@ public final class PracticeService {
                 return;
             }
             plugin.getLogger().warning("[N Arena] Bot kit binding '" + boundKit
-                    + "' for mode " + room.type() + " not found; using default gear.");
+                    + "' for mode " + type + " not found; using default gear.");
         }
-        switch (room.type()) {
+        switch (type) {
             case MACE -> giveMaceLoadout(player, session);
             case SWORD -> giveSwordLoadout(player, session);
             case CRYSTAL -> giveCrystalLoadout(player, session);
@@ -2132,17 +2171,20 @@ public final class PracticeService {
     private void spawnMaceBot(Player player, PracticeSession session, PracticeRoom room) {
         removeMaceBot(session);
         Location base = session.activeSpawn();
-        if (base == null) {
+        if (base == null && room != null) {
             base = LocationUtil.deserialize(room.serializedSpawn());
-        } else {
+        } else if (base != null) {
             base = base.clone();
         }
-        if (base.getWorld() == null) {
-            World world = Bukkit.getWorld(room.world());
+        if (base != null && base.getWorld() == null) {
+            World world = room != null ? Bukkit.getWorld(room.world()) : null;
             if (world == null) {
                 return;
             }
             base.setWorld(world);
+        }
+        if (base == null) {
+            return;
         }
         Location botLoc = resolveConfiguredBotSpawn(session, room);
         if (botLoc == null) {
@@ -2376,12 +2418,11 @@ public final class PracticeService {
                 return;
             }
             PracticeRoom room = get(session.practiceId()).orElse(null);
-            if (room == null) {
-                return;
-            }
             Mannequin bot = session.maceBot();
             if (bot == null || !bot.isValid() || bot.isDead()) {
-                // Chunk unloads or a stray kill must not leave an empty arena behind.
+                // Chunk unloads or a stray kill must not leave an empty arena behind. The
+                // room may be null (arena-venue fights have no config room) — spawnMaceBot
+                // is room-optional. Returning here used to freeze the whole bot AI.
                 spawnMaceBot(player, session, room);
                 return;
             }
@@ -2390,8 +2431,9 @@ public final class PracticeService {
                 return;
             }
             BotDifficulty diff = session.difficulty();
-            if (session.botMode() != PracticeMode.NONE) {
+            if (session.botMode() != PracticeMode.NONE && room != null) {
                 // Drill rooms are graded loops, not brawls: the mode drives everything.
+                // (Drills are room markers, so an arena-venue fight never has a mode.)
                 Vector mto = player.getLocation().toVector().subtract(bot.getLocation().toVector());
                 tickMaceDrill(player, session, bot, room, diff, now, session.botMode(), mto);
                 return;
@@ -2639,15 +2681,27 @@ public final class PracticeService {
      * knockback, even though the bot visibly swung). Paper's DamageSource API instead fires
      * a real ENTITY_ATTACK by-entity event with the bot as damager: the room's sparring
      * exemption recognises it and lets the frame through, vanilla renders the hurt
-     * animation/sound on the victim, and i-frames stay vanilla-exact. {@code damage}() never
-     * knocks, so vanilla melee knockback (0.4 horizontal / 0.36 upward) is applied manually
-     * — but only when the health actually dropped (cancelled frames must not shove).
+     * animation/sound on the victim. {@code damage}() never knocks, so vanilla melee
+     * knockback (0.4 horizontal / 0.36 upward) is applied manually — but only when the
+     * health actually dropped (cancelled frames must not shove).
+     *
+     * <p>Belt and braces so a swing can never degrade into a knockback-only shove:
+     * the victim's i-frames are cleared before the swing (the map's 0-hitcd rungs swing
+     * faster than vanilla's 10-tick invulnerability and expect every hit to count), the
+     * fallback for a missing DamageSource API is a REAL attributed call (it used to recurse
+     * into itself and never deal damage), and if some pipeline still swallows the frame a
+     * direct health registration registers the rung's tuned damage — except against a
+     * genuinely raised shield, which blocks like vanilla.</p>
      */
     private void botMeleeHit(Player player, Mannequin bot, double damage, boolean knockback) {
-        if (player == null || !player.isOnline() || damage <= 0.0d) {
+        if (player == null || !player.isOnline() || damage <= 0.0d || player.isDead()) {
             return;
         }
         double before = player.getHealth();
+        boolean blocked = player.isBlocking();
+        if (!blocked) {
+            player.setNoDamageTicks(0); // bot swings never i-frame-whiff
+        }
         try {
             org.bukkit.damage.DamageSource source = org.bukkit.damage.DamageSource.builder(
                             org.bukkit.damage.DamageType.PLAYER_ATTACK)
@@ -2656,11 +2710,33 @@ public final class PracticeService {
                     .build();
             player.damage(damage, source);
         } catch (Throwable t) {
-            // Compat fallback (DamageSource API missing/refused): plain call it. Some rooms
-            // may swallow this as before — never crash the fight loop over it.
-            botMeleeHit(player, bot, damage, true);
+            // Compat fallback (DamageSource API missing/refused): the plain call still carries
+            // the bot as the damage source (it used to recurse into itself — no damage ever).
+            try {
+                player.damage(damage, bot);
+            } catch (Throwable ignored) {
+                return;
+            }
         }
         boolean landed = player.getHealth() < before - 1.0e-9d && !player.isDead();
+        if (!landed && !blocked && !player.isDead()) {
+            // The attributed frame was swallowed: register the rung's tuned damage directly
+            // so the exchange keeps dealing real damage instead of shove-only hits. The raw
+            // amount is reduced by the victim's armor first (vanilla: 4% per armor point,
+            // capped at 80%) — a direct setHealth used to bypass armor entirely and bot hits
+            // landed as if the player were naked.
+            double armored = damage * (1.0d - armorReduction(player));
+            AttributeInstance maxAttr = player.getAttribute(Attribute.MAX_HEALTH);
+            double max = maxAttr != null ? maxAttr.getValue() : 20.0d;
+            player.setHealth(Math.max(0.0d, Math.min(max, player.getHealth() - armored)));
+            landed = player.getHealth() < before - 1.0e-9d && !player.isDead();
+            if (landed) {
+                player.getWorld().playSound(player.getLocation(), Sound.ENTITY_PLAYER_HURT, 1.0f, 1.0f);
+            }
+            plugin.getLogger().fine("[N Arena][BotHit] attributed frame swallowed; registered"
+                    + " armored fallback damage raw=" + damage + " applied=" + armored
+                    + " victim=" + player.getName());
+        }
         if (!landed || !knockback) {
             return;
         }
@@ -2673,6 +2749,13 @@ public final class PracticeService {
                     Math.max(v.getY() * 0.5d, 0.35999998474121094d),
                     v.getZ() + push.getZ()));
         }
+    }
+
+    /** Vanilla-style armor reduction for a direct health registration (4% per point, cap 80%). */
+    private static double armorReduction(Player player) {
+        AttributeInstance armor = player.getAttribute(Attribute.ARMOR);
+        double points = armor != null ? armor.getValue() : 0.0d;
+        return Math.min(0.8d, points * 0.04d);
     }
 
     /**
@@ -2690,9 +2773,59 @@ public final class PracticeService {
                         Math.max(-89.0f, Math.min(89.0f, look.getPitch())), rate));
     }
 
-    /** Turn rate in degrees per tick, derived from the rung's aim error: sloppy aim turns slow. */
+    /**
+     * Turn rate in degrees per tick — the map's {@code slowcast.step.max_rotation_per_tick}
+     * ladder (quantum:difficulty/1..6 = 1, 4, 10, 14, 20, rung 6 inheriting 20). A bad rung
+     * literally cannot track a strafe; that human slowness IS the difficulty.
+     */
     static double turnRatePerTick(BotDifficulty diff) {
-        return Math.max(3.0d, 20.0d - diff.aimSpreadDegrees());
+        return switch (diff.preset()) {
+            case EASY -> 1.0d;
+            case INTERMEDIATE -> 4.0d;
+            case HARD -> 10.0d;
+            case CRAZY -> 14.0d;
+            case MASTER, SURVIVAL_MASTER -> 20.0d;
+            default -> 8.0d; // NPC wander and hand-tuned CUSTOM keep the old default
+        };
+    }
+
+    /** The crystal bot's sword swing: map g1gc/hit sets hitcd 7 on EVERY rung (7 ticks = 350 ms). */
+    static final long CRYSTAL_MELEE_INTERVAL_MS = 350L;
+    /** Melee reach of the crystal bot's sword = the player's 3.0 (map target selector distance=..3). */
+    static final double CRYSTAL_MELEE_REACH = 3.0d;
+
+    /**
+     * Crystal place cadence — the map's {@code crystal_cd} rung in ticks converted to ms
+     * (quantum:difficulty/1..6 = 6/4/3/2/2/3 ticks). No random spread: the map reloads the
+     * timer with the rung value verbatim. Hand-tuned CUSTOM keeps its own combo cadence.
+     */
+    static long crystalPlaceIntervalMs(BotDifficulty diff) {
+        return switch (diff.preset()) {
+            case EASY -> 300L;
+            case INTERMEDIATE -> 200L;
+            case HARD -> 150L;
+            case CRAZY -> 100L;
+            case MASTER -> 100L;
+            case SURVIVAL_MASTER -> 150L;
+            default -> diff.comboCooldownMs();
+        };
+    }
+
+    /**
+     * Fight pause after the bot's own totem pop — the map's {@code totem_cd} rung
+     * (quantum:difficulty/1..6 = 40/31/21/10/0/1 ticks). MASTER literally re-engages on
+     * the same tick its totem fires; Easy stands still for two full seconds.
+     */
+    static long crystalTotemPauseMs(BotDifficulty diff) {
+        return switch (diff.preset()) {
+            case EASY -> 2000L;
+            case INTERMEDIATE -> 1550L;
+            case HARD -> 1050L;
+            case CRAZY -> 500L;
+            case MASTER -> 0L;
+            case SURVIVAL_MASTER -> 50L;
+            default -> 1050L;
+        };
     }
 
     /** Yaw step taking the shortest way round, clamped to {@code maxStep} degrees. */
@@ -2801,13 +2934,13 @@ public final class PracticeService {
                                 PracticeType type) {
         removeCombatBot(session);
         Location base = session.activeSpawn();
-        if (base == null) {
+        if (base == null && room != null) {
             base = LocationUtil.deserialize(room.serializedSpawn());
-        } else {
+        } else if (base != null) {
             base = base.clone();
         }
-        if (base.getWorld() == null) {
-            World world = Bukkit.getWorld(room.world());
+        if (base != null && base.getWorld() == null) {
+            World world = room != null ? Bukkit.getWorld(room.world()) : null;
             if (world == null) {
                 return;
             }
@@ -2978,10 +3111,7 @@ public final class PracticeService {
             // Robustness for many concurrent bots: chunk unloads or stray damage can
             // despawn a mannequin — bring it back at home instead of leaving an empty arena.
             if (bot == null || !bot.isValid()) {
-                PracticeRoom room = get(session.practiceId()).orElse(null);
-                if (room != null) {
-                    spawnCombatBot(player, session, room, type);
-                }
+                spawnCombatBot(player, session, get(session.practiceId()).orElse(null), type);
                 return;
             }
             // Bot-placed block reverts (pedestals, webs, lava, rails...) share one sweeper.
@@ -3722,19 +3852,25 @@ public final class PracticeService {
         refillCrystals(player);
         BotDifficulty crystalDiff = session.difficulty();
         PracticeSession.BotAbilityState ab = session.abilities();
-        // Regen between combos (the same 5s out-of-combat delay every other mode uses) so a
-        // half-finished combo never leaves a dead-looking bot. Crystal fighters deliberately
-        // keep the flat 20 HP body they spawn with; only the regen RATE comes from the ladder.
-        if (now - session.botLastDamagedMs() > BotDifficulty.REGEN_DELAY_MS) {
-            healToward(bot, 20.0d,
-                    Math.max(0.25d, session.difficulty().regenPerSecond() / 8.0d));
+        boolean fights = crystalDiff.attackDamage() > 0.0d;
+        // The map's crystal mode runs with regen OFF (only sword mode toggles it on): the bot
+        // sustains through golden apples alone, so its 20 HP body is the totem-pop target.
+        if (fights) {
+            tickBotGap(session, bot, 20.0d, now);
+            tickBotWaterSave(session, bot, now);
+            tickEscapePearl(player, session, bot, 20.0d, now);
         }
-        // Crystal passives (map: crystal/passive/gap, water save, escape/pearl).
-        tickBotGap(session, bot, 20.0d, now);
-        tickBotWaterSave(session, bot, now);
-        tickEscapePearl(player, session, bot, 20.0d, now);
 
-        // --- movement: orbit at 3-6 blocks, retreat while recovering ---
+        // --- totem recovery: after our own pop the fight pauses for the totem_cd rung ---
+        // (map: totem_timer = totem_cd; the bot stands still and only tracks with its eyes).
+        if (now < ab.totemPauseUntilMs()) {
+            bot.setVelocity(new Vector(0, bot.getVelocity().getY(), 0));
+            return;
+        }
+
+        // --- movement: the map bot holds its ground (g1gc/botlogic stops every tick) and only
+        // pushes forward when the player is beyond 2 blocks; it never backs away — a losing
+        // trade is answered with a pearl instead.
         Location botLoc = bot.getLocation();
         double dist = botLoc.distance(player.getLocation());
         Vector dir = player.getLocation().toVector().subtract(botLoc.toVector()).setY(0);
@@ -3750,20 +3886,38 @@ public final class PracticeService {
         Vector side = new Vector(-dir.getZ(), 0, dir.getX())
                 .multiply(0.18d * session.botStrafeDir());
         Vector move;
-        if (now < session.botRetreatUntilMs()) {
-            move = dir.clone().multiply(-0.30d).add(side); // recovery: sprint away (map behaviour)
-        } else if (dist < 3.0d) {
-            move = dir.clone().multiply(-0.22d).add(side);  // too close: back off
-        } else if (dist > 6.5d) {
-            move = dir.clone().multiply(0.24d).add(side);   // too far: close in
+        if (!fights) {
+            move = new Vector(0, 0, 0);                    // NPC: stand still, just exist
+        } else if (dist > 2.0d) {
+            move = dir.clone().multiply(0.24d).add(side);  // push forward (map: move forward)
         } else {
-            move = side;                                    // sweet spot: orbit
+            move = new Vector(0, 0, 0);                    // within 2 blocks: hold ground
+        }
+        if (fights && dist > 2.0d && bot.isOnGround()
+                && Math.hypot(bot.getVelocity().getX(), bot.getVelocity().getZ()) < 0.05d) {
+            move.setY(0.42d);                              // blocked by a wall: hop and climb
         }
         bot.setVelocity(move.setY(bot.getVelocity().getY()));
 
+        if (!fights) {
+            return; // NPC (map rung 0): no swings, no crystals, no passives — a living dummy
+        }
+
+        // --- melee: the crystal bot swings a real netherite sword (map g1gc/hit) — a fixed
+        // 7-tick cadence on every rung, the player's 3-block reach, only once the player's
+        // hurt frames have expired (map: hurtTime=0 gate in g1gc/can_hit).
+        if (dist <= CRYSTAL_MELEE_REACH
+                && player.getNoDamageTicks() <= 0
+                && now >= ab.nextMeleeMs()
+                && bot.hasLineOfSight(player)) {
+            botSwing(player, bot, crystalDiff, crystalDiff.attackDamage());
+            ab.nextMeleeMs(now + CRYSTAL_MELEE_INTERVAL_MS);
+            bot.setVelocity(new Vector(0, bot.getVelocity().getY(), 0)); // map: player @s stop
+        }
+
         // --- passive pressure: crossbow poke mid-range (map: crystal/passive/crossbow) ---
         if (dist >= CROSSBOW_MIN_RANGE && dist <= CROSSBOW_MAX_RANGE
-                && now >= ab.nextCrossbowMs() && crystalDiff.attackDamage() > 0.0d) {
+                && now >= ab.nextCrossbowMs()) {
             botShootArrow(bot, crystalDiff, dir, crystalDiff.attackDamage() * 0.6d);
             if (bot.getWorld() != null) {
                 bot.getWorld().playSound(botLoc, Sound.ITEM_CROSSBOW_SHOOT, 1.0f, 1.0f);
@@ -3778,23 +3932,45 @@ public final class PracticeService {
         }
 
         // --- attack: place a crystal combo near the player ---
+        // Map cadence: crystal_timer reloads with the crystal_cd rung verbatim (6/4/3/2/2/3
+        // ticks = 300/200/150/100/100/150 ms) — no random spread; combo speed IS the difficulty.
         if (now >= session.botNextAttackMs() && dist <= 9.0d
                 && session.botCrystals().size() < 2) {
-            long combo = crystalDiff.comboCooldownMs();
-            // g1gc anchor mixups (map: g1gc/anchor): from HARD upward, about half of the close
-            // combos are respawn-anchor strikes instead of pedestal crystals.
-            boolean anchorMix = combo <= 1800L && dist <= 6.0d && now >= ab.nextAnchorMs()
+            long combo = crystalPlaceIntervalMs(crystalDiff);
+            // g1gc anchor mixups (map .anchors playstyle): from HARD upward, about half of the
+            // close combos are respawn-anchor strikes instead of pedestal crystals.
+            boolean anchorMix = anchorCapable(crystalDiff) && dist <= 6.0d
+                    && now >= ab.nextAnchorMs()
                     && java.util.concurrent.ThreadLocalRandom.current().nextDouble() < 0.5d;
             if (anchorMix && launchAnchorStrike(player, session, bot)) {
                 ab.nextAnchorMs(now + Math.max(ANCHOR_MIN_COOLDOWN_MS, combo * 2L));
-                session.setBotNextAttackMs(now + combo
-                        + java.util.concurrent.ThreadLocalRandom.current().nextInt(400));
+                session.setBotNextAttackMs(now + combo);
             } else if (launchCrystalAttack(player, session)) {
-                // Map "crystal_cd / explosion_cd" rungs: combo speed IS the difficulty.
-                session.setBotNextAttackMs(now + combo
-                        + java.util.concurrent.ThreadLocalRandom.current().nextInt(400));
+                session.setBotNextAttackMs(now + combo);
             } else {
                 session.setBotNextAttackMs(now + 500L); // no valid spot: retry soon
+            }
+        }
+    }
+
+    /** Map .anchors playstyle: respawn anchors enter the mix from the HARD rung upward. */
+    private static boolean anchorCapable(BotDifficulty diff) {
+        return switch (diff.preset()) {
+            case HARD, CRAZY, MASTER, SURVIVAL_MASTER -> true;
+            default -> false;
+        };
+    }
+
+    /**
+     * The practice bot's own totem popped: pause its fight for the map's totem_cd rung
+     * (quantum:crystal/totmain reloads totem_timer with it on every pop).
+     */
+    public void markBotTotemPop(Mannequin bot) {
+        for (PracticeSession session : sessions.values()) {
+            if (bot.equals(session.combatBot())) {
+                session.abilities().totemPauseUntilMs(
+                        System.currentTimeMillis() + crystalTotemPauseMs(session.difficulty()));
+                return;
             }
         }
     }

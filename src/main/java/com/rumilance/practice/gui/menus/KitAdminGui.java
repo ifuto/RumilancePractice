@@ -158,9 +158,14 @@ public final class KitAdminGui extends AbstractGui {
                         kit.enabled() ? UiTheme.SUCCESS : UiTheme.DANGER)
                 .decoration(TextDecoration.ITALIC, false));
         List<Component> lore = new ArrayList<>();
+        lore.add(Component.text((kit.category() == com.rumilance.practice.model.KitCategory.SUB
+                        ? "Sub Kits" : "Main Kits"),
+                kit.category() == com.rumilance.practice.model.KitCategory.SUB
+                        ? UiTheme.SECONDARY : UiTheme.SUCCESS).decoration(TextDecoration.ITALIC, false));
         lore.add(stateLine(t(locale, "enabled"), kit.enabled(), locale));
         lore.add(stateLine(t(locale, "adventure"), kit.forceAdventure(), locale));
         lore.add(stateLine(t(locale, "ranked"), kit.ranked(), locale));
+        lore.add(stateLine("Crystal FFA", kit.crystalFfa(), locale));
         lore.add(Component.text(
                 rawGui(locale, "gui.kit-admin-duel").replace("<arenas>", arenaSummary(kit.arenas(), locale)),
                 UiTheme.PRIMARY).decoration(TextDecoration.ITALIC, false));
@@ -190,6 +195,16 @@ public final class KitAdminGui extends AbstractGui {
                 kit.forceAdventure() ? Material.LIME_DYE : Material.GRAY_DYE, locale));
         inventory.setItem(GuiSlots.slot(1, 5), toggle(t(locale, "ranked"), kit.ranked(), "toggle:ranked",
                 kit.ranked() ? Material.LIME_DYE : Material.GRAY_DYE, locale));
+        // --- Main / Sub category tiles: which section of the pickers this kit appears in ---
+        boolean isSub = kit.category() == com.rumilance.practice.model.KitCategory.SUB;
+        inventory.setItem(GuiSlots.slot(1, 2), toggle("Main Kits", !isSub, "toggle:mainkit",
+                Material.WILD_ARMOR_TRIM_SMITHING_TEMPLATE, locale));
+        inventory.setItem(GuiSlots.slot(1, 6), toggle("Sub Kits", isSub, "toggle:subkit",
+                Material.BOLT_ARMOR_TRIM_SMITHING_TEMPLATE, locale));
+        // --- Crystal FFA declaration: THE crystal FFA kit (exclusive across all kits) gets
+        // --- the KIT1..9 variant editor; FFA spawns the player with the selected slot.
+        inventory.setItem(GuiSlots.slot(1, 4), toggle("Crystal FFA", kit.crystalFfa(),
+                "toggle:crystalffa", Material.END_CRYSTAL, locale));
         // --- row 3: rule groups live in dedicated sub-GUIs so nothing is crowded ---
         inventory.setItem(GuiSlots.slot(3, 2), entry(Material.STONE_PICKAXE,
                 rawGui(locale, "gui.kit-admin-block-rules"),
@@ -357,6 +372,11 @@ public final class KitAdminGui extends AbstractGui {
         KitDefinition updated = applyConfigChange(current, action);
         if (updated != null) {
             kitService.save(updated);
+            if (updated.crystalFfa()) {
+                // The crystal FFA declaration is exclusive: declaring this kit un-declares
+                // every other kit (persisted too).
+                kitService.clearCrystalFfaExcept(updated.name());
+            }
             sounds.play(player, updated.equals(current) ? "gui-click" : "select");
             refresh(player, session, inventory);
         }
@@ -366,6 +386,9 @@ public final class KitAdminGui extends AbstractGui {
     public static KitDefinition applyConfigChange(KitDefinition kit, String action) {
         KitDefinition.Builder b = kit.toBuilder();
         return switch (action) {
+            case "toggle:mainkit" -> b.category(com.rumilance.practice.model.KitCategory.MAIN).build();
+            case "toggle:subkit" -> b.category(com.rumilance.practice.model.KitCategory.SUB).build();
+            case "toggle:crystalffa" -> b.crystalFfa(!kit.crystalFfa()).build();
             case "toggle:enabled" -> b.enabled(!kit.enabled()).build();
             case "toggle:adventure" -> b.forceAdventure(!kit.forceAdventure()).build();
             case "toggle:ranked" -> b.ranked(!kit.ranked()).build();

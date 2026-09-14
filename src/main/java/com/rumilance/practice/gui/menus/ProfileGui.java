@@ -140,7 +140,7 @@ public final class ProfileGui extends AbstractGui {
 
         // Per-kit breakdown (rows 3-4 = 14 slots).
         int index = 0;
-        for (KitDefinition kit : kitService.enabled()) {
+        for (KitDefinition kit : com.rumilance.practice.gui.KitSections.ordered(kitService)) {
             if (index >= 14) {
                 break;
             }

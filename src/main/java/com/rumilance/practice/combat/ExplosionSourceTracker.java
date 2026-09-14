@@ -38,6 +38,15 @@ public final class ExplosionSourceTracker implements Listener {
 
     /** How long a source-less blast remembers its owner (kill attribution window). */
     private static final long BLAST_OWNER_TTL_MS = 4_000L;
+    /** How long a crystal remembers who last punched it (kill attribution fallback). */
+    private static final long PUNCH_TTL_MS = 8_000L;
+
+    /** Last puncher per crystal entity id — covers crystals whose placer PDC is lost
+     * (e.g. pasted arena crystals). Attribution only; the blast itself is never touched. */
+    private final java.util.Map<UUID, Punch> crystalPunchers = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private record Punch(java.util.UUID playerId, long atMillis) {
+    }
     /** Source-less explosions (bed bombs, converted crystal blasts) remember their owner so
      * kill credit still works even though the damage event carries no damager entity. */
     private final java.util.Map<String, BlastOwner> blastOwners = new java.util.concurrent.ConcurrentHashMap<>();
@@ -93,6 +102,29 @@ public final class ExplosionSourceTracker implements Listener {
         return best == null ? null : best.playerId();
     }
 
+    /** Remembers who last punched a crystal — vanilla's blast detonator (attribution only). */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onCrystalPunch(EntityDamageByEntityEvent event) {
+        if (!(event.getEntity() instanceof EnderCrystal crystal)) {
+            return;
+        }
+        UUID puncher = null;
+        if (event.getDamager() instanceof Player player) {
+            puncher = player.getUniqueId();
+        } else if (event.getDamager() instanceof org.bukkit.entity.Projectile projectile
+                && projectile.getShooter() instanceof Player shooter) {
+            puncher = shooter.getUniqueId();
+        }
+        if (puncher == null) {
+            return;
+        }
+        crystalPunchers.put(crystal.getUniqueId(), new Punch(puncher, System.currentTimeMillis()));
+        if (crystalPunchers.size() > 512) {
+            long cutoff = System.currentTimeMillis() - PUNCH_TTL_MS;
+            crystalPunchers.values().removeIf(p -> p.atMillis() < cutoff);
+        }
+    }
+
     /** Stamp an end crystal with the player who placed it. */
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onCrystalPlace(EntityPlaceEvent event) {
@@ -146,13 +178,19 @@ public final class ExplosionSourceTracker implements Listener {
             return source.getUniqueId();
         }
         String raw = entity.getPersistentDataContainer().get(ownerKey, PersistentDataType.STRING);
-        if (raw == null || raw.isBlank()) {
-            return null;
+        if (raw != null && !raw.isBlank()) {
+            try {
+                return UUID.fromString(raw);
+            } catch (IllegalArgumentException ignored) {
+                // fall through to the puncher fallback
+            }
         }
-        try {
-            return UUID.fromString(raw);
-        } catch (IllegalArgumentException e) {
-            return null;
+        if (entity instanceof EnderCrystal crystal) {
+            Punch punch = crystalPunchers.get(crystal.getUniqueId());
+            if (punch != null && System.currentTimeMillis() - punch.atMillis() <= PUNCH_TTL_MS) {
+                return punch.playerId();
+            }
         }
+        return null;
     }
 }

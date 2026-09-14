@@ -196,6 +196,7 @@ import com.rumilance.practice.security.sign.SignChangeGuardListener;
 import com.rumilance.practice.security.sign.SignGuardService;
 import com.rumilance.practice.security.sign.SignProbeService;
 import com.rumilance.practice.session.PlayerStateManager;
+import com.rumilance.practice.state.PlayerState;
 import com.rumilance.practice.session.SessionManager;
 import com.rumilance.practice.settings.SettingsService;
 import com.rumilance.practice.sight.SightSettings;
@@ -251,6 +252,7 @@ public final class FeatureBootstrap {
     private ReplayService replayService;
     private PracticeService practiceService;
     private com.rumilance.practice.practice.afk.AfkPracticeManager afkPracticeManager;
+    private com.rumilance.practice.practice.afk.AfkCrystalManager afkCrystalManager;
     private TeamGlowLosService teamGlowLosService;
 
     public FeatureBootstrap(RumilancePractice plugin, ServiceRegistry services) {
@@ -469,6 +471,35 @@ public final class FeatureBootstrap {
         afkPracticeManager.start();
         services.register(com.rumilance.practice.practice.afk.AfkPracticeManager.class, afkPracticeManager);
         bind("afkpractice", afkPracticeManager);
+
+        afkCrystalManager = new com.rumilance.practice.practice.afk.AfkCrystalManager(
+                plugin, configService, services.get(MessageService.class));
+        afkCrystalManager.start();
+        services.register(com.rumilance.practice.practice.afk.AfkCrystalManager.class, afkCrystalManager);
+        bind("afkcrystal", afkCrystalManager);
+        // The two AFK rooms are mutually exclusive per player.
+        afkPracticeManager.setOtherSessionGuard(afkCrystalManager::hasSession);
+        afkCrystalManager.setOtherSessionGuard(afkPracticeManager::hasSession);
+        afkCrystalManager.setKitService(kitService);
+        // /hub / /lobby during an AFK BOT Crystal session must really end it: hand the
+        // manager LobbyService's full lobby return (state reset + spawn teleport).
+        afkCrystalManager.setLobbySender((player, reason) -> lobbyService.sendToLobby(player));
+        // AFK rooms and every other activity are mutually exclusive: FFA membership, a live
+        // combat tag, a duel/match, spectating, a queue or a practice session all block AFK
+        // entry (the reported "FFA中にafkcに行くとバグる"), and an AFK session blocks /ffa.
+        java.util.function.Predicate<java.util.UUID> busyElsewhere = id -> {
+            PlayerState st = stateManager.getState(id);
+            return ffaService.isInFfa(id) || ffaService.inCombat(id)
+                    || !(st == PlayerState.LOBBY || st == PlayerState.OPENING_GUI
+                    || st == PlayerState.IDLE);
+        };
+        java.util.function.Predicate<java.util.UUID> inAfkSession =
+                id -> afkCrystalManager.hasSession(id) || afkPracticeManager.hasSession(id);
+        afkCrystalManager.setEntryGuard(busyElsewhere);
+        afkPracticeManager.setEntryGuard(busyElsewhere);
+        ffaService.setSessionGuard(inAfkSession);
+
+
 
         SightSettings sightSettings = SightSettings.from(configService.config());
         services.register(SightSettings.class, sightSettings);
@@ -877,6 +908,24 @@ public final class FeatureBootstrap {
         ekitSelectGui.setEditKitGui(editKitGui);
         ekitSelectGui.setOriginalKitGui(originalKitGui);
         editKitGui.setEkitSelectGui(ekitSelectGui);
+        // Crystal FFA: the declared crystal FFA kit edits through the 4-row KIT1..9 picker;
+        // each slot keeps its own layout and FFA spawns the selected variant.
+        com.rumilance.practice.kit.CrystalFfaStore crystalFfaStore =
+                new com.rumilance.practice.kit.CrystalFfaStore(plugin);
+        com.rumilance.practice.gui.menus.CrystalKitSlotsGui crystalKitSlotsGui =
+                new com.rumilance.practice.gui.menus.CrystalKitSlotsGui(
+                        guiSessions, soundService, kitService, kitLayoutRepository, layoutCache,
+                        crystalFfaStore);
+        crystalKitSlotsGui.setEditKitGui(editKitGui);
+        crystalKitSlotsGui.setEkitSelectGui(ekitSelectGui);
+        ekitSelectGui.setCrystalKitSlotsGui(crystalKitSlotsGui);
+        ffaService.setCrystalFfaStore(crystalFfaStore);
+        // /k quick picker: nine KIT buttons, one click equips (crystal FFA entry hands out
+        // nothing, so this is how a fighter gears up after joining or respawning a life).
+        com.rumilance.practice.gui.menus.CrystalKitQuickGui crystalKitQuickGui =
+                new com.rumilance.practice.gui.menus.CrystalKitQuickGui(
+                        guiSessions, soundService, kitService, kitLayoutRepository, layoutCache,
+                        crystalFfaStore, ffaService);
         EkitAdminGui ekitAdminGui = new EkitAdminGui(guiSessions, soundService, ekitItems);
         PresetAdminGui presetAdminGui = new PresetAdminGui(guiSessions, soundService, presetItems, kitService);
         KitAdminGui kitAdminGui = new KitAdminGui(guiSessions, soundService, kitService, messageService);
@@ -959,6 +1008,7 @@ public final class FeatureBootstrap {
         battleMenuGui.setMatchHistoryGui(matchHistoryGui);
         PracticeBotSelectGui botSelectGui =
                 new PracticeBotSelectGui(guiSessions, soundService, practiceService);
+        botSelectGui.setAfkEntry(afkCrystalManager::joinFromMenu);
         battleMenuGui.setBotSelectGui(botSelectGui);
         BanListGui banListGui = new BanListGui(guiSessions, soundService, banService);
         ReportGui reportGui = new ReportGui(guiSessions, soundService, reportService);
@@ -1010,6 +1060,8 @@ public final class FeatureBootstrap {
         guiListener.register(reportListGui);
         guiListener.register(playersGui);
         guiListener.register(ekitSelectGui);
+        guiListener.register(crystalKitSlotsGui);
+        guiListener.register(crystalKitQuickGui);
         guiListener.register(originalKitGui);
         guiListener.register(confirmGui);
         guiListener.register(ekitChoiceGui);
@@ -1269,11 +1321,6 @@ public final class FeatureBootstrap {
                 })));
         pm.registerEvents(totemGuard, plugin);
 
-        // Death catch: combat modes let vanilla actually kill a player, then rule the outcome
-        // on the revived player (no HP-0 prediction anywhere) — death screens are suppressed
-        // via ProtocolLib when available. See DeathBridge / MatchListener.onDeath.
-        com.rumilance.practice.combat.DeathBridge.start(plugin);
-
         pm.registerEvents(new com.rumilance.practice.replay.ReplayControlListener(replayService), plugin);
         pm.registerEvents(new BanLoginListener(banService), plugin);
         pm.registerEvents(new com.rumilance.practice.listener.ChatBanGuardListener(chatBanService), plugin);
@@ -1311,27 +1358,26 @@ public final class FeatureBootstrap {
                 spectatorService, matchRegistry, arenaService, ffaService), plugin);
         pm.registerEvents(new FfaListener(ffaService, kitService, stateManager, combatNet, practiceTnt, playerPlacedBlockTracker, explosionSources), plugin);
         pm.registerEvents(new FfaBlockTracker(ffaService), plugin);
+        // FFA command gate (default OFF): when an admin enables it via /practiceadmin
+        // ffacommand, FFA occupants may only run the whitelisted commands and only while
+        // not combat-tagged. See FfaCommandGateListener / FfaService.
+        pm.registerEvents(new com.rumilance.practice.ffa.FfaCommandGateListener(ffaService), plugin);
         pm.registerEvents(new ItemFlowGuardListener(stateManager, ffaService), plugin);
         pm.registerEvents(ffaSpawnIndex, plugin);
         pm.registerEvents(new InstantExpCollectListener(), plugin);
         PracticeTntListener practiceTntListener =
                 new PracticeTntListener(practiceTnt, matchService, ffaService, plugin);
-        // Vanilla skips explosion damage for the blast's source entity (Paper #11167): on
-        // modern versions that is the crystal detonator / creeper igniter / TNT lighter, so
-        // own-crystal & own-creeper self-damage silently disappears. This listener restores
-        // the skipped share (damage + knockback) without touching anything vanilla applied.
-        com.rumilance.practice.combat.ExplosionSelfDamageListener explosionSelfDamage =
-                new com.rumilance.practice.combat.ExplosionSelfDamageListener(plugin);
-        practiceTntListener.setSelfDamage(explosionSelfDamage);
         practiceTntListener.setExplosionSourceTracker(explosionSources);
-        pm.registerEvents(explosionSelfDamage, plugin);
+        // Self-damage: Paper never damages an explosion's source entity (PaperMC/Paper#11167,
+        // intended) and passes the punching player as the crystal blast's source — so crystal
+        // self-damage needs the hit -> source-less re-detonation conversion. Creepers
+        // (Creeper#explode) and TNT stay pure vanilla: their source is the mob/block entity
+        // itself, the igniter is never exempt.
+        pm.registerEvents(new com.rumilance.practice.combat.CrystalSelfBlastListener(explosionSources), plugin);
         // "Bed Explosion" kit rule (/kit -> item rules): a bed placed in the fight detonates on
         // right click like a Nether / End bed (power 5, clicker takes the self-blast too).
         com.rumilance.practice.combat.BedExplosionListener bedExplosion =
                 new com.rumilance.practice.combat.BedExplosionListener(explosionSources);
-        // Your own crystal hurts you again: player-caused crystal blasts are re-detonated
-        // source-less so nobody is exempt (vanilla self-blast), owner recorded for kill credit.
-        pm.registerEvents(new com.rumilance.practice.combat.CrystalSelfBlastListener(explosionSources), plugin);
         bedExplosion.addContext(new com.rumilance.practice.combat.BedExplosionListener.Context(
                 id -> {
                     com.rumilance.practice.session.MatchSession s =
@@ -1443,8 +1489,18 @@ public final class FeatureBootstrap {
         pm.registerEvents(new com.rumilance.practice.cosmetic.namecolor.NameColorChatListener(
                 nameColorService), plugin);
         pm.registerEvents(new PracticeListener(practiceService), plugin);
+        // Death catch: totem pops stay 100% vanilla (EntityResurrectEvent is never touched);
+        // only a REAL death reaches PlayerDeathEvent, which the bridge cancels (Paper
+        // cancel+revive-health) so no combat-kill packet, no respawn and no "Loading terrain"
+        // screen ever happen. Registered LAST so the mode planners (HIGHEST) plan first and
+        // the bridge cancels after them. See DeathBridge / MatchListener.onDeath.
+        com.rumilance.practice.combat.DeathBridge.start(plugin);
         pm.registerEvents(new BedrockJoinListener(plugin), plugin);
-        pm.registerEvents(new SmithingTrimListener(rankService, smithingTrimGui, stateManager, messageService), plugin);
+        SmithingTrimListener smithingTrimListener =
+                new SmithingTrimListener(rankService, smithingTrimGui, stateManager, messageService);
+        smithingTrimListener.setAfkBlocked(id ->
+                afkCrystalManager.hasSession(id) || afkPracticeManager.hasSession(id));
+        pm.registerEvents(smithingTrimListener, plugin);
 
         LunarRichPresenceService lunarRichPresence = new LunarRichPresenceService(plugin, stateManager);
         services.register(LunarRichPresenceService.class, lunarRichPresence);
@@ -1498,6 +1554,9 @@ public final class FeatureBootstrap {
                 lobbyService, stateManager, spectatorService, ffaService, messageService, practiceService);
         lobbyCommand.setQueueCoordinator(queueCoordinator);
         lobbyCommand.setMatchService(matchService);
+        // /hub during an AFK BOT Crystal session must end the session first, or the arena
+        // boundary guard teleports the player straight back into it.
+        lobbyCommand.setAfkExit(afkCrystalManager::endAndSendToLobby);
         matchService.setHubReturn(lobbyCommand::applyHub);
         ffaService.setHubReturn(lobbyCommand::applyHub);
 
@@ -1542,6 +1601,17 @@ public final class FeatureBootstrap {
         bind("giveitem", new GiveItemCommand());
         bind("matchreport", new MatchReportCommand(matchService, settingsService));
         bind("ffa", ffaCommand);
+        // Crystal FFA quality-of-life commands (out of combat, crystal FFA arenas only).
+        com.rumilance.practice.ffa.FfaCrystalCommands ffaCrystalCommands =
+                new com.rumilance.practice.ffa.FfaCrystalCommands(ffaService);
+        ffaCrystalCommands.setCrystalKitQuickGui(crystalKitQuickGui);
+        bind("regear", ffaCrystalCommands);
+        bind("k", ffaCrystalCommands);
+        bind("repair", ffaCrystalCommands);
+        bind("heal", ffaCrystalCommands);
+        for (int i = 1; i <= 9; i++) {
+            bind("k" + i, ffaCrystalCommands);
+        }
         FfaTpaService ffaTpaService = new FfaTpaService(ffaService, messageService);
         FfaTpaCommand ffaTpaCommand = new FfaTpaCommand(ffaTpaService);
         bind("tpa", ffaTpaCommand);
@@ -1550,6 +1620,7 @@ public final class FeatureBootstrap {
         bind("tpadeny", ffaTpaCommand);
         FfaRtpQueueService ffaRtpQueueService = new FfaRtpQueueService(ffaService, ffaSpawnIndex, messageService);
         FfaRtpQueueCommand ffaRtpQueueCommand = new FfaRtpQueueCommand(ffaRtpQueueService);
+        bind("rtp", ffaRtpQueueCommand);
         bind("rtpqueue", ffaRtpQueueCommand);
         // Drop stale TPA requests / RTP queue entries on quit or when a player leaves an arena.
         pm.registerEvents(new org.bukkit.event.Listener() {
@@ -1647,6 +1718,9 @@ public final class FeatureBootstrap {
     public void disable() {
         if (afkPracticeManager != null) {
             afkPracticeManager.shutdown();
+        }
+        if (afkCrystalManager != null) {
+            afkCrystalManager.shutdown();
         }
         if (queueCoordinator != null) {
             queueCoordinator.stop();

@@ -34,6 +34,14 @@ public final class SmithingTrimListener implements Listener {
         this.messages = messages;
     }
 
+    /** Players inside an AFK session never get the trim screen (trim is kit-editor only). */
+    private java.util.function.Predicate<java.util.UUID> afkBlocked;
+
+    /** Wires the AFK-session guard (see {@link #onInteract}). */
+    public void setAfkBlocked(java.util.function.Predicate<java.util.UUID> afkBlocked) {
+        this.afkBlocked = afkBlocked;
+    }
+
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onInteract(PlayerInteractEvent event) {
         if (event.getHand() != EquipmentSlot.HAND) {
@@ -53,6 +61,11 @@ public final class SmithingTrimListener implements Listener {
         }
         PlayerState state = stateManager.getState(player.getUniqueId());
         if (!PracticeGuards.trimEditorAllowedInState(state)) {
+            return;
+        }
+        if (afkBlocked != null && afkBlocked.test(player.getUniqueId())) {
+            // The AFK rooms hand out real armor: right-clicking it there used to yank the
+            // player into the trim screen mid-fight.
             return;
         }
         if (!rankService.isVipOrAbove(player)) {

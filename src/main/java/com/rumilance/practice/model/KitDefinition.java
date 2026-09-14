@@ -9,11 +9,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
-public record KitDefinition(String name, String displayName, String icon, boolean ranked, boolean ffaEnabled, double maxHealth, boolean naturalHealthRegen, double knockbackMultiplier, List<KitItemEntry> items, Map<String, String> armor, boolean enabled, boolean autoFood, boolean swordShieldBreak, boolean blockPlace, boolean blockBreak, boolean breakPlayerPlacedOnly, List<String> canBreak, boolean pearl, boolean totem, boolean forceAdventure, int timeoutSeconds, List<String> arenas, List<String> partyArenas, List<String> startCommands, List<KitStartEffect> startEffects, boolean presetEnabled, boolean bedExplosion) {
+public record KitDefinition(String name, String displayName, String icon, KitCategory category, boolean ranked, boolean ffaEnabled, double maxHealth, boolean naturalHealthRegen, double knockbackMultiplier, List<KitItemEntry> items, Map<String, String> armor, boolean enabled, boolean autoFood, boolean swordShieldBreak, boolean blockPlace, boolean blockBreak, boolean breakPlayerPlacedOnly, List<String> canBreak, boolean pearl, boolean totem, boolean forceAdventure, int timeoutSeconds, List<String> arenas, List<String> partyArenas, List<String> startCommands, List<KitStartEffect> startEffects, boolean presetEnabled, boolean bedExplosion, boolean crystalFfa) {
     public KitDefinition {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(displayName, "displayName");
         Objects.requireNonNull(icon, "icon");
+        category = category == null ? KitCategory.MAIN : category;
         maxHealth = maxHealth <= 0.0 ? 20.0 : maxHealth;
         knockbackMultiplier = knockbackMultiplier <= 0.0 ? 1.0 : knockbackMultiplier;
         items = List.copyOf(items);
@@ -103,6 +104,7 @@ public record KitDefinition(String name, String displayName, String icon, boolea
         private String name;
         private String displayName;
         private String icon = "STONE";
+        private KitCategory category = KitCategory.MAIN;
         private boolean ranked = true;
         private boolean ffaEnabled = true;
         private double maxHealth = 20.0;
@@ -132,6 +134,12 @@ public record KitDefinition(String name, String displayName, String icon, boolea
          * default so existing kits keep plain vanilla bed behaviour (sleep / spawn point).
          */
         private boolean bedExplosion;
+        /**
+         * "Crystal FFA" declaration: this kit is THE crystal FFA kit. Editing it opens the
+         * 9-slot KIT1..KIT9 variant picker (each slot keeps its own layout); FFA spawns the
+         * player with the variant they selected. At most one kit carries the flag.
+         */
+        private boolean crystalFfa;
 
         private Builder(String name) {
             this.name = Objects.requireNonNull(name, "name");
@@ -142,6 +150,7 @@ public record KitDefinition(String name, String displayName, String icon, boolea
             this.name = source.name;
             this.displayName = source.displayName;
             this.icon = source.icon;
+            this.category = source.category;
             this.ranked = source.ranked;
             this.ffaEnabled = source.ffaEnabled;
             this.maxHealth = source.maxHealth;
@@ -166,6 +175,7 @@ public record KitDefinition(String name, String displayName, String icon, boolea
             this.startEffects = new ArrayList<KitStartEffect>(source.startEffects);
             this.presetEnabled = source.presetEnabled;
             this.bedExplosion = source.bedExplosion;
+            this.crystalFfa = source.crystalFfa;
         }
 
         public Builder name(String value) {
@@ -180,6 +190,11 @@ public record KitDefinition(String name, String displayName, String icon, boolea
 
         public Builder icon(String value) {
             this.icon = Objects.requireNonNull(value, "icon");
+            return this;
+        }
+
+        public Builder category(KitCategory value) {
+            this.category = value == null ? KitCategory.MAIN : value;
             return this;
         }
 
@@ -360,13 +375,18 @@ public record KitDefinition(String name, String displayName, String icon, boolea
             return this;
         }
 
+        public Builder crystalFfa(boolean value) {
+            this.crystalFfa = value;
+            return this;
+        }
+
         public Builder bedExplosion(boolean value) {
             this.bedExplosion = value;
             return this;
         }
 
         public KitDefinition build() {
-            return new KitDefinition(this.name, this.displayName, this.icon, this.ranked, this.ffaEnabled, this.maxHealth, this.naturalHealthRegen, this.knockbackMultiplier, this.items, this.armor, this.enabled, this.autoFood, this.swordShieldBreak, this.blockPlace, this.blockBreak, this.breakPlayerPlacedOnly, this.canBreak, this.pearl, this.totem, this.forceAdventure, this.timeoutSeconds, this.arenas, this.partyArenas, this.startCommands, this.startEffects, this.presetEnabled, this.bedExplosion);
+            return new KitDefinition(this.name, this.displayName, this.icon, this.category, this.ranked, this.ffaEnabled, this.maxHealth, this.naturalHealthRegen, this.knockbackMultiplier, this.items, this.armor, this.enabled, this.autoFood, this.swordShieldBreak, this.blockPlace, this.blockBreak, this.breakPlayerPlacedOnly, this.canBreak, this.pearl, this.totem, this.forceAdventure, this.timeoutSeconds, this.arenas, this.partyArenas, this.startCommands, this.startEffects, this.presetEnabled, this.bedExplosion, this.crystalFfa);
         }
     }
 }

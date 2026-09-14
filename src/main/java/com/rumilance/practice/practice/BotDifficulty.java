@@ -20,8 +20,10 @@ import java.util.Locale;
  *   6 SURVIVAL MASTER    0t (every) 3.0 blk     -         2-3s            1t
  * </pre>
  *
- * <p>HP / damage / regen are our own scaling on top of that (the map's bots are fake players with
- * the player's own gear, our bots are mannequins whose toughness comes from these numbers):
+ * <p>Per-hit damage is the map's too: every attacking rung swings a real netherite sword
+ * (8 damage through the vanilla pipeline — armor, i-frames and the 500 ms hurt floor apply),
+ * and every rung moves at vanilla sprint speed. HP stays at the player's 20 on every rung;
+ * regen stays our own scaling (the map toggles it per mode, not per rung).
  * <strong>INTERMEDIATE is the default</strong> — the rung for a beginner-leaning intermediate
  * player — with NPC/EASY below it and HARD/CRAZY/MASTER/SURVIVAL_MASTER above it. Every field is
  * still individually tunable, which flips the preset to {@link Preset#CUSTOM}.</p>
@@ -37,17 +39,17 @@ public final class BotDifficulty {
     public static final long REGEN_DELAY_MS = 5_000L;
 
     private Preset preset = Preset.INTERMEDIATE;
-    private double botMaxHp = 50.0d;
-    private double attackDamage = 4.0d;
+    private double botMaxHp = 20.0d;
+    private double attackDamage = 8.0d;
     private long attackIntervalMs = 750L;
-    private double moveSpeed = 0.22d;
+    private double moveSpeed = 0.28d;
     private double regenPerSecond = 3.0d;
     private long comboCooldownMs = 2400L; // crystal / cart / potion attacks
     private boolean shieldStun = true;
     private double shieldReduction = 0.5d;
     private int totemGoal = 3; // crystal bot pops needed to win
     private double reachBlocks = 3.0d;     // map "reach" (10 = 1 block)
-    private double aimSpreadDegrees = 5.0d; // map "aim": per-swing direction error
+    private double aimSpreadDegrees = 4.0d; // map "aim": per-swing direction error
 
     public static BotDifficulty of(Preset preset) {
         BotDifficulty d = new BotDifficulty();
@@ -135,46 +137,54 @@ public final class BotDifficulty {
         this.preset = next;
         switch (next) {
             case NPC -> {
-                // Map rung 0: the bot does not fight back, it just exists (and walks slowly).
+                // Map rung 0 (quantum:difficulty/0): a dummy that never swings; it just
+                // exists (and wanders slowly).
                 botMaxHp = 20; attackDamage = 0; attackIntervalMs = 2000; moveSpeed = 0.10;
                 regenPerSecond = 0; comboCooldownMs = 6000; shieldStun = false;
                 shieldReduction = 0.25; totemGoal = 1; reachBlocks = 2.5; aimSpreadDegrees = 12;
             }
             case EASY -> {
-                // Map rung 1: hitcd 23t, reach 1.3, aim 5, combos 5-6s, totem_cd 40t.
-                botMaxHp = 30; attackDamage = 3; attackIntervalMs = 1150; moveSpeed = 0.16;
+                // Map rung 1 (quantum:difficulty/1): hitcd 23t (1.15s), aim 5, totem_cd 40t,
+                // max_rotation 1 deg/t. Per-hit damage is the real sword on every rung.
+                botMaxHp = 20; attackDamage = 8; attackIntervalMs = 1150; moveSpeed = 0.28;
                 regenPerSecond = 1.5; comboCooldownMs = 4000; shieldStun = false;
-                shieldReduction = 0.4; totemGoal = 2; reachBlocks = 2.8; aimSpreadDegrees = 8;
+                shieldReduction = 0.4; totemGoal = 2; reachBlocks = 2.8; aimSpreadDegrees = 5;
             }
             case INTERMEDIATE -> {
-                // Map rung 2 ("Intermediate"): hitcd 15t, reach 1.6, aim 4, combos 4-6s.
-                botMaxHp = 50; attackDamage = 4; attackIntervalMs = 750; moveSpeed = 0.22;
+                // Map rung 2 (quantum:difficulty/2): hitcd 15t (0.75s), aim 4, totem_cd 31t,
+                // max_rotation 4 deg/t.
+                botMaxHp = 20; attackDamage = 8; attackIntervalMs = 750; moveSpeed = 0.28;
                 regenPerSecond = 3; comboCooldownMs = 2400; shieldStun = true;
-                shieldReduction = 0.5; totemGoal = 3; reachBlocks = 3.0; aimSpreadDegrees = 5;
+                shieldReduction = 0.5; totemGoal = 3; reachBlocks = 3.0; aimSpreadDegrees = 4;
             }
             case HARD -> {
-                // Map rung 3: hitcd 10t, reach 2.0, aim 3, combos 3-6s.
-                botMaxHp = 70; attackDamage = 5; attackIntervalMs = 500; moveSpeed = 0.26;
+                // Map rung 3 (quantum:difficulty/3): hitcd 10t (0.5s), aim 3, totem_cd 21t,
+                // max_rotation 10 deg/t.
+                botMaxHp = 20; attackDamage = 8; attackIntervalMs = 500; moveSpeed = 0.28;
                 regenPerSecond = 4; comboCooldownMs = 1800; shieldStun = true;
                 shieldReduction = 0.6; totemGoal = 4; reachBlocks = 3.2; aimSpreadDegrees = 3;
             }
             case CRAZY -> {
-                // Map rung 4 ("CRAZY"): hitcd 5t, reach 2.3, aim 2, combos 2-3s.
-                botMaxHp = 90; attackDamage = 6; attackIntervalMs = 300; moveSpeed = 0.30;
+                // Map rung 4 (quantum:difficulty/4): hitcd 5t, aim 2, totem_cd 10t,
+                // max_rotation 14 deg/t. Damage still lands at the vanilla 500ms hurt floor.
+                botMaxHp = 20; attackDamage = 8; attackIntervalMs = 500; moveSpeed = 0.28;
                 regenPerSecond = 5; comboCooldownMs = 1300; shieldStun = true;
                 shieldReduction = 0.7; totemGoal = 5; reachBlocks = 3.4; aimSpreadDegrees = 2;
             }
             case MASTER -> {
-                // Map rung 5 ("MASTER"): hitcd 0 (every tick it can), reach 2.9, totem_cd 0.
-                botMaxHp = 110; attackDamage = 7; attackIntervalMs = 250; moveSpeed = 0.34;
+                // Map rung 5 (quantum:difficulty/5): hitcd 0 (vanilla attack cadence), aim 2,
+                // totem_cd 0, max_rotation 20 deg/t.
+                botMaxHp = 20; attackDamage = 8; attackIntervalMs = 500; moveSpeed = 0.28;
                 regenPerSecond = 6; comboCooldownMs = 1000; shieldStun = true;
-                shieldReduction = 0.75; totemGoal = 6; reachBlocks = 3.6; aimSpreadDegrees = 1;
+                shieldReduction = 0.75; totemGoal = 6; reachBlocks = 3.6; aimSpreadDegrees = 2;
             }
             case SURVIVAL_MASTER -> {
-                // Map rung 6: the map's final boss — fastest combos, longest reach, no mercy.
-                botMaxHp = 140; attackDamage = 8; attackIntervalMs = 200; moveSpeed = 0.38;
+                // Map rung 6 (quantum:difficulty/6): hitcd 0, totem_cd 1t; it inherits rung 5's
+                // aim 2 and 20 deg/t turn — the top rungs separate through crystal/obby
+                // cadence, not through bigger melee numbers.
+                botMaxHp = 20; attackDamage = 8; attackIntervalMs = 500; moveSpeed = 0.28;
                 regenPerSecond = 8; comboCooldownMs = 800; shieldStun = true;
-                shieldReduction = 0.8; totemGoal = 8; reachBlocks = 3.8; aimSpreadDegrees = 0;
+                shieldReduction = 0.8; totemGoal = 8; reachBlocks = 3.8; aimSpreadDegrees = 2;
             }
             default -> {
             }
@@ -187,7 +197,20 @@ public final class BotDifficulty {
     }
 
     public Preset preset() { return preset; }
-    public double botMaxHp() { return botMaxHp; }
+
+    /**
+     * The bot's max hearts. Player parity is a hard product rule (fair fights on every
+     * difficulty): every rung — and any hand-tuned CUSTOM profile — fights with the same
+     * 20 hearts a player has. Difficulty still shapes damage/speed/reach/regen/totem goal.
+     */
+    public double botMaxHp() { return 20.0d; }
+
+    /**
+     * The bot's melee reach. Player parity like the hearts: a vanilla player's attack
+     * reaches 3.0 blocks, so every rung does too — difficulty tunes damage/speed/aim,
+     * never the body.
+     */
+    public double reachBlocks() { return 3.0d; }
     public double attackDamage() { return attackDamage; }
     public long attackIntervalMs() { return attackIntervalMs; }
     public double moveSpeed() { return moveSpeed; }
@@ -196,7 +219,6 @@ public final class BotDifficulty {
     public boolean shieldStun() { return shieldStun; }
     public double shieldReduction() { return shieldReduction; }
     public int totemGoal() { return totemGoal; }
-    public double reachBlocks() { return reachBlocks; }
     public double aimSpreadDegrees() { return aimSpreadDegrees; }
 
     public void setBotMaxHp(double v) { this.botMaxHp = clamp(v, 20, 200); touch(); }

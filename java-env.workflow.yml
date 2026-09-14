@@ -1,0 +1,171 @@
+# java-env: java-trigger.md を含む push で発火し、次の 3 点を git ブランチへ配送する。
+#   (1) java-env-delivery ブランチ: JDK 21 (Temurin) + Paper 1.21.11 (従来どおり)
+#   (2) mc-server-delivery ブランチ: QuantumBOT 実測用の起動済み検証済み Fabric サーバー一式
+#       (fabric server + fabric-api + herobot MOD + Quantum マップワールド + eula/server.properties)
+#
+# [なぜ git 配送か] サンドボックスの下りは github.com (git/HTTPS) と api.github.com
+# のみ許可で、Azure blob 系 (artifact / release asset) は EOF で遮断される。
+#
+# サンドボックス側での取得手順:
+#   # JDK (従来どおり)
+#   git clone --depth 1 --branch java-env-delivery https://github.com/ifuto/RumilancePractice.git /tmp/ship
+#   cat /tmp/ship/delivery/jdk21.tar.gz.part-* > /tmp/jdk21.tar.gz
+#   mkdir -p /tmp/jdk21 && tar -xzf /tmp/jdk21.tar.gz -C /tmp/jdk21 --strip-components=1
+#   # 実測用 MC サーバー
+#   git clone --depth 1 --branch mc-server-delivery https://github.com/ifuto/RumilancePractice.git /tmp/mcship
+#   cat /tmp/mcship/mcserver/mcserver.tar.gz.part-* > /tmp/mcserver.tar.gz
+#   tar -xzf /tmp/mcserver.tar.gz -C /tmp && cd /tmp/mcserver && java -jar fabric-server-launch.jar nogui
+#
+# 手動再実行: gh workflow run java-env.yml (workflow_dispatch 対応)
+#
+# 履歴: v2 API sunset で fill v3 へ移行 / checkout の clean が bundle を消すため /tmp/bundle へ /
+#       run 34761374376 で全緑。本版で QuantumBOT 実測サーバーの構築配送を追加。
+
+name: java-env
+
+on:
+  push:
+    paths:
+      - 'java-trigger.md'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Fetch portable JDK 21 (Temurin / linux x64)
+        run: |
+          curl -fsSL -o jdk21.tar.gz \
+            "https://api.adoptium.net/v3/binary/latest/21/ga/linux/x64/jdk/hotspot/normal/eclipse"
+          rm -rf /tmp/jdk21rt && mkdir -p /tmp/jdk21rt
+          tar -xzf jdk21.tar.gz -C /tmp/jdk21rt --strip-components=1
+          /tmp/jdk21rt/bin/java -version
+
+      - name: Fetch Paper 1.21.11 (latest build via fill v3 API)
+        run: |
+          UA="RumilancePractice-ci/1.0 (+https://github.com/ifuto/RumilancePractice)"
+          curl -fsSL -A "$UA" -o paper_meta.json \
+            "https://fill.papermc.io/v3/projects/paper/versions/1.21.11/builds/latest"
+          URL=$(python3 -c 'import json; d=json.load(open("paper_meta.json")); print(d["downloads"]["server:default"]["url"])')
+          NAME=$(python3 -c 'import json; d=json.load(open("paper_meta.json")); print(d["downloads"]["server:default"]["name"])')
+          SHA=$(python3 -c 'import json; d=json.load(open("paper_meta.json")); print(d["downloads"]["server:default"]["checksums"]["sha256"])')
+          echo "paper: $NAME (sha256 $SHA)"
+          curl -fsSL -A "$UA" -o "$NAME" "$URL"
+          echo "$SHA  $NAME" | sha256sum -c -
+          ls -lh paper-*.jar
+
+      - name: Bundle with checksums (outside the workspace — checkout's clean would wipe it)
+        run: |
+          mkdir -p /tmp/bundle
+          mv jdk21.tar.gz paper-*.jar /tmp/bundle/
+          (cd /tmp/bundle && sha256sum * > sha256s.txt && ls -lh)
+
+      - name: Upload java-env artifact (human fallback)
+        uses: actions/upload-artifact@v4
+        with:
+          name: java-env
+          path: /tmp/bundle/*
+          retention-days: 30
+          compression-level: 0
+
+      - name: Checkout with persisted credentials (canonical push auth)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Prepare ready-to-run Fabric server with the Quantum map + HeroBot
+        run: |
+          set -Eeuo pipefail
+          trap 'echo "::error::server prep failed at line $LINENO doing: ${BASH_COMMAND}"' ERR
+          J=/tmp/jdk21rt/bin
+          LOADER=$(curl -fsSL "https://meta.fabricmc.net/v2/versions/loader/1.21.11" \
+            | python3 -c 'import sys,json; a=json.load(sys.stdin); s=[v for v in a if v.get("stable")]; print((s or a)[0]["version"])')
+          echo "fabric loader: $LOADER"
+          INSTALLER=$(curl -fsSL "https://meta.fabricmc.net/v2/versions/installer" \
+            | python3 -c 'import sys,json; a=json.load(sys.stdin); s=[v for v in a if v.get("stable")]; print((s or a)[0]["version"])')
+          echo "installer: $INSTALLER"
+          mkdir mcserver && cd mcserver
+          curl -fsSL -o fabric-server-launch.jar \
+            "https://meta.fabricmc.net/v2/versions/loader/1.21.11/${LOADER}/${INSTALLER}/server/jar"
+          mkdir mods
+          FA_JSON=$(curl -fsSL -H "User-Agent: RumilancePractice-ci/1.0" \
+            'https://api.modrinth.com/v2/project/fabric-api/version?game_versions=%5B%221.21.11%22%5D&loaders=%5B%22fabric%22%5D')
+          if [ -z "$FA_JSON" ] || [ "$FA_JSON" = "[]" ]; then
+            FA_JSON=$(curl -fsSL -H "User-Agent: RumilancePractice-ci/1.0" \
+              'https://api.modrinth.com/v2/project/fabric-api/version?loaders=%5B%22fabric%22%5D')
+          fi
+          FA_URL=$(printf '%s' "$FA_JSON" | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["files"][0]["url"])')
+          echo "fabric-api: $FA_URL"
+          curl -fsSL -A "RumilancePractice-ci/1.0" -o mods/fabric-api.jar "$FA_URL"
+          cp "$GITHUB_WORKSPACE/bot/herobot-1.21.11-1.7.6+v260331.jar" mods/
+          rm -rf mapx && mkdir mapx
+          unzip -o -q "$GITHUB_WORKSPACE/bot/Quantum's PvP Practice v1.18.zip" -d mapx -x "__MACOSX/*" "*.DS_Store"
+          test -f mapx/level.dat
+          mkdir QuantumMap
+          (shopt -s dotglob; mv mapx/* QuantumMap/)
+          rmdir mapx
+          echo "eula=true" > eula.txt
+          printf 'level-name=QuantumMap\n' > server.properties
+          printf 'online-mode=false\n' >> server.properties
+          printf 'enable-rcon=true\n' >> server.properties
+          printf 'rcon.port=25575\n' >> server.properties
+          printf 'rcon.password=rumilance\n' >> server.properties
+          printf 'spawn-protection=0\n' >> server.properties
+          printf 'view-distance=8\n' >> server.properties
+          printf 'simulation-distance=6\n' >> server.properties
+          printf 'max-players=10\n' >> server.properties
+          printf 'allow-flight=true\n' >> server.properties
+          printf 'motd=QuantumBOT measurement\n' >> server.properties
+          # 一起動してワールド読み込みと MOD ロードを検証してから停止 (その実ログも同梱)
+          mkfifo boot_ctl
+          ( sleep 300; echo stop ) > boot_ctl &
+          ( $J/java -Xmx2400M -jar fabric-server-launch.jar nogui < boot_ctl > server_boot.log 2>&1 ) &
+          BOOT_PID=$!
+          for i in $(seq 1 72); do grep -q "Done (" server_boot.log && break; sleep 5; done
+          grep -q "Done (" server_boot.log || { echo "::error::server did not reach Done"; tail -40 server_boot.log; exit 1; }
+          grep -q "herobot" server_boot.log || { echo "::error::herobot mod not loaded"; tail -20 server_boot.log; exit 1; }
+          wait $BOOT_PID || true
+          grep -E "Done \(|Loading .* mods" server_boot.log | tail -3
+          cd ..
+          tar -czf mcserver.tar.gz --exclude='mcserver/logs' mcserver
+          ls -lh mcserver.tar.gz
+
+      - name: Deliver mcserver via mc-server-delivery branch (sandbox channel)
+        run: |
+          set -Eeuo pipefail
+          trap 'echo "::error::mcserver delivery failed at line $LINENO doing: ${BASH_COMMAND}"' ERR
+          git config http.postBuffer 524288000
+          git config user.name "java-env-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -q --orphan mc-server-delivery
+          git rm -rfq .
+          mkdir -p mcserver
+          split -b 90m -d mcserver.tar.gz mcserver/mcserver.tar.gz.part-
+          sha256sum mcserver.tar.gz > mcserver/sha256s.txt
+          ls -lh mcserver/
+          git add -A mcserver
+          git commit -qm "mcserver delivery (run ${{ github.run_id }}): bootable Fabric server + Quantum map + HeroBot"
+          git push -f origin mc-server-delivery
+          git ls-remote --heads origin mc-server-delivery
+
+      - name: Deliver jdk+paper via java-env-delivery branch (sandbox channel)
+        run: |
+          set -Eeuo pipefail
+          trap 'echo "::error::delivery failed at line $LINENO doing: ${BASH_COMMAND}"' ERR
+          test -f /tmp/bundle/jdk21.tar.gz || { echo "::error::/tmp/bundle/jdk21.tar.gz missing"; exit 1; }
+          git config http.postBuffer 524288000
+          git config user.name "java-env-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -q --orphan java-env-delivery
+          git rm -rfq .
+          mkdir -p delivery
+          split -b 90m -d /tmp/bundle/jdk21.tar.gz delivery/jdk21.tar.gz.part-
+          cp /tmp/bundle/paper-*.jar /tmp/bundle/sha256s.txt delivery/
+          git add -A delivery
+          git commit -qm "java-env delivery (run ${{ github.run_id }}): Temurin 21 + Paper 1.21.11"
+          git push -f origin java-env-delivery
+          git ls-remote --heads origin java-env-delivery

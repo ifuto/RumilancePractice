@@ -81,7 +81,9 @@ class BotDifficultyTest {
         String raw = "CUSTOM:77.0:6.5:640:0.3:4.0:1900:false:0.35:4:3.3:2.0";
         BotDifficulty d = BotDifficulty.deserialize(raw);
         assertEquals(BotDifficulty.Preset.CUSTOM, d.preset());
-        assertEquals(77.0d, d.botMaxHp(), 1e-9);
+        // Hearts are player-parity on every profile: a CUSTOM row's stored HP is kept in the
+        // save (serialize round-trip) but the bot always fights with the player's 20.
+        assertEquals(20.0d, d.botMaxHp(), 1e-9);
         assertEquals(6.5d, d.attackDamage(), 1e-9);
         assertEquals(640L, d.attackIntervalMs());
         assertEquals(0.3d, d.moveSpeed(), 1e-9);
@@ -90,7 +92,8 @@ class BotDifficultyTest {
         assertFalse(d.shieldStun());
         assertEquals(0.35d, d.shieldReduction(), 1e-9);
         assertEquals(4, d.totemGoal());
-        assertEquals(3.3d, d.reachBlocks(), 1e-9);
+        // Reach is parity-pinned (3.0) even on CUSTOM — only the save keeps the tuned value.
+        assertEquals(3.0d, d.reachBlocks(), 1e-9);
         assertEquals(2.0d, d.aimSpreadDegrees(), 1e-9);
         assertEquals(raw, d.serialize());
     }
@@ -143,7 +146,8 @@ class BotDifficultyTest {
         BotDifficulty npc = BotDifficulty.of(BotDifficulty.Preset.NPC);
         assertEquals(0.0d, npc.attackDamage(), 1e-9);
         BotDifficulty easy = BotDifficulty.of(BotDifficulty.Preset.EASY);
-        assertTrue(easy.attackDamage() <= 3.0d);
+        // The map's Easy hits RARELY (hitcd 23t) but each hit is a real netherite sword.
+        assertEquals(8.0d, easy.attackDamage(), 1e-9);
         assertTrue(easy.attackIntervalMs() >= 1100L);
         assertTrue(easy.aimSpreadDegrees() >= 5.0d);
         assertFalse(easy.shieldStun());
@@ -156,7 +160,7 @@ class BotDifficultyTest {
         assertEquals(750L, d.attackIntervalMs());
         assertEquals(3.0d, d.reachBlocks(), 1e-9);
         assertTrue(d.aimSpreadDegrees() >= 3.0d && d.aimSpreadDegrees() <= 6.0d);
-        assertTrue(d.attackDamage() >= 3.0d && d.attackDamage() <= 5.0d);
+        assertEquals(8.0d, d.attackDamage(), 1e-9);
         assertEquals(3, d.totemGoal());
     }
 
@@ -165,19 +169,35 @@ class BotDifficultyTest {
         BotDifficulty d = BotDifficulty.of(BotDifficulty.Preset.HARD);
         d.setBotMaxHp(65);
         assertEquals(BotDifficulty.Preset.CUSTOM, d.preset());
-        assertEquals(65.0d, d.botMaxHp(), 1e-9);
-        d.setBotMaxHp(10_000);
-        assertEquals(200.0d, d.botMaxHp(), 1e-9);
-        d.setBotMaxHp(-5);
+        // A manual edit still flips the rung to CUSTOM, but the bot's hearts stay at the
+        // player-parity 20 no matter what was tuned or saved (fair-fight product rule).
         assertEquals(20.0d, d.botMaxHp(), 1e-9);
+        d.setBotMaxHp(10_000);
+        assertEquals(20.0d, d.botMaxHp(), 1e-9);
+        // Same parity rule for reach: a vanilla player attacks at 3.0 blocks.
+        d.setReachBlocks(99);
+        assertEquals(3.0d, d.reachBlocks(), 1e-9);
         d.setAttackDamage(-3);
         assertEquals(0.0d, d.attackDamage(), 1e-9);
-        d.setReachBlocks(99);
-        assertEquals(4.5d, d.reachBlocks(), 1e-9);
         d.setAimSpreadDegrees(-4);
         assertEquals(0.0d, d.aimSpreadDegrees(), 1e-9);
         d.setAttackIntervalMs(1);
         assertEquals(150L, d.attackIntervalMs());
+    }
+
+    @Test
+    void everyRungFightsWithPlayerParityHearts() {
+        // "BOTのハートはどの難易度でもプレイヤーと同じ20": the fair-fight rule is a hard
+        // constant — no rung and no CUSTOM profile may field a bigger health pool.
+        for (BotDifficulty.Preset rung : LADDER) {
+            BotDifficulty d = BotDifficulty.of(rung);
+            assertEquals(20.0d, d.botMaxHp(), 1e-9, rung + " hp");
+            // Reach has the same parity: a vanilla player's attack reaches 3.0 blocks.
+            assertEquals(3.0d, d.reachBlocks(), 1e-9, rung + " reach");
+        }
+        BotDifficulty custom = BotDifficulty.deserialize("CUSTOM:140.0:6.0:500:0.26:4:1800:true:0.6:4");
+        assertEquals(20.0d, custom.botMaxHp(), 1e-9);
+        assertEquals(3.0d, custom.reachBlocks(), 1e-9);
     }
 
     @Test

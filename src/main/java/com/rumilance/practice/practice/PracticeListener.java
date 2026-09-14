@@ -15,6 +15,7 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityResurrectEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -58,7 +59,7 @@ public final class PracticeListener implements Listener {
         }
         PracticeSession session = sessionOpt.get();
         var roomOpt = practiceService.get(session.practiceId());
-        if (roomOpt.isEmpty()) {
+        if (roomOpt.isEmpty() && session.activeRegion() == null) {
             return;
         }
         if (!practiceService.contains(session, roomOpt.orElse(null), event.getTo())) {
@@ -71,6 +72,14 @@ public final class PracticeListener implements Listener {
      * where fighting IS the point: sword-bot swings in SWORD rooms, and crystal blasts in
      * CRYSTAL rooms (the bot fights back there; your own mistimed crystals hurt too).
      */
+    /** The practice bot popped its totem: pause its fight for the map's totem_cd rung. */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onBotResurrect(EntityResurrectEvent event) {
+        if (event.getEntity() instanceof Mannequin mannequin) {
+            practiceService.markBotTotemPop(mannequin);
+        }
+    }
+
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onDamage(EntityDamageEvent event) {
         if (!(event.getEntity() instanceof Player player)) {
@@ -264,7 +273,10 @@ public final class PracticeListener implements Listener {
             return;
         }
         var roomOpt = practiceService.get(session.practiceId());
-        if (roomOpt.isEmpty() || !practiceService.contains(session, roomOpt.get(), event.getBlock().getLocation())) {
+        if (roomOpt.isEmpty() && session.activeRegion() == null) {
+            return;
+        }
+        if (!practiceService.contains(session, roomOpt.orElse(null), event.getBlock().getLocation())) {
             event.setCancelled(true);
             return;
         }
@@ -335,14 +347,20 @@ public final class PracticeListener implements Listener {
         if (com.rumilance.practice.combat.PracticeDeath.hasTotemInHand(player)) {
             var totemKit = practiceService.kitOf(session);
             if (totemKit == null || totemKit.totem()) {
-                event.setCancelled(true);
-                event.getDrops().clear();
-                event.setKeepInventory(true);
-                event.setShouldDropExperience(false);
-                event.deathMessage(null);
-                com.rumilance.practice.combat.PracticeDeath.consumeTotemFromHand(player);
-                reviveWithTotem(player, session);
-                return;
+                // Consume FIRST, and only cancel when a totem was really taken. The old order
+                // (cancel -> maybe-consume) left a cancelled death standing with nothing
+                // consumed: Paper then revived at max health and the match could never end —
+                // the endless "lethal hit snaps me back to full HP" loop.
+                if (com.rumilance.practice.combat.PracticeDeath.consumeTotemFromHand(player)) {
+                    event.setCancelled(true);
+                    event.setReviveHealth(1.0d);
+                    event.getDrops().clear();
+                    event.setKeepInventory(true);
+                    event.setShouldDropExperience(false);
+                    event.deathMessage(null);
+                    reviveWithTotem(player, session);
+                    return;
+                }
             }
         }
         event.getDrops().clear();
@@ -351,10 +369,10 @@ public final class PracticeListener implements Listener {
         session.setBotNextAttackMs(System.currentTimeMillis() + 2_000L);
         if (session.type().botMode() && session.phase() == PracticeSession.Phase.ACTIVE) {
             // A real match: death is the loss. Arm the death catch first so the defeat screen
-            // never flashes; endBotMatch returns the (soon-respawned) player to the lobby.
-            com.rumilance.practice.combat.DeathBridge.plan(player, player.getLocation(), () -> {
-            });
-            practiceService.endBotMatch(player, session, PracticeService.BotMatchResult.LOSE);
+            // never flashes, and run endBotMatch as the ruling — next tick, on the revived
+            // player, so the defeat flow never has to reason about a downed entity.
+            com.rumilance.practice.combat.DeathBridge.plan(player, player.getLocation(), () ->
+                    practiceService.endBotMatch(player, session, PracticeService.BotMatchResult.LOSE));
             return;
         }
         // Dying before the fight (waiting room / countdown): abort the countdown and go back
