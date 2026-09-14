@@ -7,6 +7,7 @@
 | ファイル | 内容 |
 |---|---|
 | `fabric_normal_crystal_anchor_310s.log.gz` | **通常戦闘(仕込みなし)310秒 / 6195行**。石の地面の上で BOT が自分からクリスタルとアンカーの両方を使用 |
+| `fabric_normal_anchor_250s.log.gz` | **通常戦闘 2本目 250秒 / 4993行**(独立再現)。アンカー設置49回・**設置→チャージ 4t×49/49**・サイクル最頻12t |
 | `fabric_crystal_int2_60s.log.gz` | 相手を柱上 y=34 に固定した「台クリスタル窓」60秒(1201行) |
 | `fabric_crystal_int2_melee_60s.log.gz` | 相手を隣接(2.5blk, 同一y)に置いた「近接窓」60秒(1201行) |
 | 解析 | `python3 tools/parity_report.py docs/parity/<file>.log.gz` |
@@ -40,6 +41,7 @@
 | 近接スイング | 41 回 / 最頻 10t | `g1gc/hit` は hitcd 7 を設定 |
 | アイテム時間配分 | ender_pearl 80.2% / glowstone 4.7% / end_crystal 4.3% / totem 4.3% / respawn_anchor 3.5% / diamond_sword 2.8% / obsidian 0.2% | パール主体+クリスタル/アンカー混在 |
 | 相手(target)HP | 20.0 → 最小 **2.0**(実ダメージ 18) | 実戦で機能 |
+| (2本目 250s) アンカー設置/チャージ | **49 回 / 49 回**、設置→チャージ **4t×49/49**、サイクル最頻 **12t** | 独立再現 ✅ |
 | BOT HP | 平均 19.0 / 最小 11.9 | |
 | 平面移動 | 平均 18.1 b/s(パール瞬間移動を含む)/ 移動サンプル 74% | |
 | 視点 | yaw 平均 3.75°/tick、>15°スナップ 273 回 | |

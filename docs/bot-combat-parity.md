@@ -423,6 +423,13 @@ Fabric 参照サーバー上で **QuantumBOT を実戦させ、`[q]` 生デー�
 
 フィクスチャ: `docs/parity/fabric_normal_crystal_anchor_310s.log.gz`。
 
+**独立再現(2本目・250秒)**: アンカー設置 49 回 / チャージ 49 回、
+**設置→チャージ 4t×49/49**、サイクル最頻 **12t**、アイテム配分
+pearl 84.1% / totem 7.3% / glowstone 4.0% / respawn_anchor 3.9% / end_crystal 0.4%。
+生サンプルにも `i=minecraft:respawn_anchor ... anc=4 chg=4 exp=4` と
+`i=minecraft:end_crystal ... ct=6` が並び、**同じラウンド内で両武器を使う**ことが確認できる。
+フィクスチャ: `docs/parity/fabric_normal_anchor_250s.log.gz`。
+
 ### 当プラグイン側への含意(重要)
 
 - **アンカーは「全ラングで使う」が実測で裏付けられた**(difficulty 2 = INTERMEDIATE でも使用)。
