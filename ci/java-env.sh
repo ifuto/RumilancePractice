@@ -266,7 +266,17 @@ git config --get-regexp '^http\.' | grep -q extraheader \
 
 step "build: 当プラグイン (./gradlew test shadowJar)"
 if [ -x ./gradlew ]; then
-  ./gradlew --no-daemon -q test shadowJar 2>&1 | tail -40 || die "gradlew test shadowJar に失敗"
+  set +e
+  ./gradlew --no-daemon test shadowJar > "$WORK/plugin-build.log" 2>&1
+  rc=$?
+  set -e
+  tail -25 "$WORK/plugin-build.log" || true
+  if [ "$rc" -ne 0 ]; then
+    # サンドボックスからログ本文は読めないので、失敗行だけアノテーションに載せる
+    grep -E "error:|FAILURE|What went wrong|Caused by|> Task .*FAILED|Could not" "$WORK/plugin-build.log" \
+      | tail -12 | sed 's/^/::error::gradle: /' || true
+    die "gradlew test shadowJar に失敗 (rc=$rc)"
+  fi
   ls -lh build/libs/ || die "build/libs がありません"
   mkdir -p "$BUNDLE/plugin"
   cp build/libs/*.jar "$BUNDLE/plugin/" 2>/dev/null || die "shadowJar の成果物をコピーできません"

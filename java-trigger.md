@@ -90,3 +90,5 @@ cd /tmp/mcserver && /tmp/jdk21/bin/java -Xmx2400M -jar fabric-server-launch.jar 
 - 2026-09-14: ci/java-env.sh に当プラグインの shadowJar ビルド + plugin-delivery 配送を追加(当側を Paper で走らせて参照と比較するため)。
 
 - 2026-09-14: plugin-delivery のビルド順修正(orphan 前にビルド)を反映。
+
+- 2026-09-14: java-env のプラグインビルド失敗を診断可能に(gradle エラー行を ::error:: へ)。
