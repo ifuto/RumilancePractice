@@ -24,7 +24,7 @@ public final class PacketBot extends ServerPlayer {
                      ClientInformation information) {
         super(server, level, profile, information);
         this.owningServer = server;
-        this.profileName = profile.getName();
+        this.profileName = profile.name();
     }
 
     public String profileName() {

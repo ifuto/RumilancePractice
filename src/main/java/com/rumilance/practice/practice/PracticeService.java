@@ -3158,7 +3158,7 @@ public final class PracticeService {
                 eq.setItemInOffHand(new ItemStack(Material.TOTEM_OF_UNDYING));
             }
         }
-        zeroDropChances(bot, eq);
+        zeroDropChances(bot.living(), eq);
     }
 
     private void removeCombatBot(PracticeSession session) {
