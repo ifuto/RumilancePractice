@@ -2263,7 +2263,7 @@ public final class PracticeService {
         // to swing the weapon the mode is about.
         eq.setItemInMainHand(new ItemStack(Material.MACE));
         eq.setItemInOffHand(shieldUp ? new ItemStack(Material.SHIELD) : null);
-        zeroDropChances(bot.living(), eq);
+        zeroDropChances(bot, eq);
     }
 
     /**
@@ -4413,7 +4413,7 @@ public final class PracticeService {
         // itself shows up as the damager of its own combo — that must be ignored too.
         if (event instanceof org.bukkit.event.entity.EntityDamageByEntityEvent byEntity
                 && (byEntity.getDamager() == null
-                        || byEntity.getDamager().getUniqueId().equals(bot.getUniqueId())
+                        || byEntity.getDamager().getUniqueId().equals(bot.uuid())
                         || session.botCrystals().contains(byEntity.getDamager().getUniqueId())
                         || session.botTnt().contains(byEntity.getDamager().getUniqueId()))) {
             event.setCancelled(true);
@@ -4501,8 +4501,8 @@ public final class PracticeService {
         if (home != null && home.getWorld() != null) {
             bot.teleport(home);
         }
-        if (bot.getAttribute(Attribute.MAX_HEALTH) != null) {
-            bot.setHealth(bot.getAttribute(Attribute.MAX_HEALTH).getValue());
+        if (bot.attribute(Attribute.MAX_HEALTH) != null) {
+            bot.setHealth(bot.attribute(Attribute.MAX_HEALTH).getValue());
         }
         bot.setVelocity(new Vector());
         equipCombatBot(bot, player, session, session.type(), session.botShieldRaised());
