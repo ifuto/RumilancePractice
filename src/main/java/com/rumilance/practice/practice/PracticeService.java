@@ -1456,6 +1456,8 @@ public final class PracticeService {
     private static final double PEARL_PRESSURE_STANDOFF = 2.5d;
     /** Map ray cast is limited to {@code ^ ^ ^-15}. */
     private static final double PEARL_PRESSURE_MAX_LEAP = 15.0d;
+    /** The map's ray stops on the target's hitbox: a pearl never lands inside the enemy. */
+    private static final double PEARL_PRESSURE_STANDOFF_MIN = 2.0d;
     /** Pearl stock topped up on the bot (map kits are effectively endless). */
     private static final int PEARL_STOCK_REFILL = 16;
     /** Golden apple: eaten below half HP, heals 40%, at most twice per bot life. */
@@ -4239,6 +4241,11 @@ public final class PracticeService {
             move = new Vector(0, 0, 0);                    // NPC: stand still, just exist
         } else if (dist > 2.0d) {
             move = dir.clone().multiply(0.24d).add(side);  // push forward (map: move forward)
+        } else if (dist < 1.2d) {
+            // Safety valve for opponents that cannot push back (fake players): without this the
+            // bot parks inside the target and every distance-based module degenerates
+            // (pearl direction ~0, crystal standoff gone) — measured as a frozen fight.
+            move = dir.clone().multiply(-0.24d);
         } else {
             move = new Vector(0, 0, 0);                    // within 2 blocks: hold ground
         }
@@ -4341,14 +4348,26 @@ public final class PracticeService {
             return false; // map: `unless entity @e[tag=xlib,tag=usable]` + pearlcd/pearlcd2
         }
         Vector to = player.getLocation().toVector().subtract(bot.getLocation().toVector()).setY(0);
-        if (to.lengthSquared() < 0.0001d) {
-            return false;
+        if (to.lengthSquared() < 0.25d) {
+            // Overlapping the target (fake opponents cannot push back): pearl AWAY, which is
+            // exactly what the map's passive escape pearl does (`facing entity @p ^ ^ ^-15`).
+            to = bot.getLocation().getDirection().setY(0).multiply(-1.0d);
+            if (to.lengthSquared() < 0.01d) {
+                to = new Vector(1.0d, 0.0d, 0.0d);
+            }
+        }
+        if (dist <= PEARL_PRESSURE_STANDOFF_MIN) {
+            return false; // already at the target: the sword has the job (map: can_hit)
         }
         double leap = Math.min(Math.max(dist - PEARL_PRESSURE_STANDOFF, 2.0d),
                 PEARL_PRESSURE_MAX_LEAP);
         Location landing = findPearlLanding(session, bot.getLocation(), to.normalize(), leap);
-        if (landing == null) {
-            ab.nextPearlMs(now + 250L); // ray hit no floor: re-cast shortly, do not spam
+        // Never land on top of the target: the map's ray stops on its hitbox, ours must too.
+        if (landing != null && landing.distance(player.getLocation()) < PEARL_PRESSURE_STANDOFF_MIN) {
+            landing = findPearlLanding(session, bot.getLocation(), to.normalize(), leap - 1.5d);
+        }
+        if (landing == null || landing.distance(player.getLocation()) < 1.2d) {
+            ab.nextPearlMs(now + 250L); // no room for a standoff throw: re-cast shortly
             return false;
         }
         if (!session.botConsume(Material.ENDER_PEARL, 1)) {

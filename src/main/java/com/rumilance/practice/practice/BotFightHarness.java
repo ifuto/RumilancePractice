@@ -194,6 +194,10 @@ public final class BotFightHarness implements CommandExecutor, TabCompleter {
         practice.applySelection(roomId, Cuboid.of(w.getName(),
                 x - radius, y - 4, z - radius, x + radius, y + 8, z + radius));
         practice.setP1(roomId, new Location(w, x + 0.5, y, z + 0.5, 0f, 0f));
+        // Bot home 8 blocks to the -X side: without it the bot spawns "4 blocks ahead of the
+        // player", which for a fake opponent (no look direction, no push-back) parks the bot
+        // inside the player and every distance module degenerates.
+        practice.setBotSpawn(roomId, new Location(w, x - 8 + 0.5, y, z + 0.5, 0f, 0f));
         practice.saveDraft(roomId).ifPresent(err -> log("room save note: " + err));
         practice.setEnabled(roomId, true);
         practice.bindBotRoom(type, roomId);

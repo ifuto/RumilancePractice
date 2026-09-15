@@ -112,3 +112,5 @@ cd /tmp/mcserver && /tmp/jdk21/bin/java -Xmx2400M -jar fabric-server-launch.jar 
 - 2026-09-15: v1.76.11 の jar を配信(BOT戦トレースの精度上げ)。
 
 - 2026-09-15: v1.76.12 の jar を配信(クリスタルのパール圧モジュール)。
+
+- 2026-09-15: v1.76.13 の jar を配信(パール圧のスタンドオフ修正)。
