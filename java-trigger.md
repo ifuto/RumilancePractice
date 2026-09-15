@@ -104,3 +104,5 @@ cd /tmp/mcserver && /tmp/jdk21/bin/java -Xmx2400M -jar fabric-server-launch.jar 
 - 2026-09-15: ヘッドレスBOT戦ハーネス(/narena-harness, -Drumilance.harness=true)を追加。
 
 - 2026-09-15: ソフト依存(ProtocolLib/WorldEdit)未導入でも有効化できるようガード追加。
+
+- 2026-09-15: v1.76.9 の jar を plugin-delivery に配信(java-env 再実行)。
