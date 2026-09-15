@@ -259,6 +259,12 @@ public final class BotFightHarness implements CommandExecutor, TabCompleter {
         Player player = Bukkit.getPlayerExact(name);
         if (player != null) {
             stateManager.resetToLobby(player.getUniqueId());
+            // The dummy's game type follows the server's own default (this harness server
+            // defaults to CREATIVE, where the fake player cannot be hurt at all) and a lobby
+            // reset can push it back there mid-run: a measurement round needs the opponent in
+            // survival, which is what the reference's target plays in.
+            player.setGameMode(org.bukkit.GameMode.SURVIVAL);
+            log("dummy " + name + " gamemode=" + player.getGameMode());
         }
         startKeepAlive();
         anchor = new Location(w, x, y, z, 0f, 0f);
@@ -335,9 +341,14 @@ public final class BotFightHarness implements CommandExecutor, TabCompleter {
             session.setActiveRegion(room.region());
             session.setDurationSeconds(seconds);
             session.setDifficulty(difficulty);
+            // A lobby/join transition can push the dummy back to the server default (creative);
+            // re-assert survival right before the fight so damage is actually possible.
+            player.setGameMode(org.bukkit.GameMode.SURVIVAL);
             practice.handleWaitInteract(player, session, PracticeItems.ACTION_START);
             log("round started dummy=" + dummyName + " seconds=" + seconds
-                    + " difficulty=" + difficulty.preset() + " phase=" + session.phase());
+                    + " difficulty=" + difficulty.preset() + " phase=" + session.phase()
+                    + " gamemode=" + player.getGameMode()
+                    + " hp=" + String.format(Locale.ROOT, "%.1f", player.getHealth()));
             // Bound the round: `seconds` is the measurement window, so the trace is dumped by
             // an ordinary (draw) ruling instead of the ten minute match timeout.
             Bukkit.getScheduler().runTaskLater(plugin, () -> {

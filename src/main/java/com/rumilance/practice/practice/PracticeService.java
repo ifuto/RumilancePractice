@@ -1451,8 +1451,16 @@ public final class PracticeService {
      *  tool, which is why the reference bot holds a pearl ~76 % of its run. */
     private static final double PASSIVE_PEARL_RANGE = 8.0d;
 
-    /** Upper edge of the escape band: outside it the target has no marker at all (chase in). */
-    private static final double PASSIVE_PEARL_ESCAPE_MAX = 10.0d;
+    /**
+     * Upper edge of the escape band. The map gates the escape pearl on
+     * {@code entity @p[tag=xlib_target,distance=..8]} (bin/13 tags the target {@code close} at
+     * exactly 8), so it MUST sit at the same edge as {@link #PASSIVE_PEARL_RANGE} or the two
+     * pearls leave a dead zone: with the escape band at 10 and the chase pearl gated to >8, a
+     * bot sitting at 8-10 blocks threw the escape pearl (15 blocks away) every second and never
+     * used the chase pearl, which walked it out of the arena (measured b6: 84.8 % of the match
+     * beyond 9 blocks, 39 escape pearls against 9 chase pearls after t=40 s).
+     */
+    private static final double PASSIVE_PEARL_ESCAPE_MAX = 8.0d;
     /**
      * Map {@code eval:stats/hp}: the bot's whole decision surface is
      * {@code eval = (botHP - targetHP) * 20} — this is the factor that turns an HP lead into a
@@ -1519,9 +1527,12 @@ public final class PracticeService {
     /** Lands this far short of the target: the map's ray stops on the target's hitbox, so
      *  the throw lands right next to it — the map pearls while boxing too (no range gate). */
     /**
-     * Where the chase pearl lands relative to the target. The reference's closing jumps start at
-     * 20 blocks (median) and put it down at 8.3 (p25 5.3) — i.e. a few blocks short of the
-     * target, on the anchor band's edge, not on its face.
+     * Where the chase pearl lands relative to the target: the map's ray stops on the target's
+     * hitbox, so the throw lands right next to it and the mech chain runs from there. Landing it
+     * at 8 instead put a whole second of walking into the 6-9 gap (measured 19.3 % of the match
+     * against the reference's 2.5 %) and landing at 4 pushed the 3-6 band to 47 % (reference
+     * 37.3) while starving the crystal line down to 1.7/min. Three blocks keeps the near phase
+     * inside the band without the crossing (b24: 3-6 38.3 %, crystal 5.0/min).
      */
     private static final double PEARL_PRESSURE_STANDOFF = 3.0d;
     /** Map ray cast is limited to {@code ^ ^ ^-15}. */
@@ -1598,6 +1609,15 @@ public final class PracticeService {
      */
     private static final double FIGHT_STANDOFF_NEAR = 1.5d;
     private static final double FIGHT_STANDOFF_FAR = 4.5d;
+    /**
+     * The map reloads {@code crystal_timer} after each anchor stage so the two mechs alternate
+     * instead of stacking, and the reference therefore lands 5.3 crystals/min against 18.1
+     * anchors/min (1:3.4). Our gate (crystal &lt; 2 on the field, no anchor stage armed, inside
+     * 3.5 blocks) fired in every window the anchor cycle left open — measured 13.7-14.1/min at
+     * every 300 ms combo cadence, i.e. the crystal line is anchored to the anchor chain, not to
+     * its own timer. One crystal per this many completed anchor chains lands 15/3 ≈ 5/min.
+     */
+    private static final int CRYSTAL_CHAINS_PER_PLACE = 3;
 
     /**
      * Map {@code mark/mark_main}: an anchor marker is {@code usable} only while it is within
@@ -4169,7 +4189,7 @@ public final class PracticeService {
         }
         Location landing = findPearlLanding(session, bot.getLocation(), away.normalize(), 12.0d);
         if (landing == null) {
-            ab.nextPearlMs(now + 1500L); // no safe spot: retry soon, don't spam scans
+            ab.nextPearlMs(now + 1500L); // no safe spot: retry soon
             return false;
         }
         ab.nextPearlMs(now + ESCAPE_PEARL_COOLDOWN_MS);
@@ -4264,7 +4284,7 @@ public final class PracticeService {
         Location landing = findPearlLanding(session, bot.getLocation(), away.normalize(),
                 PASSIVE_PEARL_LEAP);
         if (landing == null) {
-            ab.nextPearlMs(now + 250L); // no landing: re-cast shortly, like the map's ray
+            ab.nextPearlMs(now + 250L); // no landing: re-cast shortly
             return false;
         }
         if (!session.botConsume(Material.ENDER_PEARL, 1)) {
@@ -4278,9 +4298,16 @@ public final class PracticeService {
     }
 
     /**
-     * Finds a survivable pearl landing {@code preferred} blocks along {@code horizontal} from
-     * {@code from}: inside the practice region, on solid ground, with two air blocks to stand
-     * in. Falls back to shorter hops when the full leap leaves the room.
+     * Finds a pearl landing {@code preferred} blocks along {@code horizontal} from {@code from}:
+     * inside the practice region, on solid ground, close enough to the ray's aim.
+     *
+     * <p>The map's pearl is a physics entity — it lands on whatever surface the ray hits, so a
+     * column whose top block is an obstacle is a perfectly good landing (the bot simply stands on
+     * top of it). Demanding a two-deep air pocket instead made every chase pearl that aimed at the
+     * cluttered ground around the target fail (measured: 34 "no landing" results in one 145 s
+     * fight, each one pushing the shared {@code pearlcd} 250 ms further, which starved the chase
+     * pearl and turned the return trip into a 3 s walk — the walk is what put 73 % of the match
+     * beyond 9 blocks against the reference's 52 %).
      */
     private Location findPearlLanding(PracticeSession session, Location from,
                                       Vector horizontal, double preferred) {
@@ -4293,34 +4320,53 @@ public final class PracticeService {
         boolean unbounded = room == null && session.activeRegion() == null;
         double boundSq = Math.max(preferred, 12.0d) * 1.5d;
         boundSq *= boundSq;
-        double[] tries = {preferred, preferred - 2.0d, preferred - 4.0d, preferred / 2.0d};
+        // The straight ray first, then progressively shorter hops (the map's ray stops on the
+        // first body it meets, so short hops are the normal outcome of a crowded arena).
+        double[] tries = {preferred, preferred - 1.5d, preferred - 3.0d, preferred * 0.75d,
+                preferred * 0.55d, preferred * 0.35d};
         for (double dist : tries) {
             if (dist < 0.5d) {
                 continue; // sub-block hops land in the bot's own column
             }
             Location cand = from.clone().add(horizontal.clone().multiply(dist));
-            for (int dy = 2; dy >= -8; dy--) {
-                Location probe = cand.clone().add(0, dy, 0);
-                boolean inside = unbounded ? probe.distanceSquared(from) <= boundSq
-                        : contains(session, room, probe);
-                if (!inside) {
+            org.bukkit.block.Block ground = null;
+            for (int dy = 4; dy >= -8; dy--) {
+                org.bukkit.block.Block probe = cand.clone().add(0, dy, 0).getBlock();
+                if (!inside(session, room, unbounded, boundSq, from, probe)) {
                     continue;
                 }
-                org.bukkit.block.Block ground = probe.getBlock();
-                if (!ground.getType().isSolid()) {
-                    continue;
+                if (probe.getType().isSolid()) {
+                    ground = probe;
+                    break;
                 }
-                org.bukkit.block.Block feet = ground.getRelative(org.bukkit.block.BlockFace.UP);
-                org.bukkit.block.Block head = feet.getRelative(org.bukkit.block.BlockFace.UP);
+            }
+            if (ground == null) {
+                continue; // no surface along this ray length
+            }
+            // Stand on top of that surface: walk up until two free blocks fit, so a wall or an
+            // anchor stack becomes a rooftop landing instead of a rejection.
+            for (int k = 1; k <= 6; k++) {
+                org.bukkit.block.Block feet = ground.getRelative(0, k, 0);
+                org.bukkit.block.Block head = feet.getRelative(0, 1, 0);
+                if (!inside(session, room, unbounded, boundSq, from, head)) {
+                    break;
+                }
                 if (feet.getType().isSolid() || head.getType().isSolid()
                         || feet.isLiquid() || head.isLiquid()) {
-                    break; // ground found but no room to stand on this column
+                    continue;
                 }
                 return feet.getLocation().add(0.5d, 0.0d, 0.5d)
                         .setDirection(from.getDirection());
             }
         }
         return null;
+    }
+
+    /** Room/bound test for a pearl-ray probe. */
+    private boolean inside(PracticeSession session, PracticeRoom room, boolean unbounded,
+                           double boundSq, Location from, org.bukkit.block.Block block) {
+        Location loc = block.getLocation();
+        return unbounded ? loc.distanceSquared(from) <= boundSq : contains(session, room, loc);
     }
 
     /** Pearl blink with the tell-tale purple trail at both ends. */
@@ -4650,23 +4696,31 @@ public final class PracticeService {
             return;
         }
 
-        // Mid-apple: the bot stands still and chomps (map gap_timer) — no fighting until done.
-        if (tickBotGapEating(session, bot, now)) {
+        // --- passives run before the fight loop, chomp or not --------------------------------
+        // crystal/tick calls quantum:holeoffense and crystal/passive/main (which owns the escape
+        // pearl) ABOVE the fight loop, so a chomp never disables them. Running ours after the
+        // gap_timer pause turned every apple break into a 4 s stand at 3-4 blocks: b18 measured
+        // 50.0 % of the match inside 6 blocks and only 28.4 % beyond 9, against the reference's
+        // 45.4/52.1. The escape pearl simply could not fire until the 35 t chomp ended (63.3 s
+        // apple chomp -> 66.8 s pearl out in the b18 trace). A teleport mid-chomp is harmless:
+        // the eat continues on landing, which is how the reference eats through a pearl cycle.
+        Location botLoc = bot.getLocation();
+        double dist = botLoc.distance(player.getLocation());
+        if (fights && tickHoleEscape(player, session, bot, now)) {
+            return;
+        }
+        if (fights && tickPassivePearl(player, session, bot, now, dist)) {
             return;
         }
 
-        // --- hole escape (map quantum:holeoffense + quantum:pearl) ---------------------------
-        // A trapped bot pearls straight up out of the hole before anything else runs; the map's
-        // holeoffense/tick sits above the whole fight loop in crystal/tick for the same reason.
-        if (fights && tickHoleEscape(player, session, bot, now)) {
+        // Mid-apple: the bot stands still and chomps (map gap_timer) — no movement until done.
+        if (tickBotGapEating(session, bot, now)) {
             return;
         }
 
         // --- movement: the map bot holds its ground (g1gc/botlogic stops every tick) and only
         // pushes forward when the player is beyond 2 blocks; it never backs away — a losing
         // trade is answered with a pearl instead.
-        Location botLoc = bot.getLocation();
-        double dist = botLoc.distance(player.getLocation());
         // Map g1gc/can_hit (used by eval AND by the weapon gates): the target is hittable when
         // it is inside melee reach, in line of sight and no longer inside its hurt frames.
         boolean canHitNow = dist <= CRYSTAL_MELEE_REACH && bot.hasLineOfSight(player)
@@ -4725,10 +4779,6 @@ public final class PracticeService {
         // widens while it is nearly dead). This is the reference's out-and-in rhythm — its
         // median distance is 18.3 blocks with 52 % of the match beyond 9 — and without it our
         // bot sat in the 3-6 band chain-gunning anchors (measured 53/min against 18.1).
-        if (fights && tickPassivePearl(player, session, bot, now, dist)) {
-            return;
-        }
-
         // --- map state machine (eval/biased): attack by default, passive as soon as the bot is
         // behind on health. The fork sits here because the branch needs the live distance and the
         // map's ordering is identical: movement, then the drain (passive vs attack), then the
@@ -4803,9 +4853,11 @@ public final class PracticeService {
         // marking radius), so the reference places crystals point blank — 68 % of them inside 3
         // blocks, 27 % inside 6, never further.
         if (now >= session.botNextAttackMs() && dist <= CRYSTAL_USABLE_RANGE
-                && session.botCrystals().size() < 2 && ab.anchorStage() == 0) {
+                && session.botCrystals().size() < 2 && ab.anchorStage() == 0
+                && ab.botChains() >= CRYSTAL_CHAINS_PER_PLACE) {
             long combo = crystalPlaceIntervalMs(crystalDiff);
             if (launchCrystalAttack(player, session, bot)) {
+                ab.botChains(0); // the chain's crystal spent: the anchors have to build it back up
                 session.setBotNextAttackMs(now + combo);
             } else {
                 session.setBotNextAttackMs(now + 500L); // no valid spot: retry soon
@@ -4815,7 +4867,8 @@ public final class PracticeService {
         // --- pressure pearl (map g1gc/pearl) -----------------------------------------------
         // Runs last so the anchor/crystal mechs keep priority (the map skips it while a usable
         // mech marker exists) and the pearl is the filler between combos, exactly like the
-        // reference: pearl in at the target, then the sword follows on the next tick.
+        // reference: pearl in at the target, then the sword follows on the next tick. It rides
+        // the same pearlcd as the escape pearl (20 t), so the pair is the reference's 48/min.
         if (fights && tickPearlPressure(player, session, bot, now, dist)) {
             ab.nextMeleeMs(0L); // map: `unless pearlcd == 20 run g1gc/hit` — hit after the pearl
         }
@@ -4876,7 +4929,7 @@ public final class PracticeService {
             }
         }
         if (landing == null || landing.distance(bot.getLocation()) < 0.3d) {
-            ab.nextPearlMs(now + 250L); // ray hit nothing usable: re-cast shortly
+            ab.nextPearlMs(now + 250L); // ray hit nothing usable
             return false;
         }
         if (!session.botConsume(Material.ENDER_PEARL, 1)) {
