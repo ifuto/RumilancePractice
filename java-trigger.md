@@ -100,3 +100,5 @@ cd /tmp/mcserver && /tmp/jdk21/bin/java -Xmx2400M -jar fabric-server-launch.jar 
 - 2026-09-14: ラダー値を参照実測に錠する BotLadderParityTest を追加。
 
 - 2026-09-15: run8(通常戦闘403秒・アンカー117/116の独立再現)を docs/parity に追加。
+
+- 2026-09-15: ヘッドレスBOT戦ハーネス(/narena-harness, -Drumilance.harness=true)を追加。

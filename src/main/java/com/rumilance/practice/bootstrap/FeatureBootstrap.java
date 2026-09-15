@@ -1044,6 +1044,10 @@ public final class FeatureBootstrap {
         // /bot opens the bot-select screen; /botadmin binds bot fight kits to arena kits.
         bind("bot", new com.rumilance.practice.practice.BotGuiCommand(practiceService, botSelectGui));
         bind("botadmin", new com.rumilance.practice.practice.BotAdminCommand(practiceService, kitService));
+        // Dev-only headless harness (-Drumilance.harness=true): drives an ordinary bot match
+        // with a fake player, so BOT parity runs need nobody at the keyboard.
+        bind("narena-harness", new com.rumilance.practice.practice.BotFightHarness(
+                plugin, practiceService, stateManager));
 
         GuiListener guiListener = new GuiListener(guiSessions, stateManager, originalKitService, messageService);
         guiListener.register(rankedGui);

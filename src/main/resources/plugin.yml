@@ -180,6 +180,10 @@ commands:
     description: Bind a bot fight kit to the arena kit hosting its fights.
     usage: /botadmin <SWORD|MACE|CRYSTAL|NETHERITE_POT|CART|botkit> <kit|arenakit|off>
     permission: rumilance.admin
+  narena-harness:
+    description: Headless BOT-fight harness for parity measurement (dev only; needs -Drumilance.harness=true).
+    usage: /narena-harness <ground|room|dummy|fight|status|stop>
+    permission: rumilance.admin
   team:
     description: Owner-invite style teams with public/private visibility and red-blue team battles.
     usage: /team <gui|create|invite|join|decline|leave|kick|public|list|info|side|autosplit|clearsides|start|disband>

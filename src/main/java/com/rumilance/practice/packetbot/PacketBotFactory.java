@@ -28,15 +28,29 @@ public final class PacketBotFactory {
     public static PacketBotBody spawnCombat(Location location, String botName,
                                             org.bukkit.entity.Player template, double maxHp,
                                             boolean shieldUp) {
-        MinecraftServer server = ((CraftServer) org.bukkit.Bukkit.getServer()).getServer();
-        ServerLevel level = ((CraftWorld) location.getWorld()).getHandle();
-
         // The bot wears the template player's skin: copy the signed textures property.
         GameProfile profile = new GameProfile(UUID.randomUUID(), botName);
-        for (ProfileProperty prop : template.getPlayerProfile().getProperties()) {
-            profile.properties().put(prop.getName(),
-                    new Property(prop.getName(), prop.getValue(), prop.getSignature()));
+        if (template != null) {
+            for (ProfileProperty prop : template.getPlayerProfile().getProperties()) {
+                profile.properties().put(prop.getName(),
+                        new Property(prop.getName(), prop.getValue(), prop.getSignature()));
+            }
         }
+        return spawn(location, profile, maxHp);
+    }
+
+    /**
+     * Skinless fake player — the headless side of a bot match (harness/automation): a normal
+     * ServerPlayer with a {@link FakePlayerConnection}, so the practice flow sees a real player
+     * while nobody is connected.
+     */
+    public static PacketBotBody spawnDummy(Location location, String botName, double maxHp) {
+        return spawnCombat(location, botName, null, maxHp, false);
+    }
+
+    private static PacketBotBody spawn(Location location, GameProfile profile, double maxHp) {
+        MinecraftServer server = ((CraftServer) org.bukkit.Bukkit.getServer()).getServer();
+        ServerLevel level = ((CraftWorld) location.getWorld()).getHandle();
 
         ClientInformation information = ClientInformation.createDefault();
         PacketBot bot = new PacketBot(server, level, profile, information);
