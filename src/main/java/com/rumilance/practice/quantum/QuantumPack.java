@@ -37,6 +37,9 @@ import java.util.zip.ZipFile;
  */
 public final class QuantumPack {
 
+    /** Vanilla's suffix mapping: {@code data/<ns>/function/a/b.mcfunction} is {@code ns:a/b}. */
+    private static final String MCFUNCTION = ".mcfunction";
+
     /** Functions by id, lines exactly as on disk. */
     private final Map<Identifier, List<String>> functions = new LinkedHashMap<>();
     /** Function tags by id; members are function ids, with a leading '#' for nested tags. */
@@ -149,10 +152,11 @@ public final class QuantumPack {
         String namespace = parts[1];
         boolean functionDir = parts[2].equals("function") || parts[2].equals("functions");
         if (functionDir) {
-            if (!relative.endsWith(".mcfunction")) {
+            String path = relative.substring(("data/" + namespace + "/" + parts[2] + "/").length());
+            if (!path.endsWith(MCFUNCTION)) {
                 return;
             }
-            String path = relative.substring(("data/" + namespace + "/" + parts[2] + "/").length());
+            path = path.substring(0, path.length() - MCFUNCTION.length());
             if (path.isEmpty()) {
                 return;
             }

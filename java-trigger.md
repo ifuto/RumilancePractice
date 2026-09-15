@@ -295,3 +295,10 @@ herobot MOD が Brigadier ノードとして直接 dispatcher に載せている
 および同じルートを二重に読む場合（ワールド直下とワールド/datapacks の両方）に、片方だけが
 有効になってしまう不具合を直した。バニラと同じく和集合を取り、重複は除く。
 これを直さないと、読み込み順によっては `quantum:tick`（マップのAI本体）がタグから抜ける。
+
+## v1.76.33 — 関数IDの拡張子が残っていた（移植側の重大バグ）
+
+`QuantumPack` のリーダーが `data/<ns>/function/<path>.mcfunction` から **`.mcfunction` を落とさず**に
+IDを作っていた（`npc:tick.mcfunction`）。そのため **タグ（#minecraft:tick など）が1つも解決できず**、
+移植側ではマップのAI本体が毎tick動いていなかった（動いていたのはバニラ側が読んだ我々の
+ハーネスタグだけ）。バニラと同じ `ns:path` に正規化して修正。
