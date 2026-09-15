@@ -1,0 +1,1 @@
+$say [q] $(px),$(py),$(pz) v=$(vx),$(vy),$(vz) y=$(yaw) p=$(pit) hp=$(hp) g=$(g) i=$(item) hit=$(hit) tot=$(tot) ct=$(ct) ob=$(ob) pc=$(pc) cry=$(cry) anc=$(anc) chg=$(chg) exp=$(exp) hpT=$(hpT) pop=$(pop) ec=$(ec) t=$(t) who=$(who) st=$(st) kit=$(kit) rhit=$(realhit)

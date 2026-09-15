@@ -1,0 +1,10 @@
+{
+  "pack": {
+    "pack_format": 94,
+    "supported_formats": [
+      48,
+      999
+    ],
+    "description": "parity: 戦闘BOT vs 戦闘BOT ハーネス（Fabric/Paper 共通）+ qlog互換サンプラ"
+  }
+}

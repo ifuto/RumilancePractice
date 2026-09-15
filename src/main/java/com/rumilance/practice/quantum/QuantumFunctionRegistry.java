@@ -85,9 +85,11 @@ public final class QuantumFunctionRegistry {
         ServerFunctionManager manager = server.getFunctions();
         for (Map.Entry<Identifier, CommandFunction<CommandSourceStack>> entry : this.installed.entrySet()) {
             Optional<CommandFunction<CommandSourceStack>> current = manager.get(entry.getKey());
-            return current.isPresent() && current.get() == entry.getValue();
+            if (current.isEmpty() || current.get() != entry.getValue()) {
+                return false;
+            }
         }
-        return false;
+        return true;
     }
 
     /**
@@ -127,8 +129,7 @@ public final class QuantumFunctionRegistry {
                 new HashMap<>(baseFunctions(manager));
         merged.putAll(functions);
         Map<Identifier, List<CommandFunction<CommandSourceStack>>> mergedTags =
-                new HashMap<>(baseTags(manager));
-        mergedTags.putAll(tags);
+                unionTags(baseTags(manager), tags);
 
         ServerFunctionLibrary library =
                 new ServerFunctionLibrary(server.getFunctionCompilationPermissions(), dispatcher);
@@ -186,6 +187,34 @@ public final class QuantumFunctionRegistry {
             manager.get(id).ifPresent(function -> base.put(id, function));
         }
         return base;
+    }
+
+    /**
+     * Tags we install keep the members other datapacks contributed (their functions still exist in
+     * the library we merge over) and take ours for the same ids — otherwise installing
+     * {@code #minecraft:tick} would silently stop every other datapack's tick function.
+     */
+    private static Map<Identifier, List<CommandFunction<CommandSourceStack>>> unionTags(
+            Map<Identifier, List<CommandFunction<CommandSourceStack>>> base,
+            Map<Identifier, List<CommandFunction<CommandSourceStack>>> ours) {
+        Map<Identifier, List<CommandFunction<CommandSourceStack>>> merged = new HashMap<>(base);
+        for (Map.Entry<Identifier, List<CommandFunction<CommandSourceStack>>> entry : ours.entrySet()) {
+            List<CommandFunction<CommandSourceStack>> combined = new ArrayList<>();
+            Set<String> seen = new LinkedHashSet<>();
+            for (CommandFunction<CommandSourceStack> function : entry.getValue()) {
+                if (seen.add(function.id().toString())) {
+                    combined.add(function);
+                }
+            }
+            for (CommandFunction<CommandSourceStack> function
+                    : merged.getOrDefault(entry.getKey(), List.of())) {
+                if (seen.add(function.id().toString())) {
+                    combined.add(function);
+                }
+            }
+            merged.put(entry.getKey(), List.copyOf(combined));
+        }
+        return merged;
     }
 
     private static Map<Identifier, List<CommandFunction<CommandSourceStack>>> baseTags(

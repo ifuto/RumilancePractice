@@ -241,3 +241,21 @@ map `bin/27` のアンカー開始条件を**そのまま**にした。`hit_deci
    importworld/loadworld)を追加。`quantum.yml` で pack パス・bot 名/座標・herobot ルールを持つ。
 
 この push で `./gradlew test shadowJar` を通し、`plugin-delivery` に新しい jar を載せる。
+
+## v1.76.29 (2026-09-15) — 戦闘BOT vs 戦闘BOT の実測ハーネス（Fabric/Paper 共通）
+
+「動作一致」を測るための実験装置を追加した (`tools/parity-runner/`, `tools/parity_runner.py`)。
+
+- **ハーネス datapack** (`parity`): Quantum マップの AI は `xlib_bot`(脳で駆動) と
+  `xlib_target`(人間側=敵) の2役割しか想定しておらず、敵は `@p[tag=xlib_target]` で選ばれる。
+  そこで毎tick「quantumbot はマップ自身に駆動させ、2体目 qbot2 には一時的に敵役を差し替えて
+  同じ脳を1tick回す」ことで **BOT vs BOT** を成立させる（マップ側の関数は無改造）。
+  `quantum:init/mode` のBOT駆動部分は複製してあり、ズレは `parity_runner.py check-dispatch` が検出する。
+- **記録**: qlog 互換の毎tickサンプラ（`who=a|b` 付き）で位置/速度/視点/HP/接地/手持ち/
+  マップのタイマ(hitcd, totem, crystal, obby, pearl, anchor, charge, explosion, pops)/
+  近傍クリスタル数を両BOT分吐く。既存の `tools/parity_report.py` がそのまま読める。
+- **アリーナ**: 最下層は岩盤(y=-64..-58)、その上は石(y=-57..30 を空気のみ置換)。
+  爆発で地形が壊れる挙動は**そのまま**（岩盤が脱出/奈落を防ぐ）。
+- 修正: `QuantumPack` が `world/datapacks/<PackName>/data/...`（入れ子）を読めていなかったのを直した。
+
+この push で `./gradlew test shadowJar` を通し、`plugin-delivery` を更新する。

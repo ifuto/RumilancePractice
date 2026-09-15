@@ -72,15 +72,22 @@ public final class QuantumPack {
         return pack;
     }
 
+    /**
+     * Reads every pack below {@code root}: the root itself may be a pack ({@code root/data/…}) or a
+     * container of packs — which is the normal case on a server, where the map's own packs sit as
+     * {@code world/datapacks/<PackName>/data/…}. Both shapes are accepted, so a whole world's
+     * {@code datapacks} folder can be handed over as one root.
+     */
     private void readDirectory(Path root, String prefix) {
         try (Stream<Path> walk = Files.walk(root)) {
             for (Path path : walk.filter(Files::isRegularFile).toList()) {
                 String relative = root.relativize(path).toString().replace('\\', '/');
-                if (!relative.startsWith("data/")) {
+                String packRelative = fromDataRoot(relative);
+                if (packRelative == null) {
                     continue;
                 }
                 try {
-                    this.accept(relative, Files.readString(path, StandardCharsets.UTF_8));
+                    this.accept(packRelative, Files.readString(path, StandardCharsets.UTF_8));
                     this.markSource(root.toString());
                 } catch (IOException e) {
                     // unreadable file: skip it, the caller reports the counts
@@ -89,6 +96,15 @@ public final class QuantumPack {
         } catch (IOException e) {
             // unreadable root: nothing to load from it
         }
+    }
+
+    /** {@code Practicebot/data/quantum/…} and {@code data/quantum/…} both become {@code data/quantum/…}. */
+    private static String fromDataRoot(String relative) {
+        if (relative.startsWith("data/")) {
+            return relative;
+        }
+        int index = relative.indexOf("/data/");
+        return index < 0 ? null : relative.substring(index + 1);
     }
 
     private void readZip(Path zip) {
