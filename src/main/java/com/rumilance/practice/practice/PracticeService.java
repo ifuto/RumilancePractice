@@ -4357,19 +4357,21 @@ public final class PracticeService {
                 to = new Vector(1.0d, 0.0d, 0.0d);
             }
         }
-        if (dist < 1.0d) {
-            return false; // touching the target: the pearl would land inside it
-        }
-        double leap = Math.min(Math.max(dist - PEARL_PRESSURE_STANDOFF, 0.5d),
+        double leap = Math.min(Math.max(dist - PEARL_PRESSURE_STANDOFF, 0.4d),
                 PEARL_PRESSURE_MAX_LEAP);
         Location landing = findPearlLanding(session, bot.getLocation(), to.normalize(), leap);
-        // Never land on top of the target: the map's ray stops on its hitbox, ours must too.
+        // Boxing distance: the map's ray stops on the target's hitbox, so a short hop that
+        // lands right next to it is the normal case — try a shorter one, then take what the
+        // ray gives us.
         if (landing != null && landing.distance(player.getLocation()) < PEARL_PRESSURE_LANDING_MIN) {
-            landing = findPearlLanding(session, bot.getLocation(), to.normalize(),
+            Location shorter = findPearlLanding(session, bot.getLocation(), to.normalize(),
                     Math.max(0.4d, leap - 0.6d));
+            if (shorter != null) {
+                landing = shorter;
+            }
         }
-        if (landing == null || landing.distance(player.getLocation()) < PEARL_PRESSURE_LANDING_MIN) {
-            ab.nextPearlMs(now + 250L); // no room for a clean landing: re-cast shortly
+        if (landing == null || landing.distance(bot.getLocation()) < 0.3d) {
+            ab.nextPearlMs(now + 250L); // ray hit nothing usable: re-cast shortly
             return false;
         }
         if (!session.botConsume(Material.ENDER_PEARL, 1)) {
@@ -4449,15 +4451,16 @@ public final class PracticeService {
             session.fightLog("anchor detonate");
             return;
         }
-        // Engage exactly like the map's bin/27: `g1gc/anchor_tick` runs only while the bot
-        // CANNOT hit right now (`hit_decision_without_cd == 0`: the target sits in its hurt
-        // frames, out of reach, or behind cover) and no usable melee marker is up. The chain
-        // places a block next to the target's feet, so block reach is the only distance limit
-        // the map has here — the reference bot anchors while boxing, not only at range.
-        boolean canHitNow = dist <= CRYSTAL_MELEE_REACH
-                && player.getNoDamageTicks() <= 0 && bot.hasLineOfSight(player);
+        // Engage exactly like the map's bin/27: while a melee line is up, `cannot_anchor` is
+        // set for the whole hit cooldown (hitcd 7 -> 6..1) and `g1gc/anchor_tick` returns; the
+        // anchor may only start on the last tick of the swing. That is the map's real rhythm —
+        // the reference bot anchors inside the boxing range (70 % of its anchors land inside
+        // 6 blocks, 31 % inside 3), not only at range. Block reach onto the target's feet is
+        // the only distance limit the map has here.
+        boolean meleeBlock = dist <= CRYSTAL_MELEE_REACH && bot.hasLineOfSight(player)
+                && now < ab.nextMeleeMs() - 50L;
         double anchorReach = CRYSTAL_MELEE_REACH + 1.5d; // vanilla block reach onto the target
-        if (canHitNow || now < ab.nextAnchorMs() || dist > anchorReach
+        if (meleeBlock || now < ab.nextAnchorMs() || dist > anchorReach
                 || !bot.hasLineOfSight(player)) {
             return;
         }
