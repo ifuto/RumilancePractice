@@ -1,0 +1,4 @@
+name: HeroSpike
+version: '0.1'
+main: herospike.HeroSpike
+api-version: '1.21'
