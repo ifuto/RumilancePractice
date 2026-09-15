@@ -1461,6 +1461,8 @@ public final class PracticeService {
     private static final double PEARL_PRESSURE_LANDING_MIN = 0.9d;
     /** Pearl stock topped up on the bot (map kits are effectively endless). */
     private static final int PEARL_STOCK_REFILL = 16;
+    /** Anchor stock (and 4x glowstone for the charges) topped up the same way. */
+    private static final int ANCHOR_STOCK_REFILL = 16;
     /** Golden apple: eaten below half HP, heals 40%, at most twice per bot life. */
     private static final int GAP_MAX_USES = 2;
     /** Cobweb trick: placed under the player, melts away after TTL. */
@@ -3872,8 +3874,8 @@ public final class PracticeService {
         boundSq *= boundSq;
         double[] tries = {preferred, preferred - 2.0d, preferred - 4.0d, preferred / 2.0d};
         for (double dist : tries) {
-            if (dist < 2.0d) {
-                continue;
+            if (dist < 0.5d) {
+                continue; // sub-block hops land in the bot's own column
             }
             Location cand = from.clone().add(horizontal.clone().multiply(dist));
             for (int dy = 2; dy >= -8; dy--) {
@@ -4196,6 +4198,14 @@ public final class PracticeService {
         // pearl module below throws one about every second.
         if (session.botStock().getOrDefault(Material.ENDER_PEARL, 0) < 4) {
             session.botStock().put(Material.ENDER_PEARL, PEARL_STOCK_REFILL);
+        }
+        // The map's kit is effectively endless: 16 anchors and 64 glowstone (= 16 charges at
+        // 4 per charge) ran the chain dry mid-match, after which the bot stopped anchoring.
+        if (session.botStock().getOrDefault(Material.RESPAWN_ANCHOR, 0) < 4) {
+            session.botStock().put(Material.RESPAWN_ANCHOR, ANCHOR_STOCK_REFILL);
+        }
+        if (session.botStock().getOrDefault(Material.GLOWSTONE, 0) < 8) {
+            session.botStock().put(Material.GLOWSTONE, ANCHOR_STOCK_REFILL * 4);
         }
         BotDifficulty crystalDiff = session.difficulty();
         PracticeSession.BotAbilityState ab = session.abilities();
