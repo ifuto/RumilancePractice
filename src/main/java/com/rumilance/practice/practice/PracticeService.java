@@ -1491,6 +1491,26 @@ public final class PracticeService {
     private static final double CROSSBOW_MAX_RANGE = 24.0d;
     /** Respawn-anchor mixup (g1gc): only from HARD upward, every other combo at most. */
     private static final long ANCHOR_MIN_COOLDOWN_MS = 6500L;
+    /**
+     * Beat between two anchor chains — measured straight off the reference qlog
+     * ({@code docs/parity/fabric_normal_anchor_run8_400s.log.gz}, 403 s, difficulty 2):
+     * {@code place -> charge} = 0.20 s and {@code place -> next place} = 0.65 s median with the
+     * mode at exactly 0.60 s (57 of 117 gaps), i.e. one chain every 12 ticks = anchor_cd 4t +
+     * charge_cd 4t + explosion_cd 4t. The ladder IS the cadence; the overall 17.3/min of the
+     * reference comes from it only being in block reach ~8 % of the match, so a permanently
+     * close opponent (a fake player cannot push back) must not be answered with a slower chain.
+     */
+    private static final long ANCHOR_RECYCLE_MS = 200L;
+    /**
+     * Hotbar timers, each one the module's own map timer. The reference bot's sampled hand over
+     * a 400 s match: pearl 76.5 %, totem 7.2 %, glowstone 5.7 %, anchor 5.5 %, crystal 2.7 %,
+     * sword 2.3 % — so a chain holds the anchor for its place beat, the glowstone for the charge
+     * beat, then returns to the totem for a beat before the pearl comes back.
+     */
+    private static final long HOLD_MELEE_MS = 150L;
+    private static final long HOLD_ANCHOR_MS = 200L;
+    private static final long HOLD_TOTEM_MS = 300L;
+    private static final long HOLD_CRYSTAL_MS = 350L;
     /** Defensive block wall (crystal obsidian / cart oak log). */
     private static final long DEFENSE_BLOCK_COOLDOWN_MS = 9000L;
     private static final long DEFENSE_BLOCK_TTL_MS = 7000L;
@@ -3722,7 +3742,9 @@ public final class PracticeService {
         if (!session.botKitMaterials().contains(material)
                 && material != Material.OBSIDIAN && material != Material.END_CRYSTAL
                 && material != Material.RESPAWN_ANCHOR && material != Material.GLOWSTONE
-                && material != Material.NETHERITE_SWORD) {
+                && material != Material.NETHERITE_SWORD
+                && material != Material.TOTEM_OF_UNDYING && material != Material.ENDER_PEARL
+                && material != Material.GOLDEN_APPLE) {
             return;
         }
         eq.setItemInMainHand(new ItemStack(material));
@@ -3768,6 +3790,15 @@ public final class PracticeService {
                 bot.getWorld().spawnParticle(org.bukkit.Particle.CRIT,
                         target.getLocation().add(0.5d, 0.5d, 0.5d), 6, 0.3d, 0.3d, 0.3d, 0.0d);
             }
+            return;
+        }
+        // Trapped (own head covered): dig the lid off instead of grinding against it — the map
+        // answers the same situation with holeoffense/pearl, and mining is the second way out.
+        org.bukkit.block.Block selfLid = bot.getLocation().getBlock().getRelative(0, 2, 0);
+        if (!isPassable(selfLid) && selfLid.getType().isSolid()
+                && selfLid.getType() != Material.BEDROCK) {
+            ab.miningBlock(selfLid.getLocation());
+            ab.miningUntilMs(now + 1500L);
             return;
         }
         if (dist > 6.0d) {
@@ -3864,6 +3895,56 @@ public final class PracticeService {
         }
         pearlTeleportFx(bot, landing);
         return true;
+    }
+
+    /**
+     * Map {@code quantum:holeoffense}: when the bot is boxed in — head and sides covered, i.e.
+     * {@code holeoffense/tick}'s three {@code g1gc/block} probes all fail — it looks at its own
+     * feet and throws a pearl ({@code holeoffense/dash} → {@code quantum:pearl}, which is
+     * {@code hotbar 7} + one use + {@code pearlcd = 20}) to pop out of the hole instead of
+     * standing there swinging at the floor.
+     *
+     * <p>Shares {@code pearlcd} with the chase/passive pearls, exactly like the map.
+     */
+    private boolean tickHoleEscape(Player player, PracticeSession session, BotBody bot, long now) {
+        PracticeSession.BotAbilityState ab = session.abilities();
+        if (now < ab.nextPearlMs() || !session.botConsume(Material.ENDER_PEARL, 0)) {
+            return false;
+        }
+        Location loc = bot.getLocation();
+        org.bukkit.block.Block feet = loc.getBlock();
+        boolean covered = !isPassable(feet.getRelative(0, 2, 0))
+                && !isPassable(feet.getRelative(1, 0, 0)) && !isPassable(feet.getRelative(-1, 0, 0))
+                && !isPassable(feet.getRelative(0, 0, 1)) && !isPassable(feet.getRelative(0, 0, -1));
+        if (!covered) {
+            return false;
+        }
+        // Escape upwards: a vertical pearl lands back on the bot's own column once it has room,
+        // so walk the column up until the landing spot is open, like the map's ray.
+        Location landing = null;
+        for (int dy = 1; dy <= 12 && landing == null; dy++) {
+            org.bukkit.block.Block cand = feet.getRelative(0, dy, 0);
+            if (isPassable(cand) && isPassable(cand.getRelative(0, 1, 0))
+                    && !isPassable(cand.getRelative(0, -1, 0))) {
+                landing = cand.getLocation().add(0.5d, 0.0d, 0.5d);
+            }
+        }
+        if (landing == null) {
+            return false; // a roof all the way up: nothing to pearl onto
+        }
+        if (!session.botConsume(Material.ENDER_PEARL, 1)) {
+            return false;
+        }
+        clearCrystalsNear(loc, 3.0d); // map: g1gc/pearl clears its own crystals first
+        ab.nextPearlMs(now + PASSIVE_PEARL_CD_MS);
+        pearlTeleportFx(bot, landing);
+        session.fightLog("pearl out (hole)");
+        return true;
+    }
+
+    /** Air, water, grass, snow layer: anything the bot can stand/swing through. */
+    private static boolean isPassable(org.bukkit.block.Block block) {
+        return block.getType().isAir() || block.getBlockData().isReplaceable();
     }
 
     /**
@@ -4277,6 +4358,13 @@ public final class PracticeService {
             return;
         }
 
+        // --- hole escape (map quantum:holeoffense + quantum:pearl) ---------------------------
+        // A trapped bot pearls straight up out of the hole before anything else runs; the map's
+        // holeoffense/tick sits above the whole fight loop in crystal/tick for the same reason.
+        if (fights && tickHoleEscape(player, session, bot, now)) {
+            return;
+        }
+
         // --- passive pearl (map crystal/passive/escape/pearl) --------------------------------
         // The layer above the fight loop: inside 8 blocks the map bot pearls away ~15 blocks on
         // every free pearlcd (1 s) — the reason it spends most of the match holding a pearl and
@@ -4345,6 +4433,7 @@ public final class PracticeService {
                 && now >= ab.nextMeleeMs()
                 && bot.hasLineOfSight(player)) {
             selectBotSlot(session, bot, Material.NETHERITE_SWORD); // map hotbar 4
+            ab.hold(Material.NETHERITE_SWORD, now + HOLD_MELEE_MS);
             botSwing(session, player, bot, crystalDiff, crystalDiff.attackDamage());
             ab.nextMeleeMs(now + CRYSTAL_MELEE_INTERVAL_MS);
             bot.setVelocity(new Vector(0, bot.getVelocity().getY(), 0)); // map: player @s stop
@@ -4400,6 +4489,16 @@ public final class PracticeService {
         if (fights && tickPearlPressure(player, session, bot, now, dist)) {
             ab.nextMeleeMs(0L); // map: `unless pearlcd == 20 run g1gc/hit` — hit after the pearl
         }
+
+        // --- hotbar parity (map: `player @s hotbar N` + `swing once`) ------------------------
+        // Every map module flashes its own slot for the length of its own timer and the bot
+        // otherwise stands there with the ender pearl in hand — pearl 76.5 % of a 400 s
+        // reference match against sword 2.3 %. Without this the sword stayed selected after the
+        // first swing and the sampled hand diverged from the qlog timeline entirely.
+        Material hand = ab.gapEatUntilMs() > now ? Material.GOLDEN_APPLE
+                : ab.holdUntilMs() > now && ab.holdItem() != null ? ab.holdItem()
+                : Material.ENDER_PEARL;
+        selectBotSlot(session, bot, hand);
     }
 
     /**
@@ -4494,6 +4593,7 @@ public final class PracticeService {
                 data.setCharges(1);
                 anchor.setBlockData(data, false);
                 selectBotSlot(session, bot, Material.GLOWSTONE); // map hotbar 9 for the charge
+                ab.hold(Material.GLOWSTONE, now + HOLD_ANCHOR_MS);
                 bot.swingMainHand();
                 if (bot.getWorld() != null) {
                     bot.getWorld().playSound(anchor.getLocation(),
@@ -4513,7 +4613,11 @@ public final class PracticeService {
             }
             ab.anchorStage(0);
             ab.anchorBlock(null);
-            ab.nextAnchorMs(now + anchorExplodeCdMs(diff));
+            ab.nextAnchorMs(now + Math.max(anchorExplodeCdMs(diff), ANCHOR_RECYCLE_MS));
+            // Map: the chain hands back to the totem slot right after the blast (the reference's
+            // `glowstone -> totem_of_undying` transition fires once per chain).
+            selectBotSlot(session, bot, Material.TOTEM_OF_UNDYING);
+            ab.hold(Material.TOTEM_OF_UNDYING, now + HOLD_TOTEM_MS);
             session.fightLog("anchor detonate");
             return;
         }
@@ -4549,6 +4653,7 @@ public final class PracticeService {
             return; // nowhere to place: retry next tick, the crystal path keeps firing
         }
         selectBotSlot(session, bot, Material.RESPAWN_ANCHOR); // map hotbar 8
+        ab.hold(Material.RESPAWN_ANCHOR, now + HOLD_ANCHOR_MS);
         bot.swingMainHand();
         ab.anchorBlock(spot.getLocation());
         ab.anchorStage(1);
@@ -4607,6 +4712,7 @@ public final class PracticeService {
             return false;
         }
         selectBotSlot(session, bot, Material.END_CRYSTAL); // map hotbar 3
+        session.abilities().hold(Material.END_CRYSTAL, System.currentTimeMillis() + HOLD_CRYSTAL_MS);
         boolean pedestal = spot.getRelative(org.bukkit.block.BlockFace.DOWN).getType() != Material.OBSIDIAN
                 && spot.getRelative(org.bukkit.block.BlockFace.DOWN).getType() != Material.BEDROCK;
         if (pedestal) {

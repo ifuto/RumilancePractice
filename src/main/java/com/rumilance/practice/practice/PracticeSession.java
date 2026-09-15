@@ -140,6 +140,15 @@ public final class PracticeSession {
         private long gapEatUntilMs;
         /** Regen-II style heal window after a golden apple (vanilla: +8 HP over 5 s). */
         private long gapRegenUntilMs;
+        /**
+         * Map hotbar behaviour: the item the bot keeps in hand until {@code holdUntilMs}.
+         * The map switches slots per module ({@code player @s hotbar N} + {@code swing once})
+         * and falls back to the ender pearl, which is why the reference bot carries a pearl
+         * for ~76 % of a 400 s match and only flashes the other slots (anchor 5.5 %,
+         * glowstone 5.7 %, totem 7.2 %, crystal 2.7 %, sword 2.3 %).
+         */
+        private org.bukkit.Material holdItem;
+        private long holdUntilMs;
         /** While set, the bot is mining the block at this location (crack particles each tick). */
         private long miningUntilMs;
         /** The block being mined. */
@@ -197,6 +206,12 @@ public final class PracticeSession {
         public void miningBlock(org.bukkit.Location v) { miningBlock = v; }
         public int gapUses() { return gapUses; }
         public void gapUses(int v) { gapUses = v; }
+        public org.bukkit.Material holdItem() { return holdItem; }
+        public long holdUntilMs() { return holdUntilMs; }
+        public void hold(org.bukkit.Material item, long untilMs) {
+            holdItem = item;
+            holdUntilMs = untilMs;
+        }
         public int potUses() { return potUses; }
         public void potUses(int v) { potUses = v; }
 

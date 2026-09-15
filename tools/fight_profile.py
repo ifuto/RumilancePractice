@@ -109,8 +109,11 @@ def plugin_profile(path: str, dummy):
             continue
         m = SAMPLE.search(line)
         if m:
-            samples.append((float(m.group(1)), float(m.group(2)), float(m.group(3)),
-                            float(m.group(4))))
+            # The sampler writes DECISECONDS since session start (10 units = 1 s), while the
+            # event trace writes seconds with one decimal. Same clock, different unit — fold
+            # it here or every per-action distance band is matched against the wrong instant.
+            t = float(m.group(1)) / 10.0
+            samples.append((t, float(m.group(2)), float(m.group(3)), float(m.group(4))))
             continue
         m = TRACE.search(line)
         if m and not m.group(2).startswith("s p="):

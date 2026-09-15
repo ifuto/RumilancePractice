@@ -155,3 +155,58 @@ map `crystal/passive/escape/pearl` を実装(受動パール)。距離8ブロッ
 
 加えて、部屋にクリスタルドリルを割り当てても「素の戦闘」が動いていた配線ミス(CRYSTAL 早期リターンの
 後ろにドリル呼び出しがあった)を修正 → アサインされたドリルが通常戦の上に乗る。
+
+## v1.76.18 (2026-09-15)
+
+run6(1.76.16)でアンカーが 200回/145秒 = 82.8/min と過剰(参照は 18.1/min、6ブロック以内の
+滞在時間あたりなら約40/min)。map の rung は 4t/4t/4t だが、実際は着地点を毎回 look/raycast で
+取り直す(mark/mark_main → check/raycast3)ため、連鎖の再開は約1.4秒間隔。
+これを定数 ANCHOR_RECYCLE_MS = 1000 として明示し、爆発後の待ちを rung と最大値を取る形にした。
+ラダー(place→charge 4t、charge→explode 4t)はそのまま。
+
+## v1.76.19 (2026-09-15)
+
+参照(実 QuantumBOT)の qlog 405 秒分から**アイテム遷移の順序と保持率**を実測して合わせた:
+pearl 76.5% / totem 7.2% / glowstone 5.7% / respawn_anchor 5.5% / end_crystal 2.7% /
+diamond_sword 2.3%。遷移は respawn_anchor→glowstone 104 回、glowstone→totem 96 回
+(アンカー連鎖のたびにトーテムへ戻る)、totem→respawn_anchor 69 回など。
+
+- `BotAbilityState.hold(item, untilMs)` を追加。各モジュールは自分のタイマ分だけスロットを
+  維持する(近接 150ms / アンカー設置・装填 200ms / 爆発後のトーテム 300ms / クリスタル 350ms)。
+- `tickCrystalBot` の末尾で既定の持ち物(エンダーパール)へ戻す。gap食い中は金リンゴを維持。
+- アンカー連鎖の再開間隔を実測にあわせて 1000 → 1700 ms(参照の実測 17.4/min へ寄せる)。
+- tools/fight_profile.py のサンプル時刻バグを修正: サンプルは**デシ秒**(10 = 1 秒)で、
+  イベントは秒。混在していたため距離バンドの対応付けが全滅していた。
+
+## v1.76.21 (2026-09-15)
+
+参照マップ(bot/Quantum's PvP Practice v1.18.zip)の**実際のモジュール解禁状態**を
+`data/scoreboard.dat` から直接読んで突き合わせた。
+
+参照(基準となる実 QuantumBOT 環境)で有効なもの:
+`.anchors=1`, `.crystals=1`, `.crystal_playstyle=2`(**ANCHOR SPAMMER**), `.axe=1`,
+`.cobweb=1`, `.strafe=1`, `.crit/.pcrit/.scrit=1`, `.jumpreset=1`, `.stun=1`,
+`.triple_tap=1`, `.breach=1`, `.spear=1`, `.lava=1`, `.water=1`, `.far_pearl=1`,
+`.wind_pearl=1`, `.dbp=1`, `.refill=1`, `.blocks_drop=1`, `.inf_tot=1`,
+`.random=1`, `.random_mech=1`, `.crystal_hardcode=0`(通常の crystal/tick)。
+
+無効(未解禁):`.shield`, `.pearl_spam`, `.slowfall`, `.elytra`, `.healing`, `.uppercut`,
+`.no_pearl_land`, `.flat_terrain`, `.breakable`, `.fast`, `.small`, `.res`, `.old_kb`,
+`.inf`, `.music`, `.shieldcd`, `.holding`, `.no_fall`, `.jreset`, `.jresett`,
+`.prompt_activation`(すべて未設定=0)。`.gear=2`, `.ping=100`, `.cart_speed=3`。
+
+→ つまり「クリスタルのシールド/パールスパム/スローフォール」は参照でも**切ってある**。
+逆にこちらの実装で抜けていたのは以下の2つなので、それを足した。
+
+1. **穴に詰まったらパールで脱出**(map `quantum:holeoffense/tick` → `holeoffense/dash` →
+   `quantum:pearl`)。頭の上と四方が塞がっているとき、自分の足元を見て上方向へパールを投げる
+   (`hotbar 7` + `use once` + `pearlcd=20`)。`tickHoleEscape` として追加。
+2. **詰まったときは蓋を掘る**(map と同じ発想のもう一つの脱出路): BOT自身の頭上のブロックを
+   1.5秒で破壊する(`tickBotMining` の先頭に追加)。従来は「相手の箱」だけを掘っていた。
+
+さらに、アンカー連鎖の再開間隔を**実測値に戻した**: 参照 qlog
+(`docs/parity/fabric_normal_anchor_run8_400s.log.gz`, 403秒, difficulty 2)で
+`place -> charge = 0.20s`、`place -> 次の place = 中央値 0.65s / 最頻 0.60s(117件中57件)= 12 tick`。
+つまり `anchor_cd 4t + charge_cd 4t + explosion_cd 4t` がそのまま刻みで、
+v1.76.18/.19 で入れた 1000/1700 ms は誤り(全体 17.3/min は「近距離に8%しか居ない」ことの
+帰結であって、連鎖自体を遅くする理由にはならない)。`ANCHOR_RECYCLE_MS = 200` に修正。

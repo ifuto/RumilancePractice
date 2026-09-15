@@ -7,7 +7,7 @@ Paper の logs/latest.log(またはその抜粋)にある
     [N Arena][BotMatch] trace (N events):
     [N Arena][BotMatch]   <0.1秒> <event>
     [N Arena][BotMatch] samples (N @0.1s):
-    [N Arena][BotMatch]   <0.1秒> s p=… i=<item> …
+    [N Arena][BotMatch]   <デシ秒> s p=… i=<item> …   (10 単位 = 1 秒)
 
 を読み、参照側 qlog(docs/parity/fabric_normal_anchor_run8_400s.log.gz)から同じ統計を
 出して並べる。標準ライブラリのみ。

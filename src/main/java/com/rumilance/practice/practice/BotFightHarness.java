@@ -63,6 +63,9 @@ public final class BotFightHarness implements CommandExecutor, TabCompleter {
     private Location anchor;
     private BukkitTask fillTask;
     private BukkitTask driveTask;
+    /** Top the fake opponent up once it drops to this health (never at full HP, see below). */
+    private static final double DUMMY_HEAL_FLOOR = 4.0d;
+
     private BukkitTask keepAliveTask;
 
     public BotFightHarness(Plugin plugin, PracticeService practice, PlayerStateManager stateManager) {
@@ -358,9 +361,15 @@ public final class BotFightHarness implements CommandExecutor, TabCompleter {
     /**
      * The fake player has no client: a lethal hit that the plugin's death-catch cancels leaves
      * it stranded at 0 HP (no respawn screen to click, and {@code isDead()} then stops the BOT
-     * AI for good). Topping the dummy back up every tick keeps the match running, and the
-     * damage still lands on it for a tick — so the BOT's hurt-frame gates behave exactly like
-     * they do against a real player.
+     * AI for good). The dummy is therefore only topped up once it is nearly down
+     * ({@value #DUMMY_HEAL_FLOOR} HP).
+     *
+     * <p>It deliberately does <em>not</em> heal every tick any more: the practice room applies
+     * melee knockback only when the victim's health actually dropped, so a dummy kept at full
+     * HP never absorbed a hit, never moved, and the BOT ended up glued to its face (49 % of the
+     * match inside 2 blocks against the reference's 4.6 %, melee 77/min against 11.4/min).
+     * Letting the damage land — the reference target wears resistance/regen instead — restores
+     * the natural in-and-out rhythm of a normal fight.
      */
     private void startKeepAlive() {
         if (keepAliveTask != null) {
@@ -377,8 +386,9 @@ public final class BotFightHarness implements CommandExecutor, TabCompleter {
                     player.spigot().respawn();
                     player.setHealth(max);
                     log("dummy " + name + " respawned (death would strand the match)");
-                } else if (player.getHealth() < max) {
+                } else if (player.getHealth() <= DUMMY_HEAL_FLOOR) {
                     player.setHealth(max);
+                    log("dummy " + name + " topped up (health floor)");
                 }
             }
         }, 1L, 1L);
