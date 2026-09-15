@@ -8,6 +8,8 @@
 |---|---|
 | `fabric_normal_crystal_anchor_310s.log.gz` | **通常戦闘(仕込みなし)310秒 / 6195行**。石の地面の上で BOT が自分からクリスタルとアンカーの両方を使用 |
 | `fabric_normal_anchor_250s.log.gz` | **通常戦闘 2本目 250秒 / 4993行**(独立再現)。アンカー設置49回・**設置→チャージ 4t×49/49**・サイクル最頻12t |
+| `fabric_normal_anchor_run8_400s.log.gz` | **通常戦闘 3本目 403秒 / 8056行**(アンカー最重の窓)。**アンカー設置117回・チャージ116回**・**設置→チャージ 4t×111**・サイクル最小11t/最頻12t |
+| `fabric_normal_anchor_run8_timeline.png` / `.svg` | run8 の可視化: 上から「手持ちアイテム遷移 / クリスタル / アンカー / HP」。`python3 tools/fight_timeline.py docs/parity/fabric_normal_anchor_run8_400s.log.gz <out.svg\|png>` で再生成 |
 | `fabric_crystal_int2_60s.log.gz` | 相手を柱上 y=34 に固定した「台クリスタル窓」60秒(1201行) |
 | `fabric_crystal_int2_melee_60s.log.gz` | 相手を隣接(2.5blk, 同一y)に置いた「近接窓」60秒(1201行) |
 | 解析 | `python3 tools/parity_report.py docs/parity/<file>.log.gz` |
@@ -24,6 +26,12 @@
    併せて `herobot explosionNoFire true` も設定。
 3. **相手(target)には何もしない**(ピン留めも耐性も無し)。ラウンドは
    `.start=1` + `map/start2`(クリンナップ)で通常開始する。
+   相手は `/playerspawn target1` で出すただのフェイクプレイヤー
+   (`quantum:miscellaneous/tags` が「quantumbot/Quantum/Notch/Herobrine 以外」を
+   `xlib_target` にタグ付けするだけ。マップ側が自動でアリーナへ運ぶ)。
+   ラウンドが終わって BOT がハブ(y≈57)へ送還されたら、`.start` を 0 に戻すだけで
+   `qlog:keepalive` → `qlog:start_round` が通常のラウンド開始を踏み、BOT は会場へ戻る
+   (負傷や位置のピン留めは一切しない)。run8 の自動航行もこれだけを行った。
 
 ## 実測値 — 通常戦闘(仕込みなし・5分)
 
@@ -42,6 +50,7 @@
 | アイテム時間配分 | ender_pearl 80.2% / glowstone 4.7% / end_crystal 4.3% / totem 4.3% / respawn_anchor 3.5% / diamond_sword 2.8% / obsidian 0.2% | パール主体+クリスタル/アンカー混在 |
 | 相手(target)HP | 20.0 → 最小 **2.0**(実ダメージ 18) | 実戦で機能 |
 | (2本目 250s) アンカー設置/チャージ | **49 回 / 49 回**、設置→チャージ **4t×49/49**、サイクル最頻 **12t** | 独立再現 ✅ |
+| (3本目 run8 403s) アンカー設置/チャージ | **117 回 / 116 回**(設置→チャージ **4t×111**、5t×3、残り2回は中断)、サイクル 最小 **11t** / 最頻 **12t**、チャージ→爆発 最頻 8t | 独立再現 ✅ |
 | BOT HP | 平均 19.0 / 最小 11.9 | |
 | 平面移動 | 平均 18.1 b/s(パール瞬間移動を含む)/ 移動サンプル 74% | |
 | 視点 | yaw 平均 3.75°/tick、>15°スナップ 273 回 | |
