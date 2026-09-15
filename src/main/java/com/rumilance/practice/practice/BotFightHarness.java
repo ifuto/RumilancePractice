@@ -63,6 +63,7 @@ public final class BotFightHarness implements CommandExecutor, TabCompleter {
     private Location anchor;
     private BukkitTask fillTask;
     private BukkitTask driveTask;
+    private BukkitTask keepAliveTask;
 
     public BotFightHarness(Plugin plugin, PracticeService practice, PlayerStateManager stateManager) {
         this.plugin = plugin;
@@ -99,6 +100,7 @@ public final class BotFightHarness implements CommandExecutor, TabCompleter {
                 case "room" -> room(sender, args);
                 case "dummy" -> dummy(sender, args);
                 case "fight" -> fight(sender, args);
+                case "end" -> end(sender);
                 case "status" -> status(sender);
                 case "stop" -> stop(sender);
                 default -> sender.sendMessage("usage: " + usage());
@@ -112,7 +114,8 @@ public final class BotFightHarness implements CommandExecutor, TabCompleter {
 
     private static String usage() {
         return "narena-harness ground <r> <depth> [world] | room <id> <TYPE> <r> <x> <y> <z> | "
-                + "dummy <name> <x> <y> <z> | fight <TYPE> <secs> [difficulty] [rounds] | status | stop";
+                + "dummy <name> <x> <y> <z> | fight <TYPE> <secs> [difficulty] [rounds] | "
+                + "end | status | stop";
     }
 
     private World world(String name) {
@@ -221,6 +224,7 @@ public final class BotFightHarness implements CommandExecutor, TabCompleter {
         if (player != null) {
             stateManager.resetToLobby(player.getUniqueId());
         }
+        startKeepAlive();
         anchor = new Location(w, x, y, z, 0f, 0f);
         log("dummy " + name + " spawned at " + x + "," + y + "," + z + " world=" + w.getName()
                 + " online=" + (player != null));
@@ -291,6 +295,15 @@ public final class BotFightHarness implements CommandExecutor, TabCompleter {
             practice.handleWaitInteract(player, session, PracticeItems.ACTION_START);
             log("round started dummy=" + dummyName + " seconds=" + seconds
                     + " difficulty=" + difficulty.preset() + " phase=" + session.phase());
+            // Bound the round: `seconds` is the measurement window, so the trace is dumped by
+            // an ordinary (draw) ruling instead of the ten minute match timeout.
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                var live = practice.session(player.getUniqueId()).orElse(null);
+                if (live != null && live.phase() == PracticeSession.Phase.ACTIVE
+                        && player.isOnline()) {
+                    practice.endBotMatch(player, live, PracticeService.BotMatchResult.DRAW);
+                }
+            }, Math.max(20L, seconds * 20L));
             if (driveTask != null) {
                 driveTask.cancel();
             }
@@ -313,6 +326,58 @@ public final class BotFightHarness implements CommandExecutor, TabCompleter {
                         40L);
             }, 60L, 20L);
         }, 40L);
+    }
+
+    // ------------------------------------------------------ end / keep-alive
+    /**
+     * Ends the running match for every dummy right now (the ruling is a draw), which is what
+     * dumps the {@code [N Arena][BotMatch]} trace/samples — a 10 minute wait for the match
+     * timeout is not how these runs are meant to be measured.
+     */
+    private void end(CommandSender sender) {
+        int ended = 0;
+        for (String name : dummies.keySet()) {
+            Player player = Bukkit.getPlayerExact(name);
+            if (player == null) {
+                continue;
+            }
+            var session = practice.session(player.getUniqueId()).orElse(null);
+            if (session != null) {
+                practice.endBotMatch(player, session, PracticeService.BotMatchResult.DRAW);
+                ended++;
+            }
+        }
+        log("ended " + ended + " match(es) on demand");
+        sender.sendMessage("ended " + ended + " match(es)");
+    }
+
+    /**
+     * The fake player has no client: a lethal hit that the plugin's death-catch cancels leaves
+     * it stranded at 0 HP (no respawn screen to click, and {@code isDead()} then stops the BOT
+     * AI for good). Topping the dummy back up every tick keeps the match running, and the
+     * damage still lands on it for a tick — so the BOT's hurt-frame gates behave exactly like
+     * they do against a real player.
+     */
+    private void startKeepAlive() {
+        if (keepAliveTask != null) {
+            return;
+        }
+        keepAliveTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            for (String name : List.copyOf(dummies.keySet())) {
+                Player player = Bukkit.getPlayerExact(name);
+                if (player == null || !player.isOnline()) {
+                    continue;
+                }
+                double max = Math.max(1.0d, player.getMaxHealth());
+                if (player.isDead()) {
+                    player.spigot().respawn();
+                    player.setHealth(max);
+                    log("dummy " + name + " respawned (death would strand the match)");
+                } else if (player.getHealth() < max) {
+                    player.setHealth(max);
+                }
+            }
+        }, 1L, 1L);
     }
 
     // ------------------------------------------------------------ status / stop
@@ -355,6 +420,10 @@ public final class BotFightHarness implements CommandExecutor, TabCompleter {
             fillTask.cancel();
             fillTask = null;
         }
+        if (keepAliveTask != null) {
+            keepAliveTask.cancel();
+            keepAliveTask = null;
+        }
         List<String> names = new ArrayList<>(dummies.keySet());
         for (String name : names) {
             Player player = Bukkit.getPlayerExact(name);
@@ -381,7 +450,7 @@ public final class BotFightHarness implements CommandExecutor, TabCompleter {
             return List.of();
         }
         if (args.length == 1) {
-            return List.of("ground", "room", "dummy", "fight", "status", "stop");
+            return List.of("ground", "room", "dummy", "fight", "end", "status", "stop");
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("fight")) {
             return List.of("CRYSTAL", "SWORD", "NETHERITE_POT", "MACE", "CART");

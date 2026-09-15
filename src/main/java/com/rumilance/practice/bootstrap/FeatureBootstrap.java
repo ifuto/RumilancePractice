@@ -908,11 +908,20 @@ public final class FeatureBootstrap {
         // keeps GSit's permissions in line - on every join the player loses ALL GSit.* nodes and
         // gets exactly GSit.SitClick back, so players can sit on stairs/slabs by clicking them
         // and nothing else GSit offers (no /sit command, no double-seat conflicts).
-        com.rumilance.practice.gsit.GsitPermissionService gsitPermissions =
-                new com.rumilance.practice.gsit.GsitPermissionService(plugin, configService);
-        gsitPermissions.hook();
-        services.register(com.rumilance.practice.gsit.GsitPermissionService.class, gsitPermissions);
-        plugin.getServer().getPluginManager().registerEvents(gsitPermissions, plugin);
+        if (hasPlugin("LuckPerms")) {
+            try {
+                com.rumilance.practice.gsit.GsitPermissionService gsitPermissions =
+                        new com.rumilance.practice.gsit.GsitPermissionService(plugin, configService);
+                gsitPermissions.hook();
+                services.register(com.rumilance.practice.gsit.GsitPermissionService.class, gsitPermissions);
+                plugin.getServer().getPluginManager().registerEvents(gsitPermissions, plugin);
+            } catch (LinkageError | RuntimeException e) {
+                plugin.getLogger().log(java.util.logging.Level.WARNING, "LuckPerms detected but the "
+                        + "GSit permission bridge failed to initialize; GSit nodes are untouched.", e);
+            }
+        } else {
+            plugin.getLogger().info("LuckPerms not detected - the GSit permission bridge is off.");
+        }
         plugin.getServer().getPluginManager().registerEvents(
                 new com.rumilance.practice.originalkit.OriginalKitRoomListener(
                         originalKitRoomService, originalKitService, plugin), plugin);
@@ -1835,8 +1844,11 @@ public final class FeatureBootstrap {
         }
         services.find(com.rumilance.practice.signqueue.SignQueueService.class)
                 .ifPresent(com.rumilance.practice.signqueue.SignQueueService::shutdown);
-        services.find(com.rumilance.practice.gsit.GsitPermissionService.class)
-                .ifPresent(com.rumilance.practice.gsit.GsitPermissionService::shutdown);
+        if (hasPlugin("LuckPerms")) {
+            // The class constant itself would load the LuckPerms API, so this stays guarded.
+            services.find(com.rumilance.practice.gsit.GsitPermissionService.class)
+                    .ifPresent(com.rumilance.practice.gsit.GsitPermissionService::shutdown);
+        }
         if (liveGuiTask != null) {
             liveGuiTask.cancel();
             liveGuiTask = null;
