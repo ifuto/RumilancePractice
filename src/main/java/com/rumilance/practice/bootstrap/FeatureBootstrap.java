@@ -376,10 +376,27 @@ public final class FeatureBootstrap {
                 plugin.getLogger());
         services.register(ReportService.class, reportService);
 
-        com.rumilance.practice.replay.ReplayNpcService replayNpcService =
-                new com.rumilance.practice.replay.ReplayNpcService(plugin);
-        replayNpcService.init();
-        replayService = new ReplayService(plugin, lobbyService, replayNpcService);
+        // ProtocolLib is a soft dependency: the NPC-packet code lives in ReplayNpcService, so
+        // without it the plugin must still enable (replays then run avatar-less).
+        com.rumilance.practice.replay.ReplayNpcService replayNpcService = null;
+        ReplayService replayServiceRef = null;
+        if (hasPlugin("ProtocolLib")) {
+            try {
+                replayNpcService = new com.rumilance.practice.replay.ReplayNpcService(plugin);
+                replayNpcService.init();
+                replayServiceRef = new ReplayService(plugin, lobbyService, replayNpcService);
+            } catch (LinkageError | RuntimeException e) {
+                plugin.getLogger().log(java.util.logging.Level.WARNING, "ProtocolLib detected but the "
+                        + "replay avatar service failed to initialize; replay runs without NPCs.", e);
+                replayServiceRef = null;
+            }
+        } else {
+            plugin.getLogger().info("ProtocolLib not detected - replay runs without NPC avatars.");
+        }
+        if (replayServiceRef == null) {
+            replayServiceRef = new ReplayService(plugin, lobbyService);
+        }
+        replayService = replayServiceRef;
         services.register(ReplayService.class, replayService);
         com.rumilance.practice.replay.ReplayArchive replayArchive =
                 new com.rumilance.practice.replay.ReplayArchive();
@@ -414,10 +431,22 @@ public final class FeatureBootstrap {
         SignGuardService signGuardService = new SignGuardService(
                 configService, banService, auditLogRepository, asyncExecutor, plugin.getLogger());
         services.register(SignGuardService.class, signGuardService);
-        SignProbeService signProbeService = new SignProbeService(
-                plugin, configService, banService, auditLogRepository, asyncExecutor, plugin.getLogger());
-        signProbeService.init();
-        services.register(SignProbeService.class, signProbeService);
+        SignProbeService signProbeService = null;
+        if (hasPlugin("ProtocolLib")) {
+            try {
+                signProbeService = new SignProbeService(
+                        plugin, configService, banService, auditLogRepository, asyncExecutor,
+                        plugin.getLogger());
+                signProbeService.init();
+                services.register(SignProbeService.class, signProbeService);
+            } catch (LinkageError | RuntimeException e) {
+                plugin.getLogger().log(java.util.logging.Level.WARNING, "ProtocolLib detected but the "
+                        + "sign-probe service failed to initialize; the mod detector stays off.", e);
+                signProbeService = null;
+            }
+        } else {
+            plugin.getLogger().info("ProtocolLib not detected - the active mod detector is off.");
+        }
 
         SpectatorService spectatorService = new SpectatorService(
                 plugin, matchRegistry, stateManager, settingsService, lobbyService, settings);
@@ -431,10 +460,21 @@ public final class FeatureBootstrap {
         matchService.setTeamColoredArmorService(teamColoredArmor);
         spectatorService.setTeamColoredArmorService(teamColoredArmor);
 
-        teamGlowLosService = new TeamGlowLosService(plugin, matchRegistry, settingsService);
-        teamGlowLosService.start();
-        services.register(TeamGlowLosService.class, teamGlowLosService);
-        teamColoredArmor.setTeamGlowLosService(teamGlowLosService);
+        // Team LOS glow rides ProtocolLib packets as well - same soft-depend rule as above.
+        if (hasPlugin("ProtocolLib")) {
+            try {
+                teamGlowLosService = new TeamGlowLosService(plugin, matchRegistry, settingsService);
+                teamGlowLosService.start();
+                services.register(TeamGlowLosService.class, teamGlowLosService);
+                teamColoredArmor.setTeamGlowLosService(teamGlowLosService);
+            } catch (LinkageError | RuntimeException e) {
+                plugin.getLogger().log(java.util.logging.Level.WARNING, "ProtocolLib detected but the "
+                        + "team-glow service failed to initialize; team LOS glow is off.", e);
+                teamGlowLosService = null;
+            }
+        } else {
+            plugin.getLogger().info("ProtocolLib not detected - team LOS glow is off.");
+        }
 
         FfaService ffaService = new FfaService(
                 plugin, configService, kitService, layoutCache, lobbyService, stateManager,
@@ -1702,7 +1742,16 @@ public final class FeatureBootstrap {
         bind("replay", new ReplayCommand(replayService,
                 services.find(com.rumilance.practice.replay.ReplayArchive.class).orElse(null),
                 rankService));
-        bind("signcheck", new SignCheckCommand(signProbeService));
+        if (signProbeService != null) {
+            bind("signcheck", new SignCheckCommand(signProbeService));
+        } else {
+            bind("signcheck", (CommandExecutor) (sender, command, label, args) -> {
+                sender.sendMessage(net.kyori.adventure.text.Component.text(
+                        "看板プローブは ProtocolLib 未導入のため無効です。",
+                        net.kyori.adventure.text.format.NamedTextColor.RED));
+                return true;
+            });
+        }
         bind("checkid", new CheckIdCommand(duelLogStore));
         bind("originalkit", (CommandExecutor) (sender, command, label, args) -> {
             if (sender instanceof Player player) {
@@ -1784,6 +1833,15 @@ public final class FeatureBootstrap {
             liveGuiTask.cancel();
             liveGuiTask = null;
         }
+    }
+
+    /**
+     * Soft-depend probe. {@code ProtocolLib}/{@code WorldEdit} APIs are only touched from their
+     * dedicated hook classes, and only after this check said the plugin is installed — a server
+     * without them must still enable NARENA (the API classes are absent from its classpath).
+     */
+    private boolean hasPlugin(String name) {
+        return plugin.getServer().getPluginManager().getPlugin(name) != null;
     }
 
     private void bind(String name, Object executor) {

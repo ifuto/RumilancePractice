@@ -102,3 +102,5 @@ cd /tmp/mcserver && /tmp/jdk21/bin/java -Xmx2400M -jar fabric-server-launch.jar 
 - 2026-09-15: run8(通常戦闘403秒・アンカー117/116の独立再現)を docs/parity に追加。
 
 - 2026-09-15: ヘッドレスBOT戦ハーネス(/narena-harness, -Drumilance.harness=true)を追加。
+
+- 2026-09-15: ソフト依存(ProtocolLib/WorldEdit)未導入でも有効化できるようガード追加。

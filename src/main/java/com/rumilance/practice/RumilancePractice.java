@@ -106,9 +106,18 @@ public final class RumilancePractice extends JavaPlugin {
         );
         serviceRegistry.register(EloCalculator.class, eloCalculator);
 
-        FaweBridge faweBridge = settings.faweEnabled()
-                ? FaweBridgeImpl.createIfAvailable(this, asyncExecutor)
-                : NoOpFaweBridge.INSTANCE;
+        // WorldEdit/FAWE are optional: the API types only exist inside FaweBridgeImpl, and its
+        // class cannot be loaded (let alone verified) without them — so probe the plugins here,
+        // before the reference below is resolved. A server with fawe.enabled=true and neither
+        // plugin installed must still enable, just with arena regeneration disabled.
+        boolean worldEditInstalled = getServer().getPluginManager().getPlugin("FastAsyncWorldEdit") != null
+                || getServer().getPluginManager().getPlugin("WorldEdit") != null;
+        FaweBridge faweBridge;
+        if (settings.faweEnabled() && worldEditInstalled) {
+            faweBridge = FaweBridgeImpl.createIfAvailable(this, asyncExecutor);
+        } else {
+            faweBridge = NoOpFaweBridge.INSTANCE;
+        }
         serviceRegistry.register(FaweBridge.class, faweBridge);
         if (faweBridge.isAvailable()) {
             getLogger().info("FastAsyncWorldEdit/WorldEdit detected - arena regeneration is enabled.");

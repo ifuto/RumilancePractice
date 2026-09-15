@@ -67,6 +67,19 @@ public final class ReplayService {
     }
 
     /**
+     * ProtocolLib-less construction (see {@code FeatureBootstrap}'s soft-depend guard). This
+     * overload deliberately keeps {@link ReplayNpcService} out of its descriptor: that class
+     * cannot even be loaded when ProtocolLib is absent, so resolving a constructor that names it
+     * would throw {@link NoClassDefFoundError} before the guard could fall back.
+     */
+    public ReplayService(Plugin plugin, LobbyService lobbyService) {
+        this.plugin = plugin;
+        this.lobbyService = lobbyService;
+        this.npcService = null;
+        this.controlKey = new org.bukkit.NamespacedKey(plugin, "replay_control");
+    }
+
+    /**
      * Wires arena re-paste support; without it replays play over whatever blocks exist.
      * {@code arenaService} is accepted for future collision checks and kept for callers.
      */
