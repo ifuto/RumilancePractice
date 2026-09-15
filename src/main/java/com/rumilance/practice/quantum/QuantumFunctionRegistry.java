@@ -7,6 +7,8 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.ServerFunctionLibrary;
 import net.minecraft.server.ServerFunctionManager;
+import com.rumilance.practice.herobot.HeroBotDistanceCommand;
+import com.rumilance.practice.herobot.HeroBotLineRewriter;
 
 import java.lang.reflect.Field;
 import java.util.ArrayDeque;
@@ -47,6 +49,7 @@ public final class QuantumFunctionRegistry {
     private List<String> failures = List.of();
     private int installedCount;
     private int tagCount;
+    private int rewrittenLines;
 
     public QuantumFunctionRegistry(org.bukkit.plugin.Plugin plugin) {
         this.plugin = plugin;
@@ -67,6 +70,15 @@ public final class QuantumFunctionRegistry {
 
     public int tagCount() {
         return this.tagCount;
+    }
+
+    /**
+     * Lines that needed translating from the reference mod's selector extensions
+     * ({@code distanceH=}/{@code distanceV=}) into the {@code hfilter} pair — see
+     * {@link com.rumilance.practice.herobot.HeroBotLineRewriter}.
+     */
+    public int rewrittenLines() {
+        return this.rewrittenLines;
     }
 
     /** Lines that failed to compile, with the vanilla error text (e.g. an unknown verb). */
@@ -107,17 +119,35 @@ public final class QuantumFunctionRegistry {
         CommandSourceStack compileSource = net.minecraft.commands.Commands
                 .createCompilationContext(server.getFunctionCompilationPermissions());
 
+        ensureTempObjective();
+
         Map<Identifier, CommandFunction<CommandSourceStack>> functions = new LinkedHashMap<>();
         List<String> failures = new ArrayList<>();
+        int rewritten = 0;
         for (Map.Entry<Identifier, List<String>> entry : pack.functions().entrySet()) {
             Identifier id = entry.getKey();
+            List<String> lines = new ArrayList<>();
+            for (String line : entry.getValue()) {
+                HeroBotLineRewriter.Result rewrite = HeroBotLineRewriter.rewrite(line);
+                if (rewrite == null) {
+                    lines.add(line);
+                    continue;
+                }
+                if (rewrite.note() != null) {
+                    failures.add(id + " -> selector option not translated (" + rewrite.note() + ")");
+                    lines.add(line);
+                    continue;
+                }
+                lines.addAll(rewrite.lines());
+                rewritten++;
+            }
             try {
-                functions.put(id, CommandFunction.fromLines(id, dispatcher, compileSource,
-                        entry.getValue()));
+                functions.put(id, CommandFunction.fromLines(id, dispatcher, compileSource, lines));
             } catch (RuntimeException e) {
                 failures.add(id + " -> " + shorten(e.getMessage()));
             }
         }
+        this.rewrittenLines = rewritten;
 
         Map<Identifier, List<CommandFunction<CommandSourceStack>>> tags = new LinkedHashMap<>();
         Map<Identifier, List<String>> rawTags = pack.tagMembers();
@@ -224,6 +254,24 @@ public final class QuantumFunctionRegistry {
             base.put(id, List.copyOf(manager.getTag(id)));
         }
         return base;
+    }
+
+    /**
+     * The rewritten lines park their match count in {@code quantum_tmp}:.qd — one objective for
+     * the whole server, created before anything is compiled.
+     */
+    private static void ensureTempObjective() {
+        try {
+            org.bukkit.scoreboard.Scoreboard board =
+                    org.bukkit.Bukkit.getScoreboardManager().getMainScoreboard();
+            if (board.getObjective(HeroBotDistanceCommand.TEMP_OBJECTIVE) == null) {
+                board.registerNewObjective(HeroBotDistanceCommand.TEMP_OBJECTIVE,
+                        org.bukkit.scoreboard.Criteria.DUMMY,
+                        net.kyori.adventure.text.Component.text("quantum temp"));
+            }
+        } catch (RuntimeException e) {
+            // an existing objective with the same name is fine; anything else surfaces on compile
+        }
     }
 
     private static boolean setLibraryField(ServerFunctionLibrary library, String name, Object value) {

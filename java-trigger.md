@@ -269,3 +269,22 @@ herobot MOD が Brigadier ノードとして直接 dispatcher に載せている
 呼べる。移植側も同じ場所 — サーバー自身の CommandDispatcher の root — に直接 addChild する
 ようにした（/reload で作り直されたら watchdog が入れ直し、動詞が戻るまでパックの再コンパイルは
 保留する）。Paper の登録 API は dispatcher に届かない時の最終手段に降格。
+
+## v1.76.31 — 参照MODの構文拡張を移植（関数内から呼べる形で）
+
+移植側でコンパイルに失敗していたのは、バニラに無い **herobot MOD の構文拡張**を使う5ファイルだった:
+
+- `distance from <pos|entity> to <pos|entity|toHitbox …> [horizontal|vertical [e n]] [e n]`
+  — 参照 MOD の `DistanceCommand`/`DistanceCalculator` をそのまま移植（箱同士の最近点、10^n 倍して四捨五入、
+  フィードバック5行まで同じ）。`quantum:allstats/newstats` と `advancestats` がこれを使う。
+- セレクタオプション `distanceH=`（水平距離）/`distanceV=`（垂直距離）— 参照は Mixin
+  (`EntitySelectorOptionsMixin` + `EntitySelectorMixin`) で後付けしている。Paper に Mixin は無いので、
+  移植側は**コンパイル時に等価変換**する: `unless entity @a[tag=xlib_target,distanceH=..4]` →
+  `execute … store result score .qd quantum_tmp run hfilter @a[tag=xlib_target] h ..4` +
+  `execute … if score .qd quantum_tmp matches 0 …`。判定は `hfilter` が参照と同じ式
+  (`MinMaxBounds.Doubles#matchesSqr(dx²+dz²)` / `matches(|dy|)`、原点は実行位置) で行う。
+
+ついでに `/quantum run` をバニラの**実行コンテキスト経路** (`Commands#performCommand`) に変更 —
+`function` は CustomCommandExecutor なので、旧来の `CommandDispatcher#execute` では
+"This function should not run" になっていた（コンソールは元から現行経路なので手打ちだけ動いていた）。
+`tools/parity_runner.py` に `--invoke` を追加（Paper 側は `quantum run ` を前置）。

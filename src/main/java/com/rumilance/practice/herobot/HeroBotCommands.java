@@ -67,7 +67,8 @@ public final class HeroBotCommands {
     }
 
     /**
-     * The three reference roots ({@code /player}, {@code /playerspawn}, {@code /herobot}).
+     * The reference roots ({@code /player}, {@code /playerspawn}, {@code /herobot}, and the
+     * syntax extensions {@code /distance} + the port-side {@code /hfilter}).
      *
      * <p>They are registered on the server's own command dispatcher — the tree the map's
      * {@code .mcfunction} lines are compiled against — so a function can call them exactly like
@@ -75,7 +76,14 @@ public final class HeroBotCommands {
      */
     public static List<LiteralArgumentBuilder<CommandSourceStack>> roots(HeroBotRegistry registry) {
         CommandBuildContext buildContext = buildContext(registry);
-        return List.of(player(registry, buildContext), playerspawn(registry), herobot());
+        List<LiteralArgumentBuilder<CommandSourceStack>> roots = new ArrayList<>();
+        roots.add(player(registry, buildContext));
+        roots.add(playerspawn(registry));
+        roots.add(herobot());
+        // The reference mod's syntax extensions the map's functions rely on: /distance and the
+        // port-side /hfilter that stands in for the distanceH=/distanceV= selector options.
+        roots.addAll(HeroBotDistanceCommand.roots());
+        return List.copyOf(roots);
     }
 
     /** The item argument is built once, at registration time, from the running server. */

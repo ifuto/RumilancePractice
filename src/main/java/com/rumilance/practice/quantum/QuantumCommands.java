@@ -64,18 +64,19 @@ public final class QuantumCommands {
                 // is only recompiled once they are back, see Runtime#installWhenReady).
                 if (this.areRootsRegistered() || this.ensureRoots()) {
                     this.registered = true;
-                    this.plugin.getLogger().info("[Quantum] registered /player, /playerspawn, "
-                            + "/herobot on the server command dispatcher (function-callable)");
+                    this.plugin.getLogger().info("[Quantum] registered "
+                            + this.roots.stream()
+                            .map(node -> "/" + node.getName())
+                            .collect(java.util.stream.Collectors.joining(", "))
+                            + " on the server command dispatcher (function-callable)");
                 } else {
                     // Last resort: let Paper own the nodes — visible to humans, but functions will
                     // not be able to call them, so say so loudly.
                     try {
-                        event.registrar().register(paper(this.roots.get(0)),
-                                "HeroBot bot control (Quantum)");
-                        event.registrar().register(paper(this.roots.get(1)),
-                                "Spawn a HeroBot fake player (Quantum)");
-                        event.registrar().register(paper(this.roots.get(2)),
-                                "HeroBot rules (Quantum)");
+                        for (LiteralCommandNode<CommandSourceStack> node : this.roots) {
+                            event.registrar().register(paper(node),
+                                    "HeroBot verb (Quantum): /" + node.getName());
+                        }
                         this.registered = true;
                         this.plugin.getLogger().warning("[Quantum] herobot verbs could only be "
                                 + "registered as Paper commands; the map's functions will not be "

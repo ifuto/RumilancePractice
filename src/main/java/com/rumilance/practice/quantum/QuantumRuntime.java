@@ -191,6 +191,9 @@ public final class QuantumRuntime {
         QuantumFunctionRegistry.Result result = this.functions.install(this.pack);
         this.plugin.getLogger().info("[Quantum] loaded " + result.functions() + " function(s) and "
                 + result.tags() + " tag(s) from " + roots.size() + " source(s)"
+                + (this.functions.rewrittenLines() == 0 ? "" : " ("
+                + this.functions.rewrittenLines()
+                + " line(s) translated from the mod's distanceH=/distanceV= selector options)")
                 + (result.failures().isEmpty() ? "" : " (" + result.failures().size()
                 + " could not be compiled, see /quantum list failures)"));
         for (String failure : result.failures()) {
@@ -242,7 +245,17 @@ public final class QuantumRuntime {
         } else {
             source = server.createCommandSourceStack();
         }
-        return server.getCommands().getDispatcher().execute(commandLine, source);
+        // Through vanilla's *execution-context* engine, not CommandDispatcher#execute: commands
+        // like `function` are CustomCommandExecutors, and the legacy entry point hits their
+        // CommandAdapter#run, which throws "This function should not run". The console takes the
+        // same path as this code (Commands#performCommand), which is why typing the line by hand
+        // works while the legacy call would not.
+        String line = net.minecraft.commands.Commands.trimOptionalPrefix(commandLine);
+        net.minecraft.commands.Commands commands = server.getCommands();
+        com.mojang.brigadier.ParseResults<CommandSourceStack> parsed =
+                commands.getDispatcher().parse(line, source);
+        commands.performCommand(parsed, line, true);
+        return 1;
     }
 
     public boolean hasFunction(String id) {

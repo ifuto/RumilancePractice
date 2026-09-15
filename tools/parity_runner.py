@@ -121,9 +121,9 @@ def cmd_deploy(args):
 
 def cmd_run(args):
     before = tail_offset(args.log)
-    setup = 'function parity:setup/%s' % args.scenario
+    setup = args.invoke + ('function parity:setup/%s' % args.scenario)
     print('scenario %s on %s for %ss' % (args.scenario, args.side, args.seconds))
-    send(args.console, ['function parity:load', setup], quiet=True)
+    send(args.console, [args.invoke + 'function parity:load', setup], quiet=True)
     print('  > parity:load')
     print('  > %s' % setup)
     # アリーナ充填(数十万ブロック)が終わってから測る
@@ -131,7 +131,7 @@ def cmd_run(args):
     start = tail_offset(args.log)
     print('  recording %ss ...' % args.seconds)
     time.sleep(args.seconds)
-    send(args.console, ['function parity:stop'], quiet=True)
+    send(args.console, [args.invoke + 'function parity:stop'], quiet=True)
     text = read_new(args.log, start)
     os.makedirs(os.path.dirname(args.out) or '.', exist_ok=True)
     with gzip.open(args.out, 'wt', encoding='utf-8') as fh:
@@ -176,12 +176,12 @@ def cmd_matrix(args):
         print('=== [%d/%d] %s (%s, %ss)' % (i, len(scenarios), scenario, args.side, args.seconds))
         out = os.path.join(args.out_dir, '%s_%s_both.log.gz' % (args.side, scenario))
         before = tail_offset(args.log)
-        send(args.console, ['function parity:load', 'function parity:setup/%s' % scenario],
-             quiet=True)
+        send(args.console, [args.invoke + 'function parity:load',
+                            args.invoke + 'function parity:setup/%s' % scenario], quiet=True)
         time.sleep(args.warmup)
         start = tail_offset(args.log)
         time.sleep(args.seconds)
-        send(args.console, ['function parity:stop'], quiet=True)
+        send(args.console, [args.invoke + 'function parity:stop'], quiet=True)
         text = read_new(args.log, start)
         with gzip.open(out, 'wt', encoding='utf-8') as fh:
             fh.write(text)
@@ -264,6 +264,9 @@ def main():
 
     p = sub.add_parser('run', help='コンソール(FIFO)へ流し込んで 1 シナリオ記録する')
     p.add_argument('--console', required=True, help='サーバーのコンソール FIFO')
+    p.add_argument('--invoke', default='',
+                   help="関数を呼ぶときの前置き (Paper では 'quantum run ' — 移植側の関数は"
+                        "サーバー本体の関数ライブラリに無いため)")
     p.add_argument('--log', required=True, help='サーバーのコンソール出力ログ')
     p.add_argument('--side', default='fabric')
     p.add_argument('--scenario', required=True)
@@ -274,6 +277,7 @@ def main():
 
     p = sub.add_parser('matrix', help='複数シナリオを順に走らせる')
     p.add_argument('--console', required=True)
+    p.add_argument('--invoke', default='')
     p.add_argument('--log', required=True)
     p.add_argument('--side', default='fabric')
     p.add_argument('--scenarios', default=None, help='カンマ区切り（既定: 全部）')
