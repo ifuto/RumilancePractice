@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -166,8 +167,18 @@ public final class QuantumPack {
         if (!path.endsWith(".json")) {
             return;
         }
-        this.tagMembers.put(Identifier.fromNamespaceAndPath(namespace,
-                path.substring(0, path.length() - ".json".length())), readTagValues(content));
+        // Several packs of one map define the same tag (the Quantum map and our harness both add to
+        // #minecraft:tick, for instance): vanilla unions them, so we must too — and de-duplicate,
+        // because a root can be handed over twice (the world folder and its `datapacks` subfolder).
+        Identifier id = Identifier.fromNamespaceAndPath(namespace,
+                path.substring(0, path.length() - ".json".length()));
+        List<String> members = new ArrayList<>(this.tagMembers.getOrDefault(id, List.of()));
+        for (String member : readTagValues(content)) {
+            if (!members.contains(member)) {
+                members.add(member);
+            }
+        }
+        this.tagMembers.put(id, members);
     }
 
     /** Vanilla reads every line; {@code CommandFunction.fromLines} filters comments and blanks. */
