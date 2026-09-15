@@ -1496,31 +1496,39 @@ public final class FeatureBootstrap {
         pm.registerEvents(partyIconListener, plugin);
         pm.registerEvents(new SpamFilterListener(spamFilterService), plugin);
         pm.registerEvents(new SignChangeGuardListener(signGuardService), plugin);
-        pm.registerEvents(new Listener() {
-            @EventHandler
-            public void onJoin(PlayerJoinEvent event) {
-                if (!configService.config().getBoolean("sign-guard.active-probe.check-on-join", false)) {
-                    return;
+        // The join/quit probe hooks live behind the same ProtocolLib guard: the anonymous
+        // listener names SignProbeService, whose class cannot load without the API present.
+        final SignProbeService signProbe = signProbeService;
+        if (signProbe != null) {
+            pm.registerEvents(new Listener() {
+                @EventHandler
+                public void onJoin(PlayerJoinEvent event) {
+                    if (!configService.config().getBoolean(
+                            "sign-guard.active-probe.check-on-join", false)) {
+                        return;
+                    }
+                    if (!signProbe.isAvailable()) {
+                        return;
+                    }
+                    Player joined = event.getPlayer();
+                    if (joined.hasPermission("rumilance.admin")
+                            || joined.hasPermission("rumilance.sign.bypass")) {
+                        return;
+                    }
+                    long delay = Math.max(20L,
+                            configService.config().getLong(
+                                    "sign-guard.active-probe.join-delay-ticks", 60));
+                    plugin.getServer().getScheduler().runTaskLater(plugin,
+                            () -> signProbe.probe(joined, null), delay);
                 }
-                if (!signProbeService.isAvailable()) {
-                    return;
-                }
-                Player joined = event.getPlayer();
-                if (joined.hasPermission("rumilance.admin") || joined.hasPermission("rumilance.sign.bypass")) {
-                    return;
-                }
-                long delay = Math.max(20L,
-                        configService.config().getLong("sign-guard.active-probe.join-delay-ticks", 60));
-                plugin.getServer().getScheduler().runTaskLater(plugin,
-                        () -> signProbeService.probe(joined, null), delay);
-            }
 
-            @EventHandler
-            public void onQuit(PlayerQuitEvent event) {
-                // Release any in-flight probe state so a disconnect mid-scan can't leak it.
-                signProbeService.abandon(event.getPlayer().getUniqueId());
-            }
-        }, plugin);
+                @EventHandler
+                public void onQuit(PlayerQuitEvent event) {
+                    // Release any in-flight probe state so a disconnect mid-scan can't leak it.
+                    signProbe.abandon(event.getPlayer().getUniqueId());
+                }
+            }, plugin);
+        }
         PendingInput.init(plugin);
         FloatingTextCleanup.start(plugin,
                 configService.config().getLong("cleanup.floating-text-window-seconds", 300L));
