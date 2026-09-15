@@ -56,17 +56,34 @@ public final class QuantumCommands {
         this.plugin.getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event -> {
             this.buildRoots();
             if (!this.registered) {
-                try {
-                    event.registrar().register(paper(this.roots.get(0)), "HeroBot bot control (Quantum)");
-                    event.registrar().register(paper(this.roots.get(1)),
-                            "Spawn a HeroBot fake player (Quantum)");
-                    event.registrar().register(paper(this.roots.get(2)), "HeroBot rules (Quantum)");
+                // Paper's registrar wraps a node in CustomCommandExecutor, and vanilla refuses to
+                // run those *inside functions* ("This function should not run") — which is exactly
+                // where the map calls /player, /playerspawn and /herobot from. The nodes therefore
+                // go into the server's own CommandDispatcher, the tree the function loader compiles
+                // against; a /reload rebuilds that tree, so the watchdog re-adds them (and the pack
+                // is only recompiled once they are back, see Runtime#installWhenReady).
+                if (this.areRootsRegistered() || this.ensureRoots()) {
                     this.registered = true;
                     this.plugin.getLogger().info("[Quantum] registered /player, /playerspawn, "
-                            + "/herobot on the server command dispatcher");
-                } catch (RuntimeException e) {
-                    this.plugin.getLogger().warning("[Quantum] command registration failed ("
-                            + e.getMessage() + "); falling back to direct dispatcher registration");
+                            + "/herobot on the server command dispatcher (function-callable)");
+                } else {
+                    // Last resort: let Paper own the nodes — visible to humans, but functions will
+                    // not be able to call them, so say so loudly.
+                    try {
+                        event.registrar().register(paper(this.roots.get(0)),
+                                "HeroBot bot control (Quantum)");
+                        event.registrar().register(paper(this.roots.get(1)),
+                                "Spawn a HeroBot fake player (Quantum)");
+                        event.registrar().register(paper(this.roots.get(2)),
+                                "HeroBot rules (Quantum)");
+                        this.registered = true;
+                        this.plugin.getLogger().warning("[Quantum] herobot verbs could only be "
+                                + "registered as Paper commands; the map's functions will not be "
+                                + "able to call them");
+                    } catch (RuntimeException e) {
+                        this.plugin.getLogger().warning(
+                                "[Quantum] command registration failed: " + e.getMessage());
+                    }
                 }
             }
             afterRegister.run();

@@ -1,11 +1,5 @@
-fill -745 -64 58 -635 -62 125 minecraft:bedrock
-fill -745 -61 58 -635 -59 125 minecraft:bedrock
-fill -745 -58 58 -635 -58 125 minecraft:bedrock
-fill -745 20 58 -635 22 125 minecraft:bedrock
-fill -745 23 58 -635 25 125 minecraft:bedrock
-fill -745 26 58 -635 28 125 minecraft:bedrock
-fill -745 29 58 -635 29 125 minecraft:bedrock
-fill -745 30 58 -635 30 125 minecraft:stone replace minecraft:air
+# parity:resurface — ラウンド開始時に戦場を戻す（地表 y=30 を貼り直し、上を空気に）
+fill -745 30 58 -635 30 125 minecraft:stone
 fill -745 31 58 -635 33 125 minecraft:air
 fill -745 34 58 -635 36 125 minecraft:air
 fill -745 37 58 -635 39 125 minecraft:air

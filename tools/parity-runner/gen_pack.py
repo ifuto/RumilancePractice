@@ -22,7 +22,8 @@ PACK = os.path.join(ROOT, 'datapack', 'parity')
 
 # 戦場（Quantum マップのアリーナ帯）。参照実測の BOT 座標域 x −736..−645 / z 70..112 /
 # 床 y=31 に合わせ、少し余裕を持たせる。
-ARENA = dict(x1=-745, x2=-635, z1=58, z2=125, floor=30, bedrock=-64, bedrock_top=-58)
+ARENA = dict(x1=-745, x2=-635, z1=58, z2=125, floor=30, bedrock=-64, bedrock_top=-58,
+             armor=20, sky=60)
 
 BOT_A = 'quantumbot'   # マップ本来の BOT（xlib_bot）
 BOT_B = 'qbot2'        # 2体目（マップから見ると xlib_target = 人間側）
@@ -38,20 +39,59 @@ def w(rel, text):
 
 
 def arena_fill():
+    """戦場を作る。
+
+    - 最下層 y=-64..-58 は岩盤（奈落防止・爆破解体では壊れない）
+    - **y=20..29 も岩盤**に置換する: 爆破で地形が壊れるのは参照と同じ挙動だが、
+      そのままだと BOT は自分で掘った深い穴の底に落ちて戦い続ける（参照の実測でも
+      報告されている症状）。掘れる層を地表の y=30 一枚だけにすることで、
+      「爆破解体は ON のまま」かつ「戦場は常に表面」という両立ができる。
+    - y=30 を石で埋める（地表）。y=31..60 は空気にして前ラウンドの残骸を消す。
+    """
     lines = []
     y = ARENA['bedrock']
     while y <= ARENA['bedrock_top']:
-        y2 = min(y + 3, ARENA['bedrock_top'])
+        y2 = min(y + 2, ARENA['bedrock_top'])
         lines.append('fill %d %d %d %d %d %d minecraft:bedrock'
                      % (ARENA['x1'], y, ARENA['z1'], ARENA['x2'], y2, ARENA['z2']))
         y = y2 + 1
-    y = ARENA['bedrock_top'] + 1
-    while y <= ARENA['floor']:
-        y2 = min(y + 4, ARENA['floor'])
-        lines.append('fill %d %d %d %d %d %d minecraft:stone replace minecraft:air'
+    y = ARENA['armor']
+    while y < ARENA['floor']:
+        y2 = min(y + 2, ARENA['floor'] - 1)
+        lines.append('fill %d %d %d %d %d %d minecraft:bedrock'
                      % (ARENA['x1'], y, ARENA['z1'], ARENA['x2'], y2, ARENA['z2']))
         y = y2 + 1
+    lines.append('fill %d %d %d %d %d %d minecraft:stone replace minecraft:air'
+                 % (ARENA['x1'], ARENA['floor'], ARENA['z1'],
+                    ARENA['x2'], ARENA['floor'], ARENA['z2']))
+    lines.extend(clear_air())
     return '\n'.join(lines)
+
+
+def clear_air():
+    """地表より上を空気にする（前のラウンドの obsidian / アンカー / クリスタルを消す）。"""
+    lines = []
+    y = ARENA['floor'] + 1
+    while y <= ARENA['sky']:
+        y2 = min(y + 2, ARENA['sky'])
+        lines.append('fill %d %d %d %d %d %d minecraft:air'
+                     % (ARENA['x1'], y, ARENA['z1'], ARENA['x2'], y2, ARENA['z2']))
+        y = y2 + 1
+    return lines
+
+
+def resurface():
+    """ラウンド開始時に戦場を初期状態へ戻す（地表を石で貼り直し、上を空気に）。
+
+    爆破解体は ON なので、ラウンド中は地表が削れて下の岩盤が露出する = 参照と同じ。
+    穴が深くならないのは y=20..29 が岩盤だからで、挙動を縛っているわけではない。
+    """
+    lines = ['fill %d %d %d %d %d %d minecraft:stone'
+             % (ARENA['x1'], ARENA['floor'], ARENA['z1'],
+                ARENA['x2'], ARENA['floor'], ARENA['z2'])]
+    lines.extend(clear_air())
+    return '# parity:resurface — ラウンド開始時に戦場を戻す（地表 y=%d を貼り直し、上を空気に）\n%s' % (
+        ARENA['floor'], '\n'.join(lines))
 
 
 def load():
@@ -119,6 +159,7 @@ execute if score .start start matches 0 if score pari_round parity_t matches ..0
 
 def start_round():
     return f'''# parity:start_round — 通常のラウンド開始（マップの start2 + 開始スイッチ + 戦場への配置）。
+function parity:resurface
 function quantum:map/start2
 effect give @a regeneration 1 255 true
 effect give @a absorption 120 0 true
@@ -253,6 +294,8 @@ SCENARIOS = {
 
 
 def lint():
+    # fill は 1 コマンド 32,768 ブロックまで（arena は 111x68 = 7,548/層 なので 4 層まで）
+    span = (ARENA['x2'] - ARENA['x1'] + 1) * (ARENA['z2'] - ARENA['z1'] + 1)
     """生成物をバニラの関数ローダーと同じ最低限の規則で検査する。
 
     - マクロ行($始まり)は $(変数) を1つ以上含むこと
@@ -303,6 +346,7 @@ def main():
     w('data/parity/function/emit.mcfunction', emit())
     w('data/parity/function/clock.mcfunction', clock())
     w('data/parity/function/arena_fill.mcfunction', arena_fill())
+    w('data/parity/function/resurface.mcfunction', resurface())
     w('data/parity/function/stop.mcfunction', stop())
     for name, sc in SCENARIOS.items():
         w('data/parity/function/setup/%s.mcfunction' % name,

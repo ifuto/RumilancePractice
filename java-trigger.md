@@ -259,3 +259,13 @@ map `bin/27` のアンカー開始条件を**そのまま**にした。`hit_deci
 - 修正: `QuantumPack` が `world/datapacks/<PackName>/data/...`（入れ子）を読めていなかったのを直した。
 
 この push で `./gradlew test shadowJar` を通し、`plugin-delivery` を更新する。
+
+## v1.76.30 — BOTが関数から動詞を呼べなかった問題（Paper 固有）
+
+`playerspawn` / `player` / `herobot` を Paper のコマンド登録 API（LifecycleEvents.COMMANDS）で
+登録していたため、Paper がそれらを CustomCommandExecutor で包み、**バニラは関数の中から
+カスタムコマンドを実行できない**（実行時 "This function should not run"）。参照側(Fabric)は
+herobot MOD が Brigadier ノードとして直接 dispatcher に載せているので、マップの関数から普通に
+呼べる。移植側も同じ場所 — サーバー自身の CommandDispatcher の root — に直接 addChild する
+ようにした（/reload で作り直されたら watchdog が入れ直し、動詞が戻るまでパックの再コンパイルは
+保留する）。Paper の登録 API は dispatcher に届かない時の最終手段に降格。
