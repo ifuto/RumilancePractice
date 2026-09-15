@@ -145,6 +145,20 @@ public final class PracticeSession {
         private long targetHurtUntilMs;
 
         /**
+         * Map {@code state}: 1/2 = ATTACK ({@code bin/27}), 0/3 = PASSIVE ({@code bin/13}).
+         * {@code eval/biased} rebuilds it every tick from {@code eval}: while the bot is ahead
+         * (or its HP deficit is recoverable) it attacks, and the moment {@code eval <= -1} it
+         * drops into the passive branch — the reference spends 77.5 % of run8 there.
+         */
+        private int botState = 1;
+        /** Map {@code eval} after the +225 attack bonus; kept for the fight trace. */
+        private int botEval;
+        /** Next instant the map's 10-tick / 30 % roll may restore the ATTACK state. */
+        private long nextStateRollMs;
+        /** Chains (place -> charge -> detonate) this session, for the self-damage parity check. */
+        private int botChains;
+
+        /**
          * Until when the bot rides out a knockback from its own blast. Vanilla explosion push
          * is applied to every entity in radius, but the practice room cancels the blast's
          * damage frame, and the AI overwrites the bot's velocity on every tick — so the push
@@ -241,6 +255,14 @@ public final class PracticeSession {
         public int gapUses() { return gapUses; }
         public void gapUses(int v) { gapUses = v; }
         public org.bukkit.Material holdItem() { return holdItem; }
+        public int botState() { return botState; }
+        public void botState(int value) { botState = value; }
+        public int botEval() { return botEval; }
+        public void botEval(int value) { botEval = value; }
+        public long nextStateRollMs() { return nextStateRollMs; }
+        public void nextStateRollMs(long value) { nextStateRollMs = value; }
+        public int botChains() { return botChains; }
+        public void botChains(int value) { botChains = value; }
         public long holdUntilMs() { return holdUntilMs; }
         public void hold(org.bukkit.Material item, long untilMs) {
             holdItem = item;

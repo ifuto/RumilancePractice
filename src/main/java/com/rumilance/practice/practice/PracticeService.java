@@ -425,8 +425,11 @@ public final class PracticeService {
                 stock.put(Material.ENDER_PEARL, 64); // map: pearls are the movement tool
                 // The map's crystal bot hotbar: 1 totem, 2 obsidian, 3 crystal, 4 sword,
                 // 5 golden apple, 6 crossbow, 7 pearl, 8 anchor, 9 glowstone. We mirror the
-                // slots (and their counts) so the bot visibly selects and consumes them.
-                stock.put(Material.GOLDEN_APPLE, 2);
+                // slots (and their counts, botgear/neth: `golden_apple ... 64`) so the bot
+                // visibly selects and consumes them. Two apples (an earlier reading of the map)
+                // ran the bot dry: it ate both, sat at 12 HP for the rest of the match and could
+                // never heal back over the 17.5 HP the eval needs to leave the PASSIVE branch,
+                // while the reference's own HP walks 3.7 <-> 20.0 across 403 s of gaps.
             }
             case CART -> {
                 stock.put(Material.POWERED_RAIL, 99);
@@ -1450,6 +1453,42 @@ public final class PracticeService {
 
     /** Upper edge of the escape band: outside it the target has no marker at all (chase in). */
     private static final double PASSIVE_PEARL_ESCAPE_MAX = 10.0d;
+    /**
+     * Map {@code eval:stats/hp}: the bot's whole decision surface is
+     * {@code eval = (botHP - targetHP) * 20} — this is the factor that turns an HP lead into a
+     * positive eval (attack) and an HP deficit into a negative one (passive).
+     */
+    private static final double EVAL_HP_FACTOR = 20.0d;
+    /** Map {@code eval:stats/hp}: +50 while the target is regenerating (our harness opponent). */
+    private static final double EVAL_TARGET_REGEN_BONUS = 50.0d;
+    /** Map {@code eval:stats/sword/hit} through {@code eval_hit}: can-hit is +2, else -1, *80. */
+    private static final double EVAL_HIT_CAN = 160.0d;
+    private static final double EVAL_HIT_CANNOT = -80.0d;
+    /**
+     * Map {@code eval/tick}: {@code scoreboard players add @s eval 225} while the bot is in the
+     * attack states and the target is inside 15 blocks. The bonus is what gives the machine its
+     * hysteresis — leaving ATTACK costs 225 points, so the bot does not flicker state every tick.
+     */
+    private static final int EVAL_ATTACK_BONUS = 225;
+    /**
+     * Map {@code bin/29}: every 10 ticks ({@code random_cd}) a 30 % roll may drag the bot back
+     * into ATTACK while {@code eval} sits in the recoverable -224..-1 window.
+     */
+    private static final int STATE_ROLL_PERCENT = 30;
+    private static final long STATE_ROLL_INTERVAL_MS = 500L;
+    /** Map {@code bin/28}: the passive branch only walks forward while the target is 10+ away. */
+    private static final double PASSIVE_APPROACH_RANGE = 10.0d;
+    /** Map {@code mark/mark_main}: the anchor is placed while the target is inside 4.6 blocks. */
+    private static final double ANCHOR_PLACE_MIN_RANGE = 2.0d;
+    /**
+     * The bot's own blast, measured off the reference fixture: run8 detonates 116 charges and
+     * loses 0.68 HP per charge on average (44 of them cost nothing at all), while its HP walks
+     * 20.0 -> 3.7 across a 34 s chain. Vanilla's own attributed explosion cannot deliver that:
+     * the bot IS the explosion's source, so {@code Level.explode} skips it and our bot sat at a
+     * flat 20.0 HP through 145 detonations at 3-6 blocks. The damage is therefore applied
+     * explicitly with the vanilla falloff and the reference's magnitude.
+     */
+    private static final double SELF_BLAST_RAW = 2.1d;
 
     /**
      * How long the bot stays in the passive branch after an escape pearl. The reference fixture
@@ -1457,7 +1496,14 @@ public final class PracticeService {
      * (3.5 s) between chains, with one sword hit and 1.6 anchors per ~5 s engagement; walking
      * (5 b/s) instead of chase-pearling the first 10-15 blocks reproduces that gap.
      */
-    private static final long PASSIVE_ESCAPE_WINDOW_MS = 2000L;
+    /**
+     * The b22 experiment (a 2 s "walk back in" window after every escape pearl, see
+     * {@code escapePassiveUntilMs}) is superseded: the walk-in belongs to the map's PASSIVE
+     * branch, which is now driven by {@code eval}/state like the reference. Measured with the
+     * window: <=6 dwell 21.9 % (reference 37.3) and 38.9 pearls/min (49.2) against b18's 33.2 %
+     * / 57.1 without it, so it only ever cost the close-range count.
+     */
+    private static final long PASSIVE_ESCAPE_WINDOW_MS = 0L;
     private static final long PASSIVE_PEARL_CD_MS = 1000L;
     /** Map: {@code positioned ^ ^ ^-15} + {@code spreadplayers ~ ~ 0 5}. */
     private static final double PASSIVE_PEARL_LEAP = 15.0d;
@@ -1472,7 +1518,12 @@ public final class PracticeService {
     private static final long PEARL_PRESSURE_CD_MS = 1000L;
     /** Lands this far short of the target: the map's ray stops on the target's hitbox, so
      *  the throw lands right next to it — the map pearls while boxing too (no range gate). */
-    private static final double PEARL_PRESSURE_STANDOFF = 1.0d;
+    /**
+     * Where the chase pearl lands relative to the target. The reference's closing jumps start at
+     * 20 blocks (median) and put it down at 8.3 (p25 5.3) — i.e. a few blocks short of the
+     * target, on the anchor band's edge, not on its face.
+     */
+    private static final double PEARL_PRESSURE_STANDOFF = 3.0d;
     /** Map ray cast is limited to {@code ^ ^ ^-15}. */
     /**
      * Map {@code ray/cast2 → ray/pearlstep}: the chase pearl is a step-ray aimed at the target's
@@ -1490,6 +1541,8 @@ public final class PracticeService {
     private static final int ANCHOR_STOCK_REFILL = 16;
     /** Golden apple: eaten below half HP, heals 40%, at most twice per bot life. */
     private static final int GAP_MAX_USES = 2;
+    /** The map's kit stock of golden apples (botgear/neth hotbar 4: 64) — refilled like pearls. */
+    private static final int GAP_STOCK_REFILL = 64;
     /** Cobweb trick: placed under the player, melts away after TTL. */
     private static final long COBWEB_COOLDOWN_MS = 6000L;
     private static final long COBWEB_TTL_MS = 8000L;
@@ -1536,7 +1589,14 @@ public final class PracticeService {
      * against 18.1 anchors/min). Holding at 3.0 parked our bot inside sword reach, which tripled
      * the melee count and pulled the anchor places into the <=2 band.
      */
-    private static final double FIGHT_STANDOFF_NEAR = 3.0d;
+    /**
+     * The old safety valve pushed the bot back out below 3 blocks, which also locked it out of
+     * every weapon that needs the target inside 3.5 (crystal) / 3.0 (sword): measured 0 swings
+     * and 0 crystals in 145 s against the reference's 7.9-11.4 and 4.5-6.6 per minute. The
+     * rhythm is now owned by the state machine and the pearls, so the valve only has to stop the
+     * degenerate "parked inside the target" case.
+     */
+    private static final double FIGHT_STANDOFF_NEAR = 1.5d;
     private static final double FIGHT_STANDOFF_FAR = 4.5d;
 
     /**
@@ -3284,6 +3344,12 @@ public final class PracticeService {
         // The bot fights with the SAME kit the player brought: armour, offhand and the
         // item actually in hand are cloned from the player's inventory. Its material set
         // feeds the visible slot selects — the bot never shows an item the kit lacks.
+        //
+        // A harness opponent spawns NAKED (the reference's qlog keepalive only feeds the
+        // target resistance/regen), and cloning "nothing" used to leave the map bot bare as
+        // well. That is not parity: the map's own kit is botgear/neth — full protection 4
+        // netherite, blast-protection 4 leggings, feather-falling boots and a totem offhand —
+        // and it is what a blast does 1-2 HP to instead of the 4-7 a naked body takes.
         org.bukkit.inventory.ItemStack pHelm = player.getInventory().getHelmet();
         org.bukkit.inventory.ItemStack pChest = player.getInventory().getChestplate();
         org.bukkit.inventory.ItemStack pLegs = player.getInventory().getLeggings();
@@ -3312,6 +3378,31 @@ public final class PracticeService {
             return;
         }
         // No worn/held kit: fall back to the admin binding, then the type defaults.
+        boolean naked = pHelm == null && pChest == null && pLegs == null && pBoots == null
+                && (pMain == null || pMain.getType().isAir());
+        if (naked) {
+            // Play the reference's own loadout (botgear/neth), not an empty one.
+            ItemStack helm = new ItemStack(Material.NETHERITE_HELMET);
+            helm.addUnsafeEnchantment(org.bukkit.enchantments.Enchantment.PROTECTION, 4);
+            ItemStack chest = new ItemStack(Material.NETHERITE_CHESTPLATE);
+            chest.addUnsafeEnchantment(org.bukkit.enchantments.Enchantment.PROTECTION, 4);
+            ItemStack legs = new ItemStack(Material.NETHERITE_LEGGINGS);
+            legs.addUnsafeEnchantment(org.bukkit.enchantments.Enchantment.BLAST_PROTECTION, 4);
+            ItemStack boots = new ItemStack(Material.NETHERITE_BOOTS);
+            boots.addUnsafeEnchantment(org.bukkit.enchantments.Enchantment.FEATHER_FALLING, 4);
+            boots.addUnsafeEnchantment(org.bukkit.enchantments.Enchantment.PROTECTION, 4);
+            ItemStack sword = new ItemStack(Material.NETHERITE_SWORD);
+            sword.addUnsafeEnchantment(org.bukkit.enchantments.Enchantment.SHARPNESS, 5);
+            eq.setHelmet(helm);
+            eq.setChestplate(chest);
+            eq.setLeggings(legs);
+            eq.setBoots(boots);
+            eq.setItemInMainHand(sword);
+            eq.setItemInOffHand(new ItemStack(Material.TOTEM_OF_UNDYING));
+            session.botKitMaterials().add(Material.NETHERITE_SWORD);
+            zeroDropChances(bot.living(), eq);
+            return;
+        }
         ItemStack fallbackWeapon = switch (type) {
             case SWORD, NETHERITE_POT -> new ItemStack(Material.NETHERITE_SWORD);
             case CART -> new ItemStack(Material.BOW);
@@ -3785,12 +3876,16 @@ public final class PracticeService {
         if (now < ab.gapRegenUntilMs()) {
             healToward(bot, maxHp, 0.08d);
         }
-        if (now < ab.nextGapMs() || ab.gapUses() >= GAP_MAX_USES
-                || bot.getHealth() >= maxHp * 0.8d) {
+        boolean crystal = session.type() == PracticeType.CRYSTAL;
+        if (now < ab.nextGapMs() || (!crystal && ab.gapUses() >= GAP_MAX_USES)
+                || bot.getHealth() >= maxHp * (crystal ? 0.85d : 0.8d)) {
             return;
         }
-        // Map crystal/passive/gap: eat at <=80% HP, visible apple in hand, 35 ticks of
-        // chomping while standing still, then the heal lands. Two apples per life.
+        // Map crystal/passive/gap: eat below 17 HP, visible apple in hand, 35 ticks of
+        // chomping while standing still, then the heal lands. The two-apples-per-life cap is
+        // ours, not the map's, and in crystal mode it deadlocked the machine: the bot ate both
+        // apples, sat at 12.4 HP and never healed back over the 17.5 HP the eval needs to
+        // return to ATTACK (measured: passive for the last 87 s of a 144 s match).
         if (!session.botConsume(Material.GOLDEN_APPLE, 1)) {
             return;
         }
@@ -3962,6 +4057,99 @@ public final class PracticeService {
     }
 
     /**
+     * Map {@code eval/tick} + {@code eval/biased}: rebuilds the bot's {@code state} score from
+     * its own and the target's health. This is the piece that was missing entirely — our bot
+     * ran the attack branch on 100 % of ticks while the reference runs it on 22.5 % of run8
+     * (77.5 % passive), which is why every one of its action counts came out 2-3x high.
+     *
+     * <pre>
+     *   eval  = (botHP - targetHP) * 20          (eval:stats/hp)
+     *         + 50 if the target is regenerating (eval:stats/hp)
+     *         + 160 if the target can be hit, -80 if not (eval:stats/sword/hit -> eval_hit)
+     *   +225 while state is already 1-2 and the target is within 15 blocks (eval:tick)
+     *   state 1 (attack) by default; 3 (passive) as soon as eval &lt;= -1 (eval:biased)
+     *   ...with the 10-tick / 30 % roll of bin/29 allowed to restore attack in -224..-1
+     * </pre>
+     */
+    private void updateBotState(Player player, PracticeSession session, BotBody bot,
+                                long now, double dist, boolean canHit) {
+        PracticeSession.BotAbilityState ab = session.abilities();
+        double hp = bot.getHealth();
+        double targetHp = player.getHealth();
+        double eval = (hp - targetHp) * EVAL_HP_FACTOR;
+        if (player.hasPotionEffect(org.bukkit.potion.PotionEffectType.REGENERATION)) {
+            eval += EVAL_TARGET_REGEN_BONUS; // map: `if @p has regeneration` (+50)
+        }
+        // eval/tick adds the attack bonus AND the hit score only while the bot is already in the
+        // attack branch (`execute if score @s state matches 1..2 ... add @s eval 225`, and
+        // eval:stats/sword/hit is read through eval_hit in the same branch). Applying them
+        // unconditionally made PASSIVE a one-way door: at 20 HP against a 20 HP target the bot
+        // measured 0 + 50 - 80 = -30 and never walked back in (measured: one single 1 -> 3
+        // transition in 144 s and the rest of the match spent pearling away).
+        boolean attacking = ab.botState() == 1 || ab.botState() == 2;
+        if (attacking && dist <= 15.0d) {
+            eval += EVAL_ATTACK_BONUS;
+            eval += canHit ? EVAL_HIT_CAN : EVAL_HIT_CANNOT;
+        }
+        long rollDue = ab.nextStateRollMs();
+        boolean expired = now >= rollDue;
+        int state;
+        if (eval <= -1.0d) {
+            state = 3;
+            // bin/29: only a 30 % roll (on its own 10-tick clock) pulls the bot back in while
+            // the deficit is still recoverable; deeper than -224 the map never recovers.
+            if (expired && eval > -225.0d && dist <= 15.0d
+                    && java.util.concurrent.ThreadLocalRandom.current().nextInt(100)
+                            < STATE_ROLL_PERCENT) {
+                state = 1;
+                ab.nextStateRollMs(now + STATE_ROLL_INTERVAL_MS);
+            }
+        } else {
+            state = 1; // eval/biased: attack is the default for as long as the bot is not losing
+        }
+        if (expired) {
+            ab.nextStateRollMs(now + STATE_ROLL_INTERVAL_MS);
+        }
+        if (state != ab.botState()) {
+            session.fightLog("state -> " + state + " (eval " + Math.round(eval)
+                    + ", hp " + String.format(java.util.Locale.ROOT, "%.0f", hp)
+                    + "/" + String.format(java.util.Locale.ROOT, "%.0f", targetHp) + ")");
+        }
+        ab.botState(state);
+        ab.botEval((int) Math.round(eval));
+    }
+
+    /**
+     * Map {@code crystal/passive/main} + {@code bin/28}: the PASSIVE branch. The map bot never
+     * anchors or crystallises here — it keeps its distance (pearl away inside 8 blocks), heals
+     * when it is low, pokes with the crossbow over 17 blocks and only walks forward while the
+     * target is at least 10 blocks out. Measured against the reference: 77.5 % of run8.
+     *
+     * @return true when the passive branch consumed this tick (caller skips the attack loop)
+     */
+    private boolean tickCrystalPassive(Player player, PracticeSession session, BotBody bot,
+                                       long now, double dist) {
+        // (The escape pearl is not called here: crystal/passive/main already ran above.)
+        // Far away the map bot pearls back IN (g1gc/pearl, the same 20-tick clock) before it
+        // walks: the fixture's closing jumps start from 20 blocks and land around 5-8.
+        if (dist > PASSIVE_PEARL_ESCAPE_MAX
+                && tickPearlPressure(player, session, bot, now, dist)) {
+            return true;
+        }
+        // bin/28: `move forward` only while the target is beyond 10 blocks (the shield/panic
+        // variants widen that to 15 when the bot is nearly dead).
+        if (dist > PASSIVE_APPROACH_RANGE) {
+            Vector to = player.getLocation().toVector().subtract(bot.getLocation().toVector())
+                    .setY(0);
+            if (to.lengthSquared() > 0.01d) {
+                bot.setVelocity(to.normalize().multiply(0.24d)
+                        .setY(bot.getVelocity().getY()));
+            }
+        }
+        return false;
+    }
+
+    /**
      * Escape pearl (Quantum parity: sword & crystal passive/escape/pearl): wounded and
      * cornered, the bot blinks backwards onto solid ground inside the room.
      *
@@ -3971,9 +4159,8 @@ public final class PracticeService {
                                     double maxHp, long now) {
         PracticeSession.BotAbilityState ab = session.abilities();
         if (now < ab.nextPearlMs() || session.difficulty().attackDamage() <= 0.0d
-                || bot.getHealth() > maxHp * ESCAPE_PEARL_HP_FRACTION
-                || bot.getLocation().distanceSquared(player.getLocation()) > 6.0d * 6.0d) {
-            return false; // cornered only: nobody pearls away from a distant target (map <= 10)
+                || bot.getHealth() > maxHp * ESCAPE_PEARL_HP_FRACTION) {
+            return false; // wounded only: the reference pearls out at target <= 8 (map passive)
         }
         Vector away = bot.getLocation().toVector().subtract(player.getLocation().toVector())
                 .setY(0);
@@ -4051,19 +4238,22 @@ public final class PracticeService {
      * The chase pearl ({@link #tickPearlPressure}) shares that same timer, so the pair together
      * is the reference's ~48 throws/min — repositioning, not a panic button.
      */
-    private boolean tickPassivePearl(Player player, PracticeSession session, BotBody bot, long now) {
+    private boolean tickPassivePearl(Player player, PracticeSession session, BotBody bot,
+                                     long now, double dist) {
         PracticeSession.BotAbilityState ab = session.abilities();
         if (now < ab.nextPearlMs()) {
             return false;
         }
-        double dist = bot.getLocation().distance(player.getLocation());
         // Map eval/biased + mark/mark_main: the escape pearl lives in the PASSIVE branch, which
         // only runs when the bot has no usable marker — i.e. while the target sits outside the
         // 4.6-block anchor band. Firing it from inside the fight band (any distance <= 8, as
         // before) truncated every anchor chain after one cycle and threw away 62 % of the
         // throws; the reference throws 66 % of its pearls from >9 and only ~29 % from the
         // 4.6-8 escape band.
-        if (dist <= ANCHOR_USABLE_RANGE || dist > PASSIVE_PEARL_ESCAPE_MAX) {
+        // Map crystal/passive/escape/pearl: the band is `distance=..8` normally and widens to 15
+        // while the bot is in the panic corner of the eval scale.
+        double escapeRange = ab.botEval() <= -220 ? 15.0d : PASSIVE_PEARL_ESCAPE_MAX;
+        if (dist > escapeRange) {
             return false;
         }
         Vector away = bot.getLocation().toVector().subtract(player.getLocation().toVector())
@@ -4082,7 +4272,6 @@ public final class PracticeService {
         }
         clearCrystalsNear(bot.getLocation(), 3.0d); // map: kill @e[distance=..3,type=end_crystal]
         ab.nextPearlMs(now + PASSIVE_PEARL_CD_MS);
-        ab.escapePassiveUntilMs(now + PASSIVE_ESCAPE_WINDOW_MS);
         pearlTeleportFx(bot, landing);
         session.fightLog("pearl out (passive)");
         return true;
@@ -4439,6 +4628,9 @@ public final class PracticeService {
         if (session.botStock().getOrDefault(Material.GLOWSTONE, 0) < 8) {
             session.botStock().put(Material.GLOWSTONE, ANCHOR_STOCK_REFILL * 4);
         }
+        if (session.botStock().getOrDefault(Material.GOLDEN_APPLE, 0) < 4) {
+            session.botStock().put(Material.GOLDEN_APPLE, GAP_STOCK_REFILL);
+        }
         BotDifficulty crystalDiff = session.difficulty();
         PracticeSession.BotAbilityState ab = session.abilities();
         boolean fights = crystalDiff.attackDamage() > 0.0d;
@@ -4447,7 +4639,8 @@ public final class PracticeService {
         if (fights) {
             tickBotGap(session, bot, 20.0d, now);
             tickBotWaterSave(session, bot, now);
-            tickEscapePearl(player, session, bot, 20.0d, now);
+            // (The wounded escape pearl is not called here any more: in crystal mode it lives in
+            // the PASSIVE branch, where the map's crystal/passive/escape/pearl sits.)
         }
 
         // --- totem recovery: after our own pop the fight pauses for the totem_cd rung ---
@@ -4469,20 +4662,15 @@ public final class PracticeService {
             return;
         }
 
-        // --- passive pearl (map crystal/passive/escape/pearl) --------------------------------
-        // The layer above the fight loop: inside 8 blocks the map bot pearls away ~15 blocks on
-        // every free pearlcd (1 s) — the reason it spends most of the match holding a pearl and
-        // the reason it is not simply glued to the target's face. Map: `player @s stop` right
-        // after the cast, so the tick's movement is skipped.
-        if (fights && tickPassivePearl(player, session, bot, now)) {
-            return;
-        }
-
         // --- movement: the map bot holds its ground (g1gc/botlogic stops every tick) and only
         // pushes forward when the player is beyond 2 blocks; it never backs away — a losing
         // trade is answered with a pearl instead.
         Location botLoc = bot.getLocation();
         double dist = botLoc.distance(player.getLocation());
+        // Map g1gc/can_hit (used by eval AND by the weapon gates): the target is hittable when
+        // it is inside melee reach, in line of sight and no longer inside its hurt frames.
+        boolean canHitNow = dist <= CRYSTAL_MELEE_REACH && bot.hasLineOfSight(player)
+                && now >= ab.targetHurtUntilMs();
         Vector dir = player.getLocation().toVector().subtract(botLoc.toVector()).setY(0);
         if (dir.lengthSquared() < 0.0001) {
             return;
@@ -4530,6 +4718,32 @@ public final class PracticeService {
             return; // NPC (map rung 0): no swings, no crystals, no passives — a living dummy
         }
 
+        // --- escape pearl (map crystal/passive/main, called ABOVE the state split) ------------
+        // bin/13 runs `function quantum:crystal/passive/main` and only THEN returns early when
+        // the state is 1-2, so the pearl-away module is NOT part of the passive branch: an
+        // attacking bot still blinks away whenever the target is inside 8 blocks (the band
+        // widens while it is nearly dead). This is the reference's out-and-in rhythm — its
+        // median distance is 18.3 blocks with 52 % of the match beyond 9 — and without it our
+        // bot sat in the 3-6 band chain-gunning anchors (measured 53/min against 18.1).
+        if (fights && tickPassivePearl(player, session, bot, now, dist)) {
+            return;
+        }
+
+        // --- map state machine (eval/biased): attack by default, passive as soon as the bot is
+        // behind on health. The fork sits here because the branch needs the live distance and the
+        // map's ordering is identical: movement, then the drain (passive vs attack), then the
+        // weapon modules.
+        updateBotState(player, session, bot, now, dist, canHitNow);
+        if (ab.botState() != 1 && ab.botState() != 2) {
+            if (fights && tickCrystalPassive(player, session, bot, now, dist)) {
+                return;
+            }
+            Material passiveHand = ab.gapEatUntilMs() > now ? Material.GOLDEN_APPLE
+                    : Material.ENDER_PEARL;
+            selectBotSlot(session, bot, passiveHand);
+            return;
+        }
+
         // Assigned drill modules (map .mode 201-203 → mech_train) ride on top of the aggregate
         // fight. This used to sit after the CRYSTAL early return in tickCombatBot, so a room
         // with a crystal drill assigned silently ran the plain fight instead of its module.
@@ -4544,10 +4758,7 @@ public final class PracticeService {
         // --- melee: the crystal bot swings a real netherite sword (map g1gc/hit) — a fixed
         // 7-tick cadence on every rung, the player's 3-block reach, only once the player's
         // hurt frames have expired (map: hurtTime=0 gate in g1gc/can_hit).
-        if (dist <= CRYSTAL_MELEE_REACH
-                && now >= ab.targetHurtUntilMs()
-                && now >= ab.nextMeleeMs()
-                && bot.hasLineOfSight(player)) {
+        if (canHitNow && now >= ab.nextMeleeMs()) {
             selectBotSlot(session, bot, Material.NETHERITE_SWORD); // map hotbar 4
             ab.hold(Material.NETHERITE_SWORD, now + HOLD_MELEE_MS);
             botSwing(session, player, bot, crystalDiff, crystalDiff.attackDamage());
@@ -4577,7 +4788,7 @@ public final class PracticeService {
         // cycle runs, crystal placement pauses — the map reloads crystal_timer after each
         // anchor stage, so the two weapons alternate instead of stacking.
         if (fights) {
-            tickAnchorCycle(player, session, bot, crystalDiff, now, dist);
+            tickAnchorCycle(player, session, bot, crystalDiff, now, dist, canHitNow);
         }
 
         // Dig out cover/floor when the player boxes in (real crystal-pvP behaviour).
@@ -4629,18 +4840,17 @@ public final class PracticeService {
     private boolean tickPearlPressure(Player player, PracticeSession session, BotBody bot,
                                       long now, double dist) {
         PracticeSession.BotAbilityState ab = session.abilities();
-        if (now < ab.nextPearlMs() || ab.anchorStage() != 0 || !session.botCrystals().isEmpty()) {
+        if (now < ab.nextPearlMs() || !session.botCrystals().isEmpty()) {
             return false; // map: `unless entity @e[tag=xlib,tag=usable]` + pearlcd/pearlcd2
         }
+        // The chain stage is deliberately NOT a gate: in the map the pearl runs at the end of
+        // every bin/27 tick (g1gc/botlogic), i.e. between and during anchor stages, and it is
+        // blocked only by pearlcd/hitcd and a live mech marker. Blocking it during a chain left
+        // our bot with 11.7 pearls/min against the reference's 49.2.
         // Map mark: no marker can exist outside 8 blocks, so the fight branch's chase pearl is
         // the >8 case; 4.6-8 belongs to the escape pearl. Splitting them this way is what gives
         // the reference its throw bands (66 % of throws from >9, 29 % from the escape band).
         if (dist <= PASSIVE_PEARL_RANGE) {
-            return false;
-        }
-        // ... and the fight branch is off while the passive branch is running: the bot walks the
-        // first stretch back in, which is where the reference's multi-second idle gaps come from.
-        if (now < ab.escapePassiveUntilMs()) {
             return false;
         }
         Vector to = player.getLocation().toVector().subtract(bot.getLocation().toVector()).setY(0);
@@ -4728,8 +4938,31 @@ public final class PracticeService {
         session.abilities().blastUntilMs(now + BLAST_RIDE_MS);
     }
 
+    /**
+     * Applies the bot's own explosion damage (see {@link #SELF_BLAST_RAW}). Called for anchor and
+     * crystal detonations in crystal mode: it is what makes the map's {@code eval} go negative
+     * and therefore what drives the attack/passive state machine, exactly like the reference.
+     */
+    private void botSelfBlastDamage(PracticeSession session, BotBody bot, Location boom,
+                                    float power, String weapon) {
+        if (session.type() != PracticeType.CRYSTAL || bot == null || !bot.isValid()) {
+            return;
+        }
+        double radius = power * 2.0d;
+        double d = bot.getLocation().distance(boom);
+        if (d >= radius) {
+            return; // outside the blast: the reference's 38 % no-damage charges
+        }
+        double k = 1.0d - d / radius;
+        double before = bot.getHealth();
+        bot.living().damage(SELF_BLAST_RAW * k * k);
+        double after = bot.getHealth();
+        session.fightLog(String.format(java.util.Locale.ROOT,
+                "%s self-blast %.2f -> %.2f hp (d %.1f)", weapon, before, after, d));
+    }
+
     private void tickAnchorCycle(Player player, PracticeSession session, BotBody bot,
-                                 BotDifficulty diff, long now, double dist) {
+                                 BotDifficulty diff, long now, double dist, boolean canHit) {
         PracticeSession.BotAbilityState ab = session.abilities();
         // The anchor mech is not a melee weapon: the map's `xaniclelib:mark` runs only while the
         // target is inside 8 blocks (crystal/tick → `at @p[tag=xlib_target,distance=..8]`) and
@@ -4797,6 +5030,7 @@ public final class PracticeService {
                 boom.getWorld().createExplosion(boom, 5.0f, true, false, bot.entity());
                 blastPush(bot, session, boom, 5.0f, now);
             }
+            botSelfBlastDamage(session, bot, boom, 5.0f, "anchor");
             ab.anchorStage(0);
             ab.anchorBlock(null);
             ab.nextAnchorMs(now + Math.max(anchorExplodeCdMs(diff), ANCHOR_RECYCLE_MS));
@@ -4804,6 +5038,7 @@ public final class PracticeService {
             // `glowstone -> totem_of_undying` transition fires once per chain).
             selectBotSlot(session, bot, Material.TOTEM_OF_UNDYING);
             ab.hold(Material.TOTEM_OF_UNDYING, now + HOLD_TOTEM_MS);
+            ab.botChains(ab.botChains() + 1);
             session.fightLog("anchor detonate");
             return;
         }
@@ -4818,11 +5053,14 @@ public final class PracticeService {
         // is anchor/glowstone ~11 % of the match. The earlier "the target's hurt frames never
         // open" note applied to the full-heal harness only: with damage actually landing, the
         // frames cycle exactly like they do against a real player.
-        long targetHurtUntil = session.abilities().targetHurtUntilMs();
-        boolean targetHittable = dist <= CRYSTAL_MELEE_REACH && bot.hasLineOfSight(player)
-                && now >= targetHurtUntil;
+        boolean targetHittable = canHit;
         if (targetHittable || now < ab.nextAnchorMs() || dist > anchorReach
+                || dist < ANCHOR_PLACE_MIN_RANGE
                 || !bot.hasLineOfSight(player)) {
+            // Point-blank (inside 2 blocks) is the reference's rarest anchor case (its <=2
+            // dwell is 4.6 % against 3-6's 37.3 %) and it is also where the blast hurts the bot
+            // the most: measured 4-7 HP per chain when it planted the anchor under its own feet
+            // against the reference's 0.68. Inside 2 blocks the sword owns the fight.
             return;
         }
         org.bukkit.block.Block foot = player.getLocation().getBlock();
@@ -4926,6 +5164,7 @@ public final class PracticeService {
                     boom.getWorld().createExplosion(boom, 6.0f, false, false, crystal);
                     blastPush(bot, session, boom, 6.0f, System.currentTimeMillis());
                 }
+                botSelfBlastDamage(session, bot, boom, 6.0f, "crystal");
                 crystal.remove();
                 session.fightLog("crystal detonate (7t fuse)");
             }
@@ -5000,13 +5239,24 @@ public final class PracticeService {
         // The bot never dies to its own combo weapons (crystals / TNT carts). World
         // #createExplosion(..., source) attributes the blast to the source entity, so the bot
         // itself shows up as the damager of its own combo — that must be ignored too.
-        if (event instanceof org.bukkit.event.entity.EntityDamageByEntityEvent byEntity
-                && (byEntity.getDamager() == null
-                        || byEntity.getDamager().getUniqueId().equals(bot.uuid())
-                        || session.botCrystals().contains(byEntity.getDamager().getUniqueId())
-                        || session.botTnt().contains(byEntity.getDamager().getUniqueId()))) {
-            event.setCancelled(true);
-            return true;
+        if (event instanceof org.bukkit.event.entity.EntityDamageByEntityEvent byEntity) {
+            boolean ownTnt = byEntity.getDamager() != null
+                    && session.botTnt().contains(byEntity.getDamager().getUniqueId());
+            // The bot DOES eat its own anchor/crystal blasts in crystal mode: the reference
+            // fixture measures it (run8: 0.68 HP per charge on average, 38 % of charges missing
+            // the bot entirely, bot HP 20.0 -> 3.7 across a 34 s chain), and its own damage is
+            // half of the map's `eval` score that drives the attack/passive state machine. TNT
+            // carts are a different mode's gadget and stay exempt.
+            boolean ownBlast = (event.getCause() == EntityDamageEvent.DamageCause.ENTITY_EXPLOSION
+                    || event.getCause() == EntityDamageEvent.DamageCause.BLOCK_EXPLOSION)
+                    && session.type() == PracticeType.CRYSTAL;
+            if (byEntity.getDamager() == null || ownTnt
+                    || (!ownBlast && (byEntity.getDamager().getUniqueId().equals(bot.uuid())
+                            || session.botCrystals()
+                                    .contains(byEntity.getDamager().getUniqueId())))) {
+                event.setCancelled(true);
+                return true;
+            }
         }
         // The bots' own fire tricks (lava buckets) and stray flames must not pop them.
         EntityDamageEvent.DamageCause cause = event.getCause();
