@@ -1447,6 +1447,17 @@ public final class PracticeService {
      *  blocks while {@code pearlcd} (20 ticks) is free — it is the crystal bot's repositioning
      *  tool, which is why the reference bot holds a pearl ~76 % of its run. */
     private static final double PASSIVE_PEARL_RANGE = 8.0d;
+
+    /** Upper edge of the escape band: outside it the target has no marker at all (chase in). */
+    private static final double PASSIVE_PEARL_ESCAPE_MAX = 10.0d;
+
+    /**
+     * How long the bot stays in the passive branch after an escape pearl. The reference fixture
+     * shows the anchor/crystal machine idle for a median 19 ticks (0.95 s) and a mean 69 ticks
+     * (3.5 s) between chains, with one sword hit and 1.6 anchors per ~5 s engagement; walking
+     * (5 b/s) instead of chase-pearling the first 10-15 blocks reproduces that gap.
+     */
+    private static final long PASSIVE_ESCAPE_WINDOW_MS = 2000L;
     private static final long PASSIVE_PEARL_CD_MS = 1000L;
     /** Map: {@code positioned ^ ^ ^-15} + {@code spreadplayers ~ ~ 0 5}. */
     private static final double PASSIVE_PEARL_LEAP = 15.0d;
@@ -1463,7 +1474,14 @@ public final class PracticeService {
      *  the throw lands right next to it — the map pearls while boxing too (no range gate). */
     private static final double PEARL_PRESSURE_STANDOFF = 1.0d;
     /** Map ray cast is limited to {@code ^ ^ ^-15}. */
-    private static final double PEARL_PRESSURE_MAX_LEAP = 15.0d;
+    /**
+     * Map {@code ray/cast2 → ray/pearlstep}: the chase pearl is a step-ray aimed at the target's
+     * eyes that ENDS on the target's own block ({@code @a[tag=xlib_target,dx=0]} → return), so a
+     * throw from any distance lands the bot next to the target. Capping the leap at 15 blocks
+     * made the bot stop 6 blocks short and WALK the rest — measured as 24 % of the fight spent
+     * in the 6-9 band (reference 2.5 %) and anchors fired from 6-9 instead of the 3-6 band.
+     */
+    private static final double PEARL_PRESSURE_MAX_LEAP = 40.0d;
     /** Landing closer than this would be inside the target: the ray stops on its hitbox. */
     private static final double PEARL_PRESSURE_LANDING_MIN = 0.9d;
     /** Pearl stock topped up on the bot (map kits are effectively endless). */
@@ -1500,7 +1518,44 @@ public final class PracticeService {
      * reference comes from it only being in block reach ~8 % of the match, so a permanently
      * close opponent (a fake player cannot push back) must not be answered with a slower chain.
      */
+    /** Map {@code mark/mark_main}: crystal markers are usable only inside 3.5 blocks. */
+    private static final double CRYSTAL_USABLE_RANGE = 3.5d;
+
+    /**
+     * Map {@code g1gc/movement}: the bot re-positions while a {@code crystal_2} marker sits
+     * 2.5-3.5 blocks away and otherwise plants itself, i.e. it fights from a ~3 block standoff
+     * (reference dwell: 3-6 blocks 37.3 %, <=2 only 4.6 %). Standing at 2 blocks threw the
+     * reference's 3-6 dwell mass straight into the <=2 bucket.
+     */
+    private static final double FIGHT_STANDOFF = 3.0d;
+
+    /**
+     * Both ends of the map's standoff band: it moves in above the far edge, backs off below.
+     * The band sits at the FAR end of the reference's 3-6 dwell: its anchors (usable <= 4.6)
+     * are placed at 3-6 (69 %, only 21 % inside 2) while the sword needs <= 3 (melee 11.4/min
+     * against 18.1 anchors/min). Holding at 3.0 parked our bot inside sword reach, which tripled
+     * the melee count and pulled the anchor places into the <=2 band.
+     */
+    private static final double FIGHT_STANDOFF_NEAR = 3.0d;
+    private static final double FIGHT_STANDOFF_FAR = 4.5d;
+
+    /**
+     * Map {@code mark/mark_main}: an anchor marker is {@code usable} only while it is within
+     * 4.6 blocks of the bot's eyes (= the anchor band 3-4.6) — that is also the band the
+     * reference's anchors are placed in (69 % at <=6, 0 % beyond 6).
+     */
+    private static final double ANCHOR_USABLE_RANGE = 4.6d;
+
+    /**
+     * Fallback gap between anchor stages / chains when the rung's own map timers do not apply
+     * ({@code anchor_cd}, {@code charge_cd}, {@code explosion_cd} at difficulty 2 = 4 ticks each
+     * → place → charge → detonate → next place in 12 ticks = the reference fixture's 0.60 s
+     * median place → place gap). The map's chain hands straight over, so this is only a floor.
+     */
     private static final long ANCHOR_RECYCLE_MS = 200L;
+
+    /** How long the bot keeps its blast knockback instead of the movement override. */
+    private static final long BLAST_RIDE_MS = 350L;
     /**
      * Hotbar timers, each one the module's own map timer. The reference bot's sampled hand over
      * a 400 s match: pearl 76.5 %, totem 7.2 %, glowstone 5.7 %, anchor 5.5 %, crystal 2.7 %,
@@ -2881,6 +2936,15 @@ public final class PracticeService {
                     + " armored fallback damage raw=" + damage + " applied=" + armored
                     + " victim=" + player.getName());
         }
+        if (landed) {
+            // Vanilla sets the hurt animation itself; the cancelled-and-registered frame did
+            // not, which left the target permanently "hittable" and starved the anchor chain.
+            // The window is tracked on our side as well: a fake player is never ticked, so its
+            // own hurtTime would never expire (measured: it froze at 10).
+            markTargetHurt(player);
+            session.abilities().targetHurtUntilMs(System.currentTimeMillis()
+                    + TARGET_HURT_WINDOW_MS);
+        }
         if (!landed || !knockback) {
             return;
         }
@@ -2892,6 +2956,31 @@ public final class PracticeService {
             player.setVelocity(new Vector(v.getX() + push.getX(),
                     Math.max(v.getY() * 0.5d, 0.35999998474121094d),
                     v.getZ() + push.getZ()));
+        }
+    }
+
+    /**
+     * The target's hurt frames, exactly the number the map's {@code hurtTime} objective holds
+     * ({@code bin/30}: {@code execute store result score @s hurtTime run data get entity @s
+     * HurtTime}) and the value {@code g1gc/can_hit} tests against 0. Vanilla {@code hurt()}
+     * sets it; the practice room cancels the attributed frame and registers damage directly, so
+     * we have to set it ourselves or the target never shows hurt frames at all.
+     */
+    private static int hurtTime(Player player) {
+        if (player instanceof org.bukkit.craftbukkit.entity.CraftPlayer craft) {
+            return craft.getHandle().hurtTime;
+        }
+        return player.getNoDamageTicks();
+    }
+
+    /** Map {@code hitcd} of the melee rung: the bot may swing again 7 ticks after its own hit. */
+    private static final long TARGET_HURT_WINDOW_MS = 500L; // 10 ticks, vanilla hurtTime
+
+    /** What vanilla {@code hurt()} does to the victim: 10 ticks of hurt animation. */
+    private static void markTargetHurt(Player player) {
+        if (player instanceof org.bukkit.craftbukkit.entity.CraftPlayer craft) {
+            craft.getHandle().hurtTime = 10;
+            craft.getHandle().hurtDuration = 10;
         }
     }
 
@@ -3347,12 +3436,19 @@ public final class PracticeService {
                 EntityEquipment seq = bot.getEquipment();
                 String hand = seq == null ? "-" : seq.getItemInMainHand().getType().name();
                 Vector bv = bot.getVelocity();
+                // o= is the OPPONENT's own coordinates, sampled on the same beat: the
+                // reference bands come from the qlog datapack measuring player↔target
+                // distance per tick, and a knockback-driven opponent moves, so a fixed
+                // --dummy coordinate would mis-attribute every action band.
+                Location ol = player.getLocation();
                 session.fightSample(String.format(
-                        "s p=%.2f,%.2f,%.2f v=%.2f,%.2f,%.2f y=%.1f pi=%.1f hp=%.1f g=%d i=%s",
+                        "s p=%.2f,%.2f,%.2f v=%.2f,%.2f,%.2f y=%.1f pi=%.1f hp=%.1f g=%d i=%s"
+                                + " o=%.2f,%.2f,%.2f",
                         bl.getX(), bl.getY(), bl.getZ(),
                         bv.getX(), bv.getY(), bv.getZ(),
                         bl.getYaw(), bl.getPitch(),
-                        bot.getHealth(), bot.isOnGround() ? 1 : 0, hand));
+                        bot.getHealth(), bot.isOnGround() ? 1 : 0, hand,
+                        ol.getX(), ol.getY(), ol.getZ()));
             }
             Location eye = bot.getEyeLocation();
             Location target = player.getLocation().add(0, 1.0, 0);
@@ -3960,7 +4056,14 @@ public final class PracticeService {
         if (now < ab.nextPearlMs()) {
             return false;
         }
-        if (bot.getLocation().distance(player.getLocation()) > PASSIVE_PEARL_RANGE) {
+        double dist = bot.getLocation().distance(player.getLocation());
+        // Map eval/biased + mark/mark_main: the escape pearl lives in the PASSIVE branch, which
+        // only runs when the bot has no usable marker — i.e. while the target sits outside the
+        // 4.6-block anchor band. Firing it from inside the fight band (any distance <= 8, as
+        // before) truncated every anchor chain after one cycle and threw away 62 % of the
+        // throws; the reference throws 66 % of its pearls from >9 and only ~29 % from the
+        // 4.6-8 escape band.
+        if (dist <= ANCHOR_USABLE_RANGE || dist > PASSIVE_PEARL_ESCAPE_MAX) {
             return false;
         }
         Vector away = bot.getLocation().toVector().subtract(player.getLocation().toVector())
@@ -3979,6 +4082,7 @@ public final class PracticeService {
         }
         clearCrystalsNear(bot.getLocation(), 3.0d); // map: kill @e[distance=..3,type=end_crystal]
         ab.nextPearlMs(now + PASSIVE_PEARL_CD_MS);
+        ab.escapePassiveUntilMs(now + PASSIVE_ESCAPE_WINDOW_MS);
         pearlTeleportFx(bot, landing);
         session.fightLog("pearl out (passive)");
         return true;
@@ -4392,19 +4496,31 @@ public final class PracticeService {
         Vector side = new Vector(-dir.getZ(), 0, dir.getX())
                 .multiply(0.18d * session.botStrafeDir());
         Vector move;
+        // Map g1gc/movement: `move forward` is refused while an anchor stage is armed
+        // (anchor_timer / charge_timer / explosion_timer) or a crystal marker sits within 1.5
+        // blocks — the bot plants itself for the chain instead of walking into the target. This
+        // is what keeps the reference at 3-6 blocks while it anchors; without it the bot closed
+        // to melee range between every stage and the whole fight collapsed into <=2 blocks.
+        boolean holdingChain = ab.anchorStage() > 0;
+        if (now < ab.blastUntilMs()) {
+            // Just shoved by our own blast: physics owns the movement for this window (the AI
+            // used to overwrite the velocity on the very next tick, which is why the shove was
+            // invisible and the ladder ran back to back).
+            return;
+        }
         if (!fights) {
             move = new Vector(0, 0, 0);                    // NPC: stand still, just exist
-        } else if (dist > 2.0d) {
+        } else if (dist > FIGHT_STANDOFF_FAR && !holdingChain) {
             move = dir.clone().multiply(0.24d).add(side);  // push forward (map: move forward)
-        } else if (dist < 1.2d) {
+        } else if (dist < FIGHT_STANDOFF_NEAR) {
             // Safety valve for opponents that cannot push back (fake players): without this the
             // bot parks inside the target and every distance-based module degenerates
             // (pearl direction ~0, crystal standoff gone) — measured as a frozen fight.
             move = dir.clone().multiply(-0.24d);
         } else {
-            move = new Vector(0, 0, 0);                    // within 2 blocks: hold ground
+            move = side.clone();                           // in the 3-4.5 band: hold + strafe
         }
-        if (fights && dist > 2.0d && bot.isOnGround()
+        if (fights && dist > FIGHT_STANDOFF_FAR && bot.isOnGround()
                 && Math.hypot(bot.getVelocity().getX(), bot.getVelocity().getZ()) < 0.05d) {
             move.setY(0.42d);                              // blocked by a wall: hop and climb
         }
@@ -4429,7 +4545,7 @@ public final class PracticeService {
         // 7-tick cadence on every rung, the player's 3-block reach, only once the player's
         // hurt frames have expired (map: hurtTime=0 gate in g1gc/can_hit).
         if (dist <= CRYSTAL_MELEE_REACH
-                && player.getNoDamageTicks() <= 0
+                && now >= ab.targetHurtUntilMs()
                 && now >= ab.nextMeleeMs()
                 && bot.hasLineOfSight(player)) {
             selectBotSlot(session, bot, Material.NETHERITE_SWORD); // map hotbar 4
@@ -4472,7 +4588,10 @@ public final class PracticeService {
         // --- attack: place a crystal combo near the player ---
         // Map cadence: crystal_timer reloads with the crystal_cd rung verbatim (6/6/6/3/2/3
         // ticks = 300/300/300/150/100/150 ms) — no random spread; combo speed IS the difficulty.
-        if (now >= session.botNextAttackMs() && dist <= 9.0d
+        // Map mark/mark_main: a crystal marker is only `usable` inside 3.5 blocks (8 is just the
+        // marking radius), so the reference places crystals point blank — 68 % of them inside 3
+        // blocks, 27 % inside 6, never further.
+        if (now >= session.botNextAttackMs() && dist <= CRYSTAL_USABLE_RANGE
                 && session.botCrystals().size() < 2 && ab.anchorStage() == 0) {
             long combo = crystalPlaceIntervalMs(crystalDiff);
             if (launchCrystalAttack(player, session, bot)) {
@@ -4512,6 +4631,17 @@ public final class PracticeService {
         PracticeSession.BotAbilityState ab = session.abilities();
         if (now < ab.nextPearlMs() || ab.anchorStage() != 0 || !session.botCrystals().isEmpty()) {
             return false; // map: `unless entity @e[tag=xlib,tag=usable]` + pearlcd/pearlcd2
+        }
+        // Map mark: no marker can exist outside 8 blocks, so the fight branch's chase pearl is
+        // the >8 case; 4.6-8 belongs to the escape pearl. Splitting them this way is what gives
+        // the reference its throw bands (66 % of throws from >9, 29 % from the escape band).
+        if (dist <= PASSIVE_PEARL_RANGE) {
+            return false;
+        }
+        // ... and the fight branch is off while the passive branch is running: the bot walks the
+        // first stretch back in, which is where the reference's multi-second idle gaps come from.
+        if (now < ab.escapePassiveUntilMs()) {
+            return false;
         }
         Vector to = player.getLocation().toVector().subtract(bot.getLocation().toVector()).setY(0);
         if (to.lengthSquared() < 0.25d) {
@@ -4570,11 +4700,66 @@ public final class PracticeService {
      * guards each stage with the player's hurt frames on rung 6 only — we gate every stage
      * on the anchor block still existing, so a player anchor-break aborts the cycle.
      */
+    /**
+     * Vanilla explosion push for the BOT itself.
+     *
+     * <p>The reference bot's own chains are what move it: an anchor or crystal blowing up 3-6
+     * blocks away throws it out of its own anchor range, and the walk back in is the pause
+     * between chains (reference: 18.1 anchors/min while standing in range 41 % of the match).
+     * Our practice room deliberately cancels self-blame damage ("the bot never dies to its own
+     * combo weapons"), and a cancelled frame carries no knockback, so the position bookkeeping
+     * has to apply the vanilla push by hand. The velocity override in the movement block is
+     * skipped until {@code blastUntilMs} so the shove is not erased one tick later.
+     */
+    private void blastPush(BotBody bot, PracticeSession session, Location center, float power,
+                           long now) {
+        Location bl = bot.getLocation();
+        double radius = power * 2.0d; // vanilla: the entity query radius is power * 2
+        double dx = bl.getX() - center.getX();
+        double dy = bl.getY() + 0.9d - center.getY();
+        double dz = bl.getZ() - center.getZ();
+        double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (dist <= 0.0d || dist > radius) {
+            return;
+        }
+        double k = 1.0d - dist / radius; // (1 - d) * exposure, exposure ~ 1 in open air
+        Vector push = new Vector(dx, dy, dz).multiply(1.0d / dist).multiply(k);
+        bot.setVelocity(bot.getVelocity().add(push));
+        session.abilities().blastUntilMs(now + BLAST_RIDE_MS);
+    }
+
     private void tickAnchorCycle(Player player, PracticeSession session, BotBody bot,
                                  BotDifficulty diff, long now, double dist) {
         PracticeSession.BotAbilityState ab = session.abilities();
+        // The anchor mech is not a melee weapon: the map's `xaniclelib:mark` runs only while the
+        // target is inside 8 blocks (crystal/tick → `at @p[tag=xlib_target,distance=..8]`) and
+        // the anchor itself is placed AT the target, so the chain fires from mid range. Capping
+        // it at melee reach + 1.5 kept the bot welded to the target (dwell <=2 21 % against the
+        // reference's 4.6 %, anchors 59/min against 18.1) — the reference's 3-6 block band IS
+        // the anchor band (69 % of its placements).
+        // Map mark/mark_main: the anchor stages are only usable while the marker (the spot at
+        // the target's feet) sits inside 4.6 blocks of the bot's eyes — 8 is only the radius in
+        // which the spot is MARKED. Anchoring from 6-9 blocks was our worst band error.
+        double anchorReach = ANCHOR_USABLE_RANGE;
         // Advance the running cycle first — the stages run wherever the fight has moved to.
         if (ab.anchorStage() > 0) {
+            if (dist > anchorReach) {
+                // A chain cannot outlive the mark that created it: out of 8 blocks there are no
+                // markers, so the map's bot simply stops advancing the ladder (and our own blast
+                // is what throws it out). Ending the chain here is what turns one continuous
+                // ladder into the reference's bursts — 18.1 anchors/min against our 54.6, with
+                // the walk back in as the pause between chains.
+                org.bukkit.block.Block stale = ab.anchorBlock() == null
+                        ? null : ab.anchorBlock().getBlock();
+                if (stale != null && stale.getType() == Material.RESPAWN_ANCHOR) {
+                    session.botPlacedBlocks().remove(stale);
+                    stale.setType(Material.AIR, false);
+                }
+                ab.anchorStage(0);
+                ab.anchorBlock(null);
+                ab.nextAnchorMs(now + ANCHOR_RECYCLE_MS);
+                return;
+            }
             org.bukkit.block.Block anchor = ab.anchorBlock() == null
                     ? null : ab.anchorBlock().getBlock();
             if (anchor == null || anchor.getType() != Material.RESPAWN_ANCHOR) {
@@ -4610,6 +4795,7 @@ public final class PracticeService {
             anchor.setType(Material.AIR, false);
             if (boom.getWorld() != null) {
                 boom.getWorld().createExplosion(boom, 5.0f, true, false, bot.entity());
+                blastPush(bot, session, boom, 5.0f, now);
             }
             ab.anchorStage(0);
             ab.anchorBlock(null);
@@ -4632,9 +4818,9 @@ public final class PracticeService {
         // is anchor/glowstone ~11 % of the match. The earlier "the target's hurt frames never
         // open" note applied to the full-heal harness only: with damage actually landing, the
         // frames cycle exactly like they do against a real player.
+        long targetHurtUntil = session.abilities().targetHurtUntilMs();
         boolean targetHittable = dist <= CRYSTAL_MELEE_REACH && bot.hasLineOfSight(player)
-                && player.getNoDamageTicks() <= 0;
-        double anchorReach = CRYSTAL_MELEE_REACH + 1.5d; // vanilla block reach onto the target
+                && now >= targetHurtUntil;
         if (targetHittable || now < ab.nextAnchorMs() || dist > anchorReach
                 || !bot.hasLineOfSight(player)) {
             return;
@@ -4738,6 +4924,7 @@ public final class PracticeService {
                 Location boom = crystal.getLocation();
                 if (boom.getWorld() != null) {
                     boom.getWorld().createExplosion(boom, 6.0f, false, false, crystal);
+                    blastPush(bot, session, boom, 6.0f, System.currentTimeMillis());
                 }
                 crystal.remove();
                 session.fightLog("crystal detonate (7t fuse)");

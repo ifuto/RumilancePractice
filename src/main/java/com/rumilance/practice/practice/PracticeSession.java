@@ -136,6 +136,32 @@ public final class PracticeSession {
         private int anchorStage;
         /** The tracked anchor block of the running cycle. */
         private transient org.bukkit.Location anchorBlock;
+        /**
+         * Until this timestamp the target is inside its hurt frames — the exact window the map
+         * reads from the target's NBT ({@code hurtTime}, {@code g1gc/can_hit}). The plugin drives
+         * the window itself because the practice room cancels the attributed damage frame and
+         * registers the health directly, so nothing else would ever set or expire it.
+         */
+        private long targetHurtUntilMs;
+
+        /**
+         * Until when the bot rides out a knockback from its own blast. Vanilla explosion push
+         * is applied to every entity in radius, but the practice room cancels the blast's
+         * damage frame, and the AI overwrites the bot's velocity on every tick — so the push
+         * is recorded here and the movement override is skipped until it expires. Without it
+         * the bot never leaves the spot it anchored from and fires the 12-tick ladder back to
+         * back (measured 50.5 anchors/min against the reference's 18.1).
+         */
+        private long blastUntilMs;
+
+        /**
+         * Until this instant the bot is in the map's PASSIVE branch: after an escape pearl it
+         * walks back in (map {@code bin/13} + {@code bin/28} `move forward`) and does NOT throw
+         * the fight branch's chase pearl ({@code g1gc/pearl}). The reference's engagement cycle
+         * is ~5 s long with one sword hit and 1.6 anchors per cycle; without this window our bot
+         * teleported back in after 1 s and doubled every close-range count.
+         */
+        private long escapePassiveUntilMs;
         /** While set, the bot is visibly eating a golden apple (map gap_timer 35t). */
         private long gapEatUntilMs;
         /** Regen-II style heal window after a golden apple (vanilla: +8 HP over 5 s). */
@@ -196,6 +222,14 @@ public final class PracticeSession {
         public void anchorStage(int v) { anchorStage = v; }
         public org.bukkit.Location anchorBlock() { return anchorBlock; }
         public void anchorBlock(org.bukkit.Location v) { anchorBlock = v; }
+        public long targetHurtUntilMs() { return targetHurtUntilMs; }
+        public void targetHurtUntilMs(long v) { targetHurtUntilMs = v; }
+
+        public long blastUntilMs() { return blastUntilMs; }
+        public void blastUntilMs(long v) { blastUntilMs = v; }
+
+        public long escapePassiveUntilMs() { return escapePassiveUntilMs; }
+        public void escapePassiveUntilMs(long v) { escapePassiveUntilMs = v; }
         public long gapEatUntilMs() { return gapEatUntilMs; }
         public void gapEatUntilMs(long v) { gapEatUntilMs = v; }
         public long gapRegenUntilMs() { return gapRegenUntilMs; }

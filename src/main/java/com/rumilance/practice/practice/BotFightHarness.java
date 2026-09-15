@@ -66,7 +66,18 @@ public final class BotFightHarness implements CommandExecutor, TabCompleter {
     /** Top the fake opponent up once it drops to this health (never at full HP, see below). */
     private static final double DUMMY_HEAL_FLOOR = 4.0d;
 
+    /** Arena rim height (blocks) built by {@code ground}: the reference venue is walled. */
+    private static final int WALL_HEIGHT = 6;
+
+    /** Surface bookkeeping of the last {@code ground} call, used to keep the floor sealed. */
+    private World groundWorld;
+    private int[] groundCenter;
+    private int groundTop;
+    private int groundRadius;
+
     private BukkitTask keepAliveTask;
+    private final java.util.concurrent.atomic.AtomicBoolean dummyTickWarned =
+            new java.util.concurrent.atomic.AtomicBoolean();
 
     public BotFightHarness(Plugin plugin, PracticeService practice, PlayerStateManager stateManager) {
         this.plugin = plugin;
@@ -170,10 +181,28 @@ public final class BotFightHarness implements CommandExecutor, TabCompleter {
                         target.getBlockAt(x[0], y, z).setType(Material.AIR, false);
                     }
                 }
+                // Arena wall on the rim: the reference venue is a closed room, which is what
+                // makes its pearl geometry meaningful — a pearl aimed at a side wall carries
+                // the bot 10-40 blocks away (that is where the reference's >9 block dwell and
+                // its 49/min pearl rate come from), and a knocked-back opponent stays inside
+                // the arena instead of ending up in the void or in a hole it cannot leave.
+                boolean rim = x[0] == cx - radius || x[0] == cx + radius
+                        || z == cz - radius || z == cz + radius;
+                if (rim) {
+                    for (int y = top + 1; y <= top + WALL_HEIGHT; y++) {
+                        if (y <= target.getMaxHeight()) {
+                            target.getBlockAt(x[0], y, z).setType(Material.STONE, false);
+                        }
+                    }
+                }
             }
             x[0]++;
         }, 1L, 1L);
         anchor = new Location(target, cx + 0.5, top + 1, cz + 0.5, 0f, 0f);
+        groundWorld = target;
+        groundCenter = new int[]{cx, cz};
+        groundTop = top;
+        groundRadius = radius;
         sender.sendMessage("filling stone y=" + bottom + ".." + top + " around "
                 + cx + "," + cz + " (r=" + radius + ") …");
         log("ground start x=" + cx + " z=" + cz + " top=" + top + " depth=" + depth
@@ -297,6 +326,13 @@ public final class BotFightHarness implements CommandExecutor, TabCompleter {
                 log("round aborted: no session after join (dummy=" + dummyName + ")");
                 return;
             }
+            // The harness room IS the venue (the bot spawns -8 on X, the dummy sits on P1), so
+            // the session must own the room's cuboid and not just the arena-template bounds:
+            // the region is what keeps explosions from eating the practice floor. With the
+            // reference's `herobot explosionNoBlockDamage true` the venue stays intact; here
+            // the craters opened under the dummy within a minute and the headless opponent
+            // sank into one, out of reach for the rest of the round.
+            session.setActiveRegion(room.region());
             session.setDurationSeconds(seconds);
             session.setDifficulty(difficulty);
             practice.handleWaitInteract(player, session, PracticeItems.ACTION_START);
@@ -359,6 +395,53 @@ public final class BotFightHarness implements CommandExecutor, TabCompleter {
     }
 
     /**
+     * Keeps the arena floor sealed under the dummy (and pulls it out of any hole it did end up
+     * in).
+     *
+     * <p>The reference venue switches explosion block damage OFF ({@code herobot
+     * explosionNoBlockDamage true}); without that the practice floor opens up within a minute
+     * and the opponent drops into a pit it has no AI to leave — the fight then dies silently
+     * and every downstream number is measured against a stuck target. Re-sealing the surface
+     * under the dummy reproduces that setting, and the escape hatch below covers a target that
+     * is already buried.
+     */
+    private void sealFloorAround(Player player) {
+        if (groundWorld == null || groundCenter == null) {
+            return;
+        }
+        if (!player.getWorld().equals(groundWorld)) {
+            return;
+        }
+        int px = player.getLocation().getBlockX();
+        int pz = player.getLocation().getBlockZ();
+        for (int x = px - 3; x <= px + 3; x++) {
+            for (int z = pz - 3; z <= pz + 3; z++) {
+                org.bukkit.block.Block block = groundWorld.getBlockAt(x, groundTop, z);
+                if (block.getType() != Material.STONE) {
+                    block.setType(Material.STONE, false);
+                }
+            }
+        }
+        int cx = groundCenter[0];
+        int cz = groundCenter[1];
+        // The rim (wall cells) is not walkable: an explosion can wedge the target into the wall
+        // or push it past the edge, and a fake player has no AI to walk out again — the round
+        // then stalls with the bot circling a target it cannot reach.
+        int edge = groundRadius - 2;
+        if (Math.abs(px - cx) >= edge || Math.abs(pz - cz) >= edge
+                || player.getLocation().getY() < groundTop - 0.5d) {
+            // Buried or outside the arena: put it back on the arena centre (the reference map
+            // also re-places its target between rounds).
+            Location home = new Location(groundWorld, cx + 0.5d, groundTop + 1.0d, cz + 0.5d);
+            if (player instanceof org.bukkit.craftbukkit.entity.CraftPlayer craft) {
+                craft.getHandle().teleportTo(home.getX(), home.getY(), home.getZ());
+            } else {
+                player.teleport(home);
+            }
+        }
+    }
+
+    /**
      * The fake player has no client: a lethal hit that the plugin's death-catch cancels leaves
      * it stranded at 0 HP (no respawn screen to click, and {@code isDead()} then stops the BOT
      * AI for good). The dummy is therefore only topped up once it is nearly down
@@ -380,6 +463,34 @@ public final class BotFightHarness implements CommandExecutor, TabCompleter {
                 Player player = Bukkit.getPlayerExact(name);
                 if (player == null || !player.isOnline()) {
                     continue;
+                }
+                sealFloorAround(player);
+                // Carpet ticks its fake players; a ServerPlayer without a connection is NOT
+                // ticked by the server at all (ServerGamePacketListenerImpl drives the tick), so
+                // without this the dummy is a statue: no hurt frames ever expire (the map's
+                // can_hit/anchor split reads the target's HurtTime), no knockback moves it and
+                // no gravity applies. Ticking it here makes the headless opponent behave like
+                // the reference's fake player, which is what the parity numbers are measured on.
+                PacketBotBody body = dummies.get(name);
+                if (body != null) {
+                    try {
+                        net.minecraft.server.level.ServerPlayer nms = body.bot();
+                        nms.tick();
+                        // The living half of a player's tick is driven by the CONNECTION, not
+                        // by the level: ServerGamePacketListenerImpl.tick() calls doTick(),
+                        // which runs Player.tick() → LivingEntity.tick() → hurtTime--, gravity,
+                        // knockback integration. Our fake player has a no-op connection, so
+                        // without this call the dummy never leaves its first hurt frame
+                        // (measured: HurtTime pinned at 10 for minutes, position frozen) and no
+                        // explosion can push it — the map's can_hit/hurt0 split then reads a
+                        // target that is permanently invulnerable.
+                        nms.doTick();
+                    } catch (Throwable t) {
+                        if (dummyTickWarned.compareAndSet(false, true)) {
+                            log("dummy tick failed (" + t.getClass().getSimpleName() + ": "
+                                    + t.getMessage() + ") — the opponent will not animate/knock back");
+                        }
+                    }
                 }
                 double max = Math.max(1.0d, player.getMaxHealth());
                 if (player.isDead()) {

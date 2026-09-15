@@ -94,12 +94,13 @@ def ref_profile(rows):
 
 # ------------------------------------------------------------------------ plugin
 SAMPLE = re.compile(r"\[N Arena\]\[BotMatch\]\s+([\d.]+)\s+s p=(-?[\d.]+),(-?[\d.]+),(-?[\d.]+)")
+OPPONENT = re.compile(r"o=(-?[\d.]+),(-?[\d.]+),(-?[\d.]+)")
 TRACE = re.compile(r"\[N Arena\]\[BotMatch\]\s+([\d.]+)s\s+(.+)$")
 END = re.compile(r"\[N Arena\]\[BotMatch\] END .*duration=(\d+)s")
 
 
 def plugin_profile(path: str, dummy):
-    samples = []          # (t, x, y, z)
+    samples = []          # (t, x, y, z, ox, oy, oz)
     events = []           # (t, text)
     duration = None
     for line in _open(path):
@@ -109,11 +110,14 @@ def plugin_profile(path: str, dummy):
             continue
         m = SAMPLE.search(line)
         if m:
+            o = OPPONENT.search(line)
+            ox, oy, oz = (float(o.group(1)), float(o.group(2)), float(o.group(3))) if o else (None, None, None)
             # The sampler writes DECISECONDS since session start (10 units = 1 s), while the
             # event trace writes seconds with one decimal. Same clock, different unit — fold
             # it here or every per-action distance band is matched against the wrong instant.
             t = float(m.group(1)) / 10.0
-            samples.append((t, float(m.group(2)), float(m.group(3)), float(m.group(4))))
+            samples.append((t, float(m.group(2)), float(m.group(3)), float(m.group(4)),
+                            ox, oy, oz))
             continue
         m = TRACE.search(line)
         if m and not m.group(2).startswith("s p="):
@@ -123,10 +127,15 @@ def plugin_profile(path: str, dummy):
     if not samples and not events:
         raise SystemExit(f"no [N Arena][BotMatch] data in {path}")
 
-    dx, dy, dz = dummy
+    dx, dy, dz = dummy if dummy else (0.0, 0.0, 0.0)
     band_at = []
-    for t, x, y, z in samples:
-        d = ((x - dx) ** 2 + (y - dy) ** 2 + (z - dz) ** 2) ** 0.5
+    for t, x, y, z, ox, oy, oz in samples:
+        if ox is not None:
+            # Live opponent coordinates (o=) beat the fallback: the knockback-driven
+            # opponent moves, so the band must be measured against where it is NOW.
+            d = ((x - ox) ** 2 + (y - oy) ** 2 + (z - oz) ** 2) ** 0.5
+        else:
+            d = ((x - dx) ** 2 + (y - dy) ** 2 + (z - dz) ** 2) ** 0.5
         band = "<=2" if d <= 2 else "<=3" if d <= 3 else "<=6" if d <= 6 else "<=9" if d <= 9 else ">9"
         band_at.append((t, band))
     band_of = {}
