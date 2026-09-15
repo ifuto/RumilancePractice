@@ -210,3 +210,14 @@ diamond_sword 2.3%。遷移は respawn_anchor→glowstone 104 回、glowstone→
 つまり `anchor_cd 4t + charge_cd 4t + explosion_cd 4t` がそのまま刻みで、
 v1.76.18/.19 で入れた 1000/1700 ms は誤り(全体 17.3/min は「近距離に8%しか居ない」ことの
 帰結であって、連鎖自体を遅くする理由にはならない)。`ANCHOR_RECYCLE_MS = 200` に修正。
+
+## v1.76.22 (2026-09-15)
+
+map `bin/27` のアンカー開始条件を**そのまま**にした。`hit_decision_without_cd` は
+`g1gc/can_hit` = 「can_see_target && distance..3 && **hurtTime=0**」の否定なので、
+剣とアンカーは**排他**: 相手が今殴れる間は剣、相手の被弾硬直(10 tick)が明けた瞬間に剣の
+判定が落ちてアンカー連鎖が始まる(place 4t → charge 4t → explode 4t)。
+
+これまでの「自分のスイング間隔の最後 50ms だけアンカー可」は便宜的な近似で、実測でも
+連鎖が 2.0 秒間隔に間延びしていた(参照は 0.60 秒)。1.76.20 でダミーが実際にダメージを
+受けるようになり被弾硬直が回るようになったので、map どおりの条件に置き換えた。

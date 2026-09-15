@@ -4621,16 +4621,21 @@ public final class PracticeService {
             session.fightLog("anchor detonate");
             return;
         }
-        // Engage exactly like the map's bin/27: while a melee line is up, `cannot_anchor` is
-        // set for the whole hit cooldown (hitcd 7 -> 6..1) and `g1gc/anchor_tick` returns; the
-        // anchor may only start on the last tick of the swing. That is the map's real rhythm —
-        // the reference bot anchors inside the boxing range (70 % of its anchors land inside
-        // 6 blocks, 31 % inside 3), not only at range. Block reach onto the target's feet is
-        // the only distance limit the map has here.
-        boolean meleeBlock = dist <= CRYSTAL_MELEE_REACH && bot.hasLineOfSight(player)
-                && now < ab.nextMeleeMs() - 50L;
+        // Engage exactly like the map's bin/27 → g1gc/anchor_tick:
+        //   `unless entity @e[tag=loc,tag=usable] if hit_decision_without_cd == 0 run anchor_tick`
+        // and `hit_decision_without_cd` is `g1gc/can_hit` = can_see_target && distance..3 &&
+        // hurtTime=0 (i.e. the target CAN be hit right now). So the two weapons are strictly
+        // complementary: while the target is hit-able the bot swords it, and the instant its
+        // 10-tick hurt frames are up the sword line is refused and the ANCHOR CHAIN starts —
+        // place 4t → charge 4t → explode 4t, which is why the reference shows one chain every
+        // 0.6 s inside reach (place→place mode exactly 0.60 s, 57/117 gaps) and its sampled hand
+        // is anchor/glowstone ~11 % of the match. The earlier "the target's hurt frames never
+        // open" note applied to the full-heal harness only: with damage actually landing, the
+        // frames cycle exactly like they do against a real player.
+        boolean targetHittable = dist <= CRYSTAL_MELEE_REACH && bot.hasLineOfSight(player)
+                && player.getNoDamageTicks() <= 0;
         double anchorReach = CRYSTAL_MELEE_REACH + 1.5d; // vanilla block reach onto the target
-        if (meleeBlock || now < ab.nextAnchorMs() || dist > anchorReach
+        if (targetHittable || now < ab.nextAnchorMs() || dist > anchorReach
                 || !bot.hasLineOfSight(player)) {
             return;
         }
