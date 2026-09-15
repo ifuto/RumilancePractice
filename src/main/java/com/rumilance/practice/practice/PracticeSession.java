@@ -57,6 +57,10 @@ public final class PracticeSession {
      * COUNTED stock restocked on spawn — no phantom webs/lava/potions/rails appear anymore. */
     /** Objective timeline of the fight (bot swings/hits/combos/totems) for the end report. */
     private final java.util.List<String> fightLog = new java.util.ArrayList<>();
+    /** Objective events kept per fight; chatter (swing/hit) has the smaller budget below. */
+    private static final int FIGHT_LOG_CAP = 4000;
+    private static final int CHATTER_LOG_CAP = 300;
+    private int chatterLogCount;
     /** 0.1 s state samples of the bot (pos/look/hp/hand) — console-only, parity comparison. */
     private final java.util.List<String> fightSamples = new java.util.ArrayList<>();
     private final long fightLogStart = System.currentTimeMillis();
@@ -437,11 +441,22 @@ public final class PracticeSession {
     }
 
     /** Records one fight event with its second-offset; capped so a long fight cannot leak. */
+    /**
+     * Objective fight trace, stamped in 0.1 s units (the qlog datapack resolves ticks, and the
+     * anchor chain's place→charge is 4 ticks = 0.2 s — whole seconds cannot measure that).
+     * Swing/hit chatter has its own (smaller) budget so a three minute run cannot push the
+     * anchor/crystal/totem events out of the dump.
+     */
     public void fightLog(String event) {
-        if (fightLog.size() < 240) {
-            long t = (System.currentTimeMillis() - fightLogStart) / 1000L;
-            fightLog.add(t + "s " + event);
+        boolean chatter = event.startsWith("swing") || event.startsWith("hit");
+        if (chatter ? chatterLogCount >= CHATTER_LOG_CAP : fightLog.size() >= FIGHT_LOG_CAP) {
+            return;
         }
+        if (chatter) {
+            chatterLogCount++;
+        }
+        long ds = (System.currentTimeMillis() - fightLogStart) / 100L;
+        fightLog.add(String.format(java.util.Locale.ROOT, "%.1fs %s", ds / 10.0d, event));
     }
 
     public java.util.List<String> fightLog() {

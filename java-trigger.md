@@ -108,3 +108,5 @@ cd /tmp/mcserver && /tmp/jdk21/bin/java -Xmx2400M -jar fabric-server-launch.jar 
 - 2026-09-15: v1.76.9 の jar を plugin-delivery に配信(java-env 再実行)。
 
 - 2026-09-15: v1.76.10 の jar を配信(ハーネス測定のため)。
+
+- 2026-09-15: v1.76.11 の jar を配信(BOT戦トレースの精度上げ)。

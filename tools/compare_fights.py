@@ -83,9 +83,9 @@ def parse_ours(path):
                     fields[key] = mm.group(1)
             samples.append(fields)
             continue
-        m = re.search(r"\[N Arena\]\[BotMatch\]\s+(\d+)s (.+)$", line.strip())
+        m = re.search(r"\[N Arena\]\[BotMatch\]\s+([\d.]+)s (.+)$", line.strip())
         if m and not m.group(2).startswith("s p="):
-            events.append((int(m.group(1)), m.group(2)))
+            events.append((float(m.group(1)), m.group(2)))
     return samples, events
 
 
