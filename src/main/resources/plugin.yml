@@ -180,6 +180,10 @@ commands:
     description: Bind a bot fight kit to the arena kit hosting its fights.
     usage: /botadmin <SWORD|MACE|CRYSTAL|NETHERITE_POT|CART|botkit> <kit|arenakit|off>
     permission: rumilance.admin
+  quantum:
+    description: Run the Quantum (Practicebot) datapack on Paper — functions, bot verbs and map switches.
+    usage: /quantum <status|reload|failures|seed|start|stop|run|option|toggle|difficulty|spawnbot|despawnbot|bots|rules|importworld|loadworld>
+    permission: rumilance.admin
   narena-harness:
     description: Headless BOT-fight harness for parity measurement (dev only; needs -Drumilance.harness=true).
     usage: /narena-harness <ground|room|dummy|fight|status|stop>

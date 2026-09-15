@@ -221,3 +221,23 @@ map `bin/27` のアンカー開始条件を**そのまま**にした。`hit_deci
 これまでの「自分のスイング間隔の最後 50ms だけアンカー可」は便宜的な近似で、実測でも
 連鎖が 2.0 秒間隔に間延びしていた(参照は 0.60 秒)。1.76.20 でダミーが実際にダメージを
 受けるようになり被弾硬直が回るようになったので、map どおりの条件に置き換えた。
+
+## v1.76.28 (2026-09-15) — Quantum 本体を Paper で走らせる(herobot 移植 + 関数エンジン)
+
+「完全に動作一致」への方針を、関数を1つずつ書き直すのではなく **参照の実装そのものを動かす** に変えた。
+
+1. **herobot を Paper へ移植**(`com.rumilance.practice.herobot`): `BotActionPack`(once/continuous/
+   interval、3t item-use cd、移動倍率、look 補間、auto-jump 探査、block/entity レイトレース)、
+   `HeroBotPlayer`(tick HEAD で onUpdate、`move` で auto-jump、ping 遅延ノックバック、
+   shield-stun の 0.4 倍 KB、stab、hotbar、disconnect/kill)、`HeroBotRegistry`(createFake 相当)、
+   `HeroBotCommands`(`/player`・`/playerspawn`・`/herobot` を参照の Brigadier 木どおりに)。
+2. **関数エンジン**(`com.rumilance.practice.quantum`): `.mcfunction` + function タグを読み、
+   **生きている dispatcher**(= `player` 等が登録済み)で `CommandFunction.fromLines` に掛けて
+   `ServerFunctionLibrary` を組み直し `replaceLibrary` で差し替える。`function` / `execute if
+   function` / `schedule` / `#minecraft:tick` はバニラの実装がそのまま使われる。
+   スパイク(`tools/paper-bridge-spike`)で「datapack ローダー任せでは `player …` が
+   Unknown になる」と分かっていた部分を、プラグイン側でコンパイルすることで回避する。
+3. `/quantum`(status/reload/failures/seed/start/stop/run/option/toggle/difficulty/spawnbot/
+   importworld/loadworld)を追加。`quantum.yml` で pack パス・bot 名/座標・herobot ルールを持つ。
+
+この push で `./gradlew test shadowJar` を通し、`plugin-delivery` に新しい jar を載せる。

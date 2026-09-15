@@ -1,0 +1,60 @@
+# Quantum (Practicebot) datapack runtime.
+#
+# This file is what makes the reference map's own .mcfunction files run on Paper instead of a
+# hand-written re-implementation: the plugin compiles every function in the pack against the
+# live command dispatcher (where /player, /playerspawn and /herobot live) and installs it into
+# the vanilla function library, so `function`, `execute if function`, `schedule` and the
+# #minecraft:tick tag are vanilla's own.
+#
+# The world itself (arena, markers, scoreboard.dat settings) belongs in the pack zip; the map's
+# spawn positions, `forceload`s and structure templates come from there.
+enabled: true
+
+# Where the pack lives. Each entry is a directory containing `data/`, OR a .zip containing the
+# world/pack (the reference download "Quantum's PvP Practice v1.18.zip" works as-is: both the
+# world itself and its `datapacks/Practicebot` folder are read).
+packs:
+  - "plugins/RumilancePractice/quantum"
+
+# Also pick up packs from the loaded worlds' `datapacks/` folders (and from `quantum/datapacks`).
+include-world-datapacks: true
+
+world:
+  # The world the map runs in. Empty = the server's default world.
+  name: ""
+
+bot:
+  # The name the map spawns its opponent under (quantum:botspawning).
+  name: "quantumbot"
+  gamemode: "creative"
+  yaw: 0.0
+  pitch: 0.0
+  # Milliseconds; the map's .ping score / options/set_ping is authoritative once it runs.
+  ping: 100
+  # Where to spawn the bot when nothing else says otherwise (x, y, z). 3 values, no defaults
+  # beyond these; `playerspawn ... at <x y z>` in the map always wins.
+  spawn: [-646.0, 57.0, 88.0]
+
+# The reference measurement scenario (docs/bot-combat-parity.md) was taken with these two
+# settings; `mode` and `difficulty` are applied by /quantum seed and by the map's own scoring.
+mode: 0
+difficulty: 0
+
+# scoreboard players set <holder> <objective> <value> applied by /quantum seed.
+# Use `<objective>.<holder>` for anything other than the "."-holder convention.
+scores: {}
+
+# toggles applied (function quantum:options/toggles/<name>on) by /quantum seed.
+toggles: []
+
+# HeroBot rule values, the same rules /herobot sets (see quantum:options/toggles/stun_on).
+herobot:
+  bot-ping-to-ticks: 25
+  bot-lag-attacks: false
+  bot-lag-uses: false
+  shield-stunning: false
+  shield-stunning-window: 3
+  shield-delay-ticks: 5
+  allow-spawning-offline-players: true
+  bot-leave-on-death: false
+  creative-no-clip: false

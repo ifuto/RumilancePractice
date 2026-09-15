@@ -238,6 +238,11 @@ import java.util.concurrent.TimeUnit;
 public final class FeatureBootstrap {
 
     private final RumilancePractice plugin;
+
+    /** HeroBot port: named fake players the Quantum map drives with {@code player @s …}. */
+    private com.rumilance.practice.herobot.HeroBotRegistry quantumBots;
+    /** The Quantum datapack runtime (function engine + map switches). */
+    private com.rumilance.practice.quantum.QuantumRuntime quantum;
     /** Periodic re-render of open GUIs whose data can change while viewed (party/queue/FFA). */
     private org.bukkit.scheduler.BukkitTask liveGuiTask;
     private final ServiceRegistry services;
@@ -1782,10 +1787,24 @@ public final class FeatureBootstrap {
             return true;
         });
 
+        // Quantum: run the reference map's own datapack on Paper instead of re-implementing it.
+        // The verbs (/player, /playerspawn, /herobot) are registered through the lifecycle command
+        // event, and the pack's functions are compiled once they are in the dispatcher — see
+        // QuantumRuntime for why that ordering is load-bearing.
+        this.quantumBots = new com.rumilance.practice.herobot.HeroBotRegistry(plugin);
+        this.quantum = new com.rumilance.practice.quantum.QuantumRuntime(plugin, this.quantumBots);
+        this.quantum.enable();
+        bind("quantum", new com.rumilance.practice.quantum.QuantumCommand(plugin, this.quantum,
+                this.quantumBots));
+
         plugin.getLogger().info("Feature services enabled (all player GUIs and admin commands wired).");
     }
 
     public void disable() {
+        if (this.quantum != null) {
+            this.quantum.disable();
+            this.quantum = null;
+        }
         if (afkPracticeManager != null) {
             afkPracticeManager.shutdown();
         }

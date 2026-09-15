@@ -14,7 +14,7 @@ import net.minecraft.world.entity.Entity;
  * Never saved to playerdata, hunger constantly topped up, and death is redirected to the
  * session's callback instead of vanilla's drop/respawn flow.
  */
-public final class PacketBot extends ServerPlayer {
+public class PacketBot extends ServerPlayer {
 
     private final MinecraftServer owningServer;
     private final String profileName;
