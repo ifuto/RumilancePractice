@@ -1443,6 +1443,13 @@ public final class PracticeService {
     private static final double ESCAPE_PEARL_HP_FRACTION = 0.35d;
     /** Cooldown for the escape pearl (map: pearlcd 20 ticks + spread reacquire time). */
     private static final long ESCAPE_PEARL_COOLDOWN_MS = 9000L;
+    /** Map {@code crystal/passive/escape/pearl}: the passive pearl fires at ANY range up to 8
+     *  blocks while {@code pearlcd} (20 ticks) is free — it is the crystal bot's repositioning
+     *  tool, which is why the reference bot holds a pearl ~76 % of its run. */
+    private static final double PASSIVE_PEARL_RANGE = 8.0d;
+    private static final long PASSIVE_PEARL_CD_MS = 1000L;
+    /** Map: {@code positioned ^ ^ ^-15} + {@code spreadplayers ~ ~ 0 5}. */
+    private static final double PASSIVE_PEARL_LEAP = 15.0d;
     /**
      * Map {@code g1gc/pearl} — the crystal bot's pressure pearl. The map throws one whenever no
      * anchor/crystal mech is running and {@code pearlcd} (20 ticks) is free, aimed at the target
@@ -3336,6 +3343,17 @@ public final class PracticeService {
             turnToward(bot, eye, to.normalize(), session.difficulty());
 
             if (type == PracticeType.CRYSTAL) {
+                // Assigned crystal drills (map .mode 201-203 → mech_train) ride on top of the
+                // aggregate fight. This call used to sit *after* this early return, so a room
+                // with a crystal drill assigned silently ran the plain fight instead of its
+                // module (the block below in the sword/pot path was unreachable for CRYSTAL).
+                if (session.botMode() != PracticeMode.NONE) {
+                    PracticeRoom drillRoom = get(session.practiceId()).orElse(null);
+                    if (drillRoom != null && bot.getWorld() != null) {
+                        tickCrystalDrill(player, session, bot, drillRoom, session.difficulty(), now,
+                                session.botMode(), bot.getLocation().distance(player.getLocation()));
+                    }
+                }
                 tickCrystalBot(player, session, bot, now);
                 return;
             }
@@ -3358,15 +3376,7 @@ public final class PracticeService {
                 return; // chomping an apple: stand still like the map's gap_timer pause
             }
 
-            // Crystal drills ride on top of the shared combat tick.
-        if (type == PracticeType.CRYSTAL && session.botMode() != PracticeMode.NONE) {
-            PracticeRoom drillRoom = get(session.practiceId()).orElse(null);
-            if (drillRoom != null) {
-                tickCrystalDrill(player, session, bot, drillRoom, session.difficulty(), now,
-                        session.botMode(), dist);
-            }
-        }
-        // Quantum passive layer: gap healing, water saves, escape pearls (map state3
+            // Quantum passive layer: gap healing, water saves, escape pearls (map state3
             // passives run before the fight loop each tick).
             tickBotGap(session, bot, diff.botMaxHp(), now);
             tickBotWaterSave(session, bot, now);
@@ -3857,6 +3867,43 @@ public final class PracticeService {
     }
 
     /**
+     * Map {@code crystal/passive/escape/pearl} exactly as the map runs it: while the target is
+     * inside 8 blocks and the shared {@code pearlcd} (20 ticks) is free, pearl AWAY about 15
+     * blocks ({@code facing target feet positioned ^ ^ ^-15} + {@code spreadplayers}) and clear
+     * the bot's own crystals at its feet first ({@code kill @e[distance=..3,type=end_crystal]}).
+     * The chase pearl ({@link #tickPearlPressure}) shares that same timer, so the pair together
+     * is the reference's ~48 throws/min — repositioning, not a panic button.
+     */
+    private boolean tickPassivePearl(Player player, PracticeSession session, BotBody bot, long now) {
+        PracticeSession.BotAbilityState ab = session.abilities();
+        if (now < ab.nextPearlMs()) {
+            return false;
+        }
+        if (bot.getLocation().distance(player.getLocation()) > PASSIVE_PEARL_RANGE) {
+            return false;
+        }
+        Vector away = bot.getLocation().toVector().subtract(player.getLocation().toVector())
+                .setY(0);
+        if (away.lengthSquared() < 0.01d) {
+            return false;
+        }
+        Location landing = findPearlLanding(session, bot.getLocation(), away.normalize(),
+                PASSIVE_PEARL_LEAP);
+        if (landing == null) {
+            ab.nextPearlMs(now + 250L); // no landing: re-cast shortly, like the map's ray
+            return false;
+        }
+        if (!session.botConsume(Material.ENDER_PEARL, 1)) {
+            return false;
+        }
+        clearCrystalsNear(bot.getLocation(), 3.0d); // map: kill @e[distance=..3,type=end_crystal]
+        ab.nextPearlMs(now + PASSIVE_PEARL_CD_MS);
+        pearlTeleportFx(bot, landing);
+        session.fightLog("pearl out (passive)");
+        return true;
+    }
+
+    /**
      * Finds a survivable pearl landing {@code preferred} blocks along {@code horizontal} from
      * {@code from}: inside the practice region, on solid ground, with two air blocks to stand
      * in. Falls back to shorter hops when the full leap leaves the room.
@@ -4227,6 +4274,15 @@ public final class PracticeService {
 
         // Mid-apple: the bot stands still and chomps (map gap_timer) — no fighting until done.
         if (tickBotGapEating(session, bot, now)) {
+            return;
+        }
+
+        // --- passive pearl (map crystal/passive/escape/pearl) --------------------------------
+        // The layer above the fight loop: inside 8 blocks the map bot pearls away ~15 blocks on
+        // every free pearlcd (1 s) — the reason it spends most of the match holding a pearl and
+        // the reason it is not simply glued to the target's face. Map: `player @s stop` right
+        // after the cast, so the tick's movement is skipped.
+        if (fights && tickPassivePearl(player, session, bot, now)) {
             return;
         }
 
