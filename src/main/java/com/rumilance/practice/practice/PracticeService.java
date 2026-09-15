@@ -422,7 +422,7 @@ public final class PracticeService {
                 stock.put(Material.RESPAWN_ANCHOR, 16);
                 stock.put(Material.GLOWSTONE, 64);
                 stock.put(Material.WATER_BUCKET, 1);
-                stock.put(Material.ENDER_PEARL, 16);
+                stock.put(Material.ENDER_PEARL, 64); // map: pearls are the movement tool
                 // The map's crystal bot hotbar: 1 totem, 2 obsidian, 3 crystal, 4 sword,
                 // 5 golden apple, 6 crossbow, 7 pearl, 8 anchor, 9 glowstone. We mirror the
                 // slots (and their counts) so the bot visibly selects and consumes them.
@@ -1443,6 +1443,21 @@ public final class PracticeService {
     private static final double ESCAPE_PEARL_HP_FRACTION = 0.35d;
     /** Cooldown for the escape pearl (map: pearlcd 20 ticks + spread reacquire time). */
     private static final long ESCAPE_PEARL_COOLDOWN_MS = 9000L;
+    /**
+     * Map {@code g1gc/pearl} — the crystal bot's pressure pearl. The map throws one whenever no
+     * anchor/crystal mech is running and {@code pearlcd} (20 ticks) is free, aimed at the target
+     * ({@code ray/cast2} faces the target's eyes), which is why the reference bot is holding a
+     * pearl 76 % of the time and throwing ~48/min: it is how the bot moves and splits, not a
+     * panic button. Our escape pearl only covers the wounded case, so without this module the
+     * bot ground into melee and never reached anchor range.
+     */
+    private static final long PEARL_PRESSURE_CD_MS = 1000L;
+    /** Lands this far short of the target (the map's ray stops on the first block anyway). */
+    private static final double PEARL_PRESSURE_STANDOFF = 2.5d;
+    /** Map ray cast is limited to {@code ^ ^ ^-15}. */
+    private static final double PEARL_PRESSURE_MAX_LEAP = 15.0d;
+    /** Pearl stock topped up on the bot (map kits are effectively endless). */
+    private static final int PEARL_STOCK_REFILL = 16;
     /** Golden apple: eaten below half HP, heals 40%, at most twice per bot life. */
     private static final int GAP_MAX_USES = 2;
     /** Cobweb trick: placed under the player, melts away after TTL. */
@@ -3844,9 +3859,14 @@ public final class PracticeService {
     private Location findPearlLanding(PracticeSession session, Location from,
                                       Vector horizontal, double preferred) {
         PracticeRoom room = get(session.practiceId()).orElse(null);
-        if (room == null || from.getWorld() == null) {
+        if (from.getWorld() == null) {
             return null;
         }
+        // Arena-venue fights have no config room: bound the search by distance instead of by a
+        // room cuboid (the map's pearl ray is range-limited the same way).
+        boolean unbounded = room == null && session.activeRegion() == null;
+        double boundSq = Math.max(preferred, 12.0d) * 1.5d;
+        boundSq *= boundSq;
         double[] tries = {preferred, preferred - 2.0d, preferred - 4.0d, preferred / 2.0d};
         for (double dist : tries) {
             if (dist < 2.0d) {
@@ -3855,7 +3875,9 @@ public final class PracticeService {
             Location cand = from.clone().add(horizontal.clone().multiply(dist));
             for (int dy = 2; dy >= -8; dy--) {
                 Location probe = cand.clone().add(0, dy, 0);
-                if (!contains(session, room, probe)) {
+                boolean inside = unbounded ? probe.distanceSquared(from) <= boundSq
+                        : contains(session, room, probe);
+                if (!inside) {
                     continue;
                 }
                 org.bukkit.block.Block ground = probe.getBlock();
@@ -4167,6 +4189,11 @@ public final class PracticeService {
      */
     private void tickCrystalBot(Player player, PracticeSession session, BotBody bot, long now) {
         refillCrystals(player);
+        // Same idea for the bot's own pearls: the map's kit never runs dry and the pressure
+        // pearl module below throws one about every second.
+        if (session.botStock().getOrDefault(Material.ENDER_PEARL, 0) < 4) {
+            session.botStock().put(Material.ENDER_PEARL, PEARL_STOCK_REFILL);
+        }
         BotDifficulty crystalDiff = session.difficulty();
         PracticeSession.BotAbilityState ab = session.abilities();
         boolean fights = crystalDiff.attackDamage() > 0.0d;
@@ -4225,6 +4252,17 @@ public final class PracticeService {
             return; // NPC (map rung 0): no swings, no crystals, no passives — a living dummy
         }
 
+        // Assigned drill modules (map .mode 201-203 → mech_train) ride on top of the aggregate
+        // fight. This used to sit after the CRYSTAL early return in tickCombatBot, so a room
+        // with a crystal drill assigned silently ran the plain fight instead of its module.
+        if (session.botMode() != PracticeMode.NONE) {
+            PracticeRoom drillRoom = get(session.practiceId()).orElse(null);
+            if (drillRoom != null) {
+                tickCrystalDrill(player, session, bot, drillRoom, crystalDiff, now,
+                        session.botMode(), dist);
+            }
+        }
+
         // --- melee: the crystal bot swings a real netherite sword (map g1gc/hit) — a fixed
         // 7-tick cadence on every rung, the player's 3-block reach, only once the player's
         // hurt frames have expired (map: hurtTime=0 gate in g1gc/can_hit).
@@ -4278,6 +4316,60 @@ public final class PracticeService {
                 session.setBotNextAttackMs(now + combo);
             } else {
                 session.setBotNextAttackMs(now + 500L); // no valid spot: retry soon
+            }
+        }
+
+        // --- pressure pearl (map g1gc/pearl) -----------------------------------------------
+        // Runs last so the anchor/crystal mechs keep priority (the map skips it while a usable
+        // mech marker exists) and the pearl is the filler between combos, exactly like the
+        // reference: pearl in at the target, then the sword follows on the next tick.
+        if (fights && tickPearlPressure(player, session, bot, now, dist)) {
+            ab.nextMeleeMs(0L); // map: `unless pearlcd == 20 run g1gc/hit` — hit after the pearl
+        }
+    }
+
+    /**
+     * Map {@code g1gc/pearl}: pearl at the target when no mech is running, every {@code pearlcd}
+     * (20 ticks). Landings are ray-sized (never further than the target standoff), and crystals
+     * within three blocks of the bot are cleared first — the map never pearls into its own
+     * crystal blast ({@code kill @e[distance=..3,type=end_crystal]}).
+     */
+    private boolean tickPearlPressure(Player player, PracticeSession session, BotBody bot,
+                                      long now, double dist) {
+        PracticeSession.BotAbilityState ab = session.abilities();
+        if (now < ab.nextPearlMs() || ab.anchorStage() != 0 || !session.botCrystals().isEmpty()) {
+            return false; // map: `unless entity @e[tag=xlib,tag=usable]` + pearlcd/pearlcd2
+        }
+        Vector to = player.getLocation().toVector().subtract(bot.getLocation().toVector()).setY(0);
+        if (to.lengthSquared() < 0.0001d) {
+            return false;
+        }
+        double leap = Math.min(Math.max(dist - PEARL_PRESSURE_STANDOFF, 2.0d),
+                PEARL_PRESSURE_MAX_LEAP);
+        Location landing = findPearlLanding(session, bot.getLocation(), to.normalize(), leap);
+        if (landing == null) {
+            ab.nextPearlMs(now + 250L); // ray hit no floor: re-cast shortly, do not spam
+            return false;
+        }
+        if (!session.botConsume(Material.ENDER_PEARL, 1)) {
+            return false;
+        }
+        clearCrystalsNear(bot.getLocation(), 3.0d);
+        ab.nextPearlMs(now + PEARL_PRESSURE_CD_MS);
+        pearlTeleportFx(bot, landing);
+        session.fightLog("pearl in (pressure)");
+        return true;
+    }
+
+    /** Map {@code g1gc/pearl}: any end crystal within {@code radius} of the bot is destroyed. */
+    private void clearCrystalsNear(Location at, double radius) {
+        if (at == null || at.getWorld() == null) {
+            return;
+        }
+        for (org.bukkit.entity.Entity entity : at.getWorld()
+                .getNearbyEntities(at, radius, radius, radius)) {
+            if (entity instanceof org.bukkit.entity.EnderCrystal) {
+                entity.remove();
             }
         }
     }
