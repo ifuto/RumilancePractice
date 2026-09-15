@@ -288,3 +288,10 @@ herobot MOD が Brigadier ノードとして直接 dispatcher に載せている
 `function` は CustomCommandExecutor なので、旧来の `CommandDispatcher#execute` では
 "This function should not run" になっていた（コンソールは元から現行経路なので手打ちだけ動いていた）。
 `tools/parity_runner.py` に `--invoke` を追加（Paper 側は `quantum run ` を前置）。
+
+## v1.76.32 — 関数タグの統合
+
+`#minecraft:tick` のように **複数パックが同じタグを定義**する場合（マップ本体と計測ハーネス）、
+および同じルートを二重に読む場合（ワールド直下とワールド/datapacks の両方）に、片方だけが
+有効になってしまう不具合を直した。バニラと同じく和集合を取り、重複は除く。
+これを直さないと、読み込み順によっては `quantum:tick`（マップのAI本体）がタグから抜ける。
