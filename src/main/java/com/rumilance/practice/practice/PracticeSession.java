@@ -59,7 +59,7 @@ public final class PracticeSession {
     private final java.util.List<String> fightLog = new java.util.ArrayList<>();
     /** Objective events kept per fight; chatter (swing/hit) has the smaller budget below. */
     private static final int FIGHT_LOG_CAP = 4000;
-    private static final int CHATTER_LOG_CAP = 300;
+    private static final int CHATTER_LOG_CAP = 3000;
     private int chatterLogCount;
     /** 0.1 s state samples of the bot (pos/look/hp/hand) — console-only, parity comparison. */
     private final java.util.List<String> fightSamples = new java.util.ArrayList<>();

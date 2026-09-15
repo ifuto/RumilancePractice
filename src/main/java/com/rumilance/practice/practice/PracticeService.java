@@ -1452,12 +1452,13 @@ public final class PracticeService {
      * bot ground into melee and never reached anchor range.
      */
     private static final long PEARL_PRESSURE_CD_MS = 1000L;
-    /** Lands this far short of the target (the map's ray stops on the first block anyway). */
-    private static final double PEARL_PRESSURE_STANDOFF = 2.5d;
+    /** Lands this far short of the target: the map's ray stops on the target's hitbox, so
+     *  the throw lands right next to it — the map pearls while boxing too (no range gate). */
+    private static final double PEARL_PRESSURE_STANDOFF = 1.0d;
     /** Map ray cast is limited to {@code ^ ^ ^-15}. */
     private static final double PEARL_PRESSURE_MAX_LEAP = 15.0d;
-    /** The map's ray stops on the target's hitbox: a pearl never lands inside the enemy. */
-    private static final double PEARL_PRESSURE_STANDOFF_MIN = 2.0d;
+    /** Landing closer than this would be inside the target: the ray stops on its hitbox. */
+    private static final double PEARL_PRESSURE_LANDING_MIN = 0.9d;
     /** Pearl stock topped up on the bot (map kits are effectively endless). */
     private static final int PEARL_STOCK_REFILL = 16;
     /** Golden apple: eaten below half HP, heals 40%, at most twice per bot life. */
@@ -4356,18 +4357,19 @@ public final class PracticeService {
                 to = new Vector(1.0d, 0.0d, 0.0d);
             }
         }
-        if (dist <= PEARL_PRESSURE_STANDOFF_MIN) {
-            return false; // already at the target: the sword has the job (map: can_hit)
+        if (dist < 1.0d) {
+            return false; // touching the target: the pearl would land inside it
         }
-        double leap = Math.min(Math.max(dist - PEARL_PRESSURE_STANDOFF, 2.0d),
+        double leap = Math.min(Math.max(dist - PEARL_PRESSURE_STANDOFF, 0.5d),
                 PEARL_PRESSURE_MAX_LEAP);
         Location landing = findPearlLanding(session, bot.getLocation(), to.normalize(), leap);
         // Never land on top of the target: the map's ray stops on its hitbox, ours must too.
-        if (landing != null && landing.distance(player.getLocation()) < PEARL_PRESSURE_STANDOFF_MIN) {
-            landing = findPearlLanding(session, bot.getLocation(), to.normalize(), leap - 1.5d);
+        if (landing != null && landing.distance(player.getLocation()) < PEARL_PRESSURE_LANDING_MIN) {
+            landing = findPearlLanding(session, bot.getLocation(), to.normalize(),
+                    Math.max(0.4d, leap - 0.6d));
         }
-        if (landing == null || landing.distance(player.getLocation()) < 1.2d) {
-            ab.nextPearlMs(now + 250L); // no room for a standoff throw: re-cast shortly
+        if (landing == null || landing.distance(player.getLocation()) < PEARL_PRESSURE_LANDING_MIN) {
+            ab.nextPearlMs(now + 250L); // no room for a clean landing: re-cast shortly
             return false;
         }
         if (!session.botConsume(Material.ENDER_PEARL, 1)) {
@@ -4447,8 +4449,15 @@ public final class PracticeService {
             session.fightLog("anchor detonate");
             return;
         }
-        // Engage: outside melee range only (the map answers close range with the sword).
-        if (dist <= CRYSTAL_MELEE_REACH || now < ab.nextAnchorMs() || dist > 9.0d
+        // Engage exactly like the map's bin/27: `g1gc/anchor_tick` runs only while the bot
+        // CANNOT hit right now (`hit_decision_without_cd == 0`: the target sits in its hurt
+        // frames, out of reach, or behind cover) and no usable melee marker is up. The chain
+        // places a block next to the target's feet, so block reach is the only distance limit
+        // the map has here — the reference bot anchors while boxing, not only at range.
+        boolean canHitNow = dist <= CRYSTAL_MELEE_REACH
+                && player.getNoDamageTicks() <= 0 && bot.hasLineOfSight(player);
+        double anchorReach = CRYSTAL_MELEE_REACH + 1.5d; // vanilla block reach onto the target
+        if (canHitNow || now < ab.nextAnchorMs() || dist > anchorReach
                 || !bot.hasLineOfSight(player)) {
             return;
         }
