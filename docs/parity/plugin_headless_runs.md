@@ -391,3 +391,109 @@ melee swing /min   11.4    9.1    30.5  27.7   10.3   18.2    19.0        9.4
    「帯から出る時間」を伸ばす(チェイス着地とパール間隔の連動)。
 4. 自爆の HP 収支は参照帯(1 連鎖 0.3〜0.7 HP)を維持。`pops=0` の DRAW が続くのは
    ダミーが部屋のキット(ARMOR 20 + resistance I)を着ているためで、試合によっては `pops=1` が出る。
+
+## 2026-09-15 (5): b28/b29 の検証、全キット突き合わせ、Paper 版 HeroBot の実現性
+
+### b28 / b29 と、その差し戻し
+
+| build | 変更 | 実測(CRYSTAL / INTERMEDIATE / 100 床 / 通常戦) | 判定 |
+|---|---|---|---|
+| b28 | ソース同一の再ビルド(挙動不変) | 5 モード連続チェック用に使用(下記) | 基準として採用 |
+| b29 | `tickPearlPressure` に「アンカー段が動いている間は発射しない」ゲート(map の `tag=hardcode` マーカー相当) | アンカー設置 62 回 / 26.6 min⁻¹、連鎖中断 27/62(44 %)、クリスタル 4.3/min、剣 12.9/min、パール 51.0/min | **差し戻し** |
+
+- b29 の狙いは「b25 の 58 設置中 23 中断は、アンカー段の途中でチェイスパールが発射されて連鎖が切れるから」という
+  仮説の検証だった。ゲート自体は入ったが、**中断率は改善しなかった**(b24 16/54 = 30 %、b25 23/58 = 40 %、b29 27/62 = 44 %)。
+- 途中パールの検出器(直前サンプルが `GLOWSTONE`/`RESPAWN_ANCHOR` → 次が `ENDER_PEARL` かつ 3 ブロック超の移動)では
+  b29 17 件/140 s、b25 11 件/145 s、b24 11 件/145 s と**むしろ増えた**。跳躍距離はすべて 14.4〜15.7 ブロック =
+  `PASSIVE_PEARL_LEAP` の逃走パールで、`tickPearlPressure`(チェイスパール)ではない。つまり
+  **アンカー連鎖を切っているのは逃走パール側**で、チェイスパールを止めるゲートは効かない(仮説は部分的に棄却)。
+- よって b29 は採用せず `PracticeService` は e24de91 の状態(= b24/b25 のソース)へ戻した。`gradle test shadowJar` もこの状態で通る。
+
+### 全キットチェック(b28、1 回の起動で 5 モード連続、すべて DRAW・ダミー HP 20 → 20)
+
+| モード | 滞在 ≤2 / (2,3] / (3,6] / (6,9] / >9 | 剣 hit | ダミー与ダメ | 備考 |
+|---|---|---|---|---|
+| CRYSTAL | 0.0 / 11.9 / 35.3 / 0.7 / 52.1 % | 12 | 96 | アンカー 37p/28c/21d(19.3/min)、パール out 56 / in 55、クリスタル 6p/6d |
+| SWORD | 3.9 / 70.1 / 3.6 / 2.1 / 20.3 % | 103 | 900 | 接近して剣を振り続ける(モード通り) |
+| NETHERITE_POT | 2.8 / 71.1 / 4.7 / 2.1 / 19.3 % | 107 | 922 | 同上 |
+| MACE | (サンプル 0) | 133 | 1064 | トレースが 1 件も出ない = 計測側の穴(要修正) |
+| CART | 0.0 / 0.0 / 0.0 / 99.1 / 0.9 % | – | – | **異常: 手持ちが `END_CRYSTAL` 886 / `BOW` 264 サンプル。`POWERED_RAIL`/`TNT_MINECART` が一度も出ない** |
+
+- SWORD / NETHERITE_POT は 70 % が (2,3] 帯 = 密着して剣を振る。CRYSTAL だけが遠距離 52 % という別物の挙動で、
+  モードごとの性格は出ている。
+- CART は「トロッコ用の装備を着ていない」= モード → キットの紐づけ(`/botadmin`)が効いていない可能性が高い。
+  次の計測で `/botadmin CART <kit>` を明示して再取得する。
+- MACE は攻撃は通っている(1064 ダメージ)が trace が出ない。ハーネス側の trace 出力条件を確認する。
+
+### 参照側(Quantum)のキット実体 — `/bot` の中身から
+
+`Quantum's PvP Practice v1.18.zip` の datapack を展開して確認した。**QBOT が着る装備は kit1〜15 のチェストではなく
+`quantum:botgear/neth|dia`** が直接 `item replace` で作る(`options/<mode>` から `.gear toggles` で選択)。
+
+| スロット | botgear/neth(既定) | crystal(mode 2)の差分 |
+|---|---|---|
+| armor | netherite protection4/blast_protection4/feather_falling4 unbreakable | legs と boots を blast_protection4 に差し替え |
+| offhand | totem_of_undying | – |
+| hotbar 0 | totem(knockback 1) | – |
+| hotbar 1 | obsidian ×64 | – |
+| hotbar 2 | end_crystal ×64 | – |
+| hotbar 3 | netherite_sword sharpness5(+knockback1) | sweeping_edge3 版に差し替え |
+| hotbar 4 | golden_apple ×64 | shield(unbreakable) |
+| hotbar 5 | netherite_axe sharpness5 | – |
+| hotbar 6 | ender_pearl ×16 | – |
+| hotbar 7 | respawn_anchor ×64 | – |
+| hotbar 8 | glowstone ×64 | – |
+| inventory 0/1 | tipped_arrow(strong_harming ×99) | long_slow_falling ×99 |
+| inventory 2/3/4,7 | water_bucket / lava_bucket | – |
+
+- モード番号: `options/sword=1, crystal=2, mace=3, nethpot=4, pot=5, cart=6`。パリティ計測は `difficulty/2 = INTERMEDIATE`(docs の記録と一致)。
+- kit1〜15 はチェスト実体(`positioned <x> 78 <z>` + `block ~ ~ ~-1 container.N`)で、kit1(ネザライト+エリトラ+クロスボウ)、
+  kit2(ネザライト+クロスボウ+トーテム99)、kit3(ダイヤ+盾+弓)、kit4(メイス/パール/エリトラ)、kit5(ポーション各種)まで実機で読めた。
+  kit6〜9・13 は指定座標がチェストでなかった(壁の向きが別)ため未取得 — 本体側を動かす今回の方針では不要。
+- 当プラグインの `stockBotInventory` は上表の botgear/neth をモード別に写しており、アンカー 16・パール 64 など
+  **個数だけ**参照と違う(参照はアンカー 64・パール 16)。個数は自動補給で吸収されるため挙動差にはならない。
+
+### 「Paper 版 HeroBot + 戦闘関数コピペ」の実現性調査(実験済み)
+
+方針そのものは正しい(定数合わせをやめて Quantum の関数をそのまま走らせる)。ただし **Paper では datapack 関数から
+プラグインコマンドを呼べない**という決定的な障害があることを実測で確認した。
+
+実験(Paper 1.21.11-132 + 検証用プラグイン + `world/datapacks/spike`):
+
+| 試行 | 結果 |
+|---|---|
+| Bukkit `plugin.yml` のコマンド(`player`/`playerspawn`/`herobot`) | 起動時の関数パースで `Unknown or incomplete command`(プラグイン有効化は datapack パースの**後**) |
+| `MinecraftServer#getCommands().getDispatcher()` へ直接登録(NMS) | 登録はできるが Paper のコマンド同期で消え、`/player` すら Unknown |
+| Paper Brigadier API(`LifecycleEvents.COMMANDS`)で登録 | **コンソール/RCON からは herobot と完全同一の引数文字列で動く**(`player @s stop`、`playerspawn X at 0 65 0 facing 0 0 in survival on minecraft:overworld`、`herobot … perm world` がすべてハンドラに到達) |
+| `Server#reloadData()` | レシピ等は再読込するが**関数は再パースしない**(関数は Unknown のまま) |
+| `/reload` | 関数は再パースされるが、その瞬間プラグインは無効化されているため `player` は Unknown のまま |
+
+→ 結論: **datapack ローダーに任せる限り `player` 系の行は絶対にパースできない**。回避策は
+「関数ファイルを自前で読んで、生きている dispatcher で 1 行ずつパースし、`player`/`playerspawn`/`herobot`/`function` だけ
+自前実装に横取りする関数エンジン」をプラグイン側に持つこと。バニラコマンド(`scoreboard`/`data`/`execute`/`item`/`tp`/`tag`…)
+はそのまま dispatcher に流せるので、実装量は「動詞ブリッジ + 約 200 行のインタプリタ」で済む。
+
+移植に必要なもの(調査で確定):
+
+1. **動詞**: `player @s stop | sprint | move [forward|backward|left|right] | jump | hotbar <n> | use once | attack once`、
+   `playerspawn <name> at <x> <y> <z> facing <yaw> <pitch> in <gamemode> on <dimension>`、
+   `herobot <option> <value> perm <world>`(`explosionNoBlockDamage`/`explosionNoFire`/`shieldStunning` 等)。
+   いずれも Paper Brigadier API で同名登録でき、文字列はそのまま受け取れることは実測済み。
+2. **エンジン**: `.mcfunction` の行パース、`$` マクロ、`return`/`return run`、`function <ns>:<name>` の再帰呼び出し、
+   毎 tick の `#minecraft:tick` 相当の起動。ここを自前で持てば datapack ローダーに依存しない。
+3. **世界**: map 側のアリーナ・キットチェスト・`positioned over world_surface` などは座標依存。当側の石 100 床アリーナで
+   走らせるなら、アンカー/クリスタルの usable 判定に使うマーカー系はそのまま動くが、`kits/*`(チェスト)は使えない。
+4. **擬似プレイヤー**: `player … move forward` は herobot が「入力フラグ」を立てる実装。当側は既に
+   PacketBot/ServerPlayer を直接動かしているので、同じ動詞に写せる(実装は別途)。
+5. **リスク**: 20 Hz で 1000 ファイル規模の関数を回す性能、`@p[tag=xlib_target]` 前提の相手解決、死亡/リセット処理。
+
+寄り道として、この構成なら **QBOT 対 QBOT** も自然に作れる(map 側が `as quantumbot` で 1 体しか駆動しない問題は、
+ブリッジ側で 2 体ぶん `npc:tick` を呼び、タグを交互に付け替えればよい。当側は 1 tick 内で相手タグを入れ替える
+`quantum:ref_harness/twobot` を用意して実験した — 実機ログは未取得)。
+
+### 次の一手(優先順)
+
+1. **関数エンジン + 動詞ブリッジの PoC**: `crystal/tick` と `g1gc/*` だけでよいので、1 体の擬似プレイヤーで
+   map の関数をそのまま動かす。動いたら「定数合わせ」を全部捨てて、同じ計測(`tools/fight_profile.py`)で突き合わせる。
+2. 既存の手書き BOT(`tickCrystalBot` 系)はフォールバックとして残し、切り替えは `/botadmin` 相当のフラグで。
+3. CART モードのキット紐づけと MACE の trace 欠落を直してから 5 モード再計測。
