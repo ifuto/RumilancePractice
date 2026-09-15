@@ -6,3 +6,7 @@ build/
 out/
 .DS_Store
 build/localtest/
+
+# python tooling
+__pycache__/
+*.pyc
