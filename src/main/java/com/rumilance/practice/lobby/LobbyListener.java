@@ -34,6 +34,11 @@ public final class LobbyListener implements Listener {
     }
 
     private boolean shouldProtect(Player player) {
+        // Fake players (HeroBot/PacketBot) are the Quantum map's fighters, not lobby visitors:
+        // without this they inherit the lobby's default state and every hit on them is cancelled.
+        if (com.rumilance.practice.packetbot.PacketBot.isBot(player)) {
+            return false;
+        }
         if (ffaService != null && ffaService.isInFfa(player.getUniqueId())) {
             return false;
         }

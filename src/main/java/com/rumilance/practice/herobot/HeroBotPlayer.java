@@ -87,15 +87,21 @@ public class HeroBotPlayer extends PacketBot {
         return random < remainder ? this.ping / conversion + 1 : this.ping / conversion;
     }
 
+    /**
+     * The server's player tick path on Paper is
+     * {@code PlayerList#tick()} → {@link net.minecraft.server.level.ServerPlayer#doTick()}, and
+     * {@code doTick()} reaches the entity's movement through a direct {@code super.tick()} call —
+     * i.e. it never dispatches to {@code ServerPlayer#tick()}. The reference's
+     * {@code @Inject(method = "tick", at = HEAD)} therefore has to live here: the action pack has
+     * to write its inputs before {@code doTick()} runs the movement for the tick.
+     */
     @Override
-    public void tick() {
-        // Reference: ServerPlayerMixin injects at the HEAD of ServerPlayerEntity#tick, i.e. the
-        // action pack writes its inputs before the entity's own movement runs for the tick.
+    public void doTick() {
         this.actionPack.onUpdate();
         double startX = this.getX();
         double startY = this.getY();
         double startZ = this.getZ();
-        super.tick();
+        super.doTick();
         this.processPendingKnockbacks();
         if (this.tickCount() % 10 == 0) {
             // Reference: keep the bot's chunk tracking alive from its own position.
@@ -105,6 +111,12 @@ public class HeroBotPlayer extends PacketBot {
         if (movement.lengthSqr() > 1.0E-5) {
             this.resetLastActionTime();
         }
+    }
+
+    /** {@code ServerPlayer#tick()} stays vanilla — the server path above does not call it. */
+    @Override
+    public void tick() {
+        super.tick();
     }
 
     /**

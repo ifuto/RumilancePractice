@@ -36,5 +36,5 @@ execute as quantumbot run function quantum:bin/3
 execute as qbot2 run function quantum:bin/3
 execute as quantumbot run function quantum:botgear/dia
 execute as qbot2 run function quantum:botgear/dia
-function parity:start_round
+schedule function parity:start_round 40t
 scoreboard players set pari_round parity_t 80

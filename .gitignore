@@ -10,3 +10,7 @@ build/localtest/
 # python tooling
 __pycache__/
 *.pyc
+
+# パリティ検証の作業生成物(ログ・サーバー実体・JDK など。git には入れない)
+parity-logs/
+parity-env/

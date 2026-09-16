@@ -13,6 +13,7 @@ import org.bukkit.craftbukkit.CraftServer;
 import org.bukkit.craftbukkit.CraftWorld;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -36,6 +37,7 @@ public final class HeroBotRegistry {
 
     private final Plugin plugin;
     private final Map<String, HeroBotPlayer> bots = new LinkedHashMap<>();
+    private BukkitTask ticker;
     private final Set<String> spawning = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     public HeroBotRegistry(Plugin plugin) {
@@ -144,6 +146,7 @@ public final class HeroBotRegistry {
         bot.ping = 0;
         this.spawning.remove(name.toLowerCase(Locale.ROOT));
         this.bots.put(name.toLowerCase(Locale.ROOT), bot);
+        this.ensureTicker();
         return bot;
     }
 
@@ -169,6 +172,44 @@ public final class HeroBotRegistry {
         for (String name : List.copyOf(this.bots.keySet())) {
             this.despawn(name);
         }
+    }
+
+    /**
+     * Drives one server tick for every bot.
+     *
+     * <p>The reference mod's bots are real fake players on a real (dead) connection, and the
+     * server ticks players from <b>their connection</b>: {@code ServerConnectionListener} →
+     * {@code Connection#tick} → (TickablePacketListener) {@code ServerGamePacketListenerImpl#tick}
+     * → {@code ServerPlayer#doTick}. A bot whose connection was never registered in the connection
+     * list is ticked by nobody, so the plugin runs that same call itself — one scheduled task for
+     * all bots, started with the first bot and stopped with the last.</p>
+     */
+    public void ensureTicker() {
+        if (this.ticker != null) {
+            return;
+        }
+        this.ticker = Bukkit.getScheduler().runTaskTimer(this.plugin, this::tickBots, 1L, 1L);
+    }
+
+    private void tickBots() {
+        List<HeroBotPlayer> alive = new java.util.ArrayList<>(this.all());
+        if (alive.isEmpty()) {
+            if (this.ticker != null) {
+                this.ticker.cancel();
+                this.ticker = null;
+            }
+            return;
+        }
+        for (HeroBotPlayer bot : alive) {
+            if (!bot.isRemoved() && bot.valid) {
+                bot.doTick();
+            }
+        }
+    }
+
+    /** True while the per-tick driver is running (diagnostics). */
+    public boolean ticking() {
+        return this.ticker != null;
     }
 
     public Plugin plugin() {

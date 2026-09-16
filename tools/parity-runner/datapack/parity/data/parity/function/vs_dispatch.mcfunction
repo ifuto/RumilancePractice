@@ -1,4 +1,5 @@
-# parity:vs_dispatch — quantum:init/mode の「BOTを動かす部分」だけを取り出した複製。
+# parity:vs_dispatch — quantum:init/mode の「BOTを動かす部分」だけ取り出した複製。
+scoreboard players add .c_vsdispatch dbgc 1
 # init/mode は cooldowns/treats（毎tickのタイマ・補給）も呼ぶので二重に走らせられない。
 # ズレ検出のため tools/parity_runner.py check-dispatch が init/mode と突き合わせる。
 tag @a[tag=xlib_target,tag=checked] remove checked

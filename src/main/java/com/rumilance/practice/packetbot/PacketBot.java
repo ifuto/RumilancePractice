@@ -31,6 +31,20 @@ public class PacketBot extends ServerPlayer {
         return profileName;
     }
 
+    /**
+     * True when the Bukkit player is one of this plugin's fake players.
+     *
+     * <p>Used by the ordinary player-facing services (join bootstrap, lobby reset, …) to leave
+     * bots alone: they are real {@link ServerPlayer}s, so a {@code PlayerJoinEvent} fires for them,
+     * and the lobby flow would otherwise put them in adventure, teleport them to the lobby spawn
+     * and hand them the lobby's infinite Resistance 255 — which makes the Quantum map's own
+     * damage pipeline (and every bot-vs-bot fight) silently invulnerable.</p>
+     */
+    public static boolean isBot(org.bukkit.entity.Player player) {
+        return player instanceof org.bukkit.craftbukkit.entity.CraftPlayer craft
+                && craft.getHandle() instanceof PacketBot;
+    }
+
     public MinecraftServer owningServer() {
         return owningServer;
     }
@@ -39,9 +53,16 @@ public class PacketBot extends ServerPlayer {
         this.deathCallback = callback;
     }
 
+    /**
+     * The real per-tick path for a player on this platform: the server ticks players from their
+     * connection ({@code Connection#tick} → {@code ServerGamePacketListenerImpl#tick} →
+     * {@code ServerPlayer#doTick}), and a dead-connection bot has no connection to be ticked from,
+     * so {@link com.rumilance.practice.herobot.HeroBotRegistry} drives it. {@code ServerPlayer#tick}
+     * stays vanilla: nothing in the server's player path dispatches to it.
+     */
     @Override
-    public void tick() {
-        super.tick();
+    public void doTick() {
+        super.doTick();
         // No client sends hunger packets; keep the bot fed so vanilla sprint/food rules stay real.
         this.getFoodData().eat(1, 0.2f);
     }

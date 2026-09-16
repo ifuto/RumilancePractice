@@ -26,5 +26,8 @@ $execute store result storage parity:in st int 1 run scoreboard players get $(na
 $execute store result storage parity:in kit int 1 run scoreboard players get $(name) kit
 $execute at $(name) store result storage parity:in cry int 1 run execute if entity @e[type=end_crystal,distance=..9]
 $execute at $(name) store result storage parity:in ec int 1 run execute if entity @e[type=end_crystal,distance=..16]
+$execute store result storage parity:in hd int 1 run scoreboard players get $(name) hit_decision_without_cd
+$execute store result storage parity:in cst int 1 run scoreboard players get $(name) can_see_target
+$execute store result storage parity:in p1d int 1 run scoreboard players get $(name) Pos1_difference
 $data modify storage parity:in who set value "$(who)"
 function parity:emit with storage parity:in

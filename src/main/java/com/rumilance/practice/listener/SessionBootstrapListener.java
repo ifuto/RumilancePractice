@@ -129,6 +129,13 @@ public final class SessionBootstrapListener implements Listener {
     public void onJoin(PlayerJoinEvent event) {
         JoinQuitMessages.apply(event);
         Player player = event.getPlayer();
+        // Fake players (HeroBot/PacketBot) join through the same event but are not players of this
+        // server's network: the lobby bootstrap would teleport them to the hub, switch them to
+        // adventure and give them the lobby's infinite Resistance 255, which turns every bot fight
+        // in the Quantum map into a no-damage tick loop.
+        if (com.rumilance.practice.packetbot.PacketBot.isBot(player)) {
+            return;
+        }
         String clientLocale = player.locale() != null ? player.locale().toString().toLowerCase(Locale.ROOT) : defaultLocale;
         var settings = settingsService.get(player.getUniqueId());
         // A previously chosen language wins over the client locale; first-timers (LOCALE_AUTO)

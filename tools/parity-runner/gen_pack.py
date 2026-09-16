@@ -97,6 +97,7 @@ def resurface():
 def load():
     return f'''# parity:load — ハーネスのスコアとサンプラ用 storage を用意する（何度でも安全）。
 scoreboard objectives add parity_t dummy
+scoreboard objectives add dbgc dummy
 scoreboard players set pari_clock parity_t 0
 scoreboard players set pari_round parity_t 0
 data merge storage parity:in {{px:0.0d,py:0.0d,pz:0.0d,vx:0.0d,vy:0.0d,vz:0.0d,yaw:0.0d,pit:0.0d,hp:0.0d,g:0,item:"minecraft:air",hit:0,tot:0,ct:0,ob:0,pc:0,cry:0,anc:0,chg:0,exp:0,hpT:0,pop:0,ec:0,t:0,who:"?",st:-1,kit:-1}}
@@ -137,7 +138,8 @@ tag {BOT_B} add xlib_target'''
 
 
 def vs_dispatch():
-    return '''# parity:vs_dispatch — quantum:init/mode の「BOTを動かす部分」だけを取り出した複製。
+    return '''# parity:vs_dispatch — quantum:init/mode の「BOTを動かす部分」だけ取り出した複製。
+scoreboard players add .c_vsdispatch dbgc 1
 # init/mode は cooldowns/treats（毎tickのタイマ・補給）も呼ぶので二重に走らせられない。
 # ズレ検出のため tools/parity_runner.py check-dispatch が init/mode と突き合わせる。
 tag @a[tag=xlib_target,tag=checked] remove checked
@@ -165,8 +167,28 @@ effect give @a regeneration 1 255 true
 effect give @a absorption 120 0 true
 tp {BOT_A} {SPOT_A}
 tp {BOT_B} {SPOT_B}
+# マップは xlib_bot / xlib_target を「マップ自身の開始フロー」で付ける。ハーネスは
+# そのフローを飛ばして直接ラウンドを立てるので、毎ラウンドここで役割を貼り直す。
+# （無いと quantum:main_tick が「ターゲット不在」と判断して毎tick map/reset を呼び、
+#   .start が 0 に戻ってAIが永久に起動しない。Fabric だけで動いていたのは
+#   以前の手動タグが残っていたため。）
+# `death` は deathCount。マップの開始フロー（start3/load）が 0 を入れるが、ハーネスは
+# そのフローを飛ばす。未設定だと scores={{death=0}} にマッチせずAIが丸ごと止まる。
+scoreboard players set {BOT_A} death 0
+scoreboard players set {BOT_B} death 0
+tag {BOT_A} remove xlib_target
+tag {BOT_A} add xlib_bot
+tag {BOT_B} remove xlib_bot
+tag {BOT_B} add xlib_target
 scoreboard players set .start start 1
-scoreboard players set pari_round parity_t 80'''
+scoreboard players set pari_round parity_t 80
+scoreboard players set .c_vsbrain dbgc 0
+scoreboard players set .c_vsdispatch dbgc 0
+scoreboard players set .c_crystaltick dbgc 0
+scoreboard players set .c_newstats dbgc 0
+scoreboard players set .c_canhit dbgc 0
+scoreboard players set .c_hit dbgc 0
+scoreboard players set .c_mode dbgc 0'''
 
 
 def sample():
@@ -199,6 +221,9 @@ $execute store result storage parity:in st int 1 run scoreboard players get $(na
 $execute store result storage parity:in kit int 1 run scoreboard players get $(name) kit
 $execute at $(name) store result storage parity:in cry int 1 run execute if entity @e[type=end_crystal,distance=..9]
 $execute at $(name) store result storage parity:in ec int 1 run execute if entity @e[type=end_crystal,distance=..16]
+$execute store result storage parity:in hd int 1 run scoreboard players get $(name) hit_decision_without_cd
+$execute store result storage parity:in cst int 1 run scoreboard players get $(name) can_see_target
+$execute store result storage parity:in p1d int 1 run scoreboard players get $(name) Pos1_difference
 $data modify storage parity:in who set value "$(who)"
 function parity:emit with storage parity:in'''
 
@@ -213,7 +238,7 @@ def emit():
     return ('$say [q] $(px),$(py),$(pz) v=$(vx),$(vy),$(vz) y=$(yaw) p=$(pit) hp=$(hp) g=$(g) '
             'i=$(item) hit=$(hit) tot=$(tot) ct=$(ct) ob=$(ob) pc=$(pc) cry=$(cry) anc=$(anc) '
             'chg=$(chg) exp=$(exp) hpT=$(hpT) pop=$(pop) ec=$(ec) t=$(t) who=$(who) st=$(st) '
-            'kit=$(kit) rhit=$(realhit)')
+            'kit=$(kit) rhit=$(realhit) hd=$(hd) cst=$(cst) p1d=$(p1d)')
 
 
 def setup(mode_fn, mode_name, kitchen, kit_a, kit_b, gear, toggles, difficulty=2):
@@ -235,7 +260,11 @@ def setup(mode_fn, mode_name, kitchen, kit_a, kit_b, gear, toggles, difficulty=2
     gear_fn = 'dia' if gear == 2 else 'neth'
     L.append(f'execute as {BOT_A} run function quantum:botgear/{gear_fn}')
     L.append(f'execute as {BOT_B} run function quantum:botgear/{gear_fn}')
-    L.append('function parity:start_round')
+    # The round start has to wait until both bots exist: the reference mod's `playerspawn` resolves
+    # the profile asynchronously, so a `tp` in the very same function body still sees an empty
+    # player list and the bot is left at the map's default spawn instead of the arena spot. Two
+    # seconds is one whole round-trip of that lookup; Paper's synchronous spawn does not care.
+    L.append('schedule function parity:start_round 40t')
     L.append('scoreboard players set pari_round parity_t 80')
     return '\n'.join(L)
 

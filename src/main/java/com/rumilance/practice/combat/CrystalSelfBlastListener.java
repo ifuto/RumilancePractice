@@ -34,11 +34,30 @@ public final class CrystalSelfBlastListener implements Listener {
     private static final float CRYSTAL_POWER = 6.0f;
     /** Vanilla end crystals break blocks (practice maps rely on it, anchored obsidian meta). */
     private static final boolean BREAK_BLOCKS = true;
+    /**
+     * Belt and braces for the chain: a crystal explodes at most once per tick, and a blast that
+     * would hit an already-detonating crystal is simply cancelled (vanilla ignores damage on a
+     * dead crystal). Vanilla chains are bounded by the crystals inside one radius; without this
+     * guard the re-detonation recursed into itself — {@code createExplosion} → damage → this
+     * listener → {@code createExplosion} → … — until the server thread blew its stack
+     * ({@code StackOverflowError} in the tick loop, killing the server).
+     */
+    private static final int MAX_CHAIN_DEPTH = 32;
 
     private final ExplosionSourceTracker explosionSources;
+    /** Crystals already detonated by us in the current tick. */
+    private final java.util.Set<java.util.UUID> detonating = new java.util.HashSet<>();
+    private int chainDepth;
 
     public CrystalSelfBlastListener(ExplosionSourceTracker explosionSources) {
         this.explosionSources = explosionSources;
+    }
+
+    /** A crystal may explode once per tick; the next tick it is gone from the world anyway. */
+    @EventHandler
+    public void onTickEnd(com.destroystokyo.paper.event.server.ServerTickEndEvent event) {
+        this.detonating.clear();
+        this.chainDepth = 0;
     }
 
     /**
@@ -56,6 +75,9 @@ public final class CrystalSelfBlastListener implements Listener {
             return; // not player-caused: vanilla handles it
         }
         event.setCancelled(true);
+        if (!this.detonating.add(crystal.getUniqueId())) {
+            return; // this crystal is already exploding: no second blast
+        }
         detonate(crystal, detonator);
     }
 
@@ -76,6 +98,9 @@ public final class CrystalSelfBlastListener implements Listener {
             return;
         }
         event.setCancelled(true);
+        if (!this.detonating.add(crystal.getUniqueId())) {
+            return; // this crystal is already exploding: no second blast
+        }
         detonate(crystal, explosionSources.ownerOf(crystal));
     }
 
@@ -101,7 +126,7 @@ public final class CrystalSelfBlastListener implements Listener {
 
     /** Source-less re-detonation at the crystal's exact position (vanilla blast origin). */
     private void detonate(EnderCrystal crystal, java.util.UUID owner) {
-        if (crystal.isDead() || !crystal.isValid()) {
+        if (crystal.isDead() || !crystal.isValid() || this.chainDepth >= MAX_CHAIN_DEPTH) {
             return;
         }
         Location at = crystal.getLocation();
@@ -115,6 +140,11 @@ public final class CrystalSelfBlastListener implements Listener {
         }
         // Source == null: Paper exempts only the source entity, and there is none — the
         // detonator takes their share, exactly like vanilla crystal PvP.
-        world.createExplosion(at, CRYSTAL_POWER, false, BREAK_BLOCKS, null);
+        this.chainDepth++;
+        try {
+            world.createExplosion(at, CRYSTAL_POWER, false, BREAK_BLOCKS, null);
+        } finally {
+            this.chainDepth--;
+        }
     }
 }
