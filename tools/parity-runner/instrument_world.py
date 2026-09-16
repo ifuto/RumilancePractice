@@ -56,6 +56,18 @@ COUNTERS = {
         ('c_qa_ctick',
          'execute if entity @s[name=quantumbot] run scoreboard players add .c_qa_ctick dbgc 1'),
     ],
+    # --- クリスタルの当たり判定(can_hit)の中の条件を1つずつ数える ---
+    # ここで落ちている条件があれば「Paper だけ結晶を撃たずに剣で殴る」説明になる。
+    'quantum/function/g1gc/can_hit.mcfunction': [
+        ('c_cansee', 'execute if score @s can_see_target matches 1 run scoreboard players add .c_cansee dbgc 1'),
+        ('c_hurt0', 'execute if entity @p[tag=xlib_target,distance=..3,scores={hurtTime=0},gamemode=!spectator,predicate=!quantum:flying] run scoreboard players add .c_hurt0 dbgc 1'),
+        ('c_block', 'execute at @p[tag=xlib_target,distance=..3,scores={hurtTime=0},gamemode=!spectator,predicate=!quantum:flying] positioned ~ ~2 ~ if function quantum:g1gc/block run scoreboard players add .c_block dbgc 1'),
+        ('c_noloc', 'execute unless entity @e[tag=loc,tag=usable,distance=0..,type=marker] run scoreboard players add .c_noloc dbgc 1'),
+    ],
+    'quantum/function/g1gc/botlogic.mcfunction': [
+        ('c_hitdec', 'execute if score @s hit_decision_without_cd matches 1 run scoreboard players add .c_hitdec dbgc 1'),
+        ('c_hitdec_ok', 'execute if score @s hit_decision_without_cd matches 1 unless score @s pearlcd matches 20 run scoreboard players add .c_hitdec_ok dbgc 1'),
+    ],
     'quantum/function/look.mcfunction': [
         ('c_look', 'scoreboard players add .c_look dbgc 1'),
     ],

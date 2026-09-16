@@ -32,6 +32,8 @@ COUNTERS = [
     'c_spawncry', 'c_placeobby', 'c_chargeanchor', 'c_placeanchor', 'c_breakcry',
     'c_canhit', 'c_hit', 'c_bin14', 'c_anchortick', 'c_checktimer', 'c_mark',
     'c_anchortest', 'c_obbycheck',
+    # can_hit の条件別
+    'c_cansee', 'c_hurt0', 'c_block', 'c_noloc', 'c_hitdec', 'c_hitdec_ok',
 ]
 # スコア(ラウンドの状態そのもの)
 SCORES = ['.start start', '.mode mode', '.tempaim aim', '.difficulty difficulty',
