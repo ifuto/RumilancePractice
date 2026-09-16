@@ -667,3 +667,49 @@ TNT 爆発 (1.75 ブロック, 耐性 IV): fabric 3.140 / paper 3.110 → 爆発
 swing 3.2 倍 → 剣保持 5.7 倍の入口。`raycast4` は純 vanilla execute (`dx=0` 箱判定 +
 `positioned ^ ^ ^.71` レイマーチ) なので、次は「同じ座標・同じ向きでの cansee 直接比較」で
 距離閾値 (`distance=..3.2`) の食い違いを潰す。
+
+## 10.13 クリスタルを「サーバーキット」で動かす (`/botadmin`, PvP サーバー本線) (2026-09-16)
+
+パリティ計測で使うキットチェストは *参照パックの都合* であって製品の供給元ではない。
+PvP サーバーでは **BOT の装備 = サーバーキット** (`/botadmin`) が本線:
+
+    /botadmin <SWORD|MACE|CRYSTAL|NETHERITE_POT|CART> <kit|off>   # 装備 (ロードアウト) の紐づけ
+    /botadmin <botkit> <arenakit|off>                             # 開催アリーナ (会場) の紐づけ
+
+### クリスタルの正規スロット (パックの脳が切り替える位置)
+`quantum:g1gc/*` と `quantum:crystal/*` の `player @s hotbar N` から逆算した契約
+(1-based hotbar → inventory slot index):
+
+| hotbar | slot | 中身 | 根拠 |
+|---|---|---|---|
+| 1 | 0 | トーテム | `crystal/maintot` `hotbar.0`, `crystal/totmain` |
+| 2 | 1 | 黒曜石 | `g1gc/placeobsidian` `hotbar 2` |
+| 3 | 2 | エンドクリスタル | `g1gc/spawncrystal` `hotbar 3` |
+| 4 | 3 | 殴り (剣) | `g1gc/hit`, `crystal/hardcode/mech/hit` `hotbar 4` |
+| 5 | 4 | 金リンゴ (盾) | `crystal/passive/gap` / `passive/shield/main` |
+| 6 | 5 | クロスボウ / 低速落下 | `crystal/passive/crossbow/load` / `slowfall` |
+| 7 | 6 | エンダーパール | `g1gc/pearl` `hotbar 7` |
+| 8 | 7 | リスポーンアンカー | `g1gc/place_anchor` `hotbar 8` |
+| 9 | 8 | グロウストーン | `g1gc/charge_anchor` `hotbar 9` |
+
+### 実装・検証 (Paper ライブ)
+- サーバー側キット `crystal` を `plugins/n-arena/kits.yml` に追加 (上表 + ダイヤ防具)、
+  `quantum.yml` は `bot.mode: CRYSTAL`。
+- `/botadmin CRYSTAL crystal` →「紐づけました: CRYSTAL BOT → キット 'crystal'」。
+- `/quantum spawnbot` の起動ログ:
+  `[Quantum] bot quantumbot wears the server kit 'crystal' (mode CRYSTAL, /botadmin)`
+- 実インベントリ照合: slot 0=トーテム / 1=黒曜石x8 / 2=クリスタルx64 / 3=ダイヤ剣 /
+  4=金リンゴx8 / 6=パールx16 / 7=アンカーx8 / 8=グロウストーンx64 +
+  `equipment.head/chest/legs/feet` = ダイヤ一式 → **サーバーキットが BOT に載っている**。
+- 未達: `slot: 40` (offhand トーテム) は適用されず (`KitLoadout.give` は `setItemInOffHand` を
+  呼ぶので、ロード/正規化側で落ちている疑い) → 追跡項目。パック側は
+  `item replace entity @s weapon.offhand with totem_of_undying` で自前補充するため、
+  パリティ計測はこれ無しでも成立する。
+
+### パリティ計測への含意
+両エンジン比較では **同じロードアウトを両側に配る**必要がある (Fabric 側にサーバーキットは無い)。
+実ラウンド中のインベントリはパックが動的に供給する (q 行の `i=` は
+`data modify storage parity:in item set from entity <bot> SelectedItem.id` の値で、
+失敗時は前回値が残る = スティッキー)。したがって `i=` の滞在率は「最後に成功した読み」であり、
+クリスタル残差 (`diamond_sword` 26.0% vs 4.6%) は **剣保持そのもの**ではなく
+「スロット選択の時間配分」の差として読むのが安全。
