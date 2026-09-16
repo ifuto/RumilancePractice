@@ -496,3 +496,63 @@ Practicebot パックの該当行の条件部だけを複製して `.g_* dbgc` �
 実験時の注意: `playerspawn <新しい名前>` で作った Bot は map 側の処理で別の場所へ飛ばされる/死ぬ
 (Fabric は world spawn 落ち、Paper は死亡)。**制御実験は `quantumbot`/`qbot2` を使い、
 1 つの function 呼び出しの中で tp → 計測 → 元に戻す**のが正しい(間に RCON を挟むと tick をまたいで map が動かす)。
+
+## 10.8 tick 位相の修正 — 剣の残差(hp_low_share)を潰した本物のバグ (2026-09-16)
+
+### 症状と原因
+剣ミラー (`sword_k10v10`) の残差は `hp_low_share` だけで、dagger の与 hit 数が
+Fabric 19 / Paper 16 (命中平均は同じ 1.77) と食い違っていた。原因は**ボットを tick の
+どこで動かしていたか**:
+
+- 参照 (Fabric mod): bot は player list の `ServerPlayer` なので `PlayerList.tick()`
+  (= tick の内側) で `doTick` が走る → サーバーの `#minecraft:tick` 関数は
+  **同じ tick の状態**を見る。
+- 以前のプラグイン: `BukkitScheduler#runTaskTimer(1, 1)` = scheduler の heart は
+  tick の *終わり*。つまり関数は常に**1 tick 前の状態**を見ていた。
+  → 攻撃/クールダウンの判定が参照より 1 tick ずれ、同じ 45 秒でも与 hit が減る。
+
+### 修正
+- `HeroBotSettings.tickPhase` (quantum.yml `herobot.tick-phase`, 既定 `tick-start`)
+- `HeroBotRegistry.ensureTicker()`: `tick-start` のとき `ServerTickStartEvent`
+  (tick の先頭 = 関数タグより前) で `doTick` を回す。`scheduler` を指定すれば旧挙動。
+- 起動ログに `tickPhase=` を出す。
+
+### 検証 (tools/parity_compare.py --noise, 同一位相の 2 本をノイズ床に)
+| ラウンド | who | 本物(Fabric↔Paper で食い違う指標) |
+|---|---|---|
+| dec19/dec19b (旧: scheduler) | a | `hp_low_share` |
+| swfix1 (新: tick-start) | a / b | **なし** (a は z_span/hp_avg/hp_min/hp_low_share がノイズ判定) |
+| swfix2 (新: tick-start) | a / b | **なし** (a は totem_pop/hp_min がノイズ、b はノイズなし・全 30 指標一致) |
+
+カウンタも同位相に揃った: `c_look` 1301/1303, `c_bmlogic_qa` 1301/1300 (比 1.00)。
+→ **剣は残差なし**。以降の計測は `tick-start` が前提。
+
+## 10.9 「未実装コマンド 3 個」の正体と /reload 復旧の修正
+
+### 正体 = 未実装ではなく *vanilla のプラグイン以前コンパイル*
+Paper の起動ログ 12:34:27 に出る `Failed to load function ...` は約 20 件あり、その中に
+`quantum:crystal/hardcode/totem` / `quantum:sword/passive/bow/load` / `mech_train:escape/main`
+が含まれる。順序は 12:34:27 (vanilla の関数コンパイル) → 12:34:29 (プラグイン読込) →
+12:34:33 (`re-added the herobot verbs` + `loaded 905 function(s) and 5 tag(s)`, failures 0)。
+つまり **Paper ではプラグインが読まれる前に datapack の関数がコンパイルされる**ので、
+`player …` を呼ぶ行はこのときだけ落ちる。プラグインの自前ローダが直後に 905 個
+(failures 0) を入れ直すため、実行時は 3 つとも存在する (RCON `function` が
+"Running function" を返し、カウンタも両エンジンで同じ値を示す)。
+
+機能の直接確認 (脳の無い検体 bot を作り、同 tick で書き→読み):
+| verb | Fabric | Paper |
+|---|---|---|
+| `player <bot> hotbar 1..9` → `SelectedItemSlot` | 0,1,2,3,4,5,6,7,8 | 0,1,2,3,4,5,6,7,8 |
+| `player <bot> move forward` (0.5s の Δxz) | 2.66 | 2.86 |
+| `player <bot> jump` (静止時) | 変化なし | 変化なし (両者同一挙動) |
+
+結晶シナリオでの呼び出し地点のカウンタ (`c_esc_main*`, `c_esc_ledge`, `c_bowload`, `c_hctotem`) は
+**両エンジンとも 0** = そのシナリオでは到達しないので、これらの関数が差の原因にはならない。
+
+### 本当にあったバグ = `/reload` で関数が壊れる (Paper のみ)
+サーバーの `/reload` は「新しい dispatcher を作る → その dispatcher で関数をコンパイルする」
+順で進むため、`player …` を含む行は必ず失敗し、5 秒おきの watchdog が拾うまでの間
+(=非同期の読み直しと競合した回) は動詞なしの状態で計測されていた (cry6 の Paper 側ゼロ)。
+修正: `ServerResourcesReloadedEvent` (読み直し完了後に発火) で動詞を戻し、
+**自前ローダでパックを入れ直す** (`QuantumRuntime#reinstallAfterResourceReload`)。
+ここで `reloadResources` を投げないのが重要 (自分自身を無限に呼ぶ)。

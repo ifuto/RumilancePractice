@@ -62,6 +62,24 @@ public final class HeroBotSettings {
     /** Creative fake players fly with the creative flight model (reference default true). */
     public static boolean creativeNoClip = false;
 
+    /**
+     * Where in the server tick the bots are driven.
+     *
+     * <p>In the reference (Fabric mod) a bot <i>is</i> a {@code ServerPlayer} in the player list,
+     * so its {@code doTick} runs from {@code PlayerList.tick()} — i.e. inside the tick, before the
+     * server's {@code #minecraft:tick} function tag runs. Paper cannot inject at that exact point,
+     * so the plugin drives the bots itself and the only question is which hook lands on the right
+     * side of the function tick:</p>
+     * <ul>
+     *   <li>{@code tick-start} — Paper's {@code ServerTickStartEvent} (start of the tick, i.e.
+     *       before the function tag). Same-tick visibility, like the reference.</li>
+     *   <li>{@code scheduler} — {@code BukkitScheduler#runTaskTimer(1, 1)}: the heart of the
+     *       scheduler sits at the <i>end</i> of the tick, so a function reading bot state sees the
+     *       previous tick's — a systematic one-tick lag against the reference.</li>
+     * </ul>
+     */
+    public static String tickPhase = "tick-start";
+
     /** Rules set with {@code perm} by {@code /herobot … perm world}, persisted on shutdown. */
     private static final Map<String, String> PERSISTED = new LinkedHashMap<>();
 
@@ -170,6 +188,7 @@ public final class HeroBotSettings {
                             allowSpawningOfflinePlayers = boolOr(value, allowSpawningOfflinePlayers);
                     case "bot-leave-on-death" -> botLeaveOnDeath = boolOr(value, botLeaveOnDeath);
                     case "creative-no-clip" -> creativeNoClip = boolOr(value, creativeNoClip);
+                    case "tick-phase" -> tickPhase = value;
                     default -> {
                         // Unknown key: ignore (forward compatible with newer herobot configs).
                     }
@@ -179,7 +198,8 @@ public final class HeroBotSettings {
                 log.info("[Quantum] herobot settings: pingTicks=" + botPingToTicks
                         + " shieldStunning=" + shieldStunning
                         + " shieldDelay=" + shieldDelayTicks
-                        + " lagAttacks=" + botLagAttacks + " lagUses=" + botLagUses);
+                        + " lagAttacks=" + botLagAttacks + " lagUses=" + botLagUses
+                        + " tickPhase=" + tickPhase);
             }
         } catch (IOException e) {
             if (log != null) {

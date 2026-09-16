@@ -113,6 +113,22 @@ public final class QuantumRuntime {
         // The verbs must be in the dispatcher before anything compiles a 'player …' line, so the
         // install hangs off the command registration rather than running right here.
         this.commands.listen(this::installWhenReady);
+        // ★ /reload 対策。サーバーのリソース読み直しは「新しい dispatcher を作る」→
+        // 「その dispatcher で .mcfunction をコンパイルする」順で進むので、`player …` を
+        // 呼ぶ行は動詞が無い状態でコンパイルされて *必ず* 落ちる(Fabric 参照では起きない)。
+        // これまでは 5 秒おきの watchdog が拾っていたが、読み直しが非同期に終わるため
+        // 「自前ロードが先・vanilla の差し替えが後」の競合で負けることがあり、その回の
+        // ラウンドは動詞なし状態のまま計測されていた(cry6 の Paper 側ゼロ)。
+        // Paper のこのイベントは *読み直しが終わった後* に走るので、そこで動詞を戻し、
+        // 自前ローダでパックを入れ直す = Fabric の /reload と同じ状態に即座に揃う。
+        Bukkit.getPluginManager().registerEvents(new org.bukkit.event.Listener() {
+            @org.bukkit.event.EventHandler(
+                    priority = org.bukkit.event.EventPriority.MONITOR)
+            public void onResourcesReloaded(
+                    io.papermc.paper.event.server.ServerResourcesReloadedEvent event) {
+                reinstallAfterResourceReload(event.getCause());
+            }
+        }, this.plugin);
         // Self-healing, for the two ways this can be undone behind our back: /reload rebuilds the
         // function library from the packs on disk (dropping the functions that only compiled with
         // 'player' present), and a dispatcher swap takes the verbs away from the map's lines.
@@ -128,6 +144,29 @@ public final class QuantumRuntime {
                 this.installWhenReady();
             }
         }, 100L, 100L);
+    }
+
+    /**
+     * リソース読み直し(サーバーの {@code /reload} やプラグインからの {@code reloadResources})が
+     * 終わった直後の復旧処理。vanilla が作った新しい関数ライブラリには {@code player …} を
+     * 呼ぶ関数が入っていないので、動詞を戻してから自前ローダで入れ直す。
+     *
+     * <p>ここで再コンパイル(= {@code reloadResources})を投げないのが重要: このイベントは
+     * 読み直しの *結果* なので、投げると自分自身を永久に呼び続ける。</p>
+     */
+    private void reinstallAfterResourceReload(Object cause) {
+        if (!this.enabled) {
+            return;
+        }
+        Bukkit.getScheduler().runTask(this.plugin, () -> {
+            if (!this.commands.areRootsRegistered()) {
+                this.commands.ensureRoots(false);
+            }
+            this.plugin.getLogger().info("[Quantum] resource reload (" + cause
+                    + ") — re-asserted the herobot verbs and re-loaded the pack's functions "
+                    + "(vanilla's own pass cannot compile lines that call /player)");
+            this.installWhenReady();
+        });
     }
 
     public void disable() {

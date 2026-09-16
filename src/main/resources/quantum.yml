@@ -58,3 +58,5 @@ herobot:
   allow-spawning-offline-players: true
   bot-leave-on-death: false
   creative-no-clip: false
+  # tick: bot を tick のどこで動かすか (tick-start = tick の先頭 / scheduler = tick の終わり)
+  tick-phase: tick-start

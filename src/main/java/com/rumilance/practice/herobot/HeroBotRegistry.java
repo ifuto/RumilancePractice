@@ -38,6 +38,8 @@ public final class HeroBotRegistry {
     private final Plugin plugin;
     private final Map<String, HeroBotPlayer> bots = new LinkedHashMap<>();
     private BukkitTask ticker;
+    /** {@code tick-phase: tick-start} のときのドライバ (ServerTickStartEvent)。 */
+    private org.bukkit.event.Listener tickListener;
     private final Set<String> spawning = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     public HeroBotRegistry(Plugin plugin) {
@@ -185,10 +187,29 @@ public final class HeroBotRegistry {
      * all bots, started with the first bot and stopped with the last.</p>
      */
     public void ensureTicker() {
-        if (this.ticker != null) {
+        if (this.ticker != null || this.tickListener != null) {
+            return;
+        }
+        // 参照(Fabric mod)の bot は player list の ServerPlayer なので、bot の doTick は
+        // `PlayerList.tick()`（= tick の内側、関数タグより前）で走る。Paper に同じ差し込み口は
+        // 無いので、既定では「tick の先頭」で回す: サーバー自身の `#minecraft:tick` 関数は
+        // これより後に走るため、関数から見た bot の状態が「同じ tick のもの」になる。
+        // (bukkit scheduler の heart は tick の *終わり* にあり、関数はその前の状態を見てしまう
+        //  = 参照に対して常に 1 tick 遅れる。実測で剣の与hit数が減っていた原因。)
+        if (!"scheduler".equalsIgnoreCase(HeroBotSettings.tickPhase)) {
+            this.tickListener = new TickStartDriver();
+            Bukkit.getPluginManager().registerEvents(this.tickListener, this.plugin);
             return;
         }
         this.ticker = Bukkit.getScheduler().runTaskTimer(this.plugin, this::tickBots, 1L, 1L);
+    }
+
+    /** {@code ServerTickStartEvent} 経由のドライバ (= tick の先頭で 1 回)。 */
+    public final class TickStartDriver implements org.bukkit.event.Listener {
+        @org.bukkit.event.EventHandler
+        public void onTickStart(com.destroystokyo.paper.event.server.ServerTickStartEvent event) {
+            tickBots();
+        }
     }
 
     private void tickBots() {
@@ -197,6 +218,10 @@ public final class HeroBotRegistry {
             if (this.ticker != null) {
                 this.ticker.cancel();
                 this.ticker = null;
+            }
+            if (this.tickListener != null) {
+                org.bukkit.event.HandlerList.unregisterAll(this.tickListener);
+                this.tickListener = null;
             }
             return;
         }
@@ -209,7 +234,7 @@ public final class HeroBotRegistry {
 
     /** True while the per-tick driver is running (diagnostics). */
     public boolean ticking() {
-        return this.ticker != null;
+        return this.ticker != null || this.tickListener != null;
     }
 
     public Plugin plugin() {
