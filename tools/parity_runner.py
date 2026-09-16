@@ -86,6 +86,45 @@ def tail_offset(path):
         return 0
 
 
+def parse_text(text):
+    """文字列をそのまま parse にかける（ログ全体の読み直し用）。"""
+    import tempfile
+    with tempfile.NamedTemporaryFile('w', suffix='.log', delete=False, encoding='utf-8') as fh:
+        fh.write(text)
+        tmp = fh.name
+    try:
+        return parse(tmp)
+    finally:
+        os.unlink(tmp)
+
+
+TS = re.compile(r'^\[(\d\d:\d\d:\d\d)[\s\]]')
+
+
+def read_since(path, since, max_bytes=400 * 1024 * 1024):
+    """ログから `since`(='[HH:MM:SS') 以降の行だけを返す。
+
+    サーバーは再起動でログファイルを作り直すので、サイズのオフセットは当てにできない。
+    タイムスタンプは行頭に必ず付くので、それで切り分ける。
+    """
+    try:
+        size = os.path.getsize(path)
+    except OSError:
+        return ''
+    with open(path, 'rb') as fh:
+        fh.seek(max(0, size - max_bytes))
+        data = fh.read()
+    text = data.decode('utf-8', 'replace')
+    if size > max_bytes and '\n' in text:
+        text = text[text.find('\n') + 1:]
+    out = []
+    for line in text.splitlines():
+        m = TS.match(line)
+        if m and m.group(1) >= since[1:]:
+            out.append(line)
+    return '\n'.join(out) + ('\n' if out else '')
+
+
 def read_new(path, offset):
     with open(path, 'rb') as fh:
         fh.seek(offset)
@@ -182,11 +221,14 @@ def cmd_run(args):
     # アリーナ充填(数十万ブロック)が終わってから測る
     time.sleep(args.warmup)
     start = tail_offset(args.log)
-    print('  recording %ss ...' % args.seconds)
+    marker = time.strftime('[%H:%M:%S')
+    print('  recording %ss ... (from %s)' % (args.seconds, marker))
     time.sleep(args.seconds)
     send(args.console, [args.invoke + 'function parity:stop'], quiet=True)
-    text = read_new(args.log, start)
-    os.makedirs(os.path.dirname(args.out) or '.', exist_ok=True)
+    # ログの tail オフセットは「サーバー再起動でファイルが差し替わる」と無意味になり、
+    # 取りこぼすと計測そのものが消える。なので**時刻で**切り出す: 記録開始時刻以降の行だけ
+    # を、ファイル末尾から必要量だけ読んで拾う。
+    text = read_since(args.log, marker)
     with gzip.open(args.out, 'wt', encoding='utf-8') as fh:
         fh.write(text)
     rows = parse(args.out)

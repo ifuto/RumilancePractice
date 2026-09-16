@@ -29,5 +29,8 @@ $execute at $(name) store result storage parity:in ec int 1 run execute if entit
 $execute store result storage parity:in hd int 1 run scoreboard players get $(name) hit_decision_without_cd
 $execute store result storage parity:in cst int 1 run scoreboard players get $(name) can_see_target
 $execute store result storage parity:in p1d int 1 run scoreboard players get $(name) Pos1_difference
+# アイテムを使う判断(decision)とその入力。cobweb/water/lava の内側フローが Paper で
+# 一度も走らない件を追うために毎tick記録する（スコアが無いとマクロ変数が欠けて
+# サンプラごと壊れるので、先に 0 で作ってから読む）。
 $data modify storage parity:in who set value "$(who)"
 function parity:emit with storage parity:in

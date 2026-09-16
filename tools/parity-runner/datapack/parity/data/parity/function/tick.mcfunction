@@ -9,6 +9,9 @@ function parity:hptrack
 scoreboard players operation .hp_mod dbgc = pari_clock parity_t
 scoreboard players operation .hp_mod dbgc %= .two dbgc
 execute if score .hp_mod dbgc matches 0 run function parity:hpsample
+scoreboard players operation .dec_mod dbgc = pari_clock parity_t
+scoreboard players operation .dec_mod dbgc %= .ten dbgc
+execute if score .dec_mod dbgc matches 0 run function parity:dec
 function parity:clock
 data merge storage parity:args {name:"quantumbot",enemy:"qbot2",who:"a"}
 function parity:sample with storage parity:args

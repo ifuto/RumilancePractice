@@ -122,6 +122,7 @@ scoreboard objectives add par_pk minecraft.custom:minecraft.player_kills
 scoreboard objectives add parity_t dummy
 scoreboard objectives add dbgc dummy
 scoreboard players set .two dbgc 2
+scoreboard players set .ten dbgc 10
 scoreboard players set .neg_one dbgc -1
 scoreboard players set pari_clock parity_t 0
 scoreboard players set pari_round parity_t 0
@@ -130,6 +131,7 @@ data merge storage parity:args {{name:"{BOT_A}",enemy:"{BOT_B}",who:"a"}}'''
 
 
 def tick():
+    # 10tick ごとの判断ダンプは .ten で割った余りを見る（.two は既存）
     return f'''# parity:tick — 毎tick:
 #   1) 2体目({BOT_B})の脳を「敵={BOT_A}」の役割で1回まわす（{BOT_A} はマップ自身が回す）
 #   2) ラウンドが終わっていたら開始し直す
@@ -141,11 +143,34 @@ function parity:hptrack
 scoreboard players operation .hp_mod dbgc = pari_clock parity_t
 scoreboard players operation .hp_mod dbgc %= .two dbgc
 execute if score .hp_mod dbgc matches 0 run function parity:hpsample
+scoreboard players operation .dec_mod dbgc = pari_clock parity_t
+scoreboard players operation .dec_mod dbgc %= .ten dbgc
+execute if score .dec_mod dbgc matches 0 run function parity:dec
 function parity:clock
 data merge storage parity:args {{name:"{BOT_A}",enemy:"{BOT_B}",who:"a"}}
 function parity:sample with storage parity:args
 data merge storage parity:args {{name:"{BOT_B}",enemy:"{BOT_A}",who:"b"}}
 function parity:sample with storage parity:args'''
+
+
+DEC_SCORES = ['fill_water_decision', 'empty_water_decision', 'fill_lava_decision', 'empty_lava_decision',
+              'in_cobweb_decision', 'in_range', 'water_bucket_count', 'lava_bucket_count',
+              'empty_water_cd', 'lava_cd', 'hit_decision_without_cd', 'can_see_target']
+
+
+def dec():
+    """[d] 行 — アイテム判断(decision)の状態を「0 / 1以上」の2値で記録する。
+
+    関数の中では scoreboard get の出力が消え(feedback 抑制)、tellraw は偽プレイヤーに
+    届かない。そこで **条件が成立したときだけ say する**方式にする。say は必ずコンソールに
+    出るので取りこぼしが無く、他関数を壊す余地も無い。
+    """
+    lines = ['# parity:dec — 判断スコアの0/1以上ダンプ']
+    for who, name in (('a', BOT_A), ('b', BOT_B)):
+        for sc in DEC_SCORES:
+            lines.append('execute if score %s %s matches 0 run say [d] %s %s=0' % (name, sc, who, sc))
+            lines.append('execute if score %s %s matches 1.. run say [d] %s %s=1+' % (name, sc, who, sc))
+    return '\n'.join(lines)
 
 
 def vs_brain():
@@ -263,6 +288,9 @@ $execute at $(name) store result storage parity:in ec int 1 run execute if entit
 $execute store result storage parity:in hd int 1 run scoreboard players get $(name) hit_decision_without_cd
 $execute store result storage parity:in cst int 1 run scoreboard players get $(name) can_see_target
 $execute store result storage parity:in p1d int 1 run scoreboard players get $(name) Pos1_difference
+# アイテムを使う判断(decision)とその入力。cobweb/water/lava の内側フローが Paper で
+# 一度も走らない件を追うために毎tick記録する（スコアが無いとマクロ変数が欠けて
+# サンプラごと壊れるので、先に 0 で作ってから読む）。
 $data modify storage parity:in who set value "$(who)"
 function parity:emit with storage parity:in'''
 
@@ -658,6 +686,7 @@ def main():
     w('data/parity/function/diag_line2.mcfunction', diag_line2())
     w('data/parity/function/dstat.mcfunction', dstat())
     w('data/parity/function/hptrack.mcfunction', hptrack())
+    w('data/parity/function/dec.mcfunction', dec())
     w('data/parity/function/hpreset.mcfunction', hpreset())
     w('data/parity/function/hpstat.mcfunction', hpstat())
     w('data/parity/function/raytest.mcfunction', raytest())
