@@ -111,6 +111,23 @@ public class HeroBotPlayer extends PacketBot {
         if (movement.lengthSqr() > 1.0E-5) {
             this.resetLastActionTime();
         }
+        this.updateFallDistance();
+    }
+
+    /**
+     * The reference's bots ride a fake client connection, so the server's own player-movement path
+     * keeps {@code Entity#fallDistance} up to date. A Paper bot without a client never runs that
+     * path, so the field stays 0 — and every {@code quantum:fall_distance*} / {@code quantum:vmotion*}
+     * predicate (the water, cobweb and lava flows of the pack are gated on them) reads false.
+     * Reproduce vanilla's accumulation rule here: gain while descending, reset on landing.
+     */
+    private void updateFallDistance() {
+        double dy = this.getDeltaMovement().y;
+        if (this.onGround()) {
+            this.fallDistance = 0.0;
+        } else if (dy < 0.0) {
+            this.fallDistance -= dy;
+        }
     }
 
     /** {@code ServerPlayer#tick()} stays vanilla — the server path above does not call it. */

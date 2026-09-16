@@ -342,3 +342,64 @@ hp_low_share(b), item 配分(sword/cobweb/bucket/water/lava)。
 - サンプラ `parity:sample` のマクロに新しい `store` を足すと、スコア未設定のときに
   マクロ変数が欠けて **`$say` 行ごと落ちる**（＝以後 [q] が一切出ない）。判断スコアの観測は
   サンプラに相乗りせず、`parity:dec`（条件成立時だけ `say [d] ...=0/1+`）で独立に出す。
+
+## 9) 落下距離(fall_distance)が Paper 側で 0 固定 — 水・クモの巣フローが全滅していた (2026-09-16)
+
+### 9.1 症状(実測)
+`dec8`/`dec9`/`dec10`(sword_k10v11, 45〜60 秒)で、**Fabric だけがアイテムを切り替える**:
+- Fabric who=a の手持ち: `diamond_sword 98.4%` + `cobweb 0.7%` + `bucket 0.5%` + `water_bucket 0.4%`
+- Paper  who=a の手持ち: `diamond_sword 100.0%`(3 ラウンド連続で再現)
+- `item_switch` は Fabric 27.6〜28 回/分、Paper 0 回。
+
+### 9.2 ゲートを1つずつ数えた(本命の特定)
+Practicebot パックの該当行の条件部だけを複製して `.g_* dbgc` でカウント(1 ラウンド、両エンジン同時)。
+| 条件 | Fabric | Paper |
+|---|---|---|
+| `quantum:vmotion_m0` / `fall_distance1`(`Δy≥0 かつ fall_distance≥0.1`) | **234 / 234** | **0 / 0** |
+| `real_hitcd 1..` | 2355(45 秒) | 1007 |
+| `in_range 0` | 5640 | 3591 |
+| `hotbar.7 water_bucket` / `hotbar.8 lava_bucket` | 2656 / 2701 | 2600 / 2600 |
+| `.water toggles=1` | 2704 | 2654 |
+| マーカー(`in_player`/`lava`/`water`) | 0 | 0 |
+| `tag util` が付いた tick | 1525 | **0** |
+
+→ `fluid_main` の `tag util` 付与は
+`real_hitcd 1..` **かつ** `@p[tag=xlib_target,predicate=quantum:vmotion_m0]` **かつ** `in_range=0`。
+他が全部一致しているので、**犯人は `vmotion_m0`(= `fall_distance`)**。
+`tag util` が無いと `water_main` / cobweb / lava の各フローが動かず、
+`empty_bucket` / `fill_bucket` / `cobweb` の `player @s hotbar N` も走らない = アイテム切替 0 回。
+
+### 9.3 根因
+参照 MOD の bot は **偽クライアント接続**(`bot/connection`)を通るので、サーバーの通常の
+プレイヤー移動処理が回り `Entity#fallDistance` が更新される。Paper 側の疑似プレイヤーには
+その経路が無いため、`data get entity <bot> FallDistance` に値が出ない=常に 0。
+(Paper の `ServerPlayer#checkFallDamage` は `Entity#checkFallDamage` を呼ばないことも確認:
+カウンタ/バイトコード両面で `Entity.checkFallDamage` が一切現れない。)
+
+### 9.4 修正
+`HeroBotPlayer#doTick` の末尾で、バニラの蓄積規則をそのまま移植(`updateFallDistance`)。
+- 空中かつ `Δy < 0` のとき `fallDistance -= Δy`(降下分を加算)
+- `onGround()` なら 0 に戻す
+
+### 9.5 結果(dec15/dec16, 修正後)
+- Paper の `g_fd1`/`g_m0`: **0 → 222**、`tag util`: **0 → 29**、
+  手持ち: `diamond_sword 99.4%` + `cobweb 0.2%` + `water_bucket 0.2%` + `bucket 0.2%`
+- ノイズ床(dec15 vs dec16 の同一エンジン同士)で再判定した「本物の乖離」は
+  **`yaw_rate` と `hp_avg` の 2 つだけ**に縮んだ。`item_switch` / `speed_med` / `yaw_snap` /
+  `yaw_med` / `hp_low_share` / `totem_pop` は同一エンジンでも同程度に振れる=カオス。
+- **一致に昇格**: `swing` / `speed` / `move_share` / `dist_med` / `items.*`(剣・クモの巣・水・バケツ・
+  溶岩バケツ)/ スパン類 / `hp_min` / `dist_close` / `dist_far` / `pearl_gap` /
+  crystal・anchor・charge・explode・pearl レート。
+
+### 9.6 訂正(このセッションで消した疑い)
+- **「Paper は進捗報酬を一切適用しない」は誤診**(既出)/**既得進捗の罠**だった。
+  `advancement revoke` してから `grant` すれば Paper も経験値 99 を適用する(198→297)。
+- `BotActionPack.getTarget` の BLOCK/MISS 差は**存在しない**。参照の `getTarget` も
+  「ブロックに当たれば BLOCK、そうでなければエンティティ再レイ」で完全一致(バイトコード確認)。
+- `stop`(→`stopAll`)/`look`(`% 360.0f`)/`hotbar`/`setSlot`/移動入力/`onUpdate` は参照と一致。
+
+### 9.7 計測用の一時配線(撤去済み)
+`quantum:gates`(ゲート単体カウンタ)と `parity:tick` の呼び出しは撤去済み。
+同種の計測をするときは、**条件部だけを複製した行**を足す(実行部を差し替えない)と
+「どの条件が落ちているか」を切り分けられる。Paper はワールド保存前に落ちると
+スコアが巻き戻るので、カウンタは**ラウンド直後に読む**こと。
