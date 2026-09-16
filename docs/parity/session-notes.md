@@ -254,3 +254,55 @@ who=b `speed, speed_med, hp_min` のみ不一致（以前は swing から何も�
 - **配備済み `parity` パックが古いと `who=` 付きサンプラ行が出ない**（`minecraft/tags/function/tick.json`
   が無い世代）。`parity_runner.py run` は「0 [q] lines」と出して無言で空ログを書くので、
   計測前に `gen_pack.py` → `parity_runner.py deploy <world>/datapacks` を必ず通すこと。
+
+## 7) ノイズ床テスト — 「まだ直すべき乖離」と「カオス」を分ける (2026-09-16)
+
+BOT vs BOT はカオスなので、**同じエンジン同士**でも勝敗が入れ替われば指標は振れる。
+Paper の移植を疑う前に「エンジン内で再現するか」を測るのが正しい順序なので、
+`parity_compare.py --noise` を追加した。
+
+    python3 tools/parity_compare.py --noise \
+        <fab1> <fab2> <pap1> <pap2> --who a
+
+同一エンジン2ランで振れる指標 =**ノイズ**（判定に使えない）、
+両エンジン内で再現するのに Fabric↔Paper で食い違う指標 =**本物の乖離**として分離する。
+
+### 実測（fix2=75s×2エンジン, long1=180s×2エンジン）
+
+| who | ノイズ（同一エンジンで振れる） | **本物の乖離（要修正）** |
+|---|---|---|
+| a (quantumbot) | totem_pop, yaw_snap, speed_med, move_share, z_span, hp_avg, hp_min, hp_low_share | **item_switch, speed, yaw_rate, yaw_med** |
+| b (qbot2) | speed_med, x_span, z_span, hp_avg, hp_min | **speed, move_share** |
+
+一致（両エンジンで再現）: swing, crystal/anchor/charge/explode/pearl/totem の各レート,
+anchor_gap, charge_explode_gap, x_span(a), y_med/y_min/y_max, dist_med/dist_close/dist_far,
+hp_low_share(b), item 配分(sword/cobweb/bucket/water/lava)。
+
+つまり **残っているのは「移動（speed/move_share）」と「視点（yaw_rate/yaw_med）」、
+そして who=a のアイテム切替(item_switch)** の3系統だけ。以前のように swing や
+トーテムが丸ごと 0 という状態ではない。
+
+### 副次的な発見（次の調査の入口）
+- `BotActionPack.onUpdate()` は `HeroBotPlayer#doTick()` から毎tick呼ばれており、
+  参照(mod)の「HEAD of tick」と同じ順序（autoJump → look補間 → 遅延アクション →
+  アクション → 移動入力）。ロジックの写し間違いではない。
+- `look upon … closest delta N` は **毎tick呼ばれる**ので、補間は毎tick
+  「残りの 1/N だけ寄る」＝ 指数的な追従になる。実測の Paper の yaw は
+  まさにその滑らかな追従（-38→-30→…→0）。**Fabric 側は同じコマンドで yaw が
+  ほぼ動かず、90度単位で飛ぶ**（-180 のまま 981/3599 tick）。→ 次はここを詰める。
+- `getTarget()` も参照と条件が違う（参照: 1本目が **MISS** なら即返す／こちらの移植:
+  1本目が **BLOCK** なら即返す）。属性の対応（BLOCK/ENTITY interaction range）と
+  あわせて要確認。
+- item 切替の実体は `quantum:cobwebs/*`（cobweb/water/lava の各フロー）。計器化すると
+  fluid_main と water_main は **両エンジンで走る**のに、内側の fill/empty_bucket と
+  cobweb だけ Paper 0 回（Fabric 7/18/3/8/14 回）＝**decision 系スコアの差**。
+  道具: `tools/parity-runner/instrument_flows.py`（両worldに計器を入れ/revertする）と
+  `read_counters.py`、`probe_slot.py`（hotbar verb のライブ確認。Paper は読み取りを
+  プレフィックス無しで送ること）、`probe_move.py`。
+
+### ハーネス運用メモ（今回踏んだ地雷）
+- `hotbar` verb は **両エンジンで正常**（Paper: lava_bucket/8 → `player quantumbot hotbar 5`
+  → golden_apple/4 → 9 → lava_bucket/8）。もう item 切替の器を疑わない。
+- Fabric は素の `playerspawn` 直後だと bot が動かない（重力すら積まない）。verb 単体の
+  性能比較は「ハーネスで試合を回す」文脈でしかできない。Paper は同じ状況でも動くので、
+  **そのまま比較すると Paper だけが動いて見える**（誤診のもと）。

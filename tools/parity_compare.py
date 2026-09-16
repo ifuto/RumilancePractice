@@ -33,6 +33,7 @@ import argparse
 import collections
 import gzip
 import json
+import os
 import math
 import re
 import sys
@@ -540,6 +541,60 @@ def audit(path=None, verbose=False):
     return 0
 
 
+
+def noise(fab_a, fab_b, pap_a, pap_b, who='a'):
+    """ノイズ床を測る: 同一エンジンの2ランを突き合わせ、判定に使える指標だけを残す。
+
+    BOT vs BOT はカオスなので、**同じエンジン同士**でも勝敗が入れ替われば item 切替や
+    hp_min のような指標は簡単に「不一致」になる。それらを Paper の移植のせいにすると
+    直しようのない差を追いかけることになるので、まず「エンジン内で再現する指標」を
+    確定し、その上で Fabric ↔ Paper が食い違うものだけを本物の乖離として出す。
+    """
+    other = 'b' if who == 'a' else 'a'
+
+    def fp(path):
+        rows = load(path, who)
+        return fingerprint(rows, load(path, other) or None)
+
+    mf1, mf2, mp1, mp2 = fp(fab_a), fp(fab_b), fp(pap_a), fp(pap_b)
+    # 判定と同じ指標集合（HARD + RATES + STATS + アイテム配分）を、同じ判定器で見る。
+    checks = [(k, tol, '!') for k, _u, tol in HARD] + \
+             [(k, 0.35, '!') for k in RATES + STATS]
+    unstable, real_bad, real_ok = [], [], []
+    for key, tol, _ in checks:
+        diff_same_engine = (compare(mf1, mf2, key, tol)[0] != '='
+                            or compare(mp1, mp2, key, tol)[0] != '=')
+        diff_cross = compare(mf1, mp1, key, tol)[0] != '='
+        if diff_same_engine:
+            unstable.append(key)
+        elif diff_cross:
+            real_bad.append(key)
+        else:
+            real_ok.append(key)
+    # アイテム配分は 15pt 超で乖離（verdict と同じ閾値）。
+    for k in sorted(set(mf1.get('items', {})) | set(mp1.get('items', {}))):
+        same = (abs(mf1['items'].get(k, 0.0) - mf2['items'].get(k, 0.0)) > 15.0
+                or abs(mp1['items'].get(k, 0.0) - mp2['items'].get(k, 0.0)) > 15.0)
+        cross = abs(mf1['items'].get(k, 0.0) - mp1['items'].get(k, 0.0)) > 15.0
+        if same:
+            unstable.append('items.' + k)
+        elif cross:
+            real_bad.append('items.' + k)
+        else:
+            real_ok.append('items.' + k)
+    print('== ノイズ床テスト (who=%s: %s)' % (who, 'quantumbot' if who == 'a' else 'qbot2'))
+    print('   fabric: %s / %s' % (os.path.basename(fab_a), os.path.basename(fab_b)))
+    print('   paper : %s / %s' % (os.path.basename(pap_a), os.path.basename(pap_b)))
+    print('   検査した指標: %d' % len(unstable + real_bad + real_ok))
+    print('   [ノイズ] 同一エンジンでも振れる（判定に使えない）: %s'
+          % (', '.join(unstable) if unstable else 'なし'))
+    print('   [本物] エンジン内では再現し、Fabric↔Paper で食い違う: %s'
+          % (', '.join(real_bad) if real_bad else 'なし'))
+    print('   [一致] 両エンジンで再現して一致: %s'
+          % (', '.join(real_ok) if real_ok else 'なし'))
+    return 1 if real_bad else 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -555,6 +610,8 @@ def main():
     ap.add_argument('--selftest', action='store_true',
                     help='カナリア自己テスト（一致/乖離を正しく判定できるか）を実行する')
     ap.add_argument('--base', help='selftest の土台にするログ（既定: 最新の parity-logs/*.log.gz）')
+    ap.add_argument('--noise', nargs=4, metavar=('FAB_A', 'FAB_B', 'PAP_A', 'PAP_B'),
+                    help='同一エンジンの2ランからノイズ床を測る（Fabric2本 + Paper2本のログ）')
     ap.add_argument('-v', '--verbose', action='store_true')
     args = ap.parse_args()
     if args.audit:
@@ -563,6 +620,8 @@ def main():
         return regression(args.fixture or 'tools/parity-runner/fixtures/regression_s2_metrics.json')
     if args.selftest:
         return selftest(args.base, args.verbose)
+    if args.noise:
+        return noise(*args.noise, who=args.who)
     if not args.fabric or not args.paper:
         ap.error('fabric と paper のログを指定する（--selftest なら不要）')
     if args.json:
