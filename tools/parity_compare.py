@@ -195,8 +195,10 @@ HARD = [('anchor_gap', 't', 0.25), ('charge_explode_gap', 't', 0.25)]
 RATES = ['crystal', 'anchor', 'charge', 'explode', 'pearl', 'swing', 'totem', 'totem_pop',
          'item_switch', 'yaw_snap']
 STATS = ['speed', 'speed_med', 'move_share', 'yaw_rate', 'yaw_med', 'x_span', 'z_span',
-         'y_med', 'y_min', 'hp_avg', 'hp_min', 'hp_low_share', 'dist_med', 'dist_close',
+         'y_med', 'y_min', 'y_max', 'hp_avg', 'hp_min', 'hp_low_share', 'dist_med', 'dist_close',
          'dist_far', 'pearl_gap']
+# 判定しない(情報表示のみ)キー。ここに入れるのは「行動の差」ではなく「サンプルの回数」だけ。
+INFO_KEYS = {'ticks', 'samples'}
 
 
 # 注意帯 = 許容の何倍までを「軽微な差」とみなすか。以前は 3.5 倍(=122%)までを
@@ -251,6 +253,8 @@ def verdict(ma, mb, tolerance=0.35):
             bad.append(key); reasons.append((key, why, ma.get(key), mb.get(key)))
         elif mark == '~':
             soft.append(key)
+    # ★ 以前は上位10件だけを見ていたため、11件目以降のアイテムが大きく違っても
+    #   黙って通っていた。ここでは *全件* を判定する(表示は呼び出し側で絞る)。
     for k in sorted(set(ma.get('items', {})) | set(mb.get('items', {}))):
         va, vb = ma['items'].get(k, 0.0), mb['items'].get(k, 0.0)
         diff = abs(va - vb)
@@ -363,10 +367,13 @@ def report(fabric, paper, who='a', label=''):
         if min(ma['samples'], mb['samples']) < MIN_SAMPLES:
             print('   ※サンプル不足のため、この判定自体が暫定')
         return 1
-    print('VERDICT: 一致（硬い数値・レート・統計・アイテム配分すべて許容内）')
     if min(ma['samples'], mb['samples']) < MIN_SAMPLES:
-        print('   ※サンプル不足のため、この判定自体が暫定')
+        # ★ 以前はここで「一致」と表示していた。サンプルが足りないログで
+        #   「一致」と言うのは嘘になるので、はっきり判定不能と出す。
+        print('VERDICT: 判定不能 — サンプル不足 (fabric=%d / paper=%d, 必要 %d 以上)'
+              % (ma['samples'], mb['samples'], MIN_SAMPLES))
         return 1
+    print('VERDICT: 一致（硬い数値・レート・統計・アイテム配分すべて許容内）')
     return 0
 
 
@@ -448,6 +455,91 @@ def selftest(base=None, verbose=False):
     return 0
 
 
+
+def audit(path=None, verbose=False):
+    """監査モード — **「一致」と言い逃れできる指標が残っていないか**を全数検査する。
+
+    やり方(重要):
+      1. 土台は **両側が同一の指標** (fixture の fabric 側を両方に使う)。
+         まず「同一 → 一致」になることを確認する。
+      2. 次に **1 指標ずつ片側だけ壊し**、必ず「不一致」になることを確認する。
+      3. それでも一致と出る指標があれば *抜け道* として列挙し FAIL にする。
+
+    土台に「すでに乖離しているペア」を使うと、何を壊しても不一致になって抜け道を
+    見逃す(実際に最初の実装がそうなっていた)。同一土台だから検出力が出る。
+    """
+    import copy
+    import os
+    if path is None:
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            'parity-runner', 'fixtures', 'regression_s2_metrics.json')
+    if not os.path.exists(path):
+        print('audit: fixture が無い: %s' % path)
+        return 2
+    with open(path, encoding='utf-8') as fh:
+        data = json.load(fh)
+    base_map = data['fabric']
+
+    # 1) 土台の健全性: 同一指標は「一致」でなければならない
+    same = copy.deepcopy(base_map)
+    ok_same, bad_same, _, _ = verdict(same, copy.deepcopy(base_map))
+    if not ok_same:
+        print('== 監査 (fixture=%s)' % path)
+        print('   [FAIL] 同一指標で「一致」にならない (判定器が常に不一致を叫んでいる): %s'
+              % ', '.join(bad_same))
+        return 1
+
+    escapes = []
+    checked = []
+
+    def check(name, a, b):
+        checked.append(name)
+        ok, _bad, _soft, _reasons = verdict(a, b)
+        if ok:
+            escapes.append(name)
+            if verbose:
+                print('   ★ 抜け道: %s (片側を 3 倍+10 に壊しても一致と判定された)' % name)
+
+    for key in sorted(set(base_map)):
+        if key in INFO_KEYS or key in ('items', 'counts', 'use_per_item'):
+            continue
+        va = base_map.get(key)
+        if not isinstance(va, (int, float)):
+            continue
+        a2, b2 = copy.deepcopy(base_map), copy.deepcopy(base_map)
+        a2[key] = abs(va) * 3.0 + 10.0
+        check(key, a2, b2)
+
+    # アイテム滞在率は「上位10件」ではなく全件壊して確認する
+    items = base_map.get('items') or {}
+    for item in sorted(items):
+        a2, b2 = copy.deepcopy(base_map), copy.deepcopy(base_map)
+        a2['items'][item] = abs(items[item]) * 3.0 + 20.0
+        check('items.%s' % item, a2, b2)
+    # 土台に無いアイテムが片側だけに生えた場合も検出できるか
+    a2, b2 = copy.deepcopy(base_map), copy.deepcopy(base_map)
+    a2['items']['__audit_new_item__'] = 40.0
+    check('items.新規出現', a2, b2)
+    # ★ 「上位10件だけ判定する」穴を突く: 12 件のアイテムを持ち、滞在率が最も小さい
+    #   11〜12 件目だけが大きく違うケース。土台のアイテム数が少ないとこの穴は見えない
+    #   ので、ここで *合成した* アイテム集合を使って確かめる。
+    many = copy.deepcopy(base_map)
+    many['items'] = {('item_%02d' % i): (30.0 - i * 2.0) for i in range(12)}
+    a2, b2 = copy.deepcopy(many), copy.deepcopy(many)
+    a2['items']['item_11'] = 90.0
+    check('items.下位(11件目)の項目', a2, b2)
+
+    print('== 監査 (fixture=%s)' % path)
+    print('   土台: 両側同一 → 一致 (OK) / 検査した指標: %d 件 / 情報表示のみ: %s'
+          % (len(checked), ', '.join(sorted(INFO_KEYS))))
+    if escapes:
+        print('   [FAIL] 「乖離を作っても一致」になる指標が %d 件: %s'
+              % (len(escapes), ', '.join(escapes)))
+        return 1
+    print('   [PASS] どの指標を壊しても「不一致」になる(＝言い逃れの余地なし)')
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -455,6 +547,8 @@ def main():
     ap.add_argument('paper', nargs='?')
     ap.add_argument('--who', default='a', help='a=quantumbot b=qbot2')
     ap.add_argument('--json', action='store_true', help='生の指標を JSON で出す')
+    ap.add_argument('--audit', action='store_true',
+                    help='全指標を1つずつ壊し、「一致」と言い逃れできる指標が残っていないか検査する')
     ap.add_argument('--regression', action='store_true',
                     help='既知の「嘘の一致」(s2_sword の実測指標)を判定に通す回帰試験')
     ap.add_argument('--fixture', help='--regression で使う fixture のパス')
@@ -463,6 +557,8 @@ def main():
     ap.add_argument('--base', help='selftest の土台にするログ（既定: 最新の parity-logs/*.log.gz）')
     ap.add_argument('-v', '--verbose', action='store_true')
     args = ap.parse_args()
+    if args.audit:
+        return audit(args.fixture, args.verbose)
     if args.regression:
         return regression(args.fixture or 'tools/parity-runner/fixtures/regression_s2_metrics.json')
     if args.selftest:

@@ -7,6 +7,9 @@
 
 やること(すべて同じ判定器 `tools/parity_compare.py` を通す):
 
+  0. **監査（監査モード）** — 両側が同一の指標から出発し、**1 指標ずつ壊して必ず
+     「不一致」になるか**を全数検査。これで「乖離があるのに一致と出る指標」が
+     残っていないことを機械的に示す（過去に 2 箇所の穴が見つかった）。
   1. **カナリア自己テスト** — 実ログを加工して「同一→一致」「攻撃を消す→不一致」
      「座標を凍結→不一致」「アイテム切替を消す→不一致」を機械検査。
      ツールが「嘘の一致」を出せばここで落ちる。
@@ -60,21 +63,25 @@ def main():
     args = ap.parse_args()
 
     results = []
-    print('== 1/3 カナリア自己テスト')
+    print('== 0/4 監査（全指標を壊して必ず不一致になるか）')
+    ok, _ = run(['--audit'], '監査モード')
+    results.append(('audit', ok))
+
+    print('== 1/4 カナリア自己テスト')
     ok, _ = run(['--selftest'], 'カナリア自己テスト')
     results.append(('canary', ok))
 
-    print('== 2/3 リグレッション試験 (過去に嘘をついた実例)')
+    print('== 2/4 リグレッション試験 (過去に嘘をついた実例)')
     ok, _ = run(['--regression'], 'リグレッション試験')
     results.append(('regression', ok))
 
     if args.tools_only:
-        print('== 3/3 本番判定 — --tools-only のためスキップ')
+        print('== 3/4 本番判定 — --tools-only のためスキップ')
     else:
         fabric, paper = args.fabric, args.paper
         if not fabric or not paper:
             fabric, paper = newest_pair()
-        print('== 3/3 本番判定 (%s vs %s)' % (fabric, paper))
+        print('== 3/4 本番判定 (%s vs %s)' % (fabric, paper))
         if not fabric or not paper:
             print('[FAIL] 判定できるログのペアが無い')
             results.append(('compare', False))
