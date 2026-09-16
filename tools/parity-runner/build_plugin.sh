@@ -22,6 +22,7 @@ SOURCES=(
   src/main/java/com/rumilance/practice/quantum
   src/main/java/com/rumilance/practice/combat/CrystalSelfBlastListener.java
   src/main/java/com/rumilance/practice/combat/ExplosionSourceTracker.java
+  src/main/java/com/rumilance/practice/listener/AdvancementBlockListener.java
   src/main/java/com/rumilance/practice/listener/SessionBootstrapListener.java
   src/main/java/com/rumilance/practice/lobby/LobbyListener.java
   src/main/java/com/rumilance/practice/packetbot/PacketBot.java

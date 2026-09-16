@@ -403,3 +403,66 @@ Practicebot パックの該当行の条件部だけを複製して `.g_* dbgc` �
 同種の計測をするときは、**条件部だけを複製した行**を足す(実行部を差し替えない)と
 「どの条件が落ちているか」を切り分けられる。Paper はワールド保存前に落ちると
 スコアが巻き戻るので、カウンタは**ラウンド直後に読む**こと。
+
+## 10) 環境リセット後の再測定 (2026-09-16 後半) — Sword は一致圏、Crystal に残り
+
+### 10.1 何が起きたか
+サンドボックス再起動で `/tmp`(JDK・Fabric・Paper・ワールド)とセッションのコミットが消えたため、
+`tools/parity-runner/env_up.sh --start` で**ゼロから再構築**した(ワールドは Fabric 側を Paper に複製)。
+再構築時に `build_plugin.sh` のソース一覧へ `AdvancementBlockListener.java` を足した
+(`FeatureBootstrap` が `CONFIG_PATH` を参照するため、抜けているとコンパイルが通らない)。
+
+再構築後も**落下距離の修正は入っている**(`HeroBotPlayer#doTick` 末尾の `updateFallDistance()`)。
+
+### 10.2 新しい道具(コミット済み)
+- `tools/parity-runner/pair.sh <tag> [scenario] [seconds] [warmup]`
+  — Fabric と Paper で**同時に**1ラウンド走らせて `parity-logs/<tag>_{fabric,paper}.log.gz` を作る。
+- `tools/parity-runner/count_round.py <tag> [scenario] [seconds] [warmup]`
+  — カウンタを 0 に戻す → 1ラウンド → **ラウンド直後**に左右のカウンタ/スコアを並べる。
+  注意: 0 に戻すのは**1コマンドずつ**(まとめて 1 行にすると構文エラーで無効)。
+  Paper の `scoreboard players get` に `quantum run ` を付けない(付けると返事が化ける)。
+- `tools/parity-runner/watch_round.py [scenario] [seconds] [interval]`
+  — ラウンド中を数秒おきに生で観測(`.start` / `pari_round` / `.c_rounds` / 各BOTの hp・hitcd・state・tempcrit)。
+
+### 10.3 Sword: 実測結果(60 秒・warmup 25)
+| シナリオ | who=a (quantumbot) | who=b (qbot2) |
+|---|---|---|
+| `sword_k10v11` (dec18/dec18b) | **本物の乖離なし**(z_span, hp_avg, hp_min, hp_low_share は同一エンジンでも振れる=ノイズ) | **本物の乖離なし**(z_span のみノイズ) |
+| `sword_k10v10` (dec19/dec19b) | `hp_low_share` **のみ本物** | **VERDICT: 一致** |
+
+- dec19 の who=a だけが残った理由を HP の毎tick差分から分解すると:
+  **被弾回数 19 回(Fabric) vs 16 回(Paper)**、1発あたりのダメージは両者 1.7〜1.8 で同一
+  (クリティカル無し)。=「当たる回数」が違う。回復回数も 24 回 vs 20 回で、Paper の方が長く生き残る。
+- つまり Sword は「攻撃の当たり数」だけが残差。決定フロー(`c_bmlogic_qa/q2`、`c_look`)の回数は
+  0.96〜1.18 倍でほぼ同じ、`c_look` は 900 vs 860(45 秒)とほぼ一致。
+
+### 10.4 クモの巣の件(質問への回答)
+- 剣モードのキットの中身は**ワールドのチェスト**が決めている:
+  `quantum:bin/3` が `.mode=1`(剣) のとき `kits/kit10|11|12` を `positioned -657 31 89|90|91`
+  から呼び、その関数は `~1 ~ ~` のチェスト(実体は **-656 31 89|90|91**)から
+  防具・オフハンド・ホットバーを移す。
+- 実測(両エンジン一致): kit10 のチェスト = 20個(ダイヤ防具一式 + トーテム + リンゴ + **クモの巣**)、
+  kit11 = 22個(+盾・弓・矢・水バケツ)、kit12 = 27個(ネザライト + 釣り竿 + スプラッシュポーション)。
+- ラウンド中の実際の手持ち(両エンジン完全一致):
+  quantumbot(kit10) = 剣・リンゴ・**クモの巣** / qbot2(kit11) = トーテム・風玉・クモの巣・剣・リンゴ・斧・パール・水・溶岩。
+- したがって「剣モードなのにクモの巣」は **BOTの不具合ではなくキットのチェストの中身**。
+  BOTは「インベントリにある物しか使わない」仕様どおりに、持っているから使っているだけ。
+  剣と防具だけにしたいなら、そのチェストの中身(キット定義)を差し替えるのが正しい直し方。
+
+### 10.5 Crystal: 実測結果(60 秒・warmup 25)
+- ラウンドは成立(両BOTが結晶・アンカー・グロウストーンを実際に使う。hp_min 0.0 まで落ちる)。
+- ノイズ床(cry1 vs cry1b)で残った**本物の乖離**:
+  - who=a: `crystal`(設置レート), `swing`, `yaw_snap`, `yaw_rate`, `hp_min`, `dist_med`, `items.diamond_sword`
+  - who=b: `crystal`, `swing`, `hp_avg`, `dist_med`, `items.diamond_sword`
+- いちばん大きいのは **剣スロット滞在率**: Fabric の a は結晶 24〜28%・グロウストーン 13〜15% なのに対し、
+  Paper の a は **剣 25〜27%**・結晶 14%。Paper の方が剣を持ったままの時間が長い。
+- 世界側カウンタ(45 秒・2回)? ばらつきが大きいが、繰り返し同じ向きに出たのは:
+  `c_qa_bin27` 0.85 / 0.84、`c_qa_ctick` 0.80 / 0.84(= Paper の A の脳が結晶tickを回す回数が 16〜20% 少ない)、
+  `c_obbycheck` 1.85 / 2.37(= Paper の方が黒曜石チェックを 2 倍回る)。
+  次はこの2つ(剣スロット滞在と `bin/27` 到達数)を追う。
+
+### 10.6 副次的に確定したこと
+- `data get entity <bot> Inventory[{Slot:103b}]` は両エンジンで "Found no elements" = **プレイヤーNBTの
+  防具スロットはこの書き方では取れない**。防具を見たいときは別手段が要る。
+- `.mode` は剣=1 / クリスタル=2。`.tempaim` はラウンド終了時に 1〜3 のいずれか(乱数)なので判定に使わない。
+- ラウンド間で BOT は消える(`list` が 0 人)。スコア(`kit` 等)は残るので RCON で読める。
