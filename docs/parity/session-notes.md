@@ -622,3 +622,48 @@ setup に `effect clear` + `scoreboard players reset` + 全回復を入れて試
 (a) `start_round` が既に `regeneration 255` + `absorption` + `parity:hpreset` で HP を正規化しており、
 (b) 追加した `resistance 5` が 5 秒ぶんダメージを消して**逆に攪乱**したため **撤去**(world 側も元に戻した)。
 今後この部分を触るなら `start_round` 内のリセットを1箇所にまとめ、ダメージに影響する効果は入れないこと。
+
+## 10.12 クリスタルの一次原因 = Paper の「ノックバック戻し」を修正 (2026-09-16)
+
+### 原因 (Paper の bytecode で確定)
+Paper 1.21.11 の `Player#causeExtraKnockback` は、被弾側 ServerPlayer の delta を
+**被弾前の値に戻す**:
+
+    // Player.causeExtraKnockback, offset 270 (source line 1232)
+    target.setDeltaMovement(currentMovement);   // currentMovement = Player#attack が被弾前に控えた delta
+
+これは「実クライアントが `ClientboundSetEntityMotionPacket` を受けて動く」前提の Paper 実装で、
+**クライアントの居ない BOT ではノックバックが完全に消える**。参照 (Fabric = 偽クライアント) は
+この戻しを踏まないので、そちらだけ吹き飛ぶ → 間合いが詰まり (dist_med 1.62 vs 3.14)、
+剣を振り続ける (swing 60 vs 19) → クリスタルを置かない、という連鎖の一次原因。
+
+| プローブ (1.75 ブロック / ダイヤ剣 / `player <bot> attack once`) | 修正前 Δxz(0.8s) | 修正後 Δxz(0.8s) |
+|---|---|---|
+| Fabric (参照) | 1.984 | 1.525 |
+| Paper (移植)  | **0.000** | **1.989** |
+
+TNT 爆発 (1.75 ブロック, 耐性 IV): fabric 3.140 / paper 3.110 → 爆発系ノックバックは元から一致
+(残差は近接ノックバックだけだった)。
+
+### 修正 (`herobot/HeroBotPlayer.java`)
+- `attack(Entity)` を override: `super.attack(target)` の直後に、被弾 BOT のノックバックが
+  「戻し」で消えていれば書き戻す (`restoreKnockbackIfStolen`)。
+- 適用側 `applyKnockbackWithScale` で「適用した delta」と「被弾前の delta」を控える。
+- `doTick()` の先頭でも同じ判定を保険として実行 (攻撃側が BOT でない場合もカバー)。
+- 書き戻し条件: 同一 tick かつ 現在値 == 被弾前の値 のときだけ (二重適用しない)。
+
+### 修正後の実測 (cry14/cry15, クリスタル k10v11, 60s/25w)
+- アイテム滞在率: `diamond_sword` **fabric 4.6% / paper 26.0%** (!), `end_crystal` 24.6/14.2,
+  `glowstone` 14.0/7.5, `respawn_anchor` 13.6/6.9, `totem_of_undying` 36.9/41.2
+- `swing` 18.7/60.1 (n=19/61), `speed_med` 0.51/0.22, `dist_med` 3.14/1.62, `explode` 95.6/55.2
+- `g1gc/can_hit` 内訳カウンタ: `c_cansee` 1128/2664 (= fabric 33% / paper 80%),
+  `c_hurt0` 425/700, `c_noloc` 2466/2593, `c_canhit` 3399/3318 (=同数)
+- `--noise` 判定 (同一エンジン 2 本で振れる指標を除外): 本物 = `charge_explode_gap`, `swing`,
+  `speed_med`, `hp_min`, `diamond_sword` (軽微: `anchor_gap`, `explode`, `dist_med`, crystal 系)
+
+### 次の狙い
+`quantum:g1gc/can_hit` の第 1 節 `can_see_target` (`allstats/newstats.mcfunction:13` →
+`xaniclelib:check/raycast4`) が Paper で 80% / Fabric 33%。ここが hit_decision 3.4 倍 →
+swing 3.2 倍 → 剣保持 5.7 倍の入口。`raycast4` は純 vanilla execute (`dx=0` 箱判定 +
+`positioned ^ ^ ^.71` レイマーチ) なので、次は「同じ座標・同じ向きでの cansee 直接比較」で
+距離閾値 (`distance=..3.2`) の食い違いを潰す。

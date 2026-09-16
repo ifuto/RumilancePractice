@@ -34,6 +34,8 @@ COUNTERS = [
     'c_anchortest', 'c_obbycheck',
     # can_hit の条件別
     'c_cansee', 'c_hurt0', 'c_block', 'c_noloc', 'c_hitdec', 'c_hitdec_ok',
+    'c_esc_main', 'c_esc_main_qa', 'c_esc_main_q2', 'c_esc_ledge', 'c_bowload', 'c_hctotem',
+    'c_swjump', 'c_swd0', 'c_g1pearl', 'c_g1move_qa', 'c_g1move_q2',
 ]
 # スコア(ラウンドの状態そのもの)
 SCORES = ['.start start', '.mode mode', '.tempaim aim', '.difficulty difficulty',

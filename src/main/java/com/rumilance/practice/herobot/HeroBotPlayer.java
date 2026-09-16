@@ -29,7 +29,7 @@ import java.util.List;
  *   <tr><td>{@code BotPlayer#tick()} → {@code processPendingKBs()}</td>
  *       <td>{@link #tick()} after {@code super.tick()}</td></tr>
  *   <tr><td>{@code BotPlayer#method_6005} (knockback) with ping delay</td>
- *       <td>{@link #knockback(double, double, double)}</td></tr>
+ *       <td>{@link #knockback(double, double, double, net.minecraft.world.entity.Entity, io.papermc.paper.event.entity.EntityKnockbackEvent.Cause)}</td></tr>
  *   <tr><td>{@code PlayerCommand} {@code player …} verbs</td>
  *       <td>{@link HeroBotCommands}</td></tr>
  * </table>
@@ -97,6 +97,8 @@ public class HeroBotPlayer extends PacketBot {
      */
     @Override
     public void doTick() {
+        // Paper の causeExtraKnockback が消したノックバックを、BOT ではここでも保険として復元する。
+        this.restoreKnockbackIfStolen();
         this.actionPack.onUpdate();
         double startX = this.getX();
         double startY = this.getY();
@@ -128,6 +130,40 @@ public class HeroBotPlayer extends PacketBot {
         } else if (dy < 0.0) {
             this.fallDistance -= dy;
         }
+    }
+
+    /**
+     * Paper の {@code Player#causeExtraKnockback} は、被弾した {@code ServerPlayer} の delta を
+     * <b>被弾前の値に戻す</b>（実クライアントが motion packet を適用する前提の実装:
+     * bytecode offset 270 = {@code target.setDeltaMovement(currentMovement)}）。
+     * BOT にはクライアントが居ないので、この「戻し」だけが効いてノックバックが完全に消える。
+     * そのため、適用したインパクトと被弾前の値を控えておき、戻されたら書き戻す。
+     */
+    private net.minecraft.world.phys.Vec3 knockbackGuardDelta = null;
+    private net.minecraft.world.phys.Vec3 knockbackGuardBefore = null;
+    private long knockbackGuardTick = -1L;
+
+    private void armKnockbackGuard(net.minecraft.world.phys.Vec3 before) {
+        this.knockbackGuardBefore = before;
+        this.knockbackGuardDelta = this.getDeltaMovement();
+        this.knockbackGuardTick = this.tickCount();
+    }
+
+    /** {@code causeExtraKnockback} の「戻し」で消されたノックバックを書き戻す（同一 tick のみ）。 */
+    public void restoreKnockbackIfStolen() {
+        if (this.knockbackGuardDelta == null || this.knockbackGuardTick != this.tickCount()) {
+            return;
+        }
+        net.minecraft.world.phys.Vec3 current = this.getDeltaMovement();
+        if (current.equals(this.knockbackGuardDelta)) {
+            return; // 生きている
+        }
+        if (this.knockbackGuardBefore != null && current.equals(this.knockbackGuardBefore)) {
+            // Paper が被弾前の値へ戻した → BOT はクライアントの代わりにここで復元する
+            this.setDeltaMovement(this.knockbackGuardDelta);
+        }
+        this.knockbackGuardDelta = null;
+        this.knockbackGuardBefore = null;
     }
 
     /** {@code ServerPlayer#tick()} stays vanilla — the server path above does not call it. */
@@ -171,7 +207,7 @@ public class HeroBotPlayer extends PacketBot {
         this.pendingKnockbacks.removeIf(pending -> {
             if (currentTick >= pending.tick()) {
                 this.applyKnockbackWithScale(pending.strength(), pending.x(), pending.z(),
-                        pending.horizontalScale());
+                        pending.horizontalScale(), pending.source(), pending.cause());
                 return true;
             }
             return false;
@@ -181,16 +217,34 @@ public class HeroBotPlayer extends PacketBot {
     /** HeroBot's {@code BotPlayer#takeKnockback}: knockback arrives {@code delayTicks(2)} late. */
     @Override
     public void knockback(double strength, double x, double z) {
-        this.scaledKnockback(strength, x, z, 1.0);
+        this.scaledKnockback(strength, x, z, 1.0, null, null);
     }
 
-    private void scaledKnockback(double strength, double x, double z, double horizontalScale) {
+    /**
+     * ★ Paper の近接ノックバックは <b>この 5 引数版</b>で飛んでくる
+     * ({@code Player#causeExtraKnockback} → {@code LivingEntity#knockback(DDD, Entity, Cause)})。
+     * 3 引数版は Paper では攻撃経路から呼ばれないため、こちらを override しないと
+     * <b>BOT がノックバックを一切受けない</b> — 実測: ダイヤ剣で殴っても Paper 側の被弾 BOT の
+     * {@code Motion} が {@code (0,-0.078,0)} のまま 0.5 秒で 0 ブロックしか動かず、参照 (Fabric)
+     * は 1.686 ブロック吹き飛ぶ。これがクリスタル戦の「間合い」差 (Paper が 1.84 ブロックまで
+     * 詰める / 地上率 92% vs 78% / 殴り 2.4 倍) の一次原因だった。
+     */
+    @Override
+    public void knockback(double strength, double x, double z,
+                          net.minecraft.world.entity.Entity source,
+                          io.papermc.paper.event.entity.EntityKnockbackEvent.Cause cause) {
+        this.scaledKnockback(strength, x, z, 1.0, source, cause);
+    }
+
+    private void scaledKnockback(double strength, double x, double z, double horizontalScale,
+                                 net.minecraft.world.entity.Entity source,
+                                 io.papermc.paper.event.entity.EntityKnockbackEvent.Cause cause) {
         int delay = this.pingDelayTicks(2);
         if (delay <= 0) {
-            this.applyKnockbackWithScale(strength, x, z, horizontalScale);
+            this.applyKnockbackWithScale(strength, x, z, horizontalScale, source, cause);
         } else {
-            this.pendingKnockbacks.add(
-                    new PendingKnockback(this.tickCount() + delay, strength, x, z, horizontalScale));
+            this.pendingKnockbacks.add(new PendingKnockback(this.tickCount() + delay, strength,
+                    x, z, horizontalScale, source, cause));
         }
     }
 
@@ -200,9 +254,17 @@ public class HeroBotPlayer extends PacketBot {
      * knockback the map's {@code tempshield}/{@code .stun} scores are built around.
      */
     private void applyKnockbackWithScale(double strength, double x, double z,
-                                          double horizontalScale) {
+                                          double horizontalScale,
+                                          net.minecraft.world.entity.Entity source,
+                                          io.papermc.paper.event.entity.EntityKnockbackEvent.Cause cause) {
+        net.minecraft.world.phys.Vec3 before = this.getDeltaMovement();
         if (horizontalScale >= 1.0) {
-            super.knockback(strength, x, z);
+            if (source != null && cause != null) {
+                super.knockback(strength, x, z, source, cause);
+            } else {
+                super.knockback(strength, x, z);
+            }
+            this.armKnockbackGuard(before);
             return;
         }
         double amount = strength * (1.0 - this.getAttributeValue(Attributes.KNOCKBACK_RESISTANCE));
@@ -220,6 +282,19 @@ public class HeroBotPlayer extends PacketBot {
         this.setDeltaMovement(velocity.x / 2.0 - direction.x,
                 this.onGround() ? Math.min(0.4, velocity.y / 2.0 + amount) : velocity.y,
                 velocity.z / 2.0 - direction.z);
+        this.armKnockbackGuard(before);
+    }
+
+    /**
+     * 近接攻撃のあと、被弾 BOT のノックバックが Paper の「戻し」で消えていないか確認して復元する。
+     * （BOT には motion packet を適用するクライアントが居ないため、サーバ側 delta が唯一の真実。）
+     */
+    @Override
+    public void attack(net.minecraft.world.entity.Entity target) {
+        super.attack(target);
+        if (target instanceof HeroBotPlayer victim) {
+            victim.restoreKnockbackIfStolen();
+        }
     }
 
     /** HeroBot's {@code handleSpearStab}: the vanilla stab action + a swing. */
@@ -275,6 +350,8 @@ public class HeroBotPlayer extends PacketBot {
     }
 
     private record PendingKnockback(long tick, double strength, double x, double z,
-                                    double horizontalScale) {
+                                    double horizontalScale,
+                                    net.minecraft.world.entity.Entity source,
+                                    io.papermc.paper.event.entity.EntityKnockbackEvent.Cause cause) {
     }
 }

@@ -68,6 +68,35 @@ COUNTERS = {
         ('c_hitdec', 'execute if score @s hit_decision_without_cd matches 1 run scoreboard players add .c_hitdec dbgc 1'),
         ('c_hitdec_ok', 'execute if score @s hit_decision_without_cd matches 1 unless score @s pearlcd matches 20 run scoreboard players add .c_hitdec_ok dbgc 1'),
     ],
+    # --- 「Paper で読み込みに失敗していた」関数が本当に動いているか ---
+    # (vanilla のローダは動詞が無い瞬間にコンパイルして落ちる。自前ローダの投入後に動いているかを数える)
+    'mech_train/function/escape/main.mcfunction': [
+        ('c_esc_main', 'scoreboard players add .c_esc_main dbgc 1'),
+        ('c_esc_main_qa', 'execute if entity @s[name=quantumbot] run scoreboard players add .c_esc_main_qa dbgc 1'),
+        ('c_esc_main_q2', 'execute if entity @s[name=qbot2] run scoreboard players add .c_esc_main_q2 dbgc 1'),
+    ],
+    'mech_train/function/crystal/ledge/tick.mcfunction': [
+        ('c_esc_ledge', 'scoreboard players add .c_esc_ledge dbgc 1'),
+    ],
+    'quantum/function/sword/passive/bow/load.mcfunction': [
+        ('c_bowload', 'scoreboard players add .c_bowload dbgc 1'),
+    ],
+    'quantum/function/crystal/hardcode/totem.mcfunction': [
+        ('c_hctotem', 'scoreboard players add .c_hctotem dbgc 1'),
+    ],
+    'quantum/function/sword/jump.mcfunction': [
+        ('c_swjump', 'scoreboard players add .c_swjump dbgc 1'),
+    ],
+    'quantum/function/sword/difficulty0.mcfunction': [
+        ('c_swd0', 'scoreboard players add .c_swd0 dbgc 1'),
+    ],
+    'quantum/function/g1gc/pearl.mcfunction': [
+        ('c_g1pearl', 'scoreboard players add .c_g1pearl dbgc 1'),
+    ],
+    'quantum/function/g1gc/movement.mcfunction': [
+        ('c_g1move_qa', 'execute if entity @s[name=quantumbot] run scoreboard players add .c_g1move_qa dbgc 1'),
+        ('c_g1move_q2', 'execute if entity @s[name=qbot2] run scoreboard players add .c_g1move_q2 dbgc 1'),
+    ],
     'quantum/function/look.mcfunction': [
         ('c_look', 'scoreboard players add .c_look dbgc 1'),
     ],
