@@ -1546,7 +1546,11 @@ public final class FeatureBootstrap {
         PendingInput.init(plugin);
         FloatingTextCleanup.start(plugin,
                 configService.config().getLong("cleanup.floating-text-window-seconds", 300L));
-        pm.registerEvents(new AdvancementBlockListener(), plugin);
+        // Off by default: blocking a criterion on Paper also rewinds it and skips
+        // AdvancementRewards.grant (experience/loot/reward function), which the Quantum pack's hit
+        // pipeline runs on — see AdvancementBlockListener's javadoc.
+        pm.registerEvents(new AdvancementBlockListener(
+                configService.config().getBoolean(AdvancementBlockListener.CONFIG_PATH, false)), plugin);
         pm.registerEvents(new PracticeSideListener(
                 chatBanService, settingsService, guiSessions, arrowEffectService, spectatorService,
                 ffaService, originalKitService), plugin);

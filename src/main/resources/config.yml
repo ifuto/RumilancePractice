@@ -145,6 +145,21 @@ cleanup:
   # 0 = only sweep already-loaded entities; negative = keep sweeping forever.
   floating-text-window-seconds: 300
 
+advancements:
+  # Hide vanilla (minecraft:*) achievement pop-ups in practice worlds.
+  #
+  # KEEP THIS FALSE for bot parity. On Paper, cancelling a criterion grant
+  # (PlayerAdvancementCriterionGrantEvent) also rewinds the criterion and returns out of
+  # PlayerAdvancements.award BEFORE AdvancementRewards.grant runs — so the advancement's
+  # experience, loot table and reward FUNCTION are all silently dropped. The Quantum pack runs
+  # its hit pipeline through exactly that path (data/stats/advancement/hit.json →
+  # quantum:allstats/advancestats → real_hitcd), and Fabric has no such event, so blocking
+  # makes the Paper bot diverge from the reference bot on every item-switch/mace/totem flow.
+  #
+  # Even when enabled it never touches: non-minecraft: namespaces (all datapack advancements),
+  # recipe unlocks, or any advancement that carries rewards.
+  block-vanilla: false
+
 # Disposable arena copies (requires FAWE/WorldEdit): every match pastes a fresh copy of the
 # arena template at a random, chunk-aligned spot that never overlaps another live copy or any
 # template's own build, and deletes the copy when the match ends. Allows unlimited concurrent

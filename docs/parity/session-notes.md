@@ -193,3 +193,64 @@ movement 関数自体は Paper の方が多く呼ばれている(877 vs 663)の�
     [FAIL] 本番判定 who=a (quantumbot)   → 不一致: totem_pop, item_switch, yaw_snap, yaw_rate, x_span, hp_avg, hp_min, hp_low_share
     [FAIL] 本番判定 who=b (qbot2)        → 不一致: totem, speed_med, x_span, hp_min
     GATE: 不一致 — 再現できていない項目あり
+
+## 6) 進捗報酬の停止 — 最大の乖離の根因と修正 (2026-09-16)
+
+### 症状
+Paper 側だけ `real_hitcd` が 1〜2 から上がらない → それを gate にしている
+アイテム切替・メイス・トーテム系のフローが **一度も走らない**。
+
+### 根因: **自作プラグインの `AdvancementBlockListener` が全 criterion をキャンセルしていた**
+`PlayerAdvancementCriterionGrantEvent` をキャンセルすると、Paper の
+`PlayerAdvancements.award` は
+
+```
+if (!progress.grantProgress(criterion)) return false;
+if (!PlayerAdvancementCriterionGrantEvent.callEvent()) {
+    progress.revokeProgress(criterion);   // ← 打ち消し
+    return false;                         // ← ここで帰るので…
+}
+if (wasDone || !progress.isDone()) return flag;
+…PlayerAdvancementDoneEvent…
+advancement.rewards().grant(player);      // ← 経験値・loot・**報酬関数**が丸ごと飛ぶ
+```
+
+つまりキャンセルは「トーストを消す」だけでなく **報酬関数(と経験値・loot)を消す**。
+Quantum パックは `data/stats/advancement/hit.json` の報酬関数
+`quantum:allstats/advancestats` でヒット時の内部状態を作っているので、Paper では
+ヒットパイプラインが根本から止まっていた。Fabric にはこのイベント自体が無い。
+
+### 実測（バニラ進捗で切り分け／両サーバ同一手順）
+| 手順 | Fabric | Paper(修正前) |
+|---|---|---|
+| `XpTotal` → `advancement grant @s parity:xp1`(経験値99) → `XpTotal` | 0 → **99** | 0 → **0** |
+| `advancement grant @s minecraft:nether/fast_travel`(経験値100) | +100 | **+0** |
+| 報酬関数カウンタ `.c_advfired dbgc` | +1 | **+0** |
+| `/function quantum:allstats/advancestats` を直接実行 | real_hitcd 11 | real_hitcd 11（**関数自体は健全**） |
+
+関数も関数マネージャも正常で、**報酬 grant の手前で帰っている**ことが確定。
+
+### 修正
+- `AdvancementBlockListener` — **既定オフ**（`config.yml: advancements.block-vanilla: false`）。
+  オンにしても (a) `minecraft:` 以外の名前空間（＝datapack の機構）には触れない、
+  (b) `recipes/` は触れない、(c) **報酬(関数/経験値/loot/レシピ)を持つ進捗は触れない**。
+- `FeatureBootstrap` は設定値を読んで登録する。
+- `docs/parity/session-notes.md`(本書) と config.yml のコメントに事故の記録を残した。
+
+### 修正後の実測（sword_k10v11 / 75s 同時ラウンド）
+| 指標 | 修正前 Paper | 修正後 Paper | Fabric(参照) |
+|---|---|---|---|
+| `real_hitcd` 最大 | 1〜2 | **10** | 10 |
+| スイング/分 (who=a) | 0（過去の s2 系） | **117.7** | 109.7 → **一致** |
+| トーテム POP (who=a) | 0 | 0.8 | 0.8 → **一致** |
+| x の広がり (who=a) | 1.23 | 2.89 | 3.89 → **一致** |
+| 平均HP (who=a) | 6.5 | 11.5 | 5.7 → まだ不一致 |
+
+`parity_verify.py` 判定: 監査 PASS / カナリア PASS / リグレッション PASS、
+本番は who=a `item_switch, yaw_snap, yaw_rate, yaw_med, speed_med, hp_low_share` /
+who=b `speed, speed_med, hp_min` のみ不一致（以前は swing から何もかも不一致だった）。
+
+### ハーネスの落とし穴（今回踏んだ）
+- **配備済み `parity` パックが古いと `who=` 付きサンプラ行が出ない**（`minecraft/tags/function/tick.json`
+  が無い世代）。`parity_runner.py run` は「0 [q] lines」と出して無言で空ログを書くので、
+  計測前に `gen_pack.py` → `parity_runner.py deploy <world>/datapacks` を必ず通すこと。
