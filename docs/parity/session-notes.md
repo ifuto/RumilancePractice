@@ -587,3 +587,38 @@ hotbar: slot0=diamond_sword slot2=golden_apple x8 / armor: diamond 4点 / offhan
 ```
 キットは `kits.yml` の `kits.sword_only` (剣+防具+リンゴのみ) で定義。**「剣モードは剣と装備だけ」は
 チェストを触らずサーバーキットの紐づけで表現できる** = 以降の PvP サーバー運用はこれで行く。
+
+## 10.11 クリスタル: 差の実体と「初期状態が揃っていない」問題 (2026-09-16)
+
+### 用語
+以後「結晶」ではなく **クリスタル** と書く(ユーザー指定)。順序は クリスタル完成 → メイス。
+
+### クリスタルで実際に起きている差 (cry9/cry10/cry11, tick-start 位相)
+| 指標 | Fabric | Paper | 比 |
+|---|---|---|---|
+| `c_hit` (殴り) | 86 | 209 | **2.4×** |
+| `c_hitdec` (`hit_decision_without_cd=1` の tick 数) | 88 | 211 | 2.4× |
+| `c_cansee` (`can_see_target=1` の利用) | 1401 | 2104 | 1.5× |
+| `c_hurt0`/`c_block` | 300 | 1395/1317 | **4.4-4.7×** |
+| `c_placeobby` | 42 | 13 | **0.31×** |
+| `c_spawncry` | 174 | 63 | 0.36× |
+| `c_g1move_qa` | 796 | 2066 | 2.6× |
+
+トレース率(1tick サンプルの `1` の割合, cry1 60秒):
+- `can_see_target=1`: a 33.3% → **74.2%** / b 36.6% → **75.8%**
+- `hit_decision_without_cd=1`: a 4.1% → **12.2%** / b 2.4% → **11.1%**
+- `OnGround=1`: a 74.3% → **91.5%** / b 77.9% → **93.3%** (Fabric は 4分の1 空中)
+- 手持ちアイテム: Fabric a = end_crystal 28.7% / sword **0%** に対し Paper a = **diamond_sword 25.0%** / crystal 14.0%
+
+→ **Paper のクリスタルBOTは「地上にいて剣を振る」側に寄っている**。視覚プリミティブ(raycast4/dx=0 セル判定)は
+一致済みなので、差分は「空中にいるかどうか」= ジャンプ/crit 系と、クリスタル設置系の分岐にある。
+`player <bot> jump` 単体は **両エンジンとも BOT を浮かせない**(同一挙動・検体 bot で確認)ので、
+flow 内でジャンプが効いているかどうかを詰めるのが次の一手。
+
+### 計測基盤の問題: ラウンド開始の初期状態が左右で揃っていない
+ラウンド最初のサンプルですでに左右が違う(前ラウンドの持ち越し):
+cry1 t=491 で `fabric a hp=2.3 / totem_timer=0 / 敵HP 11.0` に対し `paper a hp=2.0 / totem_timer=13 / 敵HP 20.0`。
+setup に `effect clear` + `scoreboard players reset` + 全回復を入れて試したが、
+(a) `start_round` が既に `regeneration 255` + `absorption` + `parity:hpreset` で HP を正規化しており、
+(b) 追加した `resistance 5` が 5 秒ぶんダメージを消して**逆に攪乱**したため **撤去**(world 側も元に戻した)。
+今後この部分を触るなら `start_round` 内のリセットを1箇所にまとめ、ダメージに影響する効果は入れないこと。

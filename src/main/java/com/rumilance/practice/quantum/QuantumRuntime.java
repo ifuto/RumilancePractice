@@ -183,7 +183,7 @@ public final class QuantumRuntime {
                 this.commands.ensureRoots(false);
             }
             this.plugin.getLogger().info("[Quantum] resource reload (" + cause
-                    + ") — re-asserted the herobot verbs and re-loaded the pack's functions "
+                    + ") -- re-asserted the herobot verbs and re-loaded the pack's functions "
                     + "(vanilla's own pass cannot compile lines that call /player)");
             this.installWhenReady();
         });
