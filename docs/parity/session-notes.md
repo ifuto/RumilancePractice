@@ -66,3 +66,36 @@ python3 tools/parity_compare.py parity-logs/fabric_crystal.log.gz parity-logs/pa
    テストは mod の仕様上 `as @s` でないと効かないので比較不能)。
 3. キット別(sword / mace / nethpot / pot / crystal の各 10-11-12 組み合わせ)に
    同じ run + compare を回して一覧化する(`gen_pack.py` の `SCENARIOS` に全部ある)。
+
+## 5. カウンタの左右比較(2026-09-16, crystal_k10v11 / 25 秒 / ハーネス修正後)
+
+ハーネス修正後に取り直した値。**分岐の回数はほぼ揃った**(以前は 8 倍差)。
+
+| カウンタ | Fabric | Paper | 比 |
+| --- | --- | --- | --- |
+| bin27(状態機械) | 905 | 1043 | 1.15 |
+| botlogic | 907 | 1061 | 1.17 |
+| movement | 663 | 877 | 1.32 |
+| look | 240 | 344 | 1.43 |
+| crystaltick | 1005 | 1156 | 1.15 |
+| canhit | 1007 | 1188 | 1.18 |
+| **hit(攻撃実行)** | **15** | **89** | **5.9** |
+| mode | 503 | 611 | 1.21 |
+| anchortick | 788 | 950 | 1.21 |
+| spawncry(クリスタル生成) | 55 | 66 | 1.20 |
+| placeobby(黒曜石) | 16 | 10 | 0.63 |
+| chargeanchor | 65 | 49 | 0.75 |
+| placeanchor | 67 | 48 | 0.72 |
+| rounds(ラウンド数) | 1 | 1 | = |
+
+読み方: `.c_hit` は `g1gc/hit`(攻撃を振る)到達回数。`can_hit` は「見えていて
+3 ブロック以内・相手が無敵でない」で `hit_decision_without_cd=1` を立てるだけで、
+hit 側はそのフラグだけを見る(クールダウンは見ない)。したがって Paper が 6 倍叩くのは
+**Paper の bot が相手に張り付いたまま(距離 ~1.0)でいること**の帰結であり、
+黒曜石・アンカー設置が少ないのも同じ理由(距離を取って設置する動きが少ない)。
+
+つまり次の本命は「**なぜ Paper の bot が距離を取らない/動かないのか**」。
+movement 関数自体は Paper の方が多く呼ばれている(877 vs 663)のに、
+変位が小さい(speed 1.60 vs 6.73 / x_span 9 vs 49)。
+`player @s move forward` を直接叩くと Paper は 4.4 b/s で正常に歩くので、
+入力そのものではなく「毎tickの 停止→入力 の順序・持続」が疑わしい。
