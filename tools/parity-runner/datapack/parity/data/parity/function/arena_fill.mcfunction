@@ -1,18 +1,18 @@
-fill -745 -64 58 -635 -62 125 minecraft:bedrock
-fill -745 -61 58 -635 -59 125 minecraft:bedrock
-fill -745 -58 58 -635 -58 125 minecraft:bedrock
-fill -745 20 58 -635 22 125 minecraft:bedrock
-fill -745 23 58 -635 25 125 minecraft:bedrock
-fill -745 26 58 -635 28 125 minecraft:bedrock
-fill -745 29 58 -635 29 125 minecraft:bedrock
-fill -745 30 58 -635 30 125 minecraft:stone replace minecraft:air
-fill -745 31 58 -635 33 125 minecraft:air
-fill -745 34 58 -635 36 125 minecraft:air
-fill -745 37 58 -635 39 125 minecraft:air
-fill -745 40 58 -635 42 125 minecraft:air
-fill -745 43 58 -635 45 125 minecraft:air
-fill -745 46 58 -635 48 125 minecraft:air
-fill -745 49 58 -635 51 125 minecraft:air
-fill -745 52 58 -635 54 125 minecraft:air
-fill -745 55 58 -635 57 125 minecraft:air
-fill -745 58 58 -635 60 125 minecraft:air
+fill -712 -64 76 -688 -62 100 minecraft:bedrock
+fill -712 -61 76 -688 -59 100 minecraft:bedrock
+fill -712 -58 76 -688 -58 100 minecraft:bedrock
+fill -712 20 76 -688 22 100 minecraft:bedrock
+fill -712 23 76 -688 25 100 minecraft:bedrock
+fill -712 26 76 -688 28 100 minecraft:bedrock
+fill -712 29 76 -688 29 100 minecraft:bedrock
+fill -712 30 76 -688 30 100 minecraft:stone replace minecraft:air
+fill -712 31 76 -688 44 76 minecraft:bedrock
+fill -712 31 100 -688 44 100 minecraft:bedrock
+fill -712 31 76 -712 44 100 minecraft:bedrock
+fill -688 31 76 -688 44 100 minecraft:bedrock
+fill -711 31 77 -689 33 99 minecraft:air
+fill -711 34 77 -689 36 99 minecraft:air
+fill -711 37 77 -689 39 99 minecraft:air
+fill -711 40 77 -689 42 99 minecraft:air
+fill -711 43 77 -689 45 99 minecraft:air
+fill -711 46 77 -689 48 99 minecraft:air

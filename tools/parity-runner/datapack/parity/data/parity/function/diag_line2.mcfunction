@@ -1,0 +1,1 @@
+$say DIAG B=$(bx),$(by),$(bz) v=$(bvx),$(bvz) hp=$(bhp) st=$(bst) hd=$(bhd) p1=$(bp1) ct=$(bcrt) hit=$(bhit) cry=$(bcr) anc=$(bobby) ir=$(bir) d2t=$(bd2t) hc=$(bhc) rhc=$(brhc) pc=$(bpc) ht=$(bht) hu=$(bhu) og=$(bog) cst=$(bcst) tc=$(btc) stt=$(bstt)

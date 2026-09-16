@@ -22,8 +22,8 @@ PACK = os.path.join(ROOT, 'datapack', 'parity')
 
 # 戦場（Quantum マップのアリーナ帯）。参照実測の BOT 座標域 x −736..−645 / z 70..112 /
 # 床 y=31 に合わせ、少し余裕を持たせる。
-ARENA = dict(x1=-745, x2=-635, z1=58, z2=125, floor=30, bedrock=-64, bedrock_top=-58,
-             armor=20, sky=60)
+ARENA = dict(x1=-712, x2=-688, z1=76, z2=100, floor=30, bedrock=-64, bedrock_top=-58,
+             armor=20, sky=48, wall=44)
 
 BOT_A = 'quantumbot'   # マップ本来の BOT（xlib_bot）
 BOT_B = 'qbot2'        # 2体目（マップから見ると xlib_target = 人間側）
@@ -64,8 +64,27 @@ def arena_fill():
     lines.append('fill %d %d %d %d %d %d minecraft:stone replace minecraft:air'
                  % (ARENA['x1'], ARENA['floor'], ARENA['z1'],
                     ARENA['x2'], ARENA['floor'], ARENA['z2']))
+    lines.extend(walls())
     lines.extend(clear_air())
     return '\n'.join(lines)
+
+
+def walls():
+    """外周に岩盤の壁を積む。
+
+    壁が無いと、耳は片方を見失った瞬間から現在の向きへ `move forward` し続けて
+    アリーナの外(NPC キット台 -625 付近や奈落)まで歩き去ってしまい、
+    「BOT vs BOT」の比較が『たまに会うだけ』の統計になってしまう。
+    地表(y=30)は爆破解体できるままにし、壁だけを岩盤にする。
+    """
+    a, f, t = ARENA, ARENA['floor'], ARENA['wall']
+    x1, x2, z1, z2 = a['x1'], a['x2'], a['z1'], a['z2']
+    return [
+        'fill %d %d %d %d %d %d minecraft:bedrock' % (x1, f + 1, z1, x2, t, z1),
+        'fill %d %d %d %d %d %d minecraft:bedrock' % (x1, f + 1, z2, x2, t, z2),
+        'fill %d %d %d %d %d %d minecraft:bedrock' % (x1, f + 1, z1, x1, t, z2),
+        'fill %d %d %d %d %d %d minecraft:bedrock' % (x2, f + 1, z1, x2, t, z2),
+    ]
 
 
 def clear_air():
@@ -75,7 +94,7 @@ def clear_air():
     while y <= ARENA['sky']:
         y2 = min(y + 2, ARENA['sky'])
         lines.append('fill %d %d %d %d %d %d minecraft:air'
-                     % (ARENA['x1'], y, ARENA['z1'], ARENA['x2'], y2, ARENA['z2']))
+                     % (ARENA['x1'] + 1, y, ARENA['z1'] + 1, ARENA['x2'] - 1, y2, ARENA['z2'] - 1))
         y = y2 + 1
     return lines
 
@@ -86,18 +105,24 @@ def resurface():
     爆破解体は ON なので、ラウンド中は地表が削れて下の岩盤が露出する = 参照と同じ。
     穴が深くならないのは y=20..29 が岩盤だからで、挙動を縛っているわけではない。
     """
-    lines = ['fill %d %d %d %d %d %d minecraft:stone'
-             % (ARENA['x1'], ARENA['floor'], ARENA['z1'],
-                ARENA['x2'], ARENA['floor'], ARENA['z2'])]
+    lines = walls()
+    lines.append('fill %d %d %d %d %d %d minecraft:stone'
+                 % (ARENA['x1'], ARENA['floor'], ARENA['z1'],
+                    ARENA['x2'], ARENA['floor'], ARENA['z2']))
     lines.extend(clear_air())
     return '# parity:resurface — ラウンド開始時に戦場を戻す（地表 y=%d を貼り直し、上を空気に）\n%s' % (
         ARENA['floor'], '\n'.join(lines))
 
 
 def load():
-    return f'''# parity:load — ハーネスのスコアとサンプラ用 storage を用意する（何度でも安全）。
+    return f'''scoreboard objectives add par_dd minecraft.custom:minecraft.damage_dealt
+scoreboard objectives add par_dt minecraft.custom:minecraft.damage_taken
+scoreboard objectives add par_pk minecraft.custom:minecraft.player_kills
+# parity:load — ハーネスのスコアとサンプラ用 storage を用意する（何度でも安全）。
 scoreboard objectives add parity_t dummy
 scoreboard objectives add dbgc dummy
+scoreboard players set .two dbgc 2
+scoreboard players set .neg_one dbgc -1
 scoreboard players set pari_clock parity_t 0
 scoreboard players set pari_round parity_t 0
 data merge storage parity:in {{px:0.0d,py:0.0d,pz:0.0d,vx:0.0d,vy:0.0d,vz:0.0d,yaw:0.0d,pit:0.0d,hp:0.0d,g:0,item:"minecraft:air",hit:0,tot:0,ct:0,ob:0,pc:0,cry:0,anc:0,chg:0,exp:0,hpT:0,pop:0,ec:0,t:0,who:"?",st:-1,kit:-1}}
@@ -112,6 +137,10 @@ def tick():
 scoreboard players add pari_clock parity_t 1
 execute if score .start start matches 1 run function parity:vs_brain
 function parity:keepalive
+function parity:hptrack
+scoreboard players operation .hp_mod dbgc = pari_clock parity_t
+scoreboard players operation .hp_mod dbgc %= .two dbgc
+execute if score .hp_mod dbgc matches 0 run function parity:hpsample
 function parity:clock
 data merge storage parity:args {{name:"{BOT_A}",enemy:"{BOT_B}",who:"a"}}
 function parity:sample with storage parity:args
@@ -164,29 +193,35 @@ def start_round():
 function parity:resurface
 function quantum:map/start2
 # --- 役割タグはマップの開始フロー(start3)より先に貼る ---
-# start3 は `@a[tag=xlib_bot]` に難易度・ギア・タイマ初期化を配るので、タグが無いと
-# 何も配られない(=Paper の新しい bot が空のスコアボードのまま走り、crystal/tick が
-#  totem_timer 未設定で早期 return する)。Fabric でだけ動いていたのは、bot が
-# 同一 UUID で再スポーンして前ラウンドのスコアが残っていたため。
+# start3 は `@a[tag=xlib_bot]` に難易度・ギア・タイマ・tempcrit 等を配る。2体とも
+# 脳として戦わせたいので、**1体ずつ「脳」の役で start3 を回す**。片方だけだと
+# その個体は tempcrit 等が未設定のままになり、vs_dispatch / init/mode の
+# `scores={{tempcrit=…}}` にマッチせず脳が1tickも回らない(=放置ターゲット)。
+# 参照実測(Fabric)でも同じ理由で B が動いていなかったので、両側でこれを直す。
 tag {BOT_A} remove xlib_target
 tag {BOT_A} add xlib_bot
 tag {BOT_B} remove xlib_bot
 tag {BOT_B} add xlib_target
 scoreboard players set {BOT_A} death 0
 scoreboard players set {BOT_B} death 0
-# --- マップ本来のラウンド開始（難易度/ギア/キット/全タイマ初期化）---
+# 1体目(A)の脳としての初期化
 function quantum:map/start3
+# 2体目(B)の脳としての初期化
+tag {BOT_A} remove xlib_bot
+tag {BOT_A} add xlib_target
+tag {BOT_B} remove xlib_target
+tag {BOT_B} add xlib_bot
+function quantum:map/start3
+# --- 標準の役割(A=脳 / B=敵)へ戻して戦場へ配置 ---
+tag {BOT_A} remove xlib_target
+tag {BOT_A} add xlib_bot
+tag {BOT_B} remove xlib_bot
+tag {BOT_B} add xlib_target
 effect give @a regeneration 1 255 true
 effect give @a absorption 120 0 true
 tp {BOT_A} {SPOT_A}
 tp {BOT_B} {SPOT_B}
-# マップは xlib_bot / xlib_target を「マップ自身の開始フロー」で付ける。ハーネスは
-# そのフローを飛ばして直接ラウンドを立てるので、毎ラウンドここで役割を貼り直す。
-# （無いと quantum:main_tick が「ターゲット不在」と判断して毎tick map/reset を呼び、
-#   .start が 0 に戻ってAIが永久に起動しない。Fabric だけで動いていたのは
-#   以前の手動タグが残っていたため。）
-# `death` は deathCount。マップの開始フロー（start3/load）が 0 を入れるが、ハーネスは
-# そのフローを飛ばす。未設定だと scores={{death=0}} にマッチせずAIが丸ごと止まる。
+function parity:hpreset
 scoreboard players set .start start 1
 scoreboard players set pari_round parity_t 80
 # ラウンドが何回始まったか（＝何回落ちたか）も左右で比べる。計測用カウンタは
@@ -271,6 +306,243 @@ def setup(mode_fn, mode_name, kitchen, kit_a, kit_b, gear, toggles, difficulty=2
     L.append('schedule function parity:start_round 40t')
     L.append('scoreboard players set pari_round parity_t 80')
     return '\n'.join(L)
+
+
+DIAG_KEYS = ('ax', 'ay', 'az', 'avx', 'avz', 'bx', 'by', 'bz', 'bvx', 'bvz',
+             'ahp', 'bhp', 'acrt', 'bcrt', 'ast', 'bst', 'ahd', 'bhd',
+             'ap1', 'bp1', 'ahit', 'bhit', 'acr', 'bcr', 'aobby', 'bobby',
+             'air', 'bir', 'ad2t', 'bd2t', 'ahc', 'bhc', 'arhc', 'brhc',
+             'apc', 'bpc', 'aht', 'bht', 'ahu', 'bhu', 'aog', 'bog',
+             'acst', 'bcst', 'atc', 'btc', 'astt', 'bstt',
+             'mloc', 'musable', 'mmall', 'mmglow')
+
+
+def diag():
+    """1 コマンドで両 Bot の位置・速度・スコア・マーカー数を吐く(ログ 1 行)。"""
+    L = ['# parity:diag — 1 コマンドで観測用の 1 行を出す(計測の高速化用)。',
+         'data merge storage parity:diag {' + ','.join('%s:0.0d' % k for k in DIAG_KEYS) + '}']
+    for bot, prefix in ((BOT_A, 'a'), (BOT_B, 'b')):
+        L.append(f'execute store result storage parity:diag {prefix}x double 0.001 '
+                 f'run data get entity {bot} Pos[0] 1000')
+        L.append(f'execute store result storage parity:diag {prefix}y double 0.001 '
+                 f'run data get entity {bot} Pos[1] 1000')
+        L.append(f'execute store result storage parity:diag {prefix}z double 0.001 '
+                 f'run data get entity {bot} Pos[2] 1000')
+        L.append(f'execute store result storage parity:diag {prefix}vx double 0.001 '
+                 f'run data get entity {bot} Motion[0] 1000')
+        L.append(f'execute store result storage parity:diag {prefix}vz double 0.001 '
+                 f'run data get entity {bot} Motion[2] 1000')
+        L.append(f'execute store result storage parity:diag {prefix}hp double 0.001 '
+                 f'run data get entity {bot} Health 1000')
+        for key, objective in (('crt', 'crystal_timer'), ('st', 'state'),
+                               ('hd', 'hit_decision_without_cd'), ('p1', 'Pos1_difference'),
+                               ('hit', 'hit'), ('cr', 'num_of_crystals_placed'),
+                               ('obby', 'num_of_anchors_placed'),
+                               ('ir', 'in_range'), ('d2t', 'distance_to_target'),
+                               ('hc', 'hitcd'), ('rhc', 'real_hitcd'), ('pc', 'pearlcd'),
+                               ('ht', 'hurtTime'), ('hu', 'hunger'), ('og', 'OnGround'),
+                               ('cst', 'can_see_target'), ('tc', 'tempcrit'),
+                               ('stt', 'state_time')):
+            L.append(f'execute store result storage parity:diag {prefix}{key} double 1 '
+                     f'run scoreboard players get {bot} {objective}')
+    for key, tag in (('loc', 'loc'), ('usable', 'usable'), ('mall', ''),
+                     ('mglow', 'glowstone')):
+        score = f'.d_{key}'
+        L.append(f'scoreboard players set {score} dbgc 0')
+        selector = 'type=minecraft:marker'
+        if tag:
+            selector += f',tag={tag}'
+        L.append(f'execute as @e[{selector}] run scoreboard players add {score} dbgc 1')
+        L.append(f'execute store result storage parity:diag m{key} double 1 '
+                 f'run scoreboard players get {score} dbgc')
+    # 1 行 256 文字制限があるので 2 行に分ける(どちらも同じ storage を読む)。
+    L.append('function parity:diag_line with storage parity:diag')
+    L.append('function parity:diag_line2 with storage parity:diag')
+    return '\n'.join(L)
+
+
+def diag_line():
+    """A 側 + マーカー数をログ 1 行にまとめる(マクロ関数)。"""
+    return ('$say DIAG A=$(ax),$(ay),$(az) v=$(avx),$(avz) hp=$(ahp) st=$(ast) hd=$(ahd) '
+            'p1=$(ap1) ct=$(acrt) hit=$(ahit) cry=$(acr) anc=$(aobby) ir=$(air) d2t=$(ad2t) '
+            'hc=$(ahc) rhc=$(arhc) pc=$(apc) ht=$(aht) hu=$(ahu) og=$(aog) cst=$(acst) '
+            'tc=$(atc) stt=$(astt) | mk loc=$(mloc) usable=$(musable) all=$(mmall) glow=$(mmglow)')
+
+
+def diag_line2():
+    """B 側をログ 1 行にまとめる(マクロ関数)。"""
+    return ('$say DIAG B=$(bx),$(by),$(bz) v=$(bvx),$(bvz) hp=$(bhp) st=$(bst) hd=$(bhd) '
+            'p1=$(bp1) ct=$(bcrt) hit=$(bhit) cry=$(bcr) anc=$(bobby) ir=$(bir) d2t=$(bd2t) '
+            'hc=$(bhc) rhc=$(brhc) pc=$(bpc) ht=$(bht) hu=$(bhu) og=$(bog) cst=$(bcst) '
+            'tc=$(btc) stt=$(bstt)')
+
+
+def dstat():
+    """両 Bot のバニラ統計(与ダメ/被ダメ/キル)をログ 1 行にまとめて出す。"""
+    L = ["data merge storage parity:dstat {add:0.0d,adt:0.0d,apk:0.0d,"
+         "bdd:0.0d,bdt:0.0d,bpk:0.0d}"]
+    for bot, pre in ((BOT_A, 'a'), (BOT_B, 'b')):
+        for key, obj in (('dd', 'par_dd'), ('dt', 'par_dt'), ('pk', 'par_pk')):
+            L.append(f'execute store result storage parity:dstat {pre}{key} double 1 '
+                     f'run scoreboard players get {bot} {obj}')
+    L.append("function parity:dstat_line with storage parity:dstat")
+    return '\n'.join(L)
+
+
+def dstat_line():
+    return ('$say DSTAT A=$(add),$(adt),$(apk) B=$(bdd),$(bdt),$(bpk)')
+
+
+def hptrack():
+    """毎tickの HP 変化から「被ダメ量 / ヒット数 / 回復量」を Bot ごとに積算する。
+
+    バニラの `damage_dealt`/`damage_taken` 統計は Paper 側の BOT では 0 のまま
+    (ポートが通常のダメージ経路を通らない?)なので、実装非依存の HP 差分で測る。
+    """
+    L = ['# parity:hptrack — HP 差分による被ダメ計測(毎tick)。']
+    for bot, pre in ((BOT_A, 'a'), (BOT_B, 'b')):
+        L += [
+            f'execute store result score .ht_now dbgc run data get entity {bot} Health 100',
+            f'execute store result score .ht_hp1 dbgc run data get entity {bot} AbsorptionAmount 100',
+            'scoreboard players operation .ht_d dbgc = .ht_prev_%s dbgc' % pre,
+            'scoreboard players operation .ht_d dbgc -= .ht_now dbgc',
+            # 符号で分岐するので絶対値は別スコアに退避する(同一スコアを両方に使うと
+            # 被ダメ tick が回復としても二重計上される)。
+            'scoreboard players operation .ht_abs dbgc = .ht_d dbgc',
+            'execute if score .ht_d dbgc matches ..-1 run scoreboard players operation .ht_abs dbgc *= .neg_one dbgc',
+            'execute if score .ht_d dbgc matches 1.. run scoreboard players operation .c_dmg_%s dbgc += .ht_d dbgc' % pre,
+            'execute if score .ht_d dbgc matches 1.. run scoreboard players add .c_nhurt_%s dbgc 1' % pre,
+            'execute if score .ht_d dbgc matches ..-1 run scoreboard players operation .c_heal_%s dbgc += .ht_abs dbgc' % pre,
+            'scoreboard players operation .ht_prev_%s dbgc = .ht_now dbgc' % pre,
+        ]
+    return '\n'.join(L)
+
+
+def hpsample():
+    """毎2tick、両BOTの生HP/吸収/hurtTime/回復タイマをログ1行に出す。
+
+    「被弾しているのに HP が減らない」のか「被弾していない」のかを切り分けるため、
+    ダメージ量ではなく *生の値* をそのまま落とす(解析は後段のスクリプトで行う)。
+    """
+    L = ['# parity:hpsample — 生HPサンプル(2tick毎)。',
+         'data merge storage parity:hps {a:0.0d,b:0.0d,aabs:0.0d,babs:0.0d,ahrt:0,aht:0,bht:0,areg:0,breg:0,atc:0,ahc:0,arhc:0,ahd:0,ahdc:0,adt:0,acst:0,ast:0,astrc:0,atsr:0,atsp:0,atss:0,ahit:0,atgt:0,btc:0,bhc:0,brhc:0,bhd:0,bhdc:0,bdt:0,bcst:0,bst:0,bstrc:0,btsr:0,btsp:0,btss:0,bhit:0,btgt:0}',
+         'execute store result storage parity:hps a double 0.01 run data get entity %s Health 100' % BOT_A,
+         'execute store result storage parity:hps b double 0.01 run data get entity %s Health 100' % BOT_B,
+         'execute store result storage parity:hps aabs double 0.01 run data get entity %s AbsorptionAmount 100' % BOT_A,
+         'execute store result storage parity:hps babs double 0.01 run data get entity %s AbsorptionAmount 100' % BOT_B,
+         'execute store result storage parity:hps ahrt double 1 run data get entity %s HurtTime' % BOT_A,
+         'execute store result storage parity:hps bht double 1 run data get entity %s HurtTime' % BOT_B]
+    for bot, key in ((BOT_A, 'areg'), (BOT_B, 'breg')):
+        L.append(f'execute store result storage parity:hps {key} double 1 run data get entity {bot} '
+                 'active_effects[{id:"minecraft:regeneration"}].amplifier')
+    # 意思決定系のスコアも同時に落とす(どちらのゲートで差が出ているかを突き止めるため)。
+    for bot, pre in ((BOT_A, 'a'), (BOT_B, 'b')):
+        for key, obj in (('tc', 'tempcrit'), ('hc', 'hitcd'), ('rhc', 'real_hitcd'),
+                         ('hd', 'hit_decision'), ('hdc', 'hit_decision_without_cd'),
+                         ('dt', 'distance_to_target'), ('cst', 'can_see_target'),
+                         ('st', 'state'), ('strc', 'strafecd'), ('tsr', 'tempstrafe'),
+                         ('tsp', 'tempstap'), ('tss', 'tempscrit'), ('hit', 'hit'),
+                         ('tgt', 'xlib_target_missing')):
+            L.append(f'execute store result storage parity:hps {pre}{key} double 1 '
+                     f'run scoreboard players get {bot} {obj}')
+    L.append('function parity:hpsample_line with storage parity:hps')
+    L.append('function parity:hpsample_line2 with storage parity:hps')
+    return '\n'.join(L)
+
+
+def hpreset():
+    """hptrack の積算値をゼロに戻し、prev を現在 HP に合わせる。"""
+    L = ['# parity:hpreset — 被ダメ計測のリセット。']
+    for bot, pre in ((BOT_A, 'a'), (BOT_B, 'b')):
+        L += [f'scoreboard players set .c_dmg_{pre} dbgc 0',
+              f'scoreboard players set .c_nhurt_{pre} dbgc 0',
+              f'scoreboard players set .c_heal_{pre} dbgc 0',
+              f'execute store result score .ht_prev_{pre} dbgc run data get entity {bot} Health 100']
+    return '\n'.join(L)
+
+
+def hpstat():
+    L = ['# parity:hpstat — 被ダメ計測の集計を 1 行で出す。',
+         'scoreboard players set .ht_mul dbgc 0']
+    for pre in ('a', 'b'):
+        L += [f'scoreboard players operation .ht_avg_{pre} dbgc = .c_dmg_{pre} dbgc',
+              f'execute if score .c_nhurt_{pre} dbgc matches 1.. '
+              f'run scoreboard players operation .ht_avg_{pre} dbgc /= .c_nhurt_{pre} dbgc',
+              f'execute unless score .c_nhurt_{pre} dbgc matches 1.. '
+              f'run scoreboard players set .ht_avg_{pre} dbgc -1']
+    L += ['data merge storage parity:hpstat {admg:0.0d,anhit:0.0d,aheal:0.0d,aavg:0.0d,'
+          'bdmg:0.0d,bnhit:0.0d,bheal:0.0d,bavg:0.0d}']
+    for pre in ('a', 'b'):
+        for key, obj in (('dmg', f'.c_dmg_{pre}'), ('nhit', f'.c_nhurt_{pre}'),
+                         ('heal', f'.c_heal_{pre}'), ('avg', f'.ht_avg_{pre}')):
+            L.append(f'execute store result storage parity:hpstat {pre}{key} double 0.01 '
+                     f'run scoreboard players get {obj} dbgc')
+    L.append('function parity:hpstat_line with storage parity:hpstat')
+    return '\n'.join(L)
+
+
+def hpstat_line():
+    return ('$say HPSTAT A dmg=$(admg) hits=$(anhit) heal=$(aheal) avg=$(aavg) | '
+            'B dmg=$(bdmg) hits=$(bnhit) heal=$(bheal) avg=$(bavg)')
+
+
+def raytest():
+    """xaniclelib 系(レイキャスト/タイマ)が成立するかを Bot 視点で調べる。
+
+    `can_see_target` は `xaniclelib:check/raycast4`(再帰レイキャスト) に依存しており、
+    Paper 側で false になると AI が目標を見失って丸ごと挙動が変わる。両側で同じ値に
+    なるべきなので、その場で比較できる 1 行を用意する。
+    `execute as <bot> at @s run function parity:raytest` として呼ぶ。
+    """
+    L = ['# parity:raytest — Bot 視点で xaniclelib の判定が成立するか調べる。']
+    for key, fn in (('ray4', 'xaniclelib:check/raycast4'), ('ray', 'xaniclelib:ray'),
+                    ('block2', 'quantum:g1gc/block2'), ('timer', 'xaniclelib:check_timer'),
+                    ('timer2', 'xaniclelib:check_timer2')):
+        L.append(f'scoreboard players set .ry_tmp dbgc 0')
+        L.append(f'execute if function {fn} run scoreboard players set .ry_tmp dbgc 1')
+        L.append(f'execute store result storage parity:raytest {key} double 1 '
+                 f'run scoreboard players get .ry_tmp dbgc')
+    L.append('function parity:raytest_line with storage parity:raytest')
+    return '\n'.join(L)
+
+
+def raytest_line():
+    return ('$say RAYTEST ray4=$(ray4) ray=$(ray) block2=$(block2) timer=$(timer) timer2=$(timer2)')
+
+
+def geo():
+    """位置を固定したまま知覚スコアを測る(ドリフト対策で tp と測定を1tickでつなぐ)。"""
+    body = f'''# parity:geo — A/B を固定配置し、知覚スコア(distance/in_range/can_see)を測る。
+scoreboard players set pari_round parity_t 100000
+scoreboard players set .start start 0
+function parity:geo_a
+function parity:geo_measure'''
+    return body
+
+
+def geo_place(fn, bpos, title):
+    return f'''# parity:geo_{fn} — {title}
+tp {BOT_A} {SPOT_A}
+tp {BOT_B} {bpos}
+scoreboard players set .geo_case dbgc {0 if fn == 'a' else (1 if fn == 'b' else 2)}
+function parity:geo_measure'''
+
+
+def geomeasure():
+    return f'''# parity:geo_measure — 知覚スコアを1行に落とす。
+data merge storage parity:geo {{ax:0.0d,az:0.0d,bx:0.0d,bz:0.0d,adt:0,ahd:0,avi:0,acst:0,ap1:0,bcst:0}}
+execute store result storage parity:geo ax double 0.001 run data get entity {BOT_A} Pos[0] 1000
+execute store result storage parity:geo az double 0.001 run data get entity {BOT_A} Pos[2] 1000
+execute store result storage parity:geo bx double 0.001 run data get entity {BOT_B} Pos[0] 1000
+execute store result storage parity:geo bz double 0.001 run data get entity {BOT_B} Pos[2] 1000
+execute as {BOT_A} at @s run function quantum:allstats/newstats
+execute store result storage parity:geo adt int 1 run scoreboard players get {BOT_A} distance_to_target
+execute store result storage parity:geo ahd int 1 run scoreboard players get {BOT_A} horiz_distance_to_target
+execute store result storage parity:geo avi int 1 run scoreboard players get {BOT_A} vertical_distance_to_target
+execute store result storage parity:geo acst int 1 run scoreboard players get {BOT_A} can_see_target
+execute store result storage parity:geo ap1 int 1 run scoreboard players get {BOT_A} Pos1_difference
+execute store result storage parity:geo bcst int 1 run scoreboard players get {BOT_B} can_see_target
+function parity:geo_line with storage parity:geo'''
 
 
 def stop():
@@ -381,6 +653,54 @@ def main():
     w('data/parity/function/arena_fill.mcfunction', arena_fill())
     w('data/parity/function/resurface.mcfunction', resurface())
     w('data/parity/function/stop.mcfunction', stop())
+    w('data/parity/function/diag.mcfunction', diag())
+    w('data/parity/function/diag_line.mcfunction', diag_line())
+    w('data/parity/function/diag_line2.mcfunction', diag_line2())
+    w('data/parity/function/dstat.mcfunction', dstat())
+    w('data/parity/function/hptrack.mcfunction', hptrack())
+    w('data/parity/function/hpreset.mcfunction', hpreset())
+    w('data/parity/function/hpstat.mcfunction', hpstat())
+    w('data/parity/function/raytest.mcfunction', raytest())
+    w('data/parity/function/raytest_line.mcfunction', raytest_line())
+    w('data/parity/function/hpstat_line.mcfunction', hpstat_line())
+    w('data/parity/function/dstat_line.mcfunction', dstat_line())
+    w('data/parity/function/hpsample.mcfunction', hpsample())
+    w('data/parity/function/hpsample_line.mcfunction',
+      '$say HPS a=$(a) b=$(b) aA=$(aabs) bA=$(babs) aH=$(ahrt) bH=$(bht) aR=$(areg) bR=$(breg)')
+    w('data/parity/function/hpsample_line2.mcfunction',
+      '$say TRC A tc=$(atc) hc=$(ahc) rhc=$(arhc) hd=$(ahd) hdc=$(ahdc) dt=$(adt) cst=$(acst) st=$(ast) '
+      'strc=$(astrc) tsr=$(atsr) tsp=$(atsp) tss=$(atss) hit=$(ahit) | '
+      'B tc=$(btc) hc=$(bhc) rhc=$(brhc) hd=$(bhd) hdc=$(bhdc) dt=$(bdt) cst=$(bcst) st=$(bst) '
+      'strc=$(bstrc) tsr=$(btsr) tsp=$(btsp) tss=$(btss) hit=$(bhit)')
+    r50 = ['# parity:r50test — quantum:random50 を200回引いて分布を数える(パック実装の検証)。',
+           'scoreboard players set .c_r50 dbgc 0',
+           'scoreboard players set .c_r20 dbgc 0',
+           'scoreboard players set .c_r80 dbgc 0']
+    for i in range(200):
+        r50.append('execute if predicate quantum:random50 run scoreboard players add .c_r50 dbgc 1')
+        r50.append('execute if predicate quantum:random20 run scoreboard players add .c_r20 dbgc 1')
+        r50.append('execute if predicate quantum:random80 run scoreboard players add .c_r80 dbgc 1')
+    r50.append('data merge storage parity:r50 {y50:0,y20:0,y80:0}')
+    for k, o in (('y50', '.c_r50'), ('y20', '.c_r20'), ('y80', '.c_r80')):
+        r50.append(f'execute store result storage parity:r50 {k} int 1 run scoreboard players get {o} dbgc')
+    r50.append('function parity:r50_line with storage parity:r50')
+    w('data/parity/function/r50test.mcfunction', '\n'.join(r50))
+    w('data/parity/function/r50_line.mcfunction',
+      '$say R50 random50=$(y50)/200 random20=$(y20)/200 random80=$(y80)/200')
+    w('data/parity/function/geo.mcfunction', geo())
+    w('data/parity/function/geo_a.mcfunction', geo_place('a', '-698.5 31 88.5', 'front 0'))
+    w('data/parity/function/geo_b.mcfunction', geo_place('b', '-701.5 31 88.5', 'front 3'))
+    w('data/parity/function/geo_c.mcfunction', geo_place('c', '-696.5 31 88.5', 'behind 2'))
+    w('data/parity/function/geo_measure.mcfunction', geomeasure())
+    w('data/parity/function/geo_line.mcfunction',
+      '$say GEO A=$(ax),$(az) B=$(bx),$(bz) d2t=$(adt) horiz=$(ahd) vert=$(avi) cstA=$(acst) cstB=$(bcst) p1d=$(ap1)')
+    w('data/parity/function/hbtest.mcfunction',
+      '# parity:hbtest — マップと同じ文脈(関数内, as @s)で hotbar 動詞を打つ。\n'
+      'execute as %s run player @s hotbar 2\n'
+      'execute as %s run player @s hotbar 2' % (BOT_A, BOT_B))
+    w('data/parity/function/cwtest.mcfunction',
+      '# parity:cwtest — 実コールサイト(quantum:cobwebs/cobweb)を直接叩く。\n'
+      'execute as %s at @s run function quantum:cobwebs/cobweb' % BOT_A)
     for name, sc in SCENARIOS.items():
         w('data/parity/function/setup/%s.mcfunction' % name,
           setup(sc['mode_fn'], sc['mode'], name, sc['kit_a'], sc['kit_b'], 2, REF_TOGGLES_ON))

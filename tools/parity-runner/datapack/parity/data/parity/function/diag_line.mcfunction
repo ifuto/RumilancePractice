@@ -1,0 +1,1 @@
+$say DIAG A=$(ax),$(ay),$(az) v=$(avx),$(avz) hp=$(ahp) st=$(ast) hd=$(ahd) p1=$(ap1) ct=$(acrt) hit=$(ahit) cry=$(acr) anc=$(aobby) ir=$(air) d2t=$(ad2t) hc=$(ahc) rhc=$(arhc) pc=$(apc) ht=$(aht) hu=$(ahu) og=$(aog) cst=$(acst) tc=$(atc) stt=$(astt) | mk loc=$(mloc) usable=$(musable) all=$(mmall) glow=$(mmglow)

@@ -5,6 +5,10 @@
 scoreboard players add pari_clock parity_t 1
 execute if score .start start matches 1 run function parity:vs_brain
 function parity:keepalive
+function parity:hptrack
+scoreboard players operation .hp_mod dbgc = pari_clock parity_t
+scoreboard players operation .hp_mod dbgc %= .two dbgc
+execute if score .hp_mod dbgc matches 0 run function parity:hpsample
 function parity:clock
 data merge storage parity:args {name:"quantumbot",enemy:"qbot2",who:"a"}
 function parity:sample with storage parity:args

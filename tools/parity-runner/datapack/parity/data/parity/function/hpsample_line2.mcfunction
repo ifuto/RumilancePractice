@@ -1,0 +1,1 @@
+$say TRC A tc=$(atc) hc=$(ahc) rhc=$(arhc) hd=$(ahd) hdc=$(ahdc) dt=$(adt) cst=$(acst) st=$(ast) strc=$(astrc) tsr=$(atsr) tsp=$(atsp) tss=$(atss) hit=$(ahit) | B tc=$(btc) hc=$(bhc) rhc=$(brhc) hd=$(bhd) hdc=$(bhdc) dt=$(bdt) cst=$(bcst) st=$(bst) strc=$(bstrc) tsr=$(btsr) tsp=$(btsp) tss=$(btss) hit=$(bhit)

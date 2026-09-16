@@ -105,6 +105,55 @@ def send(fifo, commands, quiet=False):
                 print('  > %s' % cmd)
 
 
+# サーバーごとの RCON ポート（パリティ環境の取り決め。env_up.sh と同じ）
+RCON_PORTS = {'fabric': 25575, 'paper': 25576}
+KEEP_BOTS = ('quantumbot', 'qbot2')
+
+
+def rcon(port: int, command: str, password: str = 'parity') -> str:
+    """RCON 1 発。返り値は表示用の文字列（Paper の `quantum run ` 越しでも同じ）。"""
+    script = os.path.join(ROOT, 'parity-runner', 'rcon.py')
+    try:
+        out = subprocess.run([sys.executable, script, str(port), password, command],
+                             capture_output=True, text=True, timeout=60)
+    except subprocess.TimeoutExpired:
+        return ''
+    return (out.stdout or '').strip()
+
+
+def cleanup_players(port: int, invoke: str = '', keep=KEEP_BOTS) -> list:
+    """シナリオBOT以外を降ろす。
+
+    マップのAIは `@p[tag=xlib_target]`(最寄りの敵)で相手を選ぶ単一ターゲット設計なので、
+    検証で残した別の BOT(kbbot 等)が居ると *どちらの味方* として選ばれるかで挙動が
+    丸ごと変わる。両サーバーで同じ掃除をしてから測る。
+    """
+    # `list` は接頭辞を付けない(Paper で `quantum run list` にすると名前が返らない)
+    listing = rcon(port, 'list')
+    m = re.search(r'players online:\s*(.*)$', listing)
+    names = [n.strip() for n in m.group(1).split(',')] if m and m.group(1).strip() else []
+    removed = []
+    for name in names:
+        if not name or name in keep:
+            continue
+        rcon(port, invoke + 'player %s disconnect' % name)
+        removed.append(name)
+    return removed
+
+
+def cmd_cleanup(args):
+    """シナリオBOT以外を降ろす(マップのAIは単一ターゲットなので必須)。"""
+    sides = ['fabric', 'paper'] if args.side in ('both', '') else [args.side]
+    for side in sides:
+        port = args.rcon_port or RCON_PORTS.get(side)
+        if not port:
+            continue
+        invoke = 'quantum run ' if side == 'paper' else ''
+        removed = cleanup_players(port, invoke)
+        print('%s: %s' % (side, ', '.join(removed) if removed else 'no stray bots'))
+    return 0
+
+
 def cmd_deploy(args):
     if not os.path.isdir(PACK_SRC):
         print('pack not generated; running gen_pack.py')
@@ -120,6 +169,10 @@ def cmd_deploy(args):
 
 
 def cmd_run(args):
+    port = args.rcon_port or RCON_PORTS.get(args.side)
+    if port:
+        removed = cleanup_players(port, args.invoke)
+        print('  cleanup: %s' % (', '.join(removed) if removed else 'no stray bots'))
     before = tail_offset(args.log)
     setup = args.invoke + ('function parity:setup/%s' % args.scenario)
     print('scenario %s on %s for %ss' % (args.scenario, args.side, args.seconds))
@@ -172,6 +225,10 @@ def cmd_matrix(args):
     scenarios = args.scenarios.split(',') if args.scenarios else list(mod.SCENARIOS)
     os.makedirs(args.out_dir, exist_ok=True)
     failures = []
+    port = getattr(args, 'rcon_port', None) or RCON_PORTS.get(args.side)
+    if port:
+        removed = cleanup_players(port, args.invoke)
+        print('cleanup: %s' % (', '.join(removed) if removed else 'no stray bots'))
     for i, scenario in enumerate(scenarios, 1):
         print('=== [%d/%d] %s (%s, %ss)' % (i, len(scenarios), scenario, args.side, args.seconds))
         out = os.path.join(args.out_dir, '%s_%s_both.log.gz' % (args.side, scenario))
@@ -272,6 +329,8 @@ def main():
     p.add_argument('--scenario', required=True)
     p.add_argument('--seconds', type=int, default=180)
     p.add_argument('--warmup', type=int, default=25, help='アリーナ充填などを待つ秒数')
+    p.add_argument('--rcon-port', type=int, default=0,
+                   help='RCON ポート(既定: fabric=25575 / paper=25576)。0 で自動')
     p.add_argument('--out', required=True)
     p.set_defaults(func=cmd_run)
 
@@ -283,8 +342,15 @@ def main():
     p.add_argument('--scenarios', default=None, help='カンマ区切り（既定: 全部）')
     p.add_argument('--seconds', type=int, default=180)
     p.add_argument('--warmup', type=int, default=25)
+    p.add_argument('--rcon-port', type=int, default=0)
     p.add_argument('--out-dir', required=True)
     p.set_defaults(func=cmd_matrix)
+
+    pa_clean = sub.add_parser('cleanup', help='マップの敵タグを持つ余計なBOTを降ろす')
+    pa_clean.add_argument('--side', default='both', choices=('both', 'fabric', 'paper'))
+    pa_clean.add_argument('--rcon-port', type=int, default=0)
+    pa_clean.set_defaults(func=cmd_cleanup)
+
 
     p = sub.add_parser('report', help='記録を要約する')
     p.add_argument('log')

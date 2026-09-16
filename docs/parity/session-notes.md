@@ -99,3 +99,56 @@ movement 関数自体は Paper の方が多く呼ばれている(877 vs 663)の�
 変位が小さい(speed 1.60 vs 6.73 / x_span 9 vs 49)。
 `player @s move forward` を直接叩くと Paper は 4.4 b/s で正常に歩くので、
 入力そのものではなく「毎tickの 停止→入力 の順序・持続」が疑わしい。
+
+## セッション追記 — 自動比較ツールの「嘘の一致」修正と、見つかった乖離
+
+### 1) 比較ツールが嘘をついていた（修正済み）
+
+`tools/parity_compare.py` は **「片側だけ 0 の指標を無条件で一致扱い」**、さらに
+**35%×3.5 = 122% までの差を『注意』帯にして VERDICT を「一致」と表示**していた。
+このため、たとえば s6_sword の突き合わせで
+
+    item_switch 42.0 → 0.0   (100%差)
+    hp_low_share 0.0 → 20.8  (100%差)
+    yaw_snap    65.1 → 208.2 (69%差)
+
+でも「VERDICT: 一致（…すべて許容内）※注意: …」と出ていた。修正内容:
+
+- 片側だけ 0 は **乖離**（＝その行動が再現できていない）として扱う
+- 注意帯を 1.5 倍に縮小し、**「注意」が 1 つでもあれば VERDICT は「要確認」**にする
+  （「一致」は全指標が許容内のときだけ）
+- 各行に **生の発生回数 n=** を併記（率だけでは小サンプルを誤読するため）
+- サンプル数が 200 tick 未満なら一致判定を出さない（暫定表示）
+- `--selftest` を追加: 実ログを土台に「同一→一致」「攻撃を消す→不一致」
+  「座標を凍結→不一致」「アイテム切替を消す→不一致」を機械的に検査する
+
+再判定の結果、**過去に「一致」と出ていたすべてのペア（k_sword, r9, s2〜s8）は
+不一致**だった（＝再現できていなかった）。ツールが嘘をつかなくなった状態が現在の基準。
+
+### 2) 見つけて直した本物の乖離
+
+| # | 症状 | 原因 | 修正 |
+|---|---|---|---|
+| 1 | Paper の BOT だけ満腹度が 20 のまま＝自然回復が止まらず、参照では起きる「満腹度切れ→回復停止→死亡」が起きない | `PacketBot.doTick()` が毎tick `getFoodData().eat(1, 0.2f)` で餌を注入していた（参照 herobot にそんな処理は無い） | eat ループを削除。修正後は両側とも満腹度が 20→0 まで減り、HP が 2 前後で押し合う挙動に一致 |
+| 2 | Paper だけ `quantum:sword/jump`, `sword/passive/bow/load`, `map/reset`, `map/start`, `g1gc/placeobsidian`, `allstats/advancestats`, `crystal/*` などが**ロードされない** | Paper の `/reload` は dispatcher を作り直す → `player` 動詞が消えた状態で .mcfunction がコンパイルされ失敗。プラグインは数秒後に動詞を戻すが関数は再コンパイルされない | COMMANDS ライフサイクル（＝関数コンパイル前）で必ず動詞を入れ直す。遅れて復旧した場合のみデータパックを読み直す。→ `/reload` 後の失敗 0 件 |
+| 3 | アリーナに壁が無く、BOT が見失うと 300 ブロック先（NPC キット台 x≈-625）まで散らばって戦闘が成立しない | ハーネスのアリーナ設計 | `gen_pack.py` のアリーナを壁付き 24×24（x -712..-688 / z 76..100, 外周 y31..44 岩盤）に変更 |
+
+### 3) 現在の正直な判定（s8_sword 60s, 壁あり・満腹度修正後）
+
+- **一致**: swing 115/113, speed 2.63/2.83, move_share 58/75, z_span 17.7/12.3, y_med/y_min,
+  dist_close 99.2/100, 硬い数値（アンカー連鎖）は両側 0
+- **不一致（次に直す対象）**:
+  - `item_switch` 45 → 0（Paper はクモの巣/水/溶岩への持ち替えが一度も起きない）
+  - `real_hitcd` が Paper では 1 までしか上がらない（Fabric は 10〜11）→
+    `fluid_main` の `real_hitcd matches 1..` ゲートが開かず、アイテム使用系フローが全部止まる
+  - `yaw_rate` 4.6 → 11.2 / `yaw_snap` 83 → 222（Paper の方がよく回る・pitch が真上を向く瞬間がある）
+  - `hp_avg` 17.5 → 6.5（Paper の A が一方的に削られる）、`totem_pop` 0 → 2
+
+### 4) 使った測り方（再現用）
+
+- `python3 tools/parity_compare.py <fabric.gz> <paper.gz> [--who a|b]` — 正直版の判定
+- `python3 tools/parity_compare.py --selftest` — ツール自体のカナリア
+- `python3 tools/parity_runner.py cleanup --side both` — 迷い込み BOT の掃除（Paper は `list` を
+  素のコマンドで読む必要があった。修正済み）
+- 位置を固定した知覚テスト: `function parity:geo_a|geo_b|geo_c` → `GEO` 行
+  （両側完全一致を確認: d2t/horiz/vert/can_see/tags）

@@ -62,9 +62,12 @@ public class PacketBot extends ServerPlayer {
      */
     @Override
     public void doTick() {
+        // 参照 (herobot の BotPlayer) は「クライアントからの hunger パケットが無いだけ」の
+        // 普通の fake player で、空腹も満腹度も*普通に減る*。ここで毎tick eat() して満腹に
+        // 保つと、food >= 18 が維持されて自然回復が止まらない = 参照では起きる
+        // 「満腹度切れ → 自然回復停止 → 死亡」が起きず、BOT vs BOT の勝敗・移動が丸ごと
+        // 変わってしまう(実測: Paper 側だけ満腹度が 20 のまま、参照は 20 → 0 まで減る)。
         super.doTick();
-        // No client sends hunger packets; keep the bot fed so vanilla sprint/food rules stay real.
-        this.getFoodData().eat(1, 0.2f);
     }
 
     @Override

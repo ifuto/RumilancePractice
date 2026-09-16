@@ -130,8 +130,13 @@ def fingerprint(rows, other=None):
     m = {}
     ticks = rows[-1]['t'] - rows[0]['t'] if rows else 0
     m['ticks'] = ticks
+    m['samples'] = len(rows)
+    m['counts'] = {}
     for name, (key, pred) in EVENTS.items():
-        m[name] = rate(len(rises(rows, key, pred)), ticks)
+        n = len(rises(rows, key, pred))
+        m['counts'][name] = n
+        m[name] = rate(n, ticks)
+    m['counts']['totem_pop'] = max((r['pop'] for r in rows), default=0)
     m['totem_pop'] = rate(max((r['pop'] for r in rows), default=0), ticks)
     # 実使用アイテム（遷移で「持ち替えた＝使った」を数える）
     use = collections.Counter()
@@ -139,6 +144,8 @@ def fingerprint(rows, other=None):
         if a['item'] != b['item']:
             use[b['item']] += 1
     m['item_switch'] = rate(sum(use.values()), ticks)
+    m['counts']['item_switch'] = sum(use.values())
+    m['counts']['swing'] = m['counts'].get('swing', 0)
     m['use_per_item'] = {k: rate(v, ticks) for k, v in use.items()}
     # 硬い数値: アンカーの刻み
     m['anchor_gap'] = median(pair_gap(rows, 'ob', 'chg'))
@@ -192,16 +199,33 @@ STATS = ['speed', 'speed_med', 'move_share', 'yaw_rate', 'yaw_med', 'x_span', 'z
          'dist_far', 'pearl_gap']
 
 
+# 注意帯 = 許容の何倍までを「軽微な差」とみなすか。以前は 3.5 倍(=122%)までを
+# 注意扱いにしていたため、`42回/分 vs 0回/分`(100%差) のような *事象が片側で
+# 一度も起きていない* 差でも VERDICT が「一致」になっていた。
+SOFT_FACTOR = 1.5
+# これ未満のサンプル数では率の比較が無意味(1 tick の差が数%になる)。一致判定を出さない。
+MIN_SAMPLES = 200
+
+
 def compare(a, b, key, tolerance):
-    va, vb = a.get(key, 0.0), b.get(key, 0.0)
+    """(mark, rel, reason) を返す。mark は '='(一致) / '~'(注意) / '!'(乖離)。
+
+    片側だけ 0 の場合は割合が定義できないが、**「もう片側でしか起きていない」=
+    行動が再現できていない**ので、無条件で乖離とする(以前はここが無条件一致だった)。
+    """
+    va, vb = a.get(key), b.get(key)
+    if va is None or vb is None:
+        return '!', 1.0, 'missing'
     if va == 0 and vb == 0:
-        return '=', 0.0
+        return '=', 0.0, ''
+    if va == 0 or vb == 0:
+        return '!', 1.0, 'zero-baseline'
     rel = abs(va - vb) / max(abs(va), abs(vb), 1e-9)
     if rel <= tolerance:
-        return '=', rel
-    if rel <= tolerance * 3.5:
-        return '~', rel
-    return '!', rel
+        return '=', rel, ''
+    if rel <= tolerance * SOFT_FACTOR:
+        return '~', rel, 'near'
+    return '!', rel, 'beyond'
 
 
 def report(fabric, paper, who='a', label=''):
@@ -215,32 +239,39 @@ def report(fabric, paper, who='a', label=''):
 
     print('== 再現性チェック %s (who=%s: %s)' % (label or '', who,
           'quantumbot' if who == 'a' else 'qbot2'))
-    print('   fabric=%s (%d ticks)  paper=%s (%d ticks)' % (
-        fabric, ma['ticks'], paper, mb['ticks']))
-    bad, soft = [], []
+    print('   fabric=%s (%d ticks, %d samples)  paper=%s (%d ticks, %d samples)' % (
+        fabric, ma['ticks'], ma['samples'], paper, mb['ticks'], mb['samples']))
+    if min(ma['samples'], mb['samples']) < MIN_SAMPLES:
+        print('   ※ サンプル不足: 率の比較ができないため一致判定は出せない')
+
+    bad, soft, reasons = [], [], []
     print('\n-- 硬い数値（アンカー連鎖の tick 刻み）')
     for key, unit, tol in HARD:
-        mark, rel = compare(ma, mb, key, tol)
-        print('   %-20s %7.1f%s %7.1f%s  %s (%.0f%%差)' % (
-            key, ma.get(key, 0), unit, mb.get(key, 0), unit, mark, rel * 100))
+        mark, rel, why = compare(ma, mb, key, tol)
+        n_a, n_b = ma['counts'].get(key.split('_gap')[0], 0), mb['counts'].get(key.split('_gap')[0], 0)
+        print('   %-20s %7.1f%s %7.1f%s  %s (%.0f%%差)  n=%d/%d' % (
+            key, ma.get(key, 0), unit, mb.get(key, 0), unit, mark, rel * 100, n_a, n_b))
         if mark == '!':
-            bad.append(key)
-    print('\n-- 行動レート(/分)')
+            bad.append(key); reasons.append((key, why, ma.get(key, 0), mb.get(key, 0)))
+        elif mark == '~':
+            soft.append(key)
+    print('\n-- 行動レート(/分)   [n = 計測窓内の発生回数]')
     for key in RATES:
-        mark, rel = compare(ma, mb, key, 0.35)
-        print('   %-20s %7.1f  %7.1f  %s (%.0f%%差)' % (key, ma.get(key, 0), mb.get(key, 0),
-                                                        mark, rel * 100))
+        mark, rel, why = compare(ma, mb, key, 0.35)
+        print('   %-20s %7.1f  %7.1f  %s (%.0f%%差)  n=%d/%d' % (
+            key, ma.get(key, 0), mb.get(key, 0), mark, rel * 100,
+            ma['counts'].get(key, 0), mb['counts'].get(key, 0)))
         if mark == '!':
-            bad.append(key)
+            bad.append(key); reasons.append((key, why, ma.get(key, 0), mb.get(key, 0)))
         elif mark == '~':
             soft.append(key)
     print('\n-- 立ち回り・視点・座標')
     for key in STATS:
-        mark, rel = compare(ma, mb, key, 0.35)
+        mark, rel, why = compare(ma, mb, key, 0.35)
         print('   %-20s %7.2f  %7.2f  %s (%.0f%%差)' % (key, ma.get(key, 0), mb.get(key, 0),
                                                         mark, rel * 100))
         if mark == '!':
-            bad.append(key)
+            bad.append(key); reasons.append((key, why, ma.get(key, 0), mb.get(key, 0)))
         elif mark == '~':
             soft.append(key)
     print('\n-- 手持ちアイテム滞在率')
@@ -254,26 +285,131 @@ def report(fabric, paper, who='a', label=''):
         print('   %-22s %6.1f%% %6.1f%%  %s (%+.1fpt)' % (k, va, vb, mark, vb - va))
         if mark == '!':
             item_bad.append(k)
+            reasons.append((k, 'items', va, vb))
+        elif mark == '~':
+            soft.append(k)
+
     print()
-    if not bad and not item_bad:
-        print('VERDICT: 一致（硬い数値・レート・統計・アイテム配分すべて許容内）%s' % (
-            '  ※注意: ' + ', '.join(soft) if soft else ''))
-        return 0
-    print('VERDICT: %s — 乖離: %s%s' % (
-        '要確認' if len(bad) + len(item_bad) <= 3 else '不一致',
-        ', '.join(bad + item_bad) or '-',
-        ('  ※軽微な差: ' + ', '.join(soft)) if soft else ''))
-    return 1
+    if bad or item_bad:
+        print('VERDICT: 不一致 — 再現できていない指標: %s' % (', '.join(bad + item_bad) or '-'))
+        for key, why, va, vb in reasons:
+            if why == 'zero-baseline':
+                print('   * %s: 片側で一度も起きていない (fabric=%.2f / paper=%.2f)' % (key, va, vb))
+            elif why == 'missing':
+                print('   * %s: 片側に指標が無い' % key)
+        if soft:
+            print('   ※軽微な差: %s' % ', '.join(soft))
+        if min(ma['samples'], mb['samples']) < MIN_SAMPLES:
+            print('   ※サンプル不足のため、この判定自体が暫定')
+        return 1
+    if soft:
+        # 「注意」は一致ではない。以前はここで「一致」と表示していたため、
+        # 実際には大きく違う指標が注意書きの中に隠れていた。
+        print('VERDICT: 要確認 — 許容内だが差が大きめ: %s' % ', '.join(soft))
+        if min(ma['samples'], mb['samples']) < MIN_SAMPLES:
+            print('   ※サンプル不足のため、この判定自体が暫定')
+        return 1
+    print('VERDICT: 一致（硬い数値・レート・統計・アイテム配分すべて許容内）')
+    if min(ma['samples'], mb['samples']) < MIN_SAMPLES:
+        print('   ※サンプル不足のため、この判定自体が暫定')
+        return 1
+    return 0
+
+
+def selftest(base=None, verbose=False):
+    """カナリア自己テスト — ツールが「嘘の一致」を出さないことを確かめる。
+
+    実測ログを土台に、*わかっている乖離* を作って判定させる:
+
+      1. 同じログ同士                     -> 一致     (正常に一致を出せる)
+      2. 片側の攻撃(hit=)を全消し          -> 不一致   (swing が 0 になる)
+      3. 片側の座標を凍結                  -> 不一致   (移動量が 0 になる)
+      4. 片側のアイテム切替を消す(i= 固定)  -> 不一致   (item_switch が 0 になる)
+
+    1 が「一致」を返さない(=常に不一致と叫ぶ)ならツールが壊れているし、
+    2-4 が「一致」を返すなら *嘘をつく* ツールである。どちらも FAIL。
+    """
+    import glob
+    import os
+    import tempfile
+    if base is None:
+        cands = sorted(glob.glob('parity-logs/*.log.gz'), key=os.path.getmtime, reverse=True)
+        if not cands:
+            print('selftest: parity-logs/*.log.gz が無い')
+            return 2
+        base = cands[0]
+    opener = gzip.open if base.endswith('.gz') else open
+    with opener(base, 'rt', encoding='utf-8', errors='replace') as fh:
+        raw = [l for l in fh if 'who=' in l]
+
+    def mutate(lines, fn):
+        return [fn(l) for l in lines]
+
+    def kill_swing(line):
+        return re.sub(r'hit=-?\d+', 'hit=0', line)
+
+    def freeze_pos(line):
+        m = LINE.search(line)
+        if not m:
+            return line
+        px, py, pz = m.group(1), m.group(2), m.group(3)
+        line = line.replace('%s,%s,%s' % (px, py, pz), '-698.5,31.0,88.5', 1)
+        return re.sub(r'v=(-?[\d.]+),(-?[\d.]+),(-?[\d.]+)', 'v=0,0,0', line)
+
+    def kill_switch(line):
+        return re.sub(r'i=\S+', 'i=minecraft:stone', line)
+
+    tmp = tempfile.mkdtemp(prefix='parity-selftest-')
+    cases = [
+        ('同一ログ（一致するはず）', raw, raw, 0),
+        ('片側の攻撃を消す（swing 乖離）', raw, mutate(raw, kill_swing), 1),
+        ('片側の座標を凍結（移動量 乖離）', raw, mutate(raw, freeze_pos), 1),
+        ('片側のアイテム切替を消す（item_switch 乖離）', raw, mutate(raw, kill_switch), 1),
+    ]
+    failures = []
+    print('カナリア自己テスト (base=%s, %d 行)' % (base, len(raw)))
+    for name, a, b, expect in cases:
+        pa, pb = os.path.join(tmp, 'a.log'), os.path.join(tmp, 'b.log')
+        with open(pa, 'w') as fh:
+            fh.writelines(a)
+        with open(pb, 'w') as fh:
+            fh.writelines(b)
+        import io
+        import contextlib
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = report(pa, pb, 'a', name)
+        ok = (rc == 0) if expect == 0 else (rc != 0)
+        verdict = [l for l in buf.getvalue().splitlines() if l.startswith('VERDICT')]
+        print('   [%s] %-42s -> %s' % ('PASS' if ok else 'FAIL', name,
+                                       verdict[0] if verdict else 'rc=%d' % rc))
+        if not ok:
+            failures.append(name)
+        elif verbose:
+            print(buf.getvalue())
+    if failures:
+        print('selftest FAILED: %s' % ', '.join(failures))
+        return 1
+    print('selftest OK: 一致は一致、既知の乖離はすべて不一致として検出')
+    return 0
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('fabric')
-    ap.add_argument('paper')
+    ap.add_argument('fabric', nargs='?')
+    ap.add_argument('paper', nargs='?')
     ap.add_argument('--who', default='a', help='a=quantumbot b=qbot2')
     ap.add_argument('--json', action='store_true', help='生の指標を JSON で出す')
+    ap.add_argument('--selftest', action='store_true',
+                    help='カナリア自己テスト（一致/乖離を正しく判定できるか）を実行する')
+    ap.add_argument('--base', help='selftest の土台にするログ（既定: 最新の parity-logs/*.log.gz）')
+    ap.add_argument('-v', '--verbose', action='store_true')
     args = ap.parse_args()
+    if args.selftest:
+        return selftest(args.base, args.verbose)
+    if not args.fabric or not args.paper:
+        ap.error('fabric と paper のログを指定する（--selftest なら不要）')
     if args.json:
         other = 'b' if args.who == 'a' else 'a'
         out = {

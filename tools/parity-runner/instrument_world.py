@@ -104,6 +104,55 @@ COUNTERS = {
     'xaniclelib/function/obbycheck.mcfunction': [
         ('c_obbycheck', 'scoreboard players add .c_obbycheck dbgc 1'),
     ],
+    # --- 剣の意思決定(どの分岐に入っているかを左右で比べる) ---
+    'quantum/function/sword/passive/main.mcfunction': [
+        ('c_sp_main', 'scoreboard players add .c_sp_main dbgc 1'),
+        ('c_sp_main_qa', 'execute if entity @s[name=quantumbot] run scoreboard players add .c_sp_main_qa dbgc 1'),
+        ('c_sp_main_q2', 'execute if entity @s[name=qbot2] run scoreboard players add .c_sp_main_q2 dbgc 1'),
+    ],
+    'quantum/function/sword/passive/state2.mcfunction': [
+        ('c_sp_st2', 'scoreboard players add .c_sp_st2 dbgc 1'),
+    ],
+    'quantum/function/sword/passive/notstate2.mcfunction': [
+        ('c_sp_nst2', 'scoreboard players add .c_sp_nst2 dbgc 1'),
+    ],
+    'quantum/function/sword/bot_mech/logic.mcfunction': [
+        ('c_bmlogic', 'scoreboard players add .c_bmlogic dbgc 1'),
+        ('c_bmlogic_qa', 'execute if entity @s[name=quantumbot] run scoreboard players add .c_bmlogic_qa dbgc 1'),
+        ('c_bmlogic_q2', 'execute if entity @s[name=qbot2] run scoreboard players add .c_bmlogic_q2 dbgc 1'),
+    ],
+    'quantum/function/sword/bot_mech/combo_logic.mcfunction': [
+        ('c_bmcombo', 'scoreboard players add .c_bmcombo dbgc 1'),
+        ('c_bmcombo_qa', 'execute if entity @s[name=quantumbot] run scoreboard players add .c_bmcombo_qa dbgc 1'),
+        ('c_bmcombo_q2', 'execute if entity @s[name=qbot2] run scoreboard players add .c_bmcombo_q2 dbgc 1'),
+    ],
+    'quantum/function/sword/crit.mcfunction': [
+        ('c_scrit_hit_qa', 'execute if entity @s[name=quantumbot] run scoreboard players add .c_scrit_hit_qa dbgc 1'),
+        ('c_scrit_hit_q2', 'execute if entity @s[name=qbot2] run scoreboard players add .c_scrit_hit_q2 dbgc 1'),
+    ],
+    'quantum/function/sword/combo/hit.mcfunction': [
+        ('c_scombohit_qa', 'execute if entity @s[name=quantumbot] run scoreboard players add .c_scombohit_qa dbgc 1'),
+        ('c_scombohit_q2', 'execute if entity @s[name=qbot2] run scoreboard players add .c_scombohit_q2 dbgc 1'),
+    ],
+    'quantum/function/decisions/tick.mcfunction': [
+        ('c_dec_tick', 'scoreboard players add .c_dec_tick dbgc 1'),
+    ],
+    'quantum/function/decisions/optimise_stats/can_see.mcfunction': [
+        ('c_cansee', 'scoreboard players add .c_cansee dbgc 1'),
+    ],
+    'quantum/function/sword/combo/distance.mcfunction': [
+        ('c_swdist', 'scoreboard players add .c_swdist dbgc 1'),
+    ],
+    'quantum/function/sword/jump.mcfunction': [
+        ('c_swjump_qa', 'execute if entity @s[name=quantumbot] run scoreboard players add .c_swjump_qa dbgc 1'),
+        ('c_swjump_q2', 'execute if entity @s[name=qbot2] run scoreboard players add .c_swjump_q2 dbgc 1'),
+    ],
+    'quantum/function/miscellaneous/treats.mcfunction': [
+        ('c_treats', 'scoreboard players add .c_treats dbgc 1'),
+    ],
+    'quantum/function/allstats/pos.mcfunction': [
+        ('c_pos', 'scoreboard players add .c_pos dbgc 1'),
+    ],
 }
 
 # crystal/tick は「どこまで進んだか」を 1 行ずつ数える(早期 return の位置を特定するため)
