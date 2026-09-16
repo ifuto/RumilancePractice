@@ -99,7 +99,30 @@ public final class KitService {
                 // "data" carries the full serialized ItemStack (enchantments, potion effects,
                 // custom names, ...) so kits created from a live inventory keep their NBT.
                 String data = dataObj == null ? null : String.valueOf(dataObj);
-                items.add(new KitItemEntry(slot, material, amount, null, data));
+                // Readable enchantments for hand-written kits: `enchantments: {sharpness: 5}`.
+                Map<String, Integer> enchants = new java.util.LinkedHashMap<>();
+                Object enchObj = map.get("enchantments");
+                if (enchObj instanceof Map<?, ?> enchMap) {
+                    for (Map.Entry<?, ?> e : enchMap.entrySet()) {
+                        if (e.getKey() == null) {
+                            continue;
+                        }
+                        int level = 1;
+                        if (e.getValue() instanceof Number number) {
+                            level = number.intValue();
+                        } else if (e.getValue() != null) {
+                            try {
+                                level = Integer.parseInt(String.valueOf(e.getValue()).trim());
+                            } catch (NumberFormatException ignored) {
+                                level = 1;
+                            }
+                        }
+                        if (level > 0) {
+                            enchants.put(String.valueOf(e.getKey()), level);
+                        }
+                    }
+                }
+                items.add(new KitItemEntry(slot, material, amount, null, data, enchants));
             }
             builder.items(items);
 
@@ -499,6 +522,9 @@ public final class KitService {
             map.put("amount", entry.amount());
             if (entry.hasSerializedItem()) {
                 map.put("data", entry.itemDataBase64());
+            }
+            if (!entry.enchantments().isEmpty()) {
+                map.put("enchantments", new LinkedHashMap<>(entry.enchantments()));
             }
             itemMaps.add(map);
         }

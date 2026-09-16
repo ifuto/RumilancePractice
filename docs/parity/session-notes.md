@@ -713,3 +713,53 @@ PvP サーバーでは **BOT の装備 = サーバーキット** (`/botadmin`) �
 失敗時は前回値が残る = スティッキー)。したがって `i=` の滞在率は「最後に成功した読み」であり、
 クリスタル残差 (`diamond_sword` 26.0% vs 4.6%) は **剣保持そのもの**ではなく
 「スロット選択の時間配分」の差として読むのが安全。
+
+## 10.14 クリスタル完了 — 残差ゼロ (2026-09-16 深夜 / 環境リセット後)
+
+### 結論 (cryF/cryG, crystal_k10v11, 60s/25w, ノイズ床)
+```
+[本物] エンジン内では再現し、Fabric↔Paper で食い違う: なし       (who=a)
+[本物] エンジン内では再現し、Fabric↔Paper で食い違う: なし       (who=b)
+[ノイズ] swing, speed, speed_med, anchor_gap, charge_explode_gap, x_span, hp_min, ... 
+```
+残差はすべて「同一エンジン内でも振れる」= 移植のせいではない指標に落ちた。
+`cryF` の 1 本だけを見ても `c_hit` 110/106、`diamond_sword` 14.6%/15.5%、`dist_med` 一致。
+
+### 原因は 2 つ (両方潰した)
+1. **Paper の近接ノックバック消失** (§10.12) — `Player#causeExtraKnockback` が
+   被弾前 delta に戻すため、クライアントの居ない BOT ではノックバックが消えていた。
+2. **ラウンド中のロードアウトが両エンジンで違っていた** — Fabric はマップの
+   `quantum:botgear/dia` (mode 2) の装備、Paper はプラグインが着せる **サーバーキット**
+   (エンチャント無しの素の剣) で戦っていた。剣の `knockback:1`/`sharpness:5` と防具の
+   `blast_protection` が落ちるため、間合い (`dist_med` 1.6 vs 3.1) → `cansee` (2.4 倍) →
+   `hit_decision` → `swing` (2.5 倍) → クリスタル設置数、と連鎖していた。
+
+### 実装
+- **kits.yml に `enchantments:` を追加** (`KitItemEntry.enchantments` 新設 / `KitService`
+  の読み書き / `KitLoadout.applyEnchantments`)。これまでエンチャントは
+  `data:` の Base64 でしか持てず、手書きキットでは表現できなかった。
+- **防具はアイテム定義 (slot 36-39) で書ける運用に** — `armor:` マップはエンチャントを
+  表現できないため、キットはアイテムとして防具を持たせる。
+- `tools/parity-runner/server_kit.py` — サーバーキットの upsert + `bot.mode` 切替 +
+  `/botadmin <MODE> <kit>` の紐づけを 1 コマンドで (環境リセット後も再現可能)。
+- **`build_plugin.sh` の盲点を修正** — コンパイル対象が手書きのファイル列挙で、
+  `kit/` `model/` の変更が *黙って無視* されていた (delivery jar の古いクラスが使われる)。
+  キット系 3 ファイルを追加。
+
+### 検証 (Paper ライブ)
+- `bot.mode: CRYSTAL` + `/botadmin CRYSTAL crystal` → ログ
+  `[Quantum] bot quantumbot wears the server kit 'crystal' (mode CRYSTAL, /botadmin)`
+- 実際のアイテム: 剣 `sharpness 5 + knockback 1` / 黒曜石 `knockback 1` /
+  兜 `protection 4 + unbreaking 3` / 脚 `blast_protection 4 + unbreaking 3` — 参照と同一。
+
+### 環境リセットの教訓 (次に踏まないための記録)
+- サンドボックス再起動で `/tmp` も **作業ツリーの未コミット分も** 消えることがある。
+  今回 `parity-logs/` と作業ツリーが初期化され、`git log` が `bcf8a0b` に戻っていた
+  (プッシュ済みコミットはリモートに残っていたので `git reset --hard origin/<branch>` で復旧)。
+- 復旧は `tools/parity-runner/env_up.sh --start` 1 発 (JDK/Fabric/Paper/ワールド/プラグイン)。
+- **`start.sh` を二重に起動してはいけない**: スクリプトが `console.in` FIFO を作り直すため、
+  先に動いていたサーバーは古い FIFO を掴んだままになり、コンソール経由のシナリオ投入が
+  届かなくなる (RCON は生きているので気づきにくい)。症状: `count_round.py` が
+  paper 側だけ無出力でハングする。
+- `bot:` が quantum.yml に 2 つある (spawn 用と mode/kit 用)。YAML は後勝ちなので、
+  `bot.mode` を書くツールは «最後の» `bot:` ブロックを狙うこと。

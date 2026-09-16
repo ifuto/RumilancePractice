@@ -9,6 +9,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Builds a 41-slot loadout (0-35 storage, 36 helmet, 37 chest, 38 legs, 39 boots, 40 offhand)
@@ -265,6 +266,7 @@ public final class KitLoadout {
         if (entry.hasSerializedItem()) {
             ItemStack decoded = ItemSerializer.singleFromBase64(entry.itemDataBase64());
             if (decoded != null && !decoded.getType().isAir()) {
+                applyEnchantments(decoded, entry);
                 return decoded;
             }
         }
@@ -272,7 +274,30 @@ public final class KitLoadout {
         if (material == null || material.isAir()) {
             return null;
         }
-        return new ItemStack(material, Math.max(1, entry.amount()));
+        ItemStack stack = new ItemStack(material, Math.max(1, entry.amount()));
+        applyEnchantments(stack, entry);
+        return stack;
+    }
+
+    /** Hand-written kits may name enchantments directly ({@code enchantments: {sharpness: 5}}). */
+    private static void applyEnchantments(ItemStack stack, KitItemEntry entry) {
+        if (stack == null || entry == null || entry.enchantments().isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, Integer> enchant : entry.enchantments().entrySet()) {
+            String key = enchant.getKey().toLowerCase(java.util.Locale.ROOT).trim();
+            if (key.startsWith("minecraft:")) {
+                key = key.substring("minecraft:".length());
+            }
+            org.bukkit.enchantments.Enchantment resolved;
+            try {
+                resolved = org.bukkit.Registry.ENCHANTMENT.getOrThrow(
+                        org.bukkit.NamespacedKey.minecraft(key));
+            } catch (RuntimeException unknown) {
+                continue;
+            }
+            stack.addUnsafeEnchantment(resolved, Math.max(1, enchant.getValue()));
+        }
     }
 
     static ItemStack armorItem(String value) {

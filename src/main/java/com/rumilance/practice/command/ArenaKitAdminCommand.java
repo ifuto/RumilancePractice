@@ -136,6 +136,21 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
     }
 
     private boolean handleKit(CommandSender sender, String[] args) {
+        // コンソール/RCON からのスナップショット: `/kit create <name> <player>` は
+        // 送信者がプレイヤーでなくても成立させる。GUI を持たない相手 (BOT 等) の
+        // ロードアウトをそのままキット化したい運用が実在するため。
+        if (!(sender instanceof Player) && args.length >= 3
+                && ("create".equalsIgnoreCase(args[0]) || "overwrite".equalsIgnoreCase(args[0]))) {
+            Player source = org.bukkit.Bukkit.getPlayerExact(args[2]);
+            if (source == null) {
+                sender.sendMessage(Component.text("Player not found: " + args[2], NamedTextColor.RED));
+                return true;
+            }
+            KitDefinition saved = kitService.createFromPlayer(source, args[1]);
+            sender.sendMessage(Component.text("Kit saved: " + saved.displayName()
+                    + " (from " + source.getName() + ")", NamedTextColor.GREEN));
+            return true;
+        }
         if (!(sender instanceof Player player)) {
             return true;
         }
@@ -212,13 +227,27 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
             }
             case "create", "overwrite" -> {
                 if (args.length < 2) {
-                    player.sendMessage(Component.text("/kit create <name>", NamedTextColor.YELLOW));
+                    player.sendMessage(Component.text("/kit create <name> [player]", NamedTextColor.YELLOW));
                     yield true;
+                }
+                // Optional source player: snapshots THAT player's loadout instead of the
+                // sender's. Headless-friendly (console/RCON can snapshot a bot) and lets an
+                // admin mirror somebody else's inventory — enchantments, potions and all,
+                // because the whole stack is serialized into the entry's `data`.
+                Player source = player;
+                if (args.length >= 3) {
+                    Player named = org.bukkit.Bukkit.getPlayerExact(args[2]);
+                    if (named == null) {
+                        player.sendMessage(Component.text("Player not found: " + args[2], NamedTextColor.RED));
+                        yield true;
+                    }
+                    source = named;
                 }
                 // Pass the RAW name: KitService lowercases the storage key itself but keeps
                 // the typed casing as the display name (for gui.kit-name-case: KEEP).
-                KitDefinition kit = kitService.createFromPlayer(player, args[1]);
-                player.sendMessage(Component.text("Kit saved: " + kit.displayName(), NamedTextColor.GREEN));
+                KitDefinition kit = kitService.createFromPlayer(source, args[1]);
+                player.sendMessage(Component.text("Kit saved: " + kit.displayName()
+                        + " (from " + source.getName() + ")", NamedTextColor.GREEN));
                 yield true;
             }
             case "list" -> {

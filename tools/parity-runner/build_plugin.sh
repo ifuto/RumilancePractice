@@ -28,6 +28,12 @@ SOURCES=(
   src/main/java/com/rumilance/practice/packetbot/PacketBot.java
   src/main/java/com/rumilance/practice/bootstrap/FeatureBootstrap.java
   src/main/java/com/rumilance/practice/practice/PracticeService.java
+  # キットの定義/適用/管理コマンド (kits.yml のスキーマや /kit の挙動を触るので必須。
+  # ここを忘れると「ソースは直っているのに挙動が変わらない」= delivery jar の
+  # 古いクラスが使われ続ける)。
+  src/main/java/com/rumilance/practice/kit/KitService.java
+  src/main/java/com/rumilance/practice/kit/KitLoadout.java
+  src/main/java/com/rumilance/practice/model/KitItemEntry.java
 )
 
 CP="$DELIVERY:$PAPER_JAR:$(find "$LIBS_DIR" -name '*.jar' 2>/dev/null | tr '\n' ':')$(find "$SERVER_LIBS_DIR" -name '*.jar' 2>/dev/null | tr '\n' ':')"
