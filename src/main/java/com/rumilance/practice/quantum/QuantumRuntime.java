@@ -69,6 +69,11 @@ public final class QuantumRuntime {
     private YamlConfiguration config;
     private boolean enabled;
     private BukkitTask watchdog;
+    /**
+     * PvP サーバー側のキット (および {@code /botadmin} の紐づけ) への橋。null なら
+     * キット連携なし = マップ側のキットチェストが唯一の供給元 (パリティ計測時はこちら)。
+     */
+    private com.rumilance.practice.practice.PracticeService practice;
 
     public QuantumRuntime(Plugin plugin, HeroBotRegistry bots) {
         this.plugin = plugin;
@@ -79,6 +84,21 @@ public final class QuantumRuntime {
 
     public QuantumCommands commands() {
         return this.commands;
+    }
+
+    /**
+     * サーバーのキットサービスを繋ぐ ({@code FeatureBootstrap})。
+     *
+     * <p>PvP サーバーとしての役割: BOT の装備は参照マップのキットチェストではなく
+     * <b>サーバーのキット</b>から与える。管理者の紐づけは {@code /botadmin} の2形式 —
+     * {@code /botadmin <SWORD|MACE|CRYSTAL|NETHERITE_POT|CART> <キット>} (装備) と
+     * {@code /botadmin <botkit> <arenakit>} (開催アリーナ) — で、どちらも
+     * {@link com.rumilance.practice.practice.PracticeService} の同じストアに入る。</p>
+     */
+    public void setPracticeService(com.rumilance.practice.practice.PracticeService practice) {
+        this.practice = practice;
+        this.applyConfiguredBotLoadout(this.bots.byName(
+                this.config == null ? "quantumbot" : this.config.getString("bot.name", "quantumbot")));
     }
 
     public HeroBotRegistry bots() {
@@ -307,7 +327,16 @@ public final class QuantumRuntime {
 
     /** {@code function quantum:options/<name>} — the map's mode switch. */
     public boolean setOption(CommandSender sender, String name) {
-        return this.runQuietly(sender, "function " + expand("options/" + name));
+        boolean ok = this.runQuietly(sender, "function " + expand("options/" + name));
+        if (ok) {
+            // モード切替はマップ側のキットチェストから装備を読み直す。/botadmin でサーバー
+            // キットを紐づけているサーバーでは、その *あと* に BOT の装備をサーバーキットへ
+            // 戻す (そうしないとサーバーキットがチェストの内容に上書きされる)。
+            for (HeroBotPlayer bot : this.bots.all()) {
+                this.applyConfiguredBotLoadout(bot);
+            }
+        }
+        return ok;
     }
 
     /** {@code function quantum:options/toggles/<name>on|off}. */
@@ -386,7 +415,49 @@ public final class QuantumRuntime {
                 (float) this.config.getDouble("bot.pitch", where.getPitch()),
                 mode == null ? GameType.SURVIVAL : mode, skinTemplate);
         bot.ping = this.config.getInt("bot.ping", 100);
+        this.applyConfiguredBotLoadout(bot);
         return bot;
+    }
+
+    /**
+     * BOT にサーバーキットを着せる (設定があるときだけ)。
+     *
+     * <p>決定順:</p>
+     * <ol>
+     *   <li>{@code bot.kit: <キット名>} — 明示指定 (どのモードでもこれを使う)。</li>
+     *   <li>{@code bot.mode: <SWORD|MACE|CRYSTAL|NETHERITE_POT|CART>} に
+     *       {@code /botadmin <モード> <キット>} で紐づいたキット。</li>
+     * </ol>
+     * <p>どちらも無ければ何もしない = マップのキットチェスト (パリティ計測と同じ挙動)。</p>
+     */
+    private void applyConfiguredBotLoadout(HeroBotPlayer bot) {
+        if (bot == null || this.practice == null || this.config == null) {
+            return;
+        }
+        String kit = this.config.getString("bot.kit", "");
+        String mode = this.config.getString("bot.mode", "");
+        if ((kit == null || kit.isBlank()) && mode != null && !mode.isBlank()) {
+            com.rumilance.practice.practice.PracticeType type =
+                    com.rumilance.practice.practice.PracticeType.parse(mode);
+            if (type != null && type.botMode()) {
+                kit = this.practice.botKitFor(type);
+                if (kit == null || kit.isBlank()) {
+                    return;
+                }
+            }
+        }
+        if (kit == null || kit.isBlank()) {
+            return;
+        }
+        org.bukkit.entity.Player who = bot.getBukkitEntity();
+        if (this.practice.applyServerKitToBot(who, kit)) {
+            this.plugin.getLogger().info("[Quantum] bot " + bot.profileName()
+                    + " wears the server kit '" + kit + "'"
+                    + (mode == null || mode.isBlank() ? "" : " (mode " + mode + ", /botadmin)"));
+        } else {
+            this.plugin.getLogger().warning("[Quantum] bot kit '" + kit
+                    + "' was configured but could not be applied (kit missing?)");
+        }
     }
 
     private Location botSpawn(Location fallback) {

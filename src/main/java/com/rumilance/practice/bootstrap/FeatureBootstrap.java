@@ -1797,6 +1797,9 @@ public final class FeatureBootstrap {
         // QuantumRuntime for why that ordering is load-bearing.
         this.quantumBots = new com.rumilance.practice.herobot.HeroBotRegistry(plugin);
         this.quantum = new com.rumilance.practice.quantum.QuantumRuntime(plugin, this.quantumBots);
+        // PvP サーバーとしての BOT の装備はサーバーキット (/botadmin の紐づけ) から。
+        // 紐づけが無ければ何もしない = マップのキットチェストがそのまま使われる。
+        this.quantum.setPracticeService(this.practiceService);
         this.quantum.enable();
         bind("quantum", new com.rumilance.practice.quantum.QuantumCommand(plugin, this.quantum,
                 this.quantumBots));

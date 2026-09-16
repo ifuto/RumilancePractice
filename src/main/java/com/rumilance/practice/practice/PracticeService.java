@@ -2036,6 +2036,28 @@ public final class PracticeService {
         giveBotLoadout(player, session, room != null ? room.type() : session.type());
     }
 
+    /**
+     * Quantum BOT 用の装備適用: サーバーキットを「そのまま」着せる (PvP サーバーの流れ)。
+     *
+     * <p>{@code /botadmin <モード> <キット>} や {@code /botadmin <botkit> <arenakit>} で
+     * 紐づけたキットを、マップの BOT (Paper 上では本物の fake player) に装備させる。
+     * マップ側のキットチェストはこのあと読み直される可能性があるので、呼び出し側
+     * ({@code QuantumRuntime}) がモード切替の後にもう一度呼ぶ。</p>
+     */
+    public boolean applyServerKitToBot(Player who, String kitName) {
+        if (who == null || kitName == null || kitName.isBlank() || kitService == null) {
+            return false;
+        }
+        var kit = kitService.get(kitName);
+        if (kit.isEmpty()) {
+            return false;
+        }
+        who.getInventory().clear();
+        who.getInventory().setArmorContents(null);
+        kitService.apply(who, kit.get());
+        return true;
+    }
+
     /** Player loadout: the admin-bound server kit wins, else the mode's built-in gear. */
     private void giveBotLoadout(Player player, PracticeSession session, PracticeType type) {
         String boundKit = botModeKits.get(type);

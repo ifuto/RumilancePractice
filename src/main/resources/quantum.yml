@@ -60,3 +60,11 @@ herobot:
   creative-no-clip: false
   # tick: bot を tick のどこで動かすか (tick-start = tick の先頭 / scheduler = tick の終わり)
   tick-phase: tick-start
+
+# BOT の装備をサーバーのキットから与える (PvP サーバー向け)。
+#   mode: SWORD|MACE|CRYSTAL|NETHERITE_POT|CART — /botadmin <mode> <kit> の紐づけを使う
+#   kit : キット名を直接指定 (モード紐づけより優先。空なら紐づけを使う)
+# どちらも空なら、参照マップのキットチェストが装備を供給する (パリティ計測と同じ)。
+bot:
+  mode: ''
+  kit: ''

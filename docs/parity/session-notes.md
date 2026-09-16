@@ -556,3 +556,34 @@ Paper の起動ログ 12:34:27 に出る `Failed to load function ...` は約 20
 修正: `ServerResourcesReloadedEvent` (読み直し完了後に発火) で動詞を戻し、
 **自前ローダでパックを入れ直す** (`QuantumRuntime#reinstallAfterResourceReload`)。
 ここで `reloadResources` を投げないのが重要 (自分自身を無限に呼ぶ)。
+
+## 10.10 BOT の装備をサーバーキット (`/botadmin`) から与える (PvP サーバーとしての本線)
+
+**指摘**: このプラグインは PvP サーバー用なので、BOT の装備は参照パックのキットチェストでは
+なく **サーバーのキット** (`/botadmin` の紐づけ) から与えるのが正しい。これまで Quantum BOT は
+マップの `kits/kitN` (チェスト) だけで装備が決まっており、`/botadmin` の紐づけは
+practice 側 (`PracticeService`) にしか効いていなかった = **BOT にサーバーキットが届いていない**。
+
+**修正**:
+- `PracticeService#applyServerKitToBot(Player, kitName)` — サーバーキットをそのまま着せる
+  (`kitService.apply` = 装備/最大体力/満腹度/ゲームモードまで本番と同じ経路)。
+- `QuantumRuntime`:
+  - `setPracticeService(...)` で practice/kit サービスを繋ぐ (`FeatureBootstrap`)。
+  - `bot.mode: SWORD|MACE|CRYSTAL|NETHERITE_POT|CART` を書くと
+    **`/botadmin <モード> <キット>` の装備紐づけ**を、`bot.kit: <キット名>` を書くと
+    **キット直指定** (`/botadmin <botkit> <arenakit>` の botkit と同じ発想) を使う。
+  - 適用点は `/quantum spawnbot` と **モード切替の直後** (`setOption` =
+    `quantum:options/<name>`)。後者が要るのは、モード切替がマップのキットチェストから
+    装備を読み直すため (サーバーキットがチェストで上書きされるのを防ぐ)。
+  - 両方空なら何もしない = キットチェスト (パリティ計測はこのまま)。
+- `quantum.yml` に `bot.mode` / `bot.kit` を追加 (既定は空)。
+
+**実機確認 (Paper, 25576)**:
+```
+/botadmin SWORD sword_only      → 紐づけました: SWORD BOT → キット 'sword_only'（装備）
+/quantum spawnbot               → [Quantum] bot quantumbot wears the server kit 'sword_only' (mode SWORD, /botadmin)
+hotbar: slot0=diamond_sword slot2=golden_apple x8 / armor: diamond 4点 / offhand: 空
+クモの巣: 無し   (キットに無いものは BOT も持たない)
+```
+キットは `kits.yml` の `kits.sword_only` (剣+防具+リンゴのみ) で定義。**「剣モードは剣と装備だけ」は
+チェストを触らずサーバーキットの紐づけで表現できる** = 以降の PvP サーバー運用はこれで行く。

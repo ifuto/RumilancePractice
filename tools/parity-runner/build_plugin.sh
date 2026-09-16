@@ -27,6 +27,7 @@ SOURCES=(
   src/main/java/com/rumilance/practice/lobby/LobbyListener.java
   src/main/java/com/rumilance/practice/packetbot/PacketBot.java
   src/main/java/com/rumilance/practice/bootstrap/FeatureBootstrap.java
+  src/main/java/com/rumilance/practice/practice/PracticeService.java
 )
 
 CP="$DELIVERY:$PAPER_JAR:$(find "$LIBS_DIR" -name '*.jar' 2>/dev/null | tr '\n' ':')$(find "$SERVER_LIBS_DIR" -name '*.jar' 2>/dev/null | tr '\n' ':')"
