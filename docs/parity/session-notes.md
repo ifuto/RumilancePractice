@@ -38,8 +38,11 @@ python3 tools/parity_runner.py run --console /tmp/testsrv/console.in \
   --invoke 'quantum run ' --scenario crystal_k10v11 --seconds 60 --warmup 25 \
   --out parity-logs/paper_crystal.log.gz
 
-python3 tools/parity_compare.py parity-logs/fabric_crystal.log.gz parity-logs/paper_crystal.log.gz
+python3 tools/parity_verify.py parity-logs/fabric_crystal.log.gz parity-logs/paper_crystal.log.gz
 ```
+
+`parity_verify.py` が「カナリア自己テスト → リグレッション試験 → 本番判定(who=a/b)」を
+まとめて実行して合否(終了コード)を返す。個別に見たいときだけ `parity_compare.py` を直接叩く。
 
 `--invoke 'quantum run '` は Paper 用。プラグインは「関数から呼べる verb」を持たないので、
 マップの関数を外から叩くときだけ RCON 経由で `quantum run <cmd>` に包む。
