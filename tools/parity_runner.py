@@ -255,6 +255,12 @@ def cmd_matrix(args):
     return 0
 
 
+def _verdict_hint(fabric_path, paper_path):
+    """単一ログの統計ではなく「一致したか」が必要なときの入口を案内する。"""
+    print('\n判定(一致/不一致)は: python3 tools/parity_verify.py %s %s'
+          % (fabric_path, paper_path))
+
+
 def cmd_report(args):
     rows = parse(args.log)
     if not rows:
@@ -262,6 +268,8 @@ def cmd_report(args):
         return 1
     print('%s: %d lines' % (args.log, len(rows)))
     summarise(rows, label=os.path.basename(args.log))
+    print('\n※ これは片側ログの統計であって合否判定ではない。'
+          '一致判定は tools/parity_verify.py <fabric.log.gz> <paper.log.gz> を使う。')
     return 0
 
 

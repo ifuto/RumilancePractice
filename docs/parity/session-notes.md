@@ -1,3 +1,12 @@
+
+> ⚠️ **この文書の前半(過去セッションの「到達点」)には、壊れた比較ツールが出した
+> 『一致』が混じっています。** 当時の `tools/parity_compare.py` は
+> 「片側だけ 0 の指標を無条件一致」＋「122% までの差を注意帯」にしていたため、
+> たとえば s2_sword の `swing 122.1 vs 0.0`・`x_span 10.13 vs 1.23` でも
+> **VERDICT: 一致** と表示していました。判定は必ず
+> `python3 tools/parity_verify.py <fabric.gz> <paper.gz>` で取り直してください。
+> 現在、**過去に出た「一致」はすべて否定済み**(＝まだ一致したシナリオは無い)。
+
 # パリティ検証 作業ノート(2026-09-16 時点)
 
 Fabric(herobot MOD)と Paper(この repо の HeroBot 移植)で **戦闘BOT vs 戦闘BOT** を
@@ -152,3 +161,24 @@ movement 関数自体は Paper の方が多く呼ばれている(877 vs 663)の�
   素のコマンドで読む必要があった。修正済み）
 - 位置を固定した知覚テスト: `function parity:geo_a|geo_b|geo_c` → `GEO` 行
   （両側完全一致を確認: d2t/horiz/vert/can_see/tags）
+
+
+### 5) 「嘘の一致」の再発防止(追加)
+
+- `tools/parity_verify.py` — 1コマンドの入口。①カナリア自己テスト ②リグレッション試験
+  ③本番判定(who=a/b 両方) を通し、**すべて通れば 0 / 乖離があれば 1** を返す。
+- `tools/parity_runner/fixtures/regression_s2_metrics.json` — 実際に嘘をついた指標
+  (s2_sword: swing 122.1 vs 0.0 / x_span 10.13 vs 1.23 / item_switch 104.1 vs 0.0)を
+  固定した回帰試験の土台。`--regression` がこれを判定に通し、**不一致と出なければ FAIL**。
+- レポート冒頭に **主要指標(スイング/移動/平均HP/アイテム切替/x の広がり/視点スナップ)** を
+  `!` `~` `=` 付きで表示。要約だけ見て判断できないようにした。
+- `tools/compare_fights.py` は判定を出さない(数値を並べるだけ)と明記。
+  `parity_runner.py report` も「片側統計であり合否ではない」と案内するようにした。
+
+現時点の `parity_verify.py` の出力:
+
+    [PASS] カナリア自己テスト
+    [PASS] リグレッション試験
+    [FAIL] 本番判定 who=a (quantumbot)   → 不一致: totem_pop, item_switch, yaw_snap, yaw_rate, x_span, hp_avg, hp_min, hp_low_share
+    [FAIL] 本番判定 who=b (qbot2)        → 不一致: totem, speed_med, x_span, hp_min
+    GATE: 不一致 — 再現できていない項目あり

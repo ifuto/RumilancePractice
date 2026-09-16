@@ -228,6 +228,69 @@ def compare(a, b, key, tolerance):
     return '!', rel, 'beyond'
 
 
+HEADLINE = [('swing', 'スイング/分'), ('speed', '移動 b/s'), ('hp_avg', '平均HP'),
+            ('item_switch', 'アイテム切替/分'), ('x_span', 'x の広がり'), ('yaw_snap', '視点スナップ/分')]
+
+
+def verdict(ma, mb, tolerance=0.35):
+    """指標辞書 2 つを突き合わせて (ok, bad, soft, reasons) を返す。
+
+    レポート本文とリグレッション試験(--regression)が **同じ判定** を通るようにするため、
+    判定そのものをここに集約する(別実装だと片方だけ嘘をつける)。
+    """
+    bad, soft, reasons = [], [], []
+    for key, unit, tol in HARD:
+        mark, rel, why = compare(ma, mb, key, tol)
+        if mark == '!':
+            bad.append(key); reasons.append((key, why, ma.get(key), mb.get(key)))
+        elif mark == '~':
+            soft.append(key)
+    for key in RATES + STATS:
+        mark, rel, why = compare(ma, mb, key, tolerance)
+        if mark == '!':
+            bad.append(key); reasons.append((key, why, ma.get(key), mb.get(key)))
+        elif mark == '~':
+            soft.append(key)
+    for k in sorted(set(ma.get('items', {})) | set(mb.get('items', {}))):
+        va, vb = ma['items'].get(k, 0.0), mb['items'].get(k, 0.0)
+        diff = abs(va - vb)
+        if diff > 15:
+            bad.append(k); reasons.append((k, 'items', va, vb))
+        elif diff > 5:
+            soft.append(k)
+    return (not bad), bad, soft, reasons
+
+
+def regression(path='tools/parity-runner/fixtures/regression_s2_metrics.json'):
+    """既知の「嘘の一致」を固定して検証する。
+
+    土台は s2_sword の実測指標: swing 122.1 vs 0.0、x_span 10.13 vs 1.23。
+    旧ツールはこれを **「VERDICT: 一致」** と表示していた(片側 0 を無条件一致、
+    122% までを注意帯にしていたため)。ここでは同じ指標を判定に通し、
+    不一致と出ることを確かめる。
+    """
+    import os
+    if not os.path.exists(path):
+        print('regression: fixture が無い: %s' % path)
+        return 2
+    with open(path, encoding='utf-8') as fh:
+        data = json.load(fh)
+    ma, mb = data['fabric'], data['paper']
+    ok, bad, soft, reasons = verdict(ma, mb)
+    print('== リグレッション試験 (fixture=%s)' % path)
+    print('   swing %.1f vs %.1f   x_span %.2f vs %.2f   item_switch %.1f vs %.1f' % (
+        ma.get('swing', 0), mb.get('swing', 0), ma.get('x_span', 0), mb.get('x_span', 0),
+        ma.get('item_switch', 0), mb.get('item_switch', 0)))
+    if ok:
+        print('   [FAIL] この指標は「不一致」でなければならない(旧ツールはここで嘘をついた)')
+        return 1
+    print('   [PASS] 不一致として検出: %s' % ', '.join(bad))
+    for key, why, va, vb in reasons:
+        if why == 'zero-baseline':
+            print('          * %s: 片側でしか起きていない (%.2f / %.2f)' % (key, va, vb))
+    return 0
+
+
 def report(fabric, paper, who='a', label=''):
     fa, fb = load(fabric, who), load(paper, who)
     if not fa or not fb:
@@ -244,50 +307,41 @@ def report(fabric, paper, who='a', label=''):
     if min(ma['samples'], mb['samples']) < MIN_SAMPLES:
         print('   ※ サンプル不足: 率の比較ができないため一致判定は出せない')
 
-    bad, soft, reasons = [], [], []
+    _ok, bad, soft, reasons = verdict(ma, mb)
+
+    print('\n-- 主要指標（ここだけ見れば「一致」かどうかが分かる）')
+    for key, label in HEADLINE:
+        mark, rel, why = compare(ma, mb, key, 0.35)
+        print('   %-16s %8.2f  %8.2f  %s (%.0f%%差, n=%s/%s)' % (
+            label, ma.get(key, 0), mb.get(key, 0), mark, rel * 100,
+            ma['counts'].get(key, '-'), mb['counts'].get(key, '-')))
+
     print('\n-- 硬い数値（アンカー連鎖の tick 刻み）')
     for key, unit, tol in HARD:
         mark, rel, why = compare(ma, mb, key, tol)
-        n_a, n_b = ma['counts'].get(key.split('_gap')[0], 0), mb['counts'].get(key.split('_gap')[0], 0)
-        print('   %-20s %7.1f%s %7.1f%s  %s (%.0f%%差)  n=%d/%d' % (
-            key, ma.get(key, 0), unit, mb.get(key, 0), unit, mark, rel * 100, n_a, n_b))
-        if mark == '!':
-            bad.append(key); reasons.append((key, why, ma.get(key, 0), mb.get(key, 0)))
-        elif mark == '~':
-            soft.append(key)
+        print('   %-20s %7.1f%s %7.1f%s  %s (%.0f%%差)' % (
+            key, ma.get(key, 0), unit, mb.get(key, 0), unit, mark, rel * 100))
     print('\n-- 行動レート(/分)   [n = 計測窓内の発生回数]')
     for key in RATES:
         mark, rel, why = compare(ma, mb, key, 0.35)
         print('   %-20s %7.1f  %7.1f  %s (%.0f%%差)  n=%d/%d' % (
             key, ma.get(key, 0), mb.get(key, 0), mark, rel * 100,
             ma['counts'].get(key, 0), mb['counts'].get(key, 0)))
-        if mark == '!':
-            bad.append(key); reasons.append((key, why, ma.get(key, 0), mb.get(key, 0)))
-        elif mark == '~':
-            soft.append(key)
     print('\n-- 立ち回り・視点・座標')
     for key in STATS:
         mark, rel, why = compare(ma, mb, key, 0.35)
         print('   %-20s %7.2f  %7.2f  %s (%.0f%%差)' % (key, ma.get(key, 0), mb.get(key, 0),
                                                         mark, rel * 100))
-        if mark == '!':
-            bad.append(key); reasons.append((key, why, ma.get(key, 0), mb.get(key, 0)))
-        elif mark == '~':
-            soft.append(key)
     print('\n-- 手持ちアイテム滞在率')
     keys = sorted(set(ma['items']) | set(mb['items']),
                   key=lambda k: -max(ma['items'].get(k, 0), mb['items'].get(k, 0)))
-    item_bad = []
+    item_bad = [k for k in keys[:10]
+                if abs(ma['items'].get(k, 0.0) - mb['items'].get(k, 0.0)) > 15]
     for k in keys[:10]:
         va, vb = ma['items'].get(k, 0.0), mb['items'].get(k, 0.0)
         diff = abs(va - vb)
         mark = '=' if diff <= 5 else ('~' if diff <= 15 else '!')
         print('   %-22s %6.1f%% %6.1f%%  %s (%+.1fpt)' % (k, va, vb, mark, vb - va))
-        if mark == '!':
-            item_bad.append(k)
-            reasons.append((k, 'items', va, vb))
-        elif mark == '~':
-            soft.append(k)
 
     print()
     if bad or item_bad:
@@ -401,11 +455,16 @@ def main():
     ap.add_argument('paper', nargs='?')
     ap.add_argument('--who', default='a', help='a=quantumbot b=qbot2')
     ap.add_argument('--json', action='store_true', help='生の指標を JSON で出す')
+    ap.add_argument('--regression', action='store_true',
+                    help='既知の「嘘の一致」(s2_sword の実測指標)を判定に通す回帰試験')
+    ap.add_argument('--fixture', help='--regression で使う fixture のパス')
     ap.add_argument('--selftest', action='store_true',
                     help='カナリア自己テスト（一致/乖離を正しく判定できるか）を実行する')
     ap.add_argument('--base', help='selftest の土台にするログ（既定: 最新の parity-logs/*.log.gz）')
     ap.add_argument('-v', '--verbose', action='store_true')
     args = ap.parse_args()
+    if args.regression:
+        return regression(args.fixture or 'tools/parity-runner/fixtures/regression_s2_metrics.json')
     if args.selftest:
         return selftest(args.base, args.verbose)
     if not args.fabric or not args.paper:

@@ -16,6 +16,13 @@ Usage:
   - クリスタル設置間隔(ctサイクル / crystal placeイベント)
   - トーテムPOP回数と休止長
 を抽出して並べる。数値完全一致ループの差分レポート。
+
+**注意: このスクリプトは判定(一致/不一致)を出さない。** 目視で並べるだけなので、
+「一致した」と読み違えないこと。合否が必要なときは
+
+    python3 tools/parity_verify.py <fabric.log.gz> <paper.log.gz>
+
+を使う(片側だけ 0 の指標も乖離として扱う判定器)。
 """
 import gzip
 import re
