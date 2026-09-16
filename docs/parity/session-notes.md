@@ -303,6 +303,13 @@ hp_low_share(b), item 配分(sword/cobweb/bucket/water/lava)。
 ### ハーネス運用メモ（今回踏んだ地雷）
 - `hotbar` verb は **両エンジンで正常**（Paper: lava_bucket/8 → `player quantumbot hotbar 5`
   → golden_apple/4 → 9 → lava_bucket/8）。もう item 切替の器を疑わない。
-- Fabric は素の `playerspawn` 直後だと bot が動かない（重力すら積まない）。verb 単体の
-  性能比較は「ハーネスで試合を回す」文脈でしかできない。Paper は同じ状況でも動くので、
-  **そのまま比較すると Paper だけが動いて見える**（誤診のもと）。
+- Fabric は素の `playerspawn` 直後だと bot が**動かない**（`player @s move forward` を
+  投げても位置が 1mm も動かず、`look north` もほぼ効かない）。ただし **entity 自体は tick
+  している**（levitation を与えると 0.18/tick で上がる＝vanilla どおり）。つまり止まって
+  いるのは mod の **action pack** で、これはラウンドが武装した後（harness の setup 実行後）
+  にしか回らない。→ **verb 単体の性能比較は「試合を回している最中」にしか意味がない**。
+  Paper は素の状態でも verb が効くので、**そのまま並べると Paper だけが動いて見える**（誤診のもと）。
+- 一時的に Fabric が 1〜2 TPS まで落ちることがある（アリーナ充填直後など）。落ちている間は
+  wall-clock の観測（0.5s スリープで位置を読む等）が全部嘘になる。TPS は
+  `scoreboard players get pari_clock parity_t` を 5 秒あけて 2 回読めば測れる
+  （両サーバ静穏時はどちらも 20.0 TPS）。比較に使う qlog は tick 基準なので影響を受けない。
