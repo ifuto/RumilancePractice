@@ -873,3 +873,54 @@ qlog の `hit=` フィールドは **`hitcd`(攻撃クールダウン)そのも�
 - したがって次の標的は「`hitcd` が空いた瞬間に殴ってよいか」を決めている移植側の判定
   (`hit_decision` の成立条件 / 難易度の aim 相当) — 攻撃回数そのものではなく**殴る前の
   間合い・照準の作り方**。
+
+## 10.17 剣退化の原因解決 + 剣一致再確認 + crystal 残差の再浮上 (2026-09-17 午後)
+
+### 剣が degenerate していた原因 = ラウンド開始リセットブロック (22dcd02 で導入)
+- 症状: swV1/swV2/swV3 (sword_k10v11 45s/5w) で両エンジン HP 凍結 (hp=20.0 固定)、
+  開始 7s で両 BOT 東壁 (x≈-688) に張り付き壁ダンス、被弾 A=1〜2/45s、B=0。
+  HPS 行の吸収減で被弾を数えると fabric A=2 / paper A=1 と左右同型 (→ 「一致」だが
+  実質無接触で判定の実がなかった)。
+- 機構: `parity:start_round` は `quantum:map/start3` の**後**に走る。start3 は
+  `.crit toggles=1` のため `tempcrit 1` を配布し、init/mode は
+  `.uppercut=0` の下で **tempcrit=1 → init/crit / tempcrit=0 → init/combo** を選ぶ。
+  リセットブロックが直後に `tempcrit 0` を上書き → **開始脳が crit→combo に反転**し
+  戦闘の型が壊れていた。`Pos1_difference` も未設定→0 設定で `unless matches 0..`
+  の距離ゲートを反転させうる (スコアボードの「未設定」は `matches 0` にマッチしない)。
+- 修正 (gen_pack.py): リセットを**タイマー類のみ**に縮小
+  (pops/hitcd/real_hitcd/crystal/obby/pearl/anchor/charge/totem/explosion の 10 種×2体)。
+  tempcrit/state/state_time/hit_decision_without_cd/can_see_target/Pos1_difference は触らない。
+- 検証: swV4/4b (リセット無し)・swV5/5b (timers-only) のいずれでも HP が動き
+  (A が hp_min 0.6〜6.9 まで削れる) healthy な戦闘に復帰。
+  **剣 2v2 --noise は who=a/b とも本物なし = 一致** (speed_med を含む; swV3 時代の
+  speed_med 本物は退化状態の副産物だった)。
+
+### crystal は本日一貫して残差あり (cryF/cryG の一致は再現せず)
+- 本物 (再現): who=a: swing / dist_med / items.diamond_sword (+anchor_gap/totem など),
+  who=b: swing / dist_med (+pearl/crystal 数など)。可視サインとして **paper の A は
+  diamond_sword 滞在 17〜27%、fabric の A は 0〜8%**。
+- 同一残差が ①HEAD パック 45/5・60/25 ②22dcd02 パック (cryF/cryG 当時と同一生成物)
+  60/25 ③timers-only + botadmin 紐づけ修復後、の全部で出る → **gen_pack・計測窓・
+  紐づけは原因ではない**。fabric 側は 9/15 配信物とビット同一 (delivery 未更新)、
+  装備 NBT (botgear/dia 由来) も左右一致済み。残る差分候補は paper 側の
+  プラグイン (6c96cfd+ffc1863 の KitLoadout/KitService/KitItemEntry 変更) か、
+  cryF/cryG のノイズ床 (2 本) が薄かった可能性。
+- 混乱の元を 1 つ潰した: paper BOT の `data get entity Inventory` は実体と
+  同期しない (トーテム 1 枠だけに見える; §10.6 の防具スロット盲点と同型)。
+  **実状態は `SelectedItem` / `equipment.*` で読む** (held は glowstone/anchor/crystal を
+  正しく巡回する)。`Inventory` NBT で装備差を論じないこと。
+
+### 環境トラップ (朝の起動手順の落とし穴)
+- **/botadmin の紐づけは practices.yml の bot-mode-kits だが、プラグインは起動時に
+  読む。`server_preset.py apply` を起動後にやっただけでは反映されない** → 今日は
+  CRYSTAL/SWORD/MACE の紐づけが全て無効のまま計測していた (16 時過ぎに
+  `botadmin CRYSTAL crystal` / `MACE mace` / `SWORD sword_only` で再作成済み)。
+  正順は **apply → (rumireload または botadmin 再実行) → 確認**。
+  env_up.sh のコメント「紐づけが見えない→再適用して rumireload」がこれ。
+- bin/3 はモード別に別チェストを引く: mode1 剣 = 防具 -656 / 中身 -657,
+  mode2 結晶 = 防具 -688 (壁内, resurface で生き残る) / 中身 -689 (アリーナ内 =
+  **resurface の空気充填で破壊済み, 両エンジンで引き失敗=昔から対称**)。
+  mode1 チェストは **paper 側だけ消耗** (-656=ヘルメット1, -657=剣1/ツルハシ1/
+  トーテム99 vs fabric はフル) — 消耗メカニズム未解明。装備は botgear/dia が
+  上書きするため今日の計測には影響しなかったが、チェスト引きに依存する
+  将来の検証では偽差を出しうる。
