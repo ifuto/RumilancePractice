@@ -987,3 +987,47 @@ qlog の `hit=` フィールドは **`hitcd`(攻撃クールダウン)そのも�
   build_plugin.sh → RCON stop で新 jar 読み込み、の再順序を確認済み。
 - RCON ラッパの `quantum run data get ...` 応答は値を返さない (→ 1 のみ)。値は
   fabric のように直接読めない → 計測は [q] ログか fabric 側で。
+
+## 10.19 cryR17/R18 後の残差分析 (移動レジーム層)
+
+### 残差の構造 (--noise 36指標中 24一致 / 両who)
+残差: charge, explode, pearl, speed_med, yaw_rate, y_max, dist_med (who=a) /
+crystal, charge, explode, swing, yaw_rate, y_max, dist_med, items.ender_pearl (who=b)。
+
+### 定量 (R17/R18)
+- **dist_med P1.36-1.44 vs F3.46-3.48** — R13/R14 (4.6-5.2) から今度は近すぎる。均衡点が逆転。
+- 距離変化レート (1s窓): close(<3.5) で F **-1.1〜-1.2/s** (後退する) vs P **-0.1/s**
+  (後退しない, p75=+0.5〜0.7 でまだ詰めている)。mid(3.5-6) で F +1.0-1.2/s vs P +2.2-2.5/s
+  (接近が2倍速い)。
+- **パール投擲数 P42-44 vs F22-31 (2倍)**、投擲後変位 **P1.5-2.1 vs F2.9-3.6 (半分)**。
+- **投擲時ピッチ P +55〜77° (急俯角=地面に撃ち込む) vs F +11〜21° (ほぼ水平)** — MCの
+  pitchは+が下方。escape/pearl は close(<=8blk) の逃げ手段で、投擲が弱いと距離が保てず
+  再投擲が増える (投擲数2倍・pearl滞在率高・dist_med低下の連鎖)。
+- yaw_rate p90 **P78-90°/tick vs F33-43°/tick**。
+
+### escape/pearl の機械 (マップ精読)
+- crystal/passive/main: `distance=..8` で escape/pearl → marker を背後15blkに
+  spreadplayers → `quantum:ray/ray2/cast` (目線から0.5stepで前進レイキャスト、
+  遮蔽で lookhigh (上 回し)、marker到達で looklow (lowpos高さ別に look at ~+4/1.4/0.8/-1.5))
+  → stop → hotbar 7 → use once。**投擲方向はこのレイキャストのlook次第**。
+- look.mcfunction: `.mode 2` なら即時look、それ以外は `.tempaim aim` ラダー
+  (aim4 → `look upon ... closest delta 3` = 3tick補間)。実測: crystalラウンドの
+  aim スコアは **両エンジンとも 4** ✓。
+- 両エンジンで `spreadplayers` / `g1gc/block` (nonsolid2判定) / marker summon は
+  管理実験で同一動作を確認済み。逆に管理状態での `ray2/cast` は**両エンジンとも
+  lookを変えなかった** (実戦文脈との差: 走行中の呼び出し文脈/ワールド状態)。
+
+### 未解決の疑い (次回の接続点)
+1. 実戦での cast → looklow/lookhigh が paper だけ「低pos・至近」枝に落ちる経路
+   (lowpos の高さ走査 marklow は `unless g1gc/block` を y-1 ずつ下げる再帰 —
+   床/ob 残置状態への依存)。
+2. yaw_rate 2× の発生源 (closest点は実装同一を確認済み — mod/plugin とも
+   closestPointToBox(botEye, target.getBoundingBox())。interpolation (lookInterpolated,
+   delta=wrap/ticks) も一致。差は実戦の呼び出しミックスに残る)。
+3. 接近速度 2× は sprint/strafe の入力実装差 (travel 積分 vs 速度指定) か、
+   yaw 即応性の従属効果か — 未分離。
+
+### 運用メモ
+- paper の RCON 応答 (`§bran ... → 1`) は値を返さない。数値観測は
+  **scorestore → 閾値 matches → say → console.log grep** (両エンジン共通で使える)。
+- kbtest/kbtgt 等のプローブBOTは使い捨て → disconnect → `list` で 0 確認まで。
