@@ -20,7 +20,8 @@ import java.util.Objects;
  * of whatever the material (or {@code data:} blob) produced — unknown keys are ignored.</p>
  */
 public record KitItemEntry(int slot, String material, int amount, String displayName,
-                           String itemDataBase64, Map<String, Integer> enchantments) {
+                           String itemDataBase64, Map<String, Integer> enchantments,
+                           boolean unbreakable) {
 
     public KitItemEntry {
         Objects.requireNonNull(material, "material");
@@ -34,15 +35,21 @@ public record KitItemEntry(int slot, String material, int amount, String display
     }
 
     public KitItemEntry(int slot, String material, int amount) {
-        this(slot, material, amount, null, null, null);
+        this(slot, material, amount, null, null, null, false);
     }
 
     public KitItemEntry(int slot, String material, int amount, String displayName) {
-        this(slot, material, amount, displayName, null, null);
+        this(slot, material, amount, displayName, null, null, false);
     }
 
     public KitItemEntry(int slot, String material, int amount, String displayName, String itemDataBase64) {
-        this(slot, material, amount, displayName, itemDataBase64, null);
+        this(slot, material, amount, displayName, itemDataBase64, null, false);
+    }
+
+    /** 後方互換: エンチャントだけ指定する従来の呼び出し。 */
+    public KitItemEntry(int slot, String material, int amount, String displayName,
+                        String itemDataBase64, Map<String, Integer> enchantments) {
+        this(slot, material, amount, displayName, itemDataBase64, enchantments, false);
     }
 
     public boolean hasSerializedItem() {
@@ -50,6 +57,6 @@ public record KitItemEntry(int slot, String material, int amount, String display
     }
 
     public KitItemEntry withSlot(int newSlot) {
-        return new KitItemEntry(newSlot, material, amount, displayName, itemDataBase64, enchantments);
+        return new KitItemEntry(newSlot, material, amount, displayName, itemDataBase64, enchantments, unbreakable);
     }
 }

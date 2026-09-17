@@ -267,6 +267,7 @@ public final class KitLoadout {
             ItemStack decoded = ItemSerializer.singleFromBase64(entry.itemDataBase64());
             if (decoded != null && !decoded.getType().isAir()) {
                 applyEnchantments(decoded, entry);
+                applyUnbreakable(decoded, entry);
                 return decoded;
             }
         }
@@ -276,7 +277,20 @@ public final class KitLoadout {
         }
         ItemStack stack = new ItemStack(material, Math.max(1, entry.amount()));
         applyEnchantments(stack, entry);
+        applyUnbreakable(stack, entry);
         return stack;
+    }
+
+    /** {@code unbreakable: true} — 参照パックの装備はほぼ全て破壊不能で作られている。 */
+    private static void applyUnbreakable(ItemStack stack, KitItemEntry entry) {
+        if (stack == null || entry == null || !entry.unbreakable()) {
+            return;
+        }
+        org.bukkit.inventory.meta.ItemMeta meta = stack.getItemMeta();
+        if (meta != null) {
+            meta.setUnbreakable(true);
+            stack.setItemMeta(meta);
+        }
     }
 
     /** Hand-written kits may name enchantments directly ({@code enchantments: {sharpness: 5}}). */

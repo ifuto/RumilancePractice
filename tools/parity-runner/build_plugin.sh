@@ -34,6 +34,9 @@ SOURCES=(
   src/main/java/com/rumilance/practice/kit/KitService.java
   src/main/java/com/rumilance/practice/kit/KitLoadout.java
   src/main/java/com/rumilance/practice/model/KitItemEntry.java
+  src/main/java/com/rumilance/practice/command/ArenaKitAdminCommand.java
+  # @NotNull/@Nullable の最小スタブ (annotations jar が無い環境用)
+  tools/parity-runner/stubs/org/jetbrains/annotations
 )
 
 CP="$DELIVERY:$PAPER_JAR:$(find "$LIBS_DIR" -name '*.jar' 2>/dev/null | tr '\n' ':')$(find "$SERVER_LIBS_DIR" -name '*.jar' 2>/dev/null | tr '\n' ':')"

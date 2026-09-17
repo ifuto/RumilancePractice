@@ -118,7 +118,70 @@ CRYSTAL_KIT = """
         amount: 1
 """
 
-BINDINGS = {'crystal': ('CRYSTAL', 'crystal'), 'sword': ('SWORD', 'sword_only')}
+MACE_KIT = """
+  # メイス戦の正規ロードアウト。参照パックの `quantum:botgear/dia` (mode 3) と同一。
+  #   1=トーテム 2=ウィンドチャージ 3=メイス(density5/wind_burst1) 4=剣 5=金リンゴ
+  #   6=斧 7=パール 8=水バケツ 9=メイス(breach4)
+  mace:
+    display-name: "Mace"
+    icon: MACE
+    enabled: true
+    items:
+      - slot: 0
+        material: TOTEM_OF_UNDYING
+        amount: 1
+      - slot: 1
+        material: WIND_CHARGE
+        amount: 64
+      - slot: 2
+        material: MACE
+        amount: 1
+        enchantments: {density: 5, wind_burst: 1}
+      - slot: 3
+        material: DIAMOND_SWORD
+        amount: 1
+        enchantments: {sweeping_edge: 3, sharpness: 5}
+      - slot: 4
+        material: GOLDEN_APPLE
+        amount: 64
+      - slot: 5
+        material: DIAMOND_AXE
+        amount: 1
+        enchantments: {sharpness: 5}
+      - slot: 6
+        material: ENDER_PEARL
+        amount: 16
+        enchantments: {knockback: 1}
+      - slot: 7
+        material: WATER_BUCKET
+        amount: 1
+      - slot: 8
+        material: MACE
+        amount: 1
+        enchantments: {breach: 4}
+      - slot: 36
+        material: DIAMOND_HELMET
+        amount: 1
+        enchantments: {protection: 4, unbreaking: 3}
+      - slot: 37
+        material: DIAMOND_CHESTPLATE
+        amount: 1
+        enchantments: {protection: 4, unbreaking: 3}
+      - slot: 38
+        material: DIAMOND_LEGGINGS
+        amount: 1
+        enchantments: {protection: 4, unbreaking: 3}
+      - slot: 39
+        material: DIAMOND_BOOTS
+        amount: 1
+        enchantments: {feather_falling: 4, protection: 4}
+      - slot: 40
+        material: TOTEM_OF_UNDYING
+        amount: 1
+"""
+
+BINDINGS = {'crystal': ('CRYSTAL', 'crystal'), 'mace': ('MACE', 'mace'),
+            'sword': ('SWORD', 'sword_only')}
 
 
 def upsert_kit(text: str, name: str, block: str) -> str:
@@ -176,7 +239,7 @@ def main() -> int:
         return 1
 
     mode, kit_name = BINDINGS[args.kit]
-    block = {'crystal': CRYSTAL_KIT}.get(args.kit)
+    block = {'crystal': CRYSTAL_KIT, 'mace': MACE_KIT}.get(args.kit)
     if block:
         kits.write_text(upsert_kit(kits.read_text(), kit_name, block))
         print('kits.yml に %s を upsert' % kit_name)

@@ -31,6 +31,41 @@ effect give @a absorption 120 0 true
 tp quantumbot -698.5 31 88.5 90 0
 tp qbot2 -704.5 31 88.5 -90 0
 function parity:hpreset
+# --- ラウンド開始時に両エンジンの初期状態を揃える (前ラウンドの持ち越しを消す) ---
+# 位置は下の tp で固定、HP/効果は regeneration+absorption で揃う。残るのは
+# クールダウン/タイマー類なのでここで 0 に戻す (ダメージに影響する効果は入れない)。
+scoreboard players set quantumbot pops 0
+scoreboard players set quantumbot hitcd 0
+scoreboard players set quantumbot real_hitcd 0
+scoreboard players set quantumbot crystal_timer 0
+scoreboard players set quantumbot obby_timer 0
+scoreboard players set quantumbot pearlcd 0
+scoreboard players set quantumbot anchor_timer 0
+scoreboard players set quantumbot charge_timer 0
+scoreboard players set quantumbot totem_timer 0
+scoreboard players set quantumbot explosion_timer 0
+scoreboard players set quantumbot state 0
+scoreboard players set quantumbot state_time 0
+scoreboard players set quantumbot hit_decision_without_cd 0
+scoreboard players set quantumbot can_see_target 0
+scoreboard players set quantumbot tempcrit 0
+scoreboard players set quantumbot Pos1_difference 0
+scoreboard players set qbot2 pops 0
+scoreboard players set qbot2 hitcd 0
+scoreboard players set qbot2 real_hitcd 0
+scoreboard players set qbot2 crystal_timer 0
+scoreboard players set qbot2 obby_timer 0
+scoreboard players set qbot2 pearlcd 0
+scoreboard players set qbot2 anchor_timer 0
+scoreboard players set qbot2 charge_timer 0
+scoreboard players set qbot2 totem_timer 0
+scoreboard players set qbot2 explosion_timer 0
+scoreboard players set qbot2 state 0
+scoreboard players set qbot2 state_time 0
+scoreboard players set qbot2 hit_decision_without_cd 0
+scoreboard players set qbot2 can_see_target 0
+scoreboard players set qbot2 tempcrit 0
+scoreboard players set qbot2 Pos1_difference 0
 scoreboard players set .start start 1
 scoreboard players set pari_round parity_t 80
 # ラウンドが何回始まったか（＝何回落ちたか）も左右で比べる。計測用カウンタは

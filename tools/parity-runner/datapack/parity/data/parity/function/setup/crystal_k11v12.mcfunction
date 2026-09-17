@@ -21,6 +21,10 @@ scoreboard players set .lava toggles 1
 scoreboard players set .water toggles 1
 scoreboard players set .far_pearl toggles 1
 scoreboard players set .wind_pearl toggles 1
+scoreboard players set .shield toggles 0
+scoreboard players set .elytra toggles 0
+scoreboard players set .healing toggles 0
+scoreboard players set .old_kb toggles 0
 scoreboard players set .dbp toggles 1
 scoreboard players set .refill toggles 1
 scoreboard players set .blocks_drop toggles 1

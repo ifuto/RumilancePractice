@@ -117,8 +117,27 @@ def read_since(path, since, max_bytes=400 * 1024 * 1024):
     text = data.decode('utf-8', 'replace')
     if size > max_bytes and '\n' in text:
         text = text[text.find('\n') + 1:]
+    # 時刻は「文字列比較」で足りる…のは同じ日の中だけ。日付が変わると
+    # '22:43:33' >= '00:20:05' が真になり、**前夜のラウンドが丸ごと混入する**
+    # (実測: 深夜 0 時台のラウンドでサンプル数が 10 倍・座標が前ラウンドの値になった)。
+    # なので先に「ファイル末尾から見て時刻が単調増加している区間」= 最後の日付境界より
+    # 後ろだけに切り詰めてから、since と比べる。
+    lines = text.splitlines()
+    keep = []
+    prev = None
+    for line in reversed(lines):
+        m = TS.match(line)
+        if m is None:            # スタックトレース等の継続行は判定に使わず残す
+            keep.append(line)
+            continue
+        ts = m.group(1)
+        if prev is not None and ts > prev:   # 時刻が巻き戻った = ここが日付境界
+            break
+        keep.append(line)
+        prev = ts
+    keep.reverse()
     out = []
-    for line in text.splitlines():
+    for line in keep:
         m = TS.match(line)
         if m and m.group(1) >= since[1:]:
             out.append(line)

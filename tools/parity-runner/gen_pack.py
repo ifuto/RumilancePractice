@@ -23,7 +23,9 @@ PACK = os.path.join(ROOT, 'datapack', 'parity')
 # 戦場（Quantum マップのアリーナ帯）。参照実測の BOT 座標域 x −736..−645 / z 70..112 /
 # 床 y=31 に合わせ、少し余裕を持たせる。
 ARENA = dict(x1=-712, x2=-688, z1=76, z2=100, floor=30, bedrock=-64, bedrock_top=-58,
-             armor=20, sky=48, wall=44)
+             # 壁の高さ: メイス戦の垂直機動(ウィンドチャージ/エリトラ/突進)で
+             # 低いと壁を越えて場外の虚空へ落ちる。天井(sky=48)より上まで嵩上げする。
+             armor=20, sky=48, wall=119)
 
 BOT_A = 'quantumbot'   # マップ本来の BOT（xlib_bot）
 BOT_B = 'qbot2'        # 2体目（マップから見ると xlib_target = 人間側）
@@ -637,6 +639,13 @@ REF_TOGGLES_ON = [
     'scoreboard players set .water toggles 1',
     'scoreboard players set .far_pearl toggles 1',
     'scoreboard players set .wind_pearl toggles 1',
+    # ロードアウトを変えるトグルは**必ず明示**する。書いておかないと前のラウンドの
+    # 状態が残り、Fabric と Paper で「盾の有無」等が食い違ってロードアウト比較が
+    # 嘘になる (実際に踏んだ: crystal で slot4 が片側 golden_apple / 片側 shield)。
+    'scoreboard players set .shield toggles 0',
+    'scoreboard players set .elytra toggles 0',
+    'scoreboard players set .healing toggles 0',
+    'scoreboard players set .old_kb toggles 0',
     'scoreboard players set .dbp toggles 1',
     'scoreboard players set .refill toggles 1',
     'scoreboard players set .blocks_drop toggles 1',

@@ -122,7 +122,10 @@ public final class KitService {
                         }
                     }
                 }
-                items.add(new KitItemEntry(slot, material, amount, null, data, enchants));
+                // 読み書きできる形での `unbreakable: true`(参照パックの装備はほぼ全て
+                // unbreakable なので、これが無いと再現できない)。
+                boolean unbreakable = Boolean.parseBoolean(String.valueOf(map.get("unbreakable")));
+                items.add(new KitItemEntry(slot, material, amount, null, data, enchants, unbreakable));
             }
             builder.items(items);
 

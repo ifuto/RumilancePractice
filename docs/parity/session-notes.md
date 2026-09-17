@@ -763,3 +763,51 @@ PvP サーバーでは **BOT の装備 = サーバーキット** (`/botadmin`) �
   paper 側だけ無出力でハングする。
 - `bot:` が quantum.yml に 2 つある (spawn 用と mode/kit 用)。YAML は後勝ちなので、
   `bot.mode` を書くツールは «最後の» `bot:` ブロックを狙うこと。
+
+## 10.15 メイス計測で踏んだ罠と、その修正 (2026-09-17 未明)
+
+### 1. 深夜のラウンドが「前夜のラウンド」と混ざっていた (計測バグ)
+`tools/parity_runner.py: read_since()` はログの行頭時刻を **文字列比較** で切り出していた。
+同じ日の中では正しいが、日付が変わると `'22:43:33' >= '00:20:05'` が **真** になり、
+前夜 22:43 以降の行が丸ごと混入する。症状は「サンプル数が 10 倍」「座標が別ラウンドの値」
+「y=-302(虚空)」など。→ ファイル末尾から見て時刻が単調増加している区間(= 最後の日付境界
+より後ろ)だけを対象にするよう修正。偽ログ(23:59→00:01)での回帰確認つき。
+
+### 2. アリーナに壁が足りず、メイス戦で場外へ飛んでいた
+メイスの垂直機動 (ウィンドチャージ / エリトラ / 突進 / wind_pearl) は壁 y=44 を越える。
+越えた個体は虚空へ落ちて帰ってこない(= 放置 BOT と化す)。`gen_pack.py` の
+`wall=44 → wall=119`(天井 48 より上まで)。**生成パックは gen_pack.py が唯一の正** で、
+`datapack/` 配下を直接編集しても `gen_pack.py` を走らせた瞬間に戻る(実際に踏んだ)。
+
+### 3. シナリオが gear 系トグルを設定しておらず、片側だけ盾を持っていた
+`parity:setup/*` は loadout を変えるトグルを一部しか設定していなかったため、前ラウンドの
+`.shield` / `.elytra` / `.healing` / `.old_kb` が残り、Fabric と Paper で
+「slot4 が golden_apple / shield」のような食い違いが出た。→ 4 つとも明示 (0) に。
+
+### 4. Paper の RCON 応答は ~150 文字で `...` に切られる
+`data get entity <bot> Inventory[{Slot:Nb}]` を丸ごと比較すると、後半の component が
+**無いように見える**(実際に「ブーツの unbreaking が消えた」と誤判定し、原因追跡に時間を
+溶かした)。→ `tools/parity-runner/kit_snapshot.py` は葉だけを個別に引き、エンチャントは
+**名前ごとに 1 回**問い合わせる(応答が数字だけになるので絶対に切られない)。
+
+### 5. 参照ロードアウトのキット化は「両エンジン一致を確認してから」
+Paper の BOT をそのまま `/kit create` すると、その瞬間 Paper が参照と違えば**間違った
+状態を正として保存**する(実際にやらかした: sword_only にメイスの装備が入った)。
+`kit_snapshot.py` は (1) 両エンジンで setup (2) 全スロットの material/count/enchant/
+unbreakable を突き合わせ (3) **一致したときだけ** キット化 + `/botadmin` 紐づけ、を行う。
+さらにラウンド中の死亡/respawn で一瞬だけ元に戻る個体があるため 2 回サンプリングし、
+両方で食い違うものだけを差とする(揺れは respawn/チェスト再読込の途中経過)。
+
+### 6. kits.yml に `unbreakable:` を追加
+参照パックの装備はほぼ全て `unbreakable` で作られているが、読み書きできるスキーマでは
+表現できなかった(Base64 のみ)。`KitItemEntry.unbreakable` / `KitService` の読み書き /
+`KitLoadout.applyUnbreakable` を追加。
+
+### 7. 現状 (2026-09-17 03:xx)
+- **クリスタル**: `kit_snapshot.py crystal_k10v11 CRYSTAL crystal` → 13 スロット一致で
+  キット化 + 紐づけ済み。ノイズ床でも 本物ゼロ (cryF/cryG)。
+- **ソード**: `kit_snapshot.py sword_k10v11 SWORD sword_only` → 13 スロット一致で紐づけ済み。
+- **メイス**: サーバーキット(参照一致)は入ったが、まだ **本物の差** が残る:
+  `pearl`(パール投げ), `y_max`(最大到達高度), `items.diamond_spear`(槍 = lunge),
+  who=b では `hp_avg` も。カウンタでは **`c_bmcombo_qa` が Fabric 28 に対し Paper 741
+  (26 倍)**、`c_bmlogic_qa` 1672 / 978。メイス固有の combo/lunge フローの移植が次の標的。
