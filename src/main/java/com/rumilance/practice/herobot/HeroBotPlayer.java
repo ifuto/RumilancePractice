@@ -5,7 +5,9 @@ import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ClientInformation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.phys.Vec3;
@@ -51,6 +53,16 @@ public class HeroBotPlayer extends PacketBot {
     private final List<PendingKnockback> pendingKnockbacks = new ArrayList<>();
     private long shieldDisabledTick = -1L;
 
+    // ---------------------------------------------------------------- 爆発ノックバックの ping 遅延
+    // 参照 (herobot Fabric) は ServerExplosionMixin.explosionKBPing でバニラの爆発 KB 適用
+    // (entity.setDeltaMovement(vec)) を横取りし、BotPlayer は BotPlayer#delayedExplosionKB(vec)
+    // で delayTicks(2) だけ遅らせてから processPendingKBs の終端で setDeltaMovement(vec) する。
+    // Paper 側にこの横取りがないと、マップ tick-start フェーズの爆発 (アンカー/クリスタル) が
+    // BOT 自身の移動処理より先に delta を書くため、KB が移動パイプラインに消われる —
+    // 実測: 参照は爆発で vy+0.40 / 水平 0.70 で吹き飛ぶのに対し Paper BOT は実戦中 1 回も
+    // 発射しない (クリスタル戦の「間合い」残差の一次因)。
+    private final List<PendingExplosionKB> pendingExplosionKB = new ArrayList<>();
+
     public HeroBotPlayer(MinecraftServer server, ServerLevel level, GameProfile profile,
                          ClientInformation information) {
         super(server, level, profile, information);
@@ -58,6 +70,12 @@ public class HeroBotPlayer extends PacketBot {
         if (this.getAttribute(Attributes.STEP_HEIGHT) != null) {
             this.getAttribute(Attributes.STEP_HEIGHT).setBaseValue(0.6);
         }
+        // Paper は ServerPlayer の爆発 KB 耐性を 1.0 (完全耐性) にしている: 実クライアントは
+        // ClientboundExplodePacket で自前適用する前提。偽コネクションの BOT にクライアントは
+        // 居ないため爆発 KB が完全に消える (実測: EntityKnockbackEvent の kb が全て 0)。
+        // 参照 (vanilla + herobot) は ServerExplosion が setDeltaMovement で実適用するため、
+        // BOT の属性を 0 に戻してバニラ経路の KB を復活させる。
+        // 注: 属性はコンストラクタ時点で未登録 (null) — 最初の doTick で設定する。
     }
 
     public BotActionPack actionPack() {
@@ -97,6 +115,15 @@ public class HeroBotPlayer extends PacketBot {
      */
     @Override
     public void doTick() {
+        // 爆発 KB: 参照の ServerExplosionMixin 相当は ExplosionKBPingListener (イベント横取り)。
+        // ここでは Paper の ServerPlayer 完全耐性 (modifier 1.0) を定期的に潰すのみ。
+        this.resetExplosionKnockbackResistance();
+        if ((int) this.tickCount() == this.explosionKBCleanupTick) {
+            // 爆発 KB の翌 tick: 参照と同じく水平速度をリセット (脳の入力は actionPack が足す)。
+            Vec3 d = this.getDeltaMovement();
+            this.setDeltaMovement(new Vec3(0.0, d.y, 0.0));
+            this.explosionKBCleanupTick = -1;
+        }
         // Paper の causeExtraKnockback が消したノックバックを、BOT ではここでも保険として復元する。
         this.restoreKnockbackIfStolen();
         this.actionPack.onUpdate();
@@ -105,6 +132,8 @@ public class HeroBotPlayer extends PacketBot {
         double startZ = this.getZ();
         super.doTick();
         this.processPendingKnockbacks();
+        // 参照の processPendingKBs は tick 終端 (移動後) で遅延爆発 KB を setDeltaMovement する。
+        this.processPendingExplosionKB();
         if (this.tickCount() % 10 == 0) {
             // Reference: keep the bot's chunk tracking alive from its own position.
             ((ServerLevel) this.level()).getChunkSource().move(this);
@@ -212,6 +241,109 @@ public class HeroBotPlayer extends PacketBot {
             }
             return false;
         });
+    }
+
+    /**
+     * {@code ServerExplosionMixin.explosionKBPing} の代替。バニラは爆発 KB を
+     * {@code ServerPlayer} に対しても即時に {@code setDeltaMovement(vec)} する (1.21.11)。
+     * 参照はここを横取りして {@code delayTicks(2)} 遅延にしているため、ここで
+     * 「直近 doTick 終端からの外部変化 & 爆発ダメージと同 tick」を検出して
+     * 差し戻し + キュー入れ (or 遅延なしの即時適用) を再現する。
+     */
+    /** Paper の ServerPlayer 既定 1.0 (完全耐性) を 0 へ戻す。属性は初 tick 以降に存在する。 */
+    private boolean expKnockbackResReset = false;
+
+    private void resetExplosionKnockbackResistance() {
+        if (this.expKnockbackResReset) {
+            return;
+        }
+        this.expKnockbackResReset = true;
+        var attr = this.getAttribute(Attributes.EXPLOSION_KNOCKBACK_RESISTANCE);
+        if (attr == null) {
+            return;
+        }
+        attr.setBaseValue(0.0);
+        // ベース値以外の modifier (Paper が後乗せする場合) も剥がす。
+        for (var modifier : new java.util.ArrayList<>(attr.getModifiers())) {
+            attr.removeModifier(modifier);
+        }
+        System.out.println("[KB] expKBres reset -> " + this.getAttributeValue(Attributes.EXPLOSION_KNOCKBACK_RESISTANCE));
+    }
+
+
+
+    /** {@code BotPlayer#processPendingKBs} の爆発分: tick 終端 (移動後) に setDeltaMovement(vec)。 */
+    /** 爆発 KB を SET した直後の tick — 参照の脳と同じく水平速度を入力ベースへ再構築する。 */
+    private int explosionKBCleanupTick = -1;
+
+    private void processPendingExplosionKB() {
+        if (this.pendingExplosionKB.isEmpty()) {
+            return;
+        }
+        long currentTick = this.tickCount();
+        this.pendingExplosionKB.removeIf(pending -> {
+            if (currentTick >= pending.tick()) {
+                this.setDeltaMovement(pending.vec());
+                // 参照 (herobot) はクライアント権限シムで、KB 適用の翌 tick には脳の入力速度で
+                // delta を再構築する (実測: 爆発直後 Motion=(0, vy, 0) — 水平成分は 1 tick で消える)。
+                // Paper の入力積分物理は KB を何 tick も保持して吹き飛びすぎるため、翌 tick の
+                // doTick 冒頭で水平のみリセットする (vy は参照と同じく重力減衰に任せる)。
+                this.explosionKBCleanupTick = (int) currentTick + 1;
+                return true;
+            }
+            return false;
+        });
+    }
+
+
+    /** 最後に爆発ダメージを受けた server tick (push(Vec3) 横取りの照合用)。 */
+    private long lastExplosionHurtServerTick = -1L;
+
+    /**
+     * ServerExplosion はこの Paper ビルドでは EntityKnockbackEvent を発火させず、
+     * BOT (ServerPlayer) への爆発 KB を直接 {@code push(Vec3)} で書く (実測: TNT/クリスタル
+     * ともに確認)。参照の ServerExplosionMixin 相当として、爆発ダメージと同 tick の push を
+     * 横取りして即時適用をやめ、{@code pingDelayTicks(2)} 後の tick 終端に
+     * {@code setDeltaMovement(当時のdelta + KB)} する (遅延 SET — 同一 tick の複数爆発は
+     * 参照と同じく後の SET が勝つ)。delay=0 はバニラ通り即時加算 (参照の即時 SET と等価)。
+     */
+    @Override
+    public void push(net.minecraft.world.phys.Vec3 vec) {
+        if (this.lastExplosionHurtServerTick != this.tickCount()) {
+            super.push(vec);
+            return;
+        }
+        int delay = this.pingDelayTicks(2);
+        if (delay <= 0) {
+            super.push(vec);
+            return;
+        }
+        net.minecraft.world.phys.Vec3 after = new net.minecraft.world.phys.Vec3(
+                this.getDeltaMovement().x + vec.x,
+                this.getDeltaMovement().y + vec.y,
+                this.getDeltaMovement().z + vec.z);
+        this.pendingExplosionKB.add(new PendingExplosionKB(this.tickCount() + delay, after));
+        System.out.println("[KB] explosion deferred t=" + this.tickCount() + " due=" + (this.tickCount() + delay)
+                + " ping=" + this.ping + " kb=" + vec);
+    }
+
+    @Override
+    public boolean hurtServer(net.minecraft.server.level.ServerLevel level, DamageSource source, float amount) {
+        if (source.is(DamageTypeTags.IS_EXPLOSION)) {
+            this.lastExplosionHurtServerTick = this.tickCount();
+            // Paper は実クライアント向けに modifier で爆発 KB 耐性を 1.0 にする (KB は
+            // ClientboundExplodePacket 経由でクライアント適用)。偽コネクションの BOT には
+            // クライアントが居ないので KB が完全消滅する。KB 計算 (hurt 直後・同一イテレーション)
+            // の直前で base/modifier を潰し、vanilla と同じ res=0 で計算させる。
+            var expKbAttr = this.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.EXPLOSION_KNOCKBACK_RESISTANCE);
+            if (expKbAttr != null) {
+                for (var modifier : new java.util.ArrayList<>(expKbAttr.getModifiers())) {
+                    expKbAttr.removeModifier(modifier);
+                }
+                expKbAttr.setBaseValue(0.0);
+            }
+        }
+        return super.hurtServer(level, source, amount);
     }
 
     /** HeroBot's {@code BotPlayer#takeKnockback}: knockback arrives {@code delayTicks(2)} late. */
@@ -353,5 +485,9 @@ public class HeroBotPlayer extends PacketBot {
                                     double horizontalScale,
                                     net.minecraft.world.entity.Entity source,
                                     io.papermc.paper.event.entity.EntityKnockbackEvent.Cause cause) {
+    }
+
+    /** {@code BotPlayer$DelayedExplosionKB}: 適用予定 tick と、バニラが計算した爆発後の delta。 */
+    private record PendingExplosionKB(long tick, Vec3 vec) {
     }
 }

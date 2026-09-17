@@ -924,3 +924,66 @@ qlog の `hit=` フィールドは **`hitcd`(攻撃クールダウン)そのも�
   トーテム99 vs fabric はフル) — 消耗メカニズム未解明。装備は botgear/dia が
   上書きするため今日の計測には影響しなかったが、チェスト引きに依存する
   将来の検証では偽差を出しうる。
+
+## 10.18 爆発 KB 三重根因の特定と参照パイプライン移植 (cryR9〜R18)
+
+### 根因 (3 つ重なっていた — すべて実測で確定)
+1. **Paper は ServerPlayer の爆発 KB 耐性を modifier で 1.0 にする** (実クライアントは
+   ClientboundExplodePacket で自前適用する前提)。実測: BOT の
+   `explosion_knockback_resistance` は `base=0.0 mods=2 val=1.0`。一方 Fabric 参照
+   (フルネザライト装備) は **0.0** (`attribute ... get`)。KB 計算式の (1-res) 因子が
+   BOT だけ常に 0 → **EntityKnockbackEvent の kb が全て 0** (224 連続観測)。
+2. **この Paper ビルドは爆発 KB で EntityKnockbackEvent を発火しない**。res=0 にしても
+   イベントは 1 回も来ず、`Entity.push(Vec3)` が直接呼ばれる (TNT/クリスタル両方で実測、
+   `push(Vec3) called vec=(0.0,0.232,-0.685)`)。`CraftEventFactory.callEntityKnockbackEvent`
+   の逆アセンでは攻撃者付き=Bukkit 系 ByEntity / 無し=Paper 系という 2 経路があるが、
+   爆発はそもそもイベント経路に乗らない。
+3. **参照の脳は tick 毎に水平速度を入力ベースで再構築する** (クライアント権限シム)。
+   実測: Fabric BOT へ TNT 2blk → 爆発直後 `Motion=(0.0, +0.129, 0.0)` — vy は
+   kb(0.232)−重力 1tick 分、**水平は完全ゼロ**、変位 0.2blk。Paper の入力積分物理は
+   KB を何 tick も保持するため吹き飛びが累積していた (R15/16: vy p99 1.17-1.31 vs
+   fabric 0.31-0.40)。
+
+### 実装 (HeroBotPlayer、HEAD から 1 本のパイプライン)
+- `hurtServer` (IS_EXPLOSION): **base/modifier を剥がして res=0** (KB 計算の直前・同一
+  イテレーション)。初回 doTick でも 1 回リセットを試みる (`resetExplosionKnockbackResistance`)。
+- `push(Vec3)` override: **爆発 hurt と同 tick の push を横取り**し、即時適用をやめて
+  `pingDelayTicks(2)` 後の tick 終端に `setDeltaMovement(当時の delta + KB)` で SET
+  (参照 `BotPlayer.delayedExplosionKB` と同じ式・同じ遅延・同じ「後の SET が勝つ」冪等)。
+  delay=0 はバニラ通り即時加算 (= 参照の即時 SET と等価)。
+- **KB 適用の翌 tick の doTick 冒頭で水平 delta をゼロ化** (vy は重力減衰に任せる) —
+  参照の「水平は 1 tick で消える」を再現。
+- イベントリスナー方式 (ExplosionKBPingListener) は不発が実証されたため撤去。
+
+### ping=100 の恒久設定
+サンドボックス再構築で playerdata が消えるたび BOT ping が 0 に戻る (参照環境は
+.ping=100 トグル)。`gen_pack.py` の `parity:start_round` に `player <botA/B> ping 100`
+を追加 — 両エンジン対称でラウンド毎に復元 (遅延 = 100/25 = 4tick、MOD と同一式)。
+
+### 判定の推移 (--noise, 36 指標)
+- cryR9/R10 (属性修正前): 不一致 — launches ほぼ 0、dist_med P1.5 vs F3.6。
+- cryR13/R14 (res=0 + push 直通 SET): launches 数は一致 (21-33 vs 17-29) だが強度 5 倍
+  (peak 2.1-2.6 vs 0.40)。
+- cryR15/R16 (遅延 SET + ping=100): swing/explode/items 大半が一致域へ。残差 = 強度
+  (vy p99 1.3 vs 0.4) と dist_med (4-5.2 vs 3.2-3.5)。
+- **cryR17/R18 (1-tick 水平 cleanup): 36 指標中 24 一致** (両 who)。一致域に crystal /
+  anchor / swing(a) / totem / totem_pop / item_switch / speed / dist_close / hp_avg /
+  hp_low_share / **items 全種 (end_crystal・ender_pearl 含む)** が入った。
+  残差 (本物): who=a: charge, explode, pearl, speed_med, yaw_rate, y_max, dist_med /
+  who=b: crystal, charge, explode, swing, yaw_rate, y_max, dist_med, items.ender_pearl。
+
+### 残差の定量 (R17/R18)
+- dist_med **P1.36-1.44 vs F3.46-3.48** — KB 修正前は P が遠すぎたが今度は近接に張り付く。
+- ct/anc P109-131 vs F166-183、chg P31-48 vs F65-75、exp 同傾向 — 起爆回数は距離レジーム
+  の従属変数として連動して少ない。
+- B swing P32-33 vs F57-59。
+- 主疑: **脳の移動制御レイヤー (escape/後退/視線) の速度特性差** — 参照は入力=速度
+  (即応)、paper は入力=加速度 (慣性)。KB パイプラインはもう正しいので、次はここ。
+
+### 環境トラップ (サンドボックス再生成)
+- リサイクルで /tmp 全滅・parity-logs 消滅・git が base に戻る。**worktree-backup から
+  未コミット分を復元**した (バックアップ習慣が効いた)。
+- env_up.sh → server_preset.py apply (起動後) → botadmin 再作成 (CRYSTAL/MACE/SWORD) →
+  build_plugin.sh → RCON stop で新 jar 読み込み、の再順序を確認済み。
+- RCON ラッパの `quantum run data get ...` 応答は値を返さない (→ 1 のみ)。値は
+  fabric のように直接読めない → 計測は [q] ログか fabric 側で。

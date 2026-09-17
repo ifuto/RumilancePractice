@@ -264,6 +264,12 @@ tag {BOT_A} remove xlib_target
 tag {BOT_A} add xlib_bot
 tag {BOT_B} remove xlib_bot
 tag {BOT_B} add xlib_target
+# --- BOT の疑似 ping を 100ms に設定 (参照環境の .ping=100 トグル相当) ---
+# エンジン (Fabric herobot / Paper 移植) はこの値を KB・攻撃・use の tick 遅延に使う。
+# サンドボックス再構築で playerdata が初期化されても、ラウンド開始ごとに両エンジン対称で
+# 100ms が復元される。爆発 KB の遅延 SET (delayTicks(2) → 100ms/25 = 4tick) もこれで揃う。
+player {BOT_A} ping 100
+player {BOT_B} ping 100
 effect give @a regeneration 1 255 true
 effect give @a absorption 120 0 true
 tp {BOT_A} {SPOT_A}
