@@ -851,3 +851,25 @@ who=a: [本物] pearl, swing, hp_min    ← 残り 3 指標
   更新規則が参照と違う疑いが強い。次はここ(攻撃/真珠のカウンタ更新)を潰す。
 - BOT b 側(ハーネスの `vs_brain` が回す方)は一致しているので、差は「マップ自身が
   回す BOT a」の経路に固有。
+
+### 5. メイスの残差の正体 (2026-09-17 未明の続き)
+qlog の `hit=` フィールドは **`hitcd`(攻撃クールダウン)そのもの**だった
+(`qlog/function/sample.mcfunction:13` が `scoreboard players get @s hitcd` を
+`hit` として保存している)。したがって `swing` 指標 =「`hitcd` が 7 以上に跳ねた回数」=
+**着弾イベント数**。
+```
+着弾数 (maceR / maceS)   fabric → paper
+  who=a (マップが回す)     35/39 → 97/72     ← 2〜2.8 倍 (本物)
+  who=b (ハーネスが回す)   69/68 → 84/76     ← 1.2 倍 (ノイズ床内)
+```
+- `hitcd` は `quantum:cooldowns` が毎tick `@a[scores={hitcd=1..}]` から 1 減らし、
+  着弾時に `sword/combo/hit` が **11** に、ラウンド開始時は `difficulty/2` が
+  **`@a[tag=xlib_bot]` に 15** をセットする(`map/start3` 経由)。
+- BOT b は `xlib_target` なので難易度ラダーの影響を受けない。**a だけが 15t の上限に
+  縛られる**。実測: Paper の a は 72〜97/分 ≒ 上限(20t/s ÷ 15t = 80/分)に張り付き、
+  Fabric の a は 35〜39/分 = 上限の半分。つまり **Fabric 側には着弾を遅らせる何かが
+  更にある**(難易度の aim/combo cd か、`hit_decision` が成立するまでの間合い取り)のに、
+  Paper 側はクールダウンが空いた瞬間に殴れている。
+- したがって次の標的は「`hitcd` が空いた瞬間に殴ってよいか」を決めている移植側の判定
+  (`hit_decision` の成立条件 / 難易度の aim 相当) — 攻撃回数そのものではなく**殴る前の
+  間合い・照準の作り方**。
