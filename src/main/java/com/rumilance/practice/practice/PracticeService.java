@@ -1421,22 +1421,11 @@ public final class PracticeService {
     /** Bot fights are capped at ten minutes; no decision by then ends the match as a draw. */
     public static final long BOT_MATCH_LIMIT_SECONDS = 600L;
 
-    // --- mace bot (Quantum parity: quantum:mace/tick, mace/lunge, mace/wind) ---------------
-    /** Fall distance from which a mace hit counts as a smash attack (a normal jump qualifies). */
-    private static final double MACE_SMASH_FALL_BLOCKS = 0.9d;
-    /** Extra smash damage per block fallen past that, and the cap on the whole scale. */
-    private static final double MACE_SMASH_PER_BLOCK = 0.35d;
-    private static final double MACE_SMASH_MAX_SCALE = 3.0d;
-    /** Lunge window: sprint-jump at the player from here and smash on the way down. */
-    private static final double MACE_LUNGE_MIN_RANGE = 2.2d;
-    private static final double MACE_LUNGE_MAX_RANGE = 5.0d;
-    private static final double MACE_LUNGE_UP = 0.55d;
-    private static final double MACE_LUNGE_FORWARD = 0.32d;
-    /** Recovery after a committed smash: the mace swing is slow, so is the bot. */
-    private static final long MACE_LAND_RECOVERY_MS = 350L;
-    /** Wind-charge self-launch: needs room so the burst does not shove the player off a ledge. */
-    private static final double MACE_WIND_MIN_RANGE = 4.0d;
-    private static final long MACE_WIND_COOLDOWN_MS = 5200L;
+    // --- mace bot (Quantum parity: quantum:mace/tick + mace_new/* pipeline) ---------------
+    // The swing gates (slam 1.5 fall, in_range 4, can_see 3.2, hit 3.0, lunge horizon 4,
+    // far-pearl 5, hitcd 15/11/13, real_hitcd 11/7, target hitcd 15, windcd/pearlcd 20,
+    // wind_pearl_cd 10, strafecd 5) are transcribed into the pure kernel {@link BotMath} so
+    // the tests pin the map values instead of copies drifting apart here.
     /** How long a swing into the bot's raised shield costs the player. */
     private static final long MACE_SHIELD_STUN_MS = 1000L;
     // --- Quantum-parity combat abilities (sword/crit, cobwebs, decisions...) ----------
@@ -1649,12 +1638,8 @@ public final class PracticeService {
     /** Defensive block wall (crystal obsidian / cart oak log). */
     private static final long DEFENSE_BLOCK_COOLDOWN_MS = 9000L;
     private static final long DEFENSE_BLOCK_TTL_MS = 7000L;
-    /** Mace far-pearl engage when the player kites beyond melee. */
-    private static final long FAR_PEARL_COOLDOWN_MS = 8000L;
-    private static final double FAR_PEARL_MIN_RANGE = 8.0d;
-    private static final double FAR_PEARL_MAX_RANGE = 24.0d;
-    /** Mace wind+forward burst (wind_pearl) and elytra-style rocket engages. */
-    private static final long WIND_PEARL_COOLDOWN_MS = 9000L;
+    /** Mace elytra-style rocket engage. The map gates elytra behind the .elytra toggle (off
+     *  in the parity scenario mace_k10v11); kept as a product feature from HARD upward. */
     private static final long ELYTRA_COOLDOWN_MS = 12000L;
     /** Generic pedestal / quick-block TTLs for the tracked-block reverter. */
     private static final long PEDESTAL_TTL_MS = 7000L;
@@ -2480,11 +2465,20 @@ public final class PracticeService {
         stockBotInventory(session, PracticeType.MACE);
         session.setMaceBot(bot);
         session.setBotHome(botLoc.clone());
+        // Round-start state, exactly as map/start3 + difficulty/2 initialise the map bot:
+        // hitcd 15 (the round-start rung), windcd/pearlcd 0, tempcrit 1 (.crit toggle on).
         long now = System.currentTimeMillis();
-        session.setBotNextAttackMs(now + 2000L);
-        session.setBotNextLungeMs(now + 1200L);
-        session.setBotNextWindMs(now + MACE_WIND_COOLDOWN_MS);
+        session.setBotNextAttackMs(now + BotMath.MACE_HITCD_ROUND_START_MS);
+        session.setBotNextLungeMs(now);
+        session.setBotNextWindMs(now);
         session.setBotStrafeFlipMs(now + 1500L);
+        PracticeSession.BotAbilityState ab = session.abilities();
+        ab.botVariant(1);
+        ab.maceStapUntilMs(0L);
+        ab.maceTargetHitcdUntilMs(0L);
+        ab.botStrafeSide(1);
+        ab.botStrafeCdUntilMs(0L);
+        ab.nextPearlMs(0L);
     }
 
     private void equipMaceBot(BotBody bot, boolean shieldUp) {
@@ -2702,6 +2696,15 @@ public final class PracticeService {
                     && diff.regenPerSecond() > 0) {
                 healToward(bot, diff.botMaxHp(), diff.regenPerSecond() / 20.0d);
             }
+            PracticeSession.BotAbilityState maceAb = session.abilities();
+            // The map's kit is effectively endless (a ten-minute kite would drain the 99 wind
+            // charges and 16 pearls of the mace loadout): top them up like the crystal bot's.
+            if (session.botStock().getOrDefault(Material.WIND_CHARGE, 0) < 8) {
+                session.botStock().put(Material.WIND_CHARGE, 99);
+            }
+            if (session.botStock().getOrDefault(Material.ENDER_PEARL, 0) < 4) {
+                session.botStock().put(Material.ENDER_PEARL, 16);
+            }
 
             Location eye = bot.getEyeLocation();
             Location botLoc = bot.getLocation();
@@ -2712,83 +2715,30 @@ public final class PracticeService {
             }
             turnToward(bot, eye, to.clone().normalize(), diff);
 
+            // The map's per-tick scores, transcribed (allstats/newstats + decisions/tick +
+            // cooldowns). The bot only swings when hitcd is empty AND the pre-swing gates —
+            // grounded, line of sight, in reach — line up: that gate, not the cooldown, is
+            // what pins the reference's swing cadence (measured 72-97/min on Paper against a
+            // raw 11-tick ceiling of ~180/min).
             double dist = eye.distance(target);
-            double reach = reachWithJitter(diff);
             double dx = target.getX() - botLoc.getX();
             double dz = target.getZ() - botLoc.getZ();
             double flat = Math.sqrt(dx * dx + dz * dz);
             boolean grounded = bot.isOnGround();
             double fall = bot.getFallDistance();
+            boolean inRange = dist <= BotMath.MACE_IN_RANGE;
+            boolean canSee = dist <= BotMath.MACE_CAN_SEE && bot.hasLineOfSight(player);
+            boolean targetHurt = now < maceAb.targetHurtUntilMs();
+            long hitCdLeftMs = session.botNextAttackMs() - now;
+            boolean slamFalling = !grounded && fall >= BotMath.MACE_SLAM_FALL_BLOCKS;
+            java.util.concurrent.ThreadLocalRandom rng =
+                    java.util.concurrent.ThreadLocalRandom.current();
 
-            // 1) SMASH: a mace hit landed while falling. Vanilla scales smash damage with the
-            //    fall distance, and the map only commits a slam once it has real height.
-            if (!grounded && fall >= MACE_SMASH_FALL_BLOCKS && dist <= reach + 0.75d
-                    && now >= session.botNextAttackMs()) {
-                botSwing(session, player, bot, diff, diff.attackDamage() * maceSmashScale(fall));
-                session.setBotNextAttackMs(now + diff.attackIntervalMs() + MACE_LAND_RECOVERY_MS);
-                return;
-            }
-            // 2) WIND CHARGE (HARD and up): blast itself skyward and smash on the way down.
-            if (grounded && flat >= MACE_WIND_MIN_RANGE && now >= session.botNextWindMs()
-                    && diff.preset().ordinal() >= BotDifficulty.Preset.HARD.ordinal()) {
-                launchMaceWindCharge(session, bot);
-                session.setBotNextWindMs(now + MACE_WIND_COOLDOWN_MS
-                        + java.util.concurrent.ThreadLocalRandom.current().nextInt(1200));
-                return;
-            }
-            PracticeSession.BotAbilityState maceAb = session.abilities();
-            // 2b) WIND PEARL (Quantum parity: mace_new/wind_pearl, HARD and up): wind blast
-            //     plus a forward shove, so the bot sails over the gap into a big smash.
-            if (grounded && flat >= 4.5d && dist <= 9.0d && now >= maceAb.nextWindPearlMs()
-                    && diff.preset().ordinal() >= BotDifficulty.Preset.HARD.ordinal()) {
-                launchMaceWindCharge(session, bot);
-                bot.setVelocity(new Vector(dx / flat * 0.55d, 0.35d, dz / flat * 0.55d));
-                maceAb.nextWindPearlMs(now + WIND_PEARL_COOLDOWN_MS);
-                return;
-            }
-            // 2c) FAR PEARL (Quantum parity: mace_new/far_pearl): blink to a kiting player.
-            if (grounded && dist >= FAR_PEARL_MIN_RANGE && dist <= FAR_PEARL_MAX_RANGE
-                    && now >= maceAb.nextFarPearlMs() && diff.attackDamage() > 0.0d && flat > 0.0001) {
-                Vector toward = new Vector(dx / flat, 0, dz / flat);
-                Location landing = findPearlLanding(session, botLoc, toward, dist - 2.5d);
-                if (landing != null && session.botConsume(Material.ENDER_PEARL, 1)) {
-                    maceAb.nextFarPearlMs(now + FAR_PEARL_COOLDOWN_MS);
-                    pearlTeleportFx(bot, landing);
-                    return;
-                }
-                maceAb.nextFarPearlMs(now + 1500L); // no safe spot: retry soon, don't spam scans
-            }
-            // 2d) ELYTRA (Quantum parity: mace_new/elytra, HARD and up): rocket up-forward,
-            //     the descent falls straight into the SMASH branch above.
-            if (grounded && dist > 7.0d && dist <= 20.0d && now >= maceAb.nextElytraMs()
-                    && diff.preset().ordinal() >= BotDifficulty.Preset.HARD.ordinal() && flat > 0.0001) {
-                bot.setVelocity(new Vector(dx / flat * 0.7d, 0.95d, dz / flat * 0.7d));
-                if (bot.getWorld() != null) {
-                    bot.getWorld().playSound(botLoc, Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 0.9f, 1.1f);
-                    bot.getWorld().spawnParticle(org.bukkit.Particle.CLOUD,
-                            botLoc.add(0, 0.4, 0), 12, 0.3, 0.2, 0.3, 0.05d);
-                }
-                maceAb.nextElytraMs(now + ELYTRA_COOLDOWN_MS);
-                return;
-            }
-            // 3) LUNGE: sprint-jump at the player (map: move forward + sprint + jump + attack).
-            if (grounded && flat > 0.0001 && dist >= MACE_LUNGE_MIN_RANGE
-                    && dist <= MACE_LUNGE_MAX_RANGE && now >= session.botNextLungeMs()) {
-                bot.setVelocity(new Vector(dx / flat * MACE_LUNGE_FORWARD, MACE_LUNGE_UP,
-                        dz / flat * MACE_LUNGE_FORWARD));
-                bot.swingMainHand();
-                session.setBotNextLungeMs(now + diff.attackIntervalMs() * 4L);
-                return;
-            }
-            // 4) Plain melee when already inside reach with no height to smash from.
-            if (grounded && dist <= reach && now >= session.botNextAttackMs()) {
-                botSwing(session, player, bot, diff, diff.attackDamage());
-                session.setBotNextAttackMs(now + diff.attackIntervalMs()
-                        + java.util.concurrent.ThreadLocalRandom.current().nextInt(150));
-                return;
-            }
-            // 5) Reposition: walk in (full speed past 4 blocks), orbit while the shield is up,
-            //    and step up one-block ledges instead of grinding into them.
+            // --- Movement (map bot_mech/logic + combo_logic + distance + strafe): W + sprint
+            // every tick — including swing ticks, because the map sets the inputs BEFORE the
+            // hit runs. The combo variant (tempcrit 0) adds the 1 % W-tap stop at <=1.8, the
+            // W+S cancel (S-tap) for the last 7 ticks of each hit's real_hitcd, and a strafe
+            // side that re-rolls every 5 ticks; the crit variant (tempcrit 1) runs plain W.
             if (grounded && flat > 0.0001) {
                 Vector dir = new Vector(dx / flat, 0, dz / flat);
                 // herobot-style steering: follow the A* path when it exists (obstacle escape),
@@ -2803,24 +2753,142 @@ public final class PracticeService {
                         dir = pd.normalize();
                     }
                 }
+                boolean stopped = flat <= BotMath.MACE_W_TAP_RANGE && rng.nextInt(100) < 1
+                        ? true // W-tap (bot_mech/distance): one-tick stop at point blank
+                        : maceAb.botVariant() == 0
+                                && now + BotMath.MACE_STAP_ACTIVE_MS <= maceAb.maceStapUntilMs();
+                Vector move;
+                if (stopped) {
+                    move = new Vector(0, 0, 0);
+                } else {
+                    move = dir.multiply(diff.moveSpeed()); // full W every tick, no distance scaling
+                    if (maceAb.botVariant() == 0) {
+                        if (now >= maceAb.botStrafeCdUntilMs()) {
+                            maceAb.botStrafeSide(rng.nextBoolean() ? 1 : -1);
+                            maceAb.botStrafeCdUntilMs(now + BotMath.MACE_STRAFE_CD_MS);
+                        }
+                        Vector side = new Vector(-dir.getZ(), 0, dir.getX())
+                                .multiply(diff.moveSpeed() * maceAb.botStrafeSide());
+                        move = move.add(side);
+                    }
+                }
                 Location ahead = botLoc.clone().add(dir.clone().multiply(0.9d));
                 boolean ledge = ahead.getBlock().getType().isSolid()
                         && ahead.getBlock().getRelative(0, 1, 0).getType().isAir();
-                if (now >= session.botStrafeFlipMs()) {
-                    session.setBotStrafeDir(-session.botStrafeDir());
-                    session.setBotStrafeFlipMs(now + 1500L
-                            + java.util.concurrent.ThreadLocalRandom.current().nextInt(1500));
-                }
-                double speed = diff.moveSpeed() * (dist > 4.0d ? 1.0d : 0.55d);
-                if (session.botShieldRaised()) {
-                    speed *= 0.4d; // a raised shield walks, it does not sprint
-                }
-                Vector side = new Vector(-dir.getZ(), 0, dir.getX())
-                        .multiply(diff.moveSpeed() * 0.5d * session.botStrafeDir());
-                bot.setVelocity(dir.multiply(speed).add(side).setY(bot.getVelocity().getY()));
+                bot.setVelocity(move.setY(bot.getVelocity().getY()));
                 if (ledge || pathHop) {
                     bot.setVelocity(bot.getVelocity().setY(0.45d));
                 }
+            }
+
+            // 1) WIND CHARGE (map mace/wind, EVERY rung — not just HARD): out of in_range,
+            //    grounded, all cooldowns empty; drops a wind charge at its feet and jumps.
+            //    windcd = 20t and the launch flips the bot to the crit variant.
+            if (grounded && !inRange && hitCdLeftMs <= 0
+                    && now >= session.botNextWindMs() && now >= maceAb.nextPearlMs()
+                    && !inCobweb(botLoc)) {
+                launchMaceWindCharge(session, bot);
+                session.setBotNextWindMs(now + BotMath.MACE_WIND_CD_MS);
+                maceAb.botVariant(1); // mace/wind: `if .crit = 1 → tempcrit 1`
+                return;
+            }
+            // 2) GROUNDED HIT (map: hitcd 0 + grounded + can_see + target within 3 of the
+            //    eyes; the CRIT variant adds the pcrit gate — the target's own hitcd of 15,
+            //    set by advancestats when the bot last hit it, refuses the swing): the
+            //    reference's anti-trade rhythm.
+            boolean pcritBlocked = maceAb.botVariant() == 1
+                    && now < maceAb.maceTargetHitcdUntilMs()
+                    && !inCobweb(player.getLocation()) && !inCobweb(botLoc);
+            if (grounded && hitCdLeftMs <= 0 && canSee
+                    && dist <= BotMath.MACE_HIT_RANGE && !pcritBlocked) {
+                botSwing(session, player, bot, diff, diff.attackDamage());
+                session.setBotNextAttackMs(now + BotMath.MACE_HITCD_HIT_MS);
+                maceAb.maceStapUntilMs(now + BotMath.MACE_REAL_HITCD_MS);
+                maceAb.maceTargetHitcdUntilMs(now + BotMath.MACE_TARGET_HITCD_MS);
+                flipMaceVariant(maceAb);
+                return;
+            }
+            // 3) LUNGE (map mace/lunge): the spear's sprint-jump attack fires while the bot is
+            //    AIRBORNE, out of in_range, beyond 4 blocks horizontal from the target, with
+            //    hitcd empty. A real jump + real hit; costs hitcd 13.
+            if (!grounded && !inRange && flat > BotMath.MACE_LUNGE_MIN_HORIZON
+                    && hitCdLeftMs <= 0) {
+                Vector v = bot.getVelocity();
+                bot.setVelocity(new Vector(v.getX(), 0.42d, v.getZ())); // `jump once`
+                botSwing(session, player, bot, diff, diff.attackDamage());
+                session.setBotNextAttackMs(now + BotMath.MACE_HITCD_LUNGE_MS);
+                // advancestats arms both bookkeeping windows for ANY landed bot damage.
+                maceAb.maceStapUntilMs(Math.max(maceAb.maceStapUntilMs(),
+                        now + BotMath.MACE_REAL_HITCD_MS));
+                maceAb.maceTargetHitcdUntilMs(Math.max(maceAb.maceTargetHitcdUntilMs(),
+                        now + BotMath.MACE_TARGET_HITCD_MS));
+                flipMaceVariant(maceAb);
+                return;
+            }
+            // 4) SLAM (map decisions/tick + mace/tick): the mace picks up when the fall is 1.5
+            //    blocks or more (fall_distance15 predicate), in_range, can_see, and the target's
+            //    hurt frames are not running (slam_decision zeroes while hitcd>0 AND target
+            //    hurtTime>0, so one slam per fall). hitcd 11; while the mace is held, cooldowns
+            //    pin hitcd at the 13-tick non-sharp floor.
+            if (slamFalling && inRange && canSee && !(hitCdLeftMs > 0 && targetHurt)) {
+                holdItemBriefly(bot, new ItemStack(Material.MACE), 6L);
+                botSwing(session, player, bot, diff, diff.attackDamage() * maceSmashScale(fall));
+                session.setBotNextAttackMs(now + BotMath.MACE_HITCD_HIT_MS);
+                // The map's one-slam-per-fall guard reads the TARGET's hurtTime (set by the
+                // connecting vanilla attack); keep the window in sync here for both body types
+                // (the packet bot's hit path applies the damage in vanilla and never records it).
+                maceAb.targetHurtUntilMs(Math.max(maceAb.targetHurtUntilMs(),
+                        now + TARGET_HURT_WINDOW_MS));
+                flipMaceVariant(maceAb);
+                return;
+            }
+            if (slamFalling && inRange && canSee) {
+                // Holding the mace: hitcd cannot decay below 13 (quantum:cooldowns line 1).
+                session.setBotNextAttackMs(Math.max(session.botNextAttackMs(),
+                        now + BotMath.MACE_HITCD_NON_SHARP_FLOOR_MS));
+            }
+            // 5) FAR PEARL (map mace_new/far_pearl): airborne, at or below the target's height,
+            //    the target at least 5 away, pearlcd empty, and the rung's roll (40 % at
+            //    Intermediate). quantum:pearl sets pearlcd 20 — shared with every pearl.
+            if (!grounded && botLoc.getY() <= target.getY()
+                    && dist >= BotMath.MACE_FAR_PEARL_MIN_RANGE && now >= maceAb.nextPearlMs()
+                    && diff.attackDamage() > 0.0d && flat > 0.0001
+                    && rng.nextDouble(100.0d) < BotMath.maceFarPearlChance(diff)) {
+                Vector toward = new Vector(dx / flat, 0, dz / flat);
+                Location landing = findPearlLanding(session, botLoc, toward,
+                        Math.max(1.0d, dist - 2.5d));
+                if (landing != null && session.botConsume(Material.ENDER_PEARL, 1)) {
+                    maceAb.nextPearlMs(now + BotMath.MACE_PEARL_CD_MS);
+                    pearlTeleportFx(bot, landing);
+                    return;
+                }
+                maceAb.nextPearlMs(now + 250L); // no safe spot: retry soon, don't spam scans
+            }
+            // 6) WIND PEARL (map mace_new/wind_pearl, wind_pearl_cd 10t + the same rung roll):
+            //    from 5+ blocks ABOVE the target, a wind burst aimed down at it.
+            if (!grounded && botLoc.getY() - target.getY() >= 5.0d && hitCdLeftMs <= 0
+                    && now >= session.botNextWindMs() && now >= maceAb.nextWindPearlMs()
+                    && now >= maceAb.nextPearlMs() && diff.attackDamage() > 0.0d && flat > 0.0001
+                    && rng.nextDouble(100.0d) < BotMath.maceFarPearlChance(diff)) {
+                launchMaceWindCharge(session, bot);
+                bot.setVelocity(new Vector(dx / flat * 0.55d, 0.35d, dz / flat * 0.55d));
+                maceAb.nextWindPearlMs(now + BotMath.MACE_WIND_PEARL_CD_MS);
+                maceAb.nextPearlMs(now + BotMath.MACE_PEARL_CD_MS);
+                return;
+            }
+            // 7) ELYTRA (map mace_new/elytra, .elytra toggle — off in the parity scenario):
+            //    kept as a product feature from HARD upward; the descent falls into the slam.
+            if (grounded && dist > 7.0d && dist <= 20.0d && now >= maceAb.nextElytraMs()
+                    && diff.preset().ordinal() >= BotDifficulty.Preset.HARD.ordinal()
+                    && flat > 0.0001) {
+                bot.setVelocity(new Vector(dx / flat * 0.7d, 0.95d, dz / flat * 0.7d));
+                if (bot.getWorld() != null) {
+                    bot.getWorld().playSound(botLoc, Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 0.9f, 1.1f);
+                    bot.getWorld().spawnParticle(org.bukkit.Particle.CLOUD,
+                            botLoc.add(0, 0.4, 0), 12, 0.3, 0.2, 0.3, 0.05d);
+                }
+                maceAb.nextElytraMs(now + ELYTRA_COOLDOWN_MS);
+                return;
             }
         }
     }
@@ -2833,6 +2901,16 @@ public final class PracticeService {
     /** Delegates to {@link BotMath#maceSmashScale} (pure kernel; locally testable). */
     static double maceSmashScale(double fallDistance) {
         return BotMath.maceSmashScale(fallDistance);
+    }
+
+    /**
+     * {@code quantum:sword/randomise} (runs at the end of every mace swing while the .random
+     * toggle is on): tempcrit is set to 1 and then re-rolled to 0 with 50 % — the bot
+     * alternates between the combo variant (taps + strafe, no pcrit) and the crit variant
+     * (pcrit gate). Both variants together are what produces the measured swing cadence.
+     */
+    private static void flipMaceVariant(PracticeSession.BotAbilityState ab) {
+        ab.botVariant(java.util.concurrent.ThreadLocalRandom.current().nextBoolean() ? 0 : 1);
     }
 
     /**

@@ -30,16 +30,51 @@
 
 ## Mace ボット（`quantum:mace_new/*`）— 本家 `PracticeType.MACE`
 
-| Quantum 関数 | 内容 | 実装 |
+**2026-09-17 全行読了後の完全転写（v1.76.28、Paper 実測を正として合意）**。
+mace mode (3) の毎tickフローは `main_tick → allstats/newstats → init/mode → (treats,
+cooldowns) → tempcrit 分岐`。`tempcrit`（`.crit` トグル ON でラウンド開始時 1、各スイング後に
+`sword/randomise` が 50/50 で再抽選、`mace/wind` が 1 に固定）で 2 種のコアを交互に使う:
+
+- `mace/combo/tick`（tempcrit 0）= `sword/combo/tick`（**`bot_mech/distance`（W/S-tap）＋
+  `bot_mech/strafe`（5tで左右再抽選）**入り・ヒットに pcrit ゲート**なし**）
+- `mace/tick`（tempcrit 1）= `sword/tick`（タップ/ストレイフなし・ヒットに **pcrit ゲートあり**）
+
+| Quantum 関数 / 判定 | 内容 | 実装（v1.76.28） |
 |---|---|---|
-| `tick` / `combo` | 接近＆スマッシュ近接 | ✅ `tickMaceBots` |
-| `lunge` | スプリントジャンプ突進 | ✅ |
-| `wind` | ウィンドチャージ自己打ち上げ | ✅（HARD以上） |
-| 落下比例スマッシュ | 落下距離スケール | ✅ `maceSmashScale` |
-| `far_pearl` + `pearl` | 遠距離へパール急接近 | ✅ 8〜24ブロックで前方2.5ブロック手前へテレポート（7秒CD） |
-| `wind_pearl` | ウィンド＋前進バースト | ✅ 4.5〜9ブロック、ウィンド波＋前ベロシティ（HARD以上） |
-| `elytra` | エリトラ式ロケット突進 | ✅ 7〜20ブロック、前上0.95ベロシティ＋花火音/雲粒子（HARD以上） |
-| 盾 | 盾装備 | ✅（構えトグル付き） |
+| `allstats/newstats` | `can_see_target`（**≤3.2＋目の0.71先からのレーキャスト**、2ブロック以内は即OK）/ `in_range`（≤4＋toHitbox<reach）/ `OnGround` / `airborne` / `fall_distance` | ✅ `inRange`/`canSee`/`grounded`/`fall`（`BotMath.MACE_*` に定数固定） |
+| `cooldowns` 行1 | **鋭利武器以外（メイス/槍/風）を主手なら hitcd を毎tick 13 に固定** | ✅ 空中スラム窓（落下≥1.5＋in_range＋can_see）で hitcd の 650ms 床 |
+| `difficulty/2`（ラウンド開始） | `@a[xlib_bot]` に **hitcd 15** | ✅ `spawnMaceBot` で 750ms |
+| `decisions/tick`（mace 行） | `slam_decision = in_range && can_see && fall≥1.5`（**`fall_distance15` は 1.5 の意味**）; hitcd>0 かつ相手 hurtTime>0 なら 0 に戻す（=**1落下につき1回**） | ✅ slam 分岐＋ターゲット hurtTime 窓 |
+| `decisions/player_hit`（mode 3） | `hit_decision_without_cd` は **BOT が接地（airborne=0）＋相手≤3（目の距離）＋相手 gap_timer=0** のときのみ | ✅ 地上ヒットゲート（LOS＋≤3.0） |
+| `sword/pcrit`（crit 側のみ） | 相手の `hitcd=1..`（＝直前にBOTに殴られた、`advancestats` が gear2 で **15** を設定）ならスイング拒否 | ✅ `maceTargetHitcdUntilMs`（750ms、スイング毎にアーム）＋ variant による適用 |
+| `sword/combo/hit` | hitcd **11**・stop→forward→sprint→attack（剣で殴る＝hotbar 4） | ✅ `botSwing`＋hitcd 550ms |
+| `sword/randomise` | スイング後 tempcrit を 50/50 で反転（.random ON） | ✅ `flipMaceVariant` |
+| `mace/wind`（**全ラダー**） | pearlcd==0＋windcd≤0＋hitcd≤0＋接地＋**in_range=0** → 足元に wind_charge＋jump; windcd **20t**; tempcrit→1 | ✅ 全ラダー化（旧 HARD以上・5.2s は誤り） |
+| `mace/lunge`（槍） | **空中**＋in_range=0＋相手距離H>4＋hitcd=0 → sprint+jump+attack; hitcd **13** | ✅ 旧「地上 2.2〜5.0 のノジュール」は誤り |
+| `mace/far_pearl` | **空中**＋BOTが相手より低い＋相手≥5＋pearlcd≤0＋難易度ロール（Easy20/Int40/Hard60/Crazy80/Master+100%）→ `quantum:pearl`（pearlcd 20） | ✅ |
+| `mace/wind_pearl` | 相手より**5以上高い**＋pearl/wind/wind_pearl_cd 全空＋同一ロール → 風バースト＋前進; wind_pearl_cd **10t** | ✅ |
+| `bot_mech/distance`（combo 側） | **W-tap**: 相手≤1.8 で 1%/tick 停止; **S-tap**: `real_hitcd≥7`（着弾で **11** にリセット、1/tick 減衰 → 約4t）の間 `move backward`（=W と相殺して停止） | ✅ |
+| `bot_mech/strafe`（combo 側） | 接地かつ strafecd≤0 で 50/50 抽選、strafecd 5t | ✅ |
+| `bot_mech/logic` | 毎tick: lookスナップ（aim delta）＋W＋sprint＋hotbar 4＋2段穴ジャンプ | ✅（A* ステアリングは当プラグイン拡張として保持） |
+| `advancestats` | **BOT が相手に何らかのダメージを与えた瞬間**（advancement `player_hurt_entity`）に 相手の hitcd=15 ＋ 自分の real_hitcd=11 | ✅ 地上ヒット/slam/lunge 全経路でアーム |
+
+旧実装との差分（v1.76.28 で修正）:
+
+1. **スマッシュ閾値 0.9 → 1.5**（`fall_distance15` の真の意味）。通常ジャンプ（落下≈1.25）は
+   slam にならず、剣の地上ヒットのみに戻る。
+2. **地上ヒットに LOS（can_see）ゲート追加**＋ reach は固定 3.0（jitter 廃止）。
+3. **pcrit ゲート**（crit variant）: 相手に着弾した直後の 15t はスイング拒否。これが参照側の
+   実測 cadence（Paper: 72〜97/分 ≒ 15t 上限）を作っている本体。Fabric 側の 35〜39/分は
+   環境由来の遅延（ユーザー合意: **Paper と一致させる**）。
+4. **variant 反転**（50/50、スイング後; wind 後に 1）で combo/crit の 2 種コアを再現。
+5. **W/S-tap ＋ strafe**（combo variant）: 着弾後に約 4t の停止リズム＋5t 毎の左右。
+6. **wind を全ラダー化・windcd 20t・in_range=0 必須**（旧 HARD以上・5.2s・flat≥4 は誤読）。
+7. **lunge を空中攻撃に変更**（旧 地上 2.2〜5.0 のノジュール＋無実害スイングは誤り）:
+   空中＋in_range=0＋距離H>4＋hitcd=0、実ジャンプ（0.42）＋実ダメージ、hitcd 13。
+8. **far_pearl を空中＋下方＋≥5＋40%ロール＋pearlcd 20t に**（旧 地上 8〜24・8s CD）。
+9. 移動を**毎 tick 全力 W**（距離による減速・盾 0.4x 廃止。参照は常に W+sprint）。
+10. 風 99/パール 16 のキットは実質無限（`.refill` 相当）→ 少なくなったら補充。
+
 
 ## Crystal ボット（`quantum:crystal/*`, `quantum:g1gc/*`）— 本家 `PracticeType.CRYSTAL`
 

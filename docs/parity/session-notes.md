@@ -873,3 +873,58 @@ qlog の `hit=` フィールドは **`hitcd`(攻撃クールダウン)そのも�
 - したがって次の標的は「`hitcd` が空いた瞬間に殴ってよいか」を決めている移植側の判定
   (`hit_decision` の成立条件 / 難易度の aim 相当) — 攻撃回数そのものではなく**殴る前の
   間合い・照準の作り方**。
+
+## 10.17 mace パイプライン完全転写 (2026-09-17 夜 / v1.76.28)
+
+ユーザー指示: 「Fabric 2 回テストで双方近似したものは運。Paper と一致する必要」。
+→ 正 = **参照 BOT の Paper 実測**（ハーネス maceR/maceS: who=a 72〜97/分 ≒ 15t 上限、
+who=b 84/76/分）。Fabric の 35〜39/分は Fabric 環境由来の遅延として追わない。
+
+参照 pack（`bot/Quantum's PvP Practice v1.18.zip`）の mace mode (3) 全関数を読み切った:
+
+- 毎tick: `main_tick → allstats/newstats → init/mode → (treats, cooldowns) →
+  tempcrit 分岐`。**tempcrit**（ラウンド開始 1、各スイング後 `sword/randomise` で 50/50、
+  `mace/wind` 後に 1）で `mace/combo/tick`（W/S-tap＋strafe、pcrit なし）と `mace/tick`
+  （pcrit あり）を交互に使う。これが swing cadence の本体。
+- **swing ゲート**（mode 3）: `hitcd==0` ＋ `hit_decision_without_cd` ＝
+  **BOT 接地**（`airborne=0`）＋ `can_see_target`（≤3.2＋目の 0.71 先レーキャスト）＋
+  相手 ≤3（目の距離）＋ 相手 gap_timer=0。crit variant はさらに **pcrit**（相手の hitcd>0
+  なら拒否。相手の hitcd は `advancestats` が BOT 着弾時に 15 に設定）で、これが 15t 上限
+  （80/分）を作っている。
+- **hitcd ラダー**: ラウンド開始 15（`difficulty/2`）/ 地上ヒット・slam 11（`combo/hit`,
+  `sword/crit`）/ lunge 13（`mace/lunge`）/ **鋭利武器以外は毎tick 13 に固定**
+  （`cooldowns` 行1: メイス/槍/風を主手に持つ間）。
+- **slam**: `fall_distance15` predicate = **1.5**（名前の 15 ではない）。in_range（≤4）＋
+  can_see＋相手が hurtTime 中でない（hitcd>0 かつ相手 hurtTime>0 で slam_decision 0 に
+  戻る＝1 落下につき 1 回）。
+- **lunge**（槍）: **空中**＋in_range=0＋相手距離H>4＋hitcd=0 → sprint+jump+attack。
+- **wind**（全ラダー）: pearlcd==0＋windcd≤0＋hitcd≤0＋接地＋**in_range=0** → 20t。
+- **far_pearl**（空中・相手より低い・≥5・40% ロール）/ **wind_pearl**（5 以上上・10t）。
+- 移動: 毎 tick W+sprint＋look スナップ（aim delta）。combo variant だけ **W-tap**
+  （相手 ≤1.8 で 1%/tick 停止）＋ **S-tap**（着弾で real_hitcd=11、≥7 の間 move backward
+  = W と相殺して停止）＋ **strafe**（5t 毎 50/50）。
+- `advancestats`（advancement `player_hurt_entity`）は **全武器共通**で 相手 hitcd=15 ＋
+  自分の real_hitcd=11 をアーム。
+
+移植（v1.76.28、`PracticeService.tickMaceBot` 全面書き換え + `BotMath` にゲートを純粋
+カーネル化）:
+
+1. slam 閾値 0.9 → **1.5**。通常ジャンプは剣ヒットに戻す。
+2. 地上ヒットに **LOS（can_see ≤3.2）＋ ≤3.0 固定**（jitter 廃止）。
+3. **pcrit ゲート** ＋ **variant 50/50 反転**（wind 後に 1）を追加（`BotAbilityState`:
+   `botVariant`/`maceStapUntilMs`/`maceTargetHitcdUntilMs`/`botStrafeSide`/
+   `botStrafeCdUntilMs`）。
+4. **W/S-tap ＋ strafe**（combo variant）実装。
+5. wind を**全ラダー化・20t・in_range=0 必須**。lunge を**空中攻撃**（実ジャンプ 0.42 ＋
+   実ダメージ、hitcd 13）に変更。far_pearl を**空中・下方・≥5・40% ロール・20t** に。
+6. hitcd はラウンド開始 750ms（15t）/ ヒット 550ms（11t）/ lunge 650ms（13t）/ メイス
+   保持窓（slam 落下中）は 650ms 床。
+7. 移動を毎 tick 全力 W（距離減速・盾 0.4x 廃止）。風 99/パール 16 は少なくなったら補充
+   （map キットは実質無限）。
+8. `BotMath` に全定数＋`maceFarPearlChance(preset)` を追加、`MaceBotMathTest` で固定
+   （predicate の意味含め: fall_distance15=1.5 など）。
+
+次: CI（`build.yml`）でビルド→HEADLESS で mace 計測（`tools/parity-runner` の
+mace_k10v11 相当＋プラグイン側 `fight MACE 150 INTERMEDIATE`）で swing/pearl を
+Paper 参照値（who=a 72〜97/分、pearl ≈17.9/分）と突き合わせ。S-tap/strafe の寄与は
+サンプルの速度・yaw 変化で確認。

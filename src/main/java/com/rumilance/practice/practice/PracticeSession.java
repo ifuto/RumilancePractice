@@ -145,6 +145,32 @@ public final class PracticeSession {
         private long targetHurtUntilMs;
 
         /**
+         * Map {@code tempcrit} of the mace bot: 0 = the COMBO variant ({@code mace/combo/tick}:
+         * W/S-tap + strafe movement, no pcrit gate on the hit) and 1 = the CRIT variant
+         * ({@code mace/tick}: pcrit gate, no taps). {@code map/start3} starts it at 1 (the
+         * .crit toggle is on) and {@code quantum:sword/randomise} re-rolls it 50/50 after every
+         * swing — the two variants together are what produce the measured swing cadence.
+         */
+        private int botVariant = 1;
+        /**
+         * Map {@code real_hitcd} of the mace bot (until-when): {@code allstats/advancestats}
+         * sets it to 11 ticks when the bot lands damage on the target and it decays one per
+         * tick. While 7+ ticks remain, the combo variant's S-tap cancels the forward input.
+         */
+        private long maceStapUntilMs;
+        /**
+         * Map target {@code hitcd} of the mace bot (until-when): hitting the target sets ITS
+         * hitcd to 15 (gear 2) and it decays one per tick. While set, the crit variant's pcrit
+         * gate refuses to swing — this is the reference's anti-trade rhythm that keeps its
+         * swing rate at the measured cadence instead of the raw 11-tick cooldown ceiling.
+         */
+        private long maceTargetHitcdUntilMs;
+        /** Map mace strafe side ({@code bot_mech/strafe}: left=1 / right=0, re-rolled every 5t). */
+        private int botStrafeSide = 1;
+        /** Map mace {@code strafecd} (until-when): the strafe side re-roll clock (5 ticks). */
+        private long botStrafeCdUntilMs;
+
+        /**
          * Map {@code state}: 1/2 = ATTACK ({@code bin/27}), 0/3 = PASSIVE ({@code bin/13}).
          * {@code eval/biased} rebuilds it every tick from {@code eval}: while the bot is ahead
          * (or its HP deficit is recoverable) it attacks, and the moment {@code eval <= -1} it
@@ -238,6 +264,16 @@ public final class PracticeSession {
         public void anchorBlock(org.bukkit.Location v) { anchorBlock = v; }
         public long targetHurtUntilMs() { return targetHurtUntilMs; }
         public void targetHurtUntilMs(long v) { targetHurtUntilMs = v; }
+        public int botVariant() { return botVariant; }
+        public void botVariant(int v) { botVariant = v; }
+        public long maceStapUntilMs() { return maceStapUntilMs; }
+        public void maceStapUntilMs(long v) { maceStapUntilMs = v; }
+        public long maceTargetHitcdUntilMs() { return maceTargetHitcdUntilMs; }
+        public void maceTargetHitcdUntilMs(long v) { maceTargetHitcdUntilMs = v; }
+        public int botStrafeSide() { return botStrafeSide; }
+        public void botStrafeSide(int v) { botStrafeSide = v; }
+        public long botStrafeCdUntilMs() { return botStrafeCdUntilMs; }
+        public void botStrafeCdUntilMs(long v) { botStrafeCdUntilMs = v; }
 
         public long blastUntilMs() { return blastUntilMs; }
         public void blastUntilMs(long v) { blastUntilMs = v; }
