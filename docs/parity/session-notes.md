@@ -811,3 +811,43 @@ unbreakable を突き合わせ (3) **一致したときだけ** キット化 + `
   `pearl`(パール投げ), `y_max`(最大到達高度), `items.diamond_spear`(槍 = lunge),
   who=b では `hp_avg` も。カウンタでは **`c_bmcombo_qa` が Fabric 28 に対し Paper 741
   (26 倍)**、`c_bmlogic_qa` 1672 / 978。メイス固有の combo/lunge フローの移植が次の標的。
+
+## 10.16 環境リセット耐性 + メイスの場外問題 (2026-09-17 早朝)
+
+### 1. サンドボックス再起動で /tmp と .git の状態が巻き戻る
+再起動後、`/tmp` が空になり、**リポジトリの .git も古いコミットを指していた**
+(作業ツリーのファイルは最新のまま)。`git fetch` して
+`git diff --stat origin/<branch>` で「作業ツリー == プッシュ済み」を確認してから
+`git reset --hard origin/<branch>` で復旧する(前回と同じ手順)。
+→ 復旧後は `tools/parity-runner/env_up.sh --start` 1 発で JDK/Fabric/Paper/ワールド/
+   プラグインまで戻る。**約 3 分**。
+
+### 2. サーバーキットと紐づけの永続化 (`server_preset.py`)
+`kits.yml` / `practices.yml` の `bot-mode-kits` / `quantum.yml` の `bot.mode` はすべて
+/tmp 側にあり、再起動のたびに消える。消えたまま計測すると **キット未適用の状態を
+「本物の差」と誤認する**(実際に踏んだ: combo 発火が 28 対 741 に見えたが、正しい
+キットを当てた後は 23 対 79 / 304 対 141 と**同エンジン内でも振れるノイズ**だった)。
+- `server_preset.py save`  … いまの Paper 環境 → `tools/parity-runner/fixtures/parity-*`
+- `server_preset.py apply` … fixtures → 実行ディレクトリ (サーバー起動前に適用)
+- `env_up.sh` は unpack 直後と起動後に自動適用する。
+
+### 3. メイス: アリーナから出た後の復帰挙動が左右で違っていた
+ハーネスのアリーナは 24x24。メイス装備(真珠・ウィンドチャージ・突進)だと簡単に外へ出る。
+- Fabric: 奈落へ落ちて死に、リスポーンで戦場に戻る。
+- Paper : **壁に張り付いたまま完全停止**(実測: x=-712, y=32, z=95 で 30 秒以上動かない)。
+  → `parity:rescue` を追加: アリーナ箱の外/落下中の BOT を毎 tick 検出して戦場中央へ戻す。
+  これで両エンジンとも y_min=31 / z_span 23 に揃い、サンプル欠けも消えた。
+
+### 4. メイスの判定 (maceR/maceS, 60s/25w, ノイズ床)
+```
+who=b: [本物] なし                    ← 一致
+who=a: [本物] pearl, swing, hp_min    ← 残り 3 指標
+       [一致] y_med, y_min, z_span, x_span, speed, move_share, items.*, crystal, explode …
+```
+- `swing` = q-sample の `hit` スコアの増分 (>=7) /分。Paper の BOT a が 2〜3 倍
+  (36.7→120.0, 50.2→90.6)。`pearl` も約 2 倍 (7.9→17.9)。`hp_min` は Paper が低い。
+- **`hit` / `pc` スコアを書いている関数がパック側に存在しない**(grep 済み)。つまり
+  これらは BOT フレームワーク(Carpet/QuantumBOT 側)が更新するスコアで、移植側の
+  更新規則が参照と違う疑いが強い。次はここ(攻撃/真珠のカウンタ更新)を潰す。
+- BOT b 側(ハーネスの `vs_brain` が回す方)は一致しているので、差は「マップ自身が
+  回す BOT a」の経路に固有。

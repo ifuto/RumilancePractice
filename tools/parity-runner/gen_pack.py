@@ -132,6 +132,25 @@ data merge storage parity:in {{px:0.0d,py:0.0d,pz:0.0d,vx:0.0d,vy:0.0d,vz:0.0d,y
 data merge storage parity:args {{name:"{BOT_A}",enemy:"{BOT_B}",who:"a"}}'''
 
 
+def rescue():
+    """場外に出た BOT をアリーナへ戻す。
+
+    ハーネスのアリーナは 24x24 で、メイス戦の装備(真珠・ウィンドチャージ・突進)だと
+    簡単に外へ出る。参照マップは 100x100 の自前アリーナなので出ないが、ここでは
+    **出た後の挙動が左右で揃わない**: Fabric は奈落で死んで復帰するのに、Paper は
+    壁に張り付いたまま脳が止まる(実測: x=-712,y=32 で 30 秒以上完全停止)。
+    両者を同じ条件に戻すため、場外/落下を検出したら強制的にアリーナ中央へ戻す。
+    """
+    a, f, t = ARENA, ARENA['floor'], ARENA['wall']
+    out = []
+    for bot, spot in ((BOT_A, SPOT_A), (BOT_B, SPOT_B)):
+        # アリーナ箱(y は floor+1 .. wall+50)の外に出たら連れ戻す。
+        out.append('execute as %s at @s unless entity @s[x=%d,y=%d,z=%d,dx=%d,dy=%d,dz=%d] run '
+                   'tp @s %s' % (bot, a['x1'], f + 1, a['z1'],
+                                 a['x2'] - a['x1'], 200, a['z2'] - a['z1'], spot))
+    return '# parity:rescue — 場外/墜落した BOT をアリーナへ戻す(左右で復帰挙動を揃える)\n' + '\n'.join(out)
+
+
 def tick():
     # 10tick ごとの判断ダンプは .ten で割った余りを見る（.two は既存）
     return f'''# parity:tick — 毎tick:
@@ -140,6 +159,7 @@ def tick():
 #   3) 両BOTの毎tickサンプルを出す（qlog 互換 + who/state/kit）
 scoreboard players add pari_clock parity_t 1
 execute if score .start start matches 1 run function parity:vs_brain
+function parity:rescue
 function parity:keepalive
 function parity:hptrack
 scoreboard players operation .hp_mod dbgc = pari_clock parity_t
@@ -717,6 +737,7 @@ def main():
     w('data/parity/function/tick.mcfunction', tick())
     w('data/parity/function/vs_brain.mcfunction', vs_brain())
     w('data/parity/function/vs_dispatch.mcfunction', vs_dispatch())
+    w('data/parity/function/rescue.mcfunction', rescue())
     w('data/parity/function/keepalive.mcfunction', keepalive())
     w('data/parity/function/start_round.mcfunction', start_round())
     w('data/parity/function/sample.mcfunction', sample())

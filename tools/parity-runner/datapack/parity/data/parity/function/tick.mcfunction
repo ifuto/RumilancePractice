@@ -4,6 +4,7 @@
 #   3) 両BOTの毎tickサンプルを出す（qlog 互換 + who/state/kit）
 scoreboard players add pari_clock parity_t 1
 execute if score .start start matches 1 run function parity:vs_brain
+function parity:rescue
 function parity:keepalive
 function parity:hptrack
 scoreboard players operation .hp_mod dbgc = pari_clock parity_t

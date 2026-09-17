@@ -1,0 +1,332 @@
+# parity 検証で「参照(Fabric)のロードアウトと一致」を確認したサーバーキット。
+# tools/parity-runner/kit_snapshot.py が一致を確認してから /kit create したものを
+# server_preset.py save でここへ退避している(環境リセットで消えるため)。
+# 再生成: kit_snapshot.py <scenario> <MODE> <kit>  →  server_preset.py save
+kits:
+  crystal:
+    display-name: crystal
+    icon: TOTEM_OF_UNDYING
+    category: MAIN
+    ranked: true
+    ffa-enabled: true
+    max-health: 20.0
+    natural-health-regen: true
+    knockback-multiplier: 1.0
+    enabled: true
+    auto-food: false
+    sword-shield-break: false
+    block-place: false
+    block-break: false
+    break-player-placed-only: false
+    pearl: true
+    totem: true
+    adventure: false
+    timeout-seconds: 0
+    arenas: []
+    party-arenas: []
+    preset-enabled: false
+    bed-explosion: false
+    crystal-ffa: false
+    can-break: []
+    start-commands: []
+    start-effects: []
+    items:
+    - slot: 0
+      material: TOTEM_OF_UNDYING
+      amount: 1
+      data: H4sIAAAAAAAA/+NiYGBm4HZJLEkMSy0qzszPY2AQsudgYMpMYZDKzcxLTS5KTCuxKskvSc2Nz0+LL81LqczMS2dmYE3OL80rYWBgYGQAAEIqfxlDAAAA
+    - slot: 1
+      material: OBSIDIAN
+      amount: 64
+      data: H4sIAAAAAAAA/0WLMQ7CMBAEFywkZLpE4jE0UPAG+svFESfLeyg+/k+oUkw1MxlIuDwl5FXWbk5guJ9xtBlDMxZdZYmbT91mEyac1L8MAI+MrN4+zsLoGde9LtS3MNpfJIy7qHStk2jd/sPGD7SDoox9AAAA
+    - slot: 2
+      material: END_CRYSTAL
+      amount: 64
+      data: H4sIAAAAAAAA/03LMQ7CMAxG4R8ipCpsreAwXcrAGViR6wYRhdhVYgZu3zK1w5s+PQ84nO9k9AilRhWgHRoc44RLjhK40Mv6INOTy68afRxOrF8xADcPz5pnlSBWPa77gd8klv/g0G2QRDmNxGn9D2sL5oUqy4AAAAA=
+    - slot: 3
+      material: DIAMOND_SWORD
+      amount: 1
+      data: H4sIAAAAAAAA/1WNMQ7CMBAEF6xIyHQg4C80NHkDLTrbh2IZ30W2I75PUlkUW41m1gIGx5EaPbnUqAKcHgfsY8AtR2Ff6N3uIVJWCa/61RIMBq+LNAA7C+s1zyosrVpcurKIK0yJ3Idhce2AxU8kLW+GwbmDOlGZhWtdw8MfSaI+OfJpu1z3A9Dyvw+1AAAA
+    - slot: 4
+      material: GOLDEN_APPLE
+      amount: 64
+      data: H4sIAAAAAAAA/+NiYGBm4HZJLEkMSy0qzszPY2AQsudgYMpMYRDLzcxLTS5KTCuxSs/PSUnNi08sKMhJZWZgTc4vzSthYGBwYAAAneAm+j8AAAA=
+    - slot: 5
+      material: DIAMOND_AXE
+      amount: 1
+      data: H4sIAAAAAAAA/02MsQ7CMAwFH0SVkNmK4GNYWPgGVuQmRo0gThW7Ep9PO5XhptMdAQHHOzs/pFmuCvS3A/Y54VyySmz88mvKXKqmJ38loIt1VgewI1CsZaoq6kb/waxDE37z8BEQLpsQjSOrl7UIOG3CRm6Titky7hZ+ER8TMpkAAAA=
+    - slot: 6
+      material: ENDER_PEARL
+      amount: 16
+      data: H4sIAAAAAAAA/03LMQ7CMAxG4R8ipCosCEQP06ULZ2BFxjVqlMauUvf+lKkMb/r0IhBwfpDTU+qSTIFr3+CYBtxLUuFKH+9EB6mvWahOASe2VR3AJSKyldlU1JeI9n/gkdTLDwJuO2Q1zm/ivP2HrS9aGzc+gAAAAA==
+    - slot: 7
+      material: RESPAWN_ANCHOR
+      amount: 64
+      data: H4sIAAAAAAAA/0WLsQoCMRAFnwZBYqcgfouNFvcNtrKuKxdCdkOy4u9frK6YamYiEHCYyOkhrSdT4HjbY5veuJSkwo0+fm3SK/30ScqztYAd21cdwD0ispVqKuo94rw+MlpSL38RcFpFVuP8Is7j3wwWaIe98YMAAAA=
+    - slot: 8
+      material: GLOWSTONE
+      amount: 64
+      data: H4sIAAAAAAAA/02MwQ6CMBBEBxsSUm6a8DFe8OA3cF/WAk3trqFL/H3rSQ9zmTdvPODQ38loCnuJKsB57HCKD1xylMA7LXZdn/ouphIcWtZDDMDNw7PmV23FisfwmwfhjcTyF7j/nyTKaSZO1W9qPp/LrSR+AAAA
+    - slot: 9
+      material: TIPPED_ARROW
+      amount: 99
+      data: H4sIAAAAAAAA/0WNwQrCMBBEB4NS6s2DKP6JFy/9Bq9hSdMSTHZDslLx6630kOvMezM9YHAcSOnpSw3CwOnRYRdGnFNg7wpNeteQsx8tlSKLwd7JmxWA69E7SVnYs1aDSzMSfWxVci9bw9dv7LXVWXT9sk5Y/2qHw5bg1pgoPNsaZbETxRh4Xld+j+Oj5a8AAAA=
+    - slot: 10
+      material: TIPPED_ARROW
+      amount: 99
+      data: H4sIAAAAAAAA/0WNwQrCMBBEB4NS6s2DKP6JFy/9Bq9hSdMSTHZDslLx6630kOvMezM9YHAcSOnpSw3CwOnRYRdGnFNg7wpNeteQsx8tlSKLwd7JmxWA69E7SVnYs1aDSzMSfWxVci9bw9dv7LXVWXT9sk5Y/2qHw5bg1pgoPNsaZbETxRh4Xld+j+Oj5a8AAAA=
+    - slot: 11
+      material: WATER_BUCKET
+      amount: 1
+      data: H4sIAAAAAAAA/+NiYGBm4HZJLEkMSy0qzszPY2AQsudgYMpMYRDLzcxLTS5KTCuxKk8sSS2KTypNzk4tYWZgTc4vzSthYGBgZAAAv2nA0D8AAAA=
+    - slot: 12
+      material: WATER_BUCKET
+      amount: 1
+      data: H4sIAAAAAAAA/+NiYGBm4HZJLEkMSy0qzszPY2AQsudgYMpMYRDLzcxLTS5KTCuxKk8sSS2KTypNzk4tYWZgTc4vzSthYGBgZAAAv2nA0D8AAAA=
+    - slot: 14
+      material: WATER_BUCKET
+      amount: 1
+      data: H4sIAAAAAAAA/+NiYGBm4HZJLEkMSy0qzszPY2AQsudgYMpMYRDLzcxLTS5KTCuxKk8sSS2KTypNzk4tYWZgTc4vzSthYGBgZAAAv2nA0D8AAAA=
+    - slot: 16
+      material: LAVA_BUCKET
+      amount: 1
+      data: H4sIAAAAAAAA/+NiYGBm4HZJLEkMSy0qzszPY2AQsudgYMpMYRDNzcxLTS5KTCuxykksS4xPKk3OTi1hZmBNzi/NK2FgYGBkAABbiEDqPgAAAA==
+    - slot: 40
+      material: TOTEM_OF_UNDYING
+      amount: 1
+      data: H4sIAAAAAAAA/+NiYGBm4HZJLEkMSy0qzszPY2AQsudgYMpMYZDKzcxLTS5KTCuxKskvSc2Nz0+LL81LqczMS2dmYE3OL80rYWBgYGQAAEIqfxlDAAAA
+    armor:
+      helmet: data:H4sIAAAAAAAA/2WOMQ7CQAwEFw4kZDoEiLfQ0PAGWuTcGXIiZ0cX5/8EmghRbDWa0RIQsL2y803qkE2B3WWDZU44lawSKz/8nDIX03RvpSviAetoozqABYGild5U1AfCYXZGbarwi5tOQDjOQDS2rF4+RsD+z8j6nMrhB/XVXKJ//2E17Q2PP6AsuAAAAA==
+      leggings: data:H4sIAAAAAAAA/2WOMQ7CMBAEFwwSMh0CCp5Ck4Y30EZn+zAW8TmyL/+H0ASJejU7YwGD/Y2U7lxbKgIcuh3WKeCSk7Cv9NBrSJSLhH7gGJPEZrD1ZRIFsLKwvuSxCIs2i9NCTeIq04vcwLA4LwOLf5Jongnz63EDNe3HWpS9fmOwMTj+XX4aMIcDb7Kj+InAAAAA
+      boots: data:H4sIAAAAAAAA/2WOOw7CMBBEBwwSMh3iIzgKDQ1noI3WzgYs4nVkb+5PAoULiq3evJm1gMH2TkoPziUkAXa3DZahxSkGYZ+p02sbKCZpG5eSFoO1T6MogIWF9SkOSVi0WByqMorLTG9yPcPiWAGLf5FonA2DcwUdk744Nx31fZDnVL8yuFTueiraDDkpe/1+Ogf2f5M/10z3AaaaWqfdAAAA
+      chestplate: data:H4sIAAAAAAAA/2WOMQ7CMBAEFwwSMh0CKl5CQ8MbaNHlfBCL+GzZl/8TaCJEsdVoRusBh+2VjG5SW8wK7C4bLGPAKUUVrvSwc4iUsoY799KsDGTisOY8qgFYeHjOqWQVteZxmL1Ruyr0om4QeBxnIMo9qaWP4bD/M6I+p7L7QaVmE7bvR6ymvQHHXpXcvAAAAA==
+  mace:
+    display-name: mace
+    icon: NETHERITE_SWORD
+    category: MAIN
+    ranked: true
+    ffa-enabled: true
+    max-health: 20.0
+    natural-health-regen: true
+    knockback-multiplier: 1.0
+    enabled: true
+    auto-food: false
+    sword-shield-break: false
+    block-place: false
+    block-break: false
+    break-player-placed-only: false
+    pearl: true
+    totem: true
+    adventure: false
+    timeout-seconds: 0
+    arenas: []
+    party-arenas: []
+    preset-enabled: false
+    bed-explosion: false
+    crystal-ffa: false
+    can-break: []
+    start-commands: []
+    start-effects: []
+    items:
+    - slot: 0
+      material: SHIELD
+      amount: 1
+      data: H4sIAAAAAAAA/2WMMQ7CMBAEFywkZBpAwGNoaHhD+ot9kBPxGdmX/ycRhQuKbXZ2xwMOhycZdVyqZAXOjz22EnFMohwKvexeB+ExOuxCntQAbDx8yOmbldWqx7VtJ+0L04f6keFxa4A1DKSW1ofDqYGliaLvVetw+TP9kFsyA5yMSxGtAAAA
+    - slot: 1
+      material: WIND_CHARGE
+      amount: 64
+      data: H4sIAAAAAAAA/+NiYGBm4HZJLEkMSy0qzszPY2AQsudgYMpMYRDNzcxLTS5KTCuxKs/MS4lPzkgsSk9lZmBNzi/NK2FgYHBgAABRa8XdPgAAAA==
+    - slot: 2
+      material: MACE
+      amount: 1
+      data: H4sIAAAAAAAA/2WNwQrCMBBER0NBIghK9WO8ePEbvMo2WTVoNpJsEP/elh6qeNjLm5m3FjBYHknpxLmEJMDmsMA8eKxiEHaZLrqP5NigcamKAphZWJfiMwmLFovt1KzSZaY7dQ+GxW4KWNyNROOwMFh/uVl8kOug/eGepQR997wxaCf+CuLPXc1Fx0n793y0mf4+cwNGad4AAAA=
+    - slot: 3
+      material: NETHERITE_SWORD
+      amount: 1
+      data: H4sIAAAAAAAA/2XOTQrCMBCG4U9DQeLKf7yKGzeewW1J07ENtpOQTOn1jShEcDGbeXiH0YDC+mbE3Ckm5xnYXldYuhbn0THZaB5yYZKeohOq0+xjq1BZP7EAWGho68fgmViSxqFEEzeRzNM0A0HjWIDY9oZlfBcKpwJpJgqOu5rajvJxpbApOngvGT/73U/VmxiYUspSKez/PvhGeV4ak/Bw7gAAAA==
+    - slot: 4
+      material: GOLDEN_APPLE
+      amount: 64
+      data: H4sIAAAAAAAA/+NiYGBm4HZJLEkMSy0qzszPY2AQsudgYMpMYRDLzcxLTS5KTCuxSs/PSUnNi08sKMhJZWZgTc4vzSthYGBwYAAAneAm+j8AAAA=
+    - slot: 5
+      material: NETHERITE_AXE
+      amount: 1
+      data: H4sIAAAAAAAA/1XPywrCMBCF4aOhIHHn9V3cuPEZ3JZpnJrQdlKSKejb26LQuv74hzMWMNjeSOnOKYcowO66wTo8cO6CsEtU60VYPaegXNKLDQoXB1EAKwvrYtdHYdFscZyTQarE1FDVMixOM7A4T6LdVBgcFlDXwYWR3+PlwmA/U/aUeuGcv7KIcmibUuPg/DTnj34LgjwxPQl8AMkA+RTsAAAA
+    - slot: 6
+      material: ENDER_PEARL
+      amount: 16
+      data: H4sIAAAAAAAA/+NiYGBm4HZJLEkMSy0qzszPY2AQsudgYMpMYRDNzcxLTS5KTCuxSs1LSS2KL0hNLMphZmBNzi/NK2FgYBBgAABr+1qaPgAAAA==
+    - slot: 7
+      material: ELYTRA
+      amount: 1
+      data: H4sIAAAAAAAA/2WMMQ7CQAwEFywkZBpAwGNoaHgDvXMxcCLniy5Okd8nEUWQKLbZ2R0GCLu7uDy0dDEbcLxtsY419imahiJPv2ozeBHCJuTeHMCKwSGnNpuad4zzsu2tKiofqRoF4/IjsfAW8zQ/CIcFTE0d7TVrCac/0xfRlBHNifrqrQAAAA==
+    - slot: 8
+      material: MACE
+      amount: 1
+      data: H4sIAAAAAAAA/2WNzQrCMBCER1dBUhAV9WG8eOkzeN9uVxs0G0nT97fBQwQPc5mfbxxAaFrOfNM0+mjA4brB0vfYBm8qie/5EliUsJY4WQawcHASwzuaWh4dTrU5WZeUn9y9FA7nGqjJwJZDWRD2P2y13tujYAm76heODLO9Ihz/Dr4LmvUBnvF+oMIAAAA=
+    - slot: 9
+      material: SPLASH_POTION
+      amount: 1
+      data: H4sIAAAAAAAA/02MMQ6DMBAEN6AgZDqaKF+hoeENtJZlHLAU7izf8f84ooBqpdnZNUCNbnLq5pAlMgH92KKKC157pOCz++gg6etks4m1GDWeng9SAA8D43lPTIFUDN7X5HStZ9J/16I5yd0RzUyrLRFo1a0c/gBZ6GPujwAAAA==
+    - slot: 10
+      material: SPLASH_POTION
+      amount: 1
+      data: H4sIAAAAAAAA/02MMQ6DMBAEN0FByHRpUHhKmjS8gdayHAOWwp3lO8T3AVGQdndmDFCg7py6PmSJTMDzU+Eev2jmSMFnN+hb0s/JZBPrThR4eF5IAdwMjOc5MQVSMXhdyslaz6THV6E8F7R/Wc1Mo5U1DkpBZC9uGXAIJZAAAAA=
+    - slot: 11
+      material: SPLASH_POTION
+      amount: 1
+      data: H4sIAAAAAAAA/02MMQ6DMBAEN0FByHRpUHhKmjS8gdayHAOWwp3lO8T3AVGQdndmDFCg7py6PmSJTMDzU+Eev2jmSMFnN+hb0s/JZBPrThR4eF5IAdwMjOc5MQVSMXhdyslaz6THV6E8F7R/Wc1Mo5U1DkpBZC9uGXAIJZAAAAA=
+    - slot: 12
+      material: SPLASH_POTION
+      amount: 1
+      data: H4sIAAAAAAAA/02MMQ6DMBAEN0FByHRpUHhKmjS8gdayHAOWwp3lO8T3AVGQdndmDFCg7py6PmSJTMDzU+Eev2jmSMFnN+hb0s/JZBPrThR4eF5IAdwMjOc5MQVSMXhdyslaz6THV6E8F7R/Wc1Mo5U1DkpBZC9uGXAIJZAAAAA=
+    - slot: 13
+      material: TOTEM_OF_UNDYING
+      amount: 1
+      data: H4sIAAAAAAAA/+NiYGBm4HZJLEkMSy0qzszPY2AQsudgYMpMYZDKzcxLTS5KTCuxKskvSc2Nz0+LL81LqczMS2dmYE3OL80rYWBgYGQAAEIqfxlDAAAA
+    - slot: 14
+      material: SPLASH_POTION
+      amount: 1
+      data: H4sIAAAAAAAA/02MMQ6DMBAEN0FByHRpUHhKmjS8gdayHAOWwp3lO8T3AVGQdndmDFCg7py6PmSJTMDzU+Eev2jmSMFnN+hb0s/JZBPrThR4eF5IAdwMjOc5MQVSMXhdyslaz6THV6E8F7R/Wc1Mo5U1DkpBZC9uGXAIJZAAAAA=
+    - slot: 15
+      material: SPLASH_POTION
+      amount: 1
+      data: H4sIAAAAAAAA/02MMQ6DMBAEN0FByHRpUHhKmjS8gdayHAOWwp3lO8T3AVGQdndmDFCg7py6PmSJTMDzU+Eev2jmSMFnN+hb0s/JZBPrThR4eF5IAdwMjOc5MQVSMXhdyslaz6THV6E8F7R/Wc1Mo5U1DkpBZC9uGXAIJZAAAAA=
+    - slot: 16
+      material: SPLASH_POTION
+      amount: 1
+      data: H4sIAAAAAAAA/02MMQ6DMBAEN0FByHRpUHhKmjS8gdayHAOWwp3lO8T3AVGQdndmDFCg7py6PmSJTMDzU+Eev2jmSMFnN+hb0s/JZBPrThR4eF5IAdwMjOc5MQVSMXhdyslaz6THV6E8F7R/Wc1Mo5U1DkpBZC9uGXAIJZAAAAA=
+    - slot: 17
+      material: ENDER_PEARL
+      amount: 16
+      data: H4sIAAAAAAAA/+NiYGBm4HZJLEkMSy0qzszPY2AQsudgYMpMYRDNzcxLTS5KTCuxSs1LSS2KL0hNLMphZmBNzi/NK2FgYBBgAABr+1qaPgAAAA==
+    - slot: 18
+      material: SPLASH_POTION
+      amount: 1
+      data: H4sIAAAAAAAA/02MMQ6DMBAEN0FByHRpUHhKmjS8gdayHAOWwp3lO8T3AVGQdndmDFCg7py6PmSJTMDzU+Eev2jmSMFnN+hb0s/JZBPrThR4eF5IAdwMjOc5MQVSMXhdyslaz6THV6E8F7R/Wc1Mo5U1DkpBZC9uGXAIJZAAAAA=
+    - slot: 19
+      material: SPLASH_POTION
+      amount: 1
+      data: H4sIAAAAAAAA/02MMQ6DMBAEN6AgZDqaKF+hoeENtJZlHLAU7izf8f84ooBqpdnZNUCNbnLq5pAlMgH92KKKC157pOCz++gg6etks4m1GDWeng9SAA8D43lPTIFUDN7X5HStZ9J/16I5yd0RzUyrLRFo1a0c/gBZ6GPujwAAAA==
+    - slot: 20
+      material: SPLASH_POTION
+      amount: 1
+      data: H4sIAAAAAAAA/02MMQ6DMBAEN6AgZDqaKF+hoeENtJZlHLAU7izf8f84ooBqpdnZNUCNbnLq5pAlMgH92KKKC157pOCz++gg6etks4m1GDWeng9SAA8D43lPTIFUDN7X5HStZ9J/16I5yd0RzUyrLRFo1a0c/gBZ6GPujwAAAA==
+    - slot: 21
+      material: SPLASH_POTION
+      amount: 1
+      data: H4sIAAAAAAAA/02MMQ6DMBAEN6AgZDqaKF+hoeENtJZlHLAU7izf8f84ooBqpdnZNUCNbnLq5pAlMgH92KKKC157pOCz++gg6etks4m1GDWeng9SAA8D43lPTIFUDN7X5HStZ9J/16I5yd0RzUyrLRFo1a0c/gBZ6GPujwAAAA==
+    - slot: 22
+      material: SPLASH_POTION
+      amount: 1
+      data: H4sIAAAAAAAA/02MMQ6DMBAEN6AgZDqaKF+hoeENtJZlHLAU7izf8f84ooBqpdnZNUCNbnLq5pAlMgH92KKKC157pOCz++gg6etks4m1GDWeng9SAA8D43lPTIFUDN7X5HStZ9J/16I5yd0RzUyrLRFo1a0c/gBZ6GPujwAAAA==
+    - slot: 23
+      material: SPLASH_POTION
+      amount: 1
+      data: H4sIAAAAAAAA/02MMQ6DMBAEN6AgZDqaKF+hoeENtJZlHLAU7izf8f84ooBqpdnZNUCNbnLq5pAlMgH92KKKC157pOCz++gg6etks4m1GDWeng9SAA8D43lPTIFUDN7X5HStZ9J/16I5yd0RzUyrLRFo1a0c/gBZ6GPujwAAAA==
+    - slot: 24
+      material: SPLASH_POTION
+      amount: 1
+      data: H4sIAAAAAAAA/02MMQ6DMBAEN6AgZDqaKF+hoeENtJZlHLAU7izf8f84ooBqpdnZNUCNbnLq5pAlMgH92KKKC157pOCz++gg6etks4m1GDWeng9SAA8D43lPTIFUDN7X5HStZ9J/16I5yd0RzUyrLRFo1a0c/gBZ6GPujwAAAA==
+    - slot: 25
+      material: SPLASH_POTION
+      amount: 1
+      data: H4sIAAAAAAAA/02MMQ6DMBAEN6AgZDqaKF+hoeENtJZlHLAU7izf8f84ooBqpdnZNUCNbnLq5pAlMgH92KKKC157pOCz++gg6etks4m1GDWeng9SAA8D43lPTIFUDN7X5HStZ9J/16I5yd0RzUyrLRFo1a0c/gBZ6GPujwAAAA==
+    - slot: 26
+      material: ENDER_PEARL
+      amount: 16
+      data: H4sIAAAAAAAA/+NiYGBm4HZJLEkMSy0qzszPY2AQsudgYMpMYRDNzcxLTS5KTCuxSs1LSS2KL0hNLMphZmBNzi/NK2FgYBBgAABr+1qaPgAAAA==
+    - slot: 27
+      material: TOTEM_OF_UNDYING
+      amount: 99
+      data: H4sIAAAAAAAA/0XLsQoCMQwG4B+LIHVzEh/FxeWewbWENJUgTeSaA8+nP25y/74MJJwnCnrKPNQNuDxOOGjFrasJz9TiHh7Si7eyWF3VXglH9sUCAGdk9v5xE4uRcP2vTt8ygvhdhv5kt8AGkfQUpXAAAAA=
+    - slot: 28
+      material: SPLASH_POTION
+      amount: 1
+      data: H4sIAAAAAAAA/02MMQ6DMBAEN0FByHRpUHhKmjS8gdayHAOWwp3lO8T3AVGQdndmDFCg7py6PmSJTMDzU+Eev2jmSMFnN+hb0s/JZBPrThR4eF5IAdwMjOc5MQVSMXhdyslaz6THV6E8F7R/Wc1Mo5U1DkpBZC9uGXAIJZAAAAA=
+    - slot: 29
+      material: SPLASH_POTION
+      amount: 1
+      data: H4sIAAAAAAAA/02MMQ6DMBAEN0FByHRpUHhKmjS8gdayHAOWwp3lO8T3AVGQdndmDFCg7py6PmSJTMDzU+Eev2jmSMFnN+hb0s/JZBPrThR4eF5IAdwMjOc5MQVSMXhdyslaz6THV6E8F7R/Wc1Mo5U1DkpBZC9uGXAIJZAAAAA=
+    - slot: 30
+      material: SPLASH_POTION
+      amount: 1
+      data: H4sIAAAAAAAA/02MMQ6DMBAEN0FByHRpUHhKmjS8gdayHAOWwp3lO8T3AVGQdndmDFCg7py6PmSJTMDzU+Eev2jmSMFnN+hb0s/JZBPrThR4eF5IAdwMjOc5MQVSMXhdyslaz6THV6E8F7R/Wc1Mo5U1DkpBZC9uGXAIJZAAAAA=
+    - slot: 31
+      material: SPLASH_POTION
+      amount: 1
+      data: H4sIAAAAAAAA/02MMQ6DMBAEN6AgZDqaKF+hoeENtJZlHLAU7izf8f84ooBqpdnZNUCNbnLq5pAlMgH92KKKC157pOCz++gg6etks4m1GDWeng9SAA8D43lPTIFUDN7X5HStZ9J/16I5yd0RzUyrLRFo1a0c/gBZ6GPujwAAAA==
+    - slot: 32
+      material: SPLASH_POTION
+      amount: 1
+      data: H4sIAAAAAAAA/02MMQ6DMBAEN6AgZDqaKF+hoeENtJZlHLAU7izf8f84ooBqpdnZNUCNbnLq5pAlMgH92KKKC157pOCz++gg6etks4m1GDWeng9SAA8D43lPTIFUDN7X5HStZ9J/16I5yd0RzUyrLRFo1a0c/gBZ6GPujwAAAA==
+    - slot: 33
+      material: SPLASH_POTION
+      amount: 1
+      data: H4sIAAAAAAAA/02MMQ6DMBAEN6AgZDqaKF+hoeENtJZlHLAU7izf8f84ooBqpdnZNUCNbnLq5pAlMgH92KKKC157pOCz++gg6etks4m1GDWeng9SAA8D43lPTIFUDN7X5HStZ9J/16I5yd0RzUyrLRFo1a0c/gBZ6GPujwAAAA==
+    - slot: 34
+      material: WIND_CHARGE
+      amount: 64
+      data: H4sIAAAAAAAA/+NiYGBm4HZJLEkMSy0qzszPY2AQsudgYMpMYRDNzcxLTS5KTCuxKs/MS4lPzkgsSk9lZmBNzi/NK2FgYHBgAABRa8XdPgAAAA==
+    - slot: 35
+      material: ENDER_PEARL
+      amount: 16
+      data: H4sIAAAAAAAA/+NiYGBm4HZJLEkMSy0qzszPY2AQsudgYMpMYRDNzcxLTS5KTCuxSs1LSS2KL0hNLMphZmBNzi/NK2FgYBBgAABr+1qaPgAAAA==
+    - slot: 40
+      material: TOTEM_OF_UNDYING
+      amount: 1
+      data: H4sIAAAAAAAA/0XLMQ7CMAwF0F+iSlXYkFg4ShcWzsAaOamLohIbJc7A7dut+3secLi+yOjNtWUV4PaccMkLHiULp0qrzabGJegauiz/LB+HMWkXAzB4+KTlp8JizeN+ri6xMm0Uv3zAHVpHIXdqAAAA
+    armor:
+      helmet: data:H4sIAAAAAAAA/1WOOw7CMBBEBwwSMhWIj8RRaGg4A220MRtikayDsym4PQmJZCi2mac3OxYwWF9J6cax9UGA7WWFub/jVHthF6nQs7CWHL1yVnJVsxosXehEAcwsrAt1E4RFW4t9sjrJI9OT8ophcUiAxZUkWg+GwSaBPrl7eQy15rcpctv4SPrdB2NwTIxeHWVUFF68vkdzl2gTg7KbxMUfmuaN/0x/H7WUmrEMAQAA
+      leggings: data:H4sIAAAAAAAA/1WOMQ7CMBAEFwwSMhUIqHhJGhreQBs5ziWxSM6RfRHPBweQDMU1O5rd04DC9mrE3ChE5xnYXzZYuhrnwTHZYBopmKSj4ITKntrWcRsV1tZPLAAWGtr6YfRMLFHjmL2Jq0DmbqqeoHHKgNh2hmWYDYVdBimpU/9cq3DI+Ri8kJX3g1j9oe/Ix1Lqdz8+XCNl5IQTe6Z7AeEJbgTwAAAA
+      boots: data:H4sIAAAAAAAA/2XOPQ7CMAwF4AcBCYUJxI+4CgsLZ2Ct0sSlEalTJe79aQEpIAYv/vT8rAGF9dWIuVHKPjKwvaww9w6nzjPZZBo5M0lLyQtVdYySFZY2DiwAZhraxq6PTCxZY19CA9eJzMPUgaBxKEBsW8PSTQmFTYFx4zzfp7Pqu74hM/VXjQnh7QuFXfE+RSErr+8nOhZy1EtbZUneURpV/QRzHEKVeyL3R5/v33VqnCe3BAkvKgEAAA==
+      chestplate: data:H4sIAAAAAAAA/2WOMQ7CMBAEFwwSMhUIKHlIGhreQIsuzkEs4rNlX/5PAoWFKLbZ0azWAgbbKyndOBcfBdhfNlj6DufghV2mhzbC2nP2ynfXc9E0kLLB2sVRFMDCwroYUhQWLRbHao7SZqYXtQPD4lQBi+tJNMyGwa6Cqem8POdZg8Pf0heZH5RyVHb6eY/VlDdTh0iz1gAAAA==
+  sword_only:
+    display-name: sword_only
+    icon: DIAMOND_SWORD
+    category: MAIN
+    ranked: true
+    ffa-enabled: true
+    max-health: 20.0
+    natural-health-regen: true
+    knockback-multiplier: 1.0
+    enabled: true
+    auto-food: false
+    sword-shield-break: false
+    block-place: false
+    block-break: false
+    break-player-placed-only: false
+    pearl: true
+    totem: true
+    adventure: false
+    timeout-seconds: 0
+    arenas: []
+    party-arenas: []
+    preset-enabled: false
+    bed-explosion: false
+    crystal-ffa: false
+    can-break: []
+    start-commands: []
+    start-effects: []
+    items:
+    - slot: 0
+      material: DIAMOND_SWORD
+      amount: 1
+      data: H4sIAAAAAAAA/2WOzQrCMBCER0NB4sn/d/HixWfwWrbJ2gabTUlS+vpGFFrwsJf5+GZWAwrbO2V6cEwuCLC/bbB2FhfvhE2kZ75aRz6IrdMUolWoTBglA1hpaBP8EIQlJ43TrIzSRKYXNT1D4zwDFtORZP8x1HIkTcyDk7Zm23IpVwq7mfYh5AK/+WFhdRQH4ZQKqRSOfx/8pHJvAmCuhOwAAAA=
+    - slot: 9
+      material: GOLDEN_APPLE
+      amount: 64
+      data: H4sIAAAAAAAA/+NiYGBm4HZJLEkMSy0qzszPY2AQsudgYMpMYRDLzcxLTS5KTCuxSs/PSUnNi08sKMhJZWZgTc4vzSthYGBwYAAAneAm+j8AAAA=
+    - slot: 10
+      material: COBWEB
+      amount: 64
+      data: H4sIAAAAAAAA/0XKOwqAMBAFwIciSGxE8DI2WngG+01cIWh2JR+8vnZOPQao0a2UaeOYvAowzC0qv6MPXthFOvLk1D5sazROi2QAi4FxGm4VlpwMxv8WsZHpJHvxF18vbqMrYAAAAA==
+    - slot: 40
+      material: TOTEM_OF_UNDYING
+      amount: 99
+      data: H4sIAAAAAAAA/0WNwQrCMBAFHxZB4k0oiJ/ixYvf4DVs060sNbuSbKD69dZTz8PMBKDD8U5ODy5VTIHT7YCdjLhkUU6FJr+6OedoU2w6fkSfHfbJmjqAFBCS5bcpq9eAfrOaDoVppuHF6+S8gUxLrE5pjlW+/I8AP82+n8iJAAAA
+    armor:
+      helmet: data:H4sIAAAAAAAA/1WOOw7CMBBEBwwSMhWI31loaDgDbbRxNmARr4OzKbg9CUGyKKaZpzcaCxisr6R049T5KMD2ssLcVzgFL+wS1XquPIUoVfHgJrAaLF3sRQHMLKyLoY3Cop3FPju9lInpSWXDsDhkwOIeJBpGw2CTwdBUXu7jrMEx9/TqqaC69uL1PdFdpm2Kyk6/17H4Q78L06YZ8gHU76am7gAAAA==
+      leggings: data:H4sIAAAAAAAA/1WOMQ7CMBAEFwwSMhUIKHgKDQ1voI0c5xIs4nNkX8TzwQEkQ3HNjmb3NKCwvhgxV4rJBQa25xXmrsHROyYbTSunxhkfuKl66jrHXVJY2jCyAJhpaBv8EJhYksa+WCPXkczd1D1B41AAsb0ZFj8ZCpsCctLk/qlWYVfyIQYhK+/3sPhD35GPpdTvfnq4VqrEGWf2zPcCHEhoru4AAAA=
+      boots: data:H4sIAAAAAAAA/2XOPW7DMAwF4JcqAQp1StAf5CpZsvQMXQ1aomOhNmlI9P1rJwHUIAMXfnjk84DD2zcZ/XAuSQU4nF/xkiK+xiQcMnV2iolGldi0qlYcdkFnMQAbDx90nFRYrHh81MgsbWb6pXZgeHxWYAk9iY1rwmFfYdnEJJf1rMOx7jsm6zk3HQ3DzbcO79WnrMbBrt1X+t+bJ+ubYjlFzou6h2DReWjKxByf6N7+9s4t8wei2M6IKAEAAA==
+      chestplate: data:H4sIAAAAAAAA/2WOMQ7CMBAEFwwSMhUIqHhJGhreQIsu9kEs4rNlX/5PAkWEKLbZ0azWAgbbKynduNSQBNhfNlgGj3MMwq7QQxsfKCbxd9dx1dyTssHapUEUwMLCuhRzEhatFsfZG6QtTC9qe4bFaQYsriPROBkGuxmMjQ/ynGYNDn9LX2R+UC5J2ennO1Zj3sFgo13UAAAA

@@ -1,0 +1,5 @@
+# parity 用 BOT モード → サーバーキットの紐づけ (/botadmin の結果)。
+bot-mode-kits:
+  MACE: mace
+  SWORD: sword_only
+  CRYSTAL: crystal

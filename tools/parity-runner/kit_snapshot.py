@@ -83,6 +83,10 @@ def enchants_at(sock, bot, base):
     return found
 
 
+def _strip_ub(text):
+    return text.replace('+ub', '').replace('ub+', '').replace('+ub+', '+')
+
+
 def _describe(name, amount, ench, unbr, maxstack, potion):
     out = name + (('x' + amount) if amount != '1' else '')
     extra = []
@@ -155,11 +159,18 @@ def main(argv):
     fabric2 = dumpers['fabric'](bot, slots)
     paper2 = dumpers['paper'](bot, slots)
 
-    diff, churn = [], []
+    diff, churn, transient = [], [], []
     for key, want in fabric1.items():
         f_stable = fabric1[key] == fabric2[key]
         p_stable = paper1[key] == paper2[key]
         if fabric1[key] == paper1[key]:
+            continue
+        # ホットバーの `ub` は「装備を読む瞬間にメインハンドだったアイテム」に付く
+        # パックの副作用(quantum:miscellaneous/unbreakable が weapon.mainhand を舐める)。
+        # どちらが選ばれているかは brain のタイミング次第で、装備そのものの差ではない。
+        if (key[0] == 'slot' and key[1] < 9
+                and _strip_ub(fabric1[key]) == _strip_ub(paper1[key])):
+            transient.append((key, fabric1[key], paper1[key]))
             continue
         if f_stable and p_stable:
             diff.append((key, fabric1[key], paper1[key]))
@@ -171,6 +182,8 @@ def main(argv):
         print('   %-12s fabric=%-46s paper=%s' % ('%s %s' % key, want, got))
     for key, f1, p1, f2, p2 in churn:
         print('   (揺れ) %-9s fabric=%s→%s paper=%s→%s' % ('%s %s' % key, f1, f2, p1, p2))
+    for key, f1, p1 in transient:
+        print('   (過渡) %-9s ub の有無だけの差: fabric=%s paper=%s' % ('%s %s' % key, f1, p1))
     if diff:
         print('!! ロードアウトが違うのでキット化しない(先にこれを直す)')
         return 1

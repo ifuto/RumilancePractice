@@ -101,6 +101,16 @@ for world in "$FAB/QuantumMap" "$PAPER/QuantumMap"; do
   python3 "$ROOT/tools/parity-runner/instrument_world.py" "$world/datapacks"
 done
 
+# ---------------------------------------------------------------- 4.5 サーバーキット
+# /tmp が消えるたびにキットと紐づけを作り直すと、その途中の状態で計測して偽の差を
+# 出してしまう。検証済みの一式を fixtures から流し込んでおく(プラグインは boot 時に
+# kits.yml / practices.yml / quantum.yml を読むので、起動前が正しいタイミング)。
+if [ -f "$ROOT/tools/parity-runner/fixtures/parity-kits.yml" ]; then
+  log "検証済みサーバーキットを適用 (fixtures/parity-*)"
+  python3 "$ROOT/tools/parity-runner/server_preset.py" apply --dir "$PAPER" || \
+    echo "  !! server_preset failed"
+fi
+
 # ---------------------------------------------------------------- 5. start scripts
 write_start() {  # write_start <dir> <jar> <heap>
   cat > "$1/start.sh" <<EOF
@@ -127,4 +137,23 @@ if [ "$START" = 1 ]; then
   nohup "$PAPER/start.sh" >/dev/null 2>&1 &
   echo "  起動中… (ログ: $FAB/console.log / $PAPER/console.log)"
 fi
+if [ "$START" = 1 ] && [ -f "$ROOT/tools/parity-runner/fixtures/parity-kits.yml" ]; then
+  log "起動後のキット確認 (プラグインが初期化で上書きしていれば再適用)"
+  for _ in $(seq 1 36); do
+    if timeout 3 bash -c 'exec 3<>/dev/tcp/127.0.0.1/25576' 2>/dev/null; then break; fi
+    sleep 5
+  done
+  sleep 20   # ワールド読込とプラグイン有効化を待つ
+  if ! python3 "$ROOT/tools/parity-runner/rcon.py" 25576 parity 'botadmin' 2>/dev/null | grep -q "MACE BOT"; then
+    echo "  botadmin の紐づけが見えない → 再適用して rumireload"
+    python3 "$ROOT/tools/parity-runner/server_preset.py" apply --dir "$PAPER" >/dev/null
+    python3 "$ROOT/tools/parity-runner/rcon.py" 25576 parity 'rumireload' >/dev/null 2>&1 || true
+    sleep 5
+    python3 "$ROOT/tools/parity-runner/rcon.py" 25576 parity 'botadmin' | head -5
+  else
+    echo "  紐づけ OK:"
+    python3 "$ROOT/tools/parity-runner/rcon.py" 25576 parity 'botadmin' | head -5
+  fi
+fi
+
 log "done"
