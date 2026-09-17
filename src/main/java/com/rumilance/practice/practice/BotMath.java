@@ -88,10 +88,11 @@ public final class BotMath {
      * always. NPC never fights and CUSTOM keeps the Intermediate 40 %.
      */
     public static double maceFarPearlChance(BotDifficulty diff) {
-        if (diff == null || diff.preset() == BotDifficulty.Preset.NPC) {
+        if (diff == null) {
             return 0.0d;
         }
         return switch (diff.preset()) {
+            case NPC -> 0.0d;
             case EASY -> 0.20d;
             case INTERMEDIATE, CUSTOM -> 0.40d;
             case HARD -> 0.60d;

@@ -28,6 +28,11 @@ SOURCES=(
   src/main/java/com/rumilance/practice/packetbot/PacketBot.java
   src/main/java/com/rumilance/practice/bootstrap/FeatureBootstrap.java
   src/main/java/com/rumilance/practice/practice/PracticeService.java
+  # mace パイプラインのゲート定数とセッション状態(v1.76.28 以降)。
+  # 追加を忘れると delivery jar の古い BotMath/PracticeSession が残り、
+  # 「ソースは直っているのに挙動が変わらない」になる。
+  src/main/java/com/rumilance/practice/practice/BotMath.java
+  src/main/java/com/rumilance/practice/practice/PracticeSession.java
   # キットの定義/適用/管理コマンド (kits.yml のスキーマや /kit の挙動を触るので必須。
   # ここを忘れると「ソースは直っているのに挙動が変わらない」= delivery jar の
   # 古いクラスが使われ続ける)。
