@@ -1247,3 +1247,35 @@ crystal, charge, explode, swing, yaw_rate, y_max, dist_med, items.ender_pearl (w
 | sword | ⚠️ totem_pop/hp_avg/hp_min/dist_med (2/2) | ⚠️ yaw系+speed+dist_med |
 | mace | ⚠️ totem_pop/hp系 2/2, pearl 1/2 | 🟡 yaw_med 2/2 (他1/2) |
 | cart | ⚠️ hp_avg/yaw_med/z_span/totem_pop | 🟡 yaw_med のみ |
+
+## 10.26 mace a側hp残差の正体 = 落下maceスマッシュの接続率 (melee/爆発/i-frameは否定)
+
+### maceR17/18 (fix後, 新環境) の被弾ソース分解
+- Bのmelee接続率: **両エンジンとも 1-4%** (B swing 190/107回中 hit 1-2)。バrawlの被弾はmelee連打ではない。
+- wind charge爆発ダメージ: 固定ジオメトリプローブ (BOT横1.0blk起爆) で **F 0.0 / P ≤0.3** — ほぼ無害。頻度も同率 (wc占有率 F2-5% vs P4-5%)。
+- 被弾サイズ med 1.6-2.5 = **落下中maceスマッシュ** (Bがwind self-launch→落下mace攻撃) のダメージ。
+- A drops: F 12/16 vs P 7/10 — サイズは同等 (med 2.3 vs 2.5)、**接続回数が半分**。
+- i-frame仮説否定: B swingのhit率は Aの無傷窓/i-frame窓で変わらず (1-4% flat)。
+- deaths 0、pops F1/6 vs P1/1 (非体系)。攻撃判定回数 (hitcd遷移) は同オーダー (F190/54 vs P107/67、ラウンド差大=レジーム)。
+
+### 結論
+- a側hp系残差 = **空中バrawlにおける落下スマッシュの接続率差**。被弾サイズ・攻撃回数・i-frame・爆発ダメージは全て同等。
+- swing時の補間look (aimラダー) と落下軌道の位相が絡む movement レジーム下流。個別のダメージ/動詞バグではない
+  (crystal が 6スイープ完全一致であること、被弾サイズ一致、近接1発のダメージ式は crash 前提で同一から整合)。
+
+### プローブ手法メモ ( Dead ends / 契約 )
+- **RCON コンソール文脈からの手動 `attack once` プローブは両エンジンで不発** (照準を直しても HP 不変)。
+  実戦の attack once は脳関数内 (tick 開始, actionPack.onUpdate 前に start) で機能する。
+  コンソール文脈の近接プローブは**再試行禁止**。検証は必ず実ラウンドログ (hitcd遷移×hp drop) で。
+- `player <bot> look <yaw> <pitch>` は**文法エラー** (絶対look動詞は無い。絶対向きは playerspawn facing のみ)。
+- par_dt/par_dd 統計は累積値 (ラウンド差分なら使えるが paper 側は数値読みが面倒)。hp時系列分析で十分。
+- [q] パース時の who は group(8) (regex 構造で変動するので毎回数えること)。
+
+### 6キット現状 (§10.25 から変化なし / mace a側の原因がスマッシュ接続率と特定されただけ)
+| キット | a | b |
+|---|---|---|
+| crystal | ✅ 6スイープ一致 | ✅ |
+| pot / nethpot | ✅ | ✅ |
+| mace | ⚠️ スマッシュ接続率 (regime下流) | 🟡 yaw_med 僅差 |
+| sword | ⚠️ hp系+dist_med | ⚠️ yaw系+speed |
+| cart | ⚠️ 一方向的展開レジーム | 🟡 yaw_med 僅差 |
