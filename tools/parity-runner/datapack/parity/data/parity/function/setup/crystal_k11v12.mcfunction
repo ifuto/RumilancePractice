@@ -30,6 +30,7 @@ scoreboard players set .refill toggles 1
 scoreboard players set .blocks_drop toggles 1
 scoreboard players set .inf_tot toggles 1
 scoreboard players set .random toggles 1
+scoreboard players set .cart_speed toggles 3
 scoreboard players set .random_mech toggles 1
 scoreboard players set .crystal_hardcode toggles 0
 playerspawn quantumbot at -646 57 88 facing 0 0 in survival

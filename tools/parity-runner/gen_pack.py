@@ -730,6 +730,8 @@ REF_TOGGLES_ON = [
     'scoreboard players set .blocks_drop toggles 1',
     'scoreboard players set .inf_tot toggles 1',
     'scoreboard players set .random toggles 1',
+    # TNT MINECART (mode 6) の速度トグル。参照環境は 3 (=insta)。carttest/tick だけが読む。
+    'scoreboard players set .cart_speed toggles 3',
     'scoreboard players set .random_mech toggles 1',
     'scoreboard players set .crystal_hardcode toggles 0',
 ]
@@ -741,6 +743,7 @@ SCENARIOS = {
     'mace_k10v11':    dict(mode_fn='mace',      mode='mace',    kit_a=10, kit_b=11),
     'nethpot_k10v11': dict(mode_fn='nethpot',   mode='nethpot', kit_a=10, kit_b=11),
     'pot_k10v11':     dict(mode_fn='pot',       mode='pot',     kit_a=10, kit_b=11),
+    'cart_k10v11':    dict(mode_fn='cart',      mode='cart',    kit_a=10, kit_b=11),
     'crystal_k10v10': dict(mode_fn='crystal',   mode='crystal', kit_a=10, kit_b=10),
     'crystal_k11v12': dict(mode_fn='crystal',   mode='crystal', kit_a=11, kit_b=12),
     'mace_k10v10':    dict(mode_fn='mace',      mode='mace',    kit_a=10, kit_b=10),

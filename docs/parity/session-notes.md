@@ -1164,3 +1164,38 @@ crystal, charge, explode, swing, yaw_rate, y_max, dist_med, items.ender_pearl (w
 | **crystal** | **4スイープで持続残差ゼロ → 一致** |
 | sword | b: speed_med 2/2 (境界の可能性、要+ペア) |
 | mace | b: pearl 3/3 構造残差 (垂直同期、上記) |
+
+## 10.24 6キット目 CART (mode 6) の検証
+
+- ユーザー指摘で判明: キットは6種 (SWORD/MACE/CRYSTAL/NETHERITE_POT/POT/**CART**)。
+  harness に cart_k10v11 を追加 (mode_fn='cart', kit 10/11, gear=2)。
+  `.cart_speed=3` (insta, 参照環境と同一) を REF_TOGGLES に追加 — carttest/tick だけが読む。
+  dispatch は init/crit|combo → quantum:carttest/tick|combo/tick (mode 6) で、
+  harness の vs_dispatch は上位ブランチをコピーしているので B の脳も自動で cart になる。
+  遅延爆発KB経路は TNT カート爆発でも機能 ([KB] deferred 確認)。
+
+### cart 判定 (2スイープ×2ペア, --noise)
+- R1/R2: a 本物=x_span,z_span,hp_avg,hp_low_share / b 本物=totem,totem_pop,x_span,z_span
+- R3/R4: a 本物=totem_pop,yaw_med,hp_avg,hp_low_share / b 本物=yaw_snap,yaw_rate,yaw_med
+- **2/2 持続: a = hp_avg, hp_low_share**。他はスイープ間で入れ替わり (境界寄与混在)。
+- 定量: **hp_avg a  F 3.2-3.7 vs P 10.8-19.7**。hp<5 の時間 a: F 78-85% vs P 0%
+  (paper の A は R3/R4 で min 13.8-17.2 = ほぼ無傷)。可動域は paper が常にアリーナ全幅
+  (x_span 22.4 固定, F は 10-22 で変動)。
+- **解釈**: 相互破壊 (fabric 両者 hp<5 100%近く) vs 一方的展開 (paper B だけ削られる)
+  の**レジーム分岐**。B→A の矢/melee が機能しない定常バグではない (R1/R2 の paper A は
+  大ダメージを受けている)。mace の垂直同期と同系の「cart バrawl の優劣が初期乱数で
+  固まる」構造。bow 使用率は両エンジン同率 (9-14%)。
+- PracticeSideListener.onArrow は追跡のみ/cancel なし。MatchCountdownLock は
+  parity ラウンドでは非アクティブ — プラグインによる矢キャンセルは可能性から除外。
+
+### 6キット検証の最終表
+| キット | 判定 |
+|---|---|
+| sword | a 一致 / b speed_med (境界の可能性, +ペアで確定可能) |
+| mace  | a ほぼ一致 / **b pearl 3/3 構造残差 (垂直同期)** |
+| crystal | **a/b 4スイープ持続残差ゼロ → 一致** |
+| netherite_pot | a/b 残差ゼロ |
+| pot | a/b 残差ゼロ |
+| cart | **a hp系 2/2 構造残差 (一方的展開レジーム)** / b スイープ間変動 |
+
+残作業: mace 垂直同期, cart レジーム, sword-b speed_med 確認, anchor起爆(独立)。

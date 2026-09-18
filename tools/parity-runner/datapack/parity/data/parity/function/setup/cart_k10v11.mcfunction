@@ -1,7 +1,7 @@
-# parity:setup/mace_k10v11 — mode=mace kitA=10 kitB=11 gear=2
+# parity:setup/cart_k10v11 — mode=cart kitA=10 kitB=11 gear=2
 function parity:arena_fill
 scoreboard players set .difficulty difficulty 2
-function quantum:options/mace
+function quantum:options/cart
 scoreboard players set .gear toggles 2
 scoreboard players set .anchors toggles 1
 scoreboard players set .crystals toggles 1
