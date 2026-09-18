@@ -1391,3 +1391,15 @@ crystal, charge, explode, swing, yaw_rate, y_max, dist_med, items.ender_pearl (w
   最後の1本。次の切り分け候補: b の jump/launch 頻度 (y_max P 高め = P-B が上に飛ぶ)。
 - 6キット表 (fix後): crystal ✅(a) + 🟡(b 弱残差) / sword ✅✅ / cart ✅ / mace ✅(a) + ✅(b,
   hp_min 1回) / pot ✅ / nethpot ✅。
+
+### §10.29 追記: crystal-b 弱残差のテクスチャ分解 (texture.py + alive フィルタ)
+- R39/40/43/44 の b 側: P-B は **alive 時の hp_avg が 1.91-2.00 vs F 1.03-1.22 (4/4 非重畳)**。
+  死亡/ハブサンプル (hp<=0.5 or pos 0,0,0) を除外しても変わらない = 真の差。
+  一方で被弾イベント総量は P-B の方が多い (dmg_ev F 1-5 vs P 8-13) → 「被弾の早期性」の差
+  (F-B は序盤に削れてそのまま低 hp で推移、P-B は序盤の被弾が少ない)。
+- alive 速度 median は両エンジン ~0.01-0.06 (両者とも立ち止まり支配)。speed_med の
+  F1.3-2.0 vs P0.4-0.6 は fingerprint の計算方法 (移動サンプル寄り) による増幅。
+- swings b: F/P 同帯。connects b: 同帯。→ B の「攻撃」は一致、B の「被弾タイミング」だけズレる。
+- 切り分け候補 (次回): ①A の序盤クリスタル設置→起爆の到達時間差 ②totem pop 時点の差
+  ③regen/absorption 付与タイミング (N-Arena DeathBridge 系)。レジーム差の可能性も残る
+  (hp_avg 両者とも ≈1-2 = どちらも「破壊されている」帯の中の差)。
