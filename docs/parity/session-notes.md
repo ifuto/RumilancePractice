@@ -1080,3 +1080,37 @@ crystal, charge, explode, swing, yaw_rate, y_max, dist_med, items.ender_pearl (w
   サンプルで翌tickに消える)。F側も R22a で maxY 39.6 と跳ねる等、元々両エンジンに変動あり。
 - 次の候補: ①speed/hp_avg の残差は閾値 boundary の可能性→ペア増やして確認
   ②R21a の maxY 57.7 外れ値の追跡(単発) ③anchor起爆paper不発(独立残課題)。
+
+## 10.22 全キット検証スイープ (環境再構築後, jar=1e714a40, 2スイープ×2ペア)
+
+### 環境復旧
+- sandboxリサイクル: HEAD→base(ddb9cc6)・/tmp消失・worktree-backup消失。ただしworktreeは
+  最終状態を保持していたため fetch+reset --hard FETCH_HEAD で a27a584 に復元(内容一致確認)。
+  env_up.sh --start で /tmp 環境を再構築(jar再build=1e714a40, 両鯖起動, botadmin紐づけOK,
+  全10 setup関数+ping=100込パック展開済み確認)。
+
+### 判定 (--noise, 各シナリオ2ペア×2スイープ, 計20ペア)
+| キット | who=a 残差 | who=b 残差 | 評価 |
+|---|---|---|---|
+| pot (R1/2) | なし | なし | **完全一致** |
+| nethpot (R1/2) | yaw_med (1回, 非再現) | なし | **実質一致** |
+| crystal (R23-26) | **なし (2スイープとも)** | move_share→anchor/speed_med/hp_avg と**フラッター** | a完全一致, b=安定残差なし(境界ノイズ) |
+| sword (R1-4) | hp_avg(1回)→なし | **speed_med (2スイープ連続)** | a一致, b要確認 |
+| mace (R1-4) | pearl,speed,speed_med→totem_pop | **pearl,yaw_snap,speed_med,yaw_rate (連続)** | **要修正** |
+
+### 定量
+- sword-b speed_med: F=1.54/1.50/0.32/0.46 vs P=0.96/0.96/0.86/1.18 b/s。
+  F側の丸内分散が巨大(同エンジンで4.8倍)→境界ノイズの可能性大。ただしPはFの高状態(1.5)に一度も到達せず。
+- **mace-b**: speed_med P=3.14/1.98/3.11/3.02 vs F=1.42/1.16/2.26/2.56 (P高め)。
+  **パール投擲数 b: P19-21 vs F9-10 (約2倍)** — 旧mace残差(pearl≈2倍)の残存。
+  yaw_rate/yaw_snap b も連続残差 = パールescape多発に伴う高速回転の下流と推定。
+  swing/hp系は一致済み(旧残差のswing2-2.8倍は解消)。
+
+### 結論と次
+- 爆発KB修正が全キットに波及: 5キット中3キット(pot/nethpot/crystal-a)が残差ゼロ、
+  swordはspeed_med(b)のみ、mace-bのみが構造的残差。
+- 次: ①mace-bのpearl 2倍のトリガ解析(gap_timer/eval/pearlcd 条件が mace mode でどう読まれるか)
+  ②sword-b speed_med は+2ペアで境界確認(優先低)
+  ③crystal-bフラッターも必要なら+2ペア。
+- 注意: pair.shのサマリ([a]/[b]行)はハブ段のhpを表示することがある(hp=20固定に見える)。
+  実データは[q]行にあり swordR3/4 は minHp 0.5-0.8 の実戦。tailサマリだけでは判断しない。
