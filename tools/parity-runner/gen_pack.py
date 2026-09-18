@@ -402,6 +402,7 @@ $execute store result storage parity:in anc int 1 run scoreboard players get $(n
 $execute store result storage parity:in chg int 1 run scoreboard players get $(name) charge_timer
 $execute store result storage parity:in exp int 1 run scoreboard players get $(name) explosion_timer
 $execute store result storage parity:in pop int 1 run scoreboard players get $(name) pops
+$execute store success storage parity:in rx byte 1 run data get entity $(name) active_effects[{{id:'minecraft:regeneration'}}].duration 1
 $execute store result storage parity:in st int 1 run scoreboard players get $(name) state
 $execute store result storage parity:in kit int 1 run scoreboard players get $(name) kit
 $execute at $(name) store result storage parity:in cry int 1 run execute if entity @e[type=end_crystal,distance=..9]
@@ -423,10 +424,12 @@ def clock():
 
 
 def emit():
+    # rx= は末尾に置く (既存の固定順パーサ parity_runner/parity_compare は p1d 以降を無視するので
+    # 行の途中に入れると全行 parse 失敗になる — rxprobe3/4 と cryR45/46 で実測)。
     return ('$say [q] $(px),$(py),$(pz) v=$(vx),$(vy),$(vz) y=$(yaw) p=$(pit) hp=$(hp) g=$(g) '
             'i=$(item) hit=$(hit) tot=$(tot) ct=$(ct) ob=$(ob) pc=$(pc) cry=$(cry) anc=$(anc) '
             'chg=$(chg) exp=$(exp) hpT=$(hpT) pop=$(pop) ec=$(ec) t=$(t) who=$(who) st=$(st) '
-            'kit=$(kit) rhit=$(realhit) hd=$(hd) cst=$(cst) p1d=$(p1d)')
+            'kit=$(kit) rhit=$(realhit) hd=$(hd) cst=$(cst) p1d=$(p1d) rx=$(rx)')
 
 
 def setup(mode_fn, mode_name, kitchen, kit_a, kit_b, gear, toggles, difficulty=2):

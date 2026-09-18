@@ -22,6 +22,7 @@ $execute store result storage parity:in anc int 1 run scoreboard players get $(n
 $execute store result storage parity:in chg int 1 run scoreboard players get $(name) charge_timer
 $execute store result storage parity:in exp int 1 run scoreboard players get $(name) explosion_timer
 $execute store result storage parity:in pop int 1 run scoreboard players get $(name) pops
+$execute store success storage parity:in rx byte 1 run data get entity $(name) active_effects[{id:'minecraft:regeneration'}].duration 1
 $execute store result storage parity:in st int 1 run scoreboard players get $(name) state
 $execute store result storage parity:in kit int 1 run scoreboard players get $(name) kit
 $execute at $(name) store result storage parity:in cry int 1 run execute if entity @e[type=end_crystal,distance=..9]

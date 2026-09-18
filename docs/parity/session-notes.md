@@ -1403,3 +1403,55 @@ crystal, charge, explode, swing, yaw_rate, y_max, dist_med, items.ender_pearl (w
 - 切り分け候補 (次回): ①A の序盤クリスタル設置→起爆の到達時間差 ②totem pop 時点の差
   ③regen/absorption 付与タイミング (N-Arena DeathBridge 系)。レジーム差の可能性も残る
   (hp_avg 両者とも ≈1-2 = どちらも「破壊されている」帯の中の差)。
+
+### §10.30 crystal-b 根本原因解消 — keepalive regen のエンジン差分攪乱 (2026-09-18)
+
+#### 計測破り2件の修理
+- **paper [q]=0 破り** (rxprobe3/4, cryR45/46 の 0行): emit 行の途中に `rx=` を挿入すると
+  固定順パーサ (parity_runner/parity_compare の LINE regex) が全行 mismatch → 0行。
+  **rx= は行末尾へ** (パーサは p1d 以降を無視するので後方互換)。fabric だけ parse できて
+  いたのは fabric 側 emit が旧関数のままだったから。
+- **paper 再起動後 tick 不稼働** (pari_clock 凍結): 起動直後は tick tag 未武装のことがある
+  → **`reload` で再武装** (実測 158→362/3s)。console tail に残る [q] は手動 sample 実行の
+  残骸。以後 paper 再起動フローは stop → (自動再起動) → reload → tick 確認。
+
+#### effect 直接観測の結果
+- fabric B: totem regen amp1/900 は pops 間保持 (120サンプル中72在席, dur 1-899)。
+  keepalive amp3/dur40 は 48/120 (dur 5-39 まで減衰 = **間欠適用**)。
+- paper B: EntityPotionEffectEvent [RX] MONITOR 一時計装で CHANGED amp3/40 が毎tick
+  (739/30s) + pop 時 TOTEM ADDED amp1/900 を確認。ただし **paper の RCON NBT ビューは
+  不穏** (毎tick再適用の resistance が 30/120 中 16 しか在席しない) → paper 側の
+  effect 判定に NBT (`data get` / `execute if entity nbt=`) は使えない。
+- **正味回復速度 (pop後20t hp climb) が真実**: keepalive amp3 時代は F-B +0.30..0.80 vs
+  P-B +1.50..1.70 (4ラウンド) = P-B だけ amp3 持続回復。§10.29 の「alive hp_avg 1.0 vs
+  1.9」の正体はこれ。
+- 誤説の訂正: 「fabric MOD が自 BOT の effect を無効化」は**誤り** (NBT で amp1/amp3 とも
+  在席確認)。fabric では keepalive の amp3 が間欠にしか乗らず、正味が amp1 相当に留まる。
+
+#### 誤修正の記録 (全て revert — 現行 plugin は HEAD 素のまま)
+- keepalive regen を COMMAND-cause 限定 cancel → P-B 崩壊 (dmg 39/ラウンド, pops 7→4,
+  hp_avg 3.0)。cancel+1tick後 removePotionEffect → 効果なし (1.8 = pristine 同値)。
+
+#### 修正 (ハーネス側)
+- tools/qlog-datapack keepalive.mcfunction から
+  `effect give @a[tag=xlib_target] regeneration 2 3 true` を**削除** (resistance は維持)。
+  根拠: 毎tick再適用の amp3 はエンジンで適用率が違い (fabric 間欠 / paper 全量)、正味回復を
+  ~4 倍差にする**純粋な攪乱源**。resistance は回復でなく被ダメ軽減のみで公平。
+
+#### 検証 (cryR55-60, 6ラウンド)
+- pop後20t climb: F-B +1.0..1.6 vs P-B +0.8..1.0 (同帯)。
+- hp_avg: a F2.49-3.02 vs P2.49-2.89 / b F2.98-3.04 vs P2.85-3.57 → **hp_avg [本物]フラグ消滅**
+  (§10.29 の b hp_avg + speed_med + y_max 3連旗のうち hp_avg が消えた)。
+- R59/60 b は speed_med 1回のみ。2ペア判定は未達 (🟡継続)。
+
+#### 残留 (6ラウンド median, 次の切り分け入口)
+- a charge 84.4 vs 53.1 (-37%) / a pearl 17.2 vs 28.9 (+40%) / b anchor 8.0 vs 12.6 (+37%) /
+  両 bot speed_med ≈ 半分 (微小ジッタ指標, gameplay 影響小)。
+- charge/explode はペアリング choice で旗が揺れる (within-engine も揺れる: anchor_gap /
+  charge_explode_gap は大部分 [ノイズ] = ホワイトノイズ帯の境界)。
+- メモ: anchor mech = `quantum:crystal/hardcode/mech/anchor` (look at ~.5 ~.5 ~.5 +
+  using_item ゲート + setblock で直置き)。ob→chg_med は P が +5..8t 長い (4ラウンド一貫)。
+  `eval/function/stats/hp.mcfunction` の quantum:regen predicate (fake player NBT 経由) は
+  疑ったが `hp` eval スコアは両エンジン定数 (A=260 / B=0) で非対称未確認。
+- 運用: fabric への動詞に `quantum run ` 前置き禁止 (paper 専用)。fabric stop は RCON 25575
+  (25565 はゲームポート)。fabric 再起動直後 1 ラウンドは dud。
