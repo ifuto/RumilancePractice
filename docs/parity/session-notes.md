@@ -1279,3 +1279,64 @@ crystal, charge, explode, swing, yaw_rate, y_max, dist_med, items.ender_pearl (w
 | mace | ⚠️ スマッシュ接続率 (regime下流) | 🟡 yaw_med 僅差 |
 | sword | ⚠️ hp系+dist_med | ⚠️ yaw系+speed |
 | cart | ⚠️ 一方向的展開レジーム | 🟡 yaw_med 僅差 |
+
+## 10.27 crystal恒久 (計装除去+最終3スイープ) / pot・nethpot fix後再計測 / keepalive再武装バグ
+
+### pot/nethpot fix後再計測 (jar=fix後, potR3/R4, nethR3/R4)
+- `--noise` who=a/b とも **[本物] 残差なし** (両キット)。[ノイズ] は x_span/z_span/yaw_med/speed_med 程度。
+- §10.25 の「vmotion非依存とみられるが未再計測」注記を解消。**6キット表の pot/nethpot が fix後計測に更新。**
+
+### 計装除去 (plugin, jar 2a88f240 → 8b334374)
+- HeroBotPlayer から `[KB] expKBres reset` / `[KB] explosion deferred` の2 print と
+  デッドメソッド `resetExplosionKnockbackResistance()` (+field expKnockbackResReset) を削除。
+  呼び出しsite無し (hurtServer 内のインライン版が現役)。ロジック系 (push override /
+  getKnownMovement / hurtServer expKBres / cleanup) は一切触らず。`getKnownMovement` は
+  jar 内バイトコードで存在確認済み。
+
+### 運用インシデント2件 (原因特定済み・対処済み)
+1. **keepalive 再武装レース**: `parity:stop` の closing と BOT despawn の tick 際で keepalive が
+   同一/翌 tick に `.start=1` を踏み直す。fabric は BOT無しの幽霊ラウンド機構が継続
+   (t=2499 逆算 = nethR4 closing 08:42:21 と一致)、paper は `.start=1` がワールド保存され
+   **再起動後も再開** (起動時に quantumbot が自動復帰→rescue が SPOT_A へ tp、who=b 空の
+   半死ラウンドが tick)。→ **修正**: gen_pack.py `stop()` 末尾に `pari_round=200` (10s ガード)、
+   `load()` に `.start=0` (ブート/リロード復帰クラスの根絶)。両エンジンへ再展開。
+   post-stop 検証: 両エンジン `.start=0`・[fp] 凍結 ✓。
+2. **fabric /reload は破壊的**: パック再展開後の `/reload` 直後の最初のラウンドでサーバーが
+   凍結 (watchdog: 1 tick 60s → クラッシュ。スタックは関数実行ループ内)。クリーンブートなら
+   同じパックで正常。→ **fabric の再展開後は reload でなくサーバー再起動**をルール化。
+   なお paper の reload は問題なし。
+- 副次所見: parity_runner は取りこぼし検知で**自動リトライする** (nethR4 paper は 08:41:16 と
+  08:42:21 の2回 setup → 書かれたログはリトライ分)。リトライ有無の境界は未調査。
+- 両エンジンとも**起動時に quantumbot が自動復帰する** (fabric も同様)。次の setup の
+  playerspawn と衝突して脳死ラウンドになるので、起動後は `player quantumbot disconnect` し、
+  2 回目で「No player was found」を確認する (paper は自動復帰元の特定までに至らず)。
+
+### crystal 最終3スイープ (cryR33-38, 2ラウンド×3, jar 8b334374 + 新ハーネス)
+- 公式判定 (`--noise`): R33/34 a=[pearl, speed_med] b=[speed_med] / R35/36 a=[anchor_gap,
+  anchor, pearl, z_span, dist_med] b=[speed, hp_avg, dist_med] / R37/38 a=[anchor] b=[swing,
+  speed_med]。**3/3 持続の構造残差なし**。フラッター族 = R29-32 と同系 (anchor/yaw/pearl/charge)。
+- **ただし a側 pearl 投擲数は 6/6 ラウンド全て P>F** (F 15,18,14,20,19,14 vs P 28,25,25,23,25,21、
+  順位和 p≈0.001、倍率 1.2-1.9x)。35% 閾値前後でフラップする**方向固定の弱バイアス**。
+- 切り分け (既存ログ分析のみ):
+  - **use 動詞は無罪**: gate 呼出数 (i→ender_pearl 遷移) ≈ 実投擲 (pc 遷移) = 100% 両エンジン。
+  - トリガは `crystal/passive/main` line 7 (敵≤8blk)。`tag=close` は**どこでも付与されない**
+    (セレクタ常に空 → pearlcd チェック実質無効)。実レート制限はバニラ item cooldown 20t。
+  - far_pearl は水晶では不発 (fp_watch all=0 両エンジン) → escape pearl が本体。
+  - 差は**ゲート発火数そのもの** (a: F 14-20 vs P 21-28)。上流入力差 = 戦闘テクスチャ
+    (≤4blk 滞在 F 63% vs P 44%、fabric がより密着 grind)。line 4 の mace-defense preemption
+    (敵が前進中は escape 判定を飛ばす) が抑制側の候だが未検証。
+  - 投擲時距離分布・レンジ構造は同一 (≤8blk 支配) → 幾何/動詞/ダメージ系バグではなく、
+    **mace-a スマッシュ接続率と同族の regime 下流**。
+- 結論: crystal のコア一致 (HARD タイミング/アイテム/hp/デス/swing/移動分布) は本日 6 ラウンド
+  でも維持。**既知の弱バイアスとして a側 escape-pearl 増 (~+40%, 方向固定・閾値未満) を記録**。
+  修正対象は無し (脳は共用マップ関数、エンジン差は出力の emergent 差)。
+
+### 6キット現状 (§10.27 時点)
+| キット | a | b |
+|---|---|---|
+| crystal | ✅ コア一致 / 📝 a-pearl 弱バイアス (6/6 方向固定, 2/3 テストで閾値超え) | ✅ |
+| pot | ✅ (fix後再計測) | ✅ (fix後再計測) |
+| nethpot | ✅ (fix後再計測) | ✅ (fix後再計測) |
+| mace | ⚠️ スマッシュ接続率 (regime下流) | 🟡 yaw_med 僅差 |
+| sword | ⚠️ hp系+dist_med | ⚠️ yaw系+speed |
+| cart | ⚠️ 一方向的展開レジーム | 🟡 yaw_med 僅差 |

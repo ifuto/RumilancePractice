@@ -267,27 +267,6 @@ public class HeroBotPlayer extends PacketBot {
      * 差し戻し + キュー入れ (or 遅延なしの即時適用) を再現する。
      */
     /** Paper の ServerPlayer 既定 1.0 (完全耐性) を 0 へ戻す。属性は初 tick 以降に存在する。 */
-    private boolean expKnockbackResReset = false;
-
-    private void resetExplosionKnockbackResistance() {
-        if (this.expKnockbackResReset) {
-            return;
-        }
-        this.expKnockbackResReset = true;
-        var attr = this.getAttribute(Attributes.EXPLOSION_KNOCKBACK_RESISTANCE);
-        if (attr == null) {
-            return;
-        }
-        attr.setBaseValue(0.0);
-        // ベース値以外の modifier (Paper が後乗せする場合) も剥がす。
-        for (var modifier : new java.util.ArrayList<>(attr.getModifiers())) {
-            attr.removeModifier(modifier);
-        }
-        System.out.println("[KB] expKBres reset -> " + this.getAttributeValue(Attributes.EXPLOSION_KNOCKBACK_RESISTANCE));
-    }
-
-
-
     /** {@code BotPlayer#processPendingKBs} の爆発分: tick 終端 (移動後) に setDeltaMovement(vec)。 */
     /** 爆発 KB を SET した直後の tick — 参照の脳と同じく水平速度を入力ベースへ再構築する。 */
     private int explosionKBCleanupTick = -1;
@@ -345,8 +324,6 @@ public class HeroBotPlayer extends PacketBot {
         // 参照と同じく「生KBベクトル」だけを保存する (delta を焼き込まない)。
         long now = ((ServerLevel) this.level()).getServer().getTickCount();
         this.pendingExplosionKB.add(new PendingExplosionKB(now + delay, vec));
-        System.out.println("[KB] explosion deferred st=" + now + " due=" + (now + delay)
-                + " ping=" + this.ping + " kb=" + vec);
     }
 
     @Override
