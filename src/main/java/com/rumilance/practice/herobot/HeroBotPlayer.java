@@ -115,13 +115,16 @@ public class HeroBotPlayer extends PacketBot {
      */
     @Override
     public void doTick() {
-        // 爆発 KB: 参照の ServerExplosionMixin 相当は ExplosionKBPingListener (イベント横取り)。
-        // ここでは Paper の ServerPlayer 完全耐性 (modifier 1.0) を定期的に潰すのみ。
-        this.resetExplosionKnockbackResistance();
+        // 参照 (BotPlayer#method_5773 HEAD → processPendingKBs) と同じく、移動物理の前に
+        // 遅延爆発 KB を適用する。この tick の super.doTick() 内の物理が KB を積分する。
+        this.processPendingExplosionKB();
         if ((int) this.tickCount() == this.explosionKBCleanupTick) {
-            // 爆発 KB の翌 tick: 参照と同じく水平速度をリセット (脳の入力は actionPack が足す)。
-            Vec3 d = this.getDeltaMovement();
-            this.setDeltaMovement(new Vec3(0.0, d.y, 0.0));
+            // 爆発 KB の翌 tick: 参照脳は入力ベースで motion を丸ごと再構築する。
+            // 実測 (cryR19 fabric): |vy| は全ラウンドで max 0.665 (ジャンプ/落下の範囲) —
+            // 爆発 vy は1tick分だけ統合されて消える (=1ブロックのホップ、y_max≈32.2)。
+            // Paper の物理は vy を重力に任せて保持するため、全成分をここでリセットしないと
+            // 蓄積して空中レジーム (maxY 84-91) になる。
+            this.setDeltaMovement(Vec3.ZERO);
             this.explosionKBCleanupTick = -1;
         }
         // Paper の causeExtraKnockback が消したノックバックを、BOT ではここでも保険として復元する。
@@ -132,8 +135,6 @@ public class HeroBotPlayer extends PacketBot {
         double startZ = this.getZ();
         super.doTick();
         this.processPendingKnockbacks();
-        // 参照の processPendingKBs は tick 終端 (移動後) で遅延爆発 KB を setDeltaMovement する。
-        this.processPendingExplosionKB();
         if (this.tickCount() % 10 == 0) {
             // Reference: keep the bot's chunk tracking alive from its own position.
             ((ServerLevel) this.level()).getChunkSource().move(this);
@@ -280,15 +281,22 @@ public class HeroBotPlayer extends PacketBot {
         if (this.pendingExplosionKB.isEmpty()) {
             return;
         }
-        long currentTick = this.tickCount();
+        // 参照はサーバ tick カウンタで予定/判定する (BotPlayer#delayedExplosionKB /
+        // lambda$processPendingKBs$7 とも MinecraftServer#getTickCount)。tickServer 冒頭で
+        // インクリメントされるため、ワールド/エンティティtick中は常に現在の tick 値を返す。
+        long currentTick = ((ServerLevel) this.level()).getServer().getTickCount();
         this.pendingExplosionKB.removeIf(pending -> {
             if (currentTick >= pending.tick()) {
-                this.setDeltaMovement(pending.vec());
+                // 参照の適用は super.push(生KB) — 適用時点の現在 delta への「加算」である
+                // (bytecode: invokespecial class_3222.method_60491 = Entity.push)。
+                // キャプチャ時の delta を焼き込むと、パールテレポート等で移動した後の適用で
+                // 数tick前の速度が復活し、空中へ打ち上げられる (cryR17/18 で実測した不具合)。
+                super.push(pending.vec());
                 // 参照 (herobot) はクライアント権限シムで、KB 適用の翌 tick には脳の入力速度で
                 // delta を再構築する (実測: 爆発直後 Motion=(0, vy, 0) — 水平成分は 1 tick で消える)。
                 // Paper の入力積分物理は KB を何 tick も保持して吹き飛びすぎるため、翌 tick の
                 // doTick 冒頭で水平のみリセットする (vy は参照と同じく重力減衰に任せる)。
-                this.explosionKBCleanupTick = (int) currentTick + 1;
+                this.explosionKBCleanupTick = (int) this.tickCount() + 1;
                 return true;
             }
             return false;
@@ -303,9 +311,10 @@ public class HeroBotPlayer extends PacketBot {
      * ServerExplosion はこの Paper ビルドでは EntityKnockbackEvent を発火させず、
      * BOT (ServerPlayer) への爆発 KB を直接 {@code push(Vec3)} で書く (実測: TNT/クリスタル
      * ともに確認)。参照の ServerExplosionMixin 相当として、爆発ダメージと同 tick の push を
-     * 横取りして即時適用をやめ、{@code pingDelayTicks(2)} 後の tick 終端に
-     * {@code setDeltaMovement(当時のdelta + KB)} する (遅延 SET — 同一 tick の複数爆発は
-     * 参照と同じく後の SET が勝つ)。delay=0 はバニラ通り即時加算 (参照の即時 SET と等価)。
+     * 横取りして即時適用をやめ、{@code pingDelayTicks(2)} 後の tick 冒頭に
+     * {@code super.push(生KB)} する (遅延・生ベクトル — 参照 {@code DelayedExplosionKB} は
+     * 生KBのみを保存し、適用も Entity.push = 現在 delta への加算。同一 tick の複数爆発は
+     * 加算スタックする)。delay=0 はバニラ通り即時加算 (参照の即時 push と等価)。
      */
     @Override
     public void push(net.minecraft.world.phys.Vec3 vec) {
@@ -318,12 +327,10 @@ public class HeroBotPlayer extends PacketBot {
             super.push(vec);
             return;
         }
-        net.minecraft.world.phys.Vec3 after = new net.minecraft.world.phys.Vec3(
-                this.getDeltaMovement().x + vec.x,
-                this.getDeltaMovement().y + vec.y,
-                this.getDeltaMovement().z + vec.z);
-        this.pendingExplosionKB.add(new PendingExplosionKB(this.tickCount() + delay, after));
-        System.out.println("[KB] explosion deferred t=" + this.tickCount() + " due=" + (this.tickCount() + delay)
+        // 参照と同じく「生KBベクトル」だけを保存する (delta を焼き込まない)。
+        long now = ((ServerLevel) this.level()).getServer().getTickCount();
+        this.pendingExplosionKB.add(new PendingExplosionKB(now + delay, vec));
+        System.out.println("[KB] explosion deferred st=" + now + " due=" + (now + delay)
                 + " ping=" + this.ping + " kb=" + vec);
     }
 

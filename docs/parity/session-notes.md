@@ -1031,3 +1031,52 @@ crystal, charge, explode, swing, yaw_rate, y_max, dist_med, items.ender_pearl (w
 - paper の RCON 応答 (`§bran ... → 1`) は値を返さない。数値観測は
   **scorestore → 閾値 matches → say → console.log grep** (両エンジン共通で使える)。
 - kbtest/kbtgt 等のプローブBOTは使い捨て → disconnect → `list` で 0 確認まで。
+
+## 10.20 プロープ計測バグの全件撤回 + 空中レジームの根因FIX
+
+### 計測側バグ(過去プローブ無効の完全リスト)
+- 前セッションのプローブ#1(as無し)/#2(×1000閾値)に加え、§10.19の3本
+  (spreadplayers/KBTurn×2)も **store×10 に対し bins ×100/×1000 を書いた恒真ビン**で無効。
+  §10.19の「管理実験で同一動作確認済み(spreadplayers/g1gc)」のうち spreadplayers は無効だった。
+  教訓: `data get Pos[i] 10` → 実座標×10 (y31→310)。ビンは必ず検算してから書く。
+
+### 正しく再計測した結果(交差再生)
+- 固定ジオメトリ cast 再プローブ: 両エンジン同一(レイが南壁基部hit→lookhigh→pitch −82.7°)。
+- 実ログ投擲状態の交差再生(fabric状態→paperで再生): マーカー位置/look方向/パール方向とも一致。
+- escape照準チェーン・spreadplayers・パール発射方向・発射体物理はエンジン等価。
+- 実戦差の正体: **paperだけBOTが空中に打ち上げられる**(R17/18: y>32が19-81%、最大y71;
+  fabricは0/136回、maxY 33)。急俯角パール投擲・pearl 2倍・dist_med低下は全てその下流。
+
+### 根因1: 遅延爆発KBの意味論誤り(javap確定→修正)
+- 参照 `BotPlayer$DelayedExplosionKB` は **(tick, 生KB vec) のみ**を保存。
+  適用は `lambda$processPendingKBs$7` → `invokespecial class_3222.method_60491(vec)` =
+  **Entity.push(生vec) = 適用時点の現在deltaへの加算** (yarn: method_60491=Entity.h=push)。
+  tick予定/判定は **MinecraftServer#getTickCount**(tickServer冒頭で++)。
+- 適用位置は `BotPlayer#method_5773 (tick) HEAD → processPendingKBs` = **移動物理の前**。
+  (旧メモ「tick終端SET」は誤り)
+- 旧実装の不具合: ①キャプチャ時delta+vec を保存→SET=数tick前の速度を復活させる
+  (パールテレポートtickに着火すると vy=1.08(過去)+0.75(KB)=1.84 で打ち上げ — R18実測)
+  ②SET後勝ちで同一tick複数爆発の加算が落ちる ③適用が移動後(doTick末)で1tick位相遅れ。
+- 新実装: 生vec保存 / サーバtickで予定 / doTick HEAD で super.push(生vec) / 翌HEADで後処理。
+
+### 根因2: 爆発vyの保持(cryR19/20で判明→修正)
+- raw vec+加算FIX後も P maxY 84-91 / |vy|max 3.87 vs F maxY 32.2 / |vy|max 0.665。
+  参照脳は爆発vyも**1tick分だけ統合して消す**(=1ブロックホップ、水平も同様)。
+- cleanup を水平のみ→**全成分ゼロ**(翌doTick HEAD)に拡張。jar sha=75e84855。
+
+### 運用事故: start.sh ルーラーの複製
+- start.sh は無限ループ(停止後5sで再起動)。nohup重複起動で**2ループが session.lock 競合**し、
+  BOT不在インスタンスがラウンドを担当 → cryR21/22 初回は pos 0,0,0 / hp=0 の無効ログ。
+  対処: 余分な paper ルーラーを kill(1616/1624) → RCON stop → 単一ループで起動。
+  **fabric側ルーラー(1615/1627)は触っていない。今後 paper 再起動は「ルーラー数確認→stop→
+  単一ループ起動」の順で行うこと。**
+
+## 10.21 cryR21/22 判定 (--noise, 2ペア)
+- **who=a: 29/36 一致** — 残差[本物]: speed のみ(他7はノイズ床)。
+- **who=b: 28/36 一致** — 残差[本物]: speed, hp_avg。
+- 値: speed a F1.34/1.81 vs P1.16/1.77、b F1.37/2.21 vs P1.35/1.85。
+  hp_avg b F1.09/1.69 vs P1.07/1.73 (フロア近傍)。
+- 空中レジームはほぼ消滅 (P maxY 33.8-34.6/57.7外れ値1回, vyMax 2.2-2.4は適用tick内の
+  サンプルで翌tickに消える)。F側も R22a で maxY 39.6 と跳ねる等、元々両エンジンに変動あり。
+- 次の候補: ①speed/hp_avg の残差は閾値 boundary の可能性→ペア増やして確認
+  ②R21a の maxY 57.7 外れ値の追跡(単発) ③anchor起爆paper不発(独立残課題)。
