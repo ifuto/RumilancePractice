@@ -1199,3 +1199,51 @@ crystal, charge, explode, swing, yaw_rate, y_max, dist_med, items.ender_pearl (w
 | cart | **a hp系 2/2 構造残差 (一方的展開レジーム)** / b スイープ間変動 |
 
 残作業: mace 垂直同期, cart レジーム, sword-b speed_med 確認, anchor起爆(独立)。
+
+## 10.25 getKnownMovement FIX — movement述語がpaperのBOTで全滅していた根本原因
+
+### 発見経路
+- mace fp_watch の stab ゲート (F 9-18% vs P 62-100%) が |vy| 直接計測 (F 18-23% vs P 23-35%)
+  と矛盾 → 述語側が壊れている仮説 → 生きたBOTで predicate を直接比較。
+- **実測**: 落下中 (vy −0.45, fall_distance≥1.0) で paper は vmotion_m1 不発 / fabric は成立。
+  fall_distance 自体は NBT に正常蓄積 (初期プローブの FD_0 は誤キー `fallDistance` を読んだため。
+  1.21.11 の正キーは `fall_distance`)。
+- **根因 (バイトコード確定)**: `entity_properties` の movement 述語は
+  `EntityPredicate → entity.getKnownMovement() (×20 = per-second) + entity.fallDistance` を読む。
+  **Paper の `ServerPlayer#getKnownMovement` は `lastKnownClientMovement`**
+  (実クライアントの move packet で更新) を返す。参照 BOT は fake client 接続で餌付けされるが、
+  この BOT にクライアントは無い → **常に Vec3.ZERO** → 全 vmotion*/speed 述語が死ぬ。
+
+### 修正
+- HeroBotPlayer に `getKnownMovement()` override (delta をそのまま返す)。jar=e33970bf。
+- 再プローブ: 落下中 vmotion_m1 **成立** ✓。
+
+### 影響 (fix前→fix後)
+- **mace-b pearl 3/3 構造残差 → 消滅**。投擲数 R13/14: F 7/8,7/5 vs P 4/8,4/2 (以前 P17-24)。
+  ender_pearl 所持率 2.0% → 0.2-0.7% (fabric 同等)。
+- mace-b 残差は yaw_med のみへ縮小。cart-b も yaw_med のみ (x/z_span, totem_pop 消滅)。
+- sword-b speed_med 3/3 → R7/R8 で speed+speed_med+yaw系+dist_med (構図変化、下記参照)。
+
+### fix後に残る共通残差 (sword/mace/cart の a 側)
+- **A の被弾量が paper で少ない** (hp_avg: F 2.9-3.3 vs P 6.3-14.5、hp<5: F 65-86% vs P 0-45%)。
+  分解: B の攻撃数は同率 (maceR15: 50 vs 50) だが A への**接続が少ない**
+  (drops F21/54.7dmg vs P8/29.5、小ダメージの連打が欠ける。p90 は逆に P 大)。
+  dist_med は P が半分 (むしろ近い) なので距離ではない。
+- swordR7 は両エンジンで「B カイト & A は手出し無効」の一方向戦 (B 被弾 0)。
+  カウンター頻度 F8 vs P2 の差が A 被弾差になる構図。
+- 近接マイクロプローブ (attack once ×6, 1.3blk) は**両エンジン同一** (0 ダメージ = プローブ
+  不発、パリティ信号なし)。attack 動詞のレイキャスト条件は要精査 (次回の接続点)。
+
+### crystal (最優先) — fix後もクリーン維持
+- R29/30: anchor, yaw_rate / R31/32: anchor_gap+pearl (a), charge (b)。
+  **2スイープで持続残差ゼロ** (各指標 1/2 回のみ = 従来のフラッター範囲)。
+  getKnownMovement fix によるリグレッションなし。fix前 4 スイープ + fix後 2 スイープ = 計 6 スイープ一致。
+
+### 6キット現状 (fix後)
+| キット | a | b |
+|---|---|---|
+| crystal | ✅ (2スイープ追加確認済み) | ✅ |
+| pot / nethpot | ✅ (fix前計測。vmotion非依存とみられるが未再計測) | ✅ |
+| sword | ⚠️ totem_pop/hp_avg/hp_min/dist_med (2/2) | ⚠️ yaw系+speed+dist_med |
+| mace | ⚠️ totem_pop/hp系 2/2, pearl 1/2 | 🟡 yaw_med 2/2 (他1/2) |
+| cart | ⚠️ hp_avg/yaw_med/z_span/totem_pop | 🟡 yaw_med のみ |

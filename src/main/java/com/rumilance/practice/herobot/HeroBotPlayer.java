@@ -203,6 +203,21 @@ public class HeroBotPlayer extends PacketBot {
     }
 
     /**
+     * Paper の {@code ServerPlayer#getKnownMovement} は {@code lastKnownClientMovement}
+     * (クライアントの move packet で更新) を返す。参照の BOT は fake client 接続でそれが
+     * 餌付けされるが、この BOT にクライアントは居ないため <b>常にゼロ</b> —
+     * {@code minecraft:entity_properties} の movement 述語 (vertical_speed / speed /
+     * horizontal_speed) が全て 0 を読み、マップの {@code quantum:vmotion_*} 述語
+     * (mace far_pearl/wind_pearl、cobweb・water フロー等) が一度も成立しなくなる
+     * (実測: 落下中 fall_distance≥1.0 でも vmotion_m1 不発)。
+     * サーバ側物理が権威なので、素の delta をそのまま返す。
+     */
+    @Override
+    public net.minecraft.world.phys.Vec3 getKnownMovement() {
+        return this.getDeltaMovement();
+    }
+
+    /**
      * Reference: {@code BotPlayer#move} runs the auto-jump probe on the distance the bot actually
      * travelled this tick (its {@code player @s autojump true} support).
      */
