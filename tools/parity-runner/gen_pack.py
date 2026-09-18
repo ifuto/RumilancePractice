@@ -125,6 +125,7 @@ scoreboard objectives add parity_t dummy
 scoreboard objectives add dbgc dummy
 scoreboard players set .two dbgc 2
 scoreboard players set .ten dbgc 10
+scoreboard players set .hundred dbgc 100
 scoreboard players set .neg_one dbgc -1
 scoreboard players set pari_clock parity_t 0
 scoreboard players set pari_round parity_t 0
@@ -159,6 +160,7 @@ def tick():
 #   3) 両BOTの毎tickサンプルを出す（qlog 互換 + who/state/kit）
 scoreboard players add pari_clock parity_t 1
 execute if score .start start matches 1 run function parity:vs_brain
+execute if score .start start matches 1 run function parity:fp_watch_a
 function parity:rescue
 function parity:keepalive
 function parity:hptrack
@@ -168,6 +170,9 @@ execute if score .hp_mod dbgc matches 0 run function parity:hpsample
 scoreboard players operation .dec_mod dbgc = pari_clock parity_t
 scoreboard players operation .dec_mod dbgc %= .ten dbgc
 execute if score .dec_mod dbgc matches 0 run function parity:dec
+scoreboard players operation .fp_mod dbgc = pari_clock parity_t
+scoreboard players operation .fp_mod dbgc %= .hundred dbgc
+execute if score .fp_mod dbgc matches 0 run function parity:fp_dump
 function parity:clock
 data merge storage parity:args {{name:"{BOT_A}",enemy:"{BOT_B}",who:"a"}}
 function parity:sample with storage parity:args
@@ -195,6 +200,55 @@ def dec():
     return '\n'.join(lines)
 
 
+def fp_watch():
+    """far_pearl / wind_pearl 条件の出現率カウンタ。
+
+    gear=2 (dia) では sword-escape が無効なので mace のパールは far_pearl と wind_pearl
+    のみ。各条件が1tickに何回成立したかを dbgc に積算し、100tick ごとに say する。
+    これで F↔P の「どのゲートの占有率が違うか」を直接比較する。
+    """
+    def block(tag, name, enemy):
+        return (
+            f'execute as {name} at @s if score @s Pos1 < @p[tag=xlib_target] Pos1 '
+            f'run scoreboard players add .fp{tag}_pos dbgc 1\n'
+            f'execute as {name} at @s if entity @p[tag=xlib_target,distance=5..] '
+            f'run scoreboard players add .fp{tag}_d5 dbgc 1\n'
+            f'execute as {name} at @s if entity @p[tag=xlib_target,predicate=!quantum:vmotion_m1,'
+            f'predicate=!quantum:vmotion2] run scoreboard players add .fp{tag}_stab dbgc 1\n'
+            f'execute as {name} at @s if function quantum:decisions/airborne2 '
+            f'run scoreboard players add .fp{tag}_air dbgc 1\n'
+            f'execute as {name} at @s if score @s Pos1 < @p[tag=xlib_target] Pos1 '
+            f'if entity @p[tag=xlib_target,distance=5..,predicate=!quantum:vmotion_m1,'
+            f'predicate=!quantum:vmotion2] if function quantum:decisions/airborne2 '
+            f'run scoreboard players add .fp{tag}_all dbgc 1')
+
+    lines = ['# parity:fp_watch_b — B が脳役の文脈 (vs_brain のスワップ内) で評価',
+             block('b', BOT_B, BOT_A)]
+    w('data/parity/function/fp_watch_b.mcfunction', '\n'.join(lines))
+
+    lines = ['# parity:fp_watch_a — A が脳役の文脈 (vs_brain 後の自然な状態) で評価',
+             block('a', BOT_A, BOT_B)]
+    w('data/parity/function/fp_watch_a.mcfunction', '\n'.join(lines))
+
+    st = []
+    for t, n in (('ap', '.fpa_pos'), ('as', '.fpa_stab'), ('ad', '.fpa_d5'),
+                 ('aa', '.fpa_air'), ('al', '.fpa_all'),
+                 ('bp', '.fpb_pos'), ('bs', '.fpb_stab'), ('bd', '.fpb_d5'),
+                 ('ba', '.fpb_air'), ('bl', '.fpb_all')):
+        st.append(f'execute store result storage parity:fp {t} int 1 run scoreboard players get {n} dbgc')
+    st.append('execute store result storage parity:fp ck int 1 run scoreboard players get pari_clock parity_t')
+    st.append('function parity:fp_line with storage parity:fp')
+    w('data/parity/function/fp_dump.mcfunction', '\n'.join(st))
+    w('data/parity/function/fp_line.mcfunction',
+      '$say [fp] ck=$(ck) A pos=$(ap) stab=$(as) d5=$(ad) air=$(aa) all=$(al) | B pos=$(bp) stab=$(bs) d5=$(bd) air=$(ba) all=$(bl)')
+
+
+def fp_reset():
+    names = (['.fpa_pos', '.fpa_stab', '.fpa_d5', '.fpa_air', '.fpa_all'] +
+             ['.fpb_pos', '.fpb_stab', '.fpb_d5', '.fpb_air', '.fpb_all'])
+    return '\n'.join(f'scoreboard players set {n} dbgc 0' for n in names)
+
+
 def vs_brain():
     return f'''# parity:vs_brain — {BOT_B} に1tick分の脳を与える。
 # マップは「敵 = @p[tag=xlib_target]」で相手を探すので、この関数の中だけ役割を入れ替える:
@@ -207,6 +261,7 @@ tag {BOT_B} remove xlib_target
 tag {BOT_B} add xlib_bot
 execute as {BOT_B} at @s run function quantum:allstats/newstats
 function parity:vs_dispatch
+function parity:fp_watch_b
 tag {BOT_B} remove xlib_bot
 tag {BOT_A} remove xlib_target
 tag {BOT_A} add xlib_bot
@@ -298,6 +353,17 @@ scoreboard players set qbot2 charge_timer 0
 scoreboard players set qbot2 totem_timer 0
 scoreboard players set qbot2 explosion_timer 0
 scoreboard players set .start start 1
+# fp_watch カウンタはラウンド開始ごとにリセット (fp_dump はラウンド内積算)
+scoreboard players set .fpa_pos dbgc 0
+scoreboard players set .fpa_stab dbgc 0
+scoreboard players set .fpa_d5 dbgc 0
+scoreboard players set .fpa_air dbgc 0
+scoreboard players set .fpa_all dbgc 0
+scoreboard players set .fpb_pos dbgc 0
+scoreboard players set .fpb_stab dbgc 0
+scoreboard players set .fpb_d5 dbgc 0
+scoreboard players set .fpb_air dbgc 0
+scoreboard players set .fpb_all dbgc 0
 scoreboard players set pari_round parity_t 80
 # ラウンドが何回始まったか（＝何回落ちたか）も左右で比べる。計測用カウンタは
 # ここでは 0 に戻さない: ラウンドが短いと計測窓の途中で 0 になって比較が
@@ -733,6 +799,7 @@ def main():
     w('data/parity/function/rescue.mcfunction', rescue())
     w('data/parity/function/keepalive.mcfunction', keepalive())
     w('data/parity/function/start_round.mcfunction', start_round())
+    fp_watch()
     w('data/parity/function/sample.mcfunction', sample())
     w('data/parity/function/emit.mcfunction', emit())
     w('data/parity/function/clock.mcfunction', clock())

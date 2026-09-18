@@ -6,6 +6,7 @@ scoreboard objectives add parity_t dummy
 scoreboard objectives add dbgc dummy
 scoreboard players set .two dbgc 2
 scoreboard players set .ten dbgc 10
+scoreboard players set .hundred dbgc 100
 scoreboard players set .neg_one dbgc -1
 scoreboard players set pari_clock parity_t 0
 scoreboard players set pari_round parity_t 0

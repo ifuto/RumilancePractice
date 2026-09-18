@@ -1114,3 +1114,53 @@ crystal, charge, explode, swing, yaw_rate, y_max, dist_med, items.ender_pearl (w
   ③crystal-bフラッターも必要なら+2ペア。
 - 注意: pair.shのサマリ([a]/[b]行)はハブ段のhpを表示することがある(hp=20固定に見える)。
   実データは[q]行にあり swordR3/4 は minHp 0.5-0.8 の実戦。tailサマリだけでは判断しない。
+
+## 10.23 mace-b pearl の構造追跡 (fp_watch 計装) + crystal 4スイープ確定
+
+### mace のパール経路 (gear=2 確定済み)
+- `.gear=2` → sword-escape (`if .gear matches 1`) は**無効**。maceのパールは
+  **far_pearl** (pearlcd0 + 敵5.. + 敵が安定垂直 + 自分が敵の下 + random 40% + airborne2)
+  と **wind_pearl** (p1d≤-5 + wind charge リポジ) のみ。
+- far_pearl の照準 = crystal/passive/crossbow/aim (敵方向)。airborne2 = 足元3ブロック空気。
+- wind charge 自爆ジャンプは**両エンジン同等**を直接確認 (launch vy≈0.9-1.4, 1-2t以内,
+  遅延なし。参照MODも wind charge は遅延しない。paper console に [KB] deferred ゼロ = 一致)。
+
+### fp_watch 計装 (gen_pack.py に実装済み, 常時ON)
+- parity:tick が各tick、A は自然文脈 (A=xlib_bot)、B は vs_brain スワップ内 (B=xlib_bot)
+  で far_pearl の各条件の成立を dbgc に積算し、100tickごとに `[fp] ck=...` を say。
+  start_round でリセット。**注意: `parity_runner.py deploy` の引数はワールドの
+  datapacks ディレクトリ (/tmp/.../QuantumMap/datapacks)。パックの staging dir を渡すと
+  自分自身を rmtree する。**
+
+### maceR10 の fp 計測 (1600t窓)
+| 条件 | A_F | A_P | B_F | B_P |
+|---|---|---|---|---|
+| pos (自分が敵の下) | 36% | 37% | **0.3%** | **54%** |
+| stab (敵が垂直安定) | 17% | 52%+ | 39% | 52%+ |
+| d5 (距離5..) | 40% | 63% | 25% | 64% |
+| air (airborne2) | 50% | 66% | 40% | 53% |
+| **all (far窓)** | **9.9%** | **10%** | **0.6%** | **9.5%** |
+- **Bのfar窓が16倍差** → 投擲数差 (F 3-9 vs P 17-24) の直接説明。
+- 最大寄与は pos: **fabric は両BOTが64%のtickで同一yブロック、paper は9%**
+  (y差 med F1.62 vs P5.05)。paper の mace 空中バrawlは2体の高さが分離しやすく、
+  fabric は同期して滞空する。両エンジンとも滞空率 ~70% (bothG 5-6%)。
+- stab (敵の垂直安定 = vmotion 述語) も 3-5x 差。fallDistance エミュレーションは
+  vanilla と等価なことをバイトコードで確認済み (checkFallDamage: dy<0 加算 /
+  onGround リセット / 上昇据え置き)。
+- 結論: mace-b pearl は「空中バrawlの垂直同期」の差という**movementレジーム下流**。
+  単発修正対象ではなく、wind起爆の同期 (hitcd/windcd/OnGround ゲート) から
+  軌道同期まで踏み込む必要。優先度は crystal 完後に再評価。
+
+### crystal 4スイープ集計 (R21-28, 8ペア, --noise)
+- who=a: totem 1/4, dist_med 1/4 以外ゼロ → **持続残差なし → 合格**
+- who=b: z_span 1/4, dist_med 1/4 以外ゼロ → **持続残差なし → 合格**
+- (基準: 「Fabric 2回近似=運ではなく Paper 一致必須」= 複数スイープで持続すること)
+
+### 全キット現状
+| キット | 状態 |
+|---|---|
+| pot | 残差ゼロ (1スイープ) |
+| nethpot | 残差ゼロ (1スイープ) |
+| **crystal** | **4スイープで持続残差ゼロ → 一致** |
+| sword | b: speed_med 2/2 (境界の可能性、要+ペア) |
+| mace | b: pearl 3/3 構造残差 (垂直同期、上記) |

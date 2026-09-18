@@ -9,6 +9,7 @@ tag qbot2 remove xlib_target
 tag qbot2 add xlib_bot
 execute as qbot2 at @s run function quantum:allstats/newstats
 function parity:vs_dispatch
+function parity:fp_watch_b
 tag qbot2 remove xlib_bot
 tag quantumbot remove xlib_target
 tag quantumbot add xlib_bot

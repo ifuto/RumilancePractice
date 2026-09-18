@@ -60,6 +60,17 @@ scoreboard players set qbot2 charge_timer 0
 scoreboard players set qbot2 totem_timer 0
 scoreboard players set qbot2 explosion_timer 0
 scoreboard players set .start start 1
+# fp_watch カウンタはラウンド開始ごとにリセット (fp_dump はラウンド内積算)
+scoreboard players set .fpa_pos dbgc 0
+scoreboard players set .fpa_stab dbgc 0
+scoreboard players set .fpa_d5 dbgc 0
+scoreboard players set .fpa_air dbgc 0
+scoreboard players set .fpa_all dbgc 0
+scoreboard players set .fpb_pos dbgc 0
+scoreboard players set .fpb_stab dbgc 0
+scoreboard players set .fpb_d5 dbgc 0
+scoreboard players set .fpb_air dbgc 0
+scoreboard players set .fpb_all dbgc 0
 scoreboard players set pari_round parity_t 80
 # ラウンドが何回始まったか（＝何回落ちたか）も左右で比べる。計測用カウンタは
 # ここでは 0 に戻さない: ラウンドが短いと計測窓の途中で 0 になって比較が
