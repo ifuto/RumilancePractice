@@ -1340,3 +1340,9 @@ crystal, charge, explode, swing, yaw_rate, y_max, dist_med, items.ender_pearl (w
 | mace | ⚠️ スマッシュ接続率 (regime下流) | 🟡 yaw_med 僅差 |
 | sword | ⚠️ hp系+dist_med | ⚠️ yaw系+speed |
 | cart | ⚠️ 一方向的展開レジーム | 🟡 yaw_med 僅差 |
+
+## 10.28 sword-b speed_med 決着 (swordR9/R10)
+- `--noise` who=b: **[本物] 残差なし** (speed_med/x_span は[ノイズ])。
+- 値: F 1.80/0.76 vs P 1.16/1.20 — fabric の丸内分散が大きく (旧 R1-4 の 4.8 倍分散と同じ挙動)、
+  paper はその帯の中間。R1-4 の「P が F 高状態 (1.5) 未到達」も本スイープは解消 (F 1.8 / P 1.2)。
+- 通算 2連続[本物]→構図変化→[ノイズ] で 3連続ならず。**境界ノイズとして決着、修正対象なし**。
