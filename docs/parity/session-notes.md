@@ -1455,3 +1455,43 @@ crystal, charge, explode, swing, yaw_rate, y_max, dist_med, items.ender_pearl (w
   疑ったが `hp` eval スコアは両エンジン定数 (A=260 / B=0) で非対称未確認。
 - 運用: fabric への動詞に `quantum run ` 前置き禁止 (paper 専用)。fabric stop は RCON 25575
   (25565 はゲームポート)。fabric 再起動直後 1 ラウンドは dud。
+
+### §10.31 crystal-b 完了 — 爆発KB垂直成分の修正と判定 (2026-09-18)
+
+#### 根本原因 #2: 爆発KBの垂直成分で P-BOT が持ち上がる
+- fabric 実測 (cryR57-60): 爆発後4tの maxYgain med/p75 = **+0.00** (接地 BOT は爆発で浮かない)。
+  Paper は p75 **+0.43..+0.87**。参照のクライアント権限シムは接地中の vy を入力再構築で即座に
+  食むのに対し、Paper の push(vy) が travel を持ち上げていた。
+- 連鎖: P-BOT 空中化 → mech/hit の `@a[tag=xlib_target,OnGround=1]` ゲート閉鎖 → swing 減 →
+  escape/pearl 増 → block/main (防御 obby) 占有増 → speed/charge/explode/pearl/y_max が
+  一斉に溢れていた (§10.29 の「b hp_avg+speed_med+y_max 3連旗」もこの土台)。
+
+#### 修正 (HeroBotPlayer#processPendingExplosionKB, jar 63655c5d)
+- 遅延適用時に `onGround()` なら vec.y を 0 にして push (空中適用は生ベクトルのまま)。
+- 検証 (cryR61-68, 8ラウンド): P maxYgain p75 +0.19/+0.05 まで低減 (F +0.00)。
+  hp_avg a 2.59[2.34-2.73] vs 2.69[2.39-2.93] / b 3.12[3.02-3.46] vs 3.32[3.01-4.23]。
+  swing/charge/explode/pearl/crystal/totem/rate系は全て同エンジン内分散に収束。
+
+#### 判定
+- **`--noise` F(cryR64,cryR66) vs P(cryR63,cryR65): who=a [本物]なし / who=b [本物]なし → ✅**
+- 自然隣接 (63/64): b [本物]なし (a は anchor+speed_med のみ)。
+- 6ラウンド集計 (61-66): 非重畳は `speed` 平均のみ (バースト質量、下記残差)。
+
+#### 文書化する弱残差 (次回の切り分け入口)
+- **P の爆発KB 有効変位が fabric の ~5-7倍** (R64 exp同期 0.3-2.0blk ステップ: a F n=8/sum4.8
+  vs P n=46/sum33.1)。横取り漏れは [KBpass] 計装で 0 件確認済み (適用は全部 遅延+1tick積分)。
+  fabric は ~18% のイベントしか変位しない = 参照の遅延 push は**大半が次tickの入力再構築に
+  食まれる** (適用が移動後に来る/再構築が先行する) 挙動。候補修正: 遅延KBを移動後に適用して
+  翌tickの delta 再構築に食ませる (=実質 swallow)。**ただし cart/sword/mace/crystal-a が
+  現行 KB パイプラインで合格しているため、変更時は全キット再検証が必須**。
+- speed 平均の非重畳 (a F[2.53-3.42] vs P[3.73-5.45]) はこの KB 変位差 + パール飛距離
+  (F med 4.7-4.8 vs P 5.8-6.8, 投擲pitchは同値) の合成。中央値/move_share は一致。
+- 6キット表: **crystal a✅ b✅** / pot✅ / nethpot✅ / cart a✅b✅ / sword a✅b✅ / mace a✅b✅。
+
+#### 運用メモ (今回確定)
+- [q] emit への新規フィールドは**必ず行末尾**に追加 (固定順パーサ保護)。
+- paper 再起動後: RCON が通ったら `reload` 1発 (tick tag 再武装確認を scoreboard で)。
+- fabric への prefix: 動詞以外の読み取りに `quantum run` を付けてはいけない (paper 専用)。
+- fabric stop は RCON 25575 (25565 はゲームポート。誤投擲するとプロセスがゾンビ化する)。
+- `data get entity <fakeplayer> active_effects` は paper では当てにならない (毎tick再適用の
+  resistance が 16/120 しか見えない)。effect の実効判定は回復速度やスコアで行う。

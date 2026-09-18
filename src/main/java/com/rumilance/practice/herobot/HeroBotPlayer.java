@@ -285,11 +285,20 @@ public class HeroBotPlayer extends PacketBot {
                 // (bytecode: invokespecial class_3222.method_60491 = Entity.push)。
                 // キャプチャ時の delta を焼き込むと、パールテレポート等で移動した後の適用で
                 // 数tick前の速度が復活し、空中へ打ち上げられる (cryR17/18 で実測した不具合)。
-                super.push(pending.vec());
                 // 参照 (herobot) はクライアント権限シムで、KB 適用の翌 tick には脳の入力速度で
                 // delta を再構築する (実測: 爆発直後 Motion=(0, vy, 0) — 水平成分は 1 tick で消える)。
                 // Paper の入力積分物理は KB を何 tick も保持して吹き飛びすぎるため、翌 tick の
                 // doTick 冒頭で水平のみリセットする (vy は参照と同じく重力減衰に任せる)。
+                // さらに垂直成分: 参照の実測 (cryR57-60) では接地 BOT が爆発で持ち上がらない
+                // (爆発後 4t の maxYgain med/p75 = +0.00。入力再構築が接地中の vy を即座に食う)。
+                // Paper は push の vy が travel を持ち上げ、OnGround ゲート (mech/hit 等) が
+                // 閉れて swing/charge 減・pearl 増のループに繋がった (crystal-b 残差の根本)。
+                // → 接地での適用は垂直を食って水平のみ (空中での適用は生ベクトルのまま)。
+                Vec3 kb = pending.vec();
+                if (this.onGround() && kb.y > 0) {
+                    kb = new Vec3(kb.x, 0, kb.z);
+                }
+                super.push(kb);
                 this.explosionKBCleanupTick = (int) this.tickCount() + 1;
                 return true;
             }
