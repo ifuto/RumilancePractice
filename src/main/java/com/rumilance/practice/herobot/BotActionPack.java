@@ -113,7 +113,10 @@ public final class BotActionPack {
         }
         if (type == ActionType.USE) {
             this.itemUseCooldown = 0;
-            this.player.stopUsingItem();
+            // 参照 (method_6075) は releaseUsingItem — 進行中の use を「発火させて」終わらせる
+            // (弓なら矢が飛ぶ)。stopUsingItem (abort) にすると矢が一度も飛ばなくなり、
+            // cart モードの「射撃中のみ設置」チェーンが死ぬ (cartR7/8 で実測)。
+            this.player.releaseUsingItem();
         }
         return this;
     }
@@ -606,7 +609,9 @@ public final class BotActionPack {
             void inactiveTick(HeroBotPlayer player, Action action) {
                 BotActionPack pack = player.actionPack();
                 pack.itemUseCooldown = 0;
-                player.stopUsingItem();
+                // 参照の inactiveTick も method_6075 = releaseUsingItem (発火)。stopUsingItem
+                // (abort) だと hold 中に verb が外れたとき矢が出ない。
+                player.releaseUsingItem();
             }
         },
         ATTACK(true) {

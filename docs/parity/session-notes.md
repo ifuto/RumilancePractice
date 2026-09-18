@@ -1346,3 +1346,48 @@ crystal, charge, explode, swing, yaw_rate, y_max, dist_med, items.ender_pearl (w
 - 値: F 1.80/0.76 vs P 1.16/1.20 — fabric の丸内分散が大きく (旧 R1-4 の 4.8 倍分散と同じ挙動)、
   paper はその帯の中間。R1-4 の「P が F 高状態 (1.5) 未到達」も本スイープは解消 (F 1.8 / P 1.2)。
 - 通算 2連続[本物]→構図変化→[ノイズ] で 3連続ならず。**境界ノイズとして決着、修正対象なし**。
+
+## 10.29 use release FIX — a側残差族(mace/sword/cart)の一掃 + texture.py
+
+### 発見経路 (cart-a 一方向的レジームの正体)
+- cartR7/8: **P-A は tnt_minecart/powered_rail に一度も持ち替えない** (F は 20-25 回/ラウンド)。
+  チェーンを下から検証: command block auto実行は両エンジン健在 (プローブマーカー出現)、
+  placecmd の条件チェーン通過率も両エンジン同率 (g1gc 25/26, bot距離 14/12, ray類同水準)、
+  rail_1 マーカーは P でも湧く (6/25)。**P だけ tnt_minecart エンティティが 0**。
+- 設置 (util/rail|cart) は insta の「**arrows_in_air>=1 (射撃中) 窓」でしか走らない**構造。
+  矢の存在プローブ (1s×50): **F 11/50 vs P 0/50 — P は矢が一度も飛ばない**。
+  弓の release が P で起きていなかった。
+
+### 根因 (バイトコード確定)
+- `LivingEntity.stopUsingItem()` = abort (useItem=EMPTY, 発火なし) /
+  `releaseUsingItem()` = 発火 (弓なら矢)。
+- 参照 MOD: 新しい use 動詞で旧 USE action を置き換える時と inactiveTick で
+  **method_6075 (= releaseUsingItem, 発火側)** を呼ぶ (BotPlayerActionPack bytebode)。
+  ポートは同位置で **stopUsingItem (abort)** を呼んでいた → hold 中の弓が永遠に発火しない。
+  cart/charge (draw) → bowcharge==1 で `player @s use` → 参照はここで発火、P は不発。
+- 注: 手動 verb プローブ (draw→stop / draw→use once) は**両エンジン不発** (既知の
+  console 文脈問題と同型)。検証は必ず実ラウンドプローブで。
+
+### 修正 (BotActionPack 2 箇所, jar 7cf0597f)
+- `stop(USE)` と `USE.inactiveTick` の `stopUsingItem()` → `releaseUsingItem()`。
+  盾/ポーションは releaseUsing 側でも副作用なし (設計上 completeUsing と別)。
+
+### 結果
+- 矢プローブ: P 0/50 → **11/50 (F と同一値)**。
+- **cart: a/b [本物]残差ゼロ** (R9/10, R13/14 = 2スイープ。R11/12 a yaw_snap 1回のみ)。
+  a hp_avg F 3.0-4.1 vs P 3.5-4.7 (旧 F4.5 vs P14-19 の一方向的レジーム消滅)。
+  P-A も tnt/rail を使用するようになった (2.2-3.6%)。
+- **sword: a/b [本物]ゼロ 2スイープ** (R13-16)。旧 a hp系 (F2.8-3.4 vs P11-12) 消滅
+  (B カイト一方向戦が両エンジン同型になった。A hp_avg 3.0/3.3, 3.4/3.1)。
+- **mace: a [本物]ゼロ (R21/22)**, R23/24 pearl 1回 (フラッター)。b R23/24 ゼロ。
+  旧「落下スマッシュ接続率差」も消滅 (被弾 hp_avg a F3.0-3.9 vs P3.4-4.5)。
+- crystal: R39/40 a totem+speed 1回 / b hp_avg。R41/42 は fabric 側ハブ 0,0,0 サンプル
+  混入で無効 (x_span 705 = 既知アーティファクト増幅)。R43/44 取り直し:
+  a pearl+y_max 1回 / **b hp_avg+speed_med+y_max が 2スイープ連続** (4/4 ラウンド非重畳:
+  hp_avg b F0.98-1.18 vs P1.76-1.95, speed_med b F1.28-1.97 vs P0.38-0.62, y_max P 38-57 vs F 32-34)。
+
+### 残作業
+- **crystal-b**: P-B がやや低速 & 被弾少なめ (弱い構造差の可能性)。movement レジーム系の
+  最後の1本。次の切り分け候補: b の jump/launch 頻度 (y_max P 高め = P-B が上に飛ぶ)。
+- 6キット表 (fix後): crystal ✅(a) + 🟡(b 弱残差) / sword ✅✅ / cart ✅ / mace ✅(a) + ✅(b,
+  hp_min 1回) / pot ✅ / nethpot ✅。
