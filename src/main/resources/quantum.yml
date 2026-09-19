@@ -28,7 +28,7 @@ world:
   name: ""
 
 bot:
-  # The name the map spawns its opponent under (quantum:botspawning).
+  # Base profile name for QuantumBOT instances. Additional /bot calls use quantumbot_2, etc.
   name: "quantumbot"
   gamemode: "creative"
   yaw: 0.0

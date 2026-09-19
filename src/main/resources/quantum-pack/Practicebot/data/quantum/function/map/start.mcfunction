@@ -28,5 +28,4 @@ effect give @a regeneration 1 255 true
 effect give @a saturation 1 255 true
 effect give @a absorption 120 0 true
 kill @e[type=bee]
-tellraw @a {"text":"<quantumbot> glhf"}
 forceload remove all

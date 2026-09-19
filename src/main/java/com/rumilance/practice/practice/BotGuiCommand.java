@@ -16,11 +16,12 @@ import java.util.List;
 /**
  * {@code /bot} — spawns the real Quantum map bot.
  *
- * <p>This command intentionally does not open the old Java-side practice-bot selector. The
- * Quantum runtime owns one map bot under the profile name {@code quantumbot}; its combat behavior
- * is driven by the bundled Quantum functions and HeroBot command implementation. The player's
- * location is used only as a fallback when the Quantum config has no explicit spawn location, and
- * the player's profile is used as the bot skin template.</p>
+     * <p>This command intentionally does not open the old Java-side practice-bot selector. The
+     * Quantum runtime owns one tagged instance per invocation, using {@code quantumbot},
+     * {@code quantumbot_2}, and so on as unique profile names; its combat behavior is driven by
+     * the bundled Quantum functions and HeroBot command implementation. The player's location is
+     * used only as a fallback when the Quantum config has no explicit spawn location, and the
+     * player's profile is used as the bot skin template.</p>
  */
 public final class BotGuiCommand implements CommandExecutor, TabCompleter {
 

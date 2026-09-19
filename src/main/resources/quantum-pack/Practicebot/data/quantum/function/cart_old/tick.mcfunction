@@ -4,11 +4,11 @@ item replace entity @s[tag=!shield] weapon.offhand with totem_of_undying
 
 # Sword
 function quantum:sword/tick
-execute if score @s bowcharge matches 1 run player quantumbot use
-execute if score @s bowcharge matches 5.. run player quantumbot move backward
+execute if score @s bowcharge matches 1 run player @a[tag=xlib_bot] use
+execute if score @s bowcharge matches 5.. run player @a[tag=xlib_bot] move backward
 
 # Look at cart
-execute if score @s bowcharge matches 1.. run execute at @s at @p[tag=xlib_target] at @e[type=tnt_minecart,limit=1,sort=nearest] run player quantumbot look at ~ ~1.5 ~
+execute if score @s bowcharge matches 1.. run execute at @s at @p[tag=xlib_target] at @e[type=tnt_minecart,limit=1,sort=nearest] run player @a[tag=xlib_bot] look at ~ ~1.5 ~
 
 # Cart
 execute at @s at @p[tag=xlib_target] at @e[tag=rail,type=marker,limit=1,sort=nearest] run setblock ~ ~ ~ powered_rail

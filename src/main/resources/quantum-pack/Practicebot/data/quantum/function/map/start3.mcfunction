@@ -2,7 +2,6 @@ execute unless score .prompt_activation toggles matches 1 run scoreboard players
 execute if score .mode mode matches 1 if score .prompt_activation toggles matches 1 run scoreboard players set .start start 1
 execute if score .mode mode matches 3..5 if score .prompt_activation toggles matches 1 run scoreboard players set .start start 1
 effect clear @a[tag=xlib_bot] resistance
-tp @a[tag=xlib_bot] quantumbot
 execute as @a[tag=xlib_bot] if score .gear toggles matches 1 run function quantum:botgear/neth
 execute as @a[tag=xlib_bot] if score .gear toggles matches 2 run function quantum:botgear/dia
 

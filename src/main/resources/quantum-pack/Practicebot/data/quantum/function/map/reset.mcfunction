@@ -31,14 +31,13 @@ execute if score @a[tag=xlib_bot,limit=1] death matches 1.. if score .start star
 
 # Display scores
 # execute if score .start start matches 1 run execute in overworld run title @a subtitle {"text":"Score:","color": "yellow"}
-execute as @a[tag=xlib_bot,name=!quantumbot] run player @s disconnect
 function stats:calculate_stats
 
 # Reset
 kill @e[type=item]
 kill @e[tag=killable]
 execute as @a[tag=xlib_target] run function quantum:bin/40
-execute in overworld run tp @a[tag=xlib_bot] -646 57 88
+# QuantumBOT instances keep their own session position on reset; the plugin owns their lifecycle.
 execute in overworld run setblock -646 56 88 barrier
 execute in overworld run scoreboard players set .start start 0
 execute in overworld run gamemode adventure @a[tag=xlib_target]
@@ -47,5 +46,4 @@ kill @e[type=ender_pearl]
 function quantum:kits/loadkit
 execute in overworld run scoreboard players set @a death 0
 stopsound @a
-tellraw @a {"text":"<quantumbot> ggs!"}
-execute unless entity @a[name=quantumbot] run function quantum:miscellaneous/botspawning
+execute unless entity @a[tag=xlib_bot] run function quantum:miscellaneous/botspawning

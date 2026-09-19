@@ -1,6 +1,3 @@
-execute store result score .bot_count start run execute if entity @a[tag=xlib_bot,name=quantumbot]
-execute if score .bot_count start matches 2.. as @a[tag=!xlib_target] run player @s disconnect
-
 execute at @s run function quantum:look
 execute at @s run player @s stop
 execute as @e[tag=terrain,nbt={interaction:{}},type=interaction] run function quantum:set_terrain

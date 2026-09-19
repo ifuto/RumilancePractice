@@ -29,9 +29,9 @@ import java.util.UUID;
  * The {@code /player}-style bot directory: named HeroBot fake players, spawned and removed
  * with the reference's flow ({@code PlayerList#placeNewPlayer} over a dead connection).
  *
- * <p>The Quantum map addresses its bot by <b>name</b> ({@code tag @a[name=quantumbot] add
- * xlib_bot}), so the runtime always spawns it as {@code quantumbot} — exactly the name the
- * measurement scenario in {@code java-trigger.md} uses.</p>
+ * <p>The Quantum map addresses bots by the persistent {@code quantum_bot} tag. The first
+ * profile keeps the reference name {@code quantumbot}; additional instances receive unique
+ * suffixes and run through the same tagged function path.</p>
  */
 public final class HeroBotRegistry {
 
@@ -139,8 +139,10 @@ public final class HeroBotRegistry {
         // Diagnostics: run PE's own join-check resolution and log the verdict (no-op w/o PE).
         com.rumilance.practice.packetbot.PacketEventsCompat.verifyJoinCheck(profile.id(), name);
         // Presence policy: bots are not server players — out of the TAB, out of the count.
-        // (The Quantum map addresses its bot by the fixed profile name, so the name stays
-        // as-is; the map itself only ever runs one such bot per world.)
+        // Quantum's functions use tags rather than a single hard-coded name, so every spawned
+        // instance can participate in the same live runtime without replacing another bot.
+        bot.addTag("quantum_bot");
+        bot.addTag("xlib_bot");
         com.rumilance.practice.packetbot.PacketBot.registerLive(bot, null);
         bot.stopRiding();
         bot.teleportTo(level, location.getX(), location.getY(), location.getZ(),

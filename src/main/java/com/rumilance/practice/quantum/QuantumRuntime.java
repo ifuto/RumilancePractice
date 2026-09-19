@@ -103,8 +103,9 @@ public final class QuantumRuntime {
      */
     public void setPracticeService(com.rumilance.practice.practice.PracticeService practice) {
         this.practice = practice;
-        this.applyConfiguredBotLoadout(this.bots.byName(
-                this.config == null ? "quantumbot" : this.config.getString("bot.name", "quantumbot")));
+        for (HeroBotPlayer bot : this.bots.all()) {
+            this.applyConfiguredBotLoadout(bot);
+        }
     }
 
     public HeroBotRegistry bots() {
@@ -563,14 +564,11 @@ public final class QuantumRuntime {
 
     // ------------------------------------------------------------------ bot control
 
-    /** Spawns the map's bot ({@code quantumbot} by default) at the configured spot. */
+    /** Spawns one tagged QuantumBOT instance at the next free configured spawn slot. */
     public HeroBotPlayer spawnBot(Location fallback, Player skinTemplate) {
-        String name = this.config.getString("bot.name", "quantumbot");
+        String configuredName = this.config.getString("bot.name", "quantumbot");
+        String name = this.nextBotName(configuredName);
         Location where = this.botSpawn(fallback);
-        HeroBotPlayer existing = this.bots.byName(name);
-        if (existing != null) {
-            this.bots.despawn(name);
-        }
         GameType mode = GameType.byName(this.config.getString("bot.gamemode", "survival").toLowerCase(Locale.ROOT));
         HeroBotPlayer bot = this.bots.spawn(name, where,
                 (float) this.config.getDouble("bot.yaw", where.getYaw()),
@@ -643,13 +641,43 @@ public final class QuantumRuntime {
             y = fallback.getY();
             z = fallback.getZ();
         }
+        // Do not stack multiple QuantumBOT instances in one block. The function runtime uses
+        // the bot tag to drive every instance; this small deterministic grid keeps their hitboxes
+        // and nearest-target selection separate at spawn time.
+        int slot = this.bots.all().size();
+        if (slot > 0) {
+            x += (slot % 4) * 3.0;
+            z += (slot / 4) * 3.0;
+        }
         return new Location(world, x, y, z,
                 (float) this.config.getDouble("bot.yaw", 0.0),
                 (float) this.config.getDouble("bot.pitch", 0.0));
     }
 
+    /** Generates a unique Quantum bot profile name (Minecraft profile names are capped at 16 chars). */
+    private String nextBotName(String configuredName) {
+        String base = configuredName == null || configuredName.isBlank() ? "quantumbot" : configuredName;
+        if (base.length() > 16) {
+            base = base.substring(0, 16);
+        }
+        if (this.bots.byName(base) == null) {
+            return base;
+        }
+        for (int index = 2; index < 100_000; index++) {
+            String suffix = "_" + index;
+            int keep = Math.max(1, 16 - suffix.length());
+            String candidate = base.substring(0, Math.min(base.length(), keep)) + suffix;
+            if (this.bots.byName(candidate) == null) {
+                return candidate;
+            }
+        }
+        throw new IllegalStateException("too many QuantumBOT instances");
+    }
+
     public boolean despawnBot() {
-        return this.bots.despawn(this.config.getString("bot.name", "quantumbot"));
+        boolean removed = !this.bots.all().isEmpty();
+        this.bots.despawnAll();
+        return removed;
     }
 
     // ------------------------------------------------------------------ worlds
