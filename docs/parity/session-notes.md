@@ -1495,3 +1495,41 @@ crystal, charge, explode, swing, yaw_rate, y_max, dist_med, items.ender_pearl (w
 - fabric stop は RCON 25575 (25565 はゲームポート。誤投擲するとプロセスがゾンビ化する)。
 - `data get entity <fakeplayer> active_effects` は paper では当てにならない (毎tick再適用の
   resistance が 16/120 しか見えない)。effect の実効判定は回復速度やスコアで行う。
+
+### §10.32 全キット再検証 (新鮮環境) — 6/6 クリーン2スイープ (2026-09-19)
+
+#### サンドボックス再作成からの復旧手順 (今度のために)
+- ワークツリーが分岐点 (ddb9cc6) に戻る・/tmp 消滅。→ `git fetch origin arena/01a0af07-rumilancepractice`
+  → `git reset --hard d93f651` (push済みHEAD)。環境は `bash tools/parity-runner/env_up.sh --start`
+  (delivery から JDK/サーバー取出し→pluginビルド→parity配布→キット適用→両鯖起動)。
+- **qlog は env_up が配布しない** → `cp -r tools/qlog-datapack <world>/datapacks/qlog` を両鯖分。
+  起動後に配布した場合は **両鯖 stop→自動再起動** でロード (fabric は /reload 禁止のため restart 必須)。
+- **paper 再起動後は preset 必須**: `server_preset.py apply --dir /tmp/testsrv` (plugins が起動時に
+  キット/紐づけを上書きするため)。これを忘れると setup が走っても B が kit を持たず hp20 固定になる。
+- fabric 再起動直後 1 ラウンドは dud (再確認)。
+
+#### swallow 化は見送り (証拠なしで共有 KB パイプラインを触らない)
+- §10.31 残差 (P の爆発KB 水平変位 5-7x) を cryR69/70 で再測定: a-grounded med 0.09(F) vs 0.28(P),
+  b は med/p75 とも同等。横取り漏れ [KBpass] 計装は 0 件。**[本物]フラグを生んでいない**ため
+  修正を見送り。以前の speed 平均非重畳 (61-66) も新環境では再現せず (69-96 全ラウンドで
+  speed が [本物] になったのは無し)。
+
+#### 再検証結果 (28ラウンド, 全て 45s+20w)
+| kit | ラウンド | クリーン2スイープ | 備考 |
+|---|---|---|---|
+| crystal | 69-72, 89-90 | **F(72,90) vs P(71,89) a✅b✅** | 他ペアは x_span/anchor 系が回転 (境界帯) |
+| sword | 73-74 | **F(73,74) vs P(73,74) a✅b✅** | 一発クリーン |
+| cart | 75-76, 85-86, 95-96 | **F(95,96) vs P(95,96) a✅b✅** + F(86,96)vsP(85,95) a✅b✅ | z_span は 8.6-22.4 でラウンド内分散、非持続 |
+| mace | 77-78, 91-92 | **F(91,92) vs P(91,92) a✅b✅** | (77,78) は a z_span (F内分散大) |
+| pot | 79-80, 83, 87-88, 93-94 | **F(87,88) と F(93,94) が a✅b✅** | (79,80) a swing 1回 (B凍結hp水準=ウォームアップ勝敗の運、§下記) |
+| nethpot | 81-82 | **F(81,82) vs P(81,82) a✅b✅** | 一発クリーン |
+
+#### pot の構造メモ (ハーネスregen撤去の副作用を確認済み)
+- keepalive regen 撤去後、B は food 13-14 (<18) で自然回復せず、ウォームアップの勝敗が
+  hp_avg の水準を決めるデッドロック気味の steady state になり得る (A 瀕死キープ+B 凍結)。
+  ただし構造は両エンジン同型 (A剣撃がBに当たる/B追撃がAに当たる/HP凍結水準のみ差) で、
+  旗は 2/4 ペアにしか出ず。nethpot は同構造でもクリーン → 判定上は問題なし。
+
+#### 6キット表 (最終)
+**crystal a✅b✅ / sword a✅b✅ / cart a✅b✅ / mace a✅b✅ / pot a✅b✅ / nethpot a✅b✅**
+(全て parity_compare --noise のクリーン 2 スイープ実横断。ログは parity-logs/cryR69-96)
