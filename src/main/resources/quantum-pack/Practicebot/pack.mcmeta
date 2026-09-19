@@ -1,0 +1,14 @@
+{
+  "pack": {
+    "description": "A Practicebot made by QuantumUltimate for many popular PvP modes",
+    "pack_format": 94
+  },
+  "filter": {
+    "block": [
+      {
+        "namespace": "minecraft",
+        "path": "worldgen/structure_set"
+      }
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "parent": "quantum:detect_block/in_block",
+  "criteria": {
+    "requirements": {
+      "trigger": "minecraft:enter_block",
+      "conditions": {
+        "block": "red_sand"
+      }
+    }
+  },
+  "rewards": {
+    "function": "quantum:tp_to_surface"
+  }
+}

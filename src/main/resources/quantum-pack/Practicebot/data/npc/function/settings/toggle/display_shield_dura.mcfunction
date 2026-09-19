@@ -1,0 +1,2 @@
+execute if score .display_shield_dura npc matches 1 run return run function npc:settings/off/display_shield_dura
+execute unless score .display_shield_dura npc matches 1 run return run function npc:settings/on/display_shield_dura

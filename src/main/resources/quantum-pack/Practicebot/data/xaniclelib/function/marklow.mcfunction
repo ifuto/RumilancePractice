@@ -1,0 +1,2 @@
+execute positioned ~ ~-1 ~ unless function quantum:g1gc/block positioned ~ ~1 ~ run summon marker ~ ~ ~ {Tags:["lowpos"]}
+execute positioned ~ ~-1 ~ if function quantum:g1gc/block positioned ~ ~1 ~ run function xaniclelib:marklow

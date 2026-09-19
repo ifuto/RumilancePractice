@@ -26,7 +26,25 @@ SOURCES=(
   src/main/java/com/rumilance/practice/listener/AdvancementBlockListener.java
   src/main/java/com/rumilance/practice/listener/SessionBootstrapListener.java
   src/main/java/com/rumilance/practice/lobby/LobbyListener.java
-  src/main/java/com/rumilance/practice/packetbot/PacketBot.java
+  # packetbot 全体 (PacketBot / PacketBotBody / PacketBotFactory / BotNames / FakePlayerConnection)
+  # 1.76.28+ の BOT 多体化 / GUI 刷新 / PRO ランクで追加・変更したファイル。
+  # delivery jar (1.76.27) にはこれらの新クラス/新定数が無いので必ず同コンパイルする。
+  src/main/java/com/rumilance/practice/packetbot
+  src/main/java/com/rumilance/practice/util/RealPlayers.java
+  src/main/java/com/rumilance/practice/gui/MenuTile.java
+  src/main/java/com/rumilance/practice/gui/menus/GameMenuGui.java
+  src/main/java/com/rumilance/practice/gui/menus/BattleMenuGui.java
+  src/main/java/com/rumilance/practice/gui/menus/PracticeBotSelectGui.java
+  src/main/java/com/rumilance/practice/gui/menus/PlayersGui.java
+  src/main/java/com/rumilance/practice/scoreboard/ScoreboardService.java
+  src/main/java/com/rumilance/practice/rank/PlayerRank.java
+  src/main/java/com/rumilance/practice/rank/RankService.java
+  src/main/java/com/rumilance/practice/font/IconFontService.java
+  src/main/java/com/rumilance/practice/font/RankIconNameTags.java
+  src/main/java/com/rumilance/practice/command/SetRankCommand.java
+  src/main/java/com/rumilance/practice/command/RankIconCommand.java
+  src/main/java/com/rumilance/practice/gui/menus/AdminPlayerDataGui.java
+  src/main/java/com/rumilance/practice/resourcepack/ResourcePackService.java
   src/main/java/com/rumilance/practice/bootstrap/FeatureBootstrap.java
   src/main/java/com/rumilance/practice/practice/PracticeService.java
   # キットの定義/適用/管理コマンド (kits.yml のスキーマや /kit の挙動を触るので必須。
@@ -59,5 +77,18 @@ echo "compiling ${#FILES[@]} source file(s) ..."
 echo "classes: $(find /tmp/plugbuild/one -name '*.class' | wc -l)"
 cp "$DELIVERY" "$OUT"
 ( cd /tmp/plugbuild/one && "$JDK/bin/jar" uf "$OUT" . )
+# リソース重ね書き: config.yml / lang/*.yml / quantum-pack/ を現在のソースに合わせる
+# (plugin.yml は gradle の ${version} 置換済みが無いので jar 内のもので良し)。
+chmod -R u+w /tmp/plugbuild/res 2>/dev/null || true   # tar 由来の read-only ディレクトリに負けない
+rm -rf /tmp/plugbuild/res
+mkdir -p /tmp/plugbuild/res/lang
+cp "$ROOT/src/main/resources/config.yml" /tmp/plugbuild/res/
+cp "$ROOT/src/main/resources/quantum.yml" /tmp/plugbuild/res/
+cp "$ROOT"/src/main/resources/lang/*.yml /tmp/plugbuild/res/lang/
+# jar 内蔵マップパック (QuantumRuntime.extractBundledPack が起動時に展開する)
+if [ -d "$ROOT/src/main/resources/quantum-pack" ]; then
+  cp -r "$ROOT/src/main/resources/quantum-pack" /tmp/plugbuild/res/
+fi
+( cd /tmp/plugbuild/res && "$JDK/bin/jar" uf "$OUT" . )
 echo "built $OUT"
 sha256sum "$OUT"

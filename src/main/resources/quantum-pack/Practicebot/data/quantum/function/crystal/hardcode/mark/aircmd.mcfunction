@@ -1,0 +1,2 @@
+setblock ~ ~ ~ air
+execute if function quantum:mark/blockplace if function xaniclelib:check/intersect1 if function xaniclelib:check/raycast if function xaniclelib:check/raycast2 run summon marker ~ ~ ~ {Tags:["crystal","hardcode"]}

@@ -1,0 +1,1 @@
+execute at @s if function xaniclelib:check/raycast2 run tag @s add usable

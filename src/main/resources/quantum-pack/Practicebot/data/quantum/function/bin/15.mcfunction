@@ -1,0 +1,2 @@
+execute if score @s charge_timer matches ..0 if function quantum:g1gc/perfect/hurt1 at @n[tag=anchor_2,tag=!used,tag=usable,distance=0..,type=marker] run function quantum:g1gc/charge_anchor
+execute if score @s anchor_timer matches ..0 if function quantum:g1gc/perfect/hurt2 at @n[tag=anchor_1,tag=!used,tag=usable,distance=0..,type=marker] unless entity @e[tag=anchor_2,tag=usable,distance=0..,type=marker] run function quantum:g1gc/place_anchor

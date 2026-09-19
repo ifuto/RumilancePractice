@@ -1,0 +1,1 @@
+function npc:settings/on/chainmail

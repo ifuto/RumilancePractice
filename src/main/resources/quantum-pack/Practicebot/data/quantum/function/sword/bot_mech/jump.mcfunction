@@ -1,0 +1,3 @@
+execute at @s if score .pcrit toggles matches 1 unless items entity @p[tag=xlib_target] weapon.mainhand #quantum:weapon run scoreboard players set @p[tag=xlib_target,scores={hitcd=1..}] hitcd 0
+execute at @s as @p[tag=xlib_target] if entity @s[scores={OnGround=0}] as @p[tag=xlib_bot] if score @s hitcd matches ..0 run scoreboard players set @p[tag=xlib_target] hitcd 0
+execute at @s[tag=!pot,scores={bowcharge=..0,pot_cd=..0,hitcd=..9,combo=-2..,in_cobweb_decision=0,OnGround=1}] unless function quantum:sword/pcrit unless score @s in_cobweb_decision matches 1 unless score @s bowcharge matches 1.. run function quantum:sword/jump

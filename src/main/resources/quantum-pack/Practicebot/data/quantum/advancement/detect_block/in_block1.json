@@ -1,0 +1,14 @@
+{
+  "parent": "quantum:detect_block/in_block",
+  "criteria": {
+    "requirement": {
+      "trigger": "minecraft:enter_block",
+      "conditions": {
+        "block": "deepslate"
+      }
+    }
+  },
+  "rewards": {
+    "function": "quantum:tp_to_surface"
+  }
+}

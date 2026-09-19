@@ -1,0 +1,2 @@
+execute if entity @a[tag=xlib_bot,tag=adapt] run return run function quantum:options/toggles/adaptoff
+execute if entity @a[tag=xlib_bot,tag=!adapt] run return run function quantum:options/toggles/adapton

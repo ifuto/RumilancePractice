@@ -1,0 +1,1 @@
+$title @a actionbar [{"text":"Bot reaction time has been set to:","color":"aqua"},{"text":" $(react) tick(s)","color":"gold"},{"text":" 0-1 are instant reaction","color":"green"}]

@@ -1,0 +1,6 @@
+execute at @s[scores={crystal_timer=1..},distance=0..] anchored eyes positioned ^ ^ ^ if entity @e[distance=..4,type=minecraft:end_crystal] run function quantum:g1gc/breakcrystal
+
+# execute if entity @e[tag=optimal,type=marker,tag=loc] run return run function quantum:bin/12
+execute if score .random random matches 50.. positioned ^1 ^ ^-1 if score @s obby_timer matches ..0 unless entity @e[tag=crystal_2,tag=usable,distance=0..,type=marker] if function quantum:g1gc/perfect/hurt2 at @n[tag=crystal_1,tag=!used,tag=usable,distance=0..,type=marker] run function quantum:g1gc/placeobsidian
+execute if score @s crystal_timer matches ..0 if function quantum:g1gc/perfect/hurt1 at @n[tag=crystal_2,tag=usable,distance=0..,type=marker] unless entity @e[dx=0,type=end_crystal] run function quantum:g1gc/spawncrystal
+execute unless score .random random matches 50.. positioned ^-1 ^ ^-1 if score @s obby_timer matches ..0 unless entity @e[tag=crystal_2,tag=usable,distance=0..,type=marker] if function quantum:g1gc/perfect/hurt2 at @n[tag=crystal_1,tag=!used,tag=usable,distance=0..,type=marker] run function quantum:g1gc/placeobsidian

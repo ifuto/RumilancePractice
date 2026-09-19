@@ -1,0 +1,2 @@
+setblock ~ ~ ~ obsidian
+execute positioned ~ ~1 ~ if function quantum:g1gc/block positioned ~ ~-1 ~ if function xaniclelib:check/intersect1 positioned ~ ~1 ~ if function xaniclelib:check/raycast run return run summon marker ~ ~-2 ~ {Tags:["crystal_2","xlib","loc"]}

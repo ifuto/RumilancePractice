@@ -1,0 +1,3 @@
+execute if score @s explosion_timer matches ..0 if function quantum:g1gc/perfect/hurt0 at @n[tag=anchor_3,tag=!used,tag=optimal,distance=0..,type=marker] unless entity @e[tag=glowstone,distance=0..,type=marker] run function xaniclelib:anchor/explosion
+execute at @s if score @s explosion_timer matches ..0 at @n[tag=glowstone,distance=0..,type=marker] run function quantum:g1gc/defenceplace
+execute unless entity @e[tag=glowstone,distance=0..,type=marker] unless entity @e[tag=anchor_3,tag=optimal,distance=0..,type=marker] run function quantum:bin/15

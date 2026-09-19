@@ -1,0 +1,3 @@
+execute unless score @s gap_timer matches 1.. unless score @s bowcharge matches 1.. if score @s in_range matches 1 run function quantum:decisions/optimise_stats/hit
+execute if score @s Pos1_difference matches 0.. as @p[tag=xlib_target,distance=..3,scores={gap_timer=0}] run function quantum:decisions/player_hit
+execute unless score @s Pos1_difference matches 0.. anchored eyes positioned ^ ^ ^ as @p[tag=xlib_target,distance=..3,scores={gap_timer=0}] run function quantum:decisions/player_hit

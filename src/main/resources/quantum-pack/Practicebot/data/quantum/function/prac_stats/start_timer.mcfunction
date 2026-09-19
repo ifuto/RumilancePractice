@@ -1,0 +1,1 @@
+scoreboard players set @s bow_prac_stopwatch 1

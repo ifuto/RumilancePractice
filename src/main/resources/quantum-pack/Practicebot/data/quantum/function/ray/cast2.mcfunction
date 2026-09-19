@@ -1,0 +1,1 @@
+execute at @s anchored eyes facing entity @p[tag=xlib_target,gamemode=!spectator] eyes run function quantum:ray/pearlstep

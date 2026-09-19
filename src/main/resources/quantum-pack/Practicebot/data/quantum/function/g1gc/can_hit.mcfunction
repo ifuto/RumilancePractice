@@ -1,0 +1,2 @@
+execute if score @s can_see_target matches 1 at @p[tag=xlib_target,distance=..3,scores={hurtTime=0},gamemode=!spectator,predicate=!quantum:flying] positioned ~ ~2 ~ if function quantum:g1gc/block unless entity @e[tag=loc,tag=usable,distance=0..,type=marker] run return run function quantum:bin/1
+return 0

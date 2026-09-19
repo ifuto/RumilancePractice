@@ -1,0 +1,1 @@
+execute at QuantumUltimate in minecraft:mushroom run tp QuantumUltimate ~ ~ ~ 90 0

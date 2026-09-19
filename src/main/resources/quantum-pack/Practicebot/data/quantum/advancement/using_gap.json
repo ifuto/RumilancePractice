@@ -1,0 +1,15 @@
+{
+  "criteria": {
+    "requirements": {
+      "trigger": "minecraft:using_item",
+      "conditions": {
+        "item": {
+          "items": "minecraft:golden_apple"
+        }
+      }
+    }
+  },
+  "rewards": {
+    "function": "quantum:allstats/using_gap"
+  }
+}

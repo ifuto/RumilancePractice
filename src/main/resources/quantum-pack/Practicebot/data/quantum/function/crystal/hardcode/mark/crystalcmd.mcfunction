@@ -1,0 +1,1 @@
+execute if block ~ ~ ~ #quantum:placeable_obsidian if function xaniclelib:check/intersect1 if function quantum:mark/blockplace if function xaniclelib:check/raycast if function xaniclelib:check/raycast2 run return 1

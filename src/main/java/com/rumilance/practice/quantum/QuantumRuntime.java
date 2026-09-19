@@ -69,6 +69,12 @@ public final class QuantumRuntime {
     private YamlConfiguration config;
     private boolean enabled;
     private BukkitTask watchdog;
+    /** Watchdog pacing: a healthy install goes back to the 5 s cadence, a broken one backs off. */
+    private volatile long watchdogIntervalMs = 5_000L;
+    private volatile long nextWatchdogAt;
+    private volatile long lastReinstallLogAt;
+    /** Warn once that the pack roots contain no .mcfunction files. */
+    private volatile boolean zeroPackWarned;
     /**
      * PvP サーバー側のキット (および {@code /botadmin} の紐づけ) への橋。null なら
      * キット連携なし = マップ側のキットチェストが唯一の供給元 (パリティ計測時はこちら)。
@@ -130,6 +136,8 @@ public final class QuantumRuntime {
             this.plugin.getLogger().info("[Quantum] disabled in quantum.yml — runtime idle");
             return;
         }
+        // Deploy the map pack that ships inside the jar before the install can read it.
+        this.extractBundledPack();
         // The verbs must be in the dispatcher before anything compiles a 'player …' line, so the
         // install hangs off the command registration rather than running right here.
         this.commands.listen(this::installWhenReady);
@@ -152,16 +160,46 @@ public final class QuantumRuntime {
         // Self-healing, for the two ways this can be undone behind our back: /reload rebuilds the
         // function library from the packs on disk (dropping the functions that only compiled with
         // 'player' present), and a dispatcher swap takes the verbs away from the map's lines.
+        //
+        // The cadence is adaptive: a healthy install returns to 5 s; a broken state (verbs never
+        // register, pack unreadable, ...) doubles up to 2 min instead of hammering the log every
+        // 5 s forever — and the "reinstalling" line itself is capped at one per 30 s.
         this.watchdog = Bukkit.getScheduler().runTaskTimer(this.plugin, () -> {
             if (!this.enabled) {
                 return;
             }
+            long now = System.currentTimeMillis();
+            if (now < this.nextWatchdogAt) {
+                return;
+            }
+            this.nextWatchdogAt = now + this.watchdogIntervalMs;
             if (!this.commands.areRootsRegistered()) {
                 this.commands.ensureRoots();
             }
-            if (!this.functions.isInstalled() || !this.commands.areRootsRegistered()) {
-                this.plugin.getLogger().info("[Quantum] reinstalling the Quantum functions");
-                this.installWhenReady();
+            boolean roots = this.commands.areRootsRegistered();
+            if (this.functions.isInstalled() && roots) {
+                this.watchdogIntervalMs = 5_000L;
+                return;
+            }
+            if (now - this.lastReinstallLogAt >= 30_000L) {
+                this.lastReinstallLogAt = now;
+                this.plugin.getLogger().info("[Quantum] reinstalling the Quantum functions (roots="
+                        + roots + ")");
+            }
+            QuantumFunctionRegistry.Result result = this.installWhenReady();
+            if (!this.zeroPackWarned && result.functions() == 0 && result.tags() == 0) {
+                this.zeroPackWarned = true;
+                this.plugin.getLogger().warning("[Quantum] no .mcfunction files under the pack roots "
+                        + this.packRoots()
+                        + " — the bundled map pack should deploy to plugins/RumilancePractice/quantum"
+                        + " at boot; check quantum.yml ('packs', 'include-world-datapacks') if the map"
+                        + " should live elsewhere. Set 'enabled: false' in"
+                        + " plugins/RumilancePractice/quantum.yml to silence the runtime.");
+            }
+            if (this.functions.isInstalled() && roots) {
+                this.watchdogIntervalMs = 5_000L;
+            } else {
+                this.watchdogIntervalMs = Math.min(this.watchdogIntervalMs * 2, 120_000L);
             }
         }, 100L, 100L);
     }
@@ -262,7 +300,7 @@ public final class QuantumRuntime {
     }
 
     private List<Path> packRoots() {
-        List<Path> roots = new ArrayList<>();
+        LinkedHashSet<Path> roots = new LinkedHashSet<>();
         for (String entry : this.config.getStringList("packs")) {
             Path path = Path.of(entry);
             if (!path.isAbsolute()) {
@@ -270,9 +308,9 @@ public final class QuantumRuntime {
             }
             roots.add(path);
         }
-        if (roots.isEmpty()) {
-            roots.add(this.plugin.getDataFolder().toPath().resolve("quantum"));
-        }
+        // The bundled pack always deploys to <dataFolder>/quantum — read it no matter what the
+        // (possibly stale, e.g. pre-rename 'plugins/RumilancePractice/quantum') config says.
+        roots.add(this.plugin.getDataFolder().toPath().resolve("quantum"));
         if (this.config.getBoolean("include-world-datapacks", true)) {
             for (World world : Bukkit.getWorlds()) {
                 File folder = new File(world.getWorldFolder(), "datapacks");
@@ -286,7 +324,131 @@ public final class QuantumRuntime {
                 roots.add(container.toPath());
             }
         }
-        return roots;
+        return new ArrayList<>(roots);
+    }
+
+    // ------------------------------------------------------------------ bundled pack
+
+    /** Jar resource prefix of the map pack that ships inside the plugin. */
+    private static final String BUNDLED_PACK_ROOT = "quantum-pack/";
+    /** Marker recording the hash of the pack last deployed from the jar. */
+    private static final String BUNDLED_PACK_MARKER = ".bundled-pack-sha256";
+
+    /**
+     * Deploys the map pack bundled inside the jar (resource {@code quantum-pack/Practicebot/})
+     * into {@code plugins/RumilancePractice/quantum/} — the default {@code packs} entry of
+     * quantum.yml — so a server that only has the jar finds the map's {@code .mcfunction} files
+     * without any manual zip placement.
+     *
+     * <p>Deployment is marker-based ({@code .bundled-pack-sha256}): the hash of the bundled
+     * content is compared against the marker, and a boot with an unchanged bundle writes
+     * nothing (local edits to extracted files are never clobbered). When the bundle changes —
+     * i.e. the plugin was updated with a newer map — only the files that differ are rewritten.</p>
+     *
+     * <p>Only the function side is self-contained this way: dimensions, structures and
+     * advancements still need the pack (or the imported world) in a world's {@code datapacks/}
+     * folder, exactly as before.</p>
+     */
+    private void extractBundledPack() {
+        List<BundledPackFile> bundled;
+        try {
+            bundled = readBundledPack();
+        } catch (Exception e) {
+            this.plugin.getLogger().warning("[Quantum] cannot read the bundled map pack: " + e);
+            return;
+        }
+        if (bundled.isEmpty()) {
+            return; // this build ships no bundled pack
+        }
+        String hash;
+        try {
+            hash = sha256Of(bundled);
+        } catch (Exception e) {
+            this.plugin.getLogger().warning("[Quantum] cannot hash the bundled map pack: " + e);
+            return;
+        }
+        Path targetRoot = this.plugin.getDataFolder().toPath().resolve("quantum");
+        Path marker = targetRoot.resolve(BUNDLED_PACK_MARKER);
+        try {
+            if (Files.exists(marker) && hash.equals(Files.readString(marker).trim())) {
+                return; // already deployed
+            }
+            int written = 0;
+            for (BundledPackFile file : bundled) {
+                Path out = targetRoot.resolve(file.relativePath());
+                if (Files.exists(out) && java.util.Arrays.equals(Files.readAllBytes(out), file.content())) {
+                    continue;
+                }
+                if (out.getParent() != null) {
+                    Files.createDirectories(out.getParent());
+                }
+                Files.write(out, file.content());
+                written++;
+            }
+            Files.createDirectories(targetRoot);
+            Files.writeString(marker, hash);
+            this.plugin.getLogger().info("[Quantum] deployed the bundled map pack (Practicebot): "
+                    + written + " file(s) written under " + targetRoot
+                    + " (" + bundled.size() + " bundled)");
+        } catch (IOException e) {
+            this.plugin.getLogger().warning("[Quantum] could not deploy the bundled map pack: " + e);
+        }
+    }
+
+    /** Every bundled pack file as (relative path, content); empty list when the jar ships none. */
+    private List<BundledPackFile> readBundledPack() throws Exception {
+        // ClassLoader (not Plugin#getResource, which only yields an InputStream): the URL tells
+        // us whether the bundle lives in the plugin jar or on a dev classpath directory.
+        java.net.URL root = this.plugin.getClass().getClassLoader().getResource("quantum-pack");
+        if (root == null) {
+            return List.of();
+        }
+        List<BundledPackFile> files = new ArrayList<>();
+        if ("jar".equals(root.getProtocol())) {
+            java.net.JarURLConnection connection = (java.net.JarURLConnection) root.openConnection();
+            try (java.util.jar.JarFile jar = connection.getJarFile()) {
+                java.util.Enumeration<java.util.jar.JarEntry> entries = jar.entries();
+                while (entries.hasMoreElements()) {
+                    java.util.jar.JarEntry entry = entries.nextElement();
+                    String name = entry.getName();
+                    if (entry.isDirectory() || !name.startsWith(BUNDLED_PACK_ROOT)) {
+                        continue;
+                    }
+                    try (InputStream in = jar.getInputStream(entry)) {
+                        files.add(new BundledPackFile(name.substring(BUNDLED_PACK_ROOT.length()),
+                                in.readAllBytes()));
+                    }
+                }
+            }
+        } else {
+            // dev/test classpath: a plain directory
+            Path dir = Path.of(root.toURI());
+            try (java.util.stream.Stream<Path> walk = Files.walk(dir)) {
+                for (Path p : walk.filter(Files::isRegularFile).sorted().toList()) {
+                    files.add(new BundledPackFile(
+                            dir.relativize(p).toString().replace('\\', '/'),
+                            Files.readAllBytes(p)));
+                }
+            }
+        }
+        return files;
+    }
+
+    private static String sha256Of(List<BundledPackFile> files) throws Exception {
+        java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+        for (BundledPackFile file : files) {
+            digest.update(file.relativePath().getBytes(StandardCharsets.UTF_8));
+            digest.update((byte) 0);
+            digest.update(file.content());
+        }
+        StringBuilder out = new StringBuilder();
+        for (byte b : digest.digest()) {
+            out.append(String.format(Locale.ROOT, "%02x", b));
+        }
+        return out.toString();
+    }
+
+    private record BundledPackFile(String relativePath, byte[] content) {
     }
 
     // ------------------------------------------------------------------ map driving

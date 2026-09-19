@@ -1,0 +1,15 @@
+{
+  "criteria": {
+    "requirement": {
+      "trigger": "minecraft:using_item",
+      "conditions": {
+        "item": {
+          "items": "bow"
+        }
+      }
+    }
+  },
+  "rewards": {
+    "function": "quantum:prac_stats/used_bow"
+  }
+}

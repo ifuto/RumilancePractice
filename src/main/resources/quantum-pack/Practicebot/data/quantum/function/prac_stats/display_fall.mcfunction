@@ -1,0 +1,3 @@
+$execute if predicate quantum:fall_distance30_70 run title @s actionbar [{"text":"Fall Distance: ","color":"green"},{"color":"aqua","text":"$(fall_distance)"}]
+$execute if predicate quantum:fall_distance70 run title @s actionbar [{"text":"Fall Distance: ","color":"green"},{"color":"light_purple","text":"$(fall_distance)"}]
+$execute if predicate quantum:fall_distance150 run title @s actionbar [{"text":"Fall Distance: ","color":"green"},{"color":"red","text":"$(fall_distance)"}]

@@ -1,0 +1,2 @@
+execute if score .spear toggles matches 1 if score @s in_range matches 0 unless entity @a[tag=xlib_target,distanceH=..4] if score @s airborne matches 1 if score @s hitcd matches 0 run scoreboard players set @s lunge_decision 1
+execute if score .elytra toggles matches 1 if score @s Pos1_difference matches -3.. if score @s horiz_distance_to_target > @s vertical_distance_to_target if score @s in_range matches 0 unless entity @a[tag=xlib_target,distanceH=..5] if score @s airborne matches 1 run scoreboard players set @s elytra_decision 1

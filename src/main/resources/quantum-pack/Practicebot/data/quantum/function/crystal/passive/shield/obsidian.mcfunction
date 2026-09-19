@@ -1,0 +1,2 @@
+setblock ~ ~ ~ obsidian
+execute positioned ~ ~1 ~ if function quantum:g1gc/block positioned ~ ~-1 ~ if entity @a[tag=xlib_target,distance=..4] if function xaniclelib:check/intersect1 run return run summon marker ~ ~-1 ~ {Tags:["danger","slib"]}

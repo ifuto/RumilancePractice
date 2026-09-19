@@ -1,0 +1,2 @@
+execute if score .move_forward npc matches 1 run return run function npc:settings/off/move_forward
+execute unless score .move_forward npc matches 1 run return run function npc:settings/on/move_forward

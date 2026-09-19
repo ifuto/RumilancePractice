@@ -1,0 +1,1 @@
+function quantum:prac_stats/display_fall with entity @s

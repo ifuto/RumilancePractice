@@ -1,0 +1,19 @@
+{
+  "criteria": {
+    "requirements": {
+      "trigger": "minecraft:item_used_on_block",
+      "conditions": {
+        "player": {
+          "equipment": {
+            "mainhand": {
+              "items": "minecraft:end_crystal"
+            }
+          }
+        }
+      }
+    }
+  },
+  "rewards": {
+    "function": "stats:advancements/placed_crystal"
+  }
+}

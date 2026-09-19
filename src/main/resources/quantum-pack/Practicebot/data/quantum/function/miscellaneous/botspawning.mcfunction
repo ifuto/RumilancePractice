@@ -1,0 +1,1 @@
+execute in overworld run playerspawn quantumbot at -646 57 88 facing 0 0 in creative on minecraft:overworld

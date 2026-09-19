@@ -1,0 +1,13 @@
+{
+  "values": [
+    "stone",
+    "cobblestone",
+    "deepslate",
+    "cobbled_deepslate",
+    "#terracotta",
+    "glowstone_dust",
+    "dirt",
+    "grass_block",
+    "#sand"
+  ]
+}

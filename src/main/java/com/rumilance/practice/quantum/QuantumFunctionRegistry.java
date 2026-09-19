@@ -50,6 +50,12 @@ public final class QuantumFunctionRegistry {
     private int installedCount;
     private int tagCount;
     private int rewrittenLines;
+    /**
+     * True once a real install pass has run against the live server. An EMPTY pack is then a
+     * fixed point — the server cannot "uninstall" functions that were never installed — so the
+     * watchdog must treat it as stable instead of reinstalling (and logging) forever.
+     */
+    private volatile boolean installAttempted;
 
     public QuantumFunctionRegistry(org.bukkit.plugin.Plugin plugin) {
         this.plugin = plugin;
@@ -88,7 +94,8 @@ public final class QuantumFunctionRegistry {
 
     public boolean isInstalled() {
         if (this.installed.isEmpty()) {
-            return false;
+            // See installAttempted: an empty pack that has been installed is stable, not broken.
+            return this.installAttempted;
         }
         MinecraftServer server = server();
         if (server == null) {
@@ -174,6 +181,7 @@ public final class QuantumFunctionRegistry {
         this.failures = List.copyOf(failures);
         this.installedCount = functions.size();
         this.tagCount = tags.size();
+        this.installAttempted = true;
         return new Result(this.installedCount, this.tagCount, this.failures);
     }
 

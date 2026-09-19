@@ -1,0 +1,2 @@
+execute if score .better_shield npc matches 1 run return run function npc:settings/off/better_shield
+execute unless score .better_shield npc matches 1 run return run function npc:settings/on/better_shield

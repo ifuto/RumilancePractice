@@ -1,0 +1,2 @@
+execute positioned ^ ^ ^-1 if score @s crystal_timer matches ..0 if function quantum:g1gc/perfect/hurt1 at @n[distance=0..,tag=crystal_2,tag=!used,tag=optimal,type=marker] run function quantum:g1gc/spawncrystal
+execute positioned ^ ^ ^-1 if score @s obby_timer matches ..0 unless entity @e[distance=0..,tag=crystal_2,tag=optimal,type=marker] if function quantum:g1gc/perfect/hurt2 at @n[distance=0..,tag=crystal_1,tag=!used,tag=optimal,type=marker] run function quantum:g1gc/placeobsidian

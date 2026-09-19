@@ -1,0 +1,2 @@
+execute if score .pearl_spam toggles matches 1 if score @s OnGround matches 0 run player @s look down
+execute if score .pearl_spam toggles matches 1 if score @s OnGround matches 0 run function quantum:pearl

@@ -1,0 +1,26 @@
+{
+  "criteria": {
+    "dmg": {
+      "trigger": "minecraft:entity_hurt_player",
+      "conditions": {
+        "damage": {
+          "dealt": 5,
+          "type": {
+            "tags": [
+              {
+                "id": "minecraft:is_fall",
+                "expected": true
+              }
+            ]
+          }
+        }
+      }
+    },
+    "location": {
+      "trigger": "minecraft:location"
+    }
+  },
+  "rewards": {
+    "function": "stats:advancements/pearl_land"
+  }
+}

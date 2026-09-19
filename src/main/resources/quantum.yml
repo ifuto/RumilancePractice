@@ -13,8 +13,12 @@ enabled: true
 # Where the pack lives. Each entry is a directory containing `data/`, OR a .zip containing the
 # world/pack (the reference download "Quantum's PvP Practice v1.18.zip" works as-is: both the
 # world itself and its `datapacks/Practicebot` folder are read).
+#
+# The bundled map pack inside the plugin jar auto-deploys to plugins/NARENA/quantum at boot
+# (see [Quantum] deployed the bundled map pack … in the log) — that folder is always read,
+# whatever the list below says, so this entry is only needed for extra packs.
 packs:
-  - "plugins/RumilancePractice/quantum"
+  - "plugins/NARENA/quantum"
 
 # Also pick up packs from the loaded worlds' `datapacks/` folders (and from `quantum/datapacks`).
 include-world-datapacks: true

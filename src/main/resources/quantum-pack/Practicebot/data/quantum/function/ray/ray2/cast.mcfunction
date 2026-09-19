@@ -1,0 +1,1 @@
+execute at @s anchored eyes facing entity @n[tag=escape,type=marker] feet run function quantum:ray/ray2/pearlstep

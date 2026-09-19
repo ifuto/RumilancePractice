@@ -1,0 +1,2 @@
+execute unless score .mode mode matches 2 as @e[type=ender_pearl] if entity @s[tag=xlib_bot] on origin run return 0
+execute if score .gear toggles matches 1 at @s[scores={bowcharge=..0,pearlcd=..0}] unless score .mode mode matches 4..5 unless score @s airborne matches 1 unless entity @a[tag=xlib_target,distance=..9] unless score @p[tag=xlib_target] airborne matches 1 run function quantum:g1gc/pearl

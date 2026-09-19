@@ -1,0 +1,3 @@
+execute if score .pcrit toggles matches 1 at @s[scores={combo=-2..,in_cobweb_decision=0}] as @p[tag=xlib_target] if entity @s[scores={hitcd=1..,in_cobweb_decision=0}] unless score .shield toggles matches 1 run return 1
+execute if score .pcrit toggles matches 1 at @s[scores={combo=-2..,in_cobweb_decision=0}] as @p[tag=xlib_target] if entity @s[scores={hitcd=1..,in_cobweb_decision=0}] if score .mode mode matches 4..5 if score .shield toggles matches 1 run return 1
+return 0

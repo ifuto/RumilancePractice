@@ -1,0 +1,1 @@
+execute as @a[tag=xlib_target] at @s[gamemode=!creative] in overworld run function quantum:bin/3
