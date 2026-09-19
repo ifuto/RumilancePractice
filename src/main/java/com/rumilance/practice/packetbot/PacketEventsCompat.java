@@ -20,16 +20,16 @@ import java.util.UUID;
  * <p>PacketEvents verifies on every {@code PlayerJoinEvent} that it can resolve a {@code User}
  * from the player's network channel; if it cannot, it kicks the player with
  * "PacketEvents failed to inject into a channel". Our fake players never perform a network
- * handshake, so no PE user is ever created from traffic. And on PE versions before 2.8.0
- * (upstream commit ec4496f83, 2025-03-23) the fallback — which does find the bot's channel by
- * reflection — fails to classify the bot's {@code EmbeddedChannel} as a fake channel, so the
- * bot is kicked on every single join.
+ * handshake, so no PE user is ever created from traffic.
  *
- * <p>The fix: pre-register a PE {@code User} for the bot's channel before
+ * <p>PE ≥ 2.8.0 whitelists {@code EmbeddedChannel} in its fallback, but that fallback
+ * (reflection over the player's handle) is broken on some Paper 1.21.x builds — production
+ * (Paper 1.21.11 + PE 2.13.0) still kicked every bot join through it. So we do NOT rely on
+ * the fallback at all: we pre-register a PE {@code User} for the bot's channel before
  * {@code placeNewPlayer} fires the join event. {@code getPlayerManager().getUser(player)}
- * then resolves on <em>any</em> PE version and the kick branch is never reached. If the
- * installed PE already whitelists {@code EmbeddedChannel} (≥ 2.8.0) we do nothing — its
- * built-in fake-channel path handles the bot. Quit-time cleanup removes the entries.
+ * then resolves on <em>any</em> PE version (the UUID→channel map is consulted first, no
+ * reflection involved) and the kick branch is never reached. Quit-time cleanup removes the
+ * entries.
  *
  * <p>All PacketEvents access is reflective, loaded through <em>PacketEvents' own class
  * loader</em> (Bukkit plugins are sibling class loaders; {@code Class.forName} from this
@@ -72,10 +72,10 @@ public final class PacketEventsCompat implements Listener {
             if (api == null) {
                 return;
             }
-            // PE >= 2.8.0 whitelists EmbeddedChannel itself — leave it to that path.
-            if (alreadyRecognizedAsFake(channel, peLoader)) {
-                return;
-            }
+            // Always pre-register: relying on PE's own fallback (reflection over the player
+            // handle + fake-channel list) is not sufficient — it still kicked bots on
+            // Paper 1.21.11 + PE 2.13.0 in production. A pre-registered User makes
+            // getUser(player) resolve on every version, so the kick branch is unreachable.
             Object protocolManager = invoke(api, "getProtocolManager", new Class<?>[0]);
             if (protocolManager == null) {
                 return;
@@ -177,16 +177,6 @@ public final class PacketEventsCompat implements Listener {
 
     private static Class<?> forName(ClassLoader loader, String name) throws ReflectiveOperationException {
         return Class.forName(name, true, loader);
-    }
-
-    private static boolean alreadyRecognizedAsFake(Channel channel, ClassLoader peLoader) {
-        try {
-            Class<?> fc = forName(peLoader, "com.github.retrooper.packetevents.util.FakeChannelUtil");
-            Object fake = fc.getMethod("isFakeChannel", Object.class).invoke(null, channel);
-            return Boolean.TRUE.equals(fake);
-        } catch (Throwable t) {
-            return false;
-        }
     }
 
     private static Object serverClientVersion(Object api) {
