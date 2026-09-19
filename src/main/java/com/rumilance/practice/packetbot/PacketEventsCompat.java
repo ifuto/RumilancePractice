@@ -14,6 +14,7 @@ import com.mojang.authlib.GameProfile;
 import java.lang.reflect.Constructor;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.logging.Level;
 
 /**
  * PacketEvents (io.github.retrooper.packetevents) coexistence for fake players.
@@ -209,11 +210,23 @@ public final class PacketEventsCompat implements Listener {
 
     // --------------------------------------------------------------- internals
 
-    private static org.bukkit.plugin.logging.Logger log() {
+    private static org.bukkit.plugin.Logger log() {
         Plugin p = host;
-        return p != null ? p.getLogger()
-                : org.bukkit.plugin.logging.LogManager.getLogger("PacketEventsCompat");
+        return p != null ? p.getLogger() : FALLBACK_LOGGER;
     }
+
+    /** Safety net for calls before {@link #register(Plugin)}; delegates to the JUL console. */
+    private static final org.bukkit.plugin.Logger FALLBACK_LOGGER = new org.bukkit.plugin.Logger() {
+        @Override
+        public void log(Level level, String message, Throwable t) {
+            java.util.logging.Logger.getLogger("RumilancePractice.PacketEventsCompat").log(level, message, t);
+        }
+
+        @Override
+        public boolean isLoggable(Level level) {
+            return true;
+        }
+    };
 
     private static String describe(Object o) {
         if (o == null) {
