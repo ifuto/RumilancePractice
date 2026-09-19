@@ -143,7 +143,11 @@ public final class HeroBotRegistry {
         // instance can participate in the same live runtime without replacing another bot.
         bot.addTag("quantum_bot");
         bot.addTag("xlib_bot");
-        com.rumilance.practice.packetbot.PacketBot.registerLive(bot, null);
+        org.bukkit.entity.Player visibleBot = bot.getBukkitEntity();
+        visibleBot.setCustomName(com.rumilance.practice.packetbot.PacketBotFactory.DEFAULT_DISPLAY_NAME);
+        visibleBot.setCustomNameVisible(true);
+        com.rumilance.practice.packetbot.PacketBot.registerLive(bot,
+                com.rumilance.practice.packetbot.PacketBotFactory.DEFAULT_DISPLAY_NAME);
         bot.stopRiding();
         bot.teleportTo(level, location.getX(), location.getY(), location.getZ(),
                 Set.of(), yaw, pitch, true);
