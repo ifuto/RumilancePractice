@@ -497,17 +497,17 @@ public final class QuantumRuntime {
     public int run(CommandSender sender, String commandLine) throws CommandSyntaxException {
         MinecraftServer server = ((CraftServer) Bukkit.getServer()).getServer();
         CommandSourceStack source;
-        if (sender instanceof Player player) {
+        String line = net.minecraft.commands.Commands.trimOptionalPrefix(commandLine);
+        if (sender instanceof Player player && com.rumilance.practice.packetbot.PacketBot.isBot(player)) {
+            // A fake player is deliberately not op. Run through the server-owned source so
+            // datapack `function` commands retain permission 4, then switch only the execution
+            // entity and position to the bot. This avoids the 1.21.11 PermissionSet internals
+            // while preserving @s, execute, return, and scheduled-function semantics.
+            source = server.createCommandSourceStack();
+            line = "execute as " + player.getUniqueId() + " at @s run " + line;
+        } else if (sender instanceof Player player) {
             source = ((org.bukkit.craftbukkit.entity.CraftPlayer) player).getHandle()
                     .createCommandSourceStack();
-            // The fake connection is not an operator, but its private function driver is a
-            // server-owned execution path. Without this permission elevation the vanilla
-            // `function` command silently refuses to run for a spawned bot.
-            if (com.rumilance.practice.packetbot.PacketBot.isBot(player)) {
-                // 1.21.11 represents command permissions as PermissionSet; the stable
-                // withMaximumPermission bridge keeps this code compatible with that API.
-                source = source.withMaximumPermission(4);
-            }
         } else {
             source = server.createCommandSourceStack();
         }
@@ -516,7 +516,7 @@ public final class QuantumRuntime {
         // CommandAdapter#run, which throws "This function should not run". The console takes the
         // same path as this code (Commands#performCommand), which is why typing the line by hand
         // works while the legacy call would not.
-        String line = net.minecraft.commands.Commands.trimOptionalPrefix(commandLine);
+        line = net.minecraft.commands.Commands.trimOptionalPrefix(line);
         net.minecraft.commands.Commands commands = server.getCommands();
         com.mojang.brigadier.ParseResults<CommandSourceStack> parsed =
                 commands.getDispatcher().parse(line, source);
