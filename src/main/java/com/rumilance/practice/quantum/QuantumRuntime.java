@@ -833,11 +833,9 @@ public final class QuantumRuntime {
                 this.despawnInstance(instance.botUuid());
                 continue;
             }
-            // Newly created vanilla projectiles/items and map markers acquire the instance entity
-            // tag before the scoped function sees them. Summons from the compiled function also
-            // receive the tag directly in the source transformer.
-            this.runQuietly(bot.getBukkitEntity(), "tag @e[distance=..64,tag=!"
-                    + instance.entityTag() + "] add " + instance.entityTag());
+            // Summoned map markers/entities receive this instance tag directly in the source
+            // transformer. Never bulk-tag nearby entities here: another player's bot, target, or
+            // projectile can be inside this radius and must remain owned by its own instance.
             this.runQuietly(bot.getBukkitEntity(), "function " + instance.tickFunction());
         }
     }

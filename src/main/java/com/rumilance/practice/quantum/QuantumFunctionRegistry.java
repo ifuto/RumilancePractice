@@ -490,19 +490,19 @@ public final class QuantumFunctionRegistry {
             }
             int nbt = line.indexOf('{', summon);
             if (nbt < 0) {
-                return line + " {Tags:[\\\"" + this.instance.entityTag() + "\\\"]}";
+                return line + " {Tags:[\"" + this.instance.entityTag() + "\"]}";
             }
             int tags = line.indexOf("Tags:[", nbt);
             if (tags >= 0) {
                 int end = line.indexOf(']', tags);
                 if (end >= 0 && !line.substring(tags, end).contains(this.instance.entityTag())) {
-                    return line.substring(0, end) + ",\\\"" + this.instance.entityTag()
-                            + "\\\"" + line.substring(end);
+                    return line.substring(0, end) + ",\"" + this.instance.entityTag()
+                            + "\"" + line.substring(end);
                 }
                 return line;
             }
-            return line.substring(0, nbt + 1) + "Tags:[\\\"" + this.instance.entityTag()
-                    + "\\\"]," + line.substring(nbt + 1);
+            return line.substring(0, nbt + 1) + "Tags:[\"" + this.instance.entityTag()
+                    + "\"]," + line.substring(nbt + 1);
         }
     }
 
