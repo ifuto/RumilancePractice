@@ -630,7 +630,20 @@ public final class QuantumRuntime {
             int dot = key.indexOf('.');
             String objective = dot < 0 ? key : key.substring(0, dot);
             String holder = dot < 0 ? ".seed" : key.substring(dot + 1);
-            if (this.runQuietly(sender, "scoreboard players set " + holder + " " + objective + " " + target)) {
+            boolean ok;
+            if (this.instances.isEmpty()) {
+                ok = this.runQuietly(sender,
+                        "scoreboard players set " + holder + " " + objective + " " + target);
+            } else {
+                ok = true;
+                for (QuantumInstance instance : List.copyOf(this.instances.values())) {
+                    HeroBotPlayer bot = this.instanceBot(instance);
+                    ok &= bot != null && this.runQuietly(bot.getBukkitEntity(),
+                            "scoreboard players set " + this.scopedHolder(instance, holder)
+                                    + " " + objective + " " + target);
+                }
+            }
+            if (ok) {
                 applied++;
             }
         }
@@ -640,6 +653,16 @@ public final class QuantumRuntime {
             }
         }
         return applied;
+    }
+
+    private static String scopedHolder(QuantumInstance instance, String holder) {
+        if (holder.startsWith(".")) {
+            return instance.holderPrefix() + holder.substring(1);
+        }
+        if (holder.equals("bot") || holder.equals("player")) {
+            return instance.holderPrefix() + holder;
+        }
+        return holder.startsWith("@") ? holder : instance.holderPrefix() + holder;
     }
 
     private boolean runQuietly(CommandSender sender, String line) {
