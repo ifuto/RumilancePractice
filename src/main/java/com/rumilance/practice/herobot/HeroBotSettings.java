@@ -30,7 +30,7 @@ import java.util.Map;
  *       the {@code quantum:shield/*} + {@code tempshield} logic in the map.</li>
  *   <li>{@code allowSpawningOfflinePlayers} — decided whether {@code /player <name> spawn}
  *       needs a resolvable game profile (Paper has no Mojang connection here, so this is what
- *       lets the map spawn {@code quantumbot} offline).</li>
+ *       lets the runtime own every QuantumBOT instance).</li>
  * </ul>
  */
 public final class HeroBotSettings {

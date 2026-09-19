@@ -104,8 +104,8 @@ require-resource-pack=true
 resource-pack-prompt={"text":"Rumilanceのアイコン表示に必要です","color":"aqua"}
 
 # またはリポジトリの dist パック直接指定（マージ後は .../main/...）
-resource-pack=https://raw.githubusercontent.com/ifuto/RumilancePractice/main/dist/RumilanceResourcePack.zip
-resource-pack-sha1=42d41dcee474c577b653049e55d8c4ca87364f7b
+resource-pack=https://github.com/ifuto/RumilancePractice/releases/download/v1.76.45/RumilanceResourcePack.zip
+resource-pack-sha1=4dcb7fc7801734a97217115a69a2eda15fb960d4
 require-resource-pack=true
 ```
 

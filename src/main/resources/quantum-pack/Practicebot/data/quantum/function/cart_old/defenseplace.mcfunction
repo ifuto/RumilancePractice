@@ -1,4 +1,4 @@
 execute at @e[tag=cartdefense] run setblock ~ ~ ~ oak_log
 kill @e[tag=cartdefense]
-say yo
+# QuantumBOT is intentionally silent.
 schedule clear quantum:cart/defenseplace

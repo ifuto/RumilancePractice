@@ -28,16 +28,19 @@ world:
   name: ""
 
 bot:
-  # Base profile name for QuantumBOT instances. Additional /bot calls use quantumbot_2, etc.
-  name: "quantumbot"
+  # Fixed player-facing name; the runtime derives unique legal profile names per instance.
+  name: "NARENA BOT"
   gamemode: "creative"
   yaw: 0.0
   pitch: 0.0
   # Milliseconds; the map's .ping score / options/set_ping is authoritative once it runs.
   ping: 100
   # Where to spawn the bot when nothing else says otherwise (x, y, z). 3 values, no defaults
-  # beyond these; `playerspawn ... at <x y z>` in the map always wins.
+  # beyond these; `/bot` owner location takes precedence for player-facing instances.
   spawn: [-646.0, 57.0, 88.0]
+  # Server-kit binding for QuantumBOT. Empty means the bundled map kit remains authoritative.
+  mode: ''
+  kit: ''
 
 # The reference measurement scenario (docs/bot-combat-parity.md) was taken with these two
 # settings; `mode` and `difficulty` are applied by /quantum seed and by the map's own scoring.
@@ -64,11 +67,3 @@ herobot:
   creative-no-clip: false
   # tick: bot を tick のどこで動かすか (tick-start = tick の先頭 / scheduler = tick の終わり)
   tick-phase: tick-start
-
-# BOT の装備をサーバーのキットから与える (PvP サーバー向け)。
-#   mode: SWORD|MACE|CRYSTAL|NETHERITE_POT|CART — /botadmin <mode> <kit> の紐づけを使う
-#   kit : キット名を直接指定 (モード紐づけより優先。空なら紐づけを使う)
-# どちらも空なら、参照マップのキットチェストが装備を供給する (パリティ計測と同じ)。
-bot:
-  mode: ''
-  kit: ''

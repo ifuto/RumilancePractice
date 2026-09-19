@@ -126,7 +126,7 @@ public final class DrillKernel {
     }
 
     // ---------------------------------------------------------------- mace far pearl
-    // mace/far_pearl/loop:7 `spreadplayers ~ ~ 15 15 false quantumbot` at marker ~ ~10 ~:
+    // mace/far_pearl/loop:7 spreads each instance-owned bot at its own marker:
     // vanilla spreads each target uniformly inside the square of half-side maxRange (15).
     /** Inclusive |dx|/|dz| cap for the scatter square. */
     public static final int FAR_PEARL_SCATTER_RADIUS = 15;

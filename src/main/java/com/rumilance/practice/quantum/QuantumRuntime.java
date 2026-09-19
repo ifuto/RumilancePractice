@@ -26,10 +26,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -69,6 +73,10 @@ public final class QuantumRuntime {
     private YamlConfiguration config;
     private boolean enabled;
     private BukkitTask watchdog;
+    /** Drives each private qbot_N:tick once per server tick; no shared quantum:tick tag is used. */
+    private BukkitTask instanceTicker;
+    private final Map<UUID, QuantumInstance> instances = new LinkedHashMap<>();
+    private final AtomicInteger nextInstanceNumber = new AtomicInteger(1);
     /** Watchdog pacing: a healthy install goes back to the 5 s cadence, a broken one backs off. */
     private volatile long watchdogIntervalMs = 5_000L;
     private volatile long nextWatchdogAt;
@@ -203,6 +211,22 @@ public final class QuantumRuntime {
                 this.watchdogIntervalMs = Math.min(this.watchdogIntervalMs * 2, 120_000L);
             }
         }, 100L, 100L);
+        // The owner is the instance target. A quit must tear down the fake player and its private
+        // function namespace instead of leaving a tagged target for the next online player.
+        Bukkit.getPluginManager().registerEvents(new org.bukkit.event.Listener() {
+            @org.bukkit.event.EventHandler
+            public void onQuit(org.bukkit.event.player.PlayerQuitEvent event) {
+                List<UUID> owned = new ArrayList<>();
+                for (QuantumInstance instance : instances.values()) {
+                    if (event.getPlayer().getUniqueId().equals(instance.targetUuid())) {
+                        owned.add(instance.botUuid());
+                    }
+                }
+                for (UUID bot : owned) {
+                    despawnInstance(bot);
+                }
+            }
+        }, this.plugin);
     }
 
     /**
@@ -233,6 +257,18 @@ public final class QuantumRuntime {
             this.watchdog.cancel();
             this.watchdog = null;
         }
+        if (this.instanceTicker != null) {
+            this.instanceTicker.cancel();
+            this.instanceTicker = null;
+        }
+        for (QuantumInstance instance : List.copyOf(this.instances.values())) {
+            Player target = Bukkit.getPlayer(instance.targetUuid());
+            if (target != null) {
+                target.removeScoreboardTag(instance.targetTag());
+                target.removeScoreboardTag(instance.participantTag());
+            }
+        }
+        this.instances.clear();
         this.bots.despawnAll();
     }
 
@@ -464,6 +500,12 @@ public final class QuantumRuntime {
         if (sender instanceof Player player) {
             source = ((org.bukkit.craftbukkit.entity.CraftPlayer) player).getHandle()
                     .createCommandSourceStack();
+            // The fake connection is not an operator, but its private function driver is a
+            // server-owned execution path. Without this permission elevation the vanilla
+            // `function` command silently refuses to run for a spawned bot.
+            if (com.rumilance.practice.packetbot.PacketBot.isBot(player)) {
+                source = source.withPermission(4);
+            }
         } else {
             source = server.createCommandSourceStack();
         }
@@ -488,9 +530,37 @@ public final class QuantumRuntime {
         return id.contains(":") ? id : "quantum:" + id;
     }
 
+    private HeroBotPlayer instanceBot(QuantumInstance instance) {
+        for (HeroBotPlayer bot : this.bots.all()) {
+            if (bot.getUUID().equals(instance.botUuid())) {
+                return bot;
+            }
+        }
+        return null;
+    }
+
+    private boolean runOnInstances(String relativeFunction) {
+        if (this.instances.isEmpty()) {
+            return false;
+        }
+        boolean ok = true;
+        for (QuantumInstance instance : List.copyOf(this.instances.values())) {
+            HeroBotPlayer bot = this.instanceBot(instance);
+            if (bot == null) {
+                ok = false;
+                continue;
+            }
+            ok &= this.runQuietly(bot.getBukkitEntity(),
+                    "function " + instance.namespace() + ":" + relativeFunction);
+        }
+        return ok;
+    }
+
     /** {@code function quantum:options/<name>} — the map's mode switch. */
     public boolean setOption(CommandSender sender, String name) {
-        boolean ok = this.runQuietly(sender, "function " + expand("options/" + name));
+        boolean ok = this.instances.isEmpty()
+                ? this.runQuietly(sender, "function " + expand("options/" + name))
+                : this.runOnInstances("options/" + name);
         if (ok) {
             // モード切替はマップ側のキットチェストから装備を読み直す。/botadmin でサーバー
             // キットを紐づけているサーバーでは、その *あと* に BOT の装備をサーバーキットへ
@@ -505,24 +575,45 @@ public final class QuantumRuntime {
     /** {@code function quantum:options/toggles/<name>on|off}. */
     public boolean setToggle(CommandSender sender, String name, boolean on) {
         String path = "options/toggles/" + name + (on ? "on" : "off");
-        if (this.hasFunction(path)) {
-            return this.runQuietly(sender, "function " + expand(path));
+        if (this.instances.isEmpty()) {
+            if (this.hasFunction(path)) {
+                return this.runQuietly(sender, "function " + expand(path));
+            }
+            return this.runQuietly(sender, "scoreboard players set ." + name + " toggles " + (on ? 1 : 0));
         }
-        return this.runQuietly(sender, "scoreboard players set ." + name + " toggles " + (on ? 1 : 0));
+        return this.runOnInstances(path);
     }
 
     /** {@code function quantum:difficulty/<n>} (0 NPC … 5 MASTER). */
     public boolean setDifficulty(CommandSender sender, int difficulty) {
-        return this.runQuietly(sender, "function quantum:difficulty/" + difficulty);
+        return this.instances.isEmpty()
+                ? this.runQuietly(sender, "function quantum:difficulty/" + difficulty)
+                : this.runOnInstances("difficulty/" + difficulty);
     }
 
     /** The reference measurement's start switch: {@code scoreboard players set .start start 1}. */
     public boolean start(CommandSender sender) {
-        return this.runQuietly(sender, "scoreboard players set .start start 1");
+        if (this.instances.isEmpty()) {
+            return this.runQuietly(sender, "scoreboard players set .start start 1");
+        }
+        boolean ok = true;
+        for (QuantumInstance instance : List.copyOf(this.instances.values())) {
+            HeroBotPlayer bot = this.instanceBot(instance);
+            ok &= bot != null && this.runQuietly(bot.getBukkitEntity(), "scoreboard players set @s start 1");
+        }
+        return ok;
     }
 
     public boolean stop(CommandSender sender) {
-        return this.runQuietly(sender, "scoreboard players set .start start 0");
+        if (this.instances.isEmpty()) {
+            return this.runQuietly(sender, "scoreboard players set .start start 0");
+        }
+        boolean ok = true;
+        for (QuantumInstance instance : List.copyOf(this.instances.values())) {
+            HeroBotPlayer bot = this.instanceBot(instance);
+            ok &= bot != null && this.runQuietly(bot.getBukkitEntity(), "scoreboard players set @s start 0");
+        }
+        return ok;
     }
 
     /** Applies {@code scores:} and {@code toggles:} from quantum.yml (the world's saved setup). */
@@ -564,9 +655,10 @@ public final class QuantumRuntime {
 
     // ------------------------------------------------------------------ bot control
 
-    /** Spawns one tagged QuantumBOT instance at the next free configured spawn slot. */
+    /** Spawns one fully isolated QuantumBOT instance at the next free configured spawn slot. */
     public HeroBotPlayer spawnBot(Location fallback, Player skinTemplate) {
-        String configuredName = this.config.getString("bot.name", "quantumbot");
+        String configuredName = this.config.getString("bot.name",
+                com.rumilance.practice.packetbot.PacketBotFactory.DEFAULT_DISPLAY_NAME);
         String name = this.nextBotName(configuredName);
         Location where = this.botSpawn(fallback);
         GameType mode = GameType.byName(this.config.getString("bot.gamemode", "survival").toLowerCase(Locale.ROOT));
@@ -575,8 +667,48 @@ public final class QuantumRuntime {
                 (float) this.config.getDouble("bot.pitch", where.getPitch()),
                 mode == null ? GameType.SURVIVAL : mode, skinTemplate);
         bot.ping = this.config.getInt("bot.ping", 100);
-        this.applyConfiguredBotLoadout(bot);
-        return bot;
+
+        int number = this.nextInstanceNumber.getAndIncrement();
+        UUID targetUuid = skinTemplate == null ? bot.getUUID() : skinTemplate.getUniqueId();
+        QuantumInstance instance = new QuantumInstance(number, bot.getUUID(), targetUuid,
+                "qbot_" + number,
+                "qbot_" + number,
+                "qtarget_" + number,
+                "qpart_" + number,
+                "qent_" + number,
+                "q" + number + "_");
+        bot.addTag(instance.botTag());
+        bot.addTag(instance.participantTag());
+        if (skinTemplate != null) {
+            skinTemplate.addScoreboardTag(instance.targetTag());
+            skinTemplate.addScoreboardTag(instance.participantTag());
+        }
+        this.instances.put(bot.getUUID(), instance);
+        try {
+            if (!this.functions.hasFunction("quantum:tick")) {
+                this.installWhenReady();
+            }
+            QuantumFunctionRegistry.Result result = this.functions.registerInstance(instance);
+            this.plugin.getLogger().info("[Quantum] registered instance " + instance.namespace()
+                    + " for profile " + bot.profileName() + " (functions=" + result.functions()
+                    + ", failures=" + result.failures().size() + ")");
+            this.runQuietly(bot.getBukkitEntity(), "function " + instance.initFunction());
+            this.runQuietly(bot.getBukkitEntity(), "scoreboard players set @s mode "
+                    + this.config.getInt("mode", 0));
+            this.runQuietly(bot.getBukkitEntity(), "scoreboard players set @s difficulty "
+                    + this.config.getInt("difficulty", 0));
+            this.applyConfiguredBotLoadout(bot);
+            this.ensureInstanceTicker();
+            return bot;
+        } catch (RuntimeException error) {
+            this.instances.remove(bot.getUUID());
+            if (skinTemplate != null) {
+                skinTemplate.removeScoreboardTag(instance.targetTag());
+                skinTemplate.removeScoreboardTag(instance.participantTag());
+            }
+            this.bots.despawn(bot.profileName());
+            throw error;
+        }
     }
 
     /**
@@ -636,14 +768,17 @@ public final class QuantumRuntime {
         double x = spawn.size() > 0 ? spawn.get(0) : 0.5;
         double y = spawn.size() > 1 ? spawn.get(1) : 34;
         double z = spawn.size() > 2 ? spawn.get(2) : 0.5;
-        if (fallback != null && fallback.getWorld() != null && spawn.isEmpty()) {
-            x = fallback.getX();
+        // /bot is a per-player command: the invoking player is the instance target, so never
+        // force every fight into one configured global coordinate. The configured point remains
+        // the console/automation fallback used when no owner location exists.
+        if (fallback != null && fallback.getWorld() != null) {
+            x = fallback.getX() + 2.5;
             y = fallback.getY();
             z = fallback.getZ();
         }
         // Do not stack multiple QuantumBOT instances in one block. The function runtime uses
-        // the bot tag to drive every instance; this small deterministic grid keeps their hitboxes
-        // and nearest-target selection separate at spawn time.
+        // the private instance tag to drive every instance; this deterministic grid keeps their
+        // hitboxes and nearby-entity scope separate at spawn time.
         int slot = this.bots.all().size();
         if (slot > 0) {
             x += (slot % 4) * 3.0;
@@ -654,19 +789,12 @@ public final class QuantumRuntime {
                 (float) this.config.getDouble("bot.pitch", 0.0));
     }
 
-    /** Generates a unique Quantum bot profile name (Minecraft profile names are capped at 16 chars). */
+    /** Generates a unique legal profile name while keeping the visible name fixed to NARENA BOT. */
     private String nextBotName(String configuredName) {
-        String base = configuredName == null || configuredName.isBlank() ? "quantumbot" : configuredName;
-        if (base.length() > 16) {
-            base = base.substring(0, 16);
-        }
-        if (this.bots.byName(base) == null) {
-            return base;
-        }
-        for (int index = 2; index < 100_000; index++) {
-            String suffix = "_" + index;
-            int keep = Math.max(1, 16 - suffix.length());
-            String candidate = base.substring(0, Math.min(base.length(), keep)) + suffix;
+        String displayName = configuredName == null || configuredName.isBlank()
+                ? com.rumilance.practice.packetbot.PacketBotFactory.DEFAULT_DISPLAY_NAME : configuredName;
+        for (int attempt = 0; attempt < 100_000; attempt++) {
+            String candidate = com.rumilance.practice.packetbot.BotNames.uniqueProfileName(displayName);
             if (this.bots.byName(candidate) == null) {
                 return candidate;
             }
@@ -674,8 +802,74 @@ public final class QuantumRuntime {
         throw new IllegalStateException("too many QuantumBOT instances");
     }
 
+    private void ensureInstanceTicker() {
+        if (this.instanceTicker != null) {
+            return;
+        }
+        this.instanceTicker = Bukkit.getScheduler().runTaskTimer(this.plugin, this::tickInstances, 1L, 1L);
+    }
+
+    /** Runs the private function for every live instance, sequentially on the server thread. */
+    private void tickInstances() {
+        if (this.instances.isEmpty()) {
+            if (this.instanceTicker != null) {
+                this.instanceTicker.cancel();
+                this.instanceTicker = null;
+            }
+            return;
+        }
+        for (QuantumInstance instance : List.copyOf(this.instances.values())) {
+            HeroBotPlayer bot = null;
+            for (HeroBotPlayer candidate : this.bots.all()) {
+                if (candidate.getUUID().equals(instance.botUuid())) {
+                    bot = candidate;
+                    break;
+                }
+            }
+            Player target = Bukkit.getPlayer(instance.targetUuid());
+            if (bot == null || bot.isRemoved() || target == null || !target.isOnline()) {
+                this.despawnInstance(instance.botUuid());
+                continue;
+            }
+            // Newly created vanilla projectiles/items and map markers acquire the instance entity
+            // tag before the scoped function sees them. Summons from the compiled function also
+            // receive the tag directly in the source transformer.
+            this.runQuietly(bot.getBukkitEntity(), "tag @e[distance=..64,tag=!"
+                    + instance.entityTag() + "] add " + instance.entityTag());
+            this.runQuietly(bot.getBukkitEntity(), "function " + instance.tickFunction());
+        }
+    }
+
+    private void despawnInstance(UUID botUuid) {
+        QuantumInstance instance = this.instances.remove(botUuid);
+        if (instance == null) {
+            return;
+        }
+        Player target = Bukkit.getPlayer(instance.targetUuid());
+        if (target != null) {
+            target.removeScoreboardTag(instance.targetTag());
+            target.removeScoreboardTag(instance.participantTag());
+        }
+        HeroBotPlayer bot = null;
+        for (HeroBotPlayer candidate : this.bots.all()) {
+            if (candidate.getUUID().equals(botUuid)) {
+                bot = candidate;
+                break;
+            }
+        }
+        if (bot != null) {
+            this.bots.despawn(bot.profileName());
+        }
+        this.functions.unregisterInstance(botUuid);
+    }
+
     public boolean despawnBot() {
-        boolean removed = !this.bots.all().isEmpty();
+        boolean removed = !this.instances.isEmpty() || !this.bots.all().isEmpty();
+        for (UUID botUuid : List.copyOf(this.instances.keySet())) {
+            this.despawnInstance(botUuid);
+        }
+        // /playerspawn-created bots are outside /bot's Quantum instance manager, but the explicit
+        // command still promises to remove all fake players.
         this.bots.despawnAll();
         return removed;
     }
@@ -763,8 +957,9 @@ public final class QuantumRuntime {
         lines.add("namespaces: " + namespaces);
         lines.add("mode=" + this.config.getString("mode", "?")
                 + " difficulty=" + this.config.getInt("difficulty", -1)
-                + " bot=" + this.config.getString("bot.name", "?")
-                + " alive=" + this.bots.names());
+                + " botDisplay=NARENA BOT"
+                + " instances=" + this.instances.size()
+                + " profiles=" + this.bots.names());
         return lines;
     }
 }

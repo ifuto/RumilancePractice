@@ -30,7 +30,7 @@ import java.util.UUID;
  * with the reference's flow ({@code PlayerList#placeNewPlayer} over a dead connection).
  *
  * <p>The Quantum map addresses bots by the persistent {@code quantum_bot} tag. The first
- * profile keeps the reference name {@code quantumbot}; additional instances receive unique
+ * each profile receives a unique legal name; every visible bot uses NARENA BOT
  * suffixes and run through the same tagged function path.</p>
  */
 public final class HeroBotRegistry {
@@ -139,10 +139,10 @@ public final class HeroBotRegistry {
         // Diagnostics: run PE's own join-check resolution and log the verdict (no-op w/o PE).
         com.rumilance.practice.packetbot.PacketEventsCompat.verifyJoinCheck(profile.id(), name);
         // Presence policy: bots are not server players — out of the TAB, out of the count.
-        // Quantum's functions use tags rather than a single hard-coded name, so every spawned
-        // instance can participate in the same live runtime without replacing another bot.
+        // QuantumRuntime adds the private qbot_N instance tag immediately after this method
+        // returns. Keep only the stable discovery tag here; the old global xlib_bot tag is
+        // intentionally not used because it makes independent fights select one another.
         bot.addTag("quantum_bot");
-        bot.addTag("xlib_bot");
         org.bukkit.entity.Player visibleBot = bot.getBukkitEntity();
         visibleBot.setCustomName(com.rumilance.practice.packetbot.PacketBotFactory.DEFAULT_DISPLAY_NAME);
         visibleBot.setCustomNameVisible(true);
