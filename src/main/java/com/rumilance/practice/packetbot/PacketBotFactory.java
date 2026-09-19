@@ -3,7 +3,6 @@ package com.rumilance.practice.packetbot;
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.properties.Property;
 import com.destroystokyo.paper.profile.ProfileProperty;
-import net.kyori.adventure.text.Component;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ClientInformation;
@@ -85,13 +84,13 @@ public final class PacketBotFactory {
         PacketBot.registerLive(bot, displayName == null || displayName.isBlank()
                 ? DEFAULT_DISPLAY_NAME : displayName);
         // In-world nametag shows the friendly display name, not the unique profile name.
-        // Bukkit API on purpose: the NMS setCustomName takes a Mojang chat Component, and the
-        // exact 1.21.x overload spelling varies — the Bukkit layer accepts an Adventure
-        // Component in every supported build.
+        // Bukkit String API on purpose: the NMS/custom-name component overloads drift across
+        // 1.21.x builds (Mojang chat Component vs Adventure vs plain String), but the plain
+        // String Bukkit overload exists in every supported version.
         try {
             org.bukkit.entity.Player bukkitBot = bot.getBukkitEntity();
-            bukkitBot.setCustomName(Component.text(displayName == null || displayName.isBlank()
-                    ? DEFAULT_DISPLAY_NAME : displayName));
+            bukkitBot.setCustomName(displayName == null || displayName.isBlank()
+                    ? DEFAULT_DISPLAY_NAME : displayName);
             bukkitBot.setCustomNameVisible(true);
         } catch (Throwable ignored) {
         }
