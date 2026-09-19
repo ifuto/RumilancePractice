@@ -16,6 +16,10 @@ class PlayerRankTest {
     @ParameterizedTest
     @CsvSource({
             "NORM, NORM, true",
+            "PRO, NORM, true",
+            "PRO, PRO, true",
+            "PRO, VIP, false",
+            "VIP, PRO, true",
             "VIP, NORM, true",
             "VIP, VIP, true",
             "VIP, VIP_PLUS, false",
@@ -30,6 +34,7 @@ class PlayerRankTest {
     @ParameterizedTest
     @CsvSource({
             "NORM, false",
+            "PRO, false",
             "VIP, true",
             "VIP_PLUS, true",
             "ADMIN, true",
@@ -41,6 +46,7 @@ class PlayerRankTest {
     @ParameterizedTest
     @CsvSource({
             "NORM, false",
+            "PRO, false",
             "VIP, false",
             "VIP_PLUS, true",
             "ADMIN, true",
@@ -51,6 +57,8 @@ class PlayerRankTest {
 
     @ParameterizedTest
     @CsvSource({
+            "pro, PRO",
+            "PRO, PRO",
             "vip, VIP",
             "VIP, VIP",
             "vip+, VIP_PLUS",
@@ -86,6 +94,7 @@ class PlayerRankTest {
     @ParameterizedTest
     @CsvSource({
             "NORM, norm",
+            "PRO, pro",
             "VIP, vip",
             "VIP_PLUS, vip+",
             "ADMIN, admin",
@@ -97,6 +106,7 @@ class PlayerRankTest {
     @ParameterizedTest
     @CsvSource({
             "NORM, NORM",
+            "PRO, PRO",
             "VIP, VIP",
             "VIP_PLUS, VIP+",
             "ADMIN, OWNER",

@@ -213,6 +213,7 @@ public final class RankService {
         Objects.requireNonNull(name, "name");
         return switch (rank == null ? PlayerRank.NORM : rank) {
             case NORM -> Component.text(name, NamedTextColor.WHITE);
+            case PRO -> Component.text(name, AQUA);
             case VIP -> gradientName(name, false);
             case VIP_PLUS, ADMIN -> gradientName(name, true);
         };

@@ -6,20 +6,36 @@ import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.GuiType;
 import com.rumilance.practice.gui.ItemBuilder;
 import com.rumilance.practice.gui.MenuScaffold;
+import com.rumilance.practice.gui.MenuTile;
 import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.locale.MessageService;
 import com.rumilance.practice.sound.SoundService;
 import com.rumilance.practice.util.GuiSlots;
+import com.rumilance.practice.util.RealPlayers;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 
 /**
- * Lobby compass hub. Combat entries live under {@link BattleMenuGui}; this screen keeps
- * kit editor, spectate, settings, titles, and teams.
+ * Lobby compass hub — the refresh layout. Three rows of exactly three core actions, a status
+ * chip (top-left) and the real online count (top-right), nothing else on the screen:
+ *
+ * <pre>
+ *   [you]  N Arena                    [N online]
+ *   ─────────────────────────────────────────────
+ *        BATTLE          KITS          PARTY
+ *
+ *       SPECTATE      PROFILE       SETTINGS
+ *
+ *                    TITLES
+ *   ─────────────────────────────────────────────
+ *                      [close]
+ * </pre>
+ *
+ * <p>Combat entries live under {@link BattleMenuGui}; this screen keeps kit editor, spectate,
+ * settings, titles and teams — each tile in the standard {@link MenuTile} anatomy.</p>
  */
 public final class GameMenuGui extends AbstractGui {
 
@@ -59,7 +75,7 @@ public final class GameMenuGui extends AbstractGui {
             TitleGui titleGui,
             MessageService messageService
     ) {
-        super(registry, sounds, GuiType.GAME_MENU, 6, true);
+        super(registry, sounds, GuiType.GAME_MENU, 5, true);
         this.battleMenuGui = battleMenuGui;
         this.ekitSelectGui = ekitSelectGui;
         this.spectateListGui = spectateListGui;
@@ -91,19 +107,38 @@ public final class GameMenuGui extends AbstractGui {
     protected void render(Player player, GuiSession session, Inventory inventory) {
         paintFrame(player, session, inventory);
         paintStatusChip(player, inventory);
+        paintOnlineChip(player, inventory);
 
-        // Sparse, centred diamond layout — the things players reach for constantly.
+        // Row 1 — the three things players reach for first.
         boolean inParty = teamService != null && teamService.teamOf(player.getUniqueId()).isPresent();
-        inventory.setItem(GuiSlots.slot(1, 2), tile(player, Material.NETHERITE_SWORD,
-                "menu.battle", UiTheme.SUCCESS, "menu.battle-lore", "battle", true));
-        inventory.setItem(GuiSlots.slot(1, 4), tile(player, Material.CRAFTING_TABLE,
-                "menu.kits", UiTheme.PRIMARY, "menu.kits-lore", "ekit", false));
-        inventory.setItem(GuiSlots.slot(1, 6), tile(player,
-                inParty ? Material.BEACON : Material.WHITE_BANNER,
-                inParty ? "menu.teams-in-party" : "menu.teams", UiTheme.HEADER,
-                inParty ? "menu.teams-in-party-lore" : "menu.teams-lore", "teams", inParty));
-        inventory.setItem(GuiSlots.slot(2, 2), tile(player, Material.SPYGLASS,
-                "menu.spectate", UiTheme.WARNING, "menu.spectate-lore", "spectate", false));
+        boolean kitLocked = kitEditBusy.test(player);
+        inventory.setItem(GuiSlots.slot(1, 2),
+                MenuTile.of(player, this, Material.NETHERITE_SWORD,
+                        "menu.battle", UiTheme.SUCCESS, "menu.battle-lore", "battle")
+                        .glint(true)
+                        .live(UiTheme.labelValue(line(player, "menu.server-online"),
+                                String.valueOf(Math.max(0, RealPlayers.count() - 1))))
+                        .build(false, null));
+        inventory.setItem(GuiSlots.slot(1, 4),
+                MenuTile.of(player, this, Material.CRAFTING_TABLE,
+                        "menu.kits", UiTheme.PRIMARY, "menu.kits-lore", "ekit")
+                        .build(kitLocked, "menu.kits-busy-reason"));
+        inventory.setItem(GuiSlots.slot(1, 6),
+                MenuTile.of(player, this,
+                        inParty ? Material.BEACON : Material.WHITE_BANNER,
+                        inParty ? "menu.teams-in-party" : "menu.teams",
+                        inParty ? UiTheme.HEADER : UiTheme.SECONDARY,
+                        inParty ? "menu.teams-in-party-lore" : "menu.teams-lore",
+                        "teams")
+                        .live(UiTheme.status(line(player, inParty
+                                ? "menu.teams-in-party" : "menu.teams-none"), inParty ? UiTheme.HEADER : UiTheme.MUTED))
+                        .build(false, null));
+
+        // Row 2 — secondary actions.
+        inventory.setItem(GuiSlots.slot(2, 2),
+                MenuTile.of(player, this, Material.SPYGLASS,
+                        "menu.spectate", UiTheme.WARNING, "menu.spectate-lore", "spectate")
+                        .build(false, null));
         inventory.setItem(GuiSlots.slot(2, 4),
                 ItemBuilder.of(Material.PLAYER_HEAD)
                         .name(t(player, "menu.profile").color(UiTheme.VALUE))
@@ -114,10 +149,16 @@ public final class GameMenuGui extends AbstractGui {
                                 UiTheme.hint(line(player, "menu.click")))
                         .action("profile")
                         .build());
-        inventory.setItem(GuiSlots.slot(2, 6), tile(player, Material.COMPARATOR,
-                "menu.settings", UiTheme.MUTED, "menu.settings-lore", "settings", false));
-        inventory.setItem(GuiSlots.slot(3, 4), tile(player, Material.NAME_TAG,
-                "menu.titles", UiTheme.SECONDARY, "menu.titles-lore", "titles", false));
+        inventory.setItem(GuiSlots.slot(2, 6),
+                MenuTile.of(player, this, Material.COMPARATOR,
+                        "menu.settings", UiTheme.MUTED, "menu.settings-lore", "settings")
+                        .build(false, null));
+
+        // Row 3 — cosmetics, centred.
+        inventory.setItem(GuiSlots.slot(3, 4),
+                MenuTile.of(player, this, Material.NAME_TAG,
+                        "menu.titles", UiTheme.SECONDARY, "menu.titles-lore", "titles")
+                        .build(false, null));
 
         MenuScaffold.closeButton(inventory, t(player, "menu.close"));
     }
@@ -150,22 +191,23 @@ public final class GameMenuGui extends AbstractGui {
                         .build());
     }
 
-    private org.bukkit.inventory.ItemStack tile(Player player, Material material,
-                                                String nameKey, TextColor color,
-                                                String loreKey, String action, boolean glint) {
-        return ItemBuilder.of(material)
-                .name(t(player, nameKey).color(color))
-                .lore(UiTheme.divider(),
-                        UiTheme.line(line(player, loreKey)),
-                        UiTheme.blank(),
-                        UiTheme.hint(line(player, "menu.click")))
-                .glint(glint)
-                .action(action)
-                .build();
+    /** Top-right chip: real online count — bots never count as players. */
+    private void paintOnlineChip(Player player, Inventory inventory) {
+        inventory.setItem(GuiSlots.slot(0, 7),
+                ItemBuilder.of(Material.PLAYER_HEAD)
+                        .name(t(player, "menu.server-online-name").color(UiTheme.SECONDARY))
+                        .lore(UiTheme.divider(),
+                                UiTheme.labelValue(line(player, "menu.server-online"),
+                                        String.valueOf(Math.max(0, RealPlayers.count() - 1))))
+                        .action("decorate")
+                        .build());
     }
 
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot, String action) {
+        if (action == null) {
+            return;
+        }
         switch (action) {
             case "close" -> {
                 sounds.play(player, "gui-back");
@@ -190,6 +232,10 @@ public final class GameMenuGui extends AbstractGui {
                 }
             }
             default -> {
+                if (action.startsWith("locked:")) {
+                    sounds.play(player, "error");
+                    player.sendMessage(t(player, "menu.kits-busy").color(UiTheme.DANGER));
+                }
             }
         }
     }

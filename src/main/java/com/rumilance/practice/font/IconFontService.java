@@ -11,7 +11,7 @@ import net.kyori.adventure.text.Component;
  * {@code rumilance:icons} font on unassigned Private-Use-Area codepoints:
  *
  * <pre>
- *   U+E001 admin badge   U+E002 VIP badge   U+E003 VIP+ badge
+ *   U+E001 admin badge   U+E002 VIP badge   U+E003 VIP+ badge   U+E004 PRO badge
  * </pre>
  *
  * <p>Team identification during team fights is deliberately NOT a pack glyph — it is a plain
@@ -78,6 +78,7 @@ public final class IconFontService {
             case ADMIN -> glyph("icons.glyphs.admin", "\uE001");
             case VIP -> glyph("icons.glyphs.vip", "\uE002");
             case VIP_PLUS -> glyph("icons.glyphs.vip-plus", "\uE003");
+            case PRO -> glyph("icons.glyphs.pro", "\uE004");
             default -> null;
         };
         if (glyph == null || glyph.isEmpty()) {
@@ -97,6 +98,8 @@ public final class IconFontService {
             case VIP_PLUS -> Component.text("N+", net.kyori.adventure.text.format.NamedTextColor.GOLD,
                     net.kyori.adventure.text.format.TextDecoration.BOLD);
             case VIP -> Component.text("N", net.kyori.adventure.text.format.NamedTextColor.YELLOW,
+                    net.kyori.adventure.text.format.TextDecoration.BOLD);
+            case PRO -> Component.text("PRO", net.kyori.adventure.text.format.NamedTextColor.AQUA,
                     net.kyori.adventure.text.format.TextDecoration.BOLD);
             default -> Component.empty();
         };

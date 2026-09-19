@@ -71,6 +71,7 @@ public final class RankIconCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(sample("admin", config.config().getString("icons.glyphs.admin", "\uE001"), icons));
             sender.sendMessage(sample("vip", config.config().getString("icons.glyphs.vip", "\uE002"), icons));
             sender.sendMessage(sample("vip+", config.config().getString("icons.glyphs.vip-plus", "\uE003"), icons));
+            sender.sendMessage(sample("pro", config.config().getString("icons.glyphs.pro", "\uE004"), icons));
         }
         ResourcePackService packs = services.find(ResourcePackService.class).orElse(null);
         if (packs != null) {
@@ -111,6 +112,7 @@ public final class RankIconCommand implements CommandExecutor, TabCompleter {
         return switch (label) {
             case "admin" -> PlayerRank.ADMIN;
             case "vip+" -> PlayerRank.VIP_PLUS;
+            case "pro" -> PlayerRank.PRO;
             default -> PlayerRank.VIP;
         };
     }
@@ -129,6 +131,8 @@ public final class RankIconCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("ADMIN   ", NamedTextColor.GRAY).append(admin).append(Component.text("  icon")));
         sender.sendMessage(Component.text("VIP+    ", NamedTextColor.GRAY).append(vipPlus).append(Component.text("  icon")));
         sender.sendMessage(Component.text("VIP     ", NamedTextColor.GRAY).append(vip).append(Component.text("  icon")));
+        Component pro = icons.rankIcon(PlayerRank.PRO);
+        sender.sendMessage(Component.text("PRO     ", NamedTextColor.GRAY).append(pro).append(Component.text("  icon")));
         // Diagnostic probes — distinguish "font not loaded on the client" from
         // "font loaded but glyph providers missing".
         net.kyori.adventure.key.Key iconFont = net.kyori.adventure.key.Key.key("rumilance", "icons");

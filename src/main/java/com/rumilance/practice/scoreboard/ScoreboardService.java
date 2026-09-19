@@ -229,7 +229,10 @@ public final class ScoreboardService {
         if (!cfg.enabled()) {
             return;
         }
-        Collection<? extends Player> online = Bukkit.getOnlinePlayers();
+        // Bots are not players of this server: no scoreboard, no tab header, and they must
+        // not inflate the online count shown to real players. (Never mutate the live
+        // getOnlinePlayers() view — build a fresh list instead.)
+        java.util.List<Player> online = com.rumilance.practice.util.RealPlayers.online();
         int onlineCount = online.size();
         refreshStreakRanks(cfg);
         boolean tab = cfg.tabHeaderFooter();

@@ -43,6 +43,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -996,7 +997,10 @@ public final class PracticeService {
             player.sendMessage(messages.render(player, "practice.already-in"));
             return;
         }
-        if (isRoomBusy(practiceId)) {
+        // A room hosts up to {@link #roomConcurrency()} simultaneous fights — each joiner gets
+        // their own cloned copy of the arena, so 10 players can train in the "same" room at
+        // once (the old single-session gate assumed one bot fight per room server-wide).
+        if (sessionsInRoom(practiceId) >= roomConcurrency()) {
             player.sendMessage(messages.render(player, "gui.practice-room-busy"));
             return;
         }
@@ -2454,9 +2458,10 @@ public final class PracticeService {
         double maxHp = session.difficulty().botMaxHp();
         BotBody bot;
         if (packetBots) {
-            String botName = "mace-" + java.util.concurrent.ThreadLocalRandom.current().nextInt(10, 99);
-            bot = PacketBotFactory.spawnCombat(botLoc, botName, player, maxHp,
-                    session.botShieldRaised());
+            // Unique profile name per instance (10+ parallel mace fights never collide);
+            // players only ever see the shared display name.
+            bot = PacketBotFactory.spawnCombat(botLoc, "mace", player, maxHp,
+                    session.botShieldRaised(), botDisplayName(player));
         } else {
             Mannequin spawned = botLoc.getWorld().spawn(botLoc, Mannequin.class, m -> {
                 m.setImmovable(false);
@@ -2466,7 +2471,7 @@ public final class PracticeService {
                 m.setRemoveWhenFarAway(false);
                 m.setPersistent(false);
                 m.setCollidable(true);
-                m.customName(messages.render(player, "practice.mace-bot-name"));
+                m.customName(messages.render(player, "practice.bot-display-name"));
                 m.setCustomNameVisible(true);
                 m.setProfile(ResolvableProfile.resolvableProfile(player.getPlayerProfile()));
                 if (m.getAttribute(Attribute.MAX_HEALTH) != null) {
@@ -3229,12 +3234,53 @@ public final class PracticeService {
 
     /** True while any live session occupies the given practice room (bot picker UI). */
     public boolean isRoomBusy(String practiceId) {
+        return sessionsInRoom(practiceId) > 0;
+    }
+
+    /** How many players are in live sessions of the given practice room right now. */
+    public int sessionsInRoom(String practiceId) {
+        int n = 0;
         for (PracticeSession session : sessions.values()) {
             if (session.practiceId().equals(practiceId)) {
-                return true;
+                n++;
             }
         }
-        return false;
+        return n;
+    }
+
+    /**
+     * Max simultaneous sessions one practice room can host. Each session runs in its own
+     * disposable clone ({@link PracticeCloneService} guarantees the copies never overlap),
+     * so this is a soft fairness cap, not a physics limit — 10 (the spec'd parallel
+     * bot-vs-player load) out of the box, 0/negative = unlimited.
+     */
+    public int roomConcurrency() {
+        int cap = configService.config().getInt("practice.room-concurrency", 10);
+        return cap <= 0 ? Integer.MAX_VALUE : cap;
+    }
+
+    /**
+     * Joinable bot slots left for a mode right now — what the picker GUI shows as "free":
+     * <ul>
+     *   <li>arena-venue modes: idle arena instances (one duel per instance);</li>
+     *   <li>room-venue modes: Σ over the mode's rooms of {@code max(0, cap − used)} —
+     *       a room with 3 live sessions still has {@code cap − 3} slots.</li>
+     * </ul>
+     */
+    public int botFreeSessions(PracticeType type) {
+        java.util.List<String> arenaPool = botArenaPool(type);
+        if (arenaPool != null && !arenaPool.isEmpty()) {
+            return botArenaFreeCount(type);
+        }
+        int cap = roomConcurrency();
+        int free = 0;
+        for (PracticeRoom room : enabled()) {
+            if (room.type() != type) {
+                continue;
+            }
+            free += Math.max(0, cap - sessionsInRoom(room.id()));
+        }
+        return free;
     }
 
     /** Sword room loadout: sharp sword, shield, apples and full netherite (Quantum sword preset). */
@@ -3325,30 +3371,18 @@ public final class PracticeService {
         if (botLoc.getWorld() == null) {
             return;
         }
-        String nameKey = switch (type) {
-            case SWORD -> "practice.sword-bot-name";
-            case CRYSTAL -> "practice.crystal-bot-name";
-            case NETHERITE_POT -> "practice.nethpot-bot-name";
-            case CART -> "practice.cart-bot-name";
-            default -> "practice.sword-bot-name";
-        };
         // Crystal bot dies to one combo (totem pops win the match); the rest tank by difficulty.
         double maxHp = type == PracticeType.CRYSTAL ? 20.0d : session.difficulty().botMaxHp();
         BotBody bot;
         if (packetBots) {
-            // Carpet-style fake player: a real ServerPlayer with the fighter's skin, name
-            // and vanilla pipeline. Off by default (bot.packet-bots), flipped per-server.
-            String botName = messages.raw(player, nameKey);
-            if (botName == null || botName.isBlank()) {
-                botName = type.name().toLowerCase() + "bot";
-            }
-            botName = botName.replace(' ', '_');
-            if (botName.length() > 10) {
-                botName = botName.substring(0, 10);
-            }
-            botName = botName + "-" + java.util.concurrent.ThreadLocalRandom.current().nextInt(10, 99);
-            bot = PacketBotFactory.spawnCombat(botLoc, botName, player, maxHp,
-                    session.botShieldRaised());
+            // Carpet-style fake player: a real ServerPlayer with the fighter's skin and the
+            // vanilla pipeline. Off by default (bot.packet-bots), flipped per-server.
+            //
+            // Multi-instance by design: every bot-vs-player session owns its bot. The factory
+            // derives a UNIQUE profile name (NARENA_BOT_xxxxx) from the shared display name,
+            // so 10+ simultaneous fights never collide on the server player list.
+            bot = PacketBotFactory.spawnCombat(botLoc, type.name().toLowerCase(Locale.ROOT) + "bot",
+                    player, maxHp, session.botShieldRaised(), botDisplayName(player));
             equipCombatBot(bot, player, session, type, session.botShieldRaised());
         } else {
             Mannequin spawned = botLoc.getWorld().spawn(botLoc, Mannequin.class, m -> {
@@ -3359,7 +3393,7 @@ public final class PracticeService {
                 m.setRemoveWhenFarAway(false);
                 m.setPersistent(false);
                 m.setCollidable(true);
-                m.customName(messages.render(player, nameKey));
+                m.customName(messages.render(player, "practice.bot-display-name"));
                 m.setCustomNameVisible(true);
                 m.setProfile(ResolvableProfile.resolvableProfile(player.getPlayerProfile()));
                 if (m.getAttribute(Attribute.MAX_HEALTH) != null) {
@@ -3375,6 +3409,19 @@ public final class PracticeService {
         session.setBotHome(botLoc.clone());
         session.setBotNextAttackMs(System.currentTimeMillis() + 2000L);
         session.setBotStrafeFlipMs(System.currentTimeMillis() + 1500L);
+    }
+
+    /**
+     * The one name every practice bot goes by in player-facing text: the in-world nametag,
+     * the kill lines and any feed text. All instances share it — the server-side profile
+     * name stays unique per instance (see {@link com.rumilance.practice.packetbot.BotNames}).
+     */
+    private String botDisplayName(Player player) {
+        String name = messages.raw(player, "practice.bot-display-name");
+        if (name == null || name.isBlank()) {
+            return com.rumilance.practice.packetbot.PacketBotFactory.DEFAULT_DISPLAY_NAME;
+        }
+        return name;
     }
 
     private void equipCombatBot(BotBody bot, Player player, PracticeSession session,

@@ -118,6 +118,10 @@ public final class PacketBotBody implements BotBody {
     @Override public boolean owns(Entity entity) {
         return entity != null && entity.getUniqueId().equals(bot.getUUID());
     }
-    @Override public String displayName() { return bot.profileName(); }
+    @Override public String displayName() {
+        // Player-facing name first (the unique profile name is server-internal).
+        String display = PacketBot.displayNameOf(view());
+        return display == null ? bot.profileName() : display;
+    }
     @Override public boolean isPacket() { return true; }
 }

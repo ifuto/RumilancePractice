@@ -1,14 +1,17 @@
 package com.rumilance.practice.gui.menus;
 
 import com.rumilance.practice.gui.AbstractGui;
+import com.rumilance.practice.gui.GuiFrame;
 import com.rumilance.practice.gui.GuiSession;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.GuiType;
 import com.rumilance.practice.gui.ItemBuilder;
-import com.rumilance.practice.gui.MenuScaffold;
+import com.rumilance.practice.gui.MenuTile;
 import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.locale.MessageService;
+import com.rumilance.practice.model.PracticeType;
 import com.rumilance.practice.platform.PlayerPlatform;
+import com.rumilance.practice.practice.PracticeService;
 import com.rumilance.practice.queue.QueueCoordinator;
 import com.rumilance.practice.queue.QueueService;
 import com.rumilance.practice.session.PlayerStateManager;
@@ -17,20 +20,32 @@ import com.rumilance.practice.state.MatchMode;
 import com.rumilance.practice.state.PlayerState;
 import com.rumilance.practice.team.TeamService;
 import com.rumilance.practice.util.GuiSlots;
+import com.rumilance.practice.util.RealPlayers;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
-import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
 /**
- * Combat entry: Ranked / Unranked / Player Duel / FFA. Every tile is state-aware: while the
- * player is queued the matching queue tile turns into a "leave queue" button, while they sit
- * in a party the solo modes are visibly locked, and while fighting/spectating/in FFA all
- * entries dim with the exact reason. Live waiting counts are shown on each tile.
+ * All combat entrances on one compact screen — the refresh layout:
+ *
+ * <pre>
+ *   [you]   BATTLE MENU                 [N online]
+ *   ─────────────────────────────────────────────
+ *      RANKED          UNRANKED       PLAYER DUEL
+ *
+ *       FFA      BOT PRACTICE          HISTORY
+ *   ─────────────────────────────────────────────
+ *                      [back]
+ * </pre>
+ *
+ * <p>Every tile is state-aware: while queued the matching tile flips into a one-click
+ * leave control, in-party players see the solo modes locked with the reason, busy players
+ * see exactly what they must finish first. Live data on every tile: waiting counts per
+ * queue, the real (bot-free) online count, FFA occupants and free bot rooms.</p>
  */
 public final class BattleMenuGui extends AbstractGui {
 
@@ -46,6 +61,7 @@ public final class BattleMenuGui extends AbstractGui {
     private java.util.function.IntSupplier ffaOccupants = () -> 0;
     private MatchHistoryGui matchHistoryGui;
     private PracticeBotSelectGui botSelectGui;
+    private PracticeService practiceService;
 
     public BattleMenuGui(
             GuiSessionRegistry registry,
@@ -56,7 +72,7 @@ public final class BattleMenuGui extends AbstractGui {
             FfaListGui ffaListGui,
             MessageService messageService
     ) {
-        super(registry, sounds, GuiType.BATTLE_MENU, 6, true);
+        super(registry, sounds, GuiType.BATTLE_MENU, 5, true);
         this.rankedGui = rankedGui;
         this.unrankedGui = unrankedGui;
         this.playersGui = playersGui;
@@ -87,46 +103,54 @@ public final class BattleMenuGui extends AbstractGui {
         this.matchHistoryGui = matchHistoryGui;
     }
 
-    /** ITEM 41: bot practice room picker (sword / crystal / mace bots). */
+    /** Bot practice room picker (sword / crystal / mace / nethpot / cart). */
     public void setBotSelectGui(PracticeBotSelectGui botSelectGui) {
         this.botSelectGui = botSelectGui;
     }
 
+    /** Live bot-room free counts for the BOT tile; optional (menu still works without it). */
+    public void setPracticeService(PracticeService practiceService) {
+        this.practiceService = practiceService;
+    }
+
     @Override
     protected Component title(Player player, GuiSession session) {
-        return text(player, "menu.battle-title").color(UiTheme.PRIMARY)
+        return t(player, "menu.battle-title").color(UiTheme.PRIMARY)
                 .decoration(TextDecoration.ITALIC, false);
     }
 
     @Override
-    protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
-        return com.rumilance.practice.gui.GuiFrame.Theme.LIGHT_BLUE;
+    protected GuiFrame.Theme theme() {
+        return GuiFrame.Theme.LIGHT_BLUE;
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
         paintFrame(player, session, inventory);
         paintStatusChip(player, inventory);
+        paintOnlineChip(player, inventory);
 
         PlayerState state = stateOf(player);
         boolean inParty = teamService != null && teamService.teamOf(player.getUniqueId()).isPresent();
         QueueService.QueueEntry queueEntry = queueService == null
                 ? null : queueService.get(player.getUniqueId()).orElse(null);
 
-        // Sparse pyramid: competitive modes top row, duel centred, FFA + history below.
+        // Row 1 — the three queues.
         inventory.setItem(GuiSlots.slot(1, 2), queueTile(player, Material.DIAMOND_SWORD,
                 "menu.ranked", UiTheme.PRIMARY, "menu.ranked-lore", "ranked", true,
                 MatchMode.RANKED, state, inParty, queueEntry));
-        inventory.setItem(GuiSlots.slot(1, 6), queueTile(player, Material.GOLDEN_SWORD,
+        inventory.setItem(GuiSlots.slot(1, 4), queueTile(player, Material.GOLDEN_SWORD,
                 "menu.unranked", UiTheme.VALUE, "menu.unranked-lore", "unranked", false,
                 MatchMode.UNRANKED, state, inParty, queueEntry));
-        inventory.setItem(GuiSlots.slot(2, 4), duelTile(player, state, inParty));
-        inventory.setItem(GuiSlots.slot(3, 2), ffaTile(player, state));
+        inventory.setItem(GuiSlots.slot(1, 6), duelTile(player, state, inParty));
+
+        // Row 2 — FFA / bots / history.
+        inventory.setItem(GuiSlots.slot(2, 2), ffaTile(player, state));
         if (botSelectGui != null) {
-            inventory.setItem(GuiSlots.slot(3, 4), botTile(player, state));
+            inventory.setItem(GuiSlots.slot(2, 4), botTile(player, state));
         }
         if (matchHistoryGui != null) {
-            inventory.setItem(GuiSlots.slot(3, 6), historyTile(player, state));
+            inventory.setItem(GuiSlots.slot(2, 6), historyTile(player, state));
         }
 
         paintNav(player, session, inventory);
@@ -134,24 +158,25 @@ public final class BattleMenuGui extends AbstractGui {
 
     /** Top-left chip: the viewer's own head and their current activity state. */
     private void paintStatusChip(Player player, Inventory inventory) {
-        String stateKey = switch (stateOf(player)) {
-            case LOBBY, OPENING_GUI, IDLE -> "menu.state-lobby";
-            case QUEUED_RANKED -> "menu.state-ranked-queue";
-            case QUEUED_UNRANKED -> "menu.state-unranked-queue";
-            case FIGHTING, PREPARING_MATCH, COUNTDOWN, ENDING -> "menu.state-fighting";
-            case SPECTATING -> "menu.state-spectating";
-            case FFA -> "menu.state-ffa";
-            case EDITING_KIT -> "menu.state-editing";
-            case REQUESTING_DUEL -> "menu.state-dueling";
-            case PRACTICE_WAIT, PRACTICE_ACTIVE -> "menu.state-fighting";
-        };
         inventory.setItem(GuiSlots.slot(0, 1),
                 ItemBuilder.of(Material.PLAYER_HEAD)
                         .name(Component.text(player.getName(), UiTheme.VALUE))
                         .skullOwner(player)
                         .lore(UiTheme.divider(),
                                 UiTheme.labelValue(line(player, "menu.status"),
-                                        line(player, stateKey)))
+                                        line(player, stateKey(stateOf(player)))))
+                        .action("decorate")
+                        .build());
+    }
+
+    /** Top-right chip: real online count — bots never count as players. */
+    private void paintOnlineChip(Player player, Inventory inventory) {
+        inventory.setItem(GuiSlots.slot(0, 7),
+                ItemBuilder.of(Material.PLAYER_HEAD)
+                        .name(t(player, "menu.server-online-name").color(UiTheme.SECONDARY))
+                        .lore(UiTheme.divider(),
+                                UiTheme.labelValue(line(player, "menu.server-online"),
+                                        String.valueOf(Math.max(0, RealPlayers.count() - 1))))
                         .action("decorate")
                         .build());
     }
@@ -162,29 +187,29 @@ public final class BattleMenuGui extends AbstractGui {
                 : stateManager.getState(player.getUniqueId());
     }
 
-    /** Locked (busy with something else) / party-locked / ready variants share this shell. */
+    /** Locked (busy with something else) / party-locked variants share this shell. */
     private ItemStack mode(Player player, Material material, String nameKey, TextColor color,
                            String loreKey, String action, boolean glint, PlayerState state,
                            boolean inParty, boolean partyLocked, String liveLine) {
         boolean busyLocked = isBusy(state) && action != null && !action.startsWith("leave-queue");
         boolean locked = busyLocked || (partyLocked && inParty);
         ItemBuilder builder = ItemBuilder.of(material)
-                .name(text(player, nameKey).color(locked ? UiTheme.MUTED : color))
+                .name(t(player, nameKey).color(locked ? UiTheme.MUTED : color))
                 .glint(glint && !locked)
                 .action(locked ? "locked:" + action : action);
-        builder.lore(UiTheme.line(raw(player, loreKey)));
+        builder.lore(UiTheme.line(line(player, loreKey)));
         if (liveLine != null && !locked) {
             builder.lore(UiTheme.blank(), UiTheme.status(liveLine, UiTheme.SECONDARY));
         }
         if (busyLocked) {
             builder.lore(UiTheme.blank(),
-                    UiTheme.status(raw(player, "menu.battle-locked")
-                            .replace("<state>", raw(player, stateKey(state))), UiTheme.WARNING),
-                    UiTheme.line(raw(player, "menu.battle-locked-hint")));
+                    UiTheme.status(line(player, "menu.battle-locked")
+                            .replace("<state>", line(player, stateKey(state))), UiTheme.WARNING),
+                    UiTheme.line(line(player, "menu.battle-locked-hint")));
         } else if (partyLocked && inParty) {
-            builder.lore(UiTheme.blank(), UiTheme.status(raw(player, "menu.party-only"), UiTheme.WARNING));
+            builder.lore(UiTheme.blank(), UiTheme.status(line(player, "menu.party-only"), UiTheme.WARNING));
         } else {
-            builder.lore(UiTheme.blank(), UiTheme.hint(raw(player, "menu.click")));
+            builder.lore(UiTheme.blank(), UiTheme.hint(line(player, "menu.click")));
         }
         return builder.build();
     }
@@ -196,46 +221,62 @@ public final class BattleMenuGui extends AbstractGui {
         if (queuedHere) {
             // The tile flips into a leave control — one click gets the player out.
             return ItemBuilder.of(Material.RED_DYE)
-                    .name(text(player, "menu.leave-queue").color(UiTheme.DANGER))
+                    .name(t(player, "menu.leave-queue").color(UiTheme.DANGER))
                     .lore(UiTheme.divider(),
-                            UiTheme.labelValue(raw(player, "menu.in-queue-kit"), entry.kitId()),
+                            UiTheme.labelValue(line(player, "menu.in-queue-kit"), entry.kitId()),
                             UiTheme.blank(),
-                            UiTheme.hint(raw(player, "menu.leave-queue-hint")))
+                            UiTheme.hint(line(player, "menu.leave-queue-hint")))
                     .action("leave-queue")
                     .build();
         }
         String live = queueService == null ? null
-                : raw(player, "menu.battle-waiting").replace("<n>",
+                : line(player, "menu.battle-waiting").replace("<n>",
                         String.valueOf(totalWaiting(player, mode)));
         return mode(player, material, nameKey, color, loreKey, action, glint, state, inParty, true, live);
     }
 
+    /** Player-duel tile with the real online count (bots are not duel targets). */
     private ItemStack duelTile(Player player, PlayerState state, boolean inParty) {
-        int online = Math.max(0, Bukkit.getOnlinePlayers().size() - 1);
-        String live = raw(player, "menu.battle-online").replace("<n>", String.valueOf(online));
+        int online = Math.max(0, RealPlayers.count() - 1);
+        String live = line(player, "menu.battle-online").replace("<n>", String.valueOf(online));
         return mode(player, Material.PLAYER_HEAD, "menu.player-duel", UiTheme.SECONDARY,
                 "menu.player-duel-lore", "player-duel", false, state, inParty, true, live);
     }
 
     private ItemStack ffaTile(Player player, PlayerState state) {
-        String live = raw(player, "menu.battle-ffa-now").replace("<n>", String.valueOf(ffaOccupants.getAsInt()));
+        String live = line(player, "menu.battle-ffa-now").replace("<n>", String.valueOf(ffaOccupants.getAsInt()));
         // FFA is never party-locked: it's the one combat mode a whole party can enter freely.
         return mode(player, Material.END_CRYSTAL, "menu.ffa", UiTheme.WARNING,
                 "menu.ffa-lore", "ffa", false, state, false, false, live);
     }
 
-    /** ITEM 41: practice against sword / crystal / mace bots (solo, never party-locked). */
+    /**
+     * BOT practice tile — standard anatomy plus a live "free rooms" line, so players see
+     * capacity at a glance before opening the picker (10 sessions per room are supported).
+     */
     private ItemStack botTile(Player player, PlayerState state) {
-        return mode(player, Material.ARMOR_STAND, "menu.bot", UiTheme.SUCCESS,
-                "menu.bot-lore", "bot", false, state, false, false, null);
+        MenuTile tile = MenuTile.of(player, this, Material.IRON_SWORD,
+                "menu.bot", UiTheme.SUCCESS, "menu.bot-lore", "bot")
+                .glint(!isBusy(state));
+        if (practiceService != null) {
+            int free = 0;
+            for (PracticeType type : PracticeType.values()) {
+                if (type.botMode()) {
+                    free += practiceService.botFreeSessions(type);
+                }
+            }
+            tile.live(UiTheme.status(line(player, "menu.bot-free").replace("<n>", String.valueOf(free)),
+                    free > 0 ? UiTheme.SUCCESS : UiTheme.MUTED));
+        }
+        return tile.build(false, null);
     }
 
     /** Review-only tile: never busy/party locked, so results stay reachable right after a fight. */
     private ItemStack historyTile(Player player, PlayerState state) {
         return ItemBuilder.of(Material.BOOK)
-                .name(text(player, "menu.history").color(UiTheme.SECONDARY))
-                .lore(UiTheme.line(raw(player, "menu.history-lore")),
-                        UiTheme.blank(), UiTheme.hint(raw(player, "menu.click")))
+                .name(t(player, "menu.history").color(UiTheme.SECONDARY))
+                .lore(UiTheme.line(line(player, "menu.history-lore")),
+                        UiTheme.blank(), UiTheme.hint(line(player, "menu.click")))
                 .action("history")
                 .build();
     }
@@ -252,7 +293,7 @@ public final class BattleMenuGui extends AbstractGui {
         return switch (state) {
             case QUEUED_RANKED, QUEUED_UNRANKED, REQUESTING_DUEL, PREPARING_MATCH, COUNTDOWN,
                  FIGHTING, ENDING, SPECTATING, FFA, PRACTICE_WAIT, PRACTICE_ACTIVE -> true;
-            default -> false;
+            default: false;
         };
     }
 
@@ -308,12 +349,10 @@ public final class BattleMenuGui extends AbstractGui {
                             && teamService.teamOf(player.getUniqueId()).isPresent();
                     PlayerState state = stateOf(player);
                     if (isBusy(state)) {
-                        player.sendMessage(Component.text(
-                                raw(player, "menu.battle-locked")
-                                        .replace("<state>", raw(player, stateKey(state))),
-                                UiTheme.WARNING));
+                        player.sendMessage(t(player, "menu.battle-locked")
+                                .replace("<state>", line(player, stateKey(state))).color(UiTheme.WARNING));
                     } else if (inParty) {
-                        player.sendMessage(Component.text(raw(player, "menu.party-only"), UiTheme.WARNING));
+                        player.sendMessage(t(player, "menu.party-only").color(UiTheme.WARNING));
                     }
                 }
             }
@@ -324,13 +363,5 @@ public final class BattleMenuGui extends AbstractGui {
         sounds.play(player, "gui-click");
         opener.accept(player);
         registry.get(player.getUniqueId()).ifPresent(child -> child.setFromBattleMenu(true));
-    }
-
-    private Component text(Player player, String key) {
-        return messageService.render(messageService.resolveLocale(player), key);
-    }
-
-    private String raw(Player player, String key) {
-        return messageService.localeService().rawMessage(messageService.resolveLocale(player), key);
     }
 }

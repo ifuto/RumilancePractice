@@ -5,6 +5,7 @@ import com.rumilance.practice.gui.GuiSession;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.GuiType;
 import com.rumilance.practice.gui.ItemBuilder;
+import com.rumilance.practice.gui.MenuTile;
 import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.model.PracticeRoom;
 import com.rumilance.practice.practice.PracticeService;
@@ -23,10 +24,21 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * ITEM 41: Battle-Menu bot entry. The five fight modes the Quantum bot supports — Crystal,
- * Netherite Pot, Mace, Cart PvP and Sword — each bound by an admin to a server kit.
- * Picking a mode joins the first free room of that type (players duel the bot like any
- * other opponent: countdown, difficulty, result).
+ * Battle-Menu bot entry — the refresh layout. The five fight modes the Quantum bot supports
+ * (Crystal, Nethpot, Mace, Cart, Sword), each bound by an admin to a server kit, plus the
+ * AFK "no move bot" crystal room below:
+ *
+ * <pre>
+ *   ─────────────────────────────────────────────
+ *   CRYSTAL  NETHPOT  MACE  CART  SWORD
+ *
+ *                    [ NO MOVE BOT ]
+ *   ─────────────────────────────────────────────
+ * </pre>
+ *
+ * <p>Every tile carries live capacity: free rooms vs the configured room cap
+ * (10 parallel sessions by default — one BOT serves 10 players at once), kit and venue.
+ * A mode whose bound kit owns arenas shows free ARENA instances instead.</p>
  */
 public final class PracticeBotSelectGui extends AbstractGui {
 
@@ -68,10 +80,10 @@ public final class PracticeBotSelectGui extends AbstractGui {
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
         paintFrame(player, session, inventory);
-        // Row 2 — the five modes, centred with breathing room.
+        // Row 1 — the five modes, centred with breathing room.
         int[] cols = {1, 2, 4, 6, 7};
         for (int i = 0; i < MODES.length; i++) {
-            inventory.setItem(GuiSlots.slot(2, cols[i]), modeTile(player, MODES[i]));
+            inventory.setItem(GuiSlots.slot(1, cols[i]), modeTile(player, MODES[i]));
         }
         // Row 3 centre — the AFK BOT Crystal room ("No move bot"): a passive armored
         // sparring partner on a private 100x100 floor (crystal combos, and mace swings too).
@@ -116,39 +128,26 @@ public final class PracticeBotSelectGui extends AbstractGui {
         // bound kit owns arenas is enterable even with zero same-type practice rooms.
         List<String> arenaPool = practiceService.botArenaPool(mode);
         boolean arenaVenue = arenaPool != null && !arenaPool.isEmpty();
-        long free = arenaVenue
-                ? practiceService.botArenaFreeCount(mode)
-                : rooms.stream().filter(r -> !practiceService.isRoomBusy(r.id())).count();
+        // Live joinable slots: idle arena instances, or Σ per room of (cap − used) —
+        // a room with 3 live fights still shows its remaining capacity.
+        int free = practiceService.botFreeSessions(mode);
         String kit = practiceService.botKitFor(mode);
         String map = arenaVenue ? String.join(" / ", arenaPool) : practiceService.botRoomFor(mode);
-        ItemBuilder builder = ItemBuilder.of(icon)
-                .name(t(player, typeKey).color(rooms.isEmpty() ? UiTheme.MUTED : UiTheme.SUCCESS)
-                        .decoration(TextDecoration.ITALIC, false))
-                .lore(UiTheme.divider(),
-                        UiTheme.line(line(player, descKey)),
-                        UiTheme.blank(),
-                        UiTheme.labelValue(line(player, "gui.bot-kit-label"),
-                                kit == null || kit.isBlank()
-                                        ? line(player, "gui.bot-kit-default") : kit),
-                        UiTheme.labelValue(line(player, "gui.bot-map-label"),
-                                map == null || map.isBlank()
-                                        ? line(player, "gui.bot-map-default")
-                                        : map.replace('_', ' ')));
-        if (rooms.isEmpty() && !arenaVenue) {
-            builder.lore(UiTheme.blank(),
-                    UiTheme.status(line(player, "gui.practice-none"), UiTheme.WARNING),
-                    UiTheme.hint(line(player, "gui.practice-none-lore")));
-            builder.action("locked:mode");
-        } else if (free == 0) {
-            builder.lore(UiTheme.blank(),
-                    UiTheme.status(line(player, "gui.practice-room-busy"), UiTheme.WARNING),
-                    UiTheme.hint(line(player, "gui.practice-room-busy-hint")));
-            builder.action("locked:mode");
-        } else {
-            builder.lore(UiTheme.blank(), UiTheme.hint(line(player, "gui.practice-join-hint")));
-            builder.action("mode:" + mode.name());
+
+        MenuTile tile = MenuTile.of(player, this, icon, typeKey, UiTheme.SUCCESS, descKey,
+                free > 0 ? "mode:" + mode.name() : "locked:mode");
+        if (free > 0) {
+            tile.glint(true);
         }
-        return builder.build();
+        tile.live(UiTheme.labelValue(line(player, "gui.bot-kit-label"),
+                        kit == null || kit.isBlank() ? line(player, "gui.bot-kit-default") : kit),
+                UiTheme.labelValue(line(player, "gui.bot-map-label"),
+                        map == null || map.isBlank() ? line(player, "gui.bot-map-default")
+                                : map.replace('_', ' ')),
+                UiTheme.status(line(player, "menu.bot-free")
+                        .replace("<n>", String.valueOf(free)), free > 0 ? UiTheme.SUCCESS : UiTheme.MUTED));
+        String lockKey = (rooms.isEmpty() && !arenaVenue) ? "gui.practice-none" : "gui.practice-room-busy";
+        return tile.build(free == 0, lockKey);
     }
 
     private List<PracticeRoom> roomsOf(PracticeType mode) {

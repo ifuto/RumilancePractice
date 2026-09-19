@@ -42,13 +42,13 @@ public final class SetRankCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length < 2) {
             sender.sendMessage(Component.text(
-                    "Usage: /rank <player> <norm|VIP|VIP+|admin|owner> [duration e.g. 30d]", NamedTextColor.YELLOW));
+                    "Usage: /rank <player> <norm|PRO|VIP|VIP+|admin|owner> [duration e.g. 30d]", NamedTextColor.YELLOW));
             return true;
         }
         PlayerRank rank = PlayerRank.parse(args[1]);
         if (rank == null) {
             sender.sendMessage(Component.text(
-                    "Unknown rank. Use: norm, VIP, VIP+, admin, owner", NamedTextColor.RED));
+                    "Unknown rank. Use: norm, PRO, VIP, VIP+, admin, owner", NamedTextColor.RED));
             return true;
         }
         java.time.Duration duration = null;
@@ -148,7 +148,7 @@ public final class SetRankCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length == 2) {
             return TabCompletions.filter(TabCompletions.current(args),
-                    "norm", "VIP", "VIP+", "admin", "owner");
+                    "norm", "PRO", "VIP", "VIP+", "admin", "owner");
         }
         return List.of();
     }

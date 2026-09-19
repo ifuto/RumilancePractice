@@ -132,6 +132,10 @@ public final class HeroBotRegistry {
                 new com.rumilance.practice.packetbot.FakePlayerConnection(PacketFlow.SERVERBOUND),
                 bot,
                 CommonListenerCookie.createInitial(profile, false));
+        // Presence policy: bots are not server players — out of the TAB, out of the count.
+        // (The Quantum map addresses its bot by the fixed profile name, so the name stays
+        // as-is; the map itself only ever runs one such bot per world.)
+        com.rumilance.practice.packetbot.PacketBot.registerLive(bot, null);
         bot.stopRiding();
         bot.teleportTo(level, location.getX(), location.getY(), location.getZ(),
                 Set.of(), yaw, pitch, true);
@@ -157,12 +161,13 @@ public final class HeroBotRegistry {
         return this.spawning.contains(name.toLowerCase(Locale.ROOT));
     }
 
-    /** Removes a fake player (tab list + world) — the reference's disconnect/kill cleanup. */
+    /** Removes a fake player (tab list + world + live registry) — the reference's cleanup. */
     public boolean despawn(String name) {
         HeroBotPlayer bot = this.bots.remove(name == null ? "" : name.toLowerCase(Locale.ROOT));
         if (bot == null) {
             return false;
         }
+        com.rumilance.practice.packetbot.PacketBot.unregisterLive(bot);
         if (bot.owningServer() != null) {
             bot.owningServer().getPlayerList().remove(bot);
         }

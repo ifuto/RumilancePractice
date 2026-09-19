@@ -22,6 +22,13 @@
       "chars": ["\uE003"]
     },
     {
+      "type": "minecraft:bitmap",
+      "file": "rumilance:font/pro.png",
+      "ascent": 8,
+      "height": 9,
+      "chars": ["\uE004"]
+    },
+    {
       "type": "minecraft:space",
       "advances": {
         "\uE000": 0

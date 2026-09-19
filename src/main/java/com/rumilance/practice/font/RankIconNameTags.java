@@ -90,7 +90,10 @@ public final class RankIconNameTags {
         return "2r" + hex.substring(0, Math.min(12, hex.length()));
     }
 
-    /** Effective rank used for the badge (admin > VIP+ > VIP > NORM); shared with TabBridge. */
+    /**
+     * Effective rank used for the badge (admin > VIP+ > VIP > PRO > NORM); shared with
+     * TabBridge. PRO carries no permission, so it only surfaces through the stored rank.
+     */
     public static PlayerRank effectiveRank(RankService ranks, Player player) {
         if (ranks.isAdmin(player)) {
             return PlayerRank.ADMIN;
@@ -101,6 +104,7 @@ public final class RankIconNameTags {
         if (ranks.isVipOrAbove(player)) {
             return PlayerRank.VIP;
         }
-        return PlayerRank.NORM;
+        PlayerRank stored = ranks.get(player);
+        return stored == PlayerRank.PRO ? PlayerRank.PRO : PlayerRank.NORM;
     }
 }
