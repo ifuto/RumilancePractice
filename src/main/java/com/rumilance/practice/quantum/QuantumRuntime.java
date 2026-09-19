@@ -504,7 +504,9 @@ public final class QuantumRuntime {
             // server-owned execution path. Without this permission elevation the vanilla
             // `function` command silently refuses to run for a spawned bot.
             if (com.rumilance.practice.packetbot.PacketBot.isBot(player)) {
-                source = source.withPermission(4);
+                // 1.21.11 represents command permissions as PermissionSet; the stable
+                // withMaximumPermission bridge keeps this code compatible with that API.
+                source = source.withMaximumPermission(4);
             }
         } else {
             source = server.createCommandSourceStack();
@@ -685,7 +687,7 @@ public final class QuantumRuntime {
         }
         this.instances.put(bot.getUUID(), instance);
         try {
-            if (!this.functions.hasFunction("quantum:tick")) {
+            if (!this.hasFunction("quantum:tick")) {
                 this.installWhenReady();
             }
             QuantumFunctionRegistry.Result result = this.functions.registerInstance(instance);
