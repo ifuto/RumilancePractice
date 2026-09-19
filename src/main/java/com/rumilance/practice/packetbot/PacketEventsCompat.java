@@ -12,6 +12,8 @@ import org.bukkit.plugin.Plugin;
 import com.mojang.authlib.GameProfile;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -281,17 +283,45 @@ public final class PacketEventsCompat implements Listener {
     }
 
     /**
-     * {@code method.invoke(target, args)} with explicit declared parameter types, so the lookup
-     * succeeds for interface default methods on the runtime implementation class.
+     * Invokes a PE API method without requiring access to PE's private implementation classes.
+     *
+     * <p>PE's Spigot builder returns an anonymous {@code PacketEventsAPI} implementation. Calling
+     * a method obtained from {@code target.getClass()} therefore fails with
+     * {@link IllegalAccessException} even though the API method itself is public. Resolve the
+     * method from a public superclass or interface instead; virtual dispatch still reaches PE's
+     * implementation.
      */
     private static Object invoke(Object target, String name, Class<?>[] paramTypes, Object... args) {
         if (target == null) {
             return null;
         }
         try {
-            return target.getClass().getMethod(name, paramTypes).invoke(target, args);
+            Method method = publicMethod(target.getClass(), name, paramTypes);
+            return method == null ? null : method.invoke(target, args);
         } catch (Throwable t) {
             return null;
         }
+    }
+
+    private static Method publicMethod(Class<?> type, String name, Class<?>[] paramTypes) {
+        if (type == null) {
+            return null;
+        }
+        if (Modifier.isPublic(type.getModifiers())) {
+            try {
+                Method method = type.getMethod(name, paramTypes);
+                if (Modifier.isPublic(method.getDeclaringClass().getModifiers())) {
+                    return method;
+                }
+            } catch (NoSuchMethodException ignored) {
+            }
+        }
+        for (Class<?> iface : type.getInterfaces()) {
+            Method method = publicMethod(iface, name, paramTypes);
+            if (method != null) {
+                return method;
+            }
+        }
+        return publicMethod(type.getSuperclass(), name, paramTypes);
     }
 }
