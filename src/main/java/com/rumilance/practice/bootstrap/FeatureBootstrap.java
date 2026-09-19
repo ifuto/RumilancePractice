@@ -1067,6 +1067,8 @@ public final class FeatureBootstrap {
                 new PracticeBotSelectGui(guiSessions, soundService, practiceService);
         botSelectGui.setAfkEntry(afkCrystalManager::joinFromMenu);
         battleMenuGui.setBotSelectGui(botSelectGui);
+        // Live free-slot count on the BOT tile (10+ parallel bot fights per room).
+        battleMenuGui.setPracticeService(practiceService);
         BanListGui banListGui = new BanListGui(guiSessions, soundService, banService);
         ReportGui reportGui = new ReportGui(guiSessions, soundService, reportService);
         ReportListGui reportListGui =
