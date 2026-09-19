@@ -126,7 +126,7 @@ public final class PacketEventsCompat implements Listener {
                         + "(api=" + describe(api) + ")");
             }
         } catch (Throwable t) {
-            log(java.util.logging.Level.WARNING, "[PacketEventsCompat] preRegister " + bot + " FAILED: " + t, t);
+            log().log(java.util.logging.Level.WARNING, "[PacketEventsCompat] preRegister " + bot + " FAILED: " + t, t);
         }
     }
 
@@ -172,7 +172,7 @@ public final class PacketEventsCompat implements Listener {
                         + " | playerManager=" + describe(playerManager) + " api=" + describe(api));
             }
         } catch (Throwable t) {
-            log(java.util.logging.Level.WARNING, "[PacketEventsCompat] verify " + botName + " FAILED: " + t, t);
+            log().log(java.util.logging.Level.WARNING, "[PacketEventsCompat] verify " + botName + " FAILED: " + t, t);
         }
     }
 
@@ -203,7 +203,7 @@ public final class PacketEventsCompat implements Listener {
                 ch.close();
             }
         } catch (Throwable t) {
-            log(java.util.logging.Level.WARNING, "[PacketEventsCompat] quit cleanup " + player.getName() + " failed: " + t, t);
+            log().log(java.util.logging.Level.WARNING, "[PacketEventsCompat] quit cleanup " + player.getName() + " failed: " + t, t);
         }
     }
 
