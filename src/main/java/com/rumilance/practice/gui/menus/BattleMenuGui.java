@@ -293,7 +293,7 @@ public final class BattleMenuGui extends AbstractGui {
         return switch (state) {
             case QUEUED_RANKED, QUEUED_UNRANKED, REQUESTING_DUEL, PREPARING_MATCH, COUNTDOWN,
                  FIGHTING, ENDING, SPECTATING, FFA, PRACTICE_WAIT, PRACTICE_ACTIVE -> true;
-            default: false;
+            default -> false;
         };
     }
 
