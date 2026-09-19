@@ -574,6 +574,23 @@ public final class QuantumRuntime {
         return ok;
     }
 
+    /** Applies one mode option to one newly-created instance only. */
+    public boolean setOptionFor(HeroBotPlayer bot, String name) {
+        if (bot == null) {
+            return false;
+        }
+        QuantumInstance instance = this.instances.get(bot.getUUID());
+        if (instance == null) {
+            return false;
+        }
+        boolean ok = this.runQuietly(bot.getBukkitEntity(),
+                "function " + instance.namespace() + ":options/" + name);
+        if (ok) {
+            this.applyConfiguredBotLoadout(bot);
+        }
+        return ok;
+    }
+
     /** {@code function quantum:options/toggles/<name>on|off}. */
     public boolean setToggle(CommandSender sender, String name, boolean on) {
         String path = "options/toggles/" + name + (on ? "on" : "off");

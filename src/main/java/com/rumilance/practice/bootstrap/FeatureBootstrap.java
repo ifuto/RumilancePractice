@@ -1808,6 +1808,7 @@ public final class FeatureBootstrap {
         // 紐づけが無ければ何もしない = マップのキットチェストがそのまま使われる。
         this.quantum.setPracticeService(this.practiceService);
         this.quantum.enable();
+        botSelectGui.setQuantumRuntime(this.quantum);
         bind("quantum", new com.rumilance.practice.quantum.QuantumCommand(plugin, this.quantum,
                 this.quantumBots));
         // /bot is the public entry point for the actual bundled QuantumBOT, not the old

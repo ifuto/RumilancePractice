@@ -10,6 +10,8 @@ import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.model.PracticeRoom;
 import com.rumilance.practice.practice.PracticeService;
 import com.rumilance.practice.practice.PracticeType;
+import com.rumilance.practice.quantum.QuantumRuntime;
+import com.rumilance.practice.herobot.HeroBotPlayer;
 import com.rumilance.practice.sound.SoundService;
 import com.rumilance.practice.util.GuiSlots;
 import net.kyori.adventure.text.Component;
@@ -47,6 +49,7 @@ public final class PracticeBotSelectGui extends AbstractGui {
             PracticeType.CART, PracticeType.SWORD};
 
     private final PracticeService practiceService;
+    private QuantumRuntime quantumRuntime;
     /** Opens the AFK BOT Crystal room (the "No move bot" tile). */
     private java.util.function.Consumer<Player> afkEntry;
 
@@ -54,6 +57,11 @@ public final class PracticeBotSelectGui extends AbstractGui {
                                 PracticeService practiceService) {
         super(registry, sounds, GuiType.PRACTICE_SELECT, 5, true);
         this.practiceService = practiceService;
+    }
+
+    /** Wires the real QuantumBOT runtime used by every mode tile. */
+    public void setQuantumRuntime(QuantumRuntime quantumRuntime) {
+        this.quantumRuntime = quantumRuntime;
     }
 
     /** Wires the AFK BOT Crystal entry (see {@link #afkEntry}). */
@@ -128,26 +136,31 @@ public final class PracticeBotSelectGui extends AbstractGui {
         // bound kit owns arenas is enterable even with zero same-type practice rooms.
         List<String> arenaPool = practiceService.botArenaPool(mode);
         boolean arenaVenue = arenaPool != null && !arenaPool.isEmpty();
-        // Live joinable slots: idle arena instances, or Σ per room of (cap − used) —
-        // a room with 3 live fights still shows its remaining capacity.
+        // The five selectable modes are real QuantumBOT instances. They are intentionally not
+        // limited by the old PracticeService room cap: every click gets its own namespace and
+        // can run concurrently with other players' BOT fights.
+        boolean quantumReady = this.quantumRuntime != null && this.quantumRuntime.enabled();
         int free = practiceService.botFreeSessions(mode);
         String kit = practiceService.botKitFor(mode);
         String map = arenaVenue ? String.join(" / ", arenaPool) : practiceService.botRoomFor(mode);
+        String action = quantumReady ? "mode:" + mode.name() : "locked:mode";
 
-        MenuTile tile = MenuTile.of(player, this, icon, typeKey, UiTheme.SUCCESS, descKey,
-                free > 0 ? "mode:" + mode.name() : "locked:mode");
-        if (free > 0) {
+        MenuTile tile = MenuTile.of(player, this, icon, typeKey, UiTheme.SUCCESS, descKey, action);
+        if (quantumReady || free > 0) {
             tile.glint(true);
         }
         tile.live(UiTheme.labelValue(line(player, "gui.bot-kit-label"),
                         kit == null || kit.isBlank() ? line(player, "gui.bot-kit-default") : kit),
                 UiTheme.labelValue(line(player, "gui.bot-map-label"),
-                        map == null || map.isBlank() ? line(player, "gui.bot-map-default")
-                                : map.replace('_', ' ')),
+                        map == null || map.isBlank() ? "Quantum map" : map.replace('_', ' ')),
                 UiTheme.status(line(player, "menu.bot-free")
-                        .replace("<n>", String.valueOf(free)), free > 0 ? UiTheme.SUCCESS : UiTheme.MUTED));
-        String lockKey = (rooms.isEmpty() && !arenaVenue) ? "gui.practice-none" : "gui.practice-room-busy";
-        return tile.build(free == 0, lockKey);
+                        .replace("<n>", quantumReady ? "∞" : String.valueOf(free)),
+                        quantumReady || free > 0 ? UiTheme.SUCCESS : UiTheme.MUTED));
+        String lockKey = quantumReady
+                ? null : ((rooms.isEmpty() && !arenaVenue) ? "gui.practice-none" : "gui.practice-room-busy");
+        // If Quantum is unavailable, do not leave a visually enabled tile whose action is
+        // deliberately locked just because the legacy room list still has capacity.
+        return tile.build(!quantumReady || free == 0, lockKey);
     }
 
     private List<PracticeRoom> roomsOf(PracticeType mode) {
@@ -192,44 +205,38 @@ public final class PracticeBotSelectGui extends AbstractGui {
                     } catch (IllegalArgumentException e) {
                         return;
                     }
-                    // The bound map wins: fights run in the room tied to the mode's kit.
-                    PracticeRoom target = null;
-                    String boundRoom = practiceService.botRoomFor(mode);
-                    if (boundRoom != null && !boundRoom.isBlank()) {
-                        PracticeRoom bound = practiceService.get(boundRoom).orElse(null);
-                        if (bound != null && bound.enabled() && bound.type() == mode) {
-                            target = bound;
-                        }
-                    }
-                    if (target == null) {
-                        target = roomsOf(mode).stream()
-                                .filter(r -> !practiceService.isRoomBusy(r.id()))
-                                .findFirst().orElse(null);
-                    }
-                    List<String> arenaPool = practiceService.botArenaPool(mode);
-                    boolean arenaVenue = arenaPool != null && !arenaPool.isEmpty();
-                    if (target == null && arenaVenue) {
-                        // Arena venue: an anchor room (drills/bot-home) is optional now —
-                        // joinBotMode runs the fight purely on the arena when none exists.
-                        target = roomsOf(mode).stream().filter(PracticeRoom::enabled)
-                                .findFirst().orElse(null);
-                    }
-                    if (!arenaVenue
-                            && (target == null || practiceService.isRoomBusy(target.id()))) {
+                    if (this.quantumRuntime == null || !this.quantumRuntime.enabled()) {
                         sounds.play(player, "error");
-                        player.sendMessage(t(player, "gui.practice-room-busy").color(UiTheme.WARNING));
-                        return;
-                    }
-                    if (target == null && !arenaVenue) {
-                        sounds.play(player, "error");
+                        player.sendMessage(Component.text("QuantumBOT is unavailable.", UiTheme.WARNING));
                         return;
                     }
                     sounds.play(player, "select");
                     player.closeInventory();
-                    // PracticeService routes bot fights to the kit's arena when wired so.
-                    practiceService.joinBotMode(player, mode, target);
+                    try {
+                        HeroBotPlayer bot = this.quantumRuntime.spawnBot(player.getLocation(), player);
+                        boolean configured = this.quantumRuntime.setOptionFor(bot, quantumOption(mode));
+                        player.sendMessage(Component.text(
+                                "QuantumBOT spawned: " + bot.profileName()
+                                        + (configured ? " (" + mode.name() + ")" : ""),
+                                UiTheme.SUCCESS));
+                    } catch (RuntimeException error) {
+                        player.sendMessage(Component.text(
+                                "QuantumBOT could not be spawned: " + error.getMessage(),
+                                UiTheme.WARNING));
+                    }
                 }
             }
         }
+    }
+
+    private static String quantumOption(PracticeType mode) {
+        return switch (mode) {
+            case CRYSTAL -> "crystal";
+            case NETHERITE_POT -> "nethpot";
+            case MACE -> "mace";
+            case CART -> "cart";
+            case SWORD -> "sword";
+            default -> mode.name().toLowerCase(java.util.Locale.ROOT);
+        };
     }
 }
