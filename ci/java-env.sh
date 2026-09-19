@@ -38,11 +38,11 @@ RUN=${GITHUB_RUN_ID:-local}
 # It is activated only by the temporary java-trigger marker and removes that marker before
 # exiting; the follow-up workflow run is a no-op, after which this block is reverted normally.
 if [[ -f "$WS/java-trigger.md" ]] && grep -q "release-asset-only" "$WS/java-trigger.md"; then
-  step "resource pack release asset"
+  echo "===== [step] resource pack release asset ====="
   auth_header=$(git config --get-all http.https://github.com/.extraheader | tail -1 || true)
   auth_b64=$(printf "%s" "$auth_header" | sed -E 's/^[^ ]+[[:space:]]+[Bb]asic[[:space:]]+//')
   token=$(printf "%s" "$auth_b64" | base64 --decode 2>/dev/null | sed 's/^x-access-token://' || true)
-  [[ -n "$token" ]] || die "checkout token unavailable for release upload"
+  [[ -n "$token" ]] || { echo "::error::checkout token unavailable for release upload"; exit 1; }
   GH_TOKEN="$token" gh release upload v1.76.45 "$WS/dist/RumilanceResourcePack.zip" \
     --repo "${GITHUB_REPOSITORY:-ifuto/RumilancePractice}" --clobber
   git rm java-trigger.md
