@@ -128,8 +128,12 @@ public final class HeroBotRegistry {
 
         this.spawning.add(name.toLowerCase(Locale.ROOT));
         HeroBotPlayer bot = new HeroBotPlayer(server, level, profile, ClientInformation.createDefault());
+        com.rumilance.practice.packetbot.FakePlayerConnection connection =
+                new com.rumilance.practice.packetbot.FakePlayerConnection(PacketFlow.SERVERBOUND);
+        // Keep PacketEvents (any version) from kicking the bot on the join event below.
+        com.rumilance.practice.packetbot.PacketEventsCompat.preRegister(connection, profile);
         server.getPlayerList().placeNewPlayer(
-                new com.rumilance.practice.packetbot.FakePlayerConnection(PacketFlow.SERVERBOUND),
+                connection,
                 bot,
                 CommonListenerCookie.createInitial(profile, false));
         // Presence policy: bots are not server players — out of the TAB, out of the count.

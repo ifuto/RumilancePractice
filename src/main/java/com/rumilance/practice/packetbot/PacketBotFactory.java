@@ -76,8 +76,11 @@ public final class PacketBotFactory {
 
         ClientInformation information = ClientInformation.createDefault();
         PacketBot bot = new PacketBot(server, level, profile, information);
+        FakePlayerConnection connection = new FakePlayerConnection(PacketFlow.SERVERBOUND);
+        // Keep PacketEvents (any version) from kicking the bot on the join event below.
+        PacketEventsCompat.preRegister(connection, profile);
         server.getPlayerList().placeNewPlayer(
-                new FakePlayerConnection(PacketFlow.SERVERBOUND),
+                connection,
                 bot,
                 CommonListenerCookie.createInitial(profile, false));
         // Presence policy: bots are not server players — out of the TAB, out of the count.

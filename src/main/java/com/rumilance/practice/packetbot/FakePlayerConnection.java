@@ -1,5 +1,6 @@
 package com.rumilance.practice.packetbot;
 
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.embedded.EmbeddedChannel;
 import net.minecraft.network.Connection;
@@ -43,6 +44,11 @@ public final class FakePlayerConnection extends Connection {
 
     @Override
     public void setReadOnly() {
+    }
+
+    /** The local {@link EmbeddedChannel}; {@code null} if the reflective install failed. */
+    public Channel channel() {
+        return this.channel;
     }
 
     @Override
