@@ -60,13 +60,13 @@ public final class PacketEventsCompat implements Listener {
      * Every failure is logged, never thrown.
      */
     public static void preRegister(FakePlayerConnection connection, GameProfile profile) {
-        String bot = profile != null ? profile.getName() : "?";
+        String bot = profile != null ? profile.name() : "?";
         if (connection == null || profile == null) {
             return;
         }
         Channel channel = connection.channel();
         if (channel == null) {
-            log().warn("[PacketEventsCompat] preRegister " + bot + ": connection channel is null — giving up");
+            log().warning("[PacketEventsCompat] preRegister " + bot + ": connection channel is null — giving up");
             return;
         }
         ClassLoader peLoader = packetEventsClassLoader();
@@ -78,19 +78,19 @@ public final class PacketEventsCompat implements Listener {
             Object api = forName(peLoader, "com.github.retrooper.packetevents.PacketEvents")
                     .getMethod("getAPI").invoke(null);
             if (api == null) {
-                log().warn("[PacketEventsCompat] preRegister " + bot + ": PacketEvents.getAPI() is null (PE not initialised?)");
+                log().warning("[PacketEventsCompat] preRegister " + bot + ": PacketEvents.getAPI() is null (PE not initialised?)");
                 return;
             }
             Object protocolManager = invoke(api, "getProtocolManager", new Class<?>[0]);
             if (protocolManager == null) {
-                log().warn("[PacketEventsCompat] preRegister " + bot + ": getProtocolManager() missing/failing on "
+                log().warning("[PacketEventsCompat] preRegister " + bot + ": getProtocolManager() missing/failing on "
                         + api.getClass().getName());
                 return;
             }
             Object clientVersion = serverClientVersion(api);
             Class<?> userProfileClass = forName(peLoader, "com.github.retrooper.packetevents.protocol.player.UserProfile");
             Object userProfile = userProfileClass.getConstructor(UUID.class, String.class)
-                    .newInstance(profile.id(), profile.getName());
+                    .newInstance(profile.id(), profile.name());
             Class<?> connectionStateClass = forName(peLoader, "com.github.retrooper.packetevents.protocol.ConnectionState");
             Object play = Enum.valueOf(connectionStateClass.asSubclass(Enum.class), "PLAY");
             Class<?> userClass = forName(peLoader, "com.github.retrooper.packetevents.protocol.player.User");
@@ -104,7 +104,7 @@ public final class PacketEventsCompat implements Listener {
                 }
             }
             if (user == null) {
-                log().warn("[PacketEventsCompat] preRegister " + bot + ": no 4-arg (Object,ConnectionState,*,UserProfile) "
+                log().warning("[PacketEventsCompat] preRegister " + bot + ": no 4-arg (Object,ConnectionState,*,UserProfile) "
                         + "constructor on " + userClass.getName() + " — PE API drift");
                 return;
             }
@@ -118,7 +118,7 @@ public final class PacketEventsCompat implements Listener {
                     ? null
                     : invoke(protocolManager, "getUser", new Class<?>[]{Object.class}, readBackChannel);
             if (readBackUser == null || readBackChannel != channel) {
-                log().warn("[PacketEventsCompat] preRegister " + bot + ": VERIFICATION FAILED — read-back channel="
+                log().warning("[PacketEventsCompat] preRegister " + bot + ": VERIFICATION FAILED — read-back channel="
                         + describe(readBackChannel) + " (expected " + describe(channel) + "), user="
                         + describe(readBackUser) + " | api=" + describe(api) + " mgr=" + describe(protocolManager));
             } else {
@@ -126,7 +126,7 @@ public final class PacketEventsCompat implements Listener {
                         + "(api=" + describe(api) + ")");
             }
         } catch (Throwable t) {
-            log().warn("[PacketEventsCompat] preRegister " + bot + " FAILED: " + t, t);
+            log(java.util.logging.Level.WARNING, "[PacketEventsCompat] preRegister " + bot + " FAILED: " + t, t);
         }
     }
 
@@ -142,7 +142,7 @@ public final class PacketEventsCompat implements Listener {
         }
         Player player = Bukkit.getPlayer(botUuid);
         if (player == null) {
-            log().warn("[PacketEventsCompat] verify " + botName + ": no Bukkit Player for " + botUuid);
+            log().warning("[PacketEventsCompat] verify " + botName + ": no Bukkit Player for " + botUuid);
             return;
         }
         try {
@@ -153,7 +153,7 @@ public final class PacketEventsCompat implements Listener {
             }
             Object playerManager = invoke(api, "getPlayerManager", new Class<?>[0]);
             if (playerManager == null) {
-                log().warn("[PacketEventsCompat] verify " + botName + ": getPlayerManager() missing on " + describe(api));
+                log().warning("[PacketEventsCompat] verify " + botName + ": getPlayerManager() missing on " + describe(api));
                 return;
             }
             Object user = invoke(playerManager, "getUser", new Class<?>[]{Object.class}, player);
@@ -166,13 +166,13 @@ public final class PacketEventsCompat implements Listener {
                 Object mapChannel = protocolManager == null
                         ? null
                         : invoke(protocolManager, "getChannel", new Class<?>[]{UUID.class}, botUuid);
-                log().warn("[PacketEventsCompat] verify " + botName + ": PE user IS NULL — PE will kick the bot. "
+                log().warning("[PacketEventsCompat] verify " + botName + ": PE user IS NULL — PE will kick the bot. "
                         + "uuid->channel map: " + describe(mapChannel)
                         + (mapChannel == null ? " (pre-registration did not land in PE's map!)" : "")
                         + " | playerManager=" + describe(playerManager) + " api=" + describe(api));
             }
         } catch (Throwable t) {
-            log().warn("[PacketEventsCompat] verify " + botName + " FAILED: " + t, t);
+            log(java.util.logging.Level.WARNING, "[PacketEventsCompat] verify " + botName + " FAILED: " + t, t);
         }
     }
 
@@ -203,7 +203,7 @@ public final class PacketEventsCompat implements Listener {
                 ch.close();
             }
         } catch (Throwable t) {
-            log().warn("[PacketEventsCompat] quit cleanup " + player.getName() + " failed: " + t, t);
+            log(java.util.logging.Level.WARNING, "[PacketEventsCompat] quit cleanup " + player.getName() + " failed: " + t, t);
         }
     }
 
