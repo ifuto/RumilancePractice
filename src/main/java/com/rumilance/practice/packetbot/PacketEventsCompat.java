@@ -190,8 +190,11 @@ public final class PacketEventsCompat implements Listener {
         Player player = event.getPlayer();
         try {
             Object handle = player.getClass().getMethod("getHandle").invoke(player);
-            if (!(handle instanceof PacketBot bot)
-                    || !(bot.connection instanceof FakePlayerConnection connection)) {
+            if (!(handle instanceof PacketBot bot)) {
+                return;
+            }
+            FakePlayerConnection connection = fakeConnection(bot);
+            if (connection == null) {
                 return;
             }
             GameProfile profile = bot.getGameProfile();
@@ -259,13 +262,41 @@ public final class PacketEventsCompat implements Listener {
             if (!(handle instanceof PacketBot bot)) {
                 return null;
             }
-            // ServerPlayer.connection (public) holds our FakePlayerConnection; Connection.channel
-            // (public) holds the EmbeddedChannel.
-            Object connection = bot.connection;
-            return connection instanceof net.minecraft.network.Connection conn ? conn.channel : null;
+            FakePlayerConnection connection = fakeConnection(bot);
+            return connection == null ? null : connection.channel();
         } catch (Throwable t) {
             return null;
         }
+    }
+
+    /**
+     * Paper's ServerPlayer.connection is a ServerGamePacketListenerImpl; its public
+     * ServerCommonPacketListenerImpl.connection field holds the actual Minecraft Connection.
+     * Keep the lookup reflective because that field is one of the mappings that moved between
+     * Paper versions.
+     */
+    private static FakePlayerConnection fakeConnection(PacketBot bot) {
+        if (bot == null) {
+            return null;
+        }
+        Object listener = bot.connection;
+        if (listener instanceof FakePlayerConnection direct) {
+            return direct;
+        }
+        for (Class<?> type = listener == null ? null : listener.getClass(); type != null;
+             type = type.getSuperclass()) {
+            try {
+                java.lang.reflect.Field field = type.getDeclaredField("connection");
+                field.setAccessible(true);
+                Object value = field.get(listener);
+                return value instanceof FakePlayerConnection connection ? connection : null;
+            } catch (NoSuchFieldException ignored) {
+                // The field is declared by a superclass on Paper.
+            } catch (Throwable ignored) {
+                return null;
+            }
+        }
+        return null;
     }
 
     /**
