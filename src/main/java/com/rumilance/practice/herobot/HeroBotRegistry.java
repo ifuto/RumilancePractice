@@ -136,6 +136,8 @@ public final class HeroBotRegistry {
                 connection,
                 bot,
                 CommonListenerCookie.createInitial(profile, false));
+        // Diagnostics: run PE's own join-check resolution and log the verdict (no-op w/o PE).
+        com.rumilance.practice.packetbot.PacketEventsCompat.verifyJoinCheck(profile.id(), name);
         // Presence policy: bots are not server players — out of the TAB, out of the count.
         // (The Quantum map addresses its bot by the fixed profile name, so the name stays
         // as-is; the map itself only ever runs one such bot per world.)

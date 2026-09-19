@@ -1,6 +1,7 @@
 package com.rumilance.practice.packetbot;
 
 import io.netty.channel.Channel;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -22,14 +23,17 @@ import java.util.UUID;
  * "PacketEvents failed to inject into a channel". Our fake players never perform a network
  * handshake, so no PE user is ever created from traffic.
  *
- * <p>PE ≥ 2.8.0 whitelists {@code EmbeddedChannel} in its fallback, but that fallback
- * (reflection over the player's handle) is broken on some Paper 1.21.x builds — production
- * (Paper 1.21.11 + PE 2.13.0) still kicked every bot join through it. So we do NOT rely on
- * the fallback at all: we pre-register a PE {@code User} for the bot's channel before
- * {@code placeNewPlayer} fires the join event. {@code getPlayerManager().getUser(player)}
- * then resolves on <em>any</em> PE version (the UUID→channel map is consulted first, no
- * reflection involved) and the kick branch is never reached. Quit-time cleanup removes the
- * entries.
+ * <p>The fix: pre-register a PE {@code User} for the bot's channel before
+ * {@code placeNewPlayer} fires the join event, on <em>every</em> PE version. PE's
+ * {@code getUser(player)} consults the UUID→channel map first (no reflection), so the kick
+ * branch becomes unreachable. PE 2.8.0+ whitelists {@code EmbeddedChannel} in its reflection
+ * fallback, but production (Paper 1.21.11 + PE 2.13.0) still kicked bots through that
+ * fallback, so the fallback is not trusted. Quit-time cleanup removes the entries.
+ *
+ * <p>1.76.37 adds full observability: every stage of the pre-registration is logged, the
+ * entry is read back through PE's own API, and after {@code placeNewPlayer} we run PE's own
+ * join-check resolution ({@code PlayerManager.getUser(player)}) and log the verdict — the
+ * exact function PE's kick branch calls.
  *
  * <p>All PacketEvents access is reflective, loaded through <em>PacketEvents' own class
  * loader</em> (Bukkit plugins are sibling class loaders; {@code Class.forName} from this
@@ -47,43 +51,46 @@ public final class PacketEventsCompat implements Listener {
     public static void register(Plugin plugin) {
         host = plugin;
         plugin.getServer().getPluginManager().registerEvents(new PacketEventsCompat(), plugin);
+        log().info("[PacketEventsCompat] armed (pre-registration + quit cleanup active)");
     }
 
     /**
      * Pre-register a PE user for the bot's channel. Must run before {@code placeNewPlayer}
-     * (which fires {@code PlayerJoinEvent} synchronously). No-op when PE is absent or already
-     * handles fake channels.
+     * (which fires {@code PlayerJoinEvent} synchronously). No-op when PE is absent.
+     * Every failure is logged, never thrown.
      */
     public static void preRegister(FakePlayerConnection connection, GameProfile profile) {
+        String bot = profile != null ? profile.getName() : "?";
         if (connection == null || profile == null) {
             return;
         }
         Channel channel = connection.channel();
         if (channel == null) {
+            log().warn("[PacketEventsCompat] preRegister " + bot + ": connection channel is null — giving up");
             return;
         }
         ClassLoader peLoader = packetEventsClassLoader();
         if (peLoader == null) {
+            log().info("[PacketEventsCompat] preRegister " + bot + ": no enabled PacketEvents plugin — nothing to do");
             return;
         }
         try {
             Object api = forName(peLoader, "com.github.retrooper.packetevents.PacketEvents")
                     .getMethod("getAPI").invoke(null);
             if (api == null) {
+                log().warn("[PacketEventsCompat] preRegister " + bot + ": PacketEvents.getAPI() is null (PE not initialised?)");
                 return;
             }
-            // Always pre-register: relying on PE's own fallback (reflection over the player
-            // handle + fake-channel list) is not sufficient — it still kicked bots on
-            // Paper 1.21.11 + PE 2.13.0 in production. A pre-registered User makes
-            // getUser(player) resolve on every version, so the kick branch is unreachable.
             Object protocolManager = invoke(api, "getProtocolManager", new Class<?>[0]);
             if (protocolManager == null) {
+                log().warn("[PacketEventsCompat] preRegister " + bot + ": getProtocolManager() missing/failing on "
+                        + api.getClass().getName());
                 return;
             }
             Object clientVersion = serverClientVersion(api);
             Class<?> userProfileClass = forName(peLoader, "com.github.retrooper.packetevents.protocol.player.UserProfile");
             Object userProfile = userProfileClass.getConstructor(UUID.class, String.class)
-                    .newInstance(profile.id(), profile.name());
+                    .newInstance(profile.id(), profile.getName());
             Class<?> connectionStateClass = forName(peLoader, "com.github.retrooper.packetevents.protocol.ConnectionState");
             Object play = Enum.valueOf(connectionStateClass.asSubclass(Enum.class), "PLAY");
             Class<?> userClass = forName(peLoader, "com.github.retrooper.packetevents.protocol.player.User");
@@ -97,12 +104,75 @@ public final class PacketEventsCompat implements Listener {
                 }
             }
             if (user == null) {
+                log().warn("[PacketEventsCompat] preRegister " + bot + ": no 4-arg (Object,ConnectionState,*,UserProfile) "
+                        + "constructor on " + userClass.getName() + " — PE API drift");
                 return;
             }
             invoke(protocolManager, "setUser", new Class<?>[]{Object.class, userClass}, channel, user);
             invoke(protocolManager, "setChannel", new Class<?>[]{UUID.class, Object.class}, profile.id(), channel);
-        } catch (Throwable ignored) {
-            // PE internals drifted — the bot will be subject to PE's default handling.
+
+            // Read the entries back through PE's own API. If this fails, nothing on our side
+            // was wrong — PE's map simply did not retain the entry.
+            Object readBackChannel = invoke(protocolManager, "getChannel", new Class<?>[]{UUID.class}, profile.id());
+            Object readBackUser = readBackChannel == null
+                    ? null
+                    : invoke(protocolManager, "getUser", new Class<?>[]{Object.class}, readBackChannel);
+            if (readBackUser == null || readBackChannel != channel) {
+                log().warn("[PacketEventsCompat] preRegister " + bot + ": VERIFICATION FAILED — read-back channel="
+                        + describe(readBackChannel) + " (expected " + describe(channel) + "), user="
+                        + describe(readBackUser) + " | api=" + describe(api) + " mgr=" + describe(protocolManager));
+            } else {
+                log().info("[PacketEventsCompat] preRegister " + bot + ": OK — user+channel registered and read back "
+                        + "(api=" + describe(api) + ")");
+            }
+        } catch (Throwable t) {
+            log().warn("[PacketEventsCompat] preRegister " + bot + " FAILED: " + t, t);
+        }
+    }
+
+    /**
+     * Run PE's <em>own</em> join-check resolution after {@code placeNewPlayer} has fired the
+     * join event: {@code PlayerManager.getUser(player)} — the exact call PE's kick branch
+     * makes. Logging its verdict tells us whether the bot is safe on this server.
+     */
+    public static void verifyJoinCheck(UUID botUuid, String botName) {
+        ClassLoader peLoader = packetEventsClassLoader();
+        if (peLoader == null) {
+            return; // no PE: nothing to verify
+        }
+        Player player = Bukkit.getPlayer(botUuid);
+        if (player == null) {
+            log().warn("[PacketEventsCompat] verify " + botName + ": no Bukkit Player for " + botUuid);
+            return;
+        }
+        try {
+            Object api = forName(peLoader, "com.github.retrooper.packetevents.PacketEvents")
+                    .getMethod("getAPI").invoke(null);
+            if (api == null) {
+                return;
+            }
+            Object playerManager = invoke(api, "getPlayerManager", new Class<?>[0]);
+            if (playerManager == null) {
+                log().warn("[PacketEventsCompat] verify " + botName + ": getPlayerManager() missing on " + describe(api));
+                return;
+            }
+            Object user = invoke(playerManager, "getUser", new Class<?>[]{Object.class}, player);
+            if (user != null) {
+                log().info("[PacketEventsCompat] verify " + botName + ": OK — PE resolves the bot's user ("
+                        + user.getClass().getSimpleName() + "); kick branch unreachable");
+            } else {
+                // Diagnostics: uuid->channel map hit? fallback reflection result?
+                Object protocolManager = invoke(api, "getProtocolManager", new Class<?>[0]);
+                Object mapChannel = protocolManager == null
+                        ? null
+                        : invoke(protocolManager, "getChannel", new Class<?>[]{UUID.class}, botUuid);
+                log().warn("[PacketEventsCompat] verify " + botName + ": PE user IS NULL — PE will kick the bot. "
+                        + "uuid->channel map: " + describe(mapChannel)
+                        + (mapChannel == null ? " (pre-registration did not land in PE's map!)" : "")
+                        + " | playerManager=" + describe(playerManager) + " api=" + describe(api));
+            }
+        } catch (Throwable t) {
+            log().warn("[PacketEventsCompat] verify " + botName + " FAILED: " + t, t);
         }
     }
 
@@ -132,11 +202,25 @@ public final class PacketEventsCompat implements Listener {
             if (channel instanceof Channel ch && ch.isOpen()) {
                 ch.close();
             }
-        } catch (Throwable ignored) {
+        } catch (Throwable t) {
+            log().warn("[PacketEventsCompat] quit cleanup " + player.getName() + " failed: " + t, t);
         }
     }
 
     // --------------------------------------------------------------- internals
+
+    private static org.bukkit.plugin.logging.Logger log() {
+        Plugin p = host;
+        return p != null ? p.getLogger()
+                : org.bukkit.plugin.logging.LogManager.getLogger("PacketEventsCompat");
+    }
+
+    private static String describe(Object o) {
+        if (o == null) {
+            return "null";
+        }
+        return o.getClass().getName() + "@" + Integer.toHexString(System.identityHashCode(o));
+    }
 
     private static Object botChannel(Player player) {
         try {

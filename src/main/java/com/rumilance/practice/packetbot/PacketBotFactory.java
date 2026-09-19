@@ -83,6 +83,9 @@ public final class PacketBotFactory {
                 connection,
                 bot,
                 CommonListenerCookie.createInitial(profile, false));
+        // Diagnostics: run PE's own join-check resolution and log the verdict (no-op w/o PE).
+        PacketEventsCompat.verifyJoinCheck(profile.id(),
+                displayName == null || displayName.isBlank() ? DEFAULT_DISPLAY_NAME : displayName);
         // Presence policy: bots are not server players — out of the TAB, out of the count.
         PacketBot.registerLive(bot, displayName == null || displayName.isBlank()
                 ? DEFAULT_DISPLAY_NAME : displayName);
