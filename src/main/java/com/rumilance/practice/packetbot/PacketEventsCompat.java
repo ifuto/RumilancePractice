@@ -6,6 +6,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.Plugin;
 
@@ -175,6 +176,30 @@ public final class PacketEventsCompat implements Listener {
             }
         } catch (Throwable t) {
             log().log(java.util.logging.Level.WARNING, "[PacketEventsCompat] verify " + botName + " FAILED: " + t, t);
+        }
+    }
+
+    /**
+     * ProtocolLib may replace the fake connection's raw EmbeddedChannel with its
+     * NettyChannelProxy while the join event is being prepared. Refresh PE's maps at LOWEST,
+     * before PE's own LOWEST join listener (this listener is registered while NARENA enables,
+     * before PacketEvents enables), so PE sees the same channel that its injector sees.
+     */
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onJoin(PlayerJoinEvent event) {
+        Player player = event.getPlayer();
+        try {
+            Object handle = player.getClass().getMethod("getHandle").invoke(player);
+            if (!(handle instanceof PacketBot bot)
+                    || !(bot.connection instanceof FakePlayerConnection connection)) {
+                return;
+            }
+            GameProfile profile = bot.getGameProfile();
+            log().info("[PacketEventsCompat] join refresh " + profile.name()
+                    + ": registering the post-ProtocolLib channel " + describe(connection.channel()));
+            preRegister(connection, profile);
+        } catch (Throwable ignored) {
+            // Non-bot players and API drift must never affect ordinary joins.
         }
     }
 
