@@ -34,7 +34,7 @@ import java.util.UUID;
 public class PacketBot extends ServerPlayer {
 
     /** Every live fake player, whatever spawned it (practice bots, quantum map bot, …). */
-    private static final Map<UUID, PacketBot> LIVE = java.util.concurrent.ConcurrentHashMap.newConcurrentMap();
+    private static final Map<UUID, PacketBot> LIVE = new java.util.concurrent.ConcurrentHashMap<>();
 
     private final MinecraftServer owningServer;
     private final String profileName;
@@ -119,7 +119,7 @@ public class PacketBot extends ServerPlayer {
         if (bot == null || !bot.isAlive()) {
             return;
         }
-        ClientboundPlayerInfoPacket packet = tabRemovePacket(bot);
+        ClientboundPlayerInfoRemovePacket packet = tabRemovePacket(bot);
         if (packet == null) {
             return;
         }
@@ -145,7 +145,7 @@ public class PacketBot extends ServerPlayer {
                 LIVE.remove(bot.getUUID(), bot);
                 continue;
             }
-            ClientboundPlayerInfoPacket packet = tabRemovePacket(bot);
+            ClientboundPlayerInfoRemovePacket packet = tabRemovePacket(bot);
             if (packet == null) {
                 continue;
             }

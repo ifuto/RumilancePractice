@@ -85,10 +85,14 @@ public final class PacketBotFactory {
         PacketBot.registerLive(bot, displayName == null || displayName.isBlank()
                 ? DEFAULT_DISPLAY_NAME : displayName);
         // In-world nametag shows the friendly display name, not the unique profile name.
+        // Bukkit API on purpose: the NMS setCustomName takes a Mojang chat Component, and the
+        // exact 1.21.x overload spelling varies — the Bukkit layer accepts an Adventure
+        // Component in every supported build.
         try {
-            bot.setCustomName(Component.text(displayName == null || displayName.isBlank()
+            org.bukkit.entity.Player bukkitBot = bot.getBukkitEntity();
+            bukkitBot.setCustomName(Component.text(displayName == null || displayName.isBlank()
                     ? DEFAULT_DISPLAY_NAME : displayName));
-            bot.setCustomNameVisible(true);
+            bukkitBot.setCustomNameVisible(true);
         } catch (Throwable ignored) {
         }
         bot.stopRiding();

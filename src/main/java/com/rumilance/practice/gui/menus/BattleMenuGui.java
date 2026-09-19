@@ -9,8 +9,8 @@ import com.rumilance.practice.gui.ItemBuilder;
 import com.rumilance.practice.gui.MenuTile;
 import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.locale.MessageService;
-import com.rumilance.practice.model.PracticeType;
 import com.rumilance.practice.platform.PlayerPlatform;
+import com.rumilance.practice.practice.PracticeType;
 import com.rumilance.practice.practice.PracticeService;
 import com.rumilance.practice.queue.QueueCoordinator;
 import com.rumilance.practice.queue.QueueService;
@@ -349,8 +349,10 @@ public final class BattleMenuGui extends AbstractGui {
                             && teamService.teamOf(player.getUniqueId()).isPresent();
                     PlayerState state = stateOf(player);
                     if (isBusy(state)) {
-                        player.sendMessage(t(player, "menu.battle-locked")
-                                .replace("<state>", line(player, stateKey(state))).color(UiTheme.WARNING));
+                        player.sendMessage(Component.text(
+                                line(player, "menu.battle-locked")
+                                        .replace("<state>", line(player, stateKey(state))),
+                                UiTheme.WARNING));
                     } else if (inParty) {
                         player.sendMessage(t(player, "menu.party-only").color(UiTheme.WARNING));
                     }
