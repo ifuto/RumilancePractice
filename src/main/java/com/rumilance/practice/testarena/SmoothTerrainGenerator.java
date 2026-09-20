@@ -367,13 +367,16 @@ public final class SmoothTerrainGenerator {
         private final int width;
         private final int[] positions;
         private final int[][] control;
+        private final int[][] surface;
         private final int minimum;
         private final int maximum;
 
-        private HeightMap(int width, int[] positions, int[][] control, int minimum, int maximum) {
+        private HeightMap(int width, int[] positions, int[][] control, int[][] surface,
+                          int minimum, int maximum) {
             this.width = width;
             this.positions = positions;
             this.control = control;
+            this.surface = surface;
             this.minimum = minimum;
             this.maximum = maximum;
         }
@@ -424,14 +427,57 @@ public final class SmoothTerrainGenerator {
                     }
                 }
             }
-            return new HeightMap(width, positions, values, minimum, maximum);
+            int[][] surface = new int[width][width];
+            for (int x = 0; x < width; x++) {
+                for (int z = 0; z < width; z++) {
+                    surface[x][z] = interpolatedHeight(width, positions, values, x, z);
+                }
+            }
+            // Rounding a smooth curve can still make a two-block jump where two axes meet.
+            // A few directional relaxation passes produce an integer 1-Lipschitz surface while
+            // retaining the 0..5 envelope. This is pure data work and runs off-thread.
+            for (int pass = 0; pass < width; pass++) {
+                for (int x = 1; x < width; x++) {
+                    for (int z = 0; z < width; z++) {
+                        surface[x][z] = clampStep(surface[x - 1][z], surface[x][z], 1);
+                    }
+                }
+                for (int x = width - 2; x >= 0; x--) {
+                    for (int z = 0; z < width; z++) {
+                        surface[x][z] = clampStep(surface[x + 1][z], surface[x][z], 1);
+                    }
+                }
+                for (int z = 1; z < width; z++) {
+                    for (int x = 0; x < width; x++) {
+                        surface[x][z] = clampStep(surface[x][z - 1], surface[x][z], 1);
+                    }
+                }
+                for (int z = width - 2; z >= 0; z--) {
+                    for (int x = 0; x < width; x++) {
+                        surface[x][z] = clampStep(surface[x][z + 1], surface[x][z], 1);
+                    }
+                }
+            }
+            return new HeightMap(width, positions, values, surface, minimum, maximum);
         }
 
         int heightAt(int x, int z) {
             x = Math.max(0, Math.min(width - 1, x));
             z = Math.max(0, Math.min(width - 1, z));
-            int gx = segment(x);
-            int gz = segment(z);
+            return surface[x][z];
+        }
+
+        private static int interpolatedHeight(int width, int[] positions, int[][] control,
+                                              int x, int z) {
+            int gridSize = positions.length;
+            int gx = 0;
+            int gz = 0;
+            while (gx < gridSize - 2 && x > positions[gx + 1]) {
+                gx++;
+            }
+            while (gz < gridSize - 2 && z > positions[gz + 1]) {
+                gz++;
+            }
             double tx = smooth((x - positions[gx])
                     / (double) (positions[gx + 1] - positions[gx]));
             double tz = smooth((z - positions[gz])
