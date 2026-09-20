@@ -188,8 +188,8 @@ commands:
     usage: /narena-harness <ground|room|dummy|fight|status|stop>
     permission: rumilance.admin
   testarena:
-    description: Generate a smooth five-block-range terrain test arena.
-    usage: /testarena spawnde [radius]
+    description: Spawn or delete a 100x100 smooth terrain test arena.
+    usage: /testarena <spawn|delete|cancel> [grass-stone|sand-sandstone]
     permission: rumilance.admin
   team:
     description: Owner-invite style teams with public/private visibility and red-blue team battles.

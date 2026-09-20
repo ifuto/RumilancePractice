@@ -1659,7 +1659,9 @@ public final class FeatureBootstrap {
         bind("lang", langCommand);
         bind("matchinv", new MatchInvCommand(matchInventoryGui));
         bind("setfunc", new SetFuncCommand());
-        bind("testarena", new TestArenaCommand(new SmoothTerrainGenerator(plugin)));
+        TestArenaCommand testArenaCommand = new TestArenaCommand(new SmoothTerrainGenerator(plugin));
+        bind("testarena", testArenaCommand);
+        pm.registerEvents(testArenaCommand, plugin);
         bind("admin", adminCommand);
         bind("practiceadmin", practiceAdmin);
         bind("slobby", practiceAdmin);
