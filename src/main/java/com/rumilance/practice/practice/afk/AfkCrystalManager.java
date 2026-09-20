@@ -95,7 +95,7 @@ import java.util.function.Predicate;
 public final class AfkCrystalManager implements Listener, CommandExecutor, org.bukkit.command.TabCompleter {
 
     private static final int FLOOR_RADIUS = 50;          // 100x100 netherite floor (spec)
-    private static final int BOUNDARY_HEIGHT = 40;       // build/escape cap above the floor
+    private static final int BUILD_HEIGHT_LIMIT = 30;    // only block placement cap above the floor
     private static final int BOT_HOME_OFFSET_Z = -8;     // bot spawn: 8 blocks north of centre
     private static final double BOT_MAX_HEALTH = 20.0d;  // vanilla HP at every difficulty
     private static final long BOT_AIRBORNE_GRACE_MS = 1_200L; // knock arcs settle inside this
@@ -146,6 +146,7 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
     private World world;
     private File kitsFile;
     private File settingsFile;
+    private AfkPacketVisibility packetVisibility;
 
     public AfkCrystalManager(JavaPlugin plugin, ConfigService configService,
                              MessageService messages) {
@@ -160,12 +161,17 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
         loadKits();
         loadSettings();
         Bukkit.getPluginManager().registerEvents(this, plugin);
+        packetVisibility = new AfkPacketVisibility(plugin, this);
+        packetVisibility.start();
         ticker = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 30L, 2L);
     }
 
     public void shutdown() {
         if (ticker != null) {
             ticker.cancel();
+        }
+        if (packetVisibility != null) {
+            packetVisibility.stop();
         }
         for (UUID id : new ArrayList<>(sessions.keySet())) {
             Player p = Bukkit.getPlayer(id);
@@ -197,6 +203,21 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
 
     public boolean hasSession(UUID playerId) {
         return sessions.containsKey(playerId);
+    }
+
+    /** Returns the horizontal packet-visible range for an AFKC viewer, if they are inside one. */
+    public java.util.Optional<AfkPacketVisibility.Area> packetArea(UUID playerId) {
+        AfkSession session = sessions.get(playerId);
+        if (session == null || session.center.getWorld() == null) {
+            return java.util.Optional.empty();
+        }
+        Location center = session.center;
+        return java.util.Optional.of(new AfkPacketVisibility.Area(
+                center.getWorld().getUID(),
+                center.getBlockX() - FLOOR_RADIUS,
+                center.getBlockX() + FLOOR_RADIUS + 1,
+                center.getBlockZ() - FLOOR_RADIUS,
+                center.getBlockZ() + FLOOR_RADIUS + 1));
     }
 
     /** Set by the bootstrap so the two AFK rooms can never run at the same time. */
@@ -362,9 +383,12 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
         s.shieldReturnSeconds = shieldDelayPref(player.getUniqueId());
         sessions.put(player.getUniqueId(), s);
         buildFloor(s);
-        s.bounds = new BoundingBox(center.getX() - FLOOR_RADIUS, center.getY(),
+        // The 30-block limit belongs only to block placement. Players may jump/fly above
+        // the build cap; the movement guard only keeps them inside the room horizontally and
+        // prevents falling below the floor.
+        s.bounds = new BoundingBox(center.getX() - FLOOR_RADIUS, world.getMinHeight(),
                 center.getZ() - FLOOR_RADIUS, center.getX() + FLOOR_RADIUS + 1,
-                center.getY() + BOUNDARY_HEIGHT, center.getZ() + FLOOR_RADIUS + 1);
+                world.getMaxHeight(), center.getZ() + FLOOR_RADIUS + 1);
         player.setGameMode(GameMode.SURVIVAL);
         player.setFallDistance(0f);
         player.teleport(s.spawn());
@@ -478,7 +502,7 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
         Block button = c.clone().add(0, 1, 0).getBlock();
         for (int dx = -FLOOR_RADIUS; dx < FLOOR_RADIUS; dx++) {
             for (int dz = -FLOOR_RADIUS; dz < FLOOR_RADIUS; dz++) {
-                for (int dy = 1; dy < BOUNDARY_HEIGHT; dy++) {
+                for (int dy = 1; dy <= BUILD_HEIGHT_LIMIT; dy++) {
                     Block b = c.clone().add(dx, dy, dz).getBlock();
                     if (b.getX() == button.getX() && b.getY() == button.getY()
                             && b.getZ() == button.getZ()) {
@@ -1343,11 +1367,15 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
         if (s == null) {
             return;
         }
-        if (!inside(s, event.getBlock())) {
+        Block placed = event.getBlock();
+        if (!inside(s, placed)
+                || placed.getY() <= s.center.getBlockY()
+                || placed.getY() > s.center.getBlockY() + BUILD_HEIGHT_LIMIT) {
+            // This is a build-height rule only. It must not become a player movement ceiling.
             event.setCancelled(true);
             return;
         }
-        if (isProtected(s, event.getBlock())) {
+        if (isProtected(s, placed)) {
             event.setCancelled(true);
         }
     }

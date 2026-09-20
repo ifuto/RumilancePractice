@@ -15,6 +15,9 @@ import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 
+import java.util.UUID;
+import java.util.function.Predicate;
+
 /**
  * Lobby protections. Skipped for fighting / FFA / editing / preparing match players.
  */
@@ -24,6 +27,7 @@ public final class LobbyListener implements Listener {
     private final PlayerStateManager stateManager;
     private final GuiSessionRegistry guiSessions;
     private final FfaService ffaService;
+    private Predicate<UUID> buildAllowed = id -> false;
 
     public LobbyListener(LobbyService lobbyService, PlayerStateManager stateManager,
                          GuiSessionRegistry guiSessions, FfaService ffaService) {
@@ -31,6 +35,19 @@ public final class LobbyListener implements Listener {
         this.stateManager = stateManager;
         this.guiSessions = guiSessions;
         this.ffaService = ffaService;
+    }
+
+    /** Allows isolated rooms such as AFK practice to keep their own block rules. */
+    public void setBuildAllowed(Predicate<UUID> buildAllowed) {
+        this.buildAllowed = buildAllowed == null ? id -> false : buildAllowed;
+    }
+
+    private boolean canBuild(Player player) {
+        try {
+            return buildAllowed.test(player.getUniqueId());
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 
     private boolean shouldProtect(Player player) {
@@ -88,6 +105,9 @@ public final class LobbyListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onBreak(BlockBreakEvent event) {
+        if (canBuild(event.getPlayer())) {
+            return;
+        }
         if (shouldProtect(event.getPlayer()) && !event.getPlayer().hasPermission("rumilance.lobby.bypass")) {
             event.setCancelled(true);
         }
@@ -95,6 +115,9 @@ public final class LobbyListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onPlace(BlockPlaceEvent event) {
+        if (canBuild(event.getPlayer())) {
+            return;
+        }
         if (shouldProtect(event.getPlayer()) && !event.getPlayer().hasPermission("rumilance.lobby.bypass")) {
             event.setCancelled(true);
         }

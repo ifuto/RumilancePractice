@@ -546,6 +546,9 @@ public final class FeatureBootstrap {
         afkCrystalManager.setEntryGuard(busyElsewhere);
         afkPracticeManager.setEntryGuard(busyElsewhere);
         ffaService.setSessionGuard(inAfkSession);
+        // AFK rooms are intentionally buildable for normal players. Lobby protection used to
+        // see their PlayerState as LOBBY and therefore only allowed OPs to place blocks.
+        lobbyListener.setBuildAllowed(inAfkSession);
 
 
 
@@ -1391,7 +1394,8 @@ public final class FeatureBootstrap {
                 layoutCache, settingsService, asyncExecutor, plugin, messageService, rankService, chatBanService);
         sessionBootstrapListener.setLanguagePicker(localeSelectGui::open);
         pm.registerEvents(sessionBootstrapListener, plugin);
-        pm.registerEvents(new LobbyListener(lobbyService, stateManager, guiSessions, ffaService), plugin);
+        LobbyListener lobbyListener = new LobbyListener(lobbyService, stateManager, guiSessions, ffaService);
+        pm.registerEvents(lobbyListener, plugin);
         pm.registerEvents(new MotdListener(), plugin);
         com.rumilance.practice.world.WorldOptimizer worldOptimizer =
                 new com.rumilance.practice.world.WorldOptimizer(plugin);
