@@ -1649,7 +1649,16 @@ public final class FeatureBootstrap {
         bind("lang", langCommand);
         bind("matchinv", new MatchInvCommand(matchInventoryGui));
         bind("setfunc", new SetFuncCommand());
-        TestArenaCommand testArenaCommand = new TestArenaCommand(new SmoothTerrainGenerator(plugin));
+        com.rumilance.practice.testarena.TerrainEditBridge terrainEditBridge = null;
+        // Keep the optional WorldEdit/FAWE API isolated: do not even resolve the FAWE terrain
+        // implementation on servers that do not have FastAsyncWorldEdit installed.
+        if (settings.faweEnabled()
+                && plugin.getServer().getPluginManager().getPlugin("FastAsyncWorldEdit") != null) {
+            terrainEditBridge = com.rumilance.practice.arena.fawe.FaweTerrainBridge
+                    .createIfAvailable(plugin, asyncExecutor);
+        }
+        TestArenaCommand testArenaCommand = new TestArenaCommand(
+                new SmoothTerrainGenerator(plugin, terrainEditBridge));
         bind("testarena", testArenaCommand);
         pm.registerEvents(testArenaCommand, plugin);
         bind("admin", adminCommand);

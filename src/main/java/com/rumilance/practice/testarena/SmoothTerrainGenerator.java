@@ -23,10 +23,10 @@ import java.util.function.Consumer;
 /**
  * Low-lag, plugin-side builder for the temporary {@code /testarena} maps.
  *
- * <p>Height calculation and column planning are done asynchronously. Bukkit world access is
- * intentionally limited to small, main-thread batches: Minecraft does not permit block writes
- * from an async thread, so this is the safe equivalent of asynchronous placement. The default
- * 16 columns per tick keeps the 100 by 100 by 50 test map from freezing the server.</p>
+ * <p>Height calculation and column planning are done asynchronously. Without FAWE, Bukkit world
+ * access is intentionally limited to small, main-thread batches: Minecraft does not permit block
+ * writes from an async thread. When FastAsyncWorldEdit is installed, the planned columns are
+ * converted into one clipboard and pasted through the FAWE bridge instead.</p>
  */
 public final class SmoothTerrainGenerator {
 
@@ -35,17 +35,23 @@ public final class SmoothTerrainGenerator {
     // Wider control cells make broad, gently rolling land instead of many small bumps.
     private static final int CONTROL_SPACING = 20;
     private static final int COLUMNS_PER_TICK = 16;
-    private static final int LAYERS = 50;
+    public static final int LAYERS = 50;
     private static final int CLEAR_ABOVE = 16;
     private static final String STATE_FILE = "testarena.yml";
 
     private final Plugin plugin;
+    private final TerrainEditBridge terrainEditBridge;
     private final ConcurrentMap<UUID, BukkitTask> running = new ConcurrentHashMap<>();
     private final java.util.Set<UUID> busy = ConcurrentHashMap.newKeySet();
     private volatile Area previousMap;
 
     public SmoothTerrainGenerator(Plugin plugin) {
+        this(plugin, null);
+    }
+
+    public SmoothTerrainGenerator(Plugin plugin, TerrainEditBridge terrainEditBridge) {
         this.plugin = plugin;
+        this.terrainEditBridge = terrainEditBridge;
         this.previousMap = readState();
     }
 
@@ -108,7 +114,8 @@ public final class SmoothTerrainGenerator {
                         TerrainMap map, int minY, int maxY) {
     }
 
-    private record Column(int x, int z, int topY) {
+    /** Planned surface column exposed to the optional FAWE clipboard writer. */
+    public record ColumnData(int x, int z, int topY) {
     }
 
     public boolean hasPreviousMap() {
@@ -169,7 +176,11 @@ public final class SmoothTerrainGenerator {
                                 + (error == null ? "unknown error" : error.getMessage()));
                         return;
                     }
-                    scheduleWrites(player, area, planned, seed, complete, failure);
+                    if (terrainEditBridge != null && terrainEditBridge.isAvailable()) {
+                        scheduleFawePaste(player, area, planned, seed, complete, failure);
+                    } else {
+                        scheduleWrites(player, area, planned, seed, complete, failure);
+                    }
                 }));
         // The async planning phase has no BukkitTask yet. A small sentinel task makes a second
         // click fail immediately instead of starting another planner before the callback arrives.
@@ -196,10 +207,14 @@ public final class SmoothTerrainGenerator {
             fail(failure, "Wait for the current test map operation to finish.");
             return;
         }
-        List<Column> columns = new ArrayList<>(area.width() * area.width());
+        if (terrainEditBridge != null && terrainEditBridge.isAvailable()) {
+            scheduleFaweClear(player, area, complete, failure);
+            return;
+        }
+        List<ColumnData> columns = new ArrayList<>(area.width() * area.width());
         for (int x = 0; x < area.width(); x++) {
             for (int z = 0; z < area.width(); z++) {
-                columns.add(new Column(area.centerX() - area.width() / 2 + x,
+                columns.add(new ColumnData(area.centerX() - area.width() / 2 + x,
                         area.centerZ() - area.width() / 2 + z, area.maxY()));
             }
         }
@@ -228,7 +243,71 @@ public final class SmoothTerrainGenerator {
         running.put(playerId, holder[0]);
     }
 
-    private void scheduleWrites(Player player, Area area, List<Column> columns, long seed,
+    private void scheduleFawePaste(Player player, Area area, List<ColumnData> columns, long seed,
+                                   Consumer<Result> complete, Consumer<String> failure) {
+        World world = Bukkit.getWorld(area.world());
+        if (world == null) {
+            running.remove(player.getUniqueId());
+            busy.remove(player.getUniqueId());
+            fail(failure, "The target world is no longer loaded.");
+            return;
+        }
+        int minX = area.centerX() - area.width() / 2;
+        int minZ = area.centerZ() - area.width() / 2;
+        int maxX = minX + area.width() - 1;
+        int maxZ = minZ + area.width() - 1;
+        terrainEditBridge.paste(world, minX, area.minY(), minZ, maxX, area.maxY(), maxZ,
+                        area.map(), columns)
+                .whenComplete((success, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
+                    UUID playerId = player.getUniqueId();
+                    running.remove(playerId);
+                    busy.remove(playerId);
+                    if (error != null || !Boolean.TRUE.equals(success)) {
+                        fail(failure, "FAWE could not paste the test map: "
+                                + (error == null ? "unknown error" : error.getMessage()));
+                        return;
+                    }
+                    previousMap = area;
+                    writeState(area);
+                    Result result = new Result(area.map(), area.width(), columns.size(),
+                            minimum(columns, area.baseY()), maximum(columns, area.baseY()), seed);
+                    if (complete != null && player.isOnline()) {
+                        complete.accept(result);
+                    }
+                }));
+    }
+
+    private void scheduleFaweClear(Player player, Area area, Consumer<Integer> complete,
+                                   Consumer<String> failure) {
+        World world = Bukkit.getWorld(area.world());
+        if (world == null) {
+            busy.remove(player.getUniqueId());
+            fail(failure, "The world containing the previous test map is no longer loaded.");
+            return;
+        }
+        int minX = area.centerX() - area.width() / 2;
+        int minZ = area.centerZ() - area.width() / 2;
+        int maxX = minX + area.width() - 1;
+        int maxZ = minZ + area.width() - 1;
+        terrainEditBridge.clear(world, minX, area.minY(), minZ, maxX, area.maxY(), maxZ)
+                .whenComplete((success, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
+                    UUID playerId = player.getUniqueId();
+                    running.remove(playerId);
+                    busy.remove(playerId);
+                    if (error != null || !Boolean.TRUE.equals(success)) {
+                        fail(failure, "FAWE could not delete the test map: "
+                                + (error == null ? "unknown error" : error.getMessage()));
+                        return;
+                    }
+                    previousMap = null;
+                    deleteState();
+                    if (complete != null) {
+                        complete.accept(area.width() * area.width());
+                    }
+                }));
+    }
+
+    private void scheduleWrites(Player player, Area area, List<ColumnData> columns, long seed,
                                 Consumer<Result> complete, Consumer<String> failure) {
         World world = Bukkit.getWorld(area.world());
         if (world == null) {
@@ -263,20 +342,20 @@ public final class SmoothTerrainGenerator {
         running.put(player.getUniqueId(), holder[0]);
     }
 
-    private static List<Column> plan(Area area, long seed) {
+    private static List<ColumnData> plan(Area area, long seed) {
         HeightMap map = HeightMap.create(area.width(), seed);
-        List<Column> columns = new ArrayList<>(area.width() * area.width());
+        List<ColumnData> columns = new ArrayList<>(area.width() * area.width());
         for (int x = 0; x < area.width(); x++) {
             for (int z = 0; z < area.width(); z++) {
                 int worldX = area.centerX() - area.width() / 2 + x;
                 int worldZ = area.centerZ() - area.width() / 2 + z;
-                columns.add(new Column(worldX, worldZ, area.baseY() + map.heightAt(x, z)));
+                columns.add(new ColumnData(worldX, worldZ, area.baseY() + map.heightAt(x, z)));
             }
         }
         return columns;
     }
 
-    private static void writeColumn(World world, Column column, TerrainMap map) {
+    private static void writeColumn(World world, ColumnData column, TerrainMap map) {
         for (int y = column.topY() + 1; y <= column.topY() + CLEAR_ABOVE; y++) {
             if (y >= world.getMinHeight() && y < world.getMaxHeight()) {
                 world.getBlockAt(column.x(), y, column.z()).setType(Material.AIR, false);
@@ -290,7 +369,7 @@ public final class SmoothTerrainGenerator {
         }
     }
 
-    private static void clearColumn(World world, Column column, int minY, int maxY) {
+    private static void clearColumn(World world, ColumnData column, int minY, int maxY) {
         int from = Math.max(world.getMinHeight(), minY);
         int to = Math.min(world.getMaxHeight() - 1, maxY);
         for (int y = from; y <= to; y++) {
@@ -298,11 +377,11 @@ public final class SmoothTerrainGenerator {
         }
     }
 
-    private static int minimum(List<Column> columns, int baseY) {
+    private static int minimum(List<ColumnData> columns, int baseY) {
         return columns.stream().mapToInt(c -> c.topY() - baseY).min().orElse(0);
     }
 
-    private static int maximum(List<Column> columns, int baseY) {
+    private static int maximum(List<ColumnData> columns, int baseY) {
         return columns.stream().mapToInt(c -> c.topY() - baseY).max().orElse(0);
     }
 
