@@ -160,7 +160,10 @@ public final class PracticeBotSelectGui extends AbstractGui {
                 ? null : ((rooms.isEmpty() && !arenaVenue) ? "gui.practice-none" : "gui.practice-room-busy");
         // If Quantum is unavailable, do not leave a visually enabled tile whose action is
         // deliberately locked just because the legacy room list still has capacity.
-        return tile.build(!quantumReady || free == 0, lockKey);
+        // QuantumBOT instances are independent of the legacy PracticeService room count.
+        // Do not let free == 0 lock a ready Quantum tile: lockKey is intentionally null
+        // in that branch, and MenuTile would otherwise try to localise a null key.
+        return tile.build(!quantumReady, quantumReady ? null : lockKey);
     }
 
     private List<PracticeRoom> roomsOf(PracticeType mode) {
