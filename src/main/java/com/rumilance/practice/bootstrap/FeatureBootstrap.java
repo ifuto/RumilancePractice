@@ -261,6 +261,7 @@ public final class FeatureBootstrap {
     private PracticeService practiceService;
     private com.rumilance.practice.practice.afk.AfkPracticeManager afkPracticeManager;
     private com.rumilance.practice.practice.afk.AfkCrystalManager afkCrystalManager;
+    private LobbyListener lobbyListener;
     private TeamGlowLosService teamGlowLosService;
 
     public FeatureBootstrap(RumilancePractice plugin, ServiceRegistry services) {
@@ -1394,7 +1395,7 @@ public final class FeatureBootstrap {
                 layoutCache, settingsService, asyncExecutor, plugin, messageService, rankService, chatBanService);
         sessionBootstrapListener.setLanguagePicker(localeSelectGui::open);
         pm.registerEvents(sessionBootstrapListener, plugin);
-        LobbyListener lobbyListener = new LobbyListener(lobbyService, stateManager, guiSessions, ffaService);
+        lobbyListener = new LobbyListener(lobbyService, stateManager, guiSessions, ffaService);
         pm.registerEvents(lobbyListener, plugin);
         pm.registerEvents(new MotdListener(), plugin);
         com.rumilance.practice.world.WorldOptimizer worldOptimizer =
