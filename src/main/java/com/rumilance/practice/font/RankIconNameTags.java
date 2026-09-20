@@ -105,20 +105,11 @@ public final class RankIconNameTags {
     }
 
     /**
-     * Effective rank used for the badge (admin > VIP+ > VIP > PRO > NORM). PRO carries no
-     * permission, so it only surfaces through the stored rank.
+     * Rank badges are UUID-backed social state, not a side effect of the permission graph.
+     * In particular, {@code rumilance.admin} is normally inherited by every OP on a test
+     * server and must not make every player display the OWNER badge.
      */
     public static PlayerRank effectiveRank(RankService ranks, Player player) {
-        if (ranks.isAdmin(player)) {
-            return PlayerRank.ADMIN;
-        }
-        if (ranks.isVipPlusOrAbove(player)) {
-            return PlayerRank.VIP_PLUS;
-        }
-        if (ranks.isVipOrAbove(player)) {
-            return PlayerRank.VIP;
-        }
-        PlayerRank stored = ranks.get(player);
-        return stored == PlayerRank.PRO ? PlayerRank.PRO : PlayerRank.NORM;
+        return ranks.get(player);
     }
 }

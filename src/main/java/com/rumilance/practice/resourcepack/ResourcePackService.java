@@ -82,6 +82,8 @@ public final class ResourcePackService implements Listener {
     private final Map<UUID, Integer> failedAttempts = new ConcurrentHashMap<>();
     /** Per-player pack state: TRUE = our glyphs render on that client. Absent = unknown yet. */
     private final Map<UUID, Boolean> packApplied = new ConcurrentHashMap<>();
+    /** Request id most recently sent to each player; status events from another pack are ignored. */
+    private final Map<UUID, UUID> pendingRequests = new ConcurrentHashMap<>();
     /** Admin-GUI policy override ({@code pack-policy.yml}); null = use config.yml default. */
     private volatile Boolean requiredOverride;
 
@@ -102,6 +104,10 @@ public final class ResourcePackService implements Listener {
         this.request = buildRequest();
         ResourcePackRequest built = this.request;
         if (built == null) {
+            this.packId = null;
+            this.packApplied.clear();
+            this.pendingRequests.clear();
+            this.failedAttempts.clear();
             return;
         }
         for (Player online : Bukkit.getOnlinePlayers()) {
@@ -141,19 +147,18 @@ public final class ResourcePackService implements Listener {
     }
 
     /**
-     * Whether the player's client actually applied a resource pack (our glyphs render).
-     * Unknown state (fresh join, download in flight) falls back to the vanilla check, which
-     * is {@code false} until the pack finishes loading — viewers briefly see text badges.
+     * Whether the player's client actually applied this service's current resource pack (our
+     * glyphs render). Unknown state (fresh join or download in flight) is deliberately false;
+     * viewers use text badges until this request reports SUCCESSFULLY_LOADED.
      */
     public boolean hasPack(Player player) {
         if (player == null) {
             return false;
         }
-        Boolean known = packApplied.get(player.getUniqueId());
-        if (known != null) {
-            return known;
-        }
-        return player.hasResourcePack();
+        // Only SUCCESSFULLY_LOADED for this service's current request proves that our
+        // glyph font is present. Player#hasResourcePack can refer to another plugin's pack
+        // (or an old server.properties pack), which caused inconsistent per-viewer badges.
+        return Boolean.TRUE.equals(packApplied.get(player.getUniqueId()));
     }
 
     private File policyFile() {
@@ -200,24 +205,45 @@ public final class ResourcePackService implements Listener {
     /** Sends the pack to the player (no-op when disabled or misconfigured). */
     public void applyTo(Player player) {
         ResourcePackRequest toSend = this.request;
-        if (toSend == null || player == null || !player.isOnline()) {
+        UUID currentPackId = this.packId;
+        if (toSend == null || currentPackId == null || player == null || !player.isOnline()) {
             return;
         }
+        UUID playerId = player.getUniqueId();
+        pendingRequests.put(playerId, currentPackId);
+        // A new request is not applied until its own success event arrives. This prevents a
+        // stale failure/success from a previous URL or another plugin from changing the
+        // current viewer's fallback state.
+        packApplied.remove(playerId);
         try {
             player.sendResourcePacks(toSend);
         } catch (Throwable t) {
             // A broken send (odd client, plugin acting up mid-shutdown, ...) must never
-            // bubble up into the join/status handler that called us.
+            // bubble up into the join/status handler that called us. Mark it as failed and
+            // let the normal retry path try again for transient server-side errors.
+            packApplied.put(playerId, Boolean.FALSE);
             logger.log(Level.WARNING, "Failed to send the resource pack to " + player.getName(), t);
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (player.isOnline() && pendingRequests.get(playerId) == currentPackId) {
+                    applyTo(player);
+                }
+            }, RETRY_DELAY_TICKS);
         }
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onJoin(PlayerJoinEvent event) {
+        Player player = event.getPlayer();
+        UUID playerId = player.getUniqueId();
+        // A reconnect is a new client session. Do not reuse a SUCCESS state from the old
+        // connection, otherwise the first TAB refresh can show glyphs before this client has
+        // downloaded the pack.
+        failedAttempts.remove(playerId);
+        packApplied.remove(playerId);
+        pendingRequests.remove(playerId);
         if (this.request == null) {
             return;
         }
-        Player player = event.getPlayer();
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (player.isOnline()) {
                 applyTo(player);
@@ -227,8 +253,10 @@ public final class ResourcePackService implements Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        failedAttempts.remove(event.getPlayer().getUniqueId());
-        packApplied.remove(event.getPlayer().getUniqueId());
+        UUID playerId = event.getPlayer().getUniqueId();
+        failedAttempts.remove(playerId);
+        packApplied.remove(playerId);
+        pendingRequests.remove(playerId);
     }
 
     /**
@@ -244,12 +272,32 @@ public final class ResourcePackService implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPackStatus(PlayerResourcePackStatusEvent event) {
         Player player = event.getPlayer();
+        UUID playerId = player.getUniqueId();
         PlayerResourcePackStatusEvent.Status status = event.getStatus();
+        UUID expectedId = pendingRequests.get(playerId);
+        UUID statusId = event.getID();
         UUID ourId = this.packId;
+        // Paper normally supplies the request UUID. A few older client/protocol paths emit
+        // null, so accept null only while this player has an outstanding request. A concrete
+        // different UUID is definitely another pack and must not alter our state.
+        boolean belongsToOurRequest = expectedId != null
+                && (statusId == null || expectedId.equals(statusId));
+        if (!belongsToOurRequest) {
+            if (status == PlayerResourcePackStatusEvent.Status.SUCCESSFULLY_LOADED
+                    && this.request != null && ourId != null) {
+                // Another pack finished: re-pin ours, but never mark that other pack as ours.
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (player.isOnline()) {
+                        applyTo(player);
+                    }
+                });
+            }
+            return;
+        }
         if (status == PlayerResourcePackStatusEvent.Status.SUCCESSFULLY_LOADED) {
-            if (ourId != null && ourId.equals(event.getID())) {
-                failedAttempts.remove(player.getUniqueId());
-                packApplied.put(player.getUniqueId(), Boolean.TRUE);
+            if (ourId != null && expectedId.equals(ourId)) {
+                failedAttempts.remove(playerId);
+                packApplied.put(playerId, Boolean.TRUE);
             } else if (this.request != null && ourId != null) {
                 // Keep OUR pack pinned to the top of the client's Selected list: whenever some
                 // other pack (another plugin, a /pack command...) finishes applying, re-send
@@ -274,8 +322,9 @@ public final class ResourcePackService implements Listener {
         if (status != PlayerResourcePackStatusEvent.Status.DECLINED && !downloadFailure) {
             return;
         }
-        // The pack is already applied — any failure status is stale/duplicate noise.
-        if (player.hasResourcePack()) {
+        // The pack is already applied — any late failure status is stale/duplicate noise.
+        // Do not use Player#hasResourcePack here: it may describe another plugin's pack.
+        if (Boolean.TRUE.equals(packApplied.get(playerId))) {
             return;
         }
         if (downloadFailure) {

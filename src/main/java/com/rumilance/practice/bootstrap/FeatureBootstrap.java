@@ -676,20 +676,10 @@ public final class FeatureBootstrap {
                 resourcePackService;
         com.rumilance.practice.match.MatchTeamVisuals.setPrefixResolver((viewer, player, session) -> {
             net.kyori.adventure.text.Component prefix = net.kyori.adventure.text.Component.empty();
-            // Effective rank: stored rank or granted permissions (admin > VIP+ > VIP > PRO > NORM).
-            // PRO has no permission of its own — it only comes from the stored rank.
-            com.rumilance.practice.rank.PlayerRank effective;
-            if (rankServiceRef.isAdmin(player)) {
-                effective = com.rumilance.practice.rank.PlayerRank.ADMIN;
-            } else if (rankServiceRef.isVipPlusOrAbove(player)) {
-                effective = com.rumilance.practice.rank.PlayerRank.VIP_PLUS;
-            } else if (rankServiceRef.isVipOrAbove(player)) {
-                effective = com.rumilance.practice.rank.PlayerRank.VIP;
-            } else if (rankServiceRef.get(player) == com.rumilance.practice.rank.PlayerRank.PRO) {
-                effective = com.rumilance.practice.rank.PlayerRank.PRO;
-            } else {
-                effective = com.rumilance.practice.rank.PlayerRank.NORM;
-            }
+            // Badge identity is the UUID-backed stored rank. Permission nodes remain useful
+            // for feature access, but OP/admin inheritance must not turn every test operator
+            // into an OWNER badge.
+            com.rumilance.practice.rank.PlayerRank effective = rankServiceRef.get(player);
             // Glyphs only render on clients that applied the pack; pack-less viewers get the
             // text badges (N / N+ / OWNER) instead.
             net.kyori.adventure.text.Component rankIcon = iconFontService.rankIcon(effective,
