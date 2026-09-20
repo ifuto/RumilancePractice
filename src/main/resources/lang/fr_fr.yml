@@ -680,7 +680,7 @@ gui:
   kit-sub-button: "SUB KITS"
   kit-sub-button-lore: "Ouvre la liste des kits secondaires."
   kit-count-label: "Kits"
-  kit-button-hint: "S'ouvre 0,3s apres avoir appuye"
+  kit-button-hint: "S'ouvre 0,2s apres avoir appuye"
   kit-selected: "Sélectionné"
   kit-click-select: "Clic pour sélectionner"
   kit-edit-title: "Éditeur de kits"

@@ -64,7 +64,7 @@ public final class KitSelectGui extends AbstractGui {
 
     /**
      * Two-step picker. The first screen is only the two wooden category buttons (Main Kits /
-     * Sub Kits) — 木時差式ボタン: pressing one holds it on the cursor for 0.3s, then the release
+     * Sub Kits) — 木時差式ボタン: pressing one holds it on the cursor for 0.2s, then the release
      * click opens that category's kit list. The old layout crammed a header icon plus every
      * kit of both categories onto one screen, which nobody could read.
      */
@@ -146,7 +146,7 @@ public final class KitSelectGui extends AbstractGui {
 
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot, String action) {
-        // 木時差式ボタン already consumed the 0.3s press/release, so this runs on the release.
+        // 木時差式ボタン already consumed the 0.2s press/release, so this runs on the release.
         if (action != null && action.startsWith("cat:")) {
             session.setKitCategory(action.substring(4));
             session.setPage(0);

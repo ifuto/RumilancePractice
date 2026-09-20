@@ -1968,7 +1968,7 @@ public final class AfkCrystalManager implements Listener, CommandExecutor,
                 return;
             }
             // 木時差式ボタン: the tile is pressed onto the cursor, and the kit is applied when
-            // the button pops back 0.3s later — same feel as every other menu in the plugin.
+            // the button pops back 0.2s later — same feel as every other menu in the plugin.
             com.rumilance.practice.gui.DelayedButton.press(plugin, player, event.getCurrentItem(),
                     name, picked -> {
                         if (!player.isOnline()) {

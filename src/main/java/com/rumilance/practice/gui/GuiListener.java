@@ -315,7 +315,7 @@ public final class GuiListener implements Listener {
         }
         lastClickAt.put(player.getUniqueId(), now);
         // 木時差式ボタン: the click presses the button now (cursor grabs the tile, click-on
-        // sound) and the real action runs 0.3s later with the click-off sound. Menus opt in
+        // sound) and the real action runs 0.2s later with the click-off sound. Menus opt in
         // with the "delay:" action prefix and never see the timing themselves.
         if (DelayedButton.isDelayed(guiAction)) {
             DelayedButton.press(plugin(), player, event.getCurrentItem(),

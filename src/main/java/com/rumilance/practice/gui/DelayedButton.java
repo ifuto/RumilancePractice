@@ -17,7 +17,7 @@ import java.util.function.Consumer;
  *
  * <p>A click does not fire the action immediately. It <em>presses</em> the button: the wooden
  * click-on sound plays and the tile jumps onto the player's cursor, as if they had picked it
- * up. {@link #PRESS_TICKS} later (0.3s) the button pops back with the click-off sound, the
+ * up. {@link #PRESS_TICKS} later (0.2s) the button pops back with the click-off sound, the
  * cursor is emptied and only then does the real action run — a category list opens, a setting
  * flips, a sub-screen appears. It makes every menu navigation feel like operating a real
  * switch instead of teleporting between screens.</p>
@@ -31,11 +31,16 @@ public final class DelayedButton {
 
     /** Action prefix marking a tile as a delayed button. */
     public static final String PREFIX = "delay:";
-    /** 0.3 seconds at 20 TPS — the requested press/release gap. */
-    public static final long PRESS_TICKS = 6L;
+    /** 0.2 seconds at 20 TPS — the requested press/release gap. */
+    public static final long PRESS_TICKS = 4L;
     /** Sound of a wooden button going down / coming back up. */
     private static final Sound PRESS = Sound.BLOCK_WOODEN_BUTTON_CLICK_ON;
     private static final Sound RELEASE = Sound.BLOCK_WOODEN_BUTTON_CLICK_OFF;
+    /** Volume of both clicks. */
+    private static final float VOLUME = 0.8f;
+    /** Pressing sounds sharper (1.35); the release is the plain vanilla pitch (1.0). */
+    private static final float PRESS_PITCH = 1.35f;
+    private static final float RELEASE_PITCH = 1.0f;
 
     /** Players with a button currently held down, so a second press cannot re-trigger it. */
     private static final Map<UUID, Long> PRESSED_AT = new ConcurrentHashMap<>();
@@ -94,7 +99,7 @@ public final class DelayedButton {
             // A missing cursor (spectator edge, another plugin) must not kill the action.
         }
         try {
-            player.playSound(player.getLocation(), PRESS, 0.8f, 1.0f);
+            player.playSound(player.getLocation(), PRESS, VOLUME, PRESS_PITCH);
         } catch (Throwable ignored) {
         }
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
@@ -104,7 +109,7 @@ public final class DelayedButton {
             }
             try {
                 player.setItemOnCursor(null);
-                player.playSound(player.getLocation(), RELEASE, 0.8f, 1.0f);
+                player.playSound(player.getLocation(), RELEASE, VOLUME, RELEASE_PITCH);
             } catch (Throwable ignored) {
             }
             onComplete.accept(action);

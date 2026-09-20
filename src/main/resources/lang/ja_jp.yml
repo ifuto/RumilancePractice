@@ -681,7 +681,7 @@ gui:
   kit-sub-button: "SUB KITS"
   kit-sub-button-lore: "サブキットの一覧を開きます。"
   kit-count-label: "キット数"
-  kit-button-hint: "押すと0.3秒後に開きます"
+  kit-button-hint: "押すと0.2秒後に開きます"
   kit-selected: "選択中"
   kit-click-select: "クリックで選択"
   kit-edit-title: "キット編集"

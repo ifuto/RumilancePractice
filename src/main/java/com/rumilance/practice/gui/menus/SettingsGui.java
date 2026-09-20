@@ -174,7 +174,7 @@ public final class SettingsGui extends AbstractGui {
                         UiTheme.hint(line(player, "gui.toggle-hint"))
                 )
                 .glint(enabled)
-                // 木時差式ボタン: the switch clicks down, and 0.3s later it pops back with the
+                // 木時差式ボタン: the switch clicks down, and 0.2s later it pops back with the
                 // new state — an ON/OFF you can feel instead of an instant repaint.
                 .action(com.rumilance.practice.gui.DelayedButton.wrap("toggle:" + key))
                 .build();

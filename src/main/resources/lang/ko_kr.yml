@@ -680,7 +680,7 @@ gui:
   kit-sub-button: "SUB KITS"
   kit-sub-button-lore: "서브 킷 목록을 엽니다."
   kit-count-label: "킷 수"
-  kit-button-hint: "누르고 0.3초 뒤에 열립니다"
+  kit-button-hint: "누르고 0.2초 뒤에 열립니다"
   kit-selected: "Selected"
   kit-click-select: "Click to select"
   kit-edit-title: "Kit Editor"
