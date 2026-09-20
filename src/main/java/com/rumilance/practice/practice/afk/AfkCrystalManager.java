@@ -100,8 +100,6 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
     private static final double BOT_MAX_HEALTH = 20.0d;  // vanilla HP at every difficulty
     private static final long BOT_AIRBORNE_GRACE_MS = 1_200L; // knock arcs settle inside this
     private static final int SHIELD_USE_TICKS = 72_000;       // keep the client-side block animation active
-    private static final double SHIELD_BREAK_KB = 0.42d;       // explicit axe-break impulse for Mannequin
-    private static final double SHIELD_BREAK_KB_Y = 0.28d;
     private static final double TOTEM_POP_KB = 0.4d;         // vanilla melee knockback on the pop hit
     private static final double TOTEM_POP_KB_Y = 0.36d;      // vanilla melee knockback Y
     private static final double WIND_BURST_KB = 1.6d;        // wind-charge style shove on the pop hit
@@ -842,12 +840,12 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
         // breaks). The event frame itself was already zeroed by the block, so re-register
         // the raw amount through the damage pipeline (armor + i-frames apply; a lethal
         // follow-up routes through the normal totem logic).
-        if (fromFront && s.shieldOn && !s.shieldDown && isPlayerAxeHit(event, s)) {
+        boolean shieldBreakHit = fromFront && s.shieldOn && !s.shieldDown
+                && isPlayerAxeHit(event, s);
+        if (shieldBreakHit) {
             breakBotShield(player, s);
-            // Mannequin damage does not reliably emit the vanilla player knockback packet
-            // on the same frame as an axe shield break. Queue an explicit impulse after the
-            // damage event so the disabling hit visibly pushes the BOT away.
-            queueShieldBreakKnockback(s, event);
+            // The axe strike disables the shield but does not add a special knockback impulse.
+            // The shield break itself is the only effect of the disabling hit here.
             double owed = event.getDamage();
             if (owed > 0.0d) {
                 bot.damage(owed, player);
@@ -883,7 +881,9 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
         Location at = bot.getLocation().clone();
         respawnBot(s, at);
         totemPop(s);
-        applyPopKnockback(s.bot, event);
+        if (!shieldBreakHit) {
+            applyPopKnockback(s.bot, event);
+        }
     }
 
     /** Re-creates the bot at {@code at} with the same armor/hands/profile, HP 1. */
@@ -1059,39 +1059,6 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
         w.playSound(s.bot.getLocation(), Sound.ITEM_SHIELD_BREAK, 1.0f, 0.9f);
         w.spawnParticle(Particle.CRIT, s.bot.getLocation().add(0, 1.2, 0), 20, 0.3, 0.4, 0.3, 0.05);
         msg(player, "shield-broken", msgTags("seconds", String.valueOf(s.shieldReturnSeconds)));
-    }
-
-    /**
-     * Applies the displacement that a real player gets from the axe strike which breaks a
-     * shield. The Mannequin's damage callback can consume the event without producing the
-     * client-visible impulse, so this runs one tick later, after damage/iframes have settled.
-     */
-    private void queueShieldBreakKnockback(AfkSession s, EntityDamageEvent event) {
-        if (!(event instanceof EntityDamageByEntityEvent by)
-                || !(by.getDamager() instanceof Player attacker)) {
-            return;
-        }
-        Mannequin victim = s.bot;
-        if (victim == null || !victim.isValid()) {
-            return;
-        }
-        Vector away = victim.getLocation().toVector()
-                .subtract(attacker.getLocation().toVector()).setY(0);
-        if (away.lengthSquared() < 1.0e-4d) {
-            away = victim.getLocation().getDirection().setY(0).multiply(-1.0d);
-        }
-        if (away.lengthSquared() < 1.0e-4d) {
-            return;
-        }
-        Vector impulse = away.normalize().multiply(SHIELD_BREAK_KB);
-        Bukkit.getScheduler().runTask(plugin, () -> {
-            if (s.bot != victim || !victim.isValid() || !s.shieldDown) {
-                return;
-            }
-            Vector current = victim.getVelocity();
-            victim.setVelocity(new Vector(impulse.getX(),
-                    Math.max(current.getY(), SHIELD_BREAK_KB_Y), impulse.getZ()));
-        });
     }
 
     /**
