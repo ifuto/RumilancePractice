@@ -639,6 +639,8 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
         // session's current Mannequin, and assigning it afterwards left the first spawn with
         // no off-hand item and no shield animation at all.
         s.bot = bot;
+        s.shieldDown = false;
+        s.shieldDownUntilMs = 0L;
         try {
             bot.setCustomNameVisible(true);
             bot.setGlowing(true);
@@ -654,8 +656,6 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
         } catch (Throwable ignored) {
         }
         s.airborneSinceMs = 0L;
-        s.shieldDown = false;
-        s.shieldDownUntilMs = 0L;
         s.lastBotHurtMs = System.currentTimeMillis();
         updateName(s);
     }
