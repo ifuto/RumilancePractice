@@ -24,7 +24,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ThreadLocalRandom;
 
-/** Admin entry point and settings menu for the generated smooth terrain test arena. */
+/** Admin entry point and settings menu for the generated smooth terrain test map.
+ *
+ * <p>This command only builds/removes a temporary map. It does not register an arena template;
+ * maps created with {@code /arena draft} remain valid and are selected independently.</p>
+ */
 public final class TestArenaCommand implements CommandExecutor, TabCompleter, Listener {
 
     private static final int GRASS_SLOT = 10;
@@ -49,7 +53,7 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command,
                              @NotNull String label, @NotNull String[] args) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage("Players only: run /testarena spawn in the test world.");
+            sender.sendMessage("Players only: run /testarena spawn to create a temporary test map.");
             return true;
         }
         if (args.length == 0) {
@@ -60,7 +64,7 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
         String sub = args[0].toLowerCase(Locale.ROOT);
         if (sub.equals("cancel")) {
             generator.cancel(player.getUniqueId());
-            player.sendMessage(Component.text("Test arena operation cancelled.", NamedTextColor.YELLOW));
+            player.sendMessage(Component.text("Test map operation cancelled.", NamedTextColor.YELLOW));
             return true;
         }
         if (sub.equals("delete")) {
@@ -93,12 +97,12 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
     private void start(Player player, SmoothTerrainGenerator.TerrainSettings settings) {
         if (generator.isRunning(player.getUniqueId())) {
             player.sendMessage(Component.text(
-                    "A test arena operation is already running for you.", NamedTextColor.YELLOW));
+                    "A test map operation is already running for you.", NamedTextColor.YELLOW));
             return;
         }
         if (generator.hasPreviousMap()) {
             player.sendMessage(Component.text(
-                    "Delete the previous test arena first: /testarena delete", NamedTextColor.YELLOW));
+                    "Delete the previous test map first: /testarena delete", NamedTextColor.YELLOW));
             return;
         }
         long seed = ThreadLocalRandom.current().nextLong();
@@ -111,7 +115,7 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
                         + ". Block placement is batched to protect TPS...",
                 NamedTextColor.AQUA));
         generator.generate(player, settings, seed, result -> player.sendMessage(Component.text(
-                "Test arena ready: " + result.map().displayName() + ", " + result.width() + "x"
+                "Test map ready: " + result.map().displayName() + ", " + result.width() + "x"
                         + result.width() + ", " + foundation + " + bedrock, height " + result.minimumHeight() + ".."
                         + result.maximumHeight() + " (range " + result.heightRange() + "), seed "
                         + result.seed() + ". Use /testarena delete when finished.",
@@ -122,22 +126,22 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
     private void delete(Player player) {
         if (generator.isRunning(player.getUniqueId())) {
             player.sendMessage(Component.text(
-                    "Wait for the current test arena operation to finish.", NamedTextColor.YELLOW));
+                    "Wait for the current test map operation to finish.", NamedTextColor.YELLOW));
             return;
         }
         player.sendMessage(Component.text(
-                "Deleting the previous test arena, including its underground foundation and bedrock, in low-lag batches...",
+                "Deleting the previous test map, including its underground foundation and bedrock, in low-lag batches...",
                 NamedTextColor.AQUA));
         generator.delete(player,
                 columns -> player.sendMessage(Component.text(
-                        "Deleted the previous test arena (" + columns + " columns).", NamedTextColor.GREEN)),
+                        "Deleted the previous test map (" + columns + " columns).", NamedTextColor.GREEN)),
                 error -> player.sendMessage(Component.text(error, NamedTextColor.RED)));
     }
 
     private void openMapMenu(Player player) {
         if (generator.hasPreviousMap()) {
             player.sendMessage(Component.text(
-                    "Delete the previous test arena first: /testarena delete", NamedTextColor.YELLOW));
+                    "Delete the previous test map first: /testarena delete", NamedTextColor.YELLOW));
             return;
         }
         MapMenuHolder holder = new MapMenuHolder();
@@ -189,7 +193,7 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
                 selected(holder.maxHeightDelta == 4, "Max height difference: 4"),
                 "Maximum smooth variation"));
 
-        inventory.setItem(START_SLOT, item(Material.EMERALD_BLOCK, "Generate test arena",
+        inventory.setItem(START_SLOT, item(Material.EMERALD_BLOCK, "Generate test map",
                 "Click to create the selected 100 x 100 map"));
         inventory.setItem(53, item(Material.BARRIER, "Close", "No map will be created."));
     }

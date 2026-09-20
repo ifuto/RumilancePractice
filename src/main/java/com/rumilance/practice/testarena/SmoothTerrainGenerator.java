@@ -662,14 +662,17 @@ public final class SmoothTerrainGenerator {
             for (int x = 0; x < gridSize; x++) {
                 for (int z = 0; z < gridSize; z++) {
                     if (shape == TerrainShape.CENTER_LOW) {
-                        // A shallow bowl: the centre gets a little random variation while the
-                        // outer edge gets a radial lift. The envelope remains user-configurable.
+                        // Use a broad smooth-step depression rather than a pointed dish with a
+                        // visible circular rim. A tiny low-frequency perturbation keeps the
+                        // terrain natural while the centre remains clearly lower than the edge.
                         double nx = positions[x] / (double) (width - 1) * 2.0d - 1.0d;
                         double nz = positions[z] / (double) (width - 1) * 2.0d - 1.0d;
                         double distance = Math.min(1.0d, Math.sqrt(nx * nx + nz * nz) / Math.sqrt(2.0d));
-                        values[x][z] = Math.min(maxHeightDelta,
-                                (maxHeightDelta == 0 ? 0 : random.nextInt(Math.min(2, maxHeightDelta + 1)))
-                                        + (int) Math.round(distance * maxHeightDelta));
+                        double smoothDistance = distance * distance * (3.0d - 2.0d * distance);
+                        double variation = maxHeightDelta < 2 ? 0.0d
+                                : (random.nextDouble() - 0.5d) * Math.min(0.8d, maxHeightDelta * 0.2d);
+                        values[x][z] = Math.max(0, Math.min(maxHeightDelta,
+                                (int) Math.round(smoothDistance * maxHeightDelta + variation)));
                     } else {
                         values[x][z] = random.nextInt(maxHeightDelta + 1);
                     }
@@ -713,7 +716,7 @@ public final class SmoothTerrainGenerator {
             }
             // Rounding a smooth curve can still make a two-block jump where two axes meet.
             // A few directional relaxation passes produce an integer 1-Lipschitz surface while
-            // retaining the 0..4 envelope. This is pure data work and runs off-thread.
+            // retaining the selected envelope. This is pure data work and runs off-thread.
             for (int pass = 0; pass < width; pass++) {
                 for (int x = 1; x < width; x++) {
                     for (int z = 0; z < width; z++) {

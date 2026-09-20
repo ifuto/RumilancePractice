@@ -160,11 +160,14 @@ advancements:
   # recipe unlocks, or any advancement that carries rewards.
   block-vanilla: false
 
+# /testarena is only a temporary map builder; it does not replace or register /arena draft
+# templates. Existing maps made with /arena draft continue to work normally.
+#
 # Disposable arena copies (requires FAWE/WorldEdit): every match pastes a fresh copy of the
-# arena template at a random, chunk-aligned spot that never overlaps another live copy or any
-# template's own build, and deletes the copy when the match ends. Allows unlimited concurrent
-# matches per template. Set disposable-copies to false to revert to the old in-place mode
-# (one match per template, regenerated between matches).
+# selected arena template at a random, chunk-aligned spot that never overlaps another live copy
+# or any template's own build, and deletes the copy when the match ends. Set disposable-copies
+# to false to turn automatic arena-copy generation OFF and use the existing map in place
+# instead. In that mode, match.regenerate-arena=false also disables automatic FAWE restoration.
 arena:
   disposable-copies: true
   # Copies are placed within +/- this many blocks of the placement centre (min 256).
