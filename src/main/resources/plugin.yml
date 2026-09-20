@@ -18,9 +18,13 @@ softdepend:
 
 commands:
   afkpractice:
-    description: AFK practice — endless duel vs the totem bot.
-    usage: /afkpractice [start|stop|kit|top]
+    description: AFK practice — alias of /afkcrystal (the old totem-bot room is gone).
+    usage: /afkpractice [start|stop|kit|settings|reset]
     aliases: [afkp]
+    permission: rumilance.user
+  afk:
+    description: AFK practice — alias of /afkcrystal.
+    usage: /afk [start|stop|kit|settings|reset]
     permission: rumilance.user
   afkcrystal:
     description: AFK BOT Crystal — armored totem bot on a 100x100 netherite floor.

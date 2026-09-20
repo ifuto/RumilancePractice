@@ -259,7 +259,6 @@ public final class FeatureBootstrap {
     private MatchActionRecorder matchActionRecorder;
     private ReplayService replayService;
     private PracticeService practiceService;
-    private com.rumilance.practice.practice.afk.AfkPracticeManager afkPracticeManager;
     private com.rumilance.practice.practice.afk.AfkCrystalManager afkCrystalManager;
     private TeamGlowLosService teamGlowLosService;
 
@@ -514,20 +513,18 @@ public final class FeatureBootstrap {
         practiceService.start();
         services.register(PracticeService.class, practiceService);
 
-        afkPracticeManager = new com.rumilance.practice.practice.afk.AfkPracticeManager(
-                plugin, configService, services.get(MessageService.class));
-        afkPracticeManager.start();
-        services.register(com.rumilance.practice.practice.afk.AfkPracticeManager.class, afkPracticeManager);
-        bind("afkpractice", afkPracticeManager);
-
         afkCrystalManager = new com.rumilance.practice.practice.afk.AfkCrystalManager(
                 plugin, configService, services.get(MessageService.class));
         afkCrystalManager.start();
         services.register(com.rumilance.practice.practice.afk.AfkCrystalManager.class, afkCrystalManager);
         bind("afkcrystal", afkCrystalManager);
-        // The two AFK rooms are mutually exclusive per player.
-        afkPracticeManager.setOtherSessionGuard(afkCrystalManager::hasSession);
-        afkCrystalManager.setOtherSessionGuard(afkPracticeManager::hasSession);
+        // /afkpractice (/afkp) and /afk are plain aliases now: the old 9x9 totem-bot room is
+        // gone, every AFK entry point opens the AFK BOT Crystal room.
+        bind("afkpractice", afkCrystalManager);
+        bind("afk", afkCrystalManager);
+        // Private rooms: while a session runs, block and player packets outside the player's own
+        // footprint are dropped (ProtocolLib soft-depend; hidePlayer stays as the Bukkit layer).
+        com.rumilance.practice.practice.afk.AfkRoomIsolation.register(plugin, afkCrystalManager);
         afkCrystalManager.setKitService(kitService);
         // /hub / /lobby during an AFK BOT Crystal session must really end it: hand the
         // manager LobbyService's full lobby return (state reset + spawn teleport).
@@ -541,10 +538,8 @@ public final class FeatureBootstrap {
                     || !(st == PlayerState.LOBBY || st == PlayerState.OPENING_GUI
                     || st == PlayerState.IDLE);
         };
-        java.util.function.Predicate<java.util.UUID> inAfkSession =
-                id -> afkCrystalManager.hasSession(id) || afkPracticeManager.hasSession(id);
+        java.util.function.Predicate<java.util.UUID> inAfkSession = afkCrystalManager::hasSession;
         afkCrystalManager.setEntryGuard(busyElsewhere);
-        afkPracticeManager.setEntryGuard(busyElsewhere);
         ffaService.setSessionGuard(inAfkSession);
 
 
@@ -1391,7 +1386,14 @@ public final class FeatureBootstrap {
                 layoutCache, settingsService, asyncExecutor, plugin, messageService, rankService, chatBanService);
         sessionBootstrapListener.setLanguagePicker(localeSelectGui::open);
         pm.registerEvents(sessionBootstrapListener, plugin);
-        pm.registerEvents(new LobbyListener(lobbyService, stateManager, guiSessions, ffaService), plugin);
+        LobbyListener lobbyListener =
+                new LobbyListener(lobbyService, stateManager, guiSessions, ffaService);
+        // AFK rooms own their rules. They never leave the lobby PlayerState, so without this the
+        // lobby protection cancelled their block place/break — escapable only through
+        // rumilance.lobby.bypass, i.e. OP (the reported "OPもってないと/afkcでブロック置けない") —
+        // and cancelled their damage, so the bot could never hit back.
+        lobbyListener.setAfkExempt(afkCrystalManager::hasSession);
+        pm.registerEvents(lobbyListener, plugin);
         pm.registerEvents(new MotdListener(), plugin);
         com.rumilance.practice.world.WorldOptimizer worldOptimizer =
                 new com.rumilance.practice.world.WorldOptimizer(plugin);
@@ -1421,7 +1423,11 @@ public final class FeatureBootstrap {
         // ffacommand, FFA occupants may only run the whitelisted commands and only while
         // not combat-tagged. See FfaCommandGateListener / FfaService.
         pm.registerEvents(new com.rumilance.practice.ffa.FfaCommandGateListener(ffaService), plugin);
-        pm.registerEvents(new ItemFlowGuardListener(stateManager, ffaService), plugin);
+        ItemFlowGuardListener itemFlowGuardListener =
+                new ItemFlowGuardListener(stateManager, ffaService);
+        // AFK rooms are a sandbox: dropping and collecting items is part of building there.
+        itemFlowGuardListener.setAfkExempt(afkCrystalManager::hasSession);
+        pm.registerEvents(itemFlowGuardListener, plugin);
         pm.registerEvents(ffaSpawnIndex, plugin);
         pm.registerEvents(new InstantExpCollectListener(), plugin);
         PracticeTntListener practiceTntListener =
@@ -1569,8 +1575,7 @@ public final class FeatureBootstrap {
         pm.registerEvents(new BedrockJoinListener(plugin), plugin);
         SmithingTrimListener smithingTrimListener =
                 new SmithingTrimListener(rankService, smithingTrimGui, stateManager, messageService);
-        smithingTrimListener.setAfkBlocked(id ->
-                afkCrystalManager.hasSession(id) || afkPracticeManager.hasSession(id));
+        smithingTrimListener.setAfkBlocked(afkCrystalManager::hasSession);
         pm.registerEvents(smithingTrimListener, plugin);
 
         LunarRichPresenceService lunarRichPresence = new LunarRichPresenceService(plugin, stateManager);
@@ -1830,9 +1835,6 @@ public final class FeatureBootstrap {
         if (this.quantum != null) {
             this.quantum.disable();
             this.quantum = null;
-        }
-        if (afkPracticeManager != null) {
-            afkPracticeManager.shutdown();
         }
         if (afkCrystalManager != null) {
             afkCrystalManager.shutdown();

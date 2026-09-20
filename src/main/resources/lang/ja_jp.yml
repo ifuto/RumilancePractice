@@ -1164,7 +1164,6 @@ gui:
   bot-map-label: "マップ"
   bot-map-default: "最初の空き部屋"
 
-
 lb:
   kill-title: "<gold><b>月間キルランキング</b></gold>"
   streak-title: "<gold><b>年間最大連勝ランキング</b></gold>"
@@ -1302,30 +1301,8 @@ tier:
   bands-title: "<gold>ティア・ラダー（各キットのランク戦プレイヤー上位%）:"
   hint: "<gray>ティアはキット別・対人戦成績（そのキットのランクELO）で決定。順位は HT1>LT1>HT2>…>LT5、HT1 = 上位0.1%。"
 
-# --- AFK practice ---
-afk:
-  busy: "<gold>[AFK練習]</gold> <red>試合・FFA・戦闘中は入れません。先に /hub で抜けてください。</red>"
-  welcome: "<gold>[AFK練習]</gold> <yellow>9x9ネザライト床・中央ボタンの部屋へようこそ。</yellow><newline><gray>床のボタン(またはスロット9のボタン)でキットメニュー。メニューを開く度に12個のアイテムがランダム補充されます。</gray><newline><gray>キットに無いトーテムは再装備で0になります。床は24時間毎に再生成されます。</gray>"
-  already: "<gold>[AFK練習]</gold> <red>すでにAFK練習中です。/afkpractice stop で終了できます。</red>"
-  crystal-busy: "<gold>[AFK練習]</gold> <red>AFK BOT Crystalの部屋にいます。先に /afkcrystal stop を実行してください。</red>"
-  stopped: "<gold>[AFK練習]</gold> <yellow>AFK練習を終了しました。</yellow>"
-  not-in-session: "<gold>[AFK練習]</gold> <red>AFK練習を開始していません。/afkpractice start</red>"
-  usage: "<gold>[AFK練習]</gold> <yellow>/afkpractice [start|stop|kit|top]</yellow>"
-  boundary: "<gold>[AFK練習]</gold> <red>キューブの外には出られません。中央へ戻ります。</red>"
-  protected: "<gold>[AFK練習]</gold> <red>ネザライト床・ボタン・墓標ビーコンは破壊できません。</red>"
-  kit-saved: "<gold>[AFK練習]</gold> <green>キットを保存して装備しました。</green>"
-  prototype-saved: "<gold>[AFK練習]</gold> <light_purple>サーバー既定キット(プロトタイプ)を保存しました。</light_purple>"
-  prototype-loaded: "<gold>[AFK練習]</gold> <aqua>既定キットを読み込みました。</aqua>"
-  bot-failed: "<gold>[AFK練習]</gold> <red>BOTの出現に失敗しました。</red>"
-  bot-killed: "<gold>[AFK練習]</gold> <green>BOTを倒しました! <gray>(通算キル: <kills>)</gray></green>"
-  you-died: "<gold>[AFK練習]</gold> <red>死亡…墓標ビーコンが増えました <gray>(通算デス: <deaths>)</gray></red>"
-  inactive-death: "<gold>[AFK練習]</gold> <dark_red>10分間ダメージのやり取りが無かったため、切断と同様に死亡判定となりました。</dark_red>"
-  top-header: "<gold>--- AFK練習 キル数トップ ---</gold>"
-  top-row: "<yellow><player></yellow> <gray>キル:</gray><green><kills></green> <gray>デス:</gray><red><deaths></red>"
-  top-self: "<gray>あなた: キル </gray><green><kills></green><gray> / デス </gray><red><deaths></red>"
-
 afkcrystal:
-  block-limit: "<gold>[AFK BOT Crystal]</gold> <red>ブロック上限(30)に達しました。ボタンでリセットしてください。</red>"
+  build-limit: "<gold>[AFK BOT Crystal]</gold> <red>ブロックを置けるのは床から <max> ブロックの高さまでです(移動の制限はありません)。</red>"
   busy: "<gold>[AFK BOT Crystal]</gold> <red>試合・FFA・戦闘中は入れません。先に /hub で抜けてください。</red>"
   kit-selected: "<gold>[AFK BOT Crystal]</gold> <green><kit> を装備しました。BOT戦を開始します。</green>"
   bound-added: "<gold>[AFK BOT Crystal]</gold> <green>キット <kit> を紐づけました <gray>(<count>/<max>)</gray></green>"
@@ -1339,13 +1316,12 @@ afkcrystal:
   bound-list: "<gold>[AFK BOT Crystal]</gold> <yellow>紐づけキット(<count>/<max>): </yellow><white><list></white>"
   bindkit-usage: "<gold>[AFK BOT Crystal]</gold> <yellow>/afkcrystal bindkit <kit|list|clear> / /afkcrystal unbindkit <kit|all></yellow>"
   no-admin: "<gold>[AFK BOT Crystal]</gold> <red>この操作には管理者権限が必要です。</red>"
-  welcome: "<gold>[AFK BOT Crystal]</gold> <yellow>あなた専用の100x100ネザライト床クリスタル練習部屋へようこそ(装備一式を配りました)。</yellow><newline><gray>スポーン中央のボタンで「キット再装填+BOT初期化+アリーナ復元」。キットは <yellow>/afkc kit</yellow>、設定(盾ON/OFF・盾復帰2秒/5秒)は <yellow>/afkc settings</yellow>。ホットバーに専用スロットはありません(物が消えません)。</gray><newline><gray>床とボタンは破壊できません。それ以外は設置/破壊し放題。落下ダメージ・クリスタル自傷は本物。/afkc stop または /hub で中断。</gray>"
+  welcome: "<gold>[AFK BOT Crystal]</gold> <yellow>あなた専用の100x100ネザライト床クリスタル練習部屋へようこそ(装備一式を配りました)。</yellow><newline><gray>スポーン中央のボタンで「キット再装填+BOT初期化+アリーナ復元」。キットは <yellow>/afkc kit</yellow>、設定(盾ON/OFF・盾復帰2秒/5秒)は <yellow>/afkc settings</yellow>。ホットバーに専用スロットはありません(物が消えません)。</gray><newline><gray>床とボタンは破壊できません。それ以外は設置/破壊し放題(設置は床から30ブロックまで・移動制限なし)。落下ダメージ・クリスタル自傷は本物。他の人の部屋は見えません。/afkc stop または /hub で中断。</gray>"
   already: "<gold>[AFK BOT Crystal]</gold> <red>すでに部屋にいます。/afkcrystal stop で終了できます。</red>"
-  other-session: "<gold>[AFK BOT Crystal]</gold> <red>通常AFK練習(/afk)中です。先に /afkpractice stop を実行してください。</red>"
   stopped: "<gold>[AFK BOT Crystal]</gold> <yellow>AFK BOT Crystalを終了しました。</yellow>"
   not-in-session: "<gold>[AFK BOT Crystal]</gold> <red>部屋に入っていません。/afkcrystal start</red>"
   usage: "<gold>[AFK BOT Crystal]</gold> <yellow>/afkcrystal [start|stop|kit|settings|reset]</yellow>"
-  boundary: "<gold>[AFK BOT Crystal]</gold> <red>床の外には出られません。スポーンへ戻ります。</red>"
+  boundary: "<gold>[AFK BOT Crystal]</gold> <red>自分の部屋の外にはブロックを置けません。</red>"
   protected: "<gold>[AFK BOT Crystal]</gold> <red>ネザライト床とボタンは破壊できません。</red>"
   kit-saved: "<gold>[AFK BOT Crystal]</gold> <green>キットを保存して装備しました。</green>"
   prototype-saved: "<gold>[AFK BOT Crystal]</gold> <light_purple>サーバー既定キット(プロトタイプ)を保存しました。</light_purple>"

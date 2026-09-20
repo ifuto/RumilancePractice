@@ -48,8 +48,8 @@ cd RumilancePractice
 | `/setting` `/stats` `/profile` `/ranking` | 設定・統計・ランキング |
 | `/ekit` | キット選択 → 公式キット編集 / オリジナルキット編集（OrPlusGUI） |
 | `/ekitadmin` | オリジナルキットのカテゴリアイテム管理（チェスト式GUI・管理者） |
-| `/afkpractice` `/afk` | AFK練習 — トーテムBOTと9x9ネザライト床の部屋で無限デュエル |
-| `/afkcrystal` `/afkc` | **AFK BOT Crystal** — フル装備BOT（頭/胸Pro4・脚/靴Blast Pro最大・全耐久無限・火炎耐性）と100x100ネザライト床のクリスタル練習部屋。スポーン中央ボタンでキット再装填+BOT初期化。設定でオフハンド盾ON/OFF・盾復帰2秒/5秒を選択。`/afkcrystal bindkit` で運営がキットを最大5個まで紐づけでき、紐づけ時は選択したキット(試合と同じ適用)でBOT戦・rekit |
+| `/afkpractice` `/afkp` `/afk` | AFK練習 — **すべて `/afkc` の別名**(旧9x9トーテムBOT部屋は廃止) |
+| `/afkcrystal` `/afkc` | **AFK BOT Crystal** — フル装備BOT（頭/胸Pro4・脚/靴Blast Pro最大・全耐久無限・火炎耐性）と100x100ネザライト床のクリスタル練習部屋。スポーン中央ボタンでキット再装填+BOT初期化。設置は床から30ブロックまで(移動制限なし)、自分の部屋以外はパケット遮断で見えない。設定でオフハンド盾ON/OFF・盾復帰2秒/5秒を選択。`/afkcrystal bindkit` で運営がキットを最大5個まで紐づけでき、紐づけ時は選択したキット(試合と同じ適用)でBOT戦・rekit |
 
 ## 重要仕様
 

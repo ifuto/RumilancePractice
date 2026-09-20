@@ -36,10 +36,24 @@ public final class ItemFlowGuardListener implements Listener {
 
     private final PlayerStateManager stateManager;
     private final FfaService ffaService;
+    private java.util.function.Predicate<java.util.UUID> afkExempt;
 
     public ItemFlowGuardListener(PlayerStateManager stateManager, FfaService ffaService) {
         this.stateManager = stateManager;
         this.ffaService = ffaService;
+    }
+
+    /**
+     * AFK rooms are a sandbox: blocks are broken and re-placed all session, so the loose-item
+     * rule for lobby states (which blocks drop AND pickup) must not apply there — otherwise
+     * every broken block left an unreachable drop on the floor.
+     */
+    public void setAfkExempt(java.util.function.Predicate<java.util.UUID> afkExempt) {
+        this.afkExempt = afkExempt;
+    }
+
+    private boolean inAfkRoom(java.util.UUID id) {
+        return afkExempt != null && afkExempt.test(id);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -126,6 +140,9 @@ public final class ItemFlowGuardListener implements Listener {
         if (ffaService != null && ffaService.isInFfa(player.getUniqueId())) {
             return;
         }
+        if (inAfkRoom(player.getUniqueId())) {
+            return; // AFK rooms: free item flow, see setAfkExempt
+        }
         if (PracticeGuards.looseItemMoveBlocked(state(player))) {
             event.setCancelled(true);
         }
@@ -139,6 +156,9 @@ public final class ItemFlowGuardListener implements Listener {
         if (ffaService != null && ffaService.isInFfa(player.getUniqueId())) {
             // FFA listeners own pickup policy (kit drops must be collectable).
             return;
+        }
+        if (inAfkRoom(player.getUniqueId())) {
+            return; // AFK rooms: broken blocks must be collectable
         }
         if (PracticeGuards.looseItemMoveBlocked(state(player))) {
             event.setCancelled(true);

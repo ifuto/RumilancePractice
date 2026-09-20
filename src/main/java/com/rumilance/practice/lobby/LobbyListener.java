@@ -24,6 +24,7 @@ public final class LobbyListener implements Listener {
     private final PlayerStateManager stateManager;
     private final GuiSessionRegistry guiSessions;
     private final FfaService ffaService;
+    private java.util.function.Predicate<java.util.UUID> afkExempt;
 
     public LobbyListener(LobbyService lobbyService, PlayerStateManager stateManager,
                          GuiSessionRegistry guiSessions, FfaService ffaService) {
@@ -33,10 +34,24 @@ public final class LobbyListener implements Listener {
         this.ffaService = ffaService;
     }
 
+    /**
+     * Players inside a private AFK room own their rules. They keep their lobby state (the AFK
+     * managers never touch {@link PlayerState}), so without this exemption the lobby protection
+     * swallowed their block place/break — which only OPs could dodge through
+     * {@code rumilance.lobby.bypass} (the reported "OPもってないと/afkcでブロック置けない") — and
+     * cancelled their damage outright, so the bot could never hurt them.
+     */
+    public void setAfkExempt(java.util.function.Predicate<java.util.UUID> afkExempt) {
+        this.afkExempt = afkExempt;
+    }
+
     private boolean shouldProtect(Player player) {
         // Fake players (HeroBot/PacketBot) are the Quantum map's fighters, not lobby visitors:
         // without this they inherit the lobby's default state and every hit on them is cancelled.
         if (com.rumilance.practice.packetbot.PacketBot.isBot(player)) {
+            return false;
+        }
+        if (afkExempt != null && afkExempt.test(player.getUniqueId())) {
             return false;
         }
         if (ffaService != null && ffaService.isInFfa(player.getUniqueId())) {

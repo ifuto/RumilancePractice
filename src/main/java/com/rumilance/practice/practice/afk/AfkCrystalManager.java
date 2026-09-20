@@ -60,7 +60,6 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
-import org.bukkit.util.BoundingBox;
 import org.bukkit.util.Vector;
 
 import java.io.File;
@@ -88,14 +87,19 @@ import java.util.function.Predicate;
  *
  * <p>Everything inside the arena may be placed and broken freely — only the netherite
  * floor and the reset button are protected, and explosion block damage never removes
- * them. Completely self-contained (no practice session, no match context) so no other
- * listener can interfere; guarded against running alongside the regular
- * {@link AfkPracticeManager} room.</p>
+ * them. Building is capped at {@link #BUILD_HEIGHT} blocks above the floor: that cap is a
+ * <em>placement</em> rule only, the player themselves is never held inside the box (no
+ * boundary teleport). Completely self-contained (no practice session, no match context) so
+ * no other listener can interfere.</p>
+ *
+ * <p>Rooms are private: while a session runs, {@link AfkRoomIsolation} drops every block and
+ * player packet outside the room's own footprint, so nobody ever sees another player's room.</p>
  */
-public final class AfkCrystalManager implements Listener, CommandExecutor, org.bukkit.command.TabCompleter {
+public final class AfkCrystalManager implements Listener, CommandExecutor,
+        org.bukkit.command.TabCompleter, AfkRoomIsolationSource {
 
     private static final int FLOOR_RADIUS = 50;          // 100x100 netherite floor (spec)
-    private static final int BOUNDARY_HEIGHT = 40;       // build/escape cap above the floor
+    private static final int BUILD_HEIGHT = 30;          // placement cap above the floor (blocks)
     private static final int BOT_HOME_OFFSET_Z = -8;     // bot spawn: 8 blocks north of centre
     private static final double BOT_MAX_HEALTH = 20.0d;  // vanilla HP at every difficulty
     private static final long BOT_AIRBORNE_GRACE_MS = 1_200L; // knock arcs settle inside this
@@ -133,12 +137,17 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
     private final Map<UUID, Boolean> shieldPrefs = new HashMap<>();     // uuid -> offhand shield
     private final Map<UUID, Integer> shieldDelayPrefs = new HashMap<>();// uuid -> return seconds
     private final Map<UUID, Location> arenaAnchors = new HashMap<>();   // uuid -> private arena centre (全員別々)
+    /**
+     * Live rooms as seen by the packet filter, which runs on the netty threads: the session map
+     * itself is main-thread only, so the isolation source reads this concurrent copy instead.
+     */
+    private final java.util.concurrent.ConcurrentHashMap<UUID, AfkRoomIsolationSource.Room> isolatedRooms =
+            new java.util.concurrent.ConcurrentHashMap<>();
     private ItemStack[] prototypeKit;                                   // admin-set default kit
     private KitService kitService;                                      // match-style kit application
     private java.util.function.BiConsumer<Player, String> lobbySender;  // real lobby return for /hub
     private final List<String> boundKits = new ArrayList<>();           // admin-bound kits (max 5)
     private final Map<UUID, String> kitSelections = new HashMap<>();    // uuid -> selected bound kit
-    private Predicate<UUID> otherSessionGuard;                          // cross-room guard
     /** Blocks entry while the player is in FFA / combat / a duel / any other session. */
     private Predicate<UUID> entryGuard;
     private BukkitTask ticker;
@@ -199,14 +208,19 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
         return sessions.containsKey(playerId);
     }
 
-    /** Set by the bootstrap so the two AFK rooms can never run at the same time. */
+    /**
+     * Packet-filter view of a live room (see {@link AfkRoomIsolationSource}). Read from the
+     * netty threads, so it never touches the main-thread session map. The build-height cap is
+     * intentionally not part of it: it limits placement, never sight or movement.
+     */
+    @Override
+    public AfkRoomIsolationSource.Room roomOf(UUID playerId) {
+        return playerId == null ? null : isolatedRooms.get(playerId);
+    }
+
     /** Wires the "busy elsewhere" guard (FFA, combat tag, duel, queue, practice...). */
     public void setEntryGuard(Predicate<UUID> guard) {
         this.entryGuard = guard;
-    }
-
-    public void setOtherSessionGuard(Predicate<UUID> guard) {
-        this.otherSessionGuard = guard;
     }
 
     /** Wired by the bootstrap: applies bound kits exactly like real matches do. */
@@ -329,10 +343,6 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
             msg(player, "already");
             return;
         }
-        if (otherSessionGuard != null && otherSessionGuard.test(player.getUniqueId())) {
-            msg(player, "other-session");
-            return;
-        }
         if (entryGuard != null && entryGuard.test(player.getUniqueId())) {
             // Entering mid-FFA / mid-duel / combat-tagged used to strip the kit and strand
             // the other session (the reported "FFA中にafkcに行くとバグる").
@@ -361,10 +371,11 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
         s.shieldOn = shieldPref(player.getUniqueId());
         s.shieldReturnSeconds = shieldDelayPref(player.getUniqueId());
         sessions.put(player.getUniqueId(), s);
+        // The packet filter needs the footprint before the first chunk arrives, and it reads it
+        // off-thread — publish it here, remove it in endSession.
+        isolatedRooms.put(player.getUniqueId(), new AfkRoomIsolationSource.Room(
+                center.getWorld(), center.getX(), center.getZ(), FLOOR_RADIUS));
         buildFloor(s);
-        s.bounds = new BoundingBox(center.getX() - FLOOR_RADIUS, center.getY(),
-                center.getZ() - FLOOR_RADIUS, center.getX() + FLOOR_RADIUS + 1,
-                center.getY() + BOUNDARY_HEIGHT, center.getZ() + FLOOR_RADIUS + 1);
         player.setGameMode(GameMode.SURVIVAL);
         player.setFallDistance(0f);
         player.teleport(s.spawn());
@@ -385,6 +396,7 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
         if (s == null) {
             return false;
         }
+        isolatedRooms.remove(id); // packet isolation ends with the session
         despawnBot(s);
         if (player != null && player.isOnline()) {
             player.closeInventory();
@@ -467,18 +479,22 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
     }
 
     /**
-     * The reset sweep (spec): the whole arena footprint up to its height cap is set to air —
+     * The reset sweep (spec): the whole arena footprint up to the build cap is set to air —
      * except the reset button — so every player-placed block is truly gone (the old
      * floor-only rebuild left towers and walls standing). There is intentionally no radius
      * limit: placement fills the full 100x100 floor; height is the only bound. The floor row
-     * is untouched: it is protected from mining, always pristine netherite anyway.
+     * is untouched: it is protected from mining, always pristine netherite anyway. Movement is
+     * not capped by this number — see {@link #onPlace}.
      */
     private void clearBuildArea(AfkSession s) {
         Location c = s.center;
         Block button = c.clone().add(0, 1, 0).getBlock();
+        // A little past the placement cap: leftovers from rooms built while the cap was higher
+        // must not survive a reset either.
+        int sweepTop = BUILD_HEIGHT + 16;
         for (int dx = -FLOOR_RADIUS; dx < FLOOR_RADIUS; dx++) {
             for (int dz = -FLOOR_RADIUS; dz < FLOOR_RADIUS; dz++) {
-                for (int dy = 1; dy < BOUNDARY_HEIGHT; dy++) {
+                for (int dy = 1; dy <= sweepTop; dy++) {
                     Block b = c.clone().add(dx, dy, dz).getBlock();
                     if (b.getX() == button.getX() && b.getY() == button.getY()
                             && b.getZ() == button.getZ()) {
@@ -516,7 +532,6 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
                 s.bot.getWorld().playSound(s.bot.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 0.8f, 1.6f);
                 msg(player, "shield-restored");
             }
-            tickBoundaries(player, s);
             tickBot(player, s, now);
             if (now - s.lastSlowTickMs >= 1000L) {
                 s.lastSlowTickMs = now;
@@ -525,18 +540,9 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
         }
     }
 
-    private void tickBoundaries(Player player, AfkSession s) {
-        // Escape guard: leaving the platform (or falling past it) snaps the player back.
-        if (player.isDead()) {
-            return;
-        }
-        Location loc = player.getLocation();
-        if (!s.bounds.contains(loc.toVector()) || loc.getY() < s.center.getY() - 0.5) {
-            player.setFallDistance(0f);
-            player.teleport(s.spawn());
-            msg(player, "boundary");
-        }
-    }
+    // No movement boundary on purpose: the height cap only limits where blocks may be placed
+    // ("高度制限はブロックの設置高さだけ"), so the player is free to walk off the platform or
+    // climb as high as they can. Falling into the void is still rescued in onPlayerDamaged.
 
     private void tickBot(Player player, AfkSession s, long now) {
         Mannequin bot = s.bot;
@@ -1306,9 +1312,11 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
 
     // ---------------------------------------------------------------- blocks
 
+    /** True when the block sits on this room's floor footprint (X/Z only, no height rule). */
     private boolean inside(AfkSession s, Block b) {
-        return b.getWorld() == s.center.getWorld() && s.bounds.contains(
-                b.getX() + 0.5, b.getY() + 0.5, b.getZ() + 0.5);
+        return b.getWorld() == s.center.getWorld()
+                && AfkRoomMath.onFootprint(s.center.getX(), s.center.getZ(), FLOOR_RADIUS,
+                        b.getX(), b.getZ());
     }
 
     /** The netherite floor, the reset button (and its exact cell) stay untouchable. */
@@ -1331,6 +1339,7 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
         if (s == null) {
             return;
         }
+        // Breaking has no height rule either: whatever stands inside the room may come down.
         if (!inside(s, event.getBlock()) || isProtected(s, event.getBlock())) {
             event.setCancelled(true);
             msg(event.getPlayer(), "protected");
@@ -1343,11 +1352,28 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
         if (s == null) {
             return;
         }
-        if (!inside(s, event.getBlock())) {
+        Block b = event.getBlock();
+        long now = System.currentTimeMillis();
+        if (!inside(s, b)) {
             event.setCancelled(true);
+            if (now - s.lastBoundaryMsgMs >= 1000L) {
+                s.lastBoundaryMsgMs = now;
+                msg(event.getPlayer(), "boundary");
+            }
             return;
         }
-        if (isProtected(s, event.getBlock())) {
+        // The height cap (BUILD_HEIGHT blocks above the floor) is the ONLY vertical rule, and
+        // it applies to placement alone — never to where the player may stand or fly.
+        if (!AfkRoomMath.withinBuildHeight(s.center.getY(), BUILD_HEIGHT, b.getY())) {
+            event.setCancelled(true);
+            if (now - s.lastBuildLimitMsgMs >= 1000L) {
+                s.lastBuildLimitMsgMs = now;
+                msg(event.getPlayer(), "build-limit",
+                        msgTags("max", String.valueOf(BUILD_HEIGHT)));
+            }
+            return;
+        }
+        if (isProtected(s, b)) {
             event.setCancelled(true);
         }
     }
@@ -2206,7 +2232,6 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
         final UUID playerId;
         final Location center;
         final int index;
-        BoundingBox bounds;
         Mannequin bot;
         boolean shieldOn;              // setting: shield raised in the offhand
         boolean shieldDown;            // shield broken window
@@ -2219,6 +2244,8 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
         long totemPops;
         boolean editing;
         boolean kitChosen; // a bound kit was explicitly picked in the selector
+        long lastBoundaryMsgMs;    // spam guards for the two placement refusals
+        long lastBuildLimitMsgMs;
 
         AfkSession(UUID playerId, Location center, int index) {
             this.playerId = playerId;
