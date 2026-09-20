@@ -141,7 +141,8 @@ public final class RankService {
                 if (expiresAt > System.currentTimeMillis()) {
                     // A temporary grant is authoritative until it expires, including across
                     // reconnects. Never let the permanent DB row replace it during a join.
-                    rank = cache.getOrDefault(uuid, rank);
+                    rank = cache.getOrDefault(uuid,
+                            lastKnownRanks.getOrDefault(uuid, rank));
                 } else {
                     temporaryUntil.remove(uuid, expiresAt);
                 }
