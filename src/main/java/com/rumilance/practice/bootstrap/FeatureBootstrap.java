@@ -259,7 +259,6 @@ public final class FeatureBootstrap {
     private MatchActionRecorder matchActionRecorder;
     private ReplayService replayService;
     private PracticeService practiceService;
-    private com.rumilance.practice.practice.afk.AfkPracticeManager afkPracticeManager;
     private com.rumilance.practice.practice.afk.AfkCrystalManager afkCrystalManager;
     private TeamGlowLosService teamGlowLosService;
 
@@ -514,25 +513,20 @@ public final class FeatureBootstrap {
         practiceService.start();
         services.register(PracticeService.class, practiceService);
 
-        afkPracticeManager = new com.rumilance.practice.practice.afk.AfkPracticeManager(
-                plugin, configService, services.get(MessageService.class));
-        afkPracticeManager.start();
-        services.register(com.rumilance.practice.practice.afk.AfkPracticeManager.class, afkPracticeManager);
-        bind("afkpractice", afkPracticeManager);
-
+        // The AFK practice room (/afkp) has been retired: /afk, /afkp and /afkc all lead to
+        // the AFK BOT Crystal room now. The AfkPracticeManager is no longer started or bound;
+        // every AFK command alias routes to afkCrystalManager (see plugin.yml aliases).
         afkCrystalManager = new com.rumilance.practice.practice.afk.AfkCrystalManager(
                 plugin, configService, services.get(MessageService.class));
         afkCrystalManager.start();
         services.register(com.rumilance.practice.practice.afk.AfkCrystalManager.class, afkCrystalManager);
+        // /afkcrystal + its aliases (/afkc, /afkp, /afk, /afkpractice) all bind here.
         bind("afkcrystal", afkCrystalManager);
-        // The two AFK rooms are mutually exclusive per player.
-        afkPracticeManager.setOtherSessionGuard(afkCrystalManager::hasSession);
-        afkCrystalManager.setOtherSessionGuard(afkPracticeManager::hasSession);
         afkCrystalManager.setKitService(kitService);
         // /hub / /lobby during an AFK BOT Crystal session must really end it: hand the
         // manager LobbyService's full lobby return (state reset + spawn teleport).
         afkCrystalManager.setLobbySender((player, reason) -> lobbyService.sendToLobby(player));
-        // AFK rooms and every other activity are mutually exclusive: FFA membership, a live
+        // The AFK room and every other activity are mutually exclusive: FFA membership, a live
         // combat tag, a duel/match, spectating, a queue or a practice session all block AFK
         // entry (the reported "FFA中にafkcに行くとバグる"), and an AFK session blocks /ffa.
         java.util.function.Predicate<java.util.UUID> busyElsewhere = id -> {
@@ -541,11 +535,21 @@ public final class FeatureBootstrap {
                     || !(st == PlayerState.LOBBY || st == PlayerState.OPENING_GUI
                     || st == PlayerState.IDLE);
         };
-        java.util.function.Predicate<java.util.UUID> inAfkSession =
-                id -> afkCrystalManager.hasSession(id) || afkPracticeManager.hasSession(id);
+        java.util.function.Predicate<java.util.UUID> inAfkSession = afkCrystalManager::hasSession;
         afkCrystalManager.setEntryGuard(busyElsewhere);
-        afkPracticeManager.setEntryGuard(busyElsewhere);
         ffaService.setSessionGuard(inAfkSession);
+
+        // ProtocolLib packet isolation for the AFK room: an AFK player only ever receives
+        // block/entity/player packets from inside their OWN private arena — a neighbour's
+        // room is never streamed to their client (他の人がafkcしてるとこは見れないように).
+        if (hasPlugin("ProtocolLib")) {
+            final com.rumilance.practice.practice.afk.AfkCrystalManager afkCrystal = afkCrystalManager;
+            com.rumilance.practice.practice.afk.AfkPacketIsolator.createIfAvailable(
+                    plugin, afkCrystal::regionOf);
+        } else {
+            plugin.getLogger().info("ProtocolLib not detected - AFK rooms use entity-visibility "
+                    + "hiding only (no packet isolation).");
+        }
 
 
 
@@ -1569,8 +1573,7 @@ public final class FeatureBootstrap {
         pm.registerEvents(new BedrockJoinListener(plugin), plugin);
         SmithingTrimListener smithingTrimListener =
                 new SmithingTrimListener(rankService, smithingTrimGui, stateManager, messageService);
-        smithingTrimListener.setAfkBlocked(id ->
-                afkCrystalManager.hasSession(id) || afkPracticeManager.hasSession(id));
+        smithingTrimListener.setAfkBlocked(afkCrystalManager::hasSession);
         pm.registerEvents(smithingTrimListener, plugin);
 
         LunarRichPresenceService lunarRichPresence = new LunarRichPresenceService(plugin, stateManager);
@@ -1830,9 +1833,6 @@ public final class FeatureBootstrap {
         if (this.quantum != null) {
             this.quantum.disable();
             this.quantum = null;
-        }
-        if (afkPracticeManager != null) {
-            afkPracticeManager.shutdown();
         }
         if (afkCrystalManager != null) {
             afkCrystalManager.shutdown();

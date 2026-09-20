@@ -17,15 +17,10 @@ softdepend:
   - GSit
 
 commands:
-  afkpractice:
-    description: AFK practice — endless duel vs the totem bot.
-    usage: /afkpractice [start|stop|kit|top]
-    aliases: [afkp]
-    permission: rumilance.user
   afkcrystal:
     description: AFK BOT Crystal — armored totem bot on a 100x100 netherite floor.
     usage: /afkcrystal [start|stop|kit|settings|reset|bindkit|unbindkit]
-    aliases: [afkc]
+    aliases: [afkc, afkp, afk, afkpractice]
     permission: rumilance.user
   duel:
     description: Unranked queue, or challenge a player (GUI / kit).

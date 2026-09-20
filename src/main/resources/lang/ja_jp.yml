@@ -1347,6 +1347,7 @@ afkcrystal:
   usage: "<gold>[AFK BOT Crystal]</gold> <yellow>/afkcrystal [start|stop|kit|settings|reset]</yellow>"
   boundary: "<gold>[AFK BOT Crystal]</gold> <red>床の外には出られません。スポーンへ戻ります。</red>"
   protected: "<gold>[AFK BOT Crystal]</gold> <red>ネザライト床とボタンは破壊できません。</red>"
+  height-limit: "<gold>[AFK BOT Crystal]</gold> <red>ブロックは床から <limit> ブロックの高さまでしか設置できません。</red>"
   kit-saved: "<gold>[AFK BOT Crystal]</gold> <green>キットを保存して装備しました。</green>"
   prototype-saved: "<gold>[AFK BOT Crystal]</gold> <light_purple>サーバー既定キット(プロトタイプ)を保存しました。</light_purple>"
   prototype-loaded: "<gold>[AFK BOT Crystal]</gold> <aqua>既定キットを読み込みました。</aqua>"

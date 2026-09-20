@@ -1345,6 +1345,7 @@ afkcrystal:
   usage: "<gold>[AFK BOT Crystal]</gold> <yellow>/afkcrystal [start|stop|kit|settings|reset]</yellow>"
   boundary: "<gold>[AFK BOT Crystal]</gold> <red>Impossible de sortir de la plateforme. Retour au spawn.</red>"
   protected: "<gold>[AFK BOT Crystal]</gold> <red>Le sol en netherite et le bouton sont indestructibles.</red>"
+  height-limit: "<gold>[AFK BOT Crystal]</gold> <red>Les blocs ne peuvent être placés que jusqu'à <limit> blocs au-dessus du sol.</red>"
   kit-saved: "<gold>[AFK BOT Crystal]</gold> <green>Kit sauvegardé et équipé.</green>"
   prototype-saved: "<gold>[AFK BOT Crystal]</gold> <light_purple>Kit prototype du serveur sauvegardé.</light_purple>"
   prototype-loaded: "<gold>[AFK BOT Crystal]</gold> <aqua>Kit prototype chargé.</aqua>"

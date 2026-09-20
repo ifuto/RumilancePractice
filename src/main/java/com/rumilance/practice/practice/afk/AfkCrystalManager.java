@@ -95,7 +95,10 @@ import java.util.function.Predicate;
 public final class AfkCrystalManager implements Listener, CommandExecutor, org.bukkit.command.TabCompleter {
 
     private static final int FLOOR_RADIUS = 50;          // 100x100 netherite floor (spec)
-    private static final int BOUNDARY_HEIGHT = 40;       // build/escape cap above the floor
+    // Block placement height cap ONLY: blocks may be stacked up to 30 above the floor. The
+    // player themselves is NOT bound by this — pearls, jumps and elytra can carry them as
+    // high as they like; only the horizontal platform edge and the void return them.
+    private static final int BUILD_HEIGHT_LIMIT = 30;    // placement-only ceiling above the floor
     private static final int BOT_HOME_OFFSET_Z = -8;     // bot spawn: 8 blocks north of centre
     private static final double BOT_MAX_HEALTH = 20.0d;  // vanilla HP at every difficulty
     private static final long BOT_AIRBORNE_GRACE_MS = 1_200L; // knock arcs settle inside this
@@ -197,6 +200,24 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
 
     public boolean hasSession(UUID playerId) {
         return sessions.containsKey(playerId);
+    }
+
+    /**
+     * The player's private arena region (world + full bounding box), or {@code null} when the
+     * player is not in a crystal session. Consumed by the ProtocolLib packet isolator so an
+     * AFK player only ever receives block/entity packets from inside their own arena — nobody
+     * can peek into another player's room (他の人がafkcしてるとこは見れないように).
+     */
+    public AfkRegion regionOf(UUID playerId) {
+        AfkSession s = sessions.get(playerId);
+        if (s == null || s.bounds == null || s.center.getWorld() == null) {
+            return null;
+        }
+        return new AfkRegion(s.center.getWorld().getUID(), s.bounds);
+    }
+
+    /** A player's isolated arena region: the world UID plus its full bounding box. */
+    public record AfkRegion(UUID worldId, BoundingBox bounds) {
     }
 
     /** Set by the bootstrap so the two AFK rooms can never run at the same time. */
@@ -362,9 +383,14 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
         s.shieldReturnSeconds = shieldDelayPref(player.getUniqueId());
         sessions.put(player.getUniqueId(), s);
         buildFloor(s);
+        // Player bounds: horizontal platform footprint only. The vertical extent runs to the
+        // world ceiling so nothing yanks the player down — the 30-block cap is a
+        // placement-only rule (高度制限の30はブロックの設置高さだけ). Only the platform edge
+        // and the void below return the player home.
+        double top = center.getWorld() != null ? center.getWorld().getMaxHeight() : center.getY() + 320;
         s.bounds = new BoundingBox(center.getX() - FLOOR_RADIUS, center.getY(),
                 center.getZ() - FLOOR_RADIUS, center.getX() + FLOOR_RADIUS + 1,
-                center.getY() + BOUNDARY_HEIGHT, center.getZ() + FLOOR_RADIUS + 1);
+                top, center.getZ() + FLOOR_RADIUS + 1);
         player.setGameMode(GameMode.SURVIVAL);
         player.setFallDistance(0f);
         player.teleport(s.spawn());
@@ -478,7 +504,7 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
         Block button = c.clone().add(0, 1, 0).getBlock();
         for (int dx = -FLOOR_RADIUS; dx < FLOOR_RADIUS; dx++) {
             for (int dz = -FLOOR_RADIUS; dz < FLOOR_RADIUS; dz++) {
-                for (int dy = 1; dy < BOUNDARY_HEIGHT; dy++) {
+                for (int dy = 1; dy <= BUILD_HEIGHT_LIMIT; dy++) {
                     Block b = c.clone().add(dx, dy, dz).getBlock();
                     if (b.getX() == button.getX() && b.getY() == button.getY()
                             && b.getZ() == button.getZ()) {
@@ -1311,6 +1337,20 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
                 b.getX() + 0.5, b.getY() + 0.5, b.getZ() + 0.5);
     }
 
+    /** Horizontal platform footprint (ignores height) — the area blocks may exist in. */
+    private boolean insideFootprint(AfkSession s, Block b) {
+        if (b.getWorld() != s.center.getWorld()) {
+            return false;
+        }
+        return Math.abs(b.getX() + 0.5 - s.center.getX()) <= FLOOR_RADIUS
+                && Math.abs(b.getZ() + 0.5 - s.center.getZ()) <= FLOOR_RADIUS;
+    }
+
+    /** True when a placed block would sit above the 30-block build cap. */
+    private boolean aboveBuildLimit(AfkSession s, Block b) {
+        return b.getY() > (int) s.center.getY() + BUILD_HEIGHT_LIMIT;
+    }
+
     /** The netherite floor, the reset button (and its exact cell) stay untouchable. */
     private boolean isProtected(AfkSession s, Block b) {
         Material t = b.getType();
@@ -1325,30 +1365,50 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
                 && b.getZ() == button.getZ();
     }
 
-    @EventHandler(priority = EventPriority.HIGH)
+    // ignoreCancelled deliberately false + HIGHEST: the lobby block guards run at HIGH and
+    // cancel EVERY non-OP place/break (a player in an AFK session still holds the LOBBY
+    // state, and only ops carry rumilance.lobby.bypass). That was the reported
+    // "OPもってないと/afkcでブロック置けない" — non-ops could not build. Running last and
+    // re-arming the frame lets the AFK room own its own block rules for everyone.
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onBreak(BlockBreakEvent event) {
         AfkSession s = sessions.get(event.getPlayer().getUniqueId());
         if (s == null) {
             return;
         }
-        if (!inside(s, event.getBlock()) || isProtected(s, event.getBlock())) {
+        Block b = event.getBlock();
+        if (!insideFootprint(s, b) || isProtected(s, b)) {
             event.setCancelled(true);
             msg(event.getPlayer(), "protected");
+            return;
+        }
+        // Inside the arena and not protected: this is a legal break for anyone (OP or not).
+        if (event.isCancelled()) {
+            event.setCancelled(false);
         }
     }
 
-    @EventHandler(priority = EventPriority.HIGH)
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onPlace(BlockPlaceEvent event) {
         AfkSession s = sessions.get(event.getPlayer().getUniqueId());
         if (s == null) {
             return;
         }
-        if (!inside(s, event.getBlock())) {
+        Block b = event.getBlock();
+        if (!insideFootprint(s, b) || isProtected(s, b)) {
             event.setCancelled(true);
             return;
         }
-        if (isProtected(s, event.getBlock())) {
+        // The 30-block height cap applies to PLACEMENT only.
+        if (aboveBuildLimit(s, b)) {
             event.setCancelled(true);
+            msg(event.getPlayer(), "height-limit",
+                    msgTags("limit", String.valueOf(BUILD_HEIGHT_LIMIT)));
+            return;
+        }
+        // Legal placement for anyone (OP or not): re-arm a frame the lobby guard cancelled.
+        if (event.isCancelled()) {
+            event.setCancelled(false);
         }
     }
 

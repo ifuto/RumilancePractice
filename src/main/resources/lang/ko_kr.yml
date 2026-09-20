@@ -1345,6 +1345,7 @@ afkcrystal:
   usage: "<gold>[AFK BOT Crystal]</gold> <yellow>/afkcrystal [start|stop|kit|settings|reset]</yellow>"
   boundary: "<gold>[AFK BOT Crystal]</gold> <red>바닥 밖으로 나갈 수 없습니다. 스폰으로 돌아갑니다.</red>"
   protected: "<gold>[AFK BOT Crystal]</gold> <red>네더라이트 바닥과 버튼은 파괴할 수 없습니다.</red>"
+  height-limit: "<gold>[AFK BOT Crystal]</gold> <red>블록은 바닥에서 <limit> 칸 높이까지만 설치할 수 있습니다.</red>"
   kit-saved: "<gold>[AFK BOT Crystal]</gold> <green>키트를 저장하고 장착했습니다.</green>"
   prototype-saved: "<gold>[AFK BOT Crystal]</gold> <light_purple>서버 기본 키트(프로토타입)를 저장했습니다.</light_purple>"
   prototype-loaded: "<gold>[AFK BOT Crystal]</gold> <aqua>기본 키트를 불러왔습니다.</aqua>"

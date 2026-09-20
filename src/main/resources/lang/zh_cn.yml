@@ -1345,6 +1345,7 @@ afkcrystal:
   usage: "<gold>[AFK BOT Crystal]</gold> <yellow>/afkcrystal [start|stop|kit|settings|reset]</yellow>"
   boundary: "<gold>[AFK BOT Crystal]</gold> <red>无法离开平台。正在返回出生点。</red>"
   protected: "<gold>[AFK BOT Crystal]</gold> <red>下界合金地板和按钮无法破坏。</red>"
+  height-limit: "<gold>[AFK BOT Crystal]</gold> <red>方块只能放置到距地面 <limit> 格的高度。</red>"
   kit-saved: "<gold>[AFK BOT Crystal]</gold> <green>装备已保存并穿戴。</green>"
   prototype-saved: "<gold>[AFK BOT Crystal]</gold> <light_purple>已保存服务器默认装备(原型)。</light_purple>"
   prototype-loaded: "<gold>[AFK BOT Crystal]</gold> <aqua>已加载默认装备。</aqua>"

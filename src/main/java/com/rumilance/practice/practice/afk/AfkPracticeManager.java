@@ -131,6 +131,20 @@ public final class AfkPracticeManager implements Listener, CommandExecutor {
         return sessions.containsKey(playerId);
     }
 
+    /**
+     * The player's private AFK room region (world + bounding box), or {@code null} when the
+     * player is not in a session. Consumed by the ProtocolLib packet isolator so an AFK
+     * player only ever receives block/entity packets from inside their own room.
+     */
+    public com.rumilance.practice.practice.afk.AfkCrystalManager.AfkRegion regionOf(UUID playerId) {
+        AfkSession s = sessions.get(playerId);
+        if (s == null || s.bounds == null || s.center.getWorld() == null) {
+            return null;
+        }
+        return new com.rumilance.practice.practice.afk.AfkCrystalManager.AfkRegion(
+                s.center.getWorld().getUID(), s.bounds);
+    }
+
     /** Set by the bootstrap so the AFK room and the AFK BOT Crystal room never overlap. */
     /** Wires the "busy elsewhere" guard (FFA, combat tag, duel, queue, practice...). */
     public void setEntryGuard(java.util.function.Predicate<UUID> guard) {
