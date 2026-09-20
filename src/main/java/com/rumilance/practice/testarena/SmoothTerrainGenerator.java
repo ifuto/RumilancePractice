@@ -478,7 +478,7 @@ public final class SmoothTerrainGenerator {
             public void run() {
                 int end = Math.min(columns.size(), index + COLUMNS_PER_TICK);
                 for (; index < end; index++) {
-                    writeColumn(world, columns.get(index), area.settings(), area.minY());
+                    writeColumn(world, columns.get(index), area.settings(), area.minY(), area.maxY());
                 }
                 if (index >= columns.size()) {
                     previousMap = area;
@@ -511,9 +511,10 @@ public final class SmoothTerrainGenerator {
         return columns;
     }
 
-    private static void writeColumn(World world, ColumnData column, TerrainSettings settings, int bottomY) {
+    private static void writeColumn(World world, ColumnData column, TerrainSettings settings,
+                                    int bottomY, int maxY) {
         TerrainMap map = settings.map();
-        for (int y = column.topY() + 1; y <= column.topY() + CLEAR_ABOVE; y++) {
+        for (int y = column.topY() + 1; y <= maxY; y++) {
             if (y >= world.getMinHeight() && y < world.getMaxHeight()) {
                 world.getBlockAt(column.x(), y, column.z()).setType(Material.AIR, false);
             }
