@@ -48,14 +48,22 @@ if [ -f "$WS/.release-upload-only" ]; then
   fi
   if [ -z "${GH_TOKEN:-}" ]; then
     EXTRA=$(git config --get http.https://github.com/.extraheader || true)
-    if [[ "$EXTRA" == *Basic\ * ]]; then
-      export GH_TOKEN=$(printf '%s' "${EXTRA#*Basic }" | base64 -d | cut -d: -f2-)
+    ENCODED=${EXTRA##* }
+    if [ -n "$ENCODED" ]; then
+      export GH_TOKEN=$(printf '%s' "$ENCODED" | base64 -d 2>/dev/null | sed 's/^[^:]*://' || true)
     fi
   fi
-  gh release upload "$RELEASE_TAG" \
+  if [ -z "${GH_TOKEN:-}" ]; then
+    echo "::error::release upload could not obtain the checkout token"
+    exit 1
+  fi
+  if ! UPLOAD_OUTPUT=$(gh release upload "$RELEASE_TAG" \
     "$WS/dist/RumilanceResourcePack.zip" "$WS/dist/RumilanceResourcePack.sha1" \
-    --repo "${GITHUB_REPOSITORY:-ifuto/RumilancePractice}" --clobber
-  echo "::notice::resource pack uploaded to GitHub Release $RELEASE_TAG"
+    --repo "${GITHUB_REPOSITORY:-ifuto/RumilancePractice}" --clobber 2>&1); then
+    echo "::error::release asset upload failed: $UPLOAD_OUTPUT"
+    exit 1
+  fi
+  echo "::notice::resource pack uploaded to GitHub Release $RELEASE_TAG ($UPLOAD_OUTPUT)"
   exit 0
 fi
 
