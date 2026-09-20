@@ -844,8 +844,9 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
                 && isPlayerAxeHit(event, s);
         if (shieldBreakHit) {
             breakBotShield(player, s);
-            // The axe strike disables the shield but does not add a special knockback impulse.
-            // The shield break itself is the only effect of the disabling hit here.
+            // The axe strike disables the shield but must not move the BOT. Clear any
+            // vanilla impulse after the damage event as well as avoiding a custom impulse.
+            clearShieldBreakVelocity(s, bot);
             double owed = event.getDamage();
             if (owed > 0.0d) {
                 bot.damage(owed, player);
@@ -1059,6 +1060,19 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
         w.playSound(s.bot.getLocation(), Sound.ITEM_SHIELD_BREAK, 1.0f, 0.9f);
         w.spawnParticle(Particle.CRIT, s.bot.getLocation().add(0, 1.2, 0), 20, 0.3, 0.4, 0.3, 0.05);
         msg(player, "shield-broken", msgTags("seconds", String.valueOf(s.shieldReturnSeconds)));
+    }
+
+    /**
+     * Removes the normal damage impulse from the axe hit that breaks the shield. The damage
+     * event may still apply its own velocity after the listener returns, so clear it on the
+     * following tick; a lethal hit that rebuilt the body is guarded by the identity check.
+     */
+    private void clearShieldBreakVelocity(AfkSession s, Mannequin victim) {
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (s.bot == victim && victim.isValid()) {
+                victim.setVelocity(new Vector(0, 0, 0));
+            }
+        });
     }
 
     /**
