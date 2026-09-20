@@ -60,6 +60,8 @@ public final class GuiListener implements Listener {
     private static final java.util.logging.Logger LOG =
             java.util.logging.Logger.getLogger("RumilancePractice");
     private final ConcurrentHashMap<UUID, Long> lastClickAt = new ConcurrentHashMap<>();
+    /** Scheduler owner for 木時差式ボタン releases; wired by the bootstrap. */
+    private volatile org.bukkit.plugin.Plugin plugin;
 
     public GuiListener(GuiSessionRegistry registry, PlayerStateManager stateManager,
                        OriginalKitService originalKitService) {
@@ -72,6 +74,15 @@ public final class GuiListener implements Listener {
         this.stateManager = stateManager;
         this.originalKitService = originalKitService;
         this.messages = messages;
+    }
+
+    public void setPlugin(org.bukkit.plugin.Plugin plugin) {
+        this.plugin = plugin;
+    }
+
+    private org.bukkit.plugin.Plugin plugin() {
+        org.bukkit.plugin.Plugin p = plugin;
+        return p != null ? p : org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(GuiListener.class);
     }
 
     public void register(AbstractGui gui) {
@@ -303,6 +314,16 @@ public final class GuiListener implements Listener {
             return;
         }
         lastClickAt.put(player.getUniqueId(), now);
+        // 木時差式ボタン: the click presses the button now (cursor grabs the tile, click-on
+        // sound) and the real action runs 0.3s later with the click-off sound. Menus opt in
+        // with the "delay:" action prefix and never see the timing themselves.
+        if (DelayedButton.isDelayed(guiAction)) {
+            DelayedButton.press(plugin(), player, event.getCurrentItem(),
+                    DelayedButton.unwrap(guiAction),
+                    released -> clickSafely(handler, player, session, top, event.getSlot(),
+                            released, event.getClick()));
+            return;
+        }
         clickSafely(handler, player, session, top, event.getSlot(), guiAction, event.getClick());
     }
 
@@ -450,6 +471,15 @@ public final class GuiListener implements Listener {
         }
         if (!(event.getInventory().getHolder() instanceof PracticeGuiHolder holder)) {
             return;
+        }
+        if (DelayedButton.isPressing(player.getUniqueId())) {
+            // The release task no-ops on a closed menu; drop the borrowed cursor tile here so
+            // vanilla does not dump it into the world on close.
+            DelayedButton.cancel(player.getUniqueId());
+            try {
+                player.setItemOnCursor(null);
+            } catch (Throwable ignored) {
+            }
         }
         boolean openedFromBattleMenu = registry.get(player.getUniqueId())
                 .filter(session -> session.sessionId().equals(holder.sessionId()))

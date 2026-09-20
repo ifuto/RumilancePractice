@@ -117,7 +117,7 @@ public final class SettingsGui extends AbstractGui {
                                 UiTheme.blank(),
                                 UiTheme.hint(line(player, "gui.chat-whitelist-hint"))
                         )
-                        .action("whitelist")
+                        .action(com.rumilance.practice.gui.DelayedButton.wrap("whitelist"))
                         .build());
 
         paintNav(player, session, inventory);
@@ -157,7 +157,7 @@ public final class SettingsGui extends AbstractGui {
                                 UiTheme.hint(line(player, "gui.namecolor-open-hint"))
                         )
                         .glintIf(selection.active())
-                        .action("name_color")
+                        .action(com.rumilance.practice.gui.DelayedButton.wrap("name_color"))
                         .build());
     }
 
@@ -174,7 +174,9 @@ public final class SettingsGui extends AbstractGui {
                         UiTheme.hint(line(player, "gui.toggle-hint"))
                 )
                 .glint(enabled)
-                .action("toggle:" + key)
+                // 木時差式ボタン: the switch clicks down, and 0.3s later it pops back with the
+                // new state — an ON/OFF you can feel instead of an instant repaint.
+                .action(com.rumilance.practice.gui.DelayedButton.wrap("toggle:" + key))
                 .build();
     }
 

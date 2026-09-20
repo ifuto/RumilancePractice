@@ -1097,6 +1097,8 @@ public final class FeatureBootstrap {
                 plugin, practiceService, stateManager));
 
         GuiListener guiListener = new GuiListener(guiSessions, stateManager, originalKitService, messageService);
+        // 木時差式ボタン releases are scheduled off this plugin handle.
+        guiListener.setPlugin(plugin);
         guiListener.register(rankedGui);
         guiListener.register(unrankedGui);
         guiListener.register(kitSelectGui);

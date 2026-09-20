@@ -17,6 +17,8 @@ public final class GuiSession {
     private final Map<String, Object> attributes = new ConcurrentHashMap<>();
     private volatile String selectedKit;
     private volatile String selectedMap;
+    /** Kit picker: which category page is open ("MAIN" / "SUB"), null = the chooser screen. */
+    private volatile String kitCategory;
     private volatile int page;
     private volatile int bestOf = 1;
     private volatile boolean ranked = true;
@@ -49,6 +51,14 @@ public final class GuiSession {
 
     public int rows() {
         return rows;
+    }
+
+    public String kitCategory() {
+        return kitCategory;
+    }
+
+    public void setKitCategory(String kitCategory) {
+        this.kitCategory = kitCategory;
     }
 
     public String selectedKit() {

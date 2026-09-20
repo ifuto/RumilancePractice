@@ -62,47 +62,67 @@ public final class KitSelectGui extends AbstractGui {
         return t(player, "gui.kit-select-title").color(UiTheme.PRIMARY);
     }
 
+    /**
+     * Two-step picker. The first screen is only the two wooden category buttons (Main Kits /
+     * Sub Kits) — 木時差式ボタン: pressing one holds it on the cursor for 0.3s, then the release
+     * click opens that category's kit list. The old layout crammed a header icon plus every
+     * kit of both categories onto one screen, which nobody could read.
+     */
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
         paintFrame(player, session, inventory);
-
-        // Two labelled sections: row 1 = Main Kits (azalea/nature header), row 2 = Sub Kits
-        // (bolted iron-trapdoor header); rows 3-4 continue the Main line-up when it is long.
-        List<KitDefinition> main = kitService.enabled(com.rumilance.practice.model.KitCategory.MAIN);
-        List<KitDefinition> sub = kitService.enabled(com.rumilance.practice.model.KitCategory.SUB);
-        String current = session.selectedKit();
-
-        int cell = 0;
-        inventory.setItem(MenuScaffold.gridSlot(cell++),
-                com.rumilance.practice.gui.KitSections.header(
-                        com.rumilance.practice.model.KitCategory.MAIN, main.size(),
-                        line(player, "gui.kit-click-select")));
-        for (KitDefinition kit : main) {
-            if (cell >= 7) {
-                break; // row 1: header column + up to 6 main kits
-            }
-            inventory.setItem(MenuScaffold.gridSlot(cell++), kitIcon(player, session, kit, current));
+        if (session.kitCategory() == null) {
+            renderChooser(player, inventory);
+            return;
         }
-        if (!sub.isEmpty()) {
-            inventory.setItem(MenuScaffold.gridSlot(cell++),
-                    com.rumilance.practice.gui.KitSections.header(
-                            com.rumilance.practice.model.KitCategory.SUB, sub.size(),
-                            line(player, "gui.kit-click-select")));
-            for (KitDefinition kit : sub) {
-                if (cell >= 14) {
-                    break; // row 2: header column + up to 6 sub kits
-                }
-                inventory.setItem(MenuScaffold.gridSlot(cell++), kitIcon(player, session, kit, current));
-            }
-        }
-        for (KitDefinition kit : main.subList(Math.min(6, main.size()), main.size())) {
-            if (cell >= MenuScaffold.gridPageSize()) {
-                break; // rows 3-4 continue the main line-up
-            }
-            inventory.setItem(MenuScaffold.gridSlot(cell++), kitIcon(player, session, kit, current));
-        }
-
+        renderCategory(player, session, inventory, session.kitCategory());
         MenuScaffold.returnButton(inventory, t(player, "menu.back"));
+    }
+
+    /** MAIN KITS / SUB KITS — the two wooden buttons of the first screen. */
+    private void renderChooser(Player player, Inventory inventory) {
+        int mainCount = kitService.enabled(com.rumilance.practice.model.KitCategory.MAIN).size();
+        int subCount = kitService.enabled(com.rumilance.practice.model.KitCategory.SUB).size();
+        inventory.setItem(MenuScaffold.gridSlot(9),
+                categoryButton(player, "gui.kit-main-button", "gui.kit-main-button-lore",
+                        mainCount, UiTheme.SUCCESS, "cat:MAIN"));
+        inventory.setItem(MenuScaffold.gridSlot(11),
+                categoryButton(player, "gui.kit-sub-button", "gui.kit-sub-button-lore",
+                        subCount, UiTheme.SECONDARY, "cat:SUB"));
+    }
+
+    private ItemStack categoryButton(Player player, String nameKey, String loreKey, int count,
+                                     net.kyori.adventure.text.format.TextColor color, String action) {
+        return ItemBuilder.of(Material.OAK_BUTTON)
+                .name(t(player, nameKey).color(color))
+                .lore(
+                        UiTheme.divider(),
+                        UiTheme.line(line(player, loreKey)),
+                        UiTheme.blank(),
+                        UiTheme.labelValue(line(player, "gui.kit-count-label"), String.valueOf(count)),
+                        UiTheme.blank(),
+                        UiTheme.hint(line(player, "gui.kit-button-hint"))
+                )
+                .action(com.rumilance.practice.gui.DelayedButton.wrap(action))
+                .build();
+    }
+
+    /** One category's kits, paginated over the standard content grid. */
+    private void renderCategory(Player player, GuiSession session, Inventory inventory, String category) {
+        List<KitDefinition> kits = kitService.enabled(
+                "SUB".equalsIgnoreCase(category)
+                        ? com.rumilance.practice.model.KitCategory.SUB
+                        : com.rumilance.practice.model.KitCategory.MAIN);
+        String current = session.selectedKit();
+        int pageSize = MenuScaffold.gridPageSize();
+        int pages = Math.max(1, (kits.size() + pageSize - 1) / pageSize);
+        int page = Math.min(Math.max(0, session.page()), pages - 1);
+        int from = page * pageSize;
+        for (int i = 0; i < pageSize && from + i < kits.size(); i++) {
+            inventory.setItem(MenuScaffold.gridSlot(i),
+                    kitIcon(player, session, kits.get(from + i), current));
+        }
+        paintPaging(player, inventory, page, kits.size());
     }
 
     private ItemStack kitIcon(Player player, GuiSession session, KitDefinition kit, String current) {
@@ -126,7 +146,36 @@ public final class KitSelectGui extends AbstractGui {
 
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot, String action) {
+        // 木時差式ボタン already consumed the 0.3s press/release, so this runs on the release.
+        if (action != null && action.startsWith("cat:")) {
+            session.setKitCategory(action.substring(4));
+            session.setPage(0);
+            sounds.play(player, "gui-click");
+            refresh(player, session, inventory);
+            return;
+        }
+        if (action != null && action.startsWith("page:")) {
+            List<KitDefinition> kits = kitService.enabled(
+                    "SUB".equalsIgnoreCase(session.kitCategory())
+                            ? com.rumilance.practice.model.KitCategory.SUB
+                            : com.rumilance.practice.model.KitCategory.MAIN);
+            int pages = Math.max(1, (kits.size() + MenuScaffold.gridPageSize() - 1)
+                    / MenuScaffold.gridPageSize());
+            int page = "page:next".equals(action) ? session.page() + 1 : session.page() - 1;
+            session.setPage(Math.min(Math.max(0, page), pages - 1));
+            sounds.play(player, "gui-click");
+            refresh(player, session, inventory);
+            return;
+        }
         if ("back".equals(action) || "close".equals(action)) {
+            if (session.kitCategory() != null) {
+                // Back from a category returns to the two wooden buttons, not to the duel.
+                session.setKitCategory(null);
+                session.setPage(0);
+                sounds.play(player, "gui-back");
+                refresh(player, session, inventory);
+                return;
+            }
             sounds.play(player, "gui-back");
             returnToDuel(player, session);
             return;

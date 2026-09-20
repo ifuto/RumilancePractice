@@ -1967,13 +1967,25 @@ public final class AfkCrystalManager implements Listener, CommandExecutor,
             if (kitService.get(name).isEmpty()) {
                 return;
             }
-            selectKit(player, name, true);
-            player.closeInventory();
-            if (s.bot != null && s.bot.isValid()) {
-                resetRound(player, s, false);
-            } else {
-                spawnBot(player, s);
-            }
+            // 木時差式ボタン: the tile is pressed onto the cursor, and the kit is applied when
+            // the button pops back 0.3s later — same feel as every other menu in the plugin.
+            com.rumilance.practice.gui.DelayedButton.press(plugin, player, event.getCurrentItem(),
+                    name, picked -> {
+                        if (!player.isOnline()) {
+                            return;
+                        }
+                        AfkSession live = sessions.get(player.getUniqueId());
+                        if (live == null) {
+                            return;
+                        }
+                        selectKit(player, picked, true);
+                        player.closeInventory();
+                        if (live.bot != null && live.bot.isValid()) {
+                            resetRound(player, live, false);
+                        } else {
+                            spawnBot(player, live);
+                        }
+                    });
             return;
         }
     }
