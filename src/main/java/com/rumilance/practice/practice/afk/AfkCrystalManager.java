@@ -29,6 +29,7 @@ import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Firework;
 import org.bukkit.entity.Mannequin;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Pose;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -98,6 +99,7 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
     private static final int BOT_HOME_OFFSET_Z = -8;     // bot spawn: 8 blocks north of centre
     private static final double BOT_MAX_HEALTH = 20.0d;  // vanilla HP at every difficulty
     private static final long BOT_AIRBORNE_GRACE_MS = 1_200L; // knock arcs settle inside this
+    private static final int SHIELD_USE_TICKS = 72_000;       // keep the client-side block animation active
     private static final double TOTEM_POP_KB = 0.4d;         // vanilla melee knockback on the pop hit
     private static final double TOTEM_POP_KB_Y = 0.36d;      // vanilla melee knockback Y
     private static final double WIND_BURST_KB = 1.6d;        // wind-charge style shove on the pop hit
@@ -541,6 +543,10 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
         if (bot == null || !bot.isValid() || player.isDead()) {
             return;
         }
+        // Mannequins do not keep an active item use alive by themselves. Refresh it every
+        // tick so the client sees the shield raised in front of the body, not merely an
+        // off-hand shield hanging at the hip.
+        maintainShieldPose(s);
         if (now - s.lastBotMoveMs < 100L) {
             return;
         }
@@ -627,6 +633,12 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
             m.setCollidable(true);
             m.setPersistent(false);
         });
+        // Set the session reference before equipping: equipBot(s) intentionally reads the
+        // session's current Mannequin, and assigning it afterwards left the first spawn with
+        // no off-hand item and no shield animation at all.
+        s.bot = bot;
+        s.shieldDown = false;
+        s.shieldDownUntilMs = 0L;
         try {
             bot.setCustomNameVisible(true);
             bot.setGlowing(true);
@@ -641,10 +653,7 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
             equipBot(s);
         } catch (Throwable ignored) {
         }
-        s.bot = bot;
         s.airborneSinceMs = 0L;
-        s.shieldDown = false;
-        s.shieldDownUntilMs = 0L;
         s.lastBotHurtMs = System.currentTimeMillis();
         updateName(s);
     }
@@ -704,14 +713,46 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
                 ? new ItemStack(Material.SHIELD)
                 : new ItemStack(Material.TOTEM_OF_UNDYING));
         zeroDropChances(bot, eq);
-        if (shieldUp) {
-            // Body language: actually raise the shield (Paper Mannequin item-use pose),
-            // instead of a shield idling at the chest.
-            try {
+        maintainShieldPose(s);
+    }
+
+    /**
+     * Keeps the active off-hand use and mannequin pose alive. A one-shot
+     * {@code startUsingItem} call is not enough for a Mannequin: its server tick clears the
+     * active hand, so clients see a shield held at rest rather than a real blocking motion.
+     */
+    private void maintainShieldPose(AfkSession s) {
+        Mannequin bot = s.bot;
+        if (bot == null || !bot.isValid()) {
+            return;
+        }
+        EntityEquipment eq = bot.getEquipment();
+        boolean raised = s.shieldOn && !s.shieldDown && eq != null
+                && eq.getItemInOffHand() != null
+                && eq.getItemInOffHand().getType() == Material.SHIELD;
+        try {
+            bot.setShieldBlockingDelay(0);
+            if (raised) {
                 bot.startUsingItem(EquipmentSlot.OFF_HAND);
-            } catch (Throwable ignored) {
-                // Older paper-api without the mannequin item-use pose: looks unchanged.
+                bot.setActiveItemRemainingTime(SHIELD_USE_TICKS);
+                // Mannequin has no dedicated BLOCKING pose. SNEAKING is the vanilla player
+                // body posture used while the shield arm is raised and makes the stance read
+                // correctly even on clients that do not animate the active-item flag alone.
+                try {
+                    bot.setPose(Pose.SNEAKING);
+                } catch (IllegalArgumentException ignored) {
+                    // Keep the active-item animation if this Paper build rejects the pose.
+                }
+            } else {
+                bot.clearActiveItem();
+                try {
+                    bot.setPose(Pose.STANDING);
+                } catch (IllegalArgumentException ignored) {
+                }
             }
+        } catch (Throwable ignored) {
+            // A running server must keep the AFK room alive if an older API omits one of the
+            // active-item helpers; the equipment and damage-side shield emulation still work.
         }
     }
 
@@ -799,8 +840,13 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
         // breaks). The event frame itself was already zeroed by the block, so re-register
         // the raw amount through the damage pipeline (armor + i-frames apply; a lethal
         // follow-up routes through the normal totem logic).
-        if (fromFront && s.shieldOn && !s.shieldDown && isPlayerAxeHit(event, s)) {
+        boolean shieldBreakHit = fromFront && s.shieldOn && !s.shieldDown
+                && isPlayerAxeHit(event, s);
+        if (shieldBreakHit) {
             breakBotShield(player, s);
+            // The axe strike disables the shield but must not move the BOT. Clear any
+            // vanilla impulse after the damage event as well as avoiding a custom impulse.
+            clearShieldBreakVelocity(s, bot);
             double owed = event.getDamage();
             if (owed > 0.0d) {
                 bot.damage(owed, player);
@@ -836,7 +882,9 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
         Location at = bot.getLocation().clone();
         respawnBot(s, at);
         totemPop(s);
-        applyPopKnockback(s.bot, event);
+        if (!shieldBreakHit) {
+            applyPopKnockback(s.bot, event);
+        }
     }
 
     /** Re-creates the bot at {@code at} with the same armor/hands/profile, HP 1. */
@@ -884,6 +932,9 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
         }
         s.bot = bot;
         s.airborneSinceMs = 0L;
+        // Re-apply the session hand state after the new entity becomes visible. This also
+        // restores the blocking animation when a shield-window totem pop rebuilt the body.
+        equipBot(s);
         updateName(s);
     }
 
@@ -1004,10 +1055,24 @@ public final class AfkCrystalManager implements Listener, CommandExecutor, org.b
         if (eq != null) {
             eq.setItemInOffHand(null);
         }
+        maintainShieldPose(s);
         World w = s.bot.getWorld();
         w.playSound(s.bot.getLocation(), Sound.ITEM_SHIELD_BREAK, 1.0f, 0.9f);
         w.spawnParticle(Particle.CRIT, s.bot.getLocation().add(0, 1.2, 0), 20, 0.3, 0.4, 0.3, 0.05);
         msg(player, "shield-broken", msgTags("seconds", String.valueOf(s.shieldReturnSeconds)));
+    }
+
+    /**
+     * Removes the normal damage impulse from the axe hit that breaks the shield. The damage
+     * event may still apply its own velocity after the listener returns, so clear it on the
+     * following tick; a lethal hit that rebuilt the body is guarded by the identity check.
+     */
+    private void clearShieldBreakVelocity(AfkSession s, Mannequin victim) {
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (s.bot == victim && victim.isValid()) {
+                victim.setVelocity(new Vector(0, 0, 0));
+            }
+        });
     }
 
     /**

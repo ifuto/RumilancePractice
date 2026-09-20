@@ -1,0 +1,2 @@
+execute as @s[scores={strafe=1}] at @s unless score @s airborne matches 1.. run player @s move left
+execute as @s[scores={strafe=0}] at @s unless score @s airborne matches 1.. run player @s move right

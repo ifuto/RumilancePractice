@@ -1,0 +1,1 @@
+$player @s look at ~$(Motion0) ~ ~$(Motion32)

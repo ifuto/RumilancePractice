@@ -327,7 +327,12 @@ public final class PracticeListener implements Listener {
      */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onEntityExplode(org.bukkit.event.entity.EntityExplodeEvent event) {
-        if (insideAnyPracticeRegion(event.getLocation())) {
+        // Practice-room protection still applies to player crystals, TNT and anchors. The
+        // native CRYSTAL bot is different: its crystal combo is the terrain test itself and
+        // must use the same block-breaking behaviour as ordinary Crystal PvP.
+        boolean botCrystal = event.getEntity() != null
+                && practiceService.isCombatBotCrystal(event.getEntity().getUniqueId());
+        if (!botCrystal && insideAnyPracticeRegion(event.getLocation())) {
             event.blockList().clear();
         }
     }

@@ -13,8 +13,12 @@ enabled: true
 # Where the pack lives. Each entry is a directory containing `data/`, OR a .zip containing the
 # world/pack (the reference download "Quantum's PvP Practice v1.18.zip" works as-is: both the
 # world itself and its `datapacks/Practicebot` folder are read).
+#
+# The bundled map pack inside the plugin jar auto-deploys to plugins/NARENA/quantum at boot
+# (see [Quantum] deployed the bundled map pack … in the log) — that folder is always read,
+# whatever the list below says, so this entry is only needed for extra packs.
 packs:
-  - "plugins/RumilancePractice/quantum"
+  - "plugins/NARENA/quantum"
 
 # Also pick up packs from the loaded worlds' `datapacks/` folders (and from `quantum/datapacks`).
 include-world-datapacks: true
@@ -24,16 +28,19 @@ world:
   name: ""
 
 bot:
-  # The name the map spawns its opponent under (quantum:botspawning).
-  name: "quantumbot"
+  # Fixed player-facing name; the runtime derives unique legal profile names per instance.
+  name: "NARENA BOT"
   gamemode: "creative"
   yaw: 0.0
   pitch: 0.0
   # Milliseconds; the map's .ping score / options/set_ping is authoritative once it runs.
   ping: 100
   # Where to spawn the bot when nothing else says otherwise (x, y, z). 3 values, no defaults
-  # beyond these; `playerspawn ... at <x y z>` in the map always wins.
+  # beyond these; `/bot` owner location takes precedence for player-facing instances.
   spawn: [-646.0, 57.0, 88.0]
+  # Server-kit binding for QuantumBOT. Empty means the bundled map kit remains authoritative.
+  mode: ''
+  kit: ''
 
 # The reference measurement scenario (docs/bot-combat-parity.md) was taken with these two
 # settings; `mode` and `difficulty` are applied by /quantum seed and by the map's own scoring.
@@ -60,11 +67,3 @@ herobot:
   creative-no-clip: false
   # tick: bot を tick のどこで動かすか (tick-start = tick の先頭 / scheduler = tick の終わり)
   tick-phase: tick-start
-
-# BOT の装備をサーバーのキットから与える (PvP サーバー向け)。
-#   mode: SWORD|MACE|CRYSTAL|NETHERITE_POT|CART — /botadmin <mode> <kit> の紐づけを使う
-#   kit : キット名を直接指定 (モード紐づけより優先。空なら紐づけを使う)
-# どちらも空なら、参照マップのキットチェストが装備を供給する (パリティ計測と同じ)。
-bot:
-  mode: ''
-  kit: ''

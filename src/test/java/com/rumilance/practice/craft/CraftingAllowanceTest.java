@@ -17,11 +17,21 @@ class CraftingAllowanceTest {
     }
 
     @Test
+    void pressurePlatesAndButtonsAreAllowed() {
+        assertTrue(CraftingAllowance.isPressurePlateResult(Material.OAK_PRESSURE_PLATE));
+        assertTrue(CraftingAllowance.isPressurePlateResult(Material.HEAVY_WEIGHTED_PRESSURE_PLATE));
+        assertTrue(CraftingAllowance.isButtonResult(Material.STONE_BUTTON));
+        assertTrue(CraftingAllowance.isButtonResult(Material.POLISHED_BLACKSTONE_BUTTON));
+        assertTrue(CraftingAllowance.isAllowedResult(Material.BIRCH_PRESSURE_PLATE));
+        assertTrue(CraftingAllowance.isAllowedResult(Material.CHERRY_BUTTON));
+    }
+
+    @Test
     void otherResultsAreDenied() {
-        assertFalse(CraftingAllowance.isPlanksResult(Material.STICK));
-        assertFalse(CraftingAllowance.isPlanksResult(Material.WOODEN_SWORD));
-        assertFalse(CraftingAllowance.isPlanksResult(Material.CRAFTING_TABLE));
-        assertFalse(CraftingAllowance.isPlanksResult(Material.DIAMOND_SWORD));
-        assertFalse(CraftingAllowance.isPlanksResult(null));
+        assertFalse(CraftingAllowance.isAllowedResult(Material.STICK));
+        assertFalse(CraftingAllowance.isAllowedResult(Material.WOODEN_SWORD));
+        assertFalse(CraftingAllowance.isAllowedResult(Material.CRAFTING_TABLE));
+        assertFalse(CraftingAllowance.isAllowedResult(Material.DIAMOND_SWORD));
+        assertFalse(CraftingAllowance.isAllowedResult(null));
     }
 }

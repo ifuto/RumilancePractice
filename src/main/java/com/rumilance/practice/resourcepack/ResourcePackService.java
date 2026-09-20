@@ -51,10 +51,10 @@ import java.util.logging.Logger;
  */
 public final class ResourcePackService implements Listener {
 
-    /** Shipped default: the repo's dist/ zip (public repository). */
+    /** Shipped default: immutable GitHub Release asset (not a mutable branch zip). */
     private static final String DEFAULT_URL =
-            "https://raw.githubusercontent.com/ifuto/RumilancePractice/arena/01a07b2c-rumilancepractice/dist/RumilanceResourcePack.zip";
-    private static final String DEFAULT_SHA1 = "2ad094674379fb5cc9e1f224647b9f30c26e2072";
+            "https://github.com/ifuto/RumilancePractice/releases/download/v1.76.45/RumilanceResourcePack.zip";
+    private static final String DEFAULT_SHA1 = "4dcb7fc7801734a97217115a69a2eda15fb960d4";
 
     /** Small delay after join so login-time packets settle before the pack prompt. */
     private static final long APPLY_DELAY_TICKS = 10L;

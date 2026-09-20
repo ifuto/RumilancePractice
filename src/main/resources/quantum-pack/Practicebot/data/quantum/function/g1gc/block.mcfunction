@@ -1,0 +1,2 @@
+execute if block ~ ~ ~ #xaniclelib:nonsolid2 unless block ~ ~ ~ command_block{auto:1b,Command:"function xaniclelib:obbycheck"} unless block ~ ~ ~ command_block{auto:1b,Command:"function xaniclelib:anchor/0"} unless block ~ ~ ~ command_block{auto:1b,Command:"function xaniclelib:anchor/1"} run return 1
+return 0

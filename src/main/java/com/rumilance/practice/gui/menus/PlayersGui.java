@@ -82,7 +82,8 @@ public final class PlayersGui extends AbstractGui {
     protected void render(Player player, GuiSession session, Inventory inventory) {
         paintFrame(player, session, inventory);
 
-        List<Player> online = new ArrayList<>(Bukkit.getOnlinePlayers());
+        // Real players only — bots are other users' sparring partners, not duel targets.
+        List<Player> online = new ArrayList<>(com.rumilance.practice.util.RealPlayers.online());
         online.removeIf(p -> p.getUniqueId().equals(player.getUniqueId()));
 
         int page = session.page();

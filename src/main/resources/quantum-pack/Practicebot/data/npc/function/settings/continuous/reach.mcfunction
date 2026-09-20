@@ -1,0 +1,2 @@
+$title @a actionbar [{"text":"Your reach has been set to:","color":"aqua"},{"text":" $(reach)","color":"gold"},{"text":" Default is 3.0","color":"green"}]
+$execute as @a[tag=xlib_target] run attribute @s entity_interaction_range base set $(reach)

@@ -1,0 +1,12 @@
+{
+    "rules": {
+        "disabled": [
+            "scoreboard-fake-player-missing-hash",
+            "execute-group"
+        ]
+    },
+    "executeGroup": {
+        "outputPath": "{dir}",
+        "outputName": "{name}_line_{line}"
+    }
+}

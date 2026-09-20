@@ -1,0 +1,4 @@
+execute at @p[tag=xlib_target] if dimension overworld run return run schedule function quantum:bin/38 1t
+execute at @p[tag=xlib_target] rotated 90 0 positioned ^-4 ^ ^3 summon block_display summon block_display summon block_display at @s as @e[limit=3,sort=nearest,distance=0..,type=block_display] run data merge entity @s {Glowing:1b,glow_color_override:65280,block_state:{Name:"minecraft:lime_concrete"},Tags:["killable","not_positioned"]}
+rotate @p[tag=xlib_target] 90 0
+execute at @p[tag=xlib_target] as @e[limit=3,sort=nearest,type=block_display] at @s rotated 90 0 run function mech_train:generic/flick_aim.mcfunction/place_random

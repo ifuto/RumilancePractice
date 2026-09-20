@@ -1,0 +1,2 @@
+execute if score .no_pearl_land npc matches 1 run return run function npc:settings/off/no_pearl_land
+execute unless score .no_pearl_land npc matches 1 run return run function npc:settings/on/no_pearl_land

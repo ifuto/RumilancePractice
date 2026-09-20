@@ -1,0 +1,12 @@
+{
+    "values": [
+    "minecraft:cave_vines",
+    "minecraft:cave_vines_plant",
+    "minecraft:ladder",
+    "minecraft:scaffolding",
+    "minecraft:vine",
+    "minecraft:weeping_vines",
+    "minecraft:weeping_vines_plant"
+    ],
+    "replace": true
+}

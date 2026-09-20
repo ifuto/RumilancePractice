@@ -1,0 +1,2 @@
+execute if score .insta_shieldcd npc matches 1 run return run function npc:settings/off/insta_shieldcd
+execute unless score .insta_shieldcd npc matches 1 run return run function npc:settings/on/insta_shieldcd

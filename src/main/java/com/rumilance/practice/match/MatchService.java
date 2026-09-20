@@ -1474,13 +1474,18 @@ public final class MatchService {
                         teamColorName(session, victimId));
             }
         }
-        // Count a kill for the attacker (skip self-inflicted / environmental deaths).
-        if (attackerId != null && !attackerId.equals(victimId)) {
-            session.addKill(attackerId);
-            recordMonthlyKillDeath(attackerId, victimId);
-            combatTracker.forParticipant(session.id(), attackerId).hits.incrementAndGet();
+        // Normalize attribution before any accounting. Never award a kill/title to a player
+        // outside this match, and never treat a self-inflicted blast as an opponent kill.
+        UUID creditedAttacker = attackerId != null
+                && !attackerId.equals(victimId)
+                && session.isParticipant(attackerId)
+                ? attackerId : null;
+        if (creditedAttacker != null) {
+            session.addKill(creditedAttacker);
+            recordMonthlyKillDeath(creditedAttacker, victimId);
+            combatTracker.forParticipant(session.id(), creditedAttacker).hits.incrementAndGet();
             if (titleService != null) {
-                Player killer = Bukkit.getPlayer(attackerId);
+                Player killer = Bukkit.getPlayer(creditedAttacker);
                 if (killer != null) {
                     titleService.showKillTitle(killer);
                 }
@@ -1492,7 +1497,7 @@ public final class MatchService {
         }
 
         if (session.isTeamMatch()) {
-            handleTeamLethal(session, victimId, attackerId);
+            handleTeamLethal(session, victimId, creditedAttacker);
             return;
         }
 
@@ -1513,13 +1518,10 @@ public final class MatchService {
             lastLethalTickByMatch.put(session.id(), now);
         }
         lethalSet.add(victimId);
-        // Normalise the attacker: a self-inflicted blast (owner == victim) or environmental death
-        // records null so the draw check below cannot mistake a suicide for a kill dealt by the
-        // opponent.
-        UUID killerId = (attackerId != null && !attackerId.equals(victimId)
-                && session.isParticipant(attackerId)) ? attackerId : null;
-        attackerMap.put(victimId, killerId);
-        final UUID lethalAttacker = attackerId;
+        // Self-inflicted blasts, environmental deaths and non-participants are all null here.
+        // This same normalized value is used by the draw check and the winner selection.
+        attackerMap.put(victimId, creditedAttacker);
+        final UUID lethalAttacker = creditedAttacker;
         Bukkit.getScheduler().runTaskLater(plugin, () -> resolveSoloOutcome(session, victimId, lethalAttacker, now), 1L);
     }
 

@@ -448,7 +448,7 @@ public final class HeroBotCommands {
      * {@code /playerspawn <name> [at <pos> [facing <rotation> | <cardinal>] [in <gamemode>
      * [on <dimension>]]]} — the reference mod's tree verbatim (herobot's
      * {@code PlayerSpawnCommand}), because {@code quantum:botspawning} runs
-     * {@code playerspawn quantumbot at -646 57 88 facing 0 0 in creative on minecraft:overworld}
+     * {@code the QuantumRuntime-owned QuantumBOT instance}
      * from inside a function and every node on that path has to exist for the function to parse.
      */
     private static LiteralArgumentBuilder<CommandSourceStack> playerspawn(HeroBotRegistry registry) {

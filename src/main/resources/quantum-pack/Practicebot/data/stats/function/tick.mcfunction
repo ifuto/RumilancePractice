@@ -1,0 +1,1 @@
+execute as @a[tag=xlib_target] run function stats:main_tick

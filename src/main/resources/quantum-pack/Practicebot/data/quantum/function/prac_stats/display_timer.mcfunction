@@ -1,0 +1,2 @@
+$execute if score @s bow_prac_stopwatch matches ..19 run title @s actionbar [{"text":"Time: "},{"color":"green","text":"0$(time)s"}]
+$execute unless score @s bow_prac_stopwatch matches ..19 run title @s actionbar [{"text":"Time: "},{"color":"green","text":"$(time)s"}]

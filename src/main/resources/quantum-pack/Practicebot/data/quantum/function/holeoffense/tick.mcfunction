@@ -1,0 +1,2 @@
+execute if score @s hitcd matches ..0 at @e[tag=anchor_4,tag=usable,distance=0..,type=marker] if score @s pearlcd matches ..0 if function quantum:g1gc/block positioned ~ ~-1 ~ if function quantum:g1gc/block positioned ~ ~-1 ~ if function quantum:g1gc/block positioned ~ ~2 ~ run function quantum:holeoffense/dash
+kill @e[tag=anchor_4,tag=!anchor_3,distance=0..,type=marker]

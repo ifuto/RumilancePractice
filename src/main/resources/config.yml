@@ -17,7 +17,7 @@ plugin:
 # (e.g. Cloudflare Pages) and set require-resource-pack so the glyphs always resolve.
 icons:
   # Master switch. When false no rank icons are sent (plain names, as before).
-  # Only the Admin / VIP+ / VIP rank badges come from the resource pack. Team
+  # Only the Admin / VIP+ / VIP / PRO rank badges come from the resource pack. Team
   # identification during team fights is a plain coloured ● (no pack needed).
   enabled: true
   # Font used to render the glyphs. "default" (recommended) = render with the standard
@@ -27,10 +27,11 @@ icons:
   # only if you know you need it.
   font: "default"
   glyphs:
-    # Rank badges (placed before Admin / VIP+ / VIP names). NORM players get none.
+    # Rank badges (placed before Admin / VIP+ / VIP / PRO names). NORM players get none.
     admin: "\uE001"
     vip: "\uE002"
     vip-plus: "\uE003"
+    pro: "\uE004"
 
 # Resource-pack distribution BY THE PLUGIN — no server.properties entries needed.
 # The pack is pushed to every player shortly after joining. Policy (also switchable in
@@ -43,10 +44,9 @@ icons:
 resource-pack:
   # Master switch. When false the plugin does not send any resource pack.
   enabled: true
-  # Direct download URL of the pack zip. Defaults to the dist/ zip of THIS distribution
-  # branch (jar and zip ship together, so their sha1 always agree); point this at your own
-  # hosting (Cloudflare Pages etc.) for reliability if the branch layout changes.
-  url: "https://raw.githubusercontent.com/ifuto/RumilancePractice/arena/01a07b2c-rumilancepractice/dist/RumilanceResourcePack.zip"
+  # Direct GitHub Release asset URL. Releases are immutable, so clients never receive a
+  # half-pushed branch zip; update this together with gradle.properties and the release asset.
+  url: "https://github.com/ifuto/RumilancePractice/releases/download/v1.76.52/RumilanceResourcePack.zip"
   # SHA-1 of the zip as 40 hex characters (must match the file exactly; see
   # dist/RumilanceResourcePack.sha1). The client rejects a hash mismatch — the localtest
   # guard (tools/localtest/localtest.sh) refuses a build whose sha1 drifts from the zip.
@@ -373,3 +373,11 @@ sign-guard:
 afk:
   # Cosmetic ancient-debris blocks scattered around the floor rim on every (re)build.
   netherite-ore-pool: 6
+
+# Bot-vs-player practice rooms
+practice:
+  # Max simultaneous sessions one practice room can host. Each session runs in its own
+  # disposable clone (never overlapping), so a single registered room can serve 10+
+  # players training at once — the default covers the spec'd parallel bot load.
+  # 0 (or negative) = unlimited.
+  room-concurrency: 10

@@ -1,0 +1,1 @@
+$return run execute if entity @a[tag=xlib_target,distance=..$(distance)]

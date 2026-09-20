@@ -1,0 +1,10 @@
+# NARENA internal TAB definition. Edit plugins/n-arena/tab-layout.csv after first start.
+# context,priority,group,prefix,visible
+all,500,owner,"§c§lOWNER §f",true
+all,400,admin,"§c§lADMIN §f",true
+all,300,mod,"§6§lMOD §f",true
+all,250,helper,"§eHELPER §f",true
+all,200,pro,"§bPRO §f",true
+all,150,vipplus,"§6N+ §f",true
+all,100,vip,"§eN §f",true
+all,0,default,"§7",true

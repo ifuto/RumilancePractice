@@ -1,0 +1,8 @@
+{
+  "function": "minecraft:set_components",
+  "components": {
+    "minecraft:can_place_on": {
+      "blocks": []
+    }
+  }
+}

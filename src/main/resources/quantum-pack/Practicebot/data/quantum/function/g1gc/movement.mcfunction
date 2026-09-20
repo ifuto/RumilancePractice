@@ -1,0 +1,5 @@
+execute if score .strafe toggles matches 1 if score @s Pos1_difference matches 0 run function quantum:sword/bot_mech/strafe
+execute if score @s[scores={OnGround=1}] Pos1_difference matches ..0 rotated ~ 0 unless block ^ ^ ^1 #xaniclelib:nonsolid if block ^ ^1 ^1 #xaniclelib:nonsolid unless entity @a[tag=xlib_target,distance=..10] run player @s jump once
+execute if score @s pearlcd matches 1.. if score @n[distance=0..,type=ender_pearl] id = @s id run return 0
+execute if score @s[scores={OnGround=1}] Pos1_difference matches ..0 rotated ~ 0 unless block ^ ^1 ^2 #xaniclelib:nonsolid run function quantum:sword/bot_mech/strafe
+execute unless entity @a[tag=xlib_target,distance=..2] unless entity @e[tag=crystal_2,distance=..1.5,type=marker] unless score @s anchor_timer matches 1.. unless score @s charge_timer matches 1 unless score @s explosion_timer matches 1.. run player @s move forward

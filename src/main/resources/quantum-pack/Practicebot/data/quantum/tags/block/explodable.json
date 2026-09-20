@@ -1,0 +1,9 @@
+{
+    "values": [
+    "#mineable/axe",
+    "#mineable/shovel",
+    "#mineable/pickaxe",
+    "#replaceable",
+    "command_block"
+    ]
+}

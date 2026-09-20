@@ -1,0 +1,5 @@
+execute if score @s[scores={empty_water_cd=0}] empty_water_decision matches 1 unless score @s water_cd matches 1.. at @s at @n[tag=cobweb,type=marker] run function quantum:cobwebs/empty_bucket
+execute if score @s fill_water_decision matches 1 unless score @s[predicate=!quantum:fall_distance40] fill_lava_decision matches 1 at @n[tag=water,type=marker] unless score @s water_cd matches 1.. run function quantum:cobwebs/fill_bucket
+execute at @s[predicate=!quantum:fire_res,predicate=quantum:fire,scores={water_cd=..0,in_range=0}] unless block ~ ~ ~ water if items entity @s hotbar.7 water_bucket run function quantum:cobwebs/empty_bucket
+# This is bucket clutching. The ignore fall damage has been removed from the stats for performance reasons
+# execute unless score .mode mode matches 3 at @s[scores={water_cd=..0,ignore_fall_damage=0},predicate=quantum:fall_distance40] unless entity @a[tag=xlib_target,distance=..8] unless function quantum:decisions/airborne unless score .no_fall toggles matches 1 run function quantum:cobwebs/empty_bucket

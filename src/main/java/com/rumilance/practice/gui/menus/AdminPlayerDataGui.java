@@ -167,7 +167,8 @@ public final class AdminPlayerDataGui extends AbstractGui {
                 ItemBuilder.of(Material.GOLDEN_HELMET)
                         .name(Component.text("Rank: " + rank.name(),
                                 rank.isVipPlusOrAbove() ? NamedTextColor.LIGHT_PURPLE
-                                        : rank.isVipOrAbove() ? NamedTextColor.GREEN : UiTheme.MUTED))
+                                        : rank.isVipOrAbove() ? NamedTextColor.GREEN
+                                        : rank == PlayerRank.PRO ? NamedTextColor.AQUA : UiTheme.MUTED))
                         .lore(UiTheme.line("Change with /urank"),
                                 UiTheme.hint("Read-only here"))
                         .action("decorate").build());

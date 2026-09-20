@@ -1,0 +1,1 @@
+item replace entity @s hotbar.0 with totem_of_undying

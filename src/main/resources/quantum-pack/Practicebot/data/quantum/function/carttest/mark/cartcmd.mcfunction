@@ -1,0 +1,2 @@
+setblock ~ ~ ~ powered_rail
+execute if entity @a[tag=xlib_bot,distance=..4] if entity @a[tag=xlib_target,distance=..3] if function xaniclelib:check/intersect if function xaniclelib:check/raycast if function xaniclelib:check/raycast2 run summon marker ~ ~ ~ {Tags:["rail_2","cartlib"]}

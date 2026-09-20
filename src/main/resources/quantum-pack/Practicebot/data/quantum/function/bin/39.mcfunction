@@ -1,0 +1,2 @@
+data merge entity @s {Glowing:1b,glow_color_override:65280,block_state:{Name:"minecraft:lime_concrete"},Tags:["not_positioned"]}
+execute as @n[tag=not_positioned,type=block_display] rotated as @p[tag=xlib_target] run function mech_train:generic/flick_aim.mcfunction/place_random

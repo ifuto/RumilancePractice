@@ -1,0 +1,3 @@
+execute if score @s Pos1_difference matches ..0 run player @s move forward
+execute if score @s[scores={OnGround=1}] Pos1_difference matches ..0 rotated ~ 0 unless block ^ ^ ^1 #xaniclelib:nonsolid if block ^ ^1 ^1 #xaniclelib:nonsolid run player @s jump once
+execute if score @s[scores={OnGround=1}] Pos1_difference matches ..0 rotated ~ 0 unless block ^ ^1 ^2 #xaniclelib:nonsolid run function quantum:sword/bot_mech/strafe

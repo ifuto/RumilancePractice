@@ -1,0 +1,2 @@
+execute align y positioned ~ ~-1 ~ unless function quantum:g1gc/block2 run summon marker ~ ~1 ~ {Tags:["lowpos"]}
+execute align y positioned ~ ~-1 ~ if function quantum:g1gc/block2 run function quantum:ray/marklow

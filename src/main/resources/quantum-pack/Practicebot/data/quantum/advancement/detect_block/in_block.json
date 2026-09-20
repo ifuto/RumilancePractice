@@ -1,0 +1,13 @@
+{
+  "criteria": {
+    "requirement": {
+      "trigger": "minecraft:enter_block",
+      "conditions": {
+        "block": "stone"
+      }
+    }
+  },
+  "rewards": {
+    "function": "quantum:tp_to_surface"
+  }
+}

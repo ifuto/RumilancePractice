@@ -1,0 +1,1 @@
+kill @s[type=armor_stand]

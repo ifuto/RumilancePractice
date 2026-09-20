@@ -1,0 +1,2 @@
+setblock ~ ~ ~ snow
+execute positioned ~ ~-1 ~ unless block ~ ~ ~ obsidian unless function quantum:g1gc/block positioned ~ ~1 ~ if function xaniclelib:check/intersect if function xaniclelib:check/raycast run summon marker ~ ~ ~ {Tags:["anchor_1","xlib","loc1"]}

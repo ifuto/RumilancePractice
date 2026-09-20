@@ -1,5 +1,6 @@
 package com.rumilance.practice.packetbot;
 
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.embedded.EmbeddedChannel;
 import net.minecraft.network.Connection;
@@ -20,9 +21,21 @@ public final class FakePlayerConnection extends Connection {
     public FakePlayerConnection(PacketFlow flow) {
         super(flow);
         try {
+            EmbeddedChannel channel = new EmbeddedChannel();
+            // Third-party packet injectors (ProtocolLib, PacketEvents) run
+            // {@code pipeline.addAfter("encoder", …)} on PlayerJoinEvent. A bare EmbeddedChannel
+            // has no named handlers, so that lookup throws NoSuchElementException and the bot
+            // gets kicked ("failed to inject into a channel"). Registering the real pipeline's
+            // names as no-op handlers lets the injection succeed; the injected handlers then
+            // sit unused because send() drops everything and nothing ever reads this channel.
+            channel.pipeline().addLast("splitter", new io.netty.channel.ChannelInboundHandlerAdapter());
+            channel.pipeline().addLast("decoder", new io.netty.channel.ChannelInboundHandlerAdapter());
+            channel.pipeline().addLast("prepender", new io.netty.channel.ChannelOutboundHandlerAdapter());
+            channel.pipeline().addLast("encoder", new io.netty.channel.ChannelOutboundHandlerAdapter());
+            channel.pipeline().addLast("packet_handler", new io.netty.channel.ChannelInboundHandlerAdapter());
             java.lang.reflect.Field field = Connection.class.getDeclaredField("channel");
             field.setAccessible(true);
-            field.set(this, new EmbeddedChannel());
+            field.set(this, channel);
         } catch (ReflectiveOperationException ignored) {
             // A missing channel only means vanilla gates treat the bot as disconnected;
             // gameplay keeps working.
@@ -31,6 +44,11 @@ public final class FakePlayerConnection extends Connection {
 
     @Override
     public void setReadOnly() {
+    }
+
+    /** The local {@link EmbeddedChannel}; {@code null} if the reflective install failed. */
+    public Channel channel() {
+        return this.channel;
     }
 
     @Override

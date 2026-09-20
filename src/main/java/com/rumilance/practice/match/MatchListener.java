@@ -45,22 +45,23 @@ public final class MatchListener implements Listener {
     private final com.rumilance.practice.tnt.PracticeTntSettings practiceTnt;
     private final PlayerPlacedBlockTracker playerPlacedBlocks;
     private final com.rumilance.practice.combat.ExplosionSourceTracker explosionSources;
+    private final com.rumilance.practice.combat.DamageAttributionService damageAttribution;
 
     public MatchListener(MatchService matchService, KitService kitService) {
-        this(matchService, kitService, null, null, null, null);
+        this(matchService, kitService, null, null, null, null, null);
     }
 
     public MatchListener(MatchService matchService, KitService kitService,
                          com.rumilance.practice.combat.CombatNetTracker combatNet,
                          com.rumilance.practice.tnt.PracticeTntSettings practiceTnt) {
-        this(matchService, kitService, combatNet, practiceTnt, null, null);
+        this(matchService, kitService, combatNet, practiceTnt, null, null, null);
     }
 
     public MatchListener(MatchService matchService, KitService kitService,
                          com.rumilance.practice.combat.CombatNetTracker combatNet,
                          com.rumilance.practice.tnt.PracticeTntSettings practiceTnt,
                          PlayerPlacedBlockTracker playerPlacedBlocks) {
-        this(matchService, kitService, combatNet, practiceTnt, playerPlacedBlocks, null);
+        this(matchService, kitService, combatNet, practiceTnt, playerPlacedBlocks, null, null);
     }
 
     public MatchListener(MatchService matchService, KitService kitService,
@@ -68,12 +69,22 @@ public final class MatchListener implements Listener {
                          com.rumilance.practice.tnt.PracticeTntSettings practiceTnt,
                          PlayerPlacedBlockTracker playerPlacedBlocks,
                          com.rumilance.practice.combat.ExplosionSourceTracker explosionSources) {
+        this(matchService, kitService, combatNet, practiceTnt, playerPlacedBlocks, explosionSources, null);
+    }
+
+    public MatchListener(MatchService matchService, KitService kitService,
+                         com.rumilance.practice.combat.CombatNetTracker combatNet,
+                         com.rumilance.practice.tnt.PracticeTntSettings practiceTnt,
+                         PlayerPlacedBlockTracker playerPlacedBlocks,
+                         com.rumilance.practice.combat.ExplosionSourceTracker explosionSources,
+                         com.rumilance.practice.combat.DamageAttributionService damageAttribution) {
         this.matchService = matchService;
         this.kitService = kitService;
         this.combatNet = combatNet;
         this.practiceTnt = practiceTnt;
         this.playerPlacedBlocks = playerPlacedBlocks;
         this.explosionSources = explosionSources;
+        this.damageAttribution = damageAttribution;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -93,7 +104,9 @@ public final class MatchListener implements Listener {
             return;
         }
 
-        UUIDLikeAttacker attacker = resolveAttacker(event);
+        UUIDLikeAttacker attacker = damageAttribution == null
+                ? resolveAttacker(event)
+                : new UUIDLikeAttacker(damageAttribution.resolve(event));
         UUID attackerId = attacker.playerId();
         UUID victimId = victim.getUniqueId();
         boolean selfInflicted = attackerId != null && attackerId.equals(victimId);
@@ -194,8 +207,13 @@ public final class MatchListener implements Listener {
         event.setShouldDropExperience(false);
         event.deathMessage(null);
         EntityDamageEvent last = victim.getLastDamageCause();
-        UUID attackerId = last == null ? null : resolveAttacker(last).playerId();
+        UUID attackerId = damageAttribution == null
+                ? (last == null ? null : resolveAttacker(last).playerId())
+                : damageAttribution.resolveForDeath(victim, last);
         UUID victimId = victim.getUniqueId();
+        if (damageAttribution != null) {
+            damageAttribution.clear(victimId);
+        }
         com.rumilance.practice.combat.DeathBridge.plan(victim, victim.getLocation(),
                 () -> matchService.handleLethal(session, victimId, attackerId));
     }

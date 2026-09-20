@@ -1,0 +1,41 @@
+{
+	"description": "",
+	"max_level": 1,
+	"slots": ["feet"],
+	"supported_items": [],
+	"weight": 1,
+	"anvil_cost": 0,
+	"min_cost": {
+		"base": 0,
+		"per_level_above_first": 0
+	},
+	"max_cost": {
+		"base": 0,
+		"per_level_above_first": 0
+	},
+	"effects": {
+		"minecraft:location_changed": [{
+			"effect": {
+				"type": "all_of",
+				"effects": [{
+					"type": "explode",
+					"attribute_to_user": false,
+					"knockback_multiplier": 1.8,
+					"radius": 3,
+					"create_fire": false,
+					"block_interaction": "trigger",
+					"small_particle": { "type": "minecraft:gust_emitter_small" },
+					"large_particle": { "type": "minecraft:gust_emitter_large" },
+					"sound": "minecraft:entity.wind_charge.wind_burst"
+				},{
+					"type": "run_function",
+					"function": "quantum:enchantment/kill_armour_stand"
+				}]
+			},
+			"requirements": {
+				"condition": "enchantment_active_check",
+				"active": false
+			}
+		}]
+	}
+}

@@ -1,0 +1,3 @@
+execute at @n[tag=player_pos_after_placed_anchor,distance=0..,type=marker] as @e[tag=placed_anchor,distance=..4.5,type=marker] at @s align xyz if entity @e[dx=0,tag=placed_anchor,scores={tick_timer=0..},type=marker] run kill
+execute as @n[tag=placed_anchor,distance=0..,type=marker] unless score @s tick_timer matches 0.. run scoreboard players set @s tick_timer 0
+kill @e[tag=player_pos_after_placed_anchor,distance=0..]

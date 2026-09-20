@@ -1,0 +1,2 @@
+$title @a actionbar [{"text":"Bot scale has been set to:","color":"aqua"},{"text":" $(bot_scale)","color":"gold"},{"text":" Default is 1.0","color":"green"}]
+$execute as @a[tag=xlib_bot] run attribute @s scale base set $(bot_scale)

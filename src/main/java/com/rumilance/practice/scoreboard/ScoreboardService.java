@@ -90,19 +90,7 @@ public final class ScoreboardService {
     private volatile com.rumilance.practice.font.IconFontService iconFontService;
     private volatile com.rumilance.practice.rank.RankService rankService;
     private volatile com.rumilance.practice.resourcepack.ResourcePackService resourcePackService;
-    /**
-     * When TAB (NEZNAMY) is installed it owns the client-side team packets used to sort the
-     * tab list. Assigning ANY other teams (rank icons {@code 2r*}, fight layout {@code 0*})
-     * steals every entry from TAB's sorting teams and the ordering dissolves — so this
-     * supplier (wired to {@link com.rumilance.practice.integration.TabBridge#tabActive()})
-     * skips all team work below while the icons are served as TAB placeholders instead.
-     */
-    private volatile java.util.function.BooleanSupplier tabListDelegated = () -> false;
-
-    /** Wires the TAB delegation check (called from FeatureBootstrap). */
-    public void setTabListDelegated(java.util.function.BooleanSupplier tabListDelegated) {
-        this.tabListDelegated = tabListDelegated == null ? () -> false : tabListDelegated;
-    }
+    private volatile TabCustomizationConfig tabCustomizationConfig;
     private final ConcurrentMap<UUID, CachedStats> statsCache = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, Long> statsCacheAt = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, BoardHandle> boards = new ConcurrentHashMap<>();
@@ -173,6 +161,10 @@ public final class ScoreboardService {
         this.rankService = rankService;
     }
 
+    public void setTabCustomizationConfig(TabCustomizationConfig tabCustomizationConfig) {
+        this.tabCustomizationConfig = tabCustomizationConfig;
+    }
+
     /** Pack-state lookup used to pick glyphs vs. text rank badges per viewer. */
     public void setResourcePackService(
             com.rumilance.practice.resourcepack.ResourcePackService resourcePackService) {
@@ -229,9 +221,15 @@ public final class ScoreboardService {
         if (!cfg.enabled()) {
             return;
         }
-        Collection<? extends Player> online = Bukkit.getOnlinePlayers();
+        // Bots are not players of this server: no scoreboard, no tab header, and they must
+        // not inflate the online count shown to real players. (Never mutate the live
+        // getOnlinePlayers() view — build a fresh list instead.)
+        java.util.List<Player> online = com.rumilance.practice.util.RealPlayers.online();
         int onlineCount = online.size();
         refreshStreakRanks(cfg);
+        // NARENA owns the complete tab surface: header/footer, visibility, sorting teams,
+        // rank badges and fight columns. It is deliberately independent of any external TAB
+        // plugin, so the configured layout is deterministic on every server.
         boolean tab = cfg.tabHeaderFooter();
         for (Player player : online) {
             if (!settingsService.get(player).scoreboardEnabled()) {
@@ -514,13 +512,17 @@ public final class ScoreboardService {
         MatchSession visualSession = match.orElseGet(() -> spectated.flatMap(matchRegistry::get).orElse(null));
         BoardHandle handle = boards.get(player.getUniqueId());
         // Pack-less viewers get the text rank badges (N / N+ / OWNER) — glyphs would render
-        // as missing-glyph boxes on their client.
+        // as missing-glyph boxes on their client. The CSV also owns the lobby/queue/FFA
+        // priority; fight columns below intentionally take priority while a match is active.
         boolean viewerHasPack = resourcePackService == null || resourcePackService.hasPack(player);
-        // TAB installed (see TabBridge): leave ALL teams to TAB, in every context — its
-        // sorting owns the client-side team packets and any team we'd add would steal the
-        // entries. Rank badges instead reach TAB via the %rel_rml_rankicon% placeholder.
-        boolean tabActive = tabListDelegated.getAsBoolean();
-        if (handle != null && visualSession != null && !tabActive) {
+        if (visualSession == null && tabCustomizationConfig != null && rankService != null) {
+            try {
+                player.setPlayerListOrder(tabCustomizationConfig.order(player, rankService));
+            } catch (Throwable ignored) {
+                // Paper versions without list-order support must still render the tab names.
+            }
+        }
+        if (handle != null && visualSession != null) {
             // In a match / spectating: fight teams carry the rank badge + RED/BLUE marker.
             com.rumilance.practice.font.RankIconNameTags.clear(handle.board);
             com.rumilance.practice.match.MatchTeamVisuals.apply(
@@ -534,11 +536,12 @@ public final class ScoreboardService {
                 tabFightListService.clear(player);
             }
             // Lobby / FFA / queue: rank badge (admin / VIP+ / VIP) in front of each name.
-            if (!tabActive && iconFontService != null && rankService != null
-                    && iconFontService.enabled()) {
+            if (iconFontService != null && rankService != null && iconFontService.enabled()) {
                 com.rumilance.practice.font.RankIconNameTags.apply(
                         handle.board, iconFontService, rankService,
-                        Bukkit.getOnlinePlayers(), viewerHasPack);
+                        Bukkit.getOnlinePlayers(), viewerHasPack,
+                        tabCustomizationConfig == null ? null
+                                : other -> tabCustomizationConfig.prefix(other, rankService));
             } else {
                 com.rumilance.practice.font.RankIconNameTags.clear(handle.board);
             }

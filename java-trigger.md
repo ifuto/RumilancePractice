@@ -1,5 +1,7 @@
 # java-trigger — Java 実行環境 / Fabric 実測サーバー配送の発火マーカー
 
+<!-- release asset maintenance trigger; diagnostics retry -->
+
 このファイルへの変更を含む push ごとに `.github/workflows/java-env.yml` が走ります。
 ワークフロー本体は **薄いディスパッチャ**で、実処理はすべてリポジトリ内の
 [`ci/java-env.sh`](ci/java-env.sh) にあります(サンドボックスのエージェントは

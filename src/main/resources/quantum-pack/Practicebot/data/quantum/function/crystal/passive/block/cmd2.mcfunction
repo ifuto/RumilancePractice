@@ -1,0 +1,1 @@
+execute if function quantum:g1gc/block positioned ~ ~-1 ~ unless function quantum:g1gc/block if function xaniclelib:check/intersect run return 1

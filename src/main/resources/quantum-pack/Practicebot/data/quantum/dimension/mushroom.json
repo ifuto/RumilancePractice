@@ -1,0 +1,33 @@
+{
+    "type": "minecraft:overworld",
+    "generator": {
+      "type": "minecraft:flat",
+      "settings": {
+        "biome": "minecraft:mushroom_fields",
+        "lakes": false,
+        "features": false,
+        "layers": [
+          {
+            "height": 1,
+            "block": "minecraft:bedrock"
+          },
+          {
+            "height": 64,
+            "block": "minecraft:deepslate"
+          },
+          {
+            "height": 64,
+            "block": "minecraft:stone"
+          },
+          {
+            "height": 4,
+            "block": "minecraft:dirt"
+          },
+          {
+            "height": 1,
+            "block": "minecraft:mycelium"
+          }
+        ]
+      }
+    }
+  }

@@ -29,9 +29,9 @@ import java.util.UUID;
  * The {@code /player}-style bot directory: named HeroBot fake players, spawned and removed
  * with the reference's flow ({@code PlayerList#placeNewPlayer} over a dead connection).
  *
- * <p>The Quantum map addresses its bot by <b>name</b> ({@code tag @a[name=quantumbot] add
- * xlib_bot}), so the runtime always spawns it as {@code quantumbot} — exactly the name the
- * measurement scenario in {@code java-trigger.md} uses.</p>
+ * <p>The Quantum map addresses bots by the persistent {@code quantum_bot} tag. The first
+ * each profile receives a unique legal name; every visible bot uses NARENA BOT
+ * suffixes and run through the same tagged function path.</p>
  */
 public final class HeroBotRegistry {
 
@@ -128,10 +128,26 @@ public final class HeroBotRegistry {
 
         this.spawning.add(name.toLowerCase(Locale.ROOT));
         HeroBotPlayer bot = new HeroBotPlayer(server, level, profile, ClientInformation.createDefault());
+        com.rumilance.practice.packetbot.FakePlayerConnection connection =
+                new com.rumilance.practice.packetbot.FakePlayerConnection(PacketFlow.SERVERBOUND);
+        // Keep PacketEvents (any version) from kicking the bot on the join event below.
+        com.rumilance.practice.packetbot.PacketEventsCompat.preRegister(connection, profile);
         server.getPlayerList().placeNewPlayer(
-                new com.rumilance.practice.packetbot.FakePlayerConnection(PacketFlow.SERVERBOUND),
+                connection,
                 bot,
                 CommonListenerCookie.createInitial(profile, false));
+        // Diagnostics: run PE's own join-check resolution and log the verdict (no-op w/o PE).
+        com.rumilance.practice.packetbot.PacketEventsCompat.verifyJoinCheck(profile.id(), name);
+        // Presence policy: bots are not server players — out of the TAB, out of the count.
+        // QuantumRuntime adds the private qbot_N instance tag immediately after this method
+        // returns. Keep only the stable discovery tag here; the old global xlib_bot tag is
+        // intentionally not used because it makes independent fights select one another.
+        bot.addTag("quantum_bot");
+        org.bukkit.entity.Player visibleBot = bot.getBukkitEntity();
+        visibleBot.setCustomName(com.rumilance.practice.packetbot.PacketBotFactory.DEFAULT_DISPLAY_NAME);
+        visibleBot.setCustomNameVisible(true);
+        com.rumilance.practice.packetbot.PacketBot.registerLive(bot,
+                com.rumilance.practice.packetbot.PacketBotFactory.DEFAULT_DISPLAY_NAME);
         bot.stopRiding();
         bot.teleportTo(level, location.getX(), location.getY(), location.getZ(),
                 Set.of(), yaw, pitch, true);
@@ -157,12 +173,13 @@ public final class HeroBotRegistry {
         return this.spawning.contains(name.toLowerCase(Locale.ROOT));
     }
 
-    /** Removes a fake player (tab list + world) — the reference's disconnect/kill cleanup. */
+    /** Removes a fake player (tab list + world + live registry) — the reference's cleanup. */
     public boolean despawn(String name) {
         HeroBotPlayer bot = this.bots.remove(name == null ? "" : name.toLowerCase(Locale.ROOT));
         if (bot == null) {
             return false;
         }
+        com.rumilance.practice.packetbot.PacketBot.unregisterLive(bot);
         if (bot.owningServer() != null) {
             bot.owningServer().getPlayerList().remove(bot);
         }

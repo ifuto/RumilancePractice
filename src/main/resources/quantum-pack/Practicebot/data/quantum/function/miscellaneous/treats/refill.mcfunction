@@ -1,0 +1,2 @@
+execute unless items entity @s weapon.mainhand #quantum:stone unless items entity @s weapon.mainhand crossbow unless items entity @s weapon.mainhand bucket run item modify entity @s weapon.mainhand quantum:refill
+execute unless items entity @s weapon.offhand #quantum:stone unless items entity @s weapon.mainhand crossbow unless items entity @s weapon.offhand bucket run item modify entity @s weapon.offhand quantum:refill

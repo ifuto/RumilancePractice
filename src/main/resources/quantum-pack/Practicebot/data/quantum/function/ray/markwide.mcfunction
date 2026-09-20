@@ -1,0 +1,3 @@
+execute as @e[tag=markright,distance=0..,type=marker] at @s align xyz positioned ~.5 ~.5 ~.5 run function quantum:ray/markright
+execute as @e[tag=markleft,distance=0..,type=marker] at @s align xyz positioned ~.5 ~.5 ~.5 run function quantum:ray/markleft
+execute unless entity @e[tag=markwide,tag=finished,distance=0..,type=marker] if entity @e[tag=markwide,distance=..1000,type=marker] run function quantum:ray/markwide

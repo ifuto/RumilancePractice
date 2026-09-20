@@ -1,0 +1,33 @@
+{
+  "type": "minecraft:overworld",
+  "generator": {
+    "type": "minecraft:flat",
+    "settings": {
+      "biome": "minecraft:badlands",
+      "lakes": false,
+      "features": false,
+      "layers": [
+        {
+          "height": 1,
+          "block": "minecraft:bedrock"
+        },
+        {
+          "height": 63,
+          "block": "minecraft:deepslate"
+        },
+        {
+          "height": 44,
+          "block": "minecraft:stone"
+        },
+        {
+          "height": 24,
+          "block": "minecraft:orange_terracotta"
+        },
+        {
+          "height": 1,
+          "block": "minecraft:red_sand"
+        }
+      ]
+    }
+  }
+}

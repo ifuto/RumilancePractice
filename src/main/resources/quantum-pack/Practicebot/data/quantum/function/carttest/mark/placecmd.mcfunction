@@ -1,0 +1,2 @@
+setblock ~ ~ ~ air
+execute positioned ~ ~-1 ~ unless function quantum:g1gc/block positioned ~ ~1 ~ if entity @a[tag=xlib_bot,distance=2.5..5] if entity @a[tag=xlib_target,distance=..2.5] if function xaniclelib:check/intersect if function xaniclelib:check/raycast if function xaniclelib:check/raycast2 if function xaniclelib:check/entityraycast run summon marker ~ ~ ~ {Tags:["rail_1","cartlib"]}

@@ -1,0 +1,11 @@
+{
+  "values": [
+    "#minecraft:air",
+    "minecraft:water",
+    "minecraft:lava",
+    "red_mushroom",
+    "brown_mushroom",
+    "snow",
+    "dead_bush"
+  ]
+}

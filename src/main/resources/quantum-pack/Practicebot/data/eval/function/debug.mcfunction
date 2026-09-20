@@ -1,0 +1,9 @@
+scoreboard players operation .saturation_difference eval = @s saturation_difference
+scoreboard players operation .sf eval = @s sf
+scoreboard players operation .hp eval = @s hp
+scoreboard players operation .Pos1_difference eval = @s Pos1_difference
+scoreboard players operation .pos eval = @s pos
+scoreboard players operation .xlib eval = @s xlib
+scoreboard players operation .slib eval = @s slib
+scoreboard players operation .eval_hit eval = @s eval_hit
+scoreboard players operation .cobweb eval = @s eval_cobweb

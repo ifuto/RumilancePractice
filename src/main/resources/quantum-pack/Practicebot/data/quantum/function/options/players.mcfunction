@@ -1,0 +1,2 @@
+$execute unless score .$(player) bots matches 1 run return run function quantum:options/toggles/playerson {"player":"$(player)"}
+$execute if score .$(player) bots matches 1 run return run function quantum:options/toggles/playersoff {"player":"$(player)"}

@@ -1,0 +1,30 @@
+{
+  "criteria": {
+    "example": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "player": [
+          {
+            "condition": "minecraft:value_check",
+            "value": {
+              "type": "minecraft:score",
+              "target": "this",
+              "score": "threw_wind_charge"
+            },
+            "range": {
+              "min": 1
+            }
+          }
+        ],
+        "items": [
+          {
+            "items": "minecraft:wind_charge"
+          }
+        ]
+      }
+    }
+  },
+  "rewards": {
+    "function": "stats:advancements/threw_wind_charge"
+  }
+}

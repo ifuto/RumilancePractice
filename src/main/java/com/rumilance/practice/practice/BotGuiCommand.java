@@ -1,6 +1,7 @@
 package com.rumilance.practice.practice;
 
-import com.rumilance.practice.gui.menus.PracticeBotSelectGui;
+import com.rumilance.practice.herobot.HeroBotPlayer;
+import com.rumilance.practice.quantum.QuantumRuntime;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.command.Command;
@@ -13,32 +14,41 @@ import org.jetbrains.annotations.NotNull;
 import java.util.List;
 
 /**
- * {@code /bot} — opens the bot-select GUI directly (the same screen the practice menu shows).
- * A player already inside a practice session is bounced with a message instead.
+ * {@code /bot} — spawns the real Quantum map bot.
+ *
+     * <p>This command intentionally does not open the old Java-side practice-bot selector. The
+     * Quantum runtime owns one tagged instance per invocation, using a unique profile name for every invocation; its combat behavior is driven by
+     * the bundled Quantum functions and HeroBot command implementation. The player's location is
+     * used only as a fallback when the Quantum config has no explicit spawn location, and the
+     * player's profile is used as the bot skin template.</p>
  */
 public final class BotGuiCommand implements CommandExecutor, TabCompleter {
 
-    private final PracticeService practiceService;
-    private final PracticeBotSelectGui botSelectGui;
+    private final QuantumRuntime quantum;
 
-    public BotGuiCommand(PracticeService practiceService, PracticeBotSelectGui botSelectGui) {
-        this.practiceService = practiceService;
-        this.botSelectGui = botSelectGui;
+    public BotGuiCommand(QuantumRuntime quantum) {
+        this.quantum = quantum;
     }
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command,
                              @NotNull String label, @NotNull String[] args) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage(Component.text("Only players can open the bot screen.", NamedTextColor.RED));
+            sender.sendMessage(Component.text("Only players can spawn the QuantumBOT.", NamedTextColor.RED));
             return true;
         }
-        if (practiceService.session(player.getUniqueId()).isPresent()) {
+        if (!quantum.enabled()) {
+            player.sendMessage(Component.text("QuantumBOT is disabled in quantum.yml.", NamedTextColor.RED));
+            return true;
+        }
+        try {
+            HeroBotPlayer bot = quantum.spawnBot(player.getLocation(), player);
             player.sendMessage(Component.text(
-                    "練習中はBOT画面を開けません。先に退出してください。", NamedTextColor.RED));
-            return true;
+                    "QuantumBOT spawned: " + bot.profileName(), NamedTextColor.GREEN));
+        } catch (RuntimeException error) {
+            player.sendMessage(Component.text(
+                    "QuantumBOT could not be spawned: " + error.getMessage(), NamedTextColor.RED));
         }
-        botSelectGui.open(player);
         return true;
     }
 

@@ -1,0 +1,20 @@
+{
+  "values": [
+    "#minecraft:all_signs",
+    "#minecraft:air",
+    "#minecraft:all_hanging_signs",
+    "minecraft:redstone_wire",
+    "#minecraft:crops",
+    "#minecraft:pressure_plates",
+    "#minecraft:fire",
+    "#minecraft:buttons",
+    "#minecraft:wool_carpets",
+    "#minecraft:flowers",
+    "#minecraft:rails",
+    "#minecraft:saplings",
+    "minecraft:water",
+    "minecraft:lava",
+    "snow",
+    "#replaceable"
+  ]
+}

@@ -1,0 +1,2 @@
+kill @e[tag=hardcode,distance=0..,type=marker]
+$execute positioned ~ $(Pos1) ~ run fill ~-3 ~1 ~-3 ~3 ~ ~3 command_block{auto:1b,Command:"function quantum:crystal/hardcode/mark/aircmd2"} replace #xaniclelib:nonsolid

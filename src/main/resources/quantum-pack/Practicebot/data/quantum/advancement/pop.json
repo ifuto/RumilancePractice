@@ -1,0 +1,10 @@
+{
+  "criteria": {
+    "pop_totem": {
+      "trigger": "minecraft:used_totem"
+    }
+  },
+  "rewards": {
+    "function": "quantum:adaptivedifficulty/pop"
+  }
+}  

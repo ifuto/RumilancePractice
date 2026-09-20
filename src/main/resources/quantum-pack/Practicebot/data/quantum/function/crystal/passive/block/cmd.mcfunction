@@ -1,0 +1,1 @@
+execute if function quantum:g1gc/block positioned ~ ~-1 ~ unless function quantum:g1gc/block positioned ~ ~1 ~ if function xaniclelib:check/intersect2 if function xaniclelib:check/raycast3 run summon marker ~ ~ ~ {Tags:["block","defense"]}

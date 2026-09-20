@@ -1,0 +1,2 @@
+setblock ~ ~ ~ obsidian
+execute if function xaniclelib:check/intersect1 if function xaniclelib:check/raycast if function xaniclelib:check/raycast2 run summon marker ~ ~-1 ~ {Tags:["crystal2","crystal","hardcode"]}

@@ -51,6 +51,8 @@ import com.rumilance.practice.command.ReportCommand;
 import com.rumilance.practice.command.ReportListCommand;
 import com.rumilance.practice.command.SetFuncCommand;
 import com.rumilance.practice.command.SetRankCommand;
+import com.rumilance.practice.command.TestArenaCommand;
+import com.rumilance.practice.testarena.SmoothTerrainGenerator;
 import com.rumilance.practice.command.SignCheckCommand;
 import com.rumilance.practice.config.ConfigService;
 import com.rumilance.practice.config.PluginSettings;
@@ -192,6 +194,7 @@ import com.rumilance.practice.report.ReportEvidenceStore;
 import com.rumilance.practice.report.ReportService;
 import com.rumilance.practice.scoreboard.ScoreboardConfig;
 import com.rumilance.practice.scoreboard.ScoreboardService;
+import com.rumilance.practice.scoreboard.TabCustomizationConfig;
 import com.rumilance.practice.security.sign.SignChangeGuardListener;
 import com.rumilance.practice.security.sign.SignGuardService;
 import com.rumilance.practice.security.sign.SignProbeService;
@@ -673,7 +676,8 @@ public final class FeatureBootstrap {
                 resourcePackService;
         com.rumilance.practice.match.MatchTeamVisuals.setPrefixResolver((viewer, player, session) -> {
             net.kyori.adventure.text.Component prefix = net.kyori.adventure.text.Component.empty();
-            // Effective rank: stored rank or granted permissions (admin > VIP+ > VIP).
+            // Effective rank: stored rank or granted permissions (admin > VIP+ > VIP > PRO > NORM).
+            // PRO has no permission of its own — it only comes from the stored rank.
             com.rumilance.practice.rank.PlayerRank effective;
             if (rankServiceRef.isAdmin(player)) {
                 effective = com.rumilance.practice.rank.PlayerRank.ADMIN;
@@ -681,6 +685,8 @@ public final class FeatureBootstrap {
                 effective = com.rumilance.practice.rank.PlayerRank.VIP_PLUS;
             } else if (rankServiceRef.isVipOrAbove(player)) {
                 effective = com.rumilance.practice.rank.PlayerRank.VIP;
+            } else if (rankServiceRef.get(player) == com.rumilance.practice.rank.PlayerRank.PRO) {
+                effective = com.rumilance.practice.rank.PlayerRank.PRO;
             } else {
                 effective = com.rumilance.practice.rank.PlayerRank.NORM;
             }
@@ -1064,6 +1070,8 @@ public final class FeatureBootstrap {
                 new PracticeBotSelectGui(guiSessions, soundService, practiceService);
         botSelectGui.setAfkEntry(afkCrystalManager::joinFromMenu);
         battleMenuGui.setBotSelectGui(botSelectGui);
+        // Live free-slot count on the BOT tile (10+ parallel bot fights per room).
+        battleMenuGui.setPracticeService(practiceService);
         BanListGui banListGui = new BanListGui(guiSessions, soundService, banService);
         ReportGui reportGui = new ReportGui(guiSessions, soundService, reportService);
         ReportListGui reportListGui =
@@ -1095,8 +1103,8 @@ public final class FeatureBootstrap {
         practiceService.setKitService(kitService);
         // Bot fights bound to a kit own the kit's duel arena (BOT fights are NOT practice rooms).
         practiceService.setArenaService(arenaService);
-        // /bot opens the bot-select screen; /botadmin binds bot fight kits to arena kits.
-        bind("bot", new com.rumilance.practice.practice.BotGuiCommand(practiceService, botSelectGui));
+        // /bot is bound after QuantumRuntime is created below; it spawns the real QuantumBOT.
+        // /botadmin still binds bot fight kits to arena kits for the legacy multi-instance practice flow.
         bind("botadmin", new com.rumilance.practice.practice.BotAdminCommand(practiceService, kitService));
         // Dev-only headless harness (-Drumilance.harness=true): drives an ordinary bot match
         // with a fake player, so BOT parity runs need nobody at the keyboard.
@@ -1274,14 +1282,10 @@ public final class FeatureBootstrap {
         scoreboardService.setIconFontService(iconFontService);
         scoreboardService.setResourcePackService(resourcePackService);
         scoreboardService.setRankService(rankService);
-        // NEZNAMY/TAB co-existence: while TAB ships the tablist sorting teams, this plugin
-        // must not create ANY scoreboard teams (see integration/TabBridge.java for the
-        // protocol-level reasoning). Icons still reach the tablist as TAB placeholders.
-        final com.rumilance.practice.integration.TabBridge tabBridge =
-                new com.rumilance.practice.integration.TabBridge(plugin, services, resourcePackService);
-        scoreboardService.setTabListDelegated(tabBridge::tabActive);
-        plugin.getServer().getPluginManager().registerEvents(tabBridge, plugin);
-        tabBridge.detect();
+        scoreboardService.setTabCustomizationConfig(TabCustomizationConfig.load(plugin));
+        // TAB is intentionally implemented inside NARENA. Header/footer, sorting, rank
+        // badges, fight columns and placeholders are all emitted by ScoreboardService and
+        // the TabFight* services below; no external TAB API is required.
         TabVisibilityService tabVisibilityService =
                 new TabVisibilityService(plugin, stateManager, matchRegistry);
         tabVisibilityService.setSpectatorService(spectatorService);
@@ -1406,7 +1410,13 @@ public final class FeatureBootstrap {
         com.rumilance.practice.combat.ExplosionSourceTracker explosionSources =
                 new com.rumilance.practice.combat.ExplosionSourceTracker(plugin);
         pm.registerEvents(explosionSources, plugin);
-        pm.registerEvents(new MatchListener(matchService, kitService, combatNet, practiceTnt, playerPlacedBlockTracker, explosionSources), plugin);
+        com.rumilance.practice.combat.DamageAttributionService damageAttribution =
+                new com.rumilance.practice.combat.DamageAttributionService(explosionSources);
+        // MONITOR records only the final uncancelled damage event. Match/FFA listeners use
+        // the same resolver immediately and use the ledger for void/fall deaths.
+        pm.registerEvents(damageAttribution, plugin);
+        pm.registerEvents(new MatchListener(matchService, kitService, combatNet, practiceTnt,
+                playerPlacedBlockTracker, explosionSources, damageAttribution), plugin);
         pm.registerEvents(new MatchCommandGuardListener(stateManager, messageService), plugin);
         pm.registerEvents(new MatchCountdownLockListener(stateManager), plugin);
         pm.registerEvents(new com.rumilance.practice.match.MatchChatListener(matchRegistry, spectatorService), plugin);
@@ -1414,7 +1424,8 @@ public final class FeatureBootstrap {
         pm.registerEvents(new ArenaBoundsListener(matchService, arenaService), plugin);
         pm.registerEvents(new SpectatorBoundsListener(
                 spectatorService, matchRegistry, arenaService, ffaService), plugin);
-        pm.registerEvents(new FfaListener(ffaService, kitService, stateManager, combatNet, practiceTnt, playerPlacedBlockTracker, explosionSources), plugin);
+        pm.registerEvents(new FfaListener(ffaService, kitService, stateManager, combatNet, practiceTnt,
+                playerPlacedBlockTracker, explosionSources, damageAttribution), plugin);
         pm.registerEvents(new FfaBlockTracker(ffaService), plugin);
         // FFA command gate (default OFF): when an admin enables it via /practiceadmin
         // ffacommand, FFA occupants may only run the whitelisted commands and only while
@@ -1648,6 +1659,9 @@ public final class FeatureBootstrap {
         bind("lang", langCommand);
         bind("matchinv", new MatchInvCommand(matchInventoryGui));
         bind("setfunc", new SetFuncCommand());
+        TestArenaCommand testArenaCommand = new TestArenaCommand(new SmoothTerrainGenerator(plugin));
+        bind("testarena", testArenaCommand);
+        pm.registerEvents(testArenaCommand, plugin);
         bind("admin", adminCommand);
         bind("practiceadmin", practiceAdmin);
         bind("slobby", practiceAdmin);
@@ -1797,12 +1811,18 @@ public final class FeatureBootstrap {
         // QuantumRuntime for why that ordering is load-bearing.
         this.quantumBots = new com.rumilance.practice.herobot.HeroBotRegistry(plugin);
         this.quantum = new com.rumilance.practice.quantum.QuantumRuntime(plugin, this.quantumBots);
+        // PacketEvents (any version) must not kick the fake players on join.
+        com.rumilance.practice.packetbot.PacketEventsCompat.register(plugin);
         // PvP サーバーとしての BOT の装備はサーバーキット (/botadmin の紐づけ) から。
         // 紐づけが無ければ何もしない = マップのキットチェストがそのまま使われる。
         this.quantum.setPracticeService(this.practiceService);
         this.quantum.enable();
+        botSelectGui.setQuantumRuntime(this.quantum);
         bind("quantum", new com.rumilance.practice.quantum.QuantumCommand(plugin, this.quantum,
                 this.quantumBots));
+        // /bot is the public entry point for the actual bundled QuantumBOT, not the old
+        // Java-side PracticeBot selector.
+        bind("bot", new com.rumilance.practice.practice.BotGuiCommand(this.quantum));
 
         plugin.getLogger().info("Feature services enabled (all player GUIs and admin commands wired).");
     }

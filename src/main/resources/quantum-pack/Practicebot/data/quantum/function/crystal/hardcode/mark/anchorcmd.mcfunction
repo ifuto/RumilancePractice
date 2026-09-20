@@ -1,0 +1,1 @@
+execute if block ~ ~ ~ #xaniclelib:nonsolid if entity @s[distance=..5] if function xaniclelib:check/intersect if function quantum:mark/blockplace if function xaniclelib:check/raycast if function xaniclelib:check/raycast2 run return 1
