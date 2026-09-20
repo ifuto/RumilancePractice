@@ -44,22 +44,23 @@ public final class FfaListener implements Listener {
     private final com.rumilance.practice.tnt.PracticeTntSettings practiceTnt;
     private final PlayerPlacedBlockTracker playerPlacedBlocks;
     private final com.rumilance.practice.combat.ExplosionSourceTracker explosionSources;
+    private final com.rumilance.practice.combat.DamageAttributionService damageAttribution;
 
     public FfaListener(FfaService ffaService, KitService kitService, PlayerStateManager stateManager) {
-        this(ffaService, kitService, stateManager, null, null, null, null);
+        this(ffaService, kitService, stateManager, null, null, null, null, null);
     }
 
     public FfaListener(FfaService ffaService, KitService kitService, PlayerStateManager stateManager,
                        com.rumilance.practice.combat.CombatNetTracker combatNet,
                        com.rumilance.practice.tnt.PracticeTntSettings practiceTnt) {
-        this(ffaService, kitService, stateManager, combatNet, practiceTnt, null, null);
+        this(ffaService, kitService, stateManager, combatNet, practiceTnt, null, null, null);
     }
 
     public FfaListener(FfaService ffaService, KitService kitService, PlayerStateManager stateManager,
                        com.rumilance.practice.combat.CombatNetTracker combatNet,
                        com.rumilance.practice.tnt.PracticeTntSettings practiceTnt,
                        PlayerPlacedBlockTracker playerPlacedBlocks) {
-        this(ffaService, kitService, stateManager, combatNet, practiceTnt, playerPlacedBlocks, null);
+        this(ffaService, kitService, stateManager, combatNet, practiceTnt, playerPlacedBlocks, null, null);
     }
 
     public FfaListener(FfaService ffaService, KitService kitService, PlayerStateManager stateManager,
@@ -67,6 +68,16 @@ public final class FfaListener implements Listener {
                        com.rumilance.practice.tnt.PracticeTntSettings practiceTnt,
                        PlayerPlacedBlockTracker playerPlacedBlocks,
                        com.rumilance.practice.combat.ExplosionSourceTracker explosionSources) {
+        this(ffaService, kitService, stateManager, combatNet, practiceTnt, playerPlacedBlocks,
+                explosionSources, null);
+    }
+
+    public FfaListener(FfaService ffaService, KitService kitService, PlayerStateManager stateManager,
+                       com.rumilance.practice.combat.CombatNetTracker combatNet,
+                       com.rumilance.practice.tnt.PracticeTntSettings practiceTnt,
+                       PlayerPlacedBlockTracker playerPlacedBlocks,
+                       com.rumilance.practice.combat.ExplosionSourceTracker explosionSources,
+                       com.rumilance.practice.combat.DamageAttributionService damageAttribution) {
         this.ffaService = ffaService;
         this.kitService = kitService;
         this.stateManager = stateManager;
@@ -74,6 +85,7 @@ public final class FfaListener implements Listener {
         this.practiceTnt = practiceTnt;
         this.playerPlacedBlocks = playerPlacedBlocks;
         this.explosionSources = explosionSources;
+        this.damageAttribution = damageAttribution;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -87,10 +99,12 @@ public final class FfaListener implements Listener {
         KitDefinition kit = kitOf(victim.getUniqueId());
         if (event instanceof EntityDamageByEntityEvent byEntity) {
             applyKitCombatRules(byEntity, victim, kit);
-            UUID attackerId = resolveKiller(byEntity);
-            if (attackerId != null) {
-                ffaService.tagCombat(victim.getUniqueId(), attackerId);
-            }
+        }
+        UUID attackerId = damageAttribution == null
+                ? (event instanceof EntityDamageByEntityEvent byEntity ? resolveKiller(byEntity) : null)
+                : damageAttribution.resolve(event);
+        if (attackerId != null) {
+            ffaService.tagCombat(victim.getUniqueId(), attackerId);
         }
 
         // Lethal frames are NOT intercepted or predicted: vanilla kills the player for real
@@ -114,7 +128,12 @@ public final class FfaListener implements Listener {
         event.setShouldDropExperience(false);
         event.deathMessage(null);
         EntityDamageEvent last = victim.getLastDamageCause();
-        UUID killerId = last == null ? null : resolveKiller(last);
+        UUID killerId = damageAttribution == null
+                ? (last == null ? null : resolveKiller(last))
+                : damageAttribution.resolveForDeath(victim, last);
+        if (damageAttribution != null) {
+            damageAttribution.clear(victim.getUniqueId());
+        }
         com.rumilance.practice.combat.DeathBridge.plan(victim, victim.getLocation(),
                 () -> ffaService.handleLethal(victim, killerId));
     }

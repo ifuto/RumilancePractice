@@ -98,10 +98,16 @@ public final class ScoreboardService {
      * skips all team work below while the icons are served as TAB placeholders instead.
      */
     private volatile java.util.function.BooleanSupplier tabListDelegated = () -> false;
+    private volatile com.rumilance.practice.integration.TabBridge tabBridge;
 
     /** Wires the TAB delegation check (called from FeatureBootstrap). */
     public void setTabListDelegated(java.util.function.BooleanSupplier tabListDelegated) {
         this.tabListDelegated = tabListDelegated == null ? () -> false : tabListDelegated;
+    }
+
+    /** Lets the external TAB integration apply its API-owned player-list formatting. */
+    public void setTabBridge(com.rumilance.practice.integration.TabBridge tabBridge) {
+        this.tabBridge = tabBridge;
     }
     private final ConcurrentMap<UUID, CachedStats> statsCache = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, Long> statsCacheAt = new ConcurrentHashMap<>();
@@ -235,7 +241,13 @@ public final class ScoreboardService {
         java.util.List<Player> online = com.rumilance.practice.util.RealPlayers.online();
         int onlineCount = online.size();
         refreshStreakRanks(cfg);
-        boolean tab = cfg.tabHeaderFooter();
+        boolean tabDelegated = tabListDelegated.getAsBoolean();
+        if (tabDelegated && tabBridge != null) {
+            tabBridge.refresh(online);
+        }
+        // TAB owns header/footer when installed. Sending our own packets here makes the two
+        // plugins fight every refresh and is explicitly blocked by TAB's anti-override.
+        boolean tab = cfg.tabHeaderFooter() && !tabDelegated;
         for (Player player : online) {
             if (!settingsService.get(player).scoreboardEnabled()) {
                 boards.remove(player.getUniqueId());
@@ -258,7 +270,7 @@ public final class ScoreboardService {
         if (tabVisibilityService != null) {
             tabVisibilityService.refresh(online);
         }
-        if (tabFightListService != null) {
+        if (!tabDelegated && tabFightListService != null) {
             java.util.Set<UUID> applied = new java.util.HashSet<>();
             for (Player player : online) {
                 MatchSession session = matchRegistry.byPlayer(player.getUniqueId()).orElse(null);

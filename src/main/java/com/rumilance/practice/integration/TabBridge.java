@@ -15,6 +15,7 @@ import org.bukkit.event.server.PluginDisableEvent;
 import org.bukkit.event.server.PluginEnableEvent;
 import org.bukkit.plugin.Plugin;
 
+import java.util.Collection;
 import java.util.UUID;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -67,6 +68,11 @@ public final class TabBridge implements Listener {
 
     private volatile boolean tabActive;
     private volatile boolean placeholdersRegistered;
+    private volatile Boolean tabListFormattingAvailable;
+    private volatile boolean formattingWarningLogged;
+
+    /** Prefix is applied through TAB's API, so no manual groups.yml edit is required for ranks. */
+    private static final String TAB_RANK_PREFIX = RELATIONAL_PLACEHOLDER + " ";
 
     public TabBridge(Plugin plugin, ServiceRegistry services, ResourcePackService packService) {
         this.plugin = plugin;
@@ -100,6 +106,8 @@ public final class TabBridge implements Listener {
         if (TAB_PLUGIN_NAME.equals(event.getPlugin().getName())) {
             tabActive = false;
             placeholdersRegistered = false;
+            tabListFormattingAvailable = null;
+            formattingWarningLogged = false;
             logger.info("TAB disabled — the scoreboard resumes its own rank-icon / fight teams.");
         }
     }
@@ -134,12 +142,69 @@ public final class TabBridge implements Listener {
             placeholdersRegistered = true;
             logger.info("Registered TAB placeholders " + PLAYER_PLACEHOLDER + " / "
                     + RELATIONAL_PLACEHOLDER
-                    + " — put %rel_rml_rankicon% in TAB's tablist-name-format to keep icons in TAB.");
+                    + " — the rank prefix is applied through TabListFormatManager.");
         } catch (Throwable t) {
             // TAB without its api package (very old build or proxy-only flavour): sorting is
             // already fixed by stepping off the team packets; the icons just stay off TAB.
             logger.log(Level.WARNING, "TAB present but placeholder registration failed — "
                     + "tablist sorting is delegated to TAB, rank icons stay out of it.", t);
+        }
+    }
+
+    /**
+     * Applies the plugin-owned rank prefix through TAB's documented API. TAB's API values
+     * override groups/users temporarily, so the integration works even when the server's
+     * stock groups.yml has no NARENA entries. Header/footer and sorting remain TAB-owned.
+     */
+    public void refresh(Collection<? extends Player> players) {
+        if (!tabActive || players == null || players.isEmpty()) {
+            return;
+        }
+        try {
+            Class<?> apiClass = Class.forName("me.neznamy.tab.api.TabAPI");
+            Object api = apiClass.getMethod("getInstance").invoke(null);
+            Class<?> tabPlayerClass = Class.forName("me.neznamy.tab.api.TabPlayer");
+            Class<?> formatManagerClass = Class.forName("me.neznamy.tab.api.TabListFormatManager");
+            Object formatManager = apiClass.getMethod("getTabListFormatManager").invoke(api);
+            if (formatManager == null) {
+                tabListFormattingAvailable = false;
+                if (!formattingWarningLogged) {
+                    formattingWarningLogged = true;
+                    logger.warning("TAB tablist-name-formatting is disabled; enable it in TAB "
+                            + "config.yml to display NARENA rank prefixes.");
+                }
+                return;
+            }
+            // Resolve the method once before iterating so a version mismatch is reported once.
+            formatManagerClass.getMethod("setPrefix", tabPlayerClass, String.class);
+            tabListFormattingAvailable = true;
+            for (Player player : players) {
+                Object tabPlayer = apiClass.getMethod("getPlayer", UUID.class)
+                        .invoke(api, player.getUniqueId());
+                if (tabPlayer != null) {
+                    MethodInvoker.apply(formatManager, formatManagerClass, tabPlayerClass,
+                            tabPlayer, TAB_RANK_PREFIX);
+                }
+            }
+        } catch (Throwable t) {
+            tabListFormattingAvailable = false;
+            if (!formattingWarningLogged) {
+                formattingWarningLogged = true;
+                logger.log(Level.WARNING, "TAB API formatting could not be applied; "
+                        + "the tablist remains under TAB configuration.", t);
+            }
+        }
+    }
+
+    /** Small reflection adapter kept out of the hot loop's call-site noise. */
+    private static final class MethodInvoker {
+        private MethodInvoker() {
+        }
+
+        static void apply(Object manager, Class<?> managerClass, Class<?> tabPlayerClass,
+                          Object tabPlayer, String prefix) throws ReflectiveOperationException {
+            managerClass.getMethod("setPrefix", tabPlayerClass, String.class)
+                    .invoke(manager, tabPlayer, prefix);
         }
     }
 

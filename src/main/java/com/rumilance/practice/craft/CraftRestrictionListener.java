@@ -12,10 +12,10 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.Recipe;
 
 /**
- * Server-wide crafting restriction: only log -&gt; planks crafting is allowed.
- * Recipe results are suppressed at the prepare stage, which blocks normal clicks,
- * shift-clicks and number-key moves in one place (no {@code CraftItemEvent} reaches
- * an empty result slot).
+ * Server-wide crafting restriction: log -&gt; planks, pressure plates and buttons are
+ * allowed. Recipe results are suppressed at the prepare stage, which blocks normal
+ * clicks, shift-clicks and number-key moves in one place (no {@code CraftItemEvent}
+ * reaches an empty result slot).
  *
  * <p>Exemption: operators currently in {@link PlayerState#LOBBY} (admin/build work in
  * the lobby world) keep the full vanilla recipe book. OPs inside matches/practice/FFA
@@ -36,8 +36,8 @@ public final class CraftRestrictionListener implements Listener {
             return;
         }
         ItemStack result = recipe.getResult();
-        if (result == null || CraftingAllowance.isPlanksResult(result.getType())) {
-            return; // log -> planks stays available for everyone
+        if (result == null || CraftingAllowance.isAllowedResult(result.getType())) {
+            return; // planks, pressure plates and buttons stay available for everyone
         }
         for (HumanEntity viewer : event.getViewers()) {
             if (viewer instanceof Player player && isExempt(player)) {

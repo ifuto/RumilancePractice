@@ -1,0 +1,26 @@
+# Recommended plugins/TAB/config.yml settings for NARENA.
+# Merge these sections with the current TAB-generated config; do not replace unrelated TAB features.
+
+tablist-name-formatting:
+  enabled: true
+  disable-condition: ""
+
+header-footer:
+  enabled: true
+  designs:
+    default:
+      header:
+        - "<#35D4FF>&m                                                  "
+        - "<aqua><bold>N Arena"
+        - "<gray>Practice PvP"
+      footer:
+        - "<gray>play.example.com"
+        - "<#35D4FF>&m                                                  "
+
+scoreboard-teams:
+  enabled: true
+  # Primary group order is controlled by LuckPerms/TAB. The final placeholder keeps
+  # players with the same rank deterministic and alphabetical.
+  sorting-types:
+    - "GROUPS:owner,admin,mod,helper,pro,vipplus,vip,default"
+    - "PLACEHOLDER_A_TO_Z:%player%"

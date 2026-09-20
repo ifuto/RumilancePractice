@@ -1,0 +1,35 @@
+# Recommended plugins/TAB/groups.yml additions for NARENA.
+# TAB's API prefix is applied automatically by NARENA; these values are a safe fallback
+# for TAB reloads and for players who have no explicit permission group.
+
+_DEFAULT_:
+  tabprefix: "<gray>"
+  tagprefix: "<gray>"
+
+owner:
+  tabprefix: "<red><bold>OWNER <white>"
+  tagprefix: "<red>"
+
+admin:
+  tabprefix: "<red><bold>ADMIN <white>"
+  tagprefix: "<red>"
+
+mod:
+  tabprefix: "<gold><bold>MOD <white>"
+  tagprefix: "<gold>"
+
+helper:
+  tabprefix: "<yellow>HELPER <white>"
+  tagprefix: "<yellow>"
+
+pro:
+  tabprefix: "<aqua>PRO <white>"
+  tagprefix: "<aqua>"
+
+vipplus:
+  tabprefix: "<gold>N+ <white>"
+  tagprefix: "<gold>"
+
+vip:
+  tabprefix: "<yellow>N <white>"
+  tagprefix: "<yellow>"

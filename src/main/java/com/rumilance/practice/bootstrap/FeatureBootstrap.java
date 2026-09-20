@@ -1285,6 +1285,7 @@ public final class FeatureBootstrap {
         final com.rumilance.practice.integration.TabBridge tabBridge =
                 new com.rumilance.practice.integration.TabBridge(plugin, services, resourcePackService);
         scoreboardService.setTabListDelegated(tabBridge::tabActive);
+        scoreboardService.setTabBridge(tabBridge);
         plugin.getServer().getPluginManager().registerEvents(tabBridge, plugin);
         tabBridge.detect();
         TabVisibilityService tabVisibilityService =
@@ -1411,7 +1412,13 @@ public final class FeatureBootstrap {
         com.rumilance.practice.combat.ExplosionSourceTracker explosionSources =
                 new com.rumilance.practice.combat.ExplosionSourceTracker(plugin);
         pm.registerEvents(explosionSources, plugin);
-        pm.registerEvents(new MatchListener(matchService, kitService, combatNet, practiceTnt, playerPlacedBlockTracker, explosionSources), plugin);
+        com.rumilance.practice.combat.DamageAttributionService damageAttribution =
+                new com.rumilance.practice.combat.DamageAttributionService(explosionSources);
+        // MONITOR records only the final uncancelled damage event. Match/FFA listeners use
+        // the same resolver immediately and use the ledger for void/fall deaths.
+        pm.registerEvents(damageAttribution, plugin);
+        pm.registerEvents(new MatchListener(matchService, kitService, combatNet, practiceTnt,
+                playerPlacedBlockTracker, explosionSources, damageAttribution), plugin);
         pm.registerEvents(new MatchCommandGuardListener(stateManager, messageService), plugin);
         pm.registerEvents(new MatchCountdownLockListener(stateManager), plugin);
         pm.registerEvents(new com.rumilance.practice.match.MatchChatListener(matchRegistry, spectatorService), plugin);
@@ -1419,7 +1426,8 @@ public final class FeatureBootstrap {
         pm.registerEvents(new ArenaBoundsListener(matchService, arenaService), plugin);
         pm.registerEvents(new SpectatorBoundsListener(
                 spectatorService, matchRegistry, arenaService, ffaService), plugin);
-        pm.registerEvents(new FfaListener(ffaService, kitService, stateManager, combatNet, practiceTnt, playerPlacedBlockTracker, explosionSources), plugin);
+        pm.registerEvents(new FfaListener(ffaService, kitService, stateManager, combatNet, practiceTnt,
+                playerPlacedBlockTracker, explosionSources, damageAttribution), plugin);
         pm.registerEvents(new FfaBlockTracker(ffaService), plugin);
         // FFA command gate (default OFF): when an admin enables it via /practiceadmin
         // ffacommand, FFA occupants may only run the whitelisted commands and only while
