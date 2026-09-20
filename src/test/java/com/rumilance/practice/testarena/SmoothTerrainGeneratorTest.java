@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SmoothTerrainGeneratorTest {
 
     @Test
-    void generatedSurfaceStaysWithinFiveBlocksAcrossThe100By100Map() {
+    void generatedSurfaceStaysWithinConfiguredEnvelopeAcrossThe100By100Map() {
         SmoothTerrainGenerator.HeightMap map =
                 SmoothTerrainGenerator.HeightMap.create(SmoothTerrainGenerator.WIDTH, 0x4e4152454e41L);
         int min = Integer.MAX_VALUE;
@@ -24,6 +24,11 @@ class SmoothTerrainGeneratorTest {
         assertEquals(0, min);
         assertEquals(4, max);
         assertTrue(max - min <= SmoothTerrainGenerator.MAX_HEIGHT_DELTA);
+
+        SmoothTerrainGenerator.HeightMap smaller = SmoothTerrainGenerator.HeightMap.create(
+                SmoothTerrainGenerator.WIDTH, 9L, SmoothTerrainGenerator.TerrainShape.RANDOM, 2);
+        assertTrue(smaller.minimum() >= 0);
+        assertTrue(smaller.maximum() <= 2);
     }
 
     @Test
@@ -67,7 +72,7 @@ class SmoothTerrainGeneratorTest {
     }
 
     @Test
-    void materialLayersMatchTheTwoMapDefinitions() {
+    void materialPresetsHaveTheExpectedTopLayers() {
         SmoothTerrainGenerator.TerrainMap grass = SmoothTerrainGenerator.TerrainMap.GRASS_STONE;
         assertEquals(Material.GRASS_BLOCK, grass.materialAtLayer(1));
         assertEquals(Material.DIRT, grass.materialAtLayer(2));
@@ -80,5 +85,28 @@ class SmoothTerrainGeneratorTest {
         assertEquals(Material.SAND, sand.materialAtLayer(4));
         assertEquals(Material.SANDSTONE, sand.materialAtLayer(5));
         assertEquals(Material.SANDSTONE, sand.materialAtLayer(50));
+
+        SmoothTerrainGenerator.TerrainMap red = SmoothTerrainGenerator.TerrainMap.RED_SAND_RED_SANDSTONE;
+        assertEquals(Material.RED_SAND, red.materialAtLayer(1));
+        assertEquals(Material.RED_SAND, red.materialAtLayer(3));
+        assertEquals(Material.RED_SANDSTONE, red.materialAtLayer(4));
+        assertEquals(Material.RED_SANDSTONE, red.materialAtLayer(200));
+    }
+
+    @Test
+    void surfaceOnlyAndUndergroundSettingsKeepBedrockAboveVoid() {
+        SmoothTerrainGenerator.TerrainSettings surfaceOnly = new SmoothTerrainGenerator.TerrainSettings(
+                SmoothTerrainGenerator.TerrainMap.RED_SAND_RED_SANDSTONE,
+                SmoothTerrainGenerator.TerrainShape.CENTER_LOW, true, 2);
+        SmoothTerrainGenerator.TerrainSettings underground = new SmoothTerrainGenerator.TerrainSettings(
+                SmoothTerrainGenerator.TerrainMap.GRASS_STONE,
+                SmoothTerrainGenerator.TerrainShape.RANDOM, false, 4);
+
+        assertEquals(SmoothTerrainGenerator.SURFACE_ONLY_FOUNDATION_LAYERS, surfaceOnly.foundationDepth());
+        assertEquals(SmoothTerrainGenerator.UNDERGROUND_DEPTH, underground.foundationDepth());
+        int worldMin = -64;
+        int surfaceY = worldMin + underground.foundationDepth() + 2;
+        int bedrockY = surfaceY - underground.foundationDepth() - 1;
+        assertTrue(bedrockY > worldMin, "bedrock must not touch the world's minimum Y");
     }
 }

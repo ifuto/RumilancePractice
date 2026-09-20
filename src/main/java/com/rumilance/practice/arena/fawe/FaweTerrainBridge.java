@@ -64,7 +64,7 @@ public final class FaweTerrainBridge implements TerrainEditBridge {
     @Override
     public CompletableFuture<Boolean> paste(World world, int minX, int minY, int minZ,
                                              int maxX, int maxY, int maxZ,
-                                             SmoothTerrainGenerator.TerrainMap map,
+                                             SmoothTerrainGenerator.TerrainSettings settings,
                                              List<SmoothTerrainGenerator.ColumnData> columns) {
         return asyncExecutor.supplyAsync(() -> {
             try {
@@ -74,12 +74,11 @@ public final class FaweTerrainBridge implements TerrainEditBridge {
                 CuboidRegion region = new CuboidRegion(weWorld, min, max);
                 BlockArrayClipboard clipboard = new BlockArrayClipboard(region);
                 BlockState air = BlockTypes.AIR.getDefaultState();
-                BlockState stone = BlockTypes.STONE.getDefaultState();
                 BlockState bedrock = BlockTypes.BEDROCK.getDefaultState();
 
                 // Fill the whole edit volume, including air above the terrain. The bottom is a
-                // flat bedrock plane; every cavity between that plane and a taller surface is
-                // solid stone, so no floating islands or hollow columns remain.
+                // flat bedrock plane; every cavity between that plane and the surface is filled
+                // with the selected palette, so no floating islands or hollow columns remain.
                 for (SmoothTerrainGenerator.ColumnData column : columns) {
                     for (int y = minY; y <= maxY; y++) {
                         BlockState state;
@@ -89,8 +88,7 @@ public final class FaweTerrainBridge implements TerrainEditBridge {
                             state = air;
                         } else {
                             int layer = column.topY() - y + 1;
-                            state = layer >= 1 && layer <= SmoothTerrainGenerator.LAYERS
-                                    ? stateFor(map, layer) : stone;
+                            state = stateFor(settings.map(), layer);
                         }
                         clipboard.setBlock(BlockVector3.at(column.x(), y, column.z()), state);
                     }
@@ -140,6 +138,8 @@ public final class FaweTerrainBridge implements TerrainEditBridge {
                     : layer <= 3 ? BlockTypes.DIRT.getDefaultState() : BlockTypes.STONE.getDefaultState();
             case SAND_SANDSTONE -> layer <= 4
                     ? BlockTypes.SAND.getDefaultState() : BlockTypes.SANDSTONE.getDefaultState();
+            case RED_SAND_RED_SANDSTONE -> layer <= 3
+                    ? BlockTypes.RED_SAND.getDefaultState() : BlockTypes.RED_SANDSTONE.getDefaultState();
         };
     }
 }

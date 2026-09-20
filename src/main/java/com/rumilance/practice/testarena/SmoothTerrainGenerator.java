@@ -32,9 +32,12 @@ public final class SmoothTerrainGenerator {
 
     public static final int WIDTH = 100;
     public static final int MAX_HEIGHT_DELTA = 4;
+    public static final int UNDERGROUND_DEPTH = 200;
+    public static final int SURFACE_ONLY_FOUNDATION_LAYERS = 2;
     // Wider control cells make broad, gently rolling land instead of many small bumps.
     private static final int CONTROL_SPACING = 20;
     private static final int COLUMNS_PER_TICK = 16;
+    /** Kept as a public compatibility constant for callers that describe the surface stack. */
     public static final int LAYERS = 50;
     private static final int CLEAR_ABOVE = 16;
     private static final String STATE_FILE = "testarena.yml";
@@ -61,31 +64,43 @@ public final class SmoothTerrainGenerator {
         this.previousMap = readState();
     }
 
-    /** Two terrain shapes offered by the test-arena menu. */
+    /** Shape is independent from the material palette, so Grass can also be a bowl. */
     public enum TerrainShape {
-        RANDOM,
-        CENTER_LOW
+        RANDOM("Random", "Smooth random height map"),
+        CENTER_LOW("Center-low bowl", "The centre gently slopes down");
+
+        private final String label;
+        private final String description;
+
+        TerrainShape(String label, String description) {
+            this.label = label;
+            this.description = description;
+        }
+
+        public String label() {
+            return label;
+        }
+
+        public String description() {
+            return description;
+        }
     }
 
     public enum TerrainMap {
-        // Keep the original random option and use the second material preset for the new bowl.
-        GRASS_STONE("grass-stone", "Random / Grass / Stone", TerrainShape.RANDOM,
-                Material.GRASS_BLOCK, Material.DIRT, Material.STONE),
-        SAND_SANDSTONE("sand-sandstone", "Center-low / Sand / Sandstone", TerrainShape.CENTER_LOW,
-                Material.SAND, Material.SAND, Material.SANDSTONE);
+        GRASS_STONE("grass-stone", "Grass / Stone", Material.GRASS_BLOCK, Material.DIRT, Material.STONE),
+        SAND_SANDSTONE("sand-sandstone", "Sand / Sandstone", Material.SAND, Material.SAND, Material.SANDSTONE),
+        RED_SAND_RED_SANDSTONE("red-sand-red-sandstone", "Red Sand / Red Sandstone",
+                Material.RED_SAND, Material.RED_SAND, Material.RED_SANDSTONE);
 
         private final String key;
         private final String displayName;
-        private final TerrainShape shape;
         private final Material top;
         private final Material middle;
         private final Material deep;
 
-        TerrainMap(String key, String displayName, TerrainShape shape,
-                   Material top, Material middle, Material deep) {
+        TerrainMap(String key, String displayName, Material top, Material middle, Material deep) {
             this.key = key;
             this.displayName = displayName;
-            this.shape = shape;
             this.top = top;
             this.middle = middle;
             this.deep = deep;
@@ -99,14 +114,13 @@ public final class SmoothTerrainGenerator {
             return displayName;
         }
 
-        public TerrainShape shape() {
-            return shape;
-        }
-
-        /** Material for a layer counted downward from the surface (1..50). */
-        Material materialAtLayer(int layer) {
+        /** Material for a layer counted downward from the surface. */
+        public Material materialAtLayer(int layer) {
             if (this == GRASS_STONE) {
                 return layer == 1 ? top : layer <= 3 ? middle : deep;
+            }
+            if (this == RED_SAND_RED_SANDSTONE) {
+                return layer <= 3 ? top : deep;
             }
             return layer <= 4 ? middle : deep;
         }
@@ -124,6 +138,25 @@ public final class SmoothTerrainGenerator {
         }
     }
 
+    /** Settings selected in the PvP map menu. */
+    public record TerrainSettings(TerrainMap map, TerrainShape shape, boolean surfaceOnly,
+                                  int maxHeightDelta) {
+        public TerrainSettings {
+            if (map == null) {
+                throw new IllegalArgumentException("map is required");
+            }
+            if (shape == null) {
+                shape = TerrainShape.RANDOM;
+            }
+            maxHeightDelta = Math.max(0, Math.min(MAX_HEIGHT_DELTA, maxHeightDelta));
+        }
+
+        /** Number of solid material layers below the surface before the bedrock layer. */
+        public int foundationDepth() {
+            return surfaceOnly ? SURFACE_ONLY_FOUNDATION_LAYERS : UNDERGROUND_DEPTH;
+        }
+    }
+
     /** Summary returned after all columns have been written. */
     public record Result(TerrainMap map, int width, int columns, int minimumHeight,
                          int maximumHeight, long seed) {
@@ -133,7 +166,7 @@ public final class SmoothTerrainGenerator {
     }
 
     private record Area(String world, int centerX, int centerZ, int baseY, int width,
-                        TerrainMap map, int minY, int maxY) {
+                        TerrainSettings settings, int minY, int maxY) {
     }
 
     /** Planned surface column exposed to the optional FAWE clipboard writer. */
@@ -207,8 +240,14 @@ public final class SmoothTerrainGenerator {
      */
     public void generate(Player player, TerrainMap map, long seed,
                           Consumer<Result> complete, Consumer<String> failure) {
-        if (map == null) {
-            fail(failure, "Unknown test map.");
+        generate(player, new TerrainSettings(map, TerrainShape.RANDOM, false, MAX_HEIGHT_DELTA),
+                seed, complete, failure);
+    }
+
+    public void generate(Player player, TerrainSettings settings, long seed,
+                          Consumer<Result> complete, Consumer<String> failure) {
+        if (settings == null || settings.map() == null) {
+            fail(failure, "Unknown test map settings.");
             return;
         }
         if (previousMap != null) {
@@ -229,11 +268,16 @@ public final class SmoothTerrainGenerator {
         World world = player.getWorld();
         int centerX = player.getLocation().getBlockX();
         int centerZ = player.getLocation().getBlockZ();
-        int baseY = Math.max(world.getMinHeight() + LAYERS + 2, player.getLocation().getBlockY() - 1);
-        // baseY is the lowest surface level. The flat bedrock foundation sits one block below
-        // the bottom of that 50-block surface stack; taller columns get a stone-filled cavity.
-        Area area = new Area(world.getName(), centerX, centerZ, baseY, WIDTH, map,
-                baseY - LAYERS, baseY + MAX_HEIGHT_DELTA + CLEAR_ABOVE);
+        int foundationDepth = settings.foundationDepth();
+        // Keep the bedrock one block above the world's minimum Y. This preserves the requested
+        // depth when the world has room, while preventing a deep map from touching the Void.
+        int minimumSafeSurface = world.getMinHeight() + foundationDepth + 2;
+        int baseY = Math.max(minimumSafeSurface, player.getLocation().getBlockY() - 1);
+        int highestSafeSurface = world.getMaxHeight() - CLEAR_ABOVE - settings.maxHeightDelta() - 1;
+        baseY = Math.min(baseY, highestSafeSurface);
+        int bedrockY = baseY - foundationDepth - 1;
+        Area area = new Area(world.getName(), centerX, centerZ, baseY, WIDTH,
+                settings, bedrockY, baseY + settings.maxHeightDelta() + CLEAR_ABOVE);
 
         // No Bukkit world/block calls are made in this future. This keeps noise generation and
         // the 10,000-column plan off the server thread, then hands only the write phase back to
@@ -345,7 +389,7 @@ public final class SmoothTerrainGenerator {
         CompletableFuture<Boolean> paste;
         try {
             paste = terrainEditBridge.paste(world, minX, area.minY(), minZ, maxX, area.maxY(), maxZ,
-                    area.map(), columns);
+                    area.settings(), columns);
         } catch (Throwable error) {
             running.remove(player.getUniqueId());
             busy.remove(player.getUniqueId());
@@ -365,7 +409,7 @@ public final class SmoothTerrainGenerator {
                     }
                     previousMap = area;
                     writeState(area);
-                    Result result = new Result(area.map(), area.width(), columns.size(),
+                    Result result = new Result(area.settings().map(), area.width(), columns.size(),
                             minimum(columns, area.baseY()), maximum(columns, area.baseY()), seed);
                     if (complete != null && player.isOnline()) {
                         complete.accept(result);
@@ -434,7 +478,7 @@ public final class SmoothTerrainGenerator {
             public void run() {
                 int end = Math.min(columns.size(), index + COLUMNS_PER_TICK);
                 for (; index < end; index++) {
-                    writeColumn(world, columns.get(index), area.map(), area.minY());
+                    writeColumn(world, columns.get(index), area.settings(), area.minY());
                 }
                 if (index >= columns.size()) {
                     previousMap = area;
@@ -443,7 +487,7 @@ public final class SmoothTerrainGenerator {
                     busy.remove(player.getUniqueId());
                     releaseOperation(operationId);
                     holder[0].cancel();
-                    Result result = new Result(area.map(), area.width(), columns.size(),
+                    Result result = new Result(area.settings().map(), area.width(), columns.size(),
                             minimum(columns, area.baseY()), maximum(columns, area.baseY()), seed);
                     if (complete != null && player.isOnline()) {
                         complete.accept(result);
@@ -455,7 +499,7 @@ public final class SmoothTerrainGenerator {
     }
 
     private static List<ColumnData> plan(Area area, long seed) {
-        HeightMap map = HeightMap.create(area.width(), seed, area.map().shape());
+        HeightMap map = HeightMap.create(area.width(), seed, area.settings().shape(), area.settings().maxHeightDelta());
         List<ColumnData> columns = new ArrayList<>(area.width() * area.width());
         for (int x = 0; x < area.width(); x++) {
             for (int z = 0; z < area.width(); z++) {
@@ -467,7 +511,8 @@ public final class SmoothTerrainGenerator {
         return columns;
     }
 
-    private static void writeColumn(World world, ColumnData column, TerrainMap map, int bottomY) {
+    private static void writeColumn(World world, ColumnData column, TerrainSettings settings, int bottomY) {
+        TerrainMap map = settings.map();
         for (int y = column.topY() + 1; y <= column.topY() + CLEAR_ABOVE; y++) {
             if (y >= world.getMinHeight() && y < world.getMaxHeight()) {
                 world.getBlockAt(column.x(), y, column.z()).setType(Material.AIR, false);
@@ -476,18 +521,14 @@ public final class SmoothTerrainGenerator {
         if (bottomY >= world.getMinHeight() && bottomY < world.getMaxHeight()) {
             world.getBlockAt(column.x(), bottomY, column.z()).setType(Material.BEDROCK, false);
         }
-        // Fill all space between the flat bedrock and the surface with stone first. The
-        // material-specific surface layers are then overlaid from the top downward.
+        // Use the selected palette for the complete underground volume too. This is what makes
+        // the red-sand preset red sandstone below its three red-sand top layers instead of an
+        // unrelated stone cavity.
         int from = Math.max(world.getMinHeight(), bottomY + 1);
         int to = Math.min(world.getMaxHeight() - 1, column.topY());
         for (int y = from; y <= to; y++) {
-            world.getBlockAt(column.x(), y, column.z()).setType(Material.STONE, false);
-        }
-        for (int layer = 1; layer <= LAYERS; layer++) {
-            int y = column.topY() - (layer - 1);
-            if (y >= world.getMinHeight() && y < world.getMaxHeight()) {
-                world.getBlockAt(column.x(), y, column.z()).setType(map.materialAtLayer(layer), false);
-            }
+            int layer = column.topY() - y + 1;
+            world.getBlockAt(column.x(), y, column.z()).setType(map.materialAtLayer(layer), false);
         }
     }
 
@@ -515,7 +556,11 @@ public final class SmoothTerrainGenerator {
         yaml.set("center-z", area.centerZ());
         yaml.set("base-y", area.baseY());
         yaml.set("width", area.width());
-        yaml.set("map", area.map().key());
+        yaml.set("map", area.settings().map().key());
+        yaml.set("shape", area.settings().shape().name());
+        yaml.set("surface-only", area.settings().surfaceOnly());
+        yaml.set("max-height-delta", area.settings().maxHeightDelta());
+        yaml.set("foundation-depth", area.settings().foundationDepth());
         yaml.set("min-y", area.minY());
         yaml.set("max-y", area.maxY());
         try {
@@ -538,10 +583,20 @@ public final class SmoothTerrainGenerator {
                 return null;
             }
             int baseY = yaml.getInt("base-y");
+            TerrainShape shape;
+            try {
+                shape = TerrainShape.valueOf(yaml.getString("shape", TerrainShape.RANDOM.name()));
+            } catch (IllegalArgumentException ignored) {
+                shape = TerrainShape.RANDOM;
+            }
+            TerrainSettings settings = new TerrainSettings(map, shape,
+                    yaml.getBoolean("surface-only", false),
+                    yaml.getInt("max-height-delta", MAX_HEIGHT_DELTA));
+            int defaultBedrockY = baseY - settings.foundationDepth() - 1;
             return new Area(world, yaml.getInt("center-x"), yaml.getInt("center-z"), baseY,
-                    yaml.getInt("width", WIDTH), map,
-                    yaml.getInt("min-y", baseY - LAYERS + 1),
-                    yaml.getInt("max-y", baseY + MAX_HEIGHT_DELTA + CLEAR_ABOVE));
+                    yaml.getInt("width", WIDTH), settings,
+                    yaml.getInt("min-y", defaultBedrockY),
+                    yaml.getInt("max-y", baseY + settings.maxHeightDelta() + CLEAR_ABOVE));
         } catch (Exception ignored) {
             return null;
         }
@@ -588,6 +643,11 @@ public final class SmoothTerrainGenerator {
         }
 
         static HeightMap create(int width, long seed, TerrainShape shape) {
+            return create(width, seed, shape, MAX_HEIGHT_DELTA);
+        }
+
+        static HeightMap create(int width, long seed, TerrainShape shape, int maxHeightDelta) {
+            maxHeightDelta = Math.max(0, Math.min(MAX_HEIGHT_DELTA, maxHeightDelta));
             int gridSize = (int) Math.ceil((width - 1) / (double) CONTROL_SPACING) + 1;
             int[] positions = new int[gridSize];
             for (int i = 0; i < gridSize; i++) {
@@ -601,15 +661,16 @@ public final class SmoothTerrainGenerator {
             for (int x = 0; x < gridSize; x++) {
                 for (int z = 0; z < gridSize; z++) {
                     if (shape == TerrainShape.CENTER_LOW) {
-                        // A shallow bowl: the centre gets 0..1 control height while the outer
-                        // edge gets a 0..3 radial lift. The later interpolation/relaxation keeps
-                        // it smooth and the final envelope is still exactly 0..MAX_HEIGHT_DELTA.
+                        // A shallow bowl: the centre gets a little random variation while the
+                        // outer edge gets a radial lift. The envelope remains user-configurable.
                         double nx = positions[x] / (double) (width - 1) * 2.0d - 1.0d;
                         double nz = positions[z] / (double) (width - 1) * 2.0d - 1.0d;
                         double distance = Math.min(1.0d, Math.sqrt(nx * nx + nz * nz) / Math.sqrt(2.0d));
-                        values[x][z] = random.nextInt(2) + (int) Math.round(distance * 3.0d);
+                        values[x][z] = Math.min(maxHeightDelta,
+                                (maxHeightDelta == 0 ? 0 : random.nextInt(Math.min(2, maxHeightDelta + 1)))
+                                        + (int) Math.round(distance * maxHeightDelta));
                     } else {
-                        values[x][z] = random.nextInt(MAX_HEIGHT_DELTA + 1);
+                        values[x][z] = random.nextInt(maxHeightDelta + 1);
                     }
                     minimum = Math.min(minimum, values[x][z]);
                     maximum = Math.max(maximum, values[x][z]);
@@ -619,11 +680,11 @@ public final class SmoothTerrainGenerator {
                 for (int x = 0; x < gridSize; x++) {
                     for (int z = 0; z < gridSize; z++) {
                         values[x][z] = Math.round((values[x][z] - minimum)
-                                * (float) MAX_HEIGHT_DELTA / (maximum - minimum));
+                                * (float) maxHeightDelta / (maximum - minimum));
                     }
                 }
                 minimum = 0;
-                maximum = MAX_HEIGHT_DELTA;
+                maximum = maxHeightDelta;
             }
             // The final control interval is only three blocks wide (100 is not an exact
             // multiple of eight). Cap control-point changes by the physical interval length;

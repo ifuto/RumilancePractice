@@ -18,7 +18,7 @@ public interface TerrainEditBridge {
 
     CompletableFuture<Boolean> paste(World world, int minX, int minY, int minZ,
                                      int maxX, int maxY, int maxZ,
-                                     SmoothTerrainGenerator.TerrainMap map,
+                                     SmoothTerrainGenerator.TerrainSettings settings,
                                      List<SmoothTerrainGenerator.ColumnData> columns);
 
     CompletableFuture<Boolean> clear(World world, int minX, int minY, int minZ,
