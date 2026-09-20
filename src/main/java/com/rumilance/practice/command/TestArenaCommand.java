@@ -96,7 +96,7 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
                 NamedTextColor.AQUA));
         generator.generate(player, map, seed, result -> player.sendMessage(Component.text(
                 "Test arena ready: " + result.map().displayName() + ", " + result.width() + "x"
-                        + result.width() + ", 50 layers, height " + result.minimumHeight() + ".."
+                        + result.width() + ", 50 surface layers + bedrock, height " + result.minimumHeight() + ".."
                         + result.maximumHeight() + " (range " + result.heightRange() + "), seed "
                         + result.seed() + ". Use /testarena delete when finished.",
                 NamedTextColor.GREEN)),
@@ -128,11 +128,13 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
                 Component.text("TestArena: choose a map", NamedTextColor.DARK_AQUA));
         holder.bind(inventory);
         inventory.setItem(GRASS_SLOT, item(Material.GRASS_BLOCK,
-                "Map A: Grass / Stone",
-                "Layer 1: grass block", "Layers 2-3: dirt", "Layers 4-50: stone"));
+                "Map A: Random / Grass / Stone",
+                "Smooth random height map", "Layer 1: grass block", "Layers 2-3: dirt", "Layers 4-50: stone",
+                "Flat bedrock bottom + stone foundation"));
         inventory.setItem(SAND_SLOT, item(Material.SAND,
-                "Map B: Sand / Sandstone",
-                "Layers 1-4: sand", "Layers 5-50: sandstone"));
+                "Map B: Center-low / Sand / Sandstone",
+                "The centre is gently lower", "Layers 1-4: sand", "Layers 5-50: sandstone",
+                "Flat bedrock bottom + stone foundation"));
         inventory.setItem(4, item(Material.BARRIER, "Close", "No map will be created."));
         player.openInventory(inventory);
     }

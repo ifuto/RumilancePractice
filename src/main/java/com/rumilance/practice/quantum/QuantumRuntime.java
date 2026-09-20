@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -704,10 +705,24 @@ public final class QuantumRuntime {
         String name = this.nextBotName(configuredName);
         Location where = this.botSpawn(fallback);
         GameType mode = GameType.byName(this.config.getString("bot.gamemode", "survival").toLowerCase(Locale.ROOT));
-        HeroBotPlayer bot = this.bots.spawn(name, where,
-                (float) this.config.getDouble("bot.yaw", where.getYaw()),
-                (float) this.config.getDouble("bot.pitch", where.getPitch()),
-                mode == null ? GameType.SURVIVAL : mode, skinTemplate);
+        HeroBotPlayer bot;
+        try {
+            bot = this.bots.spawn(name, where,
+                    (float) this.config.getDouble("bot.yaw", where.getYaw()),
+                    (float) this.config.getDouble("bot.pitch", where.getPitch()),
+                    mode == null ? GameType.SURVIVAL : mode, skinTemplate);
+        } catch (RuntimeException error) {
+            // A bare NullPointerException used to surface to players as
+            // "QuantumBOT could not be spawned: null". Keep the full cause in the server log and
+            // return a stable diagnostic to the command/GUI instead.
+            this.plugin.getLogger().log(Level.SEVERE,
+                    "[Quantum] HeroBot spawn failed for profile " + name + " at " + where, error);
+            String detail = error.getMessage();
+            if (detail == null || detail.isBlank()) {
+                detail = error.getClass().getSimpleName();
+            }
+            throw new IllegalStateException("HeroBot spawn failed: " + detail, error);
+        }
         bot.ping = this.config.getInt("bot.ping", 100);
 
         int number = this.nextInstanceNumber.getAndIncrement();
@@ -749,7 +764,13 @@ public final class QuantumRuntime {
                 skinTemplate.removeScoreboardTag(instance.participantTag());
             }
             this.bots.despawn(bot.profileName());
-            throw error;
+            this.plugin.getLogger().log(Level.SEVERE,
+                    "[Quantum] HeroBot setup failed for profile " + bot.profileName(), error);
+            String detail = error.getMessage();
+            if (detail == null || detail.isBlank()) {
+                detail = error.getClass().getSimpleName();
+            }
+            throw new IllegalStateException("QuantumBOT setup failed: " + detail, error);
         }
     }
 

@@ -31,7 +31,7 @@ import java.util.function.Consumer;
 public final class SmoothTerrainGenerator {
 
     public static final int WIDTH = 100;
-    public static final int MAX_HEIGHT_DELTA = 5;
+    public static final int MAX_HEIGHT_DELTA = 4;
     // Wider control cells make broad, gently rolling land instead of many small bumps.
     private static final int CONTROL_SPACING = 20;
     private static final int COLUMNS_PER_TICK = 16;
@@ -61,19 +61,31 @@ public final class SmoothTerrainGenerator {
         this.previousMap = readState();
     }
 
+    /** Two terrain shapes offered by the test-arena menu. */
+    public enum TerrainShape {
+        RANDOM,
+        CENTER_LOW
+    }
+
     public enum TerrainMap {
-        GRASS_STONE("grass-stone", "Grass / Stone", Material.GRASS_BLOCK, Material.DIRT, Material.STONE),
-        SAND_SANDSTONE("sand-sandstone", "Sand / Sandstone", Material.SAND, Material.SAND, Material.SANDSTONE);
+        // Keep the original random option and use the second material preset for the new bowl.
+        GRASS_STONE("grass-stone", "Random / Grass / Stone", TerrainShape.RANDOM,
+                Material.GRASS_BLOCK, Material.DIRT, Material.STONE),
+        SAND_SANDSTONE("sand-sandstone", "Center-low / Sand / Sandstone", TerrainShape.CENTER_LOW,
+                Material.SAND, Material.SAND, Material.SANDSTONE);
 
         private final String key;
         private final String displayName;
+        private final TerrainShape shape;
         private final Material top;
         private final Material middle;
         private final Material deep;
 
-        TerrainMap(String key, String displayName, Material top, Material middle, Material deep) {
+        TerrainMap(String key, String displayName, TerrainShape shape,
+                   Material top, Material middle, Material deep) {
             this.key = key;
             this.displayName = displayName;
+            this.shape = shape;
             this.top = top;
             this.middle = middle;
             this.deep = deep;
@@ -85,6 +97,10 @@ public final class SmoothTerrainGenerator {
 
         public String displayName() {
             return displayName;
+        }
+
+        public TerrainShape shape() {
+            return shape;
         }
 
         /** Material for a layer counted downward from the surface (1..50). */
@@ -214,8 +230,10 @@ public final class SmoothTerrainGenerator {
         int centerX = player.getLocation().getBlockX();
         int centerZ = player.getLocation().getBlockZ();
         int baseY = Math.max(world.getMinHeight() + LAYERS + 2, player.getLocation().getBlockY() - 1);
+        // baseY is the lowest surface level. The flat bedrock foundation sits one block below
+        // the bottom of that 50-block surface stack; taller columns get a stone-filled cavity.
         Area area = new Area(world.getName(), centerX, centerZ, baseY, WIDTH, map,
-                baseY - (LAYERS - 1), baseY + MAX_HEIGHT_DELTA + CLEAR_ABOVE);
+                baseY - LAYERS, baseY + MAX_HEIGHT_DELTA + CLEAR_ABOVE);
 
         // No Bukkit world/block calls are made in this future. This keeps noise generation and
         // the 10,000-column plan off the server thread, then hands only the write phase back to
@@ -416,7 +434,7 @@ public final class SmoothTerrainGenerator {
             public void run() {
                 int end = Math.min(columns.size(), index + COLUMNS_PER_TICK);
                 for (; index < end; index++) {
-                    writeColumn(world, columns.get(index), area.map());
+                    writeColumn(world, columns.get(index), area.map(), area.minY());
                 }
                 if (index >= columns.size()) {
                     previousMap = area;
@@ -437,7 +455,7 @@ public final class SmoothTerrainGenerator {
     }
 
     private static List<ColumnData> plan(Area area, long seed) {
-        HeightMap map = HeightMap.create(area.width(), seed);
+        HeightMap map = HeightMap.create(area.width(), seed, area.map().shape());
         List<ColumnData> columns = new ArrayList<>(area.width() * area.width());
         for (int x = 0; x < area.width(); x++) {
             for (int z = 0; z < area.width(); z++) {
@@ -449,11 +467,21 @@ public final class SmoothTerrainGenerator {
         return columns;
     }
 
-    private static void writeColumn(World world, ColumnData column, TerrainMap map) {
+    private static void writeColumn(World world, ColumnData column, TerrainMap map, int bottomY) {
         for (int y = column.topY() + 1; y <= column.topY() + CLEAR_ABOVE; y++) {
             if (y >= world.getMinHeight() && y < world.getMaxHeight()) {
                 world.getBlockAt(column.x(), y, column.z()).setType(Material.AIR, false);
             }
+        }
+        if (bottomY >= world.getMinHeight() && bottomY < world.getMaxHeight()) {
+            world.getBlockAt(column.x(), bottomY, column.z()).setType(Material.BEDROCK, false);
+        }
+        // Fill all space between the flat bedrock and the surface with stone first. The
+        // material-specific surface layers are then overlaid from the top downward.
+        int from = Math.max(world.getMinHeight(), bottomY + 1);
+        int to = Math.min(world.getMaxHeight() - 1, column.topY());
+        for (int y = from; y <= to; y++) {
+            world.getBlockAt(column.x(), y, column.z()).setType(Material.STONE, false);
         }
         for (int layer = 1; layer <= LAYERS; layer++) {
             int y = column.topY() - (layer - 1);
@@ -556,6 +584,10 @@ public final class SmoothTerrainGenerator {
         }
 
         static HeightMap create(int width, long seed) {
+            return create(width, seed, TerrainShape.RANDOM);
+        }
+
+        static HeightMap create(int width, long seed, TerrainShape shape) {
             int gridSize = (int) Math.ceil((width - 1) / (double) CONTROL_SPACING) + 1;
             int[] positions = new int[gridSize];
             for (int i = 0; i < gridSize; i++) {
@@ -568,7 +600,17 @@ public final class SmoothTerrainGenerator {
             int maximum = Integer.MIN_VALUE;
             for (int x = 0; x < gridSize; x++) {
                 for (int z = 0; z < gridSize; z++) {
-                    values[x][z] = random.nextInt(MAX_HEIGHT_DELTA + 1);
+                    if (shape == TerrainShape.CENTER_LOW) {
+                        // A shallow bowl: the centre gets 0..1 control height while the outer
+                        // edge gets a 0..3 radial lift. The later interpolation/relaxation keeps
+                        // it smooth and the final envelope is still exactly 0..MAX_HEIGHT_DELTA.
+                        double nx = positions[x] / (double) (width - 1) * 2.0d - 1.0d;
+                        double nz = positions[z] / (double) (width - 1) * 2.0d - 1.0d;
+                        double distance = Math.min(1.0d, Math.sqrt(nx * nx + nz * nz) / Math.sqrt(2.0d));
+                        values[x][z] = random.nextInt(2) + (int) Math.round(distance * 3.0d);
+                    } else {
+                        values[x][z] = random.nextInt(MAX_HEIGHT_DELTA + 1);
+                    }
                     minimum = Math.min(minimum, values[x][z]);
                     maximum = Math.max(maximum, values[x][z]);
                 }
@@ -609,7 +651,7 @@ public final class SmoothTerrainGenerator {
             }
             // Rounding a smooth curve can still make a two-block jump where two axes meet.
             // A few directional relaxation passes produce an integer 1-Lipschitz surface while
-            // retaining the 0..5 envelope. This is pure data work and runs off-thread.
+            // retaining the 0..4 envelope. This is pure data work and runs off-thread.
             for (int pass = 0; pass < width; pass++) {
                 for (int x = 1; x < width; x++) {
                     for (int z = 0; z < width; z++) {

@@ -46,8 +46,12 @@ public final class BotGuiCommand implements CommandExecutor, TabCompleter {
             player.sendMessage(Component.text(
                     "QuantumBOT spawned: " + bot.profileName(), NamedTextColor.GREEN));
         } catch (RuntimeException error) {
+            String detail = error.getMessage();
+            if (detail == null || detail.isBlank()) {
+                detail = error.getClass().getSimpleName();
+            }
             player.sendMessage(Component.text(
-                    "QuantumBOT could not be spawned: " + error.getMessage(), NamedTextColor.RED));
+                    "QuantumBOT could not be spawned: " + detail, NamedTextColor.RED));
         }
         return true;
     }

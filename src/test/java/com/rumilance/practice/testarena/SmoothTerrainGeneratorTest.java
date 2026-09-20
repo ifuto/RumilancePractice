@@ -22,8 +22,27 @@ class SmoothTerrainGeneratorTest {
             }
         }
         assertEquals(0, min);
-        assertEquals(5, max);
+        assertEquals(4, max);
         assertTrue(max - min <= SmoothTerrainGenerator.MAX_HEIGHT_DELTA);
+    }
+
+    @Test
+    void centerLowShapeKeepsTheCentreBelowTheOuterEdge() {
+        SmoothTerrainGenerator.HeightMap map = SmoothTerrainGenerator.HeightMap.create(
+                SmoothTerrainGenerator.WIDTH, 0x4e4152454e41L,
+                SmoothTerrainGenerator.TerrainShape.CENTER_LOW);
+        int centre = map.heightAt(50, 50);
+        int edgeTotal = 0;
+        int edgeCount = 0;
+        for (int x = 0; x < SmoothTerrainGenerator.WIDTH; x++) {
+            for (int z = 0; z < SmoothTerrainGenerator.WIDTH; z++) {
+                if (x < 10 || x >= 90 || z < 10 || z >= 90) {
+                    edgeTotal += map.heightAt(x, z);
+                    edgeCount++;
+                }
+            }
+        }
+        assertTrue(centre < edgeTotal / (double) edgeCount);
     }
 
     @Test

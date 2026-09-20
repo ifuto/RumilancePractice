@@ -74,16 +74,24 @@ public final class FaweTerrainBridge implements TerrainEditBridge {
                 CuboidRegion region = new CuboidRegion(weWorld, min, max);
                 BlockArrayClipboard clipboard = new BlockArrayClipboard(region);
                 BlockState air = BlockTypes.AIR.getDefaultState();
+                BlockState stone = BlockTypes.STONE.getDefaultState();
+                BlockState bedrock = BlockTypes.BEDROCK.getDefaultState();
 
-                // Fill the whole edit volume, including air above the terrain. This preserves
-                // the old writer's clear-above behaviour and makes a stale map disappear in one
-                // paste rather than leaving trees/blocks behind.
+                // Fill the whole edit volume, including air above the terrain. The bottom is a
+                // flat bedrock plane; every cavity between that plane and a taller surface is
+                // solid stone, so no floating islands or hollow columns remain.
                 for (SmoothTerrainGenerator.ColumnData column : columns) {
                     for (int y = minY; y <= maxY; y++) {
-                        int layer = column.topY() - y + 1;
-                        BlockState state = layer >= 1 && layer <= SmoothTerrainGenerator.LAYERS
-                                ? stateFor(map, layer)
-                                : air;
+                        BlockState state;
+                        if (y == minY) {
+                            state = bedrock;
+                        } else if (y > column.topY()) {
+                            state = air;
+                        } else {
+                            int layer = column.topY() - y + 1;
+                            state = layer >= 1 && layer <= SmoothTerrainGenerator.LAYERS
+                                    ? stateFor(map, layer) : stone;
+                        }
                         clipboard.setBlock(BlockVector3.at(column.x(), y, column.z()), state);
                     }
                 }
