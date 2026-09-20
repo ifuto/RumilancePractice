@@ -12,7 +12,7 @@ import com.sk89q.worldedit.function.operation.Operations;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.regions.CuboidRegion;
 import com.sk89q.worldedit.session.ClipboardHolder;
-import com.sk89q.worldedit.world.block.BlockStateHolder;
+import com.sk89q.worldedit.world.block.BlockState;
 import com.sk89q.worldedit.world.block.BlockTypes;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
@@ -73,7 +73,7 @@ public final class FaweTerrainBridge implements TerrainEditBridge {
                 BlockVector3 max = BlockVector3.at(maxX, maxY, maxZ);
                 CuboidRegion region = new CuboidRegion(weWorld, min, max);
                 BlockArrayClipboard clipboard = new BlockArrayClipboard(region);
-                BlockStateHolder<?> air = BlockTypes.AIR.getDefaultState();
+                BlockState air = BlockTypes.AIR.getDefaultState();
 
                 // Fill the whole edit volume, including air above the terrain. This preserves
                 // the old writer's clear-above behaviour and makes a stale map disappear in one
@@ -81,7 +81,7 @@ public final class FaweTerrainBridge implements TerrainEditBridge {
                 for (SmoothTerrainGenerator.ColumnData column : columns) {
                     for (int y = minY; y <= maxY; y++) {
                         int layer = column.topY() - y + 1;
-                        BlockStateHolder<?> state = layer >= 1 && layer <= SmoothTerrainGenerator.LAYERS
+                        BlockState state = layer >= 1 && layer <= SmoothTerrainGenerator.LAYERS
                                 ? stateFor(map, layer)
                                 : air;
                         clipboard.setBlock(BlockVector3.at(column.x(), y, column.z()), state);
@@ -125,7 +125,7 @@ public final class FaweTerrainBridge implements TerrainEditBridge {
         });
     }
 
-    private static BlockStateHolder<?> stateFor(SmoothTerrainGenerator.TerrainMap map, int layer) {
+    private static BlockState stateFor(SmoothTerrainGenerator.TerrainMap map, int layer) {
         return switch (map) {
             case GRASS_STONE -> layer == 1
                     ? BlockTypes.GRASS_BLOCK.getDefaultState()
