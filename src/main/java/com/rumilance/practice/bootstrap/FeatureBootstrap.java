@@ -96,6 +96,7 @@ import com.rumilance.practice.gui.menus.ArenaAdminGui;
 import com.rumilance.practice.gui.menus.ArrowEffectGui;
 import com.rumilance.practice.gui.menus.BanListGui;
 import com.rumilance.practice.gui.menus.BattleMenuGui;
+import com.rumilance.practice.gui.menus.ChatSettingsGui;
 import com.rumilance.practice.gui.menus.ConfirmGui;
 import com.rumilance.practice.gui.menus.DuelMapSelectGui;
 import com.rumilance.practice.gui.menus.DuelRequestGui;
@@ -769,6 +770,10 @@ public final class FeatureBootstrap {
         nameColorGui.setSettingsGui(settingsGui);
         settingsGui.setNameColorService(nameColorService);
         settingsGui.setNameColorGui(nameColorGui);
+        // 「メッセージの受信」detail screen (chat / whisper / join-quit reception).
+        ChatSettingsGui chatSettingsGui = new ChatSettingsGui(guiSessions, soundService, settingsService);
+        chatSettingsGui.setSettingsGui(settingsGui);
+        settingsGui.setChatSettingsGui(chatSettingsGui);
         com.rumilance.practice.gui.menus.LocaleSelectGui localeSelectGui =
                 new com.rumilance.practice.gui.menus.LocaleSelectGui(
                         guiSessions, soundService, sessionManager, settingsService, messageService);
@@ -1105,6 +1110,7 @@ public final class FeatureBootstrap {
         guiListener.register(duelRequestGui);
         guiListener.register(duelMapSelectGui);
         guiListener.register(settingsGui);
+        guiListener.register(chatSettingsGui);
         guiListener.register(nameColorGui);
         guiListener.register(statsKitGui);
         guiListener.register(profileGui);

@@ -12,6 +12,7 @@ import com.rumilance.practice.rank.RankService;
 import com.rumilance.practice.session.PlayerSession;
 import com.rumilance.practice.session.PlayerStateManager;
 import com.rumilance.practice.session.SessionManager;
+import com.rumilance.practice.settings.ChatPolicy;
 import com.rumilance.practice.settings.SettingsService;
 import com.rumilance.practice.util.AsyncExecutor;
 import org.bukkit.entity.Player;
@@ -139,7 +140,10 @@ public final class SessionBootstrapListener implements Listener {
             event.joinMessage(null);
             return;
         }
-        JoinQuitMessages.apply(event);
+        // メッセージの受信: the line is not broadcast by the server any more — each viewer
+        // decides whether other players' join/quit lines reach them at all.
+        event.joinMessage(null);
+        broadcastJoinQuit(player, JoinQuitMessages.join(player.getName()));
         // The join handshake just sent this player the full tab list, bot entries included —
         // strip every live bot's row so bots never show up in the TAB.
         com.rumilance.practice.packetbot.PacketBot.hideAllFromTab(player);
@@ -210,6 +214,24 @@ public final class SessionBootstrapListener implements Listener {
         });
     }
 
+    /**
+     * Sends one {@code [+] name} / {@code [-] name} line to every viewer whose reception
+     * settings accept it. Bots never see them, and the subject never gets their own line.
+     * Friends are not a thing yet, so everyone counts as {@link ChatPolicy.Relation#OTHER}.
+     */
+    private void broadcastJoinQuit(Player subject, net.kyori.adventure.text.Component line) {
+        for (Player viewer : org.bukkit.Bukkit.getOnlinePlayers()) {
+            if (viewer.getUniqueId().equals(subject.getUniqueId())
+                    || com.rumilance.practice.packetbot.PacketBot.isBot(viewer)) {
+                continue;
+            }
+            if (ChatPolicy.receivesJoinQuit(settingsService.get(viewer.getUniqueId()),
+                    ChatPolicy.Relation.OTHER)) {
+                viewer.sendMessage(line);
+            }
+        }
+    }
+
     @EventHandler(priority = EventPriority.MONITOR)
     public void onKick(org.bukkit.event.player.PlayerKickEvent event) {
         // Kicked / banned players leave silently: no "[-] name" line follows the kick screen.
@@ -226,7 +248,10 @@ public final class SessionBootstrapListener implements Listener {
             event.quitMessage(null);
             return;
         }
-        JoinQuitMessages.apply(event);
+        event.quitMessage(null);
+        if (!JoinQuitMessages.consumeQuitSuppression(player.getUniqueId())) {
+            broadcastJoinQuit(player, JoinQuitMessages.quit(player.getName()));
+        }
         settingsService.unload(player.getUniqueId());
         if (rankService != null) {
             rankService.unload(player.getUniqueId());

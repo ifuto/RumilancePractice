@@ -34,6 +34,7 @@ public final class SettingsGui extends AbstractGui {
     private com.rumilance.practice.match.TeamColoredArmorService teamColoredArmorService;
     private com.rumilance.practice.cosmetic.namecolor.NameColorService nameColorService;
     private NameColorGui nameColorGui;
+    private ChatSettingsGui chatSettingsGui;
 
     public SettingsGui(GuiSessionRegistry registry, SoundService sounds, SettingsService settingsService) {
         super(registry, sounds, GuiType.SETTINGS, 6, true);
@@ -47,6 +48,10 @@ public final class SettingsGui extends AbstractGui {
 
     public void setNameColorGui(NameColorGui nameColorGui) {
         this.nameColorGui = nameColorGui;
+    }
+
+    public void setChatSettingsGui(ChatSettingsGui chatSettingsGui) {
+        this.chatSettingsGui = chatSettingsGui;
     }
 
     public void setToggleCooldownSeconds(int seconds) {
@@ -118,6 +123,19 @@ public final class SettingsGui extends AbstractGui {
                                 UiTheme.hint(line(player, "gui.chat-whitelist-hint"))
                         )
                         .action(com.rumilance.practice.gui.DelayedButton.wrap("whitelist"))
+                        .build());
+
+        // 「メッセージの受信」— the five reception switches live on their own screen.
+        inventory.setItem(GuiSlots.slot(4, 4),
+                ItemBuilder.of(Material.BOOK)
+                        .name(t(player, "gui.chat-settings-entry").color(UiTheme.SECONDARY))
+                        .lore(
+                                UiTheme.divider(),
+                                UiTheme.line(line(player, "gui.chat-settings-entry-lore")),
+                                UiTheme.blank(),
+                                UiTheme.hint(line(player, "gui.chat-settings-open-hint"))
+                        )
+                        .action(com.rumilance.practice.gui.DelayedButton.wrap("chat_settings"))
                         .build());
 
         paintNav(player, session, inventory);
@@ -200,6 +218,15 @@ public final class SettingsGui extends AbstractGui {
                             nameColorGui.open(player);
                         }
                     });
+            return;
+        }
+        if ("chat_settings".equals(action)) {
+            if (chatSettingsGui == null) {
+                sounds.play(player, "error");
+                return;
+            }
+            player.closeInventory();
+            chatSettingsGui.open(player);
             return;
         }
         if ("whitelist".equals(action)) {

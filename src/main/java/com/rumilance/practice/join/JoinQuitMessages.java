@@ -25,6 +25,14 @@ public final class JoinQuitMessages {
         SUPPRESSED_QUITS.add(playerId);
     }
 
+    /**
+     * @return true when this quit line is suppressed (the player was kicked/banned and
+     *         already saw that screen) — callers must then send nothing to anyone.
+     */
+    public static boolean consumeQuitSuppression(java.util.UUID playerId) {
+        return SUPPRESSED_QUITS.remove(playerId);
+    }
+
     public static Component join(String playerName) {
         return bracketed("+", NamedTextColor.GREEN).append(Component.text(" " + playerName, NamedTextColor.WHITE));
     }

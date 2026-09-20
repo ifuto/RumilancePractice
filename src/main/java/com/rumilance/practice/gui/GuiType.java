@@ -67,5 +67,6 @@ public enum GuiType {
     LOCALE_SELECT,
     NAME_COLOR,
     ADMIN_PLAYER_DATA,
-    SIGN_KIT_SELECT
+    SIGN_KIT_SELECT,
+    CHAT_SETTINGS
 }
