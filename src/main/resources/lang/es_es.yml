@@ -429,6 +429,7 @@ tell:
   self: "<red>No puedes enviarte mensajes a ti mismo."
   to: "<gold>To <target></gold> <gray>»</gray> <white><message></white>"
   from: "<aqua>From <target></aqua> <gray>»</gray> <white><message></white>"
+  blocked: "<gray><target> no acepta mensajes.</gray>"
 
 packpolicy:
   usage: "<gray>Uso:</gray> <yellow>/packpolicy [required|recommended|status]</yellow>"

@@ -29,7 +29,9 @@ public final class SettingsRepository {
     public Optional<PlayerSettings> findByUuid(UUID uuid) throws SQLException {
         String sql = "SELECT uuid, sounds_enabled, scoreboard_enabled, arrow_effect, spectate_visible, "
                 + "accept_duel_requests, auto_requeue, hide_other_chat, chat_whitelist, locale, "
-                + "selected_title, show_match_report, team_glow, team_colored_armor, kill_effect FROM "
+                + "selected_title, show_match_report, team_glow, team_colored_armor, kill_effect, "
+                + "receive_global_chat, receive_friend_messages, receive_stranger_messages, "
+                + "receive_friend_join_quit, receive_stranger_join_quit FROM "
                 + databaseService.table("player_settings") + " WHERE uuid = ?";
         try (Connection connection = databaseService.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -51,12 +53,16 @@ public final class SettingsRepository {
         String sql = "INSERT INTO " + databaseService.table("player_settings")
                 + " (uuid, sounds_enabled, scoreboard_enabled, arrow_effect, spectate_visible, "
                 + "accept_duel_requests, auto_requeue, hide_other_chat, chat_whitelist, locale, "
-                + "selected_title, show_match_report, team_glow, team_colored_armor, kill_effect) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                + "selected_title, show_match_report, team_glow, team_colored_armor, kill_effect, "
+                + "receive_global_chat, receive_friend_messages, receive_stranger_messages, "
+                + "receive_friend_join_quit, receive_stranger_join_quit) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
                 + databaseService.upsertClause("uuid", "sounds_enabled", "scoreboard_enabled", "arrow_effect",
                 "spectate_visible", "accept_duel_requests", "auto_requeue", "hide_other_chat",
                 "chat_whitelist", "locale", "selected_title", "show_match_report",
-                "team_glow", "team_colored_armor", "kill_effect");
+                "team_glow", "team_colored_armor", "kill_effect",
+                "receive_global_chat", "receive_friend_messages", "receive_stranger_messages",
+                "receive_friend_join_quit", "receive_stranger_join_quit");
         try (Connection connection = databaseService.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, settings.uuid().toString());
@@ -74,6 +80,11 @@ public final class SettingsRepository {
             statement.setInt(13, settings.teamGlow() ? 1 : 0);
             statement.setInt(14, settings.teamColoredArmor() ? 1 : 0);
             statement.setString(15, settings.killEffect());
+            statement.setInt(16, settings.receiveGlobalChat() ? 1 : 0);
+            statement.setInt(17, settings.receiveFriendMessages() ? 1 : 0);
+            statement.setInt(18, settings.receiveStrangerMessages() ? 1 : 0);
+            statement.setInt(19, settings.receiveFriendJoinQuit() ? 1 : 0);
+            statement.setInt(20, settings.receiveStrangerJoinQuit() ? 1 : 0);
             statement.executeUpdate();
         }
     }
@@ -101,7 +112,12 @@ public final class SettingsRepository {
                 columnOrDefault(resultSet, "show_match_report", 0) != 0,
                 columnOrDefault(resultSet, "team_glow", 1) != 0,
                 columnOrDefault(resultSet, "team_colored_armor", 1) != 0,
-                columnOrDefault(resultSet, "kill_effect", "none")
+                columnOrDefault(resultSet, "kill_effect", "none"),
+                columnOrDefault(resultSet, "receive_global_chat", 1) != 0,
+                columnOrDefault(resultSet, "receive_friend_messages", 1) != 0,
+                columnOrDefault(resultSet, "receive_stranger_messages", 1) != 0,
+                columnOrDefault(resultSet, "receive_friend_join_quit", 1) != 0,
+                columnOrDefault(resultSet, "receive_stranger_join_quit", 1) != 0
         );
     }
 

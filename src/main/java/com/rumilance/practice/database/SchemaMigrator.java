@@ -422,6 +422,19 @@ public final class SchemaMigrator {
             databaseService.ensureColumn(connection, table, "best_reached", "CHAR(10)");
         }));
 
+        migrations.add(new Migration(32, "add chat reception columns to player_settings", List.of(
+                "ALTER TABLE " + databaseService.table("player_settings")
+                        + " ADD COLUMN receive_global_chat INTEGER NOT NULL DEFAULT 1",
+                "ALTER TABLE " + databaseService.table("player_settings")
+                        + " ADD COLUMN receive_friend_messages INTEGER NOT NULL DEFAULT 1",
+                "ALTER TABLE " + databaseService.table("player_settings")
+                        + " ADD COLUMN receive_stranger_messages INTEGER NOT NULL DEFAULT 1",
+                "ALTER TABLE " + databaseService.table("player_settings")
+                        + " ADD COLUMN receive_friend_join_quit INTEGER NOT NULL DEFAULT 1",
+                "ALTER TABLE " + databaseService.table("player_settings")
+                        + " ADD COLUMN receive_stranger_join_quit INTEGER NOT NULL DEFAULT 1"
+        )));
+
         return migrations;
     }
 }

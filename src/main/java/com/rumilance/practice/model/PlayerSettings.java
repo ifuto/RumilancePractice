@@ -25,7 +25,12 @@ public record PlayerSettings(
         boolean showMatchReport,
         boolean teamGlow,
         boolean teamColoredArmor,
-        String killEffect
+        String killEffect,
+        boolean receiveGlobalChat,
+        boolean receiveFriendMessages,
+        boolean receiveStrangerMessages,
+        boolean receiveFriendJoinQuit,
+        boolean receiveStrangerJoinQuit
 ) {
 
     /**
@@ -60,7 +65,8 @@ public record PlayerSettings(
     ) {
         this(uuid, soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
                 acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale, selectedTitle,
-                showMatchReport, true, true, "none");
+                showMatchReport, true, true, "none",
+                true, true, true, true, true);
     }
 
     public PlayerSettings(
@@ -70,14 +76,16 @@ public record PlayerSettings(
     ) {
         this(uuid, soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
                 acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale, selectedTitle,
-                false, true, true, "none");
+                false, true, true, "none",
+                true, true, true, true, true);
     }
 
     public static PlayerSettings defaultsFor(UUID uuid, String defaultLocale) {
         // Locale starts as the LOCALE_AUTO sentinel: the join flow shows the language picker
         // to players who never chose one. The parameter stays for signature compatibility.
         return new PlayerSettings(uuid, true, true, "none", true, true, false, false,
-                Set.of(), LOCALE_AUTO, "none", false, true, true, "none");
+                Set.of(), LOCALE_AUTO, "none", false, true, true, "none",
+                true, true, true, true, true);
     }
 
     private PlayerSettings copy(
@@ -88,7 +96,54 @@ public record PlayerSettings(
     ) {
         return new PlayerSettings(uuid, soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
                 acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
-                selectedTitle, showMatchReport, teamGlow, teamColoredArmor, killEffect);
+                selectedTitle, showMatchReport, teamGlow, teamColoredArmor, killEffect,
+                receiveGlobalChat, receiveFriendMessages, receiveStrangerMessages,
+                receiveFriendJoinQuit, receiveStrangerJoinQuit);
+    }
+
+    /**
+     * Reception toggles for the chat settings screen. Each returns a copy with one flag
+     * flipped; the 14-argument {@link #copy} above keeps them untouched, so every other
+     * {@code withXxx} preserves what the player chose here.
+     */
+    public PlayerSettings withReceiveGlobalChat(boolean enabled) {
+        return new PlayerSettings(uuid, soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
+                acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
+                selectedTitle, showMatchReport, teamGlow, teamColoredArmor, killEffect,
+                enabled, receiveFriendMessages, receiveStrangerMessages,
+                receiveFriendJoinQuit, receiveStrangerJoinQuit);
+    }
+
+    public PlayerSettings withReceiveFriendMessages(boolean enabled) {
+        return new PlayerSettings(uuid, soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
+                acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
+                selectedTitle, showMatchReport, teamGlow, teamColoredArmor, killEffect,
+                receiveGlobalChat, enabled, receiveStrangerMessages,
+                receiveFriendJoinQuit, receiveStrangerJoinQuit);
+    }
+
+    public PlayerSettings withReceiveStrangerMessages(boolean enabled) {
+        return new PlayerSettings(uuid, soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
+                acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
+                selectedTitle, showMatchReport, teamGlow, teamColoredArmor, killEffect,
+                receiveGlobalChat, receiveFriendMessages, enabled,
+                receiveFriendJoinQuit, receiveStrangerJoinQuit);
+    }
+
+    public PlayerSettings withReceiveFriendJoinQuit(boolean enabled) {
+        return new PlayerSettings(uuid, soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
+                acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
+                selectedTitle, showMatchReport, teamGlow, teamColoredArmor, killEffect,
+                receiveGlobalChat, receiveFriendMessages, receiveStrangerMessages,
+                enabled, receiveStrangerJoinQuit);
+    }
+
+    public PlayerSettings withReceiveStrangerJoinQuit(boolean enabled) {
+        return new PlayerSettings(uuid, soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
+                acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
+                selectedTitle, showMatchReport, teamGlow, teamColoredArmor, killEffect,
+                receiveGlobalChat, receiveFriendMessages, receiveStrangerMessages,
+                receiveFriendJoinQuit, enabled);
     }
 
     public PlayerSettings withKillEffect(String newKillEffect) {

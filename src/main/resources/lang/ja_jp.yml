@@ -430,6 +430,7 @@ tell:
   self: "<red>自分自身には送れません。"
   to: "<gold>To <target></gold> <gray>»</gray> <white><message></white>"
   from: "<aqua>From <target></aqua> <gray>»</gray> <white><message></white>"
+  blocked: "<gray><target> はメッセージを受け取っていません。</gray>"
 
 packpolicy:
   usage: "<gray>使い方:</gray> <yellow>/packpolicy [required|recommended|status]</yellow>"

@@ -1682,7 +1682,8 @@ public final class FeatureBootstrap {
         bind("packpolicy", new com.rumilance.practice.command.PackPolicyCommand(
                 resourcePackService, messageService));
         com.rumilance.practice.command.TellCommand tellCommand =
-                new com.rumilance.practice.command.TellCommand(messageService, chatBanService);
+                new com.rumilance.practice.command.TellCommand(messageService, chatBanService,
+                        settingsService);
         plugin.getServer().getPluginManager().registerEvents(tellCommand, plugin);
         bind("tell", tellCommand);
         bind("reply", tellCommand);

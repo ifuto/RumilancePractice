@@ -429,6 +429,7 @@ tell:
   self: "<red>자기 자신에게는 메시지를 보낼 수 없습니다."
   to: "<gold>To <target></gold> <gray>»</gray> <white><message></white>"
   from: "<aqua>From <target></aqua> <gray>»</gray> <white><message></white>"
+  blocked: "<gray><target> 님은 메시지를 받지 않습니다.</gray>"
 
 packpolicy:
   usage: "<gray>사용법:</gray> <yellow>/packpolicy [required|recommended|status]</yellow>"

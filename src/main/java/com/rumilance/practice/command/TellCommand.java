@@ -2,6 +2,8 @@ package com.rumilance.practice.command;
 
 import com.rumilance.practice.locale.MessageService;
 import com.rumilance.practice.punishment.ChatBanService;
+import com.rumilance.practice.settings.ChatPolicy;
+import com.rumilance.practice.settings.SettingsService;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -32,12 +34,20 @@ public final class TellCommand implements CommandExecutor, TabCompleter, Listene
 
     private final MessageService messageService;
     private final ChatBanService chatBanService;
+    /** Reception flags live in the receiver's settings; null keeps tells always delivered. */
+    private final SettingsService settingsService;
     /** Last whisper partner per player, for /reply (updated in both directions). */
     private final Map<UUID, UUID> lastPartner = new ConcurrentHashMap<>();
 
     public TellCommand(MessageService messageService, ChatBanService chatBanService) {
+        this(messageService, chatBanService, null);
+    }
+
+    public TellCommand(MessageService messageService, ChatBanService chatBanService,
+                       SettingsService settingsService) {
         this.messageService = messageService;
         this.chatBanService = chatBanService;
+        this.settingsService = settingsService;
     }
 
     @Override
@@ -105,6 +115,16 @@ public final class TellCommand implements CommandExecutor, TabCompleter, Listene
     }
 
     private void deliver(Player from, Player to, String message) {
+        // メッセージの受信: the receiver decides whether a TELL/WHISPER from this kind of
+        // sender reaches them at all. Console and staff bypass it (from == null).
+        if (from != null && settingsService != null) {
+            ChatPolicy.Relation relation = ChatPolicy.Relation.OTHER;
+            if (!ChatPolicy.receivesMessage(settingsService.get(to), relation)) {
+                from.sendMessage(messageService.render(from, "tell.blocked",
+                        MessageService.tags("target", to.getName())));
+                return;
+            }
+        }
         if (from != null) {
             from.sendMessage(messageService.render(from, "tell.to",
                     MessageService.tags("target", to.getName(), "message", message)));

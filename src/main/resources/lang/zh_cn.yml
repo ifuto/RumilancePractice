@@ -429,6 +429,7 @@ tell:
   self: "<red>不能给自己发送私信。"
   to: "<gold>To <target></gold> <gray>»</gray> <white><message></white>"
   from: "<aqua>From <target></aqua> <gray>»</gray> <white><message></white>"
+  blocked: "<gray><target> 不接收消息。</gray>"
 
 packpolicy:
   usage: "<gray>用法：</gray> <yellow>/packpolicy [required|recommended|status]</yellow>"
