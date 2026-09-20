@@ -406,6 +406,24 @@ public final class SmoothTerrainGenerator {
                 minimum = 0;
                 maximum = MAX_HEIGHT_DELTA;
             }
+            // The final control interval is only three blocks wide (100 is not an exact
+            // multiple of eight). Cap control-point changes by the physical interval length;
+            // otherwise a 0 -> 5 change over those three blocks would still produce a visible
+            // two- or three-block cliff at the map edge after rounding.
+            for (int pass = 0; pass < 3; pass++) {
+                for (int x = 0; x < gridSize - 1; x++) {
+                    int span = positions[x + 1] - positions[x];
+                    for (int z = 0; z < gridSize; z++) {
+                        values[x + 1][z] = clampStep(values[x][z], values[x + 1][z], span);
+                    }
+                }
+                for (int z = 0; z < gridSize - 1; z++) {
+                    int span = positions[z + 1] - positions[z];
+                    for (int x = 0; x < gridSize; x++) {
+                        values[x][z + 1] = clampStep(values[x][z], values[x][z + 1], span);
+                    }
+                }
+            }
             return new HeightMap(width, positions, values, minimum, maximum);
         }
 
@@ -438,6 +456,10 @@ public final class SmoothTerrainGenerator {
                 }
             }
             return positions.length - 2;
+        }
+
+        private static int clampStep(int previous, int current, int span) {
+            return Math.max(previous - span, Math.min(previous + span, current));
         }
 
         private static double smooth(double value) {
