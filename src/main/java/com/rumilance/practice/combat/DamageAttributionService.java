@@ -35,7 +35,7 @@ public final class DamageAttributionService implements Listener {
 
     /** Same order as the FFA combat tag; enough time for a knockback/void death to resolve. */
     private static final long LAST_ATTACKER_TTL_MS = 30_000L;
-    private static final long LOCATION_MAX_DISTANCE_SQUARED = 96.0d * 96.0d;
+    private static final double LOCATION_MAX_DISTANCE_SQUARED = 96.0d * 96.0d;
 
     private record RecentAttack(UUID attackerId, UUID worldId, Location victimLocation, long atMillis) {
     }
