@@ -3232,6 +3232,23 @@ public final class PracticeService {
         return out;
     }
 
+    /**
+     * Returns whether an explosion entity is a crystal currently owned by the native
+     * CRYSTAL combat bot. Practice-room protection intentionally removes block lists from
+     * ordinary explosions, but the bot's crystal combo must retain vanilla terrain damage.
+     */
+    public boolean isCombatBotCrystal(java.util.UUID entityId) {
+        if (entityId == null) {
+            return false;
+        }
+        for (PracticeSession session : sessions.values()) {
+            if (session.botCrystals().contains(entityId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** True while any live session occupies the given practice room (bot picker UI). */
     public boolean isRoomBusy(String practiceId) {
         return sessionsInRoom(practiceId) > 0;
@@ -5283,7 +5300,11 @@ public final class PracticeService {
             if (crystal.isValid()) {
                 Location boom = crystal.getLocation();
                 if (boom.getWorld() != null) {
-                    boom.getWorld().createExplosion(boom, 6.0f, false, false, crystal);
+                    // A crystal blast is a terrain-changing combat action. The old fourth argument
+                    // was false, which made the CRYSTAL bot's explosion deal damage but leave
+                    // every block untouched. Keep fire disabled, but use vanilla crystal
+                    // block-breaking semantics.
+                    boom.getWorld().createExplosion(boom, 6.0f, false, true, crystal);
                     blastPush(bot, session, boom, 6.0f, System.currentTimeMillis());
                 }
                 botSelfBlastDamage(session, bot, boom, 6.0f, "crystal");

@@ -9,6 +9,7 @@ import org.bukkit.scoreboard.Team;
 
 import java.util.Collection;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * Lobby / FFA nametag + TAB prefixes: the resource-pack rank badge (admin / VIP+ / VIP) is
@@ -30,12 +31,25 @@ public final class RankIconNameTags {
      */
     public static void apply(Scoreboard board, IconFontService icons, RankService ranks,
                              Collection<? extends Player> online, boolean viewerHasPack) {
+        apply(board, icons, ranks, online, viewerHasPack, null);
+    }
+
+    /** Applies an optional plugin-owned CSV prefix after the rank icon. */
+    public static void apply(Scoreboard board, IconFontService icons, RankService ranks,
+                             Collection<? extends Player> online, boolean viewerHasPack,
+                             Function<Player, Component> customPrefix) {
         if (board == null || icons == null || ranks == null || !icons.enabled()) {
             return;
         }
         for (Player other : online) {
             PlayerRank effective = effectiveRank(ranks, other);
             Component icon = icons.rankIcon(effective, viewerHasPack);
+            if (customPrefix != null) {
+                Component suffix = customPrefix.apply(other);
+                if (suffix != null && !suffix.equals(Component.empty())) {
+                    icon = icon.append(suffix);
+                }
+            }
             String entry = other.getName();
             String name = teamName(other.getUniqueId());
             if (icon.equals(Component.empty())) {
@@ -91,8 +105,8 @@ public final class RankIconNameTags {
     }
 
     /**
-     * Effective rank used for the badge (admin > VIP+ > VIP > PRO > NORM); shared with
-     * TabBridge. PRO carries no permission, so it only surfaces through the stored rank.
+     * Effective rank used for the badge (admin > VIP+ > VIP > PRO > NORM). PRO carries no
+     * permission, so it only surfaces through the stored rank.
      */
     public static PlayerRank effectiveRank(RankService ranks, Player player) {
         if (ranks.isAdmin(player)) {

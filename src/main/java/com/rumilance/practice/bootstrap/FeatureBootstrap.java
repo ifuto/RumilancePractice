@@ -51,6 +51,8 @@ import com.rumilance.practice.command.ReportCommand;
 import com.rumilance.practice.command.ReportListCommand;
 import com.rumilance.practice.command.SetFuncCommand;
 import com.rumilance.practice.command.SetRankCommand;
+import com.rumilance.practice.command.TestArenaCommand;
+import com.rumilance.practice.testarena.SmoothTerrainGenerator;
 import com.rumilance.practice.command.SignCheckCommand;
 import com.rumilance.practice.config.ConfigService;
 import com.rumilance.practice.config.PluginSettings;
@@ -192,6 +194,7 @@ import com.rumilance.practice.report.ReportEvidenceStore;
 import com.rumilance.practice.report.ReportService;
 import com.rumilance.practice.scoreboard.ScoreboardConfig;
 import com.rumilance.practice.scoreboard.ScoreboardService;
+import com.rumilance.practice.scoreboard.TabCustomizationConfig;
 import com.rumilance.practice.security.sign.SignChangeGuardListener;
 import com.rumilance.practice.security.sign.SignGuardService;
 import com.rumilance.practice.security.sign.SignProbeService;
@@ -1279,15 +1282,10 @@ public final class FeatureBootstrap {
         scoreboardService.setIconFontService(iconFontService);
         scoreboardService.setResourcePackService(resourcePackService);
         scoreboardService.setRankService(rankService);
-        // NEZNAMY/TAB co-existence: while TAB ships the tablist sorting teams, this plugin
-        // must not create ANY scoreboard teams (see integration/TabBridge.java for the
-        // protocol-level reasoning). Icons still reach the tablist as TAB placeholders.
-        final com.rumilance.practice.integration.TabBridge tabBridge =
-                new com.rumilance.practice.integration.TabBridge(plugin, services, resourcePackService);
-        scoreboardService.setTabListDelegated(tabBridge::tabActive);
-        scoreboardService.setTabBridge(tabBridge);
-        plugin.getServer().getPluginManager().registerEvents(tabBridge, plugin);
-        tabBridge.detect();
+        scoreboardService.setTabCustomizationConfig(TabCustomizationConfig.load(plugin));
+        // TAB is intentionally implemented inside NARENA. Header/footer, sorting, rank
+        // badges, fight columns and placeholders are all emitted by ScoreboardService and
+        // the TabFight* services below; no external TAB API is required.
         TabVisibilityService tabVisibilityService =
                 new TabVisibilityService(plugin, stateManager, matchRegistry);
         tabVisibilityService.setSpectatorService(spectatorService);
@@ -1661,6 +1659,7 @@ public final class FeatureBootstrap {
         bind("lang", langCommand);
         bind("matchinv", new MatchInvCommand(matchInventoryGui));
         bind("setfunc", new SetFuncCommand());
+        bind("testarena", new TestArenaCommand(new SmoothTerrainGenerator(plugin)));
         bind("admin", adminCommand);
         bind("practiceadmin", practiceAdmin);
         bind("slobby", practiceAdmin);

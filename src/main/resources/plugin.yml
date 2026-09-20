@@ -14,7 +14,6 @@ softdepend:
   - ProtocolLib
   - Apollo
   - LuckPerms
-  - TAB
   - GSit
 
 commands:
@@ -187,6 +186,10 @@ commands:
   narena-harness:
     description: Headless BOT-fight harness for parity measurement (dev only; needs -Drumilance.harness=true).
     usage: /narena-harness <ground|room|dummy|fight|status|stop>
+    permission: rumilance.admin
+  testarena:
+    description: Generate a smooth five-block-range terrain test arena.
+    usage: /testarena spawnde [radius]
     permission: rumilance.admin
   team:
     description: Owner-invite style teams with public/private visibility and red-blue team battles.
