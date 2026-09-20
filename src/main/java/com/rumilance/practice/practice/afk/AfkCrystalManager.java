@@ -381,7 +381,9 @@ public final class AfkCrystalManager implements Listener, CommandExecutor,
         player.teleport(s.spawn());
         hideOthers(player);
         player.getInventory().clear();
-        giveStarterLoadout(player); // 入室したらまず装備を配る
+        // 入室直後から「編集済みのキット」を配る: 紐づけキット > 個人保存キット >
+        // プロトタイプ > 初期装備。装備はスロット単位でそのまま差し込む(item replace)。
+        equipPlayerKit(player);
         msg(player, "welcome");
         if (boundMode()) {
             openKitSelector(player, s);
@@ -1274,27 +1276,44 @@ public final class AfkCrystalManager implements Listener, CommandExecutor,
     }
 
     /**
-     * Wind charges must always launch inside the room. Right-clicking the floor with one is
-     * a plain RIGHT_CLICK_BLOCK, which some interaction guard swallows — and a cancelled
-     * interact never launches the projectile (the reported "地面に向かってウィンドチャージ
-     * 投げれない"). Re-arm the frame exactly like {@link #onBotDamage} does for damage.
+     * The room's right-click re-arm ("地面を向いた状態だと何も使えない").
+     *
+     * <p>Aiming at the floor turns a click into RIGHT_CLICK_BLOCK, and vanilla is free to deny
+     * the item half of it (crouching, adventure-style tags, any guard that ran earlier): that is
+     * what silently swallowed wind charges, ender pearls, armor equip and block placement inside
+     * the room. Every right click in here is a real gameplay click, so the denial is lifted
+     * again — late, at HIGHEST, after every other listener has had its say. The reset button
+     * keeps its own handler, plugin GUI items keep their function, and blocks keep the vanilla
+     * sneak rule so crouch-placing still wins over using the item.</p>
      */
-    @EventHandler(priority = EventPriority.LOWEST)
-    public void onWindChargeInteract(PlayerInteractEvent event) {
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onInteractReArm(PlayerInteractEvent event) {
+        if (event.getHand() != EquipmentSlot.HAND) {
+            return;
+        }
         if (event.getAction() != org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK
                 && event.getAction() != org.bukkit.event.block.Action.RIGHT_CLICK_AIR) {
             return;
         }
-        if (!sessions.containsKey(event.getPlayer().getUniqueId())) {
+        Player player = event.getPlayer();
+        AfkSession s = sessions.get(player.getUniqueId());
+        if (s == null) {
             return;
+        }
+        Block b = event.getClickedBlock();
+        if (b != null && b.getType() == Material.CHERRY_BUTTON && isProtected(s, b)) {
+            return; // the reset button click belongs to onInteract
         }
         ItemStack item = event.getItem();
-        if (item == null || item.getType() != Material.WIND_CHARGE) {
-            return;
+        if (item != null && item.hasItemMeta() && item.getItemMeta().getPersistentDataContainer()
+                .has(com.rumilance.practice.util.ItemKeys.functionType(),
+                        org.bukkit.persistence.PersistentDataType.STRING)) {
+            return; // lobby/GUI function item: FunctionalItemListener owns this click
         }
-        if (event.useInteractedBlock() == org.bukkit.event.Event.Result.DENY
-                || event.useItemInHand() == org.bukkit.event.Event.Result.DENY) {
-            event.setCancelled(false);
+        event.setCancelled(false);
+        event.setUseInteractedBlock(org.bukkit.event.Event.Result.ALLOW);
+        if (item == null || !item.getType().isBlock() || !player.isSneaking()) {
+            event.setUseItemInHand(org.bukkit.event.Event.Result.ALLOW);
         }
     }
 
@@ -1635,23 +1654,37 @@ public final class AfkCrystalManager implements Listener, CommandExecutor,
     /** Full clear then apply the saved kit (hotbar GUI slots stay reserved). */
     private void equipSavedKit(Player player) {
         ItemStack[] snap = savedKits.get(player.getUniqueId());
-        if (snap == null) {
-            snap = prototypeKit != null ? prototypeKit : defaultKit();
+        if (snap != null) {
+            applySnapshot(player, snap);   // the player's own edited layout, 1:1
+            return;
         }
-        applySnapshot(player, snap);
+        if (prototypeKit != null) {
+            applySnapshot(player, prototypeKit);
+            return;
+        }
+        giveStarterLoadout(player);        // nothing edited yet: the room's starter gear
     }
 
+    /**
+     * Equips a saved layout slot by slot ("item replace"): every one of the 41 slots is written
+     * with a fresh clone, so the stored snapshot can never be mutated by gameplay (durability,
+     * amounts, meta) and the layout the player edited is exactly what they get.
+     */
     private void applySnapshot(Player player, ItemStack[] snap) {
         PlayerInventory inv = player.getInventory();
         inv.clear();
         for (int i = 0; i < Math.min(36, snap.length); i++) {
-            inv.setItem(i, snap[i]);
+            inv.setItem(i, snap[i] == null ? null : snap[i].clone());
         }
         if (snap.length >= 41) {
-            inv.setArmorContents(new ItemStack[]{snap[36] == null ? null : snap[36].clone(),
-                    snap[37], snap[38], snap[39]});
-            inv.setItemInOffHand(snap[40]);
+            inv.setArmorContents(new ItemStack[]{
+                    snap[36] == null ? null : snap[36].clone(),
+                    snap[37] == null ? null : snap[37].clone(),
+                    snap[38] == null ? null : snap[38].clone(),
+                    snap[39] == null ? null : snap[39].clone()});
+            inv.setItemInOffHand(snap[40] == null ? null : snap[40].clone());
         }
+        player.updateInventory();
         // No reserved hotbar slots: every slot the player filled survives 1:1.
     }
 
@@ -1672,29 +1705,6 @@ public final class AfkCrystalManager implements Listener, CommandExecutor,
     }
 
     /** Default crystal kit: axe + crystals + obsidian + the same armor set as the bot. */
-    private ItemStack[] defaultKit() {
-        ItemStack[] kit = new ItemStack[41];
-        kit[0] = practiceAxe();
-        kit[1] = new ItemStack(Material.END_CRYSTAL, 64);
-        kit[2] = new ItemStack(Material.OBSIDIAN, 64);
-        kit[3] = new ItemStack(Material.TOTEM_OF_UNDYING, 4);
-        kit[4] = new ItemStack(Material.ENCHANTED_GOLDEN_APPLE, 8);
-        kit[5] = new ItemStack(Material.ENDER_PEARL, 16);
-        kit[6] = new ItemStack(Material.RESPAWN_ANCHOR, 1);
-        kit[7] = new ItemStack(Material.GLOWSTONE, 16);
-        kit[36] = armored(Material.NETHERITE_BOOTS, Enchantment.BLAST_PROTECTION, true);
-        kit[37] = armored(Material.NETHERITE_LEGGINGS, Enchantment.BLAST_PROTECTION, false);
-        kit[38] = armored(Material.NETHERITE_CHESTPLATE, Enchantment.PROTECTION, false);
-        kit[39] = armored(Material.NETHERITE_HELMET, Enchantment.PROTECTION, false);
-        kit[40] = new ItemStack(Material.TOTEM_OF_UNDYING);
-        return kit;
-    }
-
-    /**
-     * Entry gift: a ready-to-fight crystal loadout so a fresh player can start swinging
-     * immediately. Everything here is destroyed by the first kit equip (selector choice,
-     * save, reset) — it is a loaner, not a forced kit (装備配って).
-     */
     private void giveStarterLoadout(Player player) {
         PlayerInventory inv = player.getInventory();
         inv.setHelmet(armored(Material.NETHERITE_HELMET, Enchantment.PROTECTION, false));

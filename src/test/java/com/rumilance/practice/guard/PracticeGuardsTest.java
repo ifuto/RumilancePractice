@@ -451,6 +451,27 @@ class PracticeGuardsTest {
         assertTrue(PracticeGuards.looseItemMoveBlocked(PlayerState.ENDING));
     }
 
+    @Test
+    void ownInventoryRearrangingBlockedInHubStatesOnly() {
+        // The lobby hotbar is a fixed menu: no slot swaps, drags or F offhand swaps there.
+        assertTrue(PracticeGuards.ownInventoryMoveBlocked(PlayerState.LOBBY));
+        assertTrue(PracticeGuards.ownInventoryMoveBlocked(PlayerState.IDLE));
+        assertTrue(PracticeGuards.ownInventoryMoveBlocked(PlayerState.OPENING_GUI));
+        assertTrue(PracticeGuards.ownInventoryMoveBlocked(PlayerState.QUEUED_RANKED));
+        assertTrue(PracticeGuards.ownInventoryMoveBlocked(PlayerState.QUEUED_UNRANKED));
+        assertTrue(PracticeGuards.ownInventoryMoveBlocked(PlayerState.REQUESTING_DUEL));
+        assertTrue(PracticeGuards.ownInventoryMoveBlocked(PlayerState.EDITING_KIT));
+        assertTrue(PracticeGuards.ownInventoryMoveBlocked(PlayerState.PRACTICE_WAIT));
+        // Everything that actually plays keeps full inventory freedom.
+        assertFalse(PracticeGuards.ownInventoryMoveBlocked(PlayerState.FIGHTING));
+        assertFalse(PracticeGuards.ownInventoryMoveBlocked(PlayerState.COUNTDOWN));
+        assertFalse(PracticeGuards.ownInventoryMoveBlocked(PlayerState.FFA));
+        assertFalse(PracticeGuards.ownInventoryMoveBlocked(PlayerState.PRACTICE_ACTIVE));
+        assertFalse(PracticeGuards.ownInventoryMoveBlocked(PlayerState.SPECTATING));
+        // Unknown / not-joined player: treat as protected, like every other lobby matrix.
+        assertTrue(PracticeGuards.ownInventoryMoveBlocked(null));
+    }
+
     // --- Automatic kick suppression (Paper) ---
 
     @ParameterizedTest(name = "automatic kick cause {0} is suppressed")

@@ -15,6 +15,7 @@ import org.bukkit.event.inventory.InventoryMoveItemEvent;
 import org.bukkit.event.inventory.InventoryPickupItemEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.Inventory;
 
 /**
@@ -132,6 +133,67 @@ public final class ItemFlowGuardListener implements Listener {
         if (isPluginGui(event.getInventory())) {
             event.setCancelled(true);
         }
+    }
+
+    /**
+     * Own-inventory lock for the hub states: the lobby hotbar is a fixed menu, so clicks, drags
+     * and the F offhand swap must not move anything either — dropping alone was easy to work
+     * around. Plugin GUIs (kit editor, settings...) own their clicks and are skipped, and AFK
+     * rooms are a sandbox where building means moving items.
+     */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onOwnInventoryClick(InventoryClickEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) {
+            return;
+        }
+        if (!ownInventoryLocked(player)) {
+            return;
+        }
+        if (isPluginGui(event.getView().getTopInventory())) {
+            return;
+        }
+        InventoryType type = event.getView().getTopInventory().getType();
+        if (type != InventoryType.CRAFTING && type != InventoryType.PLAYER
+                && type != InventoryType.CREATIVE) {
+            return; // vanilla containers are handled by onInventoryClick
+        }
+        event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onOwnInventoryDrag(InventoryDragEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) {
+            return;
+        }
+        if (!ownInventoryLocked(player)) {
+            return;
+        }
+        if (isPluginGui(event.getView().getTopInventory())) {
+            return;
+        }
+        InventoryType type = event.getView().getTopInventory().getType();
+        if (type != InventoryType.CRAFTING && type != InventoryType.PLAYER
+                && type != InventoryType.CREATIVE) {
+            return;
+        }
+        event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onSwapHands(PlayerSwapHandItemsEvent event) {
+        if (ownInventoryLocked(event.getPlayer())) {
+            event.setCancelled(true);
+        }
+    }
+
+    private boolean ownInventoryLocked(Player player) {
+        if (inAfkRoom(player.getUniqueId())) {
+            return false;
+        }
+        if (ffaService != null && ffaService.isInFfa(player.getUniqueId())) {
+            return false;
+        }
+        return PracticeGuards.ownInventoryMoveBlocked(state(player));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)

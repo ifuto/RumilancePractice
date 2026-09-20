@@ -93,10 +93,11 @@ public final class PracticeBotSelectGui extends AbstractGui {
         for (int i = 0; i < MODES.length; i++) {
             inventory.setItem(GuiSlots.slot(1, cols[i]), modeTile(player, MODES[i]));
         }
-        // Row 3 centre — the AFK BOT Crystal room ("No move bot"): a passive armored
-        // sparring partner on a private 100x100 floor (crystal combos, and mace swings too).
+        // Row 3 centre — the 受け身BOT room (AFK BOT Crystal): a passive armored sparring
+        // partner on a private 100x100 floor (crystal combos, and mace swings too). The TARGET
+        // block reads as "the thing you hit" — it never moves, it never fights back.
         inventory.setItem(GuiSlots.slot(3, 4),
-                ItemBuilder.of(Material.CHERRY_BUTTON)
+                ItemBuilder.of(Material.TARGET)
                         .name(t(player, "gui.bot-nomove-name").color(UiTheme.SUCCESS)
                                 .decoration(TextDecoration.ITALIC, false))
                         .lore(UiTheme.divider(),

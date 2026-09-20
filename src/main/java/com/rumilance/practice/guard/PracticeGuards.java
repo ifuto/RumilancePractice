@@ -426,6 +426,16 @@ public final class PracticeGuards {
     }
 
     /**
+     * States where a player may not even rearrange their OWN inventory. The lobby hotbar is a
+     * fixed set of function items: dropping was already illegal ({@link #looseItemMoveBlocked}),
+     * but slot swaps, drags and the offhand swap (F) still let players hide or reorder the menu
+     * items — the reported "ロビーでのアイテム位置の変動". Fighting states keep full freedom.
+     */
+    public static boolean ownInventoryMoveBlocked(PlayerState state) {
+        return lobbyProtectedStates(state);
+    }
+
+    /**
      * Non-combat "hub" states: lobby, menus, queues, duel requests, idle. Matches the
      * protection matrix in {@code LobbyListener#shouldProtect}.
      */
