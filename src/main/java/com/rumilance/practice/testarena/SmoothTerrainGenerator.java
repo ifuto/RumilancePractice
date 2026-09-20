@@ -43,6 +43,12 @@ public final class SmoothTerrainGenerator {
     private final TerrainEditBridge terrainEditBridge;
     private final ConcurrentMap<UUID, BukkitTask> running = new ConcurrentHashMap<>();
     private final java.util.Set<UUID> busy = ConcurrentHashMap.newKeySet();
+    /** TestArena owns one global map; serialise operations so two clipboards can never overlap. */
+    private final Object operationLock = new Object();
+    private long nextOperationId;
+    private volatile long activeOperationId;
+    private volatile UUID activeOperationOwner;
+    private volatile boolean editInFlight;
     private volatile Area previousMap;
 
     public SmoothTerrainGenerator(Plugin plugin) {
@@ -126,6 +132,40 @@ public final class SmoothTerrainGenerator {
         return busy.contains(playerId);
     }
 
+    private long beginOperation(UUID playerId) {
+        synchronized (operationLock) {
+            if (activeOperationId != 0L) {
+                return 0L;
+            }
+            activeOperationId = ++nextOperationId;
+            activeOperationOwner = playerId;
+            editInFlight = false;
+            return activeOperationId;
+        }
+    }
+
+    private boolean isActive(long operationId) {
+        return activeOperationId == operationId;
+    }
+
+    private void markEditInFlight(long operationId) {
+        synchronized (operationLock) {
+            if (activeOperationId == operationId) {
+                editInFlight = true;
+            }
+        }
+    }
+
+    private void releaseOperation(long operationId) {
+        synchronized (operationLock) {
+            if (activeOperationId == operationId) {
+                activeOperationId = 0L;
+                activeOperationOwner = null;
+                editInFlight = false;
+            }
+        }
+    }
+
     /** Cancels only the pending generation; a completed map remains available for delete. */
     public void cancel(UUID playerId) {
         BukkitTask task = running.remove(playerId);
@@ -133,6 +173,16 @@ public final class SmoothTerrainGenerator {
             task.cancel();
         }
         busy.remove(playerId);
+        synchronized (operationLock) {
+            // FAWE cannot safely interrupt an already queued paste. Keep the global lock until
+            // its completion callback releases it; planning/fallback writes can be cancelled.
+            if (activeOperationOwner != null && activeOperationOwner.equals(playerId)
+                    && !editInFlight) {
+                activeOperationId = 0L;
+                activeOperationOwner = null;
+                editInFlight = false;
+            }
+        }
     }
 
     /**
@@ -150,7 +200,13 @@ public final class SmoothTerrainGenerator {
             return;
         }
         UUID playerId = player.getUniqueId();
+        long operationId = beginOperation(playerId);
+        if (operationId == 0L) {
+            fail(failure, "Wait for the current test map operation to finish.");
+            return;
+        }
         if (!busy.add(playerId)) {
+            releaseOperation(operationId);
             fail(failure, "A test map is already being generated for you.");
             return;
         }
@@ -167,19 +223,21 @@ public final class SmoothTerrainGenerator {
         CompletableFuture
                 .supplyAsync(() -> plan(area, seed))
                 .whenComplete((planned, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
-                    if (!busy.contains(playerId)) {
+                    if (!isActive(operationId) || !busy.contains(playerId)) {
+                        releaseOperation(operationId);
                         return;
                     }
                     if (error != null || planned == null) {
                         busy.remove(playerId);
+                        releaseOperation(operationId);
                         fail(failure, "Could not plan the test map: "
                                 + (error == null ? "unknown error" : error.getMessage()));
                         return;
                     }
                     if (terrainEditBridge != null && terrainEditBridge.isAvailable()) {
-                        scheduleFawePaste(player, area, planned, seed, complete, failure);
+                        scheduleFawePaste(player, area, planned, seed, complete, failure, operationId);
                     } else {
-                        scheduleWrites(player, area, planned, seed, complete, failure);
+                        scheduleWrites(player, area, planned, seed, complete, failure, operationId);
                     }
                 }));
         // The async planning phase has no BukkitTask yet. A small sentinel task makes a second
@@ -203,12 +261,18 @@ public final class SmoothTerrainGenerator {
             return;
         }
         UUID playerId = player.getUniqueId();
+        long operationId = beginOperation(playerId);
+        if (operationId == 0L) {
+            fail(failure, "Wait for the current test map operation to finish.");
+            return;
+        }
         if (!busy.add(playerId)) {
+            releaseOperation(operationId);
             fail(failure, "Wait for the current test map operation to finish.");
             return;
         }
         if (terrainEditBridge != null && terrainEditBridge.isAvailable()) {
-            scheduleFaweClear(player, area, complete, failure);
+            scheduleFaweClear(player, area, complete, failure, operationId);
             return;
         }
         List<ColumnData> columns = new ArrayList<>(area.width() * area.width());
@@ -233,6 +297,7 @@ public final class SmoothTerrainGenerator {
                     deleteState();
                     running.remove(playerId);
                     busy.remove(playerId);
+                    releaseOperation(operationId);
                     holder[0].cancel();
                     if (complete != null) {
                         complete.accept(columns.size());
@@ -244,11 +309,13 @@ public final class SmoothTerrainGenerator {
     }
 
     private void scheduleFawePaste(Player player, Area area, List<ColumnData> columns, long seed,
-                                   Consumer<Result> complete, Consumer<String> failure) {
+                                   Consumer<Result> complete, Consumer<String> failure,
+                                   long operationId) {
         World world = Bukkit.getWorld(area.world());
         if (world == null) {
             running.remove(player.getUniqueId());
             busy.remove(player.getUniqueId());
+            releaseOperation(operationId);
             fail(failure, "The target world is no longer loaded.");
             return;
         }
@@ -256,12 +323,23 @@ public final class SmoothTerrainGenerator {
         int minZ = area.centerZ() - area.width() / 2;
         int maxX = minX + area.width() - 1;
         int maxZ = minZ + area.width() - 1;
-        terrainEditBridge.paste(world, minX, area.minY(), minZ, maxX, area.maxY(), maxZ,
-                        area.map(), columns)
-                .whenComplete((success, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
+        markEditInFlight(operationId);
+        CompletableFuture<Boolean> paste;
+        try {
+            paste = terrainEditBridge.paste(world, minX, area.minY(), minZ, maxX, area.maxY(), maxZ,
+                    area.map(), columns);
+        } catch (Throwable error) {
+            running.remove(player.getUniqueId());
+            busy.remove(player.getUniqueId());
+            releaseOperation(operationId);
+            fail(failure, "FAWE could not start the test map: " + error.getMessage());
+            return;
+        }
+        paste.whenComplete((success, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
                     UUID playerId = player.getUniqueId();
                     running.remove(playerId);
                     busy.remove(playerId);
+                    releaseOperation(operationId);
                     if (error != null || !Boolean.TRUE.equals(success)) {
                         fail(failure, "FAWE could not paste the test map: "
                                 + (error == null ? "unknown error" : error.getMessage()));
@@ -278,10 +356,11 @@ public final class SmoothTerrainGenerator {
     }
 
     private void scheduleFaweClear(Player player, Area area, Consumer<Integer> complete,
-                                   Consumer<String> failure) {
+                                   Consumer<String> failure, long operationId) {
         World world = Bukkit.getWorld(area.world());
         if (world == null) {
             busy.remove(player.getUniqueId());
+            releaseOperation(operationId);
             fail(failure, "The world containing the previous test map is no longer loaded.");
             return;
         }
@@ -289,11 +368,22 @@ public final class SmoothTerrainGenerator {
         int minZ = area.centerZ() - area.width() / 2;
         int maxX = minX + area.width() - 1;
         int maxZ = minZ + area.width() - 1;
-        terrainEditBridge.clear(world, minX, area.minY(), minZ, maxX, area.maxY(), maxZ)
-                .whenComplete((success, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
+        markEditInFlight(operationId);
+        CompletableFuture<Boolean> clear;
+        try {
+            clear = terrainEditBridge.clear(world, minX, area.minY(), minZ, maxX, area.maxY(), maxZ);
+        } catch (Throwable error) {
+            running.remove(player.getUniqueId());
+            busy.remove(player.getUniqueId());
+            releaseOperation(operationId);
+            fail(failure, "FAWE could not start deleting the test map: " + error.getMessage());
+            return;
+        }
+        clear.whenComplete((success, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
                     UUID playerId = player.getUniqueId();
                     running.remove(playerId);
                     busy.remove(playerId);
+                    releaseOperation(operationId);
                     if (error != null || !Boolean.TRUE.equals(success)) {
                         fail(failure, "FAWE could not delete the test map: "
                                 + (error == null ? "unknown error" : error.getMessage()));
@@ -308,11 +398,13 @@ public final class SmoothTerrainGenerator {
     }
 
     private void scheduleWrites(Player player, Area area, List<ColumnData> columns, long seed,
-                                Consumer<Result> complete, Consumer<String> failure) {
+                                Consumer<Result> complete, Consumer<String> failure,
+                                long operationId) {
         World world = Bukkit.getWorld(area.world());
         if (world == null) {
             running.remove(player.getUniqueId());
             busy.remove(player.getUniqueId());
+            releaseOperation(operationId);
             fail(failure, "The target world is no longer loaded.");
             return;
         }
@@ -330,6 +422,8 @@ public final class SmoothTerrainGenerator {
                     previousMap = area;
                     writeState(area);
                     running.remove(player.getUniqueId());
+                    busy.remove(player.getUniqueId());
+                    releaseOperation(operationId);
                     holder[0].cancel();
                     Result result = new Result(area.map(), area.width(), columns.size(),
                             minimum(columns, area.baseY()), maximum(columns, area.baseY()), seed);
