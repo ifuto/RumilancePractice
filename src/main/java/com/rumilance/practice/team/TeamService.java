@@ -1049,8 +1049,10 @@ public final class TeamService {
                 + partyB.name() + "!", NamedTextColor.GOLD, TextDecoration.BOLD));
         broadcast(partyB, Component.text("Match found: " + partyB.name() + " vs "
                 + partyA.name() + "!", NamedTextColor.GOLD, TextDecoration.BOLD));
+        // ラムダに渡す値は実質的 final である必要があるので、ここで確定させる。
+        final String battleKit = kitId;
         Bukkit.getScheduler().runTask(plugin, () -> matchService.startTeamMatch(
-                sideA, sideB, kitId, MatchMode.TEAM, 1, arenaName, false));
+                sideA, sideB, battleKit, MatchMode.TEAM, 1, arenaName, false));
         return true;
     }
 

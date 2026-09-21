@@ -1771,8 +1771,11 @@ public final class FfaService {
      * @return 開けたかどうか
      */
     public boolean openPrivateFfa(Player owner, String arenaId, java.util.Collection<String> invitedNames) {
+        if (owner == null) {
+            return false;
+        }
         FfaArena arena = findArena(arenaId);
-        if (owner == null || arena == null || !arena.enabled()) {
+        if (arena == null || !arena.enabled()) {
             messageService.send(owner, "ffa.unavailable");
             return false;
         }
