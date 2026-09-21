@@ -46,9 +46,15 @@ public final class SessionBootstrapListener implements Listener {
     private final ChatBanService chatBanService;
     /** Opens the language picker (wired from bootstrap; null = picker disabled). */
     private volatile java.util.function.Consumer<org.bukkit.entity.Player> languagePicker;
+    /** 参加時に言語ピッカーを自動で開くか。既定は false(設定言語に合わせる)。 */
+    private volatile boolean languagePickerOnJoin;
 
     public void setLanguagePicker(java.util.function.Consumer<org.bukkit.entity.Player> languagePicker) {
         this.languagePicker = languagePicker;
+    }
+
+    public void setLanguagePickerOnJoin(boolean enabled) {
+        this.languagePickerOnJoin = enabled;
     }
 
     public SessionBootstrapListener(
@@ -187,9 +193,10 @@ public final class SessionBootstrapListener implements Listener {
                     WelcomeTitle.play(plugin, player);
                 }
             }
-            // First-timers / players without a language choice get the picker right after the
-            // lobby teleport settles (delayed a few ticks so the teleport + welcome title land first).
-            if (localeUnset && languagePicker != null && plugin != null) {
+            // 言語は「設定に合わせる」: 参加時にピッカーは出さない。未設定ならサーバの
+            // 既定言語(設定言語)で表示され、変えたい人は /lang で自分で開く。
+            // locale.picker-on-join: true にすると旧来の自動オープンを復活できる。
+            if (languagePickerOnJoin && localeUnset && languagePicker != null && plugin != null) {
                 plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
                     if (player.isOnline()) {
                         languagePicker.accept(player);

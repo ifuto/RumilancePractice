@@ -1420,6 +1420,9 @@ public final class FeatureBootstrap {
                 sessionManager, stateManager, lobbyService, settings.defaultLocale(), playerRepository,
                 layoutCache, settingsService, asyncExecutor, plugin, messageService, rankService, chatBanService);
         sessionBootstrapListener.setLanguagePicker(localeSelectGui::open);
+        // 参加時の言語ピッカーは既定で出さない(設定言語に合わせる)。/lang は残る。
+        sessionBootstrapListener.setLanguagePickerOnJoin(
+                configService.config().getBoolean("locale.picker-on-join", false));
         pm.registerEvents(sessionBootstrapListener, plugin);
         LobbyListener lobbyListener =
                 new LobbyListener(lobbyService, stateManager, guiSessions, ffaService);
@@ -1762,6 +1765,8 @@ public final class FeatureBootstrap {
         services.register(FfaRtpQueueService.class, ffaRtpQueueService);
         bind("killeffect", new com.rumilance.practice.command.KillEffectCommand(killEffectGui));
         bind("leave", new LeaveCommand(matchService, messageService));
+        // フレンド機能は未実装: いまは「実装予定」の告知だけ返す(コマンド名は先に確保)。
+        bind("friend", new com.rumilance.practice.command.FriendCommand(messageService));
         bind("team", new TeamCommand(teamService, kitService, teamHubGui, teamsBrowserGui, messageService));
         bind("prac", new PracCommand(practiceService));
         bind("tier", new com.rumilance.practice.command.TierCommand(tierService, messageService));

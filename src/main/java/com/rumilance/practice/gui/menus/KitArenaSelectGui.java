@@ -104,18 +104,24 @@ public final class KitArenaSelectGui extends AbstractGui {
             boolean inParty = party.contains(t.name().toLowerCase(Locale.ROOT));
             Material duelMat = inDuel ? Material.LIME_STAINED_GLASS_PANE : Material.GRAY_STAINED_GLASS_PANE;
             Material partyMat = inParty ? Material.LIME_STAINED_GLASS_PANE : Material.GRAY_STAINED_GLASS_PANE;
-            String label = NameDisplay.pretty(t.name()) + (t.party() ? " [P]" : "");
+            // 表示は外部名(重複可)、内部名は説明欄に出す(一意・運営が特定するための ID)。
+            String label = NameDisplay.pretty(t.displayNameOrName()) + (t.party() ? " [P]" : "");
+            String internal = t.name();
 
             inventory.setItem(GuiSlots.slot(row, col), ItemBuilder.of(duelMat)
                     .name(t(player, "gui.kit-arena-duel", MessageService.tags("name", label))
                             .color(inDuel ? UiTheme.SUCCESS : UiTheme.MUTED))
-                    .lore(UiTheme.hint(line(player, "gui.arena-toggle")))
+                    .lore(
+                            UiTheme.labelValue(line(player, "gui.arena-internal-id"), internal),
+                            UiTheme.hint(line(player, "gui.arena-toggle")))
                     .action("duel:" + t.name())
                     .build());
             inventory.setItem(GuiSlots.slot(row, col + 5), ItemBuilder.of(partyMat)
                     .name(t(player, "gui.kit-arena-party", MessageService.tags("name", label))
                             .color(inParty ? UiTheme.SUCCESS : UiTheme.MUTED))
-                    .lore(UiTheme.hint(line(player, "gui.arena-toggle")))
+                    .lore(
+                            UiTheme.labelValue(line(player, "gui.arena-internal-id"), internal),
+                            UiTheme.hint(line(player, "gui.arena-toggle")))
                     .action("party:" + t.name())
                     .build());
 

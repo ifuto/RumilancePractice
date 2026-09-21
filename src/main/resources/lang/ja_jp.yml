@@ -947,6 +947,7 @@ gui:
   delete-all-lore: "キット内のアイテムを全て削除します。"
   arena-empty-random: "空 = ランダム"
   arena-selected: "緑 = 選択中"
+  arena-internal-id: "内部ID"
   arena-toggle: "左クリックでトグル"
   kit-full: "<red>キットのインベントリが満杯です。"
   report-title: "通報"
@@ -1365,3 +1366,8 @@ countdown:
   gaze-ready: "<n><color:#94A3B8>/2</color> <color:#334155>·</color> <color:#4ADE80><bold>Ready</bold></color> <color:#4ADE80>✓</color>"
   gaze-leave: "<n><color:#94A3B8>/2</color> <color:#334155>·</color> <color:#F87171><bold>Leave</bold></color> <color:#F87171>☓</color>"
   opponent-ready: "<color:#FBBF24><name></color> <color:#94A3B8>is</color> <color:#4ADE80><bold>Ready</bold></color> <color:#4ADE80>✓</color>"
+
+friend:
+  title: "フレンド"
+  subtitle: "実装予定"
+  coming-soon: "<color:#55FFFF><bold>フレンド機能</bold></color> <color:#94A3B8>は現在</color> <color:#FBBF24>実装予定</color> <color:#94A3B8>です。申請 / 承認 / 拒否 が入る予定です(DM 機能は付きません)。</color>"

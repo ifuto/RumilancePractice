@@ -593,6 +593,47 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                 }
                 yield true;
             }
+            case "display" -> {
+                if (args.length < 3) {
+                    player.sendMessage(Component.text(
+                            "Usage: /arena display <internal name> <display name...>", NamedTextColor.YELLOW));
+                    yield true;
+                }
+                String internalName = args[1];
+                if (arenaStore.findExact(internalName).isEmpty()) {
+                    player.sendMessage(Component.text("Arena not found: " + internalName, NamedTextColor.RED));
+                    yield true;
+                }
+                String display = String.join(" ", java.util.Arrays.copyOfRange(args, 2, args.length));
+                arenaStore.setDisplayName(internalName, display);
+                arenaService.setTemplates(arenaStore.templates());
+                player.sendMessage(Component.text("Display name: " + internalName + " -> " + display
+                        + " (internal id stays '" + internalName + "')", NamedTextColor.GREEN));
+                yield true;
+            }
+            case "queue" -> {
+                if (args.length < 3) {
+                    player.sendMessage(Component.text(
+                            "Usage: /arena queue <name> <on|off>", NamedTextColor.YELLOW));
+                    yield true;
+                }
+                String queueArena = args[1];
+                if (arenaStore.findExact(queueArena).isEmpty()) {
+                    player.sendMessage(Component.text("Arena not found: " + queueArena, NamedTextColor.RED));
+                    yield true;
+                }
+                boolean selectable = switch (args[2].toLowerCase(java.util.Locale.ROOT)) {
+                    case "on", "true", "yes", "1" -> true;
+                    case "off", "false", "no", "0" -> false;
+                    default -> true;
+                };
+                arenaStore.setQueueSelectable(queueArena, selectable);
+                arenaService.setTemplates(arenaStore.templates());
+                player.sendMessage(Component.text(
+                        (selectable ? "Queue/Random Map: enabled for " : "Queue/Random Map: excluded from ")
+                                + queueArena, NamedTextColor.GREEN));
+                yield true;
+            }
             default -> {
                 player.sendMessage(Component.text("Unknown arena subcommand.", NamedTextColor.RED));
                 yield true;

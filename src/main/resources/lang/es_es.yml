@@ -946,6 +946,7 @@ gui:
   delete-all-lore: "Quita todos los objetos de este kit."
   arena-empty-random: "Vacío = aleatorio"
   arena-selected: "Verde = seleccionado"
+  arena-internal-id: "ID interno"
   arena-toggle: "Clic izquierdo para alternar"
   kit-full: "<red>El inventario del kit está lleno."
   report-title: "Denuncia"
@@ -1364,3 +1365,8 @@ countdown:
   gaze-ready: "<n><color:#94A3B8>/2</color> <color:#334155>·</color> <color:#4ADE80><bold>Ready</bold></color> <color:#4ADE80>✓</color>"
   gaze-leave: "<n><color:#94A3B8>/2</color> <color:#334155>·</color> <color:#F87171><bold>Leave</bold></color> <color:#F87171>☓</color>"
   opponent-ready: "<color:#FBBF24><name></color> <color:#94A3B8>is</color> <color:#4ADE80><bold>Ready</bold></color> <color:#4ADE80>✓</color>"
+
+friend:
+  title: "Amigos"
+  subtitle: "Proximamente"
+  coming-soon: "<color:#55FFFF><bold>Amigos</bold></color> <color:#94A3B8>llegan</color> <color:#FBBF24>proximamente</color><color:#94A3B8>: solicitudes, aceptar y rechazar (sin DM).</color>"

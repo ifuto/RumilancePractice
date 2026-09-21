@@ -946,6 +946,7 @@ gui:
   delete-all-lore: "Removes every item in this kit."
   arena-empty-random: "Empty = random"
   arena-selected: "Green = selected"
+  arena-internal-id: "Internal ID"
   arena-toggle: "Left-click to toggle"
   kit-full: "<red>Kit inventory is full."
   report-title: "Report"
@@ -1364,3 +1365,8 @@ countdown:
   gaze-ready: "<n><color:#94A3B8>/2</color> <color:#334155>·</color> <color:#4ADE80><bold>Ready</bold></color> <color:#4ADE80>✓</color>"
   gaze-leave: "<n><color:#94A3B8>/2</color> <color:#334155>·</color> <color:#F87171><bold>Leave</bold></color> <color:#F87171>☓</color>"
   opponent-ready: "<color:#FBBF24><name></color> <color:#94A3B8>is</color> <color:#4ADE80><bold>Ready</bold></color> <color:#4ADE80>✓</color>"
+
+friend:
+  title: "Friends"
+  subtitle: "Coming soon"
+  coming-soon: "<color:#55FFFF><bold>Friends</bold></color> <color:#94A3B8>are</color> <color:#FBBF24>coming soon</color><color:#94A3B8>: requests, accept and deny (no DM by design).</color>"

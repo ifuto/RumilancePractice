@@ -79,6 +79,9 @@ public final class DisposableArenaService extends AbstractArenaService {
         // Pick a template (round-robin over enabled candidates via random start).
         List<ArenaTemplate> candidates = templates().stream()
                 .filter(t -> t.enabled() && t.type() == type)
+                // queue-selectable: false のアリーナは Queue 戦・Random Map では選ばれない
+                // (Duel Request の一覧には残るので、指定すれば使える)。
+                .filter(ArenaTemplate::queueSelectable)
                 .filter(t -> t.schematicPath() != null && !t.schematicPath().isBlank())
                 .toList();
         if (candidates.isEmpty()) {

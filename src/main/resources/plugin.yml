@@ -212,6 +212,10 @@ commands:
     description: Leave a match during the pre-match countdown.
     usage: /leave
     aliases: [le]
+  friend:
+    description: Friend system (coming soon).
+    usage: /friend
+    aliases: [friends]
     permission: rumilance.user
   lobby:
     description: Return to the practice lobby.

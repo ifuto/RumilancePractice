@@ -946,6 +946,7 @@ gui:
   delete-all-lore: "Removes every item in this kit."
   arena-empty-random: "Empty = random"
   arena-selected: "Green = selected"
+  arena-internal-id: "내부 ID"
   arena-toggle: "Left-click to toggle"
   kit-full: "<red>키트 인벤토리가 가득 찼습니다."
   report-title: "신고"
@@ -1364,3 +1365,8 @@ countdown:
   gaze-ready: "<n><color:#94A3B8>/2</color> <color:#334155>·</color> <color:#4ADE80><bold>Ready</bold></color> <color:#4ADE80>✓</color>"
   gaze-leave: "<n><color:#94A3B8>/2</color> <color:#334155>·</color> <color:#F87171><bold>Leave</bold></color> <color:#F87171>☓</color>"
   opponent-ready: "<color:#FBBF24><name></color> <color:#94A3B8>is</color> <color:#4ADE80><bold>Ready</bold></color> <color:#4ADE80>✓</color>"
+
+friend:
+  title: "친구"
+  subtitle: "구현 예정"
+  coming-soon: "<color:#55FFFF><bold>친구 기능</bold></color><color:#94A3B8>은 현재</color> <color:#FBBF24>구현 예정</color><color:#94A3B8>입니다. 요청 / 수락 / 거절 이 들어갈 예정입니다(DM 은 없습니다).</color>"

@@ -946,6 +946,7 @@ gui:
   delete-all-lore: "移除该套件的所有物品。"
   arena-empty-random: "留空 = 随机"
   arena-selected: "绿色 = 已选择"
+  arena-internal-id: "内部ID"
   arena-toggle: "左键切换"
   kit-full: "<red>套件背包已满。"
   report-title: "举报"
@@ -1364,3 +1365,8 @@ countdown:
   gaze-ready: "<n><color:#94A3B8>/2</color> <color:#334155>·</color> <color:#4ADE80><bold>Ready</bold></color> <color:#4ADE80>✓</color>"
   gaze-leave: "<n><color:#94A3B8>/2</color> <color:#334155>·</color> <color:#F87171><bold>Leave</bold></color> <color:#F87171>☓</color>"
   opponent-ready: "<color:#FBBF24><name></color> <color:#94A3B8>is</color> <color:#4ADE80><bold>Ready</bold></color> <color:#4ADE80>✓</color>"
+
+friend:
+  title: "好友"
+  subtitle: "即将推出"
+  coming-soon: "<color:#55FFFF><bold>好友功能</bold></color> <color:#94A3B8>目前</color> <color:#FBBF24>即将推出</color><color:#94A3B8>：申请 / 接受 / 拒绝（不含私信）。</color>"

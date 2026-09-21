@@ -70,6 +70,12 @@ executor:
   core-threads: 2
   keep-alive-seconds: 60
 
+# Language handling. Each player is shown the language they chose; anyone without a choice
+# follows the server default. The join-time language picker is OFF by default - the language
+# simply follows the setting, and /lang still opens the picker on demand.
+locale:
+  picker-on-join: false
+
 match:
   # Countdown, in seconds, before a duel/FFA match starts.
   countdown-seconds: 5

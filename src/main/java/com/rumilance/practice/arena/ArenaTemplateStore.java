@@ -82,6 +82,28 @@ public final class ArenaTemplateStore {
         });
     }
 
+    /** 外部名(ユーザー向け・重複可)。内部名(name)は変わらない。 */
+    public void setDisplayName(String name, String displayName) {
+        findExact(name).ifPresent(t -> {
+            int i = templates.indexOf(t);
+            if (i >= 0) {
+                templates.set(i, t.withDisplayName(displayName));
+                persistAll();
+            }
+        });
+    }
+
+    /** false にすると Queue 戦・Random Map の候補から外れる(Duel Request 一覧には残る)。 */
+    public void setQueueSelectable(String name, boolean selectable) {
+        findExact(name).ifPresent(t -> {
+            int i = templates.indexOf(t);
+            if (i >= 0) {
+                templates.set(i, t.withQueueSelectable(selectable));
+                persistAll();
+            }
+        });
+    }
+
     public void setType(String name, ArenaType type) {
         findExact(name).ifPresent(t -> {
             int i = templates.indexOf(t);
@@ -128,6 +150,12 @@ public final class ArenaTemplateStore {
             yaml.set(path + ".party", t.party());
             if (t.iconMaterial() != null) {
                 yaml.set(path + ".icon", t.iconMaterial());
+            }
+            if (t.displayName() != null && !t.displayName().equalsIgnoreCase(t.name())) {
+                yaml.set(path + ".display-name", t.displayName());
+            }
+            if (!t.queueSelectable()) {
+                yaml.set(path + ".queue-selectable", false);
             }
             yaml.set(path + ".schematic", t.schematicPath());
             yaml.set(path + ".min.x", t.minX());
@@ -188,8 +216,12 @@ public final class ArenaTemplateStore {
         boolean enabled = entry.getBoolean("enabled", true);
         boolean party = entry.getBoolean("party", false);
         String icon = entry.getString("icon", null);
+        // 内部名(name=キー)は一意、外部名(display-name)はユーザー向けで重複可。
+        String displayName = entry.getString("display-name", name);
+        // Queue 戦・Random Map の候補から外すアリーナ(Duel Request 一覧には出す)。
+        boolean queueSelectable = entry.getBoolean("queue-selectable", true);
         return new ArenaTemplate(id, name, type, world, minX, minY, minZ, maxX, maxY, maxZ,
-                spawnA, spawnB, schematic, enabled, party, icon);
+                spawnA, spawnB, schematic, enabled, party, icon, displayName, queueSelectable);
     }
 
     private static String buildSpawn(ConfigurationSection spawn, String world) {

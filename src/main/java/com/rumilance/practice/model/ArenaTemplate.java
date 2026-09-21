@@ -27,7 +27,9 @@ public record ArenaTemplate(
         String schematicPath,
         boolean enabled,
         boolean party,
-        String iconMaterial
+        String iconMaterial,
+        String displayName,
+        boolean queueSelectable
 ) {
 
     public ArenaTemplate {
@@ -38,6 +40,8 @@ public record ArenaTemplate(
         if (iconMaterial != null && iconMaterial.isBlank()) {
             iconMaterial = null;
         }
+        // 外部名は未設定なら内部名をそのまま使う(ユーザーに見える名前は常に埋まっている)。
+        displayName = displayName == null || displayName.isBlank() ? name : displayName.trim();
     }
 
     /** Backward-compatible constructor (party off, no icon). */
@@ -51,44 +55,80 @@ public record ArenaTemplate(
                 serializedSpawnA, serializedSpawnB, schematicPath, enabled, false, null);
     }
 
+    /**
+     * Backward-compatible constructor: 外部名は内部名と同じ、Queue 戦・Random Map で
+     * 選ばれる(既存のアリーナは今まで通り振る舞う)。
+     */
+    public ArenaTemplate(
+            UUID id, String name, ArenaType type, String world,
+            int minX, int minY, int minZ, int maxX, int maxY, int maxZ,
+            String serializedSpawnA, String serializedSpawnB,
+            String schematicPath, boolean enabled, boolean party, String iconMaterial
+    ) {
+        this(id, name, type, world, minX, minY, minZ, maxX, maxY, maxZ,
+                serializedSpawnA, serializedSpawnB, schematicPath, enabled, party, iconMaterial,
+                name, true);
+    }
+
+    /**
+     * 内部名({@link #name()}、一意・ユーザーにはほぼ見せない)に対して、ユーザーに
+     * 見せる名前。重複してよい。未設定なら内部名が返る。
+     */
+    public String displayNameOrName() {
+        return displayName == null || displayName.isBlank() ? name : displayName;
+    }
+
+    public ArenaTemplate withDisplayName(String newDisplayName) {
+        return new ArenaTemplate(id, name, type, world, minX, minY, minZ, maxX, maxY, maxZ,
+                serializedSpawnA, serializedSpawnB, schematicPath, enabled, party, iconMaterial,
+                newDisplayName, queueSelectable);
+    }
+
+    /** Queue 戦・Random Map の候補に入れるか。false なら Duel Request 一覧にだけ出る。 */
+    public ArenaTemplate withQueueSelectable(boolean selectable) {
+        return new ArenaTemplate(id, name, type, world, minX, minY, minZ, maxX, maxY, maxZ,
+                serializedSpawnA, serializedSpawnB, schematicPath, enabled, party, iconMaterial,
+                displayName, selectable);
+    }
+
     public ArenaTemplate withName(String newName) {
         return new ArenaTemplate(id, newName, type, world, minX, minY, minZ, maxX, maxY, maxZ,
-                serializedSpawnA, serializedSpawnB, schematicPath, enabled, party, iconMaterial);
+                serializedSpawnA, serializedSpawnB, schematicPath, enabled, party, iconMaterial, displayName, queueSelectable);
     }
 
     public ArenaTemplate withType(ArenaType newType) {
         return new ArenaTemplate(id, name, newType, world, minX, minY, minZ, maxX, maxY, maxZ,
-                serializedSpawnA, serializedSpawnB, schematicPath, enabled, party, iconMaterial);
+                serializedSpawnA, serializedSpawnB, schematicPath, enabled, party, iconMaterial, displayName, queueSelectable);
     }
 
     public ArenaTemplate withBounds(String newWorld, int nMinX, int nMinY, int nMinZ,
                                     int nMaxX, int nMaxY, int nMaxZ) {
         return new ArenaTemplate(id, name, type, newWorld, nMinX, nMinY, nMinZ, nMaxX, nMaxY, nMaxZ,
-                serializedSpawnA, serializedSpawnB, schematicPath, enabled, party, iconMaterial);
+                serializedSpawnA, serializedSpawnB, schematicPath, enabled, party, iconMaterial, displayName, queueSelectable);
     }
 
     public ArenaTemplate withSpawns(String spawnA, String spawnB) {
         return new ArenaTemplate(id, name, type, world, minX, minY, minZ, maxX, maxY, maxZ,
-                spawnA, spawnB, schematicPath, enabled, party, iconMaterial);
+                spawnA, spawnB, schematicPath, enabled, party, iconMaterial, displayName, queueSelectable);
     }
 
     public ArenaTemplate withSchematic(String path) {
         return new ArenaTemplate(id, name, type, world, minX, minY, minZ, maxX, maxY, maxZ,
-                serializedSpawnA, serializedSpawnB, path, enabled, party, iconMaterial);
+                serializedSpawnA, serializedSpawnB, path, enabled, party, iconMaterial, displayName, queueSelectable);
     }
 
     public ArenaTemplate withEnabled(boolean newEnabled) {
         return new ArenaTemplate(id, name, type, world, minX, minY, minZ, maxX, maxY, maxZ,
-                serializedSpawnA, serializedSpawnB, schematicPath, newEnabled, party, iconMaterial);
+                serializedSpawnA, serializedSpawnB, schematicPath, newEnabled, party, iconMaterial, displayName, queueSelectable);
     }
 
     public ArenaTemplate withParty(boolean partyEnabled) {
         return new ArenaTemplate(id, name, type, world, minX, minY, minZ, maxX, maxY, maxZ,
-                serializedSpawnA, serializedSpawnB, schematicPath, enabled, partyEnabled, iconMaterial);
+                serializedSpawnA, serializedSpawnB, schematicPath, enabled, partyEnabled, iconMaterial, displayName, queueSelectable);
     }
 
     public ArenaTemplate withIconMaterial(String material) {
         return new ArenaTemplate(id, name, type, world, minX, minY, minZ, maxX, maxY, maxZ,
-                serializedSpawnA, serializedSpawnB, schematicPath, enabled, party, material);
+                serializedSpawnA, serializedSpawnB, schematicPath, enabled, party, material, displayName, queueSelectable);
     }
 }

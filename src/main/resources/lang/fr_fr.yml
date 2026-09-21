@@ -946,6 +946,7 @@ gui:
   delete-all-lore: "Retire tous les objets de ce kit."
   arena-empty-random: "Vide = aléatoire"
   arena-selected: "Vert = sélectionné"
+  arena-internal-id: "ID interne"
   arena-toggle: "Clic gauche pour basculer"
   kit-full: "<red>L'inventaire du kit est plein."
   report-title: "Signalement"
@@ -1364,3 +1365,8 @@ countdown:
   gaze-ready: "<n><color:#94A3B8>/2</color> <color:#334155>·</color> <color:#4ADE80><bold>Ready</bold></color> <color:#4ADE80>✓</color>"
   gaze-leave: "<n><color:#94A3B8>/2</color> <color:#334155>·</color> <color:#F87171><bold>Leave</bold></color> <color:#F87171>☓</color>"
   opponent-ready: "<color:#FBBF24><name></color> <color:#94A3B8>is</color> <color:#4ADE80><bold>Ready</bold></color> <color:#4ADE80>✓</color>"
+
+friend:
+  title: "Amis"
+  subtitle: "Bientot disponible"
+  coming-soon: "<color:#55FFFF><bold>Amis</bold></color> <color:#94A3B8>arrivent</color> <color:#FBBF24>bientot</color><color:#94A3B8> : demandes, accepter et refuser (sans DM).</color>"
