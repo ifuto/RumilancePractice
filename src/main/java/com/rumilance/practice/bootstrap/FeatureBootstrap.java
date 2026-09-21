@@ -378,6 +378,7 @@ public final class FeatureBootstrap {
         countdownMarkers.setSessionLookup(id -> matchService.registry().get(id).orElse(null));
         countdownMarkers.setBothReadyHandler(id -> matchService.skipCountdown(id));
         countdownMarkers.setLeaveHandler(player -> matchService.leaveDuringCountdown(player));
+        countdownMarkers.setMessageService(messageService);
         matchService.setCountdownMarkers(countdownMarkers);
         plugin.getServer().getPluginManager().registerEvents(countdownMarkers, plugin);
 

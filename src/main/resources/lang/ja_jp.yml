@@ -338,7 +338,7 @@ duel-gui:
   mode-unranked: "モード: アンランク戦"
   cancel: "キャンセル"
   best-of: "Best of <n>"
-  ft: "FT: <n>"
+  ft: "<color:#55FFFF><bold>FT</bold></color> <color:#334155>:</color> <white><n></white>"
   ft-lore: "先にこの点数を取った側の勝ちです。∞ は無制限。"
   ft-hint: "クリック +1 / Shiftクリック +5"
   best-of-lore: "シリーズ長。クリックで 1 → 3 → 5。"
@@ -457,7 +457,7 @@ match:
   opponent-disconnected: "<gray>対戦相手が切断したため、あなたの勝利です。"
   ended: "<gray>試合が終了しました。"
   rematch-requested: "<yellow><player> が再戦を希望しています！"
-  ft-complete: "<gold><player></gold> <gray>が FT<ft> を達成しました。</gray> <white>(<wins> 勝)"
+  ft-complete: "<color:#4ADE80><bold><player></bold></color> <color:#94A3B8>が</color> <color:#55FFFF>FT<ft></color> <color:#94A3B8>を達成しました。</color> <color:#4ADE80>(<wins> 勝)</color>"
   cannot-leave: "<red>試合から退出できるのは開始前カウントダウン中のみです。"
   command-blocked: "<red>試合中は /leave 以外のコマンドは使えません。"
   leave-cancelled: "<gray>試合をキャンセルして退出しました。"
@@ -1276,7 +1276,7 @@ practice:
 
 killfeed:
   view-inventory-hover: "<yellow>クリックで最終インベントリを表示"
-  score: "<gray>☠</gray> <white><a></white> <gray>-</gray> <white><b></white> <gray>☠</gray>"
+  score: "<dark_gray>  </dark_gray><color:#334155>☠</color> <color:#55FFFF><bold><a></bold></color> <color:#94A3B8>-</color> <color:#F87171><bold><b></bold></color> <color:#334155>☠</color>"
 
 chat:
   spam-blocked: "<red>スパムと判定されたためメッセージを送信できません。"
@@ -1360,3 +1360,8 @@ afkcrystal:
   settings-shield-on: "<gold>[AFK BOT Crystal]</gold> <green>オフハンドの盾: ON — BOTが盾を構え、正面の攻撃/爆発をブロックします。</green>"
   settings-shield-off: "<gold>[AFK BOT Crystal]</gold> <green>オフハンドの盾: OFF — オフハンドはトーテムになります。</green>"
   settings-delay: "<gold>[AFK BOT Crystal]</gold> <green>盾の復帰時間を <seconds>秒 に設定しました。</green>"
+
+countdown:
+  gaze-ready: "<n><color:#94A3B8>/2</color> <color:#334155>·</color> <color:#4ADE80><bold>Ready</bold></color> <color:#4ADE80>✓</color>"
+  gaze-leave: "<n><color:#94A3B8>/2</color> <color:#334155>·</color> <color:#F87171><bold>Leave</bold></color> <color:#F87171>☓</color>"
+  opponent-ready: "<color:#FBBF24><name></color> <color:#94A3B8>is</color> <color:#4ADE80><bold>Ready</bold></color> <color:#4ADE80>✓</color>"

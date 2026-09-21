@@ -1,9 +1,11 @@
 package com.rumilance.practice.countdown;
 
 import com.rumilance.practice.session.MatchSession;
+import com.rumilance.practice.locale.MessageService;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
 import org.bukkit.Location;
@@ -67,6 +69,16 @@ public final class CountdownMarkers implements Listener {
     /** How often the "<name> is ready ✓" line repeats while not looking at a block. */
     private static final long READY_NOTICE_TICKS = 10L;
 
+    /**
+     * Fallback palette, identical to the {@code countdown.*} lang values: brand-cyan/slate
+     * panels, success green for Ready, danger red for Leave, amber for the opponent's name.
+     */
+    private static final TextColor READY = TextColor.color(0x4ADE80);
+    private static final TextColor LEAVE = TextColor.color(0xF87171);
+    private static final TextColor MUTED = TextColor.color(0x94A3B8);
+    private static final TextColor SEPARATOR = TextColor.color(0x334155);
+    private static final TextColor NAME = TextColor.color(0xFBBF24);
+
     private enum Kind {
         READY, LEAVE
     }
@@ -96,6 +108,8 @@ public final class CountdownMarkers implements Listener {
     private volatile Consumer<UUID> bothReadyHandler;
     /** Called with the player who clicked the redstone block (bootstrap wires /leave). */
     private volatile Consumer<Player> leaveHandler;
+    /** Localised action bar lines; null falls back to the built-in palette. */
+    private volatile MessageService messageService;
 
     public CountdownMarkers(Plugin plugin) {
         this.plugin = plugin;
@@ -108,6 +122,10 @@ public final class CountdownMarkers implements Listener {
 
     public void setLeaveHandler(Consumer<Player> handler) {
         this.leaveHandler = handler;
+    }
+
+    public void setMessageService(MessageService messages) {
+        this.messageService = messages;
     }
 
     /** Spawns one Ready/Leave pair per participant, facing the way their spawn faces. */
@@ -262,12 +280,7 @@ public final class CountdownMarkers implements Listener {
         if (gazed != null) {
             UUID opponent = opponentOf(player.getUniqueId(), set);
             int readyCount = opponent != null && set.ready.contains(opponent) ? 1 : 0;
-            player.sendActionBar(Component
-                    .text(readyCount + "/2 - ", NamedTextColor.GRAY)
-                    .append(gazed.kind == Kind.READY
-                            ? Component.text("Ready ✓", NamedTextColor.GREEN)
-                            : Component.text("Leave ☓", NamedTextColor.RED))
-                    .decorate(TextDecoration.BOLD));
+            player.sendActionBar(gazeLine(player, gazed, readyCount));
             return;
         }
         if (showReadyNotice) {
@@ -275,10 +288,52 @@ public final class CountdownMarkers implements Listener {
             if (opponent != null && set.ready.contains(opponent) && !set.ready.contains(player.getUniqueId())) {
                 Player other = Bukkit.getPlayer(opponent);
                 if (other != null) {
-                    player.sendActionBar(Component.text(other.getName(), NamedTextColor.YELLOW)
-                            .append(Component.text(" is ready ✓", NamedTextColor.GREEN)));
+                    player.sendActionBar(opponentReadyLine(player, other));
                 }
             }
+        }
+    }
+
+    /**
+     * The line shown while looking at a block: the opponent's readiness, then the action of
+     * the block being looked at. The leading number turns green once it is 1.
+     */
+    private Component gazeLine(Player player, Marker marker, int readyCount) {
+        String key = marker.kind == Kind.READY ? "countdown.gaze-ready" : "countdown.gaze-leave";
+        String number = (readyCount > 0 ? "<color:#4ADE80>" : "<color:#94A3B8>") + readyCount + "</color>";
+        Component rendered = render(player, key, MessageService.tags("n", number));
+        if (rendered != null) {
+            return rendered;
+        }
+        TextColor accent = marker.kind == Kind.READY ? READY : LEAVE;
+        return Component.text(String.valueOf(readyCount), readyCount > 0 ? READY : MUTED)
+                .append(Component.text("/2 ", MUTED))
+                .append(Component.text("· ", SEPARATOR))
+                .append(Component.text(marker.kind == Kind.READY ? "Ready ✓" : "Leave ☓", accent)
+                        .decorate(TextDecoration.BOLD));
+    }
+
+    /** The line shown when the opponent pressed Ready and this player is not looking anywhere. */
+    private Component opponentReadyLine(Player player, Player other) {
+        Component rendered = render(player, "countdown.opponent-ready",
+                MessageService.tags("name", other.getName()));
+        if (rendered != null) {
+            return rendered;
+        }
+        return Component.text(other.getName(), NAME)
+                .append(Component.text(" is ", MUTED))
+                .append(Component.text("Ready ✓", READY).decorate(TextDecoration.BOLD));
+    }
+
+    private Component render(Player player, String key, TagResolver... resolvers) {
+        MessageService messages = messageService;
+        if (messages == null) {
+            return null;
+        }
+        try {
+            return messages.render(player, key, resolvers);
+        } catch (RuntimeException ignored) {
+            return null; // missing key: the fallback line still shows
         }
     }
 

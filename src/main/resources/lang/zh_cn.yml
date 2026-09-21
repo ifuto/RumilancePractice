@@ -337,7 +337,7 @@ duel-gui:
   mode-unranked: "Mode: Unranked"
   cancel: "Cancel"
   best-of: "Best of <n>"
-  ft: "FT: <n>"
+  ft: "<color:#55FFFF><bold>FT</bold></color> <color:#334155>:</color> <white><n></white>"
   ft-lore: "先达到该分数的一方获胜。∞ 表示无限制。"
   ft-hint: "点击 +1 / Shift点击 +5"
   best-of-lore: "系列赛长度。点击切换 1 → 3 → 5。"
@@ -456,7 +456,7 @@ match:
   opponent-disconnected: "<gray>Your opponent disconnected - you win by default."
   ended: "<gray>比赛已结束。"
   rematch-requested: "<yellow><player> 想要再战一场！"
-  ft-complete: "<gold><player></gold> <gray>达成了 FT<ft>。</gray> <white>(<wins> 胜)"
+  ft-complete: "<color:#4ADE80><bold><player></bold></color> <color:#94A3B8>达成了</color> <color:#55FFFF>FT<ft></color> <color:#4ADE80>(<wins> 胜)</color>"
   cannot-leave: "<red>You can only leave during the pre-match countdown."
   command-blocked: "<red>比赛中无法使用命令。用 /leave 退出倒计时。"
   leave-cancelled: "<gray>You left the match; it was cancelled."
@@ -1275,7 +1275,7 @@ practice:
 
 killfeed:
   view-inventory-hover: "<yellow>点击查看最终物品栏"
-  score: "<gray>☠</gray> <white><a></white> <gray>-</gray> <white><b></white> <gray>☠</gray>"
+  score: "<dark_gray>  </dark_gray><color:#334155>☠</color> <color:#55FFFF><bold><a></bold></color> <color:#94A3B8>-</color> <color:#F87171><bold><b></bold></color> <color:#334155>☠</color>"
 
 chat:
   spam-blocked: "<red>消息被判定为垃圾信息,无法发送。"
@@ -1359,3 +1359,8 @@ afkcrystal:
   settings-shield-on: "<gold>[AFK BOT Crystal]</gold> <green>副手盾牌：ON — BOT 将举盾格挡正面的攻击/爆炸。</green>"
   settings-shield-off: "<gold>[AFK BOT Crystal]</gold> <green>副手盾牌：OFF — 副手改为图腾。</green>"
   settings-delay: "<gold>[AFK BOT Crystal]</gold> <green>盾牌恢复时间已设为 <seconds> 秒。</green>"
+
+countdown:
+  gaze-ready: "<n><color:#94A3B8>/2</color> <color:#334155>·</color> <color:#4ADE80><bold>Ready</bold></color> <color:#4ADE80>✓</color>"
+  gaze-leave: "<n><color:#94A3B8>/2</color> <color:#334155>·</color> <color:#F87171><bold>Leave</bold></color> <color:#F87171>☓</color>"
+  opponent-ready: "<color:#FBBF24><name></color> <color:#94A3B8>is</color> <color:#4ADE80><bold>Ready</bold></color> <color:#4ADE80>✓</color>"

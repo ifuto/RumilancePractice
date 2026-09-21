@@ -337,7 +337,7 @@ duel-gui:
   mode-unranked: "Mode : Unranked"
   cancel: "Annuler"
   best-of: "Meilleur sur <n>"
-  ft: "FT: <n>"
+  ft: "<color:#55FFFF><bold>FT</bold></color> <color:#334155>:</color> <white><n></white>"
   ft-lore: "Le premier a atteindre ce score gagne. ∞ signifie sans limite."
   ft-hint: "Clic +1 / Shift-clic +5"
   best-of-lore: "Longueur de la série. Clic pour alterner 1 → 3 → 5."
@@ -456,7 +456,7 @@ match:
   opponent-disconnected: "<gray>Ton adversaire s'est déconnecté - tu gagnes par défaut."
   ended: "<gray>Le match est terminé."
   rematch-requested: "<yellow><player> veut une revanche !"
-  ft-complete: "<gold><player></gold> <gray>a atteint FT<ft>.</gray> <white>(<wins> victoires)"
+  ft-complete: "<color:#4ADE80><bold><player></bold></color> <color:#94A3B8>a atteint</color> <color:#55FFFF>FT<ft></color> <color:#4ADE80>(<wins> victoires)</color>"
   cannot-leave: "<red>Tu ne peux partir que pendant le compte à rebours d'avant-match."
   command-blocked: "<red>Les commandes sont désactivées pendant un match. Utilise /leave pour quitter le compte à rebours."
   leave-cancelled: "<gray>Tu as quitté le match ; il a été annulé."
@@ -1275,7 +1275,7 @@ practice:
 
 killfeed:
   view-inventory-hover: "<yellow>Clic pour voir l'inventaire final"
-  score: "<gray>☠</gray> <white><a></white> <gray>-</gray> <white><b></white> <gray>☠</gray>"
+  score: "<dark_gray>  </dark_gray><color:#334155>☠</color> <color:#55FFFF><bold><a></bold></color> <color:#94A3B8>-</color> <color:#F87171><bold><b></bold></color> <color:#334155>☠</color>"
 
 chat:
   spam-blocked: "<red>Message bloqué : détecté comme spam."
@@ -1359,3 +1359,8 @@ afkcrystal:
   settings-shield-on: "<gold>[AFK BOT Crystal]</gold> <green>Bouclier en main secondaire : ON — le bot le lève et bloque les attaques/explosions de face.</green>"
   settings-shield-off: "<gold>[AFK BOT Crystal]</gold> <green>Bouclier en main secondaire : OFF — le bot tient un totem.</green>"
   settings-delay: "<gold>[AFK BOT Crystal]</gold> <green>Délai de retour du bouclier réglé sur <seconds>s.</green>"
+
+countdown:
+  gaze-ready: "<n><color:#94A3B8>/2</color> <color:#334155>·</color> <color:#4ADE80><bold>Ready</bold></color> <color:#4ADE80>✓</color>"
+  gaze-leave: "<n><color:#94A3B8>/2</color> <color:#334155>·</color> <color:#F87171><bold>Leave</bold></color> <color:#F87171>☓</color>"
+  opponent-ready: "<color:#FBBF24><name></color> <color:#94A3B8>is</color> <color:#4ADE80><bold>Ready</bold></color> <color:#4ADE80>✓</color>"

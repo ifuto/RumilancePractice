@@ -337,7 +337,7 @@ duel-gui:
   mode-unranked: "Modo: Unranked"
   cancel: "Cancelar"
   best-of: "Mejor de <n>"
-  ft: "FT: <n>"
+  ft: "<color:#55FFFF><bold>FT</bold></color> <color:#334155>:</color> <white><n></white>"
   ft-lore: "Gana quien llegue primero a esta puntuacion. ∞ significa sin limite."
   ft-hint: "Clic +1 / Shift-clic +5"
   best-of-lore: "Duración de la serie. Clic para alternar 1 → 3 → 5."
@@ -456,7 +456,7 @@ match:
   opponent-disconnected: "<gray>Tu oponente se desconectó - ganas por defecto."
   ended: "<gray>La partida ha terminado."
   rematch-requested: "<yellow>¡<player> quiere una revancha!"
-  ft-complete: "<gold><player></gold> <gray>alcanzo FT<ft>.</gray> <white>(<wins> victorias)"
+  ft-complete: "<color:#4ADE80><bold><player></bold></color> <color:#94A3B8>alcanzo</color> <color:#55FFFF>FT<ft></color> <color:#4ADE80>(<wins> victorias)</color>"
   cannot-leave: "<red>Solo puedes salir durante la cuenta atrás previa."
   command-blocked: "<red>Los comandos están desactivados durante la partida. Usa /leave para salir de la cuenta atrás."
   leave-cancelled: "<gray>Saliste de la partida; fue cancelada."
@@ -1275,7 +1275,7 @@ practice:
 
 killfeed:
   view-inventory-hover: "<yellow>Clic para ver el inventario final"
-  score: "<gray>☠</gray> <white><a></white> <gray>-</gray> <white><b></white> <gray>☠</gray>"
+  score: "<dark_gray>  </dark_gray><color:#334155>☠</color> <color:#55FFFF><bold><a></bold></color> <color:#94A3B8>-</color> <color:#F87171><bold><b></bold></color> <color:#334155>☠</color>"
 
 chat:
   spam-blocked: "<red>No puedes enviar el mensaje: detectado como spam."
@@ -1359,3 +1359,8 @@ afkcrystal:
   settings-shield-on: "<gold>[AFK BOT Crystal]</gold> <green>Escudo en la otra mano: ON — el bot lo levanta y bloquea ataques/explosiones frontales.</green>"
   settings-shield-off: "<gold>[AFK BOT Crystal]</gold> <green>Escudo en la otra mano: OFF — el bot sostiene un tótem.</green>"
   settings-delay: "<gold>[AFK BOT Crystal]</gold> <green>Tiempo de recuperación del escudo fijado a <seconds>s.</green>"
+
+countdown:
+  gaze-ready: "<n><color:#94A3B8>/2</color> <color:#334155>·</color> <color:#4ADE80><bold>Ready</bold></color> <color:#4ADE80>✓</color>"
+  gaze-leave: "<n><color:#94A3B8>/2</color> <color:#334155>·</color> <color:#F87171><bold>Leave</bold></color> <color:#F87171>☓</color>"
+  opponent-ready: "<color:#FBBF24><name></color> <color:#94A3B8>is</color> <color:#4ADE80><bold>Ready</bold></color> <color:#4ADE80>✓</color>"
