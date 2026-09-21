@@ -2439,7 +2439,8 @@ public final class MatchService {
                 if (replayService != null && replayService.isReplaying(id)) {
                     continue;
                 }
-                if (matchRegistry.byPlayer(id).isPresent()) {
+                if (registry.byPlayer(id).isPresent()) {
+                    // 直後にリマッチなど新しい試合へ入っている: 触らない。
                     continue;
                 }
                 try {
