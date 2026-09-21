@@ -29,6 +29,7 @@ public final class ItemKeys {
     public static final String TRIM_NOTE = "trim_note";
     public static final String EDITOR_HINT_COUNT = "editor_hint_count";
     public static final String QUEUE_SIGN_KIT = "queue_sign_kit";
+    public static final String LOBBY_WEAR = "lobby_wear";
 
     private static volatile Plugin plugin;
 
@@ -61,6 +62,11 @@ public final class ItemKeys {
 
     public static NamespacedKey functionType() {
         return key(FUNCTION_TYPE);
+    }
+
+    /** Tags the hub's cursed boots / elytra so only LobbyWearService touches them. */
+    public static NamespacedKey lobbyWear() {
+        return key(LOBBY_WEAR);
     }
 
     public static NamespacedKey adminTool() {

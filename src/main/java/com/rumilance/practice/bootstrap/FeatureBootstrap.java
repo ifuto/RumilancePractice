@@ -640,6 +640,13 @@ public final class FeatureBootstrap {
         RankService rankService = new RankService(plugin, rankRepository, asyncExecutor);
         services.register(RankService.class, rankService);
 
+        // Hub wear: cursed leather boots for everyone, elytra for VIP/VIP+ (VIP glides with a
+        // speed cap). Both are stripped on every teleport and reconciled 5x per second.
+        com.rumilance.practice.lobby.LobbyWearService lobbyWearService =
+                new com.rumilance.practice.lobby.LobbyWearService(plugin, stateManager, rankService);
+        plugin.getServer().getPluginManager().registerEvents(lobbyWearService, plugin);
+        lobbyWearService.startTask();
+
         // VIP+ custom name colors: single color or two-color gradient, editable in the
         // settings GUI, rate-limited to one change per three days.
         com.rumilance.practice.cosmetic.namecolor.NameColorRepository nameColorRepository =
