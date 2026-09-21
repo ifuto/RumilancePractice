@@ -138,6 +138,29 @@ public final class LobbyWearService implements Listener {
      * lands wherever they are going. The reconciler puts them back if the destination
      * turns out to be the lobby again.
      */
+    /** 参加直後はリコンサイラの初回 tick(4 tick 後)を待たずに配る。 */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onJoin(org.bukkit.event.player.PlayerJoinEvent event) {
+        equipInLobbySoon(event.getPlayer());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onRespawn(org.bukkit.event.player.PlayerRespawnEvent event) {
+        equipInLobbySoon(event.getPlayer());
+    }
+
+    /** ロビー行きが確定してから 1 tick 後に配る(スポーン TP より後に乗せるため)。 */
+    private void equipInLobbySoon(Player player) {
+        if (player == null) {
+            return;
+        }
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (player.isOnline() && isInLobby(player)) {
+                equip(player);
+            }
+        }, 2L);
+    }
+
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onTeleport(PlayerTeleportEvent event) {
         Player player = event.getPlayer();

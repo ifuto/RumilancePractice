@@ -88,8 +88,8 @@ public final class TabFightListService {
     }
 
     /** Column header texts, legacy-formatted for the fake-entry display names. */
-    private static final String HEADER_COMBAT = "\u00A7bPlayers in Combat";
-    private static final String HEADER_SPECTATING = "\u00A77Players in Spectating";
+    private static final String HEADER_COMBAT = "\u00A7bIn-Game Players";
+    private static final String HEADER_SPECTATING = "\u00A7aSpectators";
     private static final String BLANK = " ";
 
     /** Plugins known to patch the player-info packet writer and crash on the 1.21.2 action. */
@@ -366,7 +366,8 @@ public final class TabFightListService {
 
     /** Team column header: the team label in its own colour, legacy-formatted. */
     private static String teamHeader(TeamColor color) {
-        return LEGACY.serialize(Component.text(color.label(), color.textColor()));
+        // PDF サンプルの「● Red Team / ● Blue Team」に合わせる。
+        return LEGACY.serialize(Component.text("● " + color.label(), color.textColor()));
     }
 
     /** Live fighters grouped by team colour plus every spectator, for one match. */

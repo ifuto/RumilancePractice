@@ -61,7 +61,7 @@ public final class CountdownMarkers implements Listener {
     private static final double EYE = 1.55;
     /** One turn every 4 seconds: slow enough to look like it is hovering. */
     private static final float SPIN_DEGREES_PER_TICK = 1.5f;
-    private static final float BLOCK_SCALE = 0.42f;
+    private static final float BLOCK_SCALE = 0.9f;
     /** Gaze test: within this many blocks ... */
     private static final double GAZE_RANGE = 6.0;
     /** ... and within this cone half-angle (degrees). */
@@ -176,6 +176,12 @@ public final class CountdownMarkers implements Listener {
         for (UUID matchId : new ArrayList<>(sets.keySet())) {
             remove(matchId);
         }
+    }
+
+    /** この試合で指定の人が Ready を押したか(HUD の ✓/☓ 用)。 */
+    public boolean isReady(UUID matchId, UUID player) {
+        MarkerSet set = sets.get(matchId);
+        return set != null && player != null && set.ready.contains(player);
     }
 
     /** True when both fighters of this match have pressed Ready. */
@@ -412,14 +418,24 @@ public final class CountdownMarkers implements Listener {
     @EventHandler(priority = EventPriority.LOW)
     public void onLeftClick(PlayerInteractEvent event) {
         Action action = event.getAction();
-        if (action != Action.LEFT_CLICK_AIR && action != Action.LEFT_CLICK_BLOCK) {
+        boolean left = action == Action.LEFT_CLICK_AIR || action == Action.LEFT_CLICK_BLOCK;
+        boolean right = action == Action.RIGHT_CLICK_AIR || action == Action.RIGHT_CLICK_BLOCK;
+        if (!left && !right) {
             return;
         }
         Player player = event.getPlayer();
         for (MarkerSet set : sets.values()) {
             Marker gazed = gazedMarker(player, set);
-            if (gazed != null && gazed.kind == Kind.LEAVE
-                    && gazed.owner.equals(player.getUniqueId())) {
+            if (gazed == null || !gazed.owner.equals(player.getUniqueId())) {
+                continue;
+            }
+            if (gazed.kind == Kind.READY) {
+                // 向いてるまま左右どちらでも Ready。
+                event.setCancelled(true);
+                markReady(gazed, player);
+                return;
+            }
+            if (gazed.kind == Kind.LEAVE && left) {
                 event.setCancelled(true);
                 leave(player);
                 return;

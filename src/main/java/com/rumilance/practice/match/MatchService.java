@@ -1213,17 +1213,53 @@ public final class MatchService {
                 beginFight(session);
                 return;
             }
+            // カウントダウン HUD: 「{P1} ✓/☓  -  {残り秒}  -  ✓/☓ {P2}」。
+            // 顔(スキンヘッド)はリソースパックの PUA グリフが必要なため、無い環境では
+            // 名前+✓/☓で表現する。
+            Component hud = countdownHud(session, remaining[0]);
             for (UUID id : session.participants()) {
                 Player player = Bukkit.getPlayer(id);
                 if (player != null) {
-                    player.sendActionBar(Component.text(String.valueOf(remaining[0]), NamedTextColor.GOLD)
-                            .decorate(TextDecoration.BOLD));
+                    player.sendActionBar(hud);
                     soundService.play(player, "match-countdown-tick", 1.0f);
                 }
             }
             remaining[0]--;
         }, 0L, 20L);
         tasks.put(session.id(), task);
+    }
+
+    /** 「{P1} ☓/✓ - {残り} - ☓/✓ {P2}」を1行に組む(1v1 専用、2人いるときだけ)。 */
+    private Component countdownHud(MatchSession session, int seconds) {
+        List<UUID> players = session.participants();
+        Component count = Component.text(String.valueOf(seconds), NamedTextColor.GOLD)
+                .decorate(TextDecoration.BOLD);
+        if (countdownMarkers == null || players.size() != 2) {
+            return count;
+        }
+        java.util.UUID a = players.get(0);
+        java.util.UUID b = players.get(1);
+        return Component.empty()
+                .append(fighterHud(a))
+                .append(Component.text("  -  ", NamedTextColor.DARK_GRAY))
+                .append(count)
+                .append(Component.text("  -  ", NamedTextColor.DARK_GRAY))
+                .append(fighterHud(b));
+    }
+
+    /** 名前 + 状態記号(✓=Ready / ☓=未)。頭グリフが無い環境向けの表現。 */
+    private Component fighterHud(java.util.UUID id) {
+        Player p = Bukkit.getPlayer(id);
+        String name = p != null ? p.getName() : "?";
+        boolean ready = countdownMarkers != null && countdownMarkers.isReady(sessionOfAny(id), id);
+        Component mark = ready
+                ? Component.text("✓", NamedTextColor.GREEN)
+                : Component.text("☓", NamedTextColor.RED);
+        return Component.text(name, NamedTextColor.AQUA).append(Component.text(" ", NamedTextColor.GRAY)).append(mark);
+    }
+
+    private java.util.UUID sessionOfAny(java.util.UUID player) {
+        return registry().byPlayer(player).map(s -> s.id()).orElse(null);
     }
 
     /**
