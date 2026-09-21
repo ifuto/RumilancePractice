@@ -193,11 +193,9 @@ public final class DuelRequestGui extends AbstractGui {
                                 "n", com.rumilance.practice.match.FirstTo.label(session.firstTo()))))
                         .lore(
                                 com.rumilance.practice.gui.UiTheme.divider(),
-                                com.rumilance.practice.gui.UiTheme.line(
-                                        messageService.render(locale, "duel-gui.ft-lore")),
+                                messageService.render(locale, "duel-gui.ft-lore"),
                                 com.rumilance.practice.gui.UiTheme.blank(),
-                                com.rumilance.practice.gui.UiTheme.hint(
-                                        messageService.render(locale, "duel-gui.ft-hint"))
+                                messageService.render(locale, "duel-gui.ft-hint")
                         )
                         .glint(session.firstTo() > 0)
                         .action("ft")
