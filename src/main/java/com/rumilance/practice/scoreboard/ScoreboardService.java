@@ -537,27 +537,34 @@ public final class ScoreboardService {
                 // Paper versions without list-order support must still render the tab names.
             }
         }
-        if (handle != null && visualSession != null) {
-            // In a match / spectating: fight teams carry the rank badge + RED/BLUE marker.
-            com.rumilance.practice.font.RankIconNameTags.clear(handle.board);
-            com.rumilance.practice.match.MatchTeamVisuals.apply(
-                    handle.board, player, visualSession, Bukkit.getOnlinePlayers());
+        if (visualSession != null) {
+            if (handle != null) {
+                // In a match / spectating: fight teams carry the rank badge + RED/BLUE marker.
+                com.rumilance.practice.font.RankIconNameTags.clear(handle.board);
+                com.rumilance.practice.match.MatchTeamVisuals.apply(
+                        handle.board, player, visualSession, Bukkit.getOnlinePlayers());
+            }
+            // The fight TAB grid belongs to the player list, not to the sidebar: it runs even
+            // for viewers who turned their scoreboard off (handle == null).
             if (tabFightListService != null) {
                 tabFightListService.applyViewerPads(player, visualSession);
             }
-        } else if (handle != null) {
-            com.rumilance.practice.match.MatchTeamVisuals.clear(handle.board);
+        } else {
+            if (handle != null) {
+                com.rumilance.practice.match.MatchTeamVisuals.clear(handle.board);
+            }
             if (tabFightListService != null) {
                 tabFightListService.clear(player);
             }
             // Lobby / FFA / queue: rank badge (admin / VIP+ / VIP) in front of each name.
-            if (iconFontService != null && rankService != null && iconFontService.enabled()) {
+            if (handle != null && iconFontService != null && rankService != null
+                    && iconFontService.enabled()) {
                 com.rumilance.practice.font.RankIconNameTags.apply(
                         handle.board, iconFontService, rankService,
                         Bukkit.getOnlinePlayers(), viewerHasPack,
                         tabCustomizationConfig == null ? null
                                 : other -> tabCustomizationConfig.prefix(other, rankService));
-            } else {
+            } else if (handle != null) {
                 com.rumilance.practice.font.RankIconNameTags.clear(handle.board);
             }
         }

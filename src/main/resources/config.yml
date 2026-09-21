@@ -92,13 +92,19 @@ match:
   regenerate-arena: true
   # Countdown after match end before players/spectators are teleported back to the lobby.
   end-teleport-delay-seconds: 5
-  # TAB list grouping during a match: each team becomes its own column in battle order
-  # (RED | BLUE | ...), spectators below them, alphabetical inside each column. Columns are
-  # visually separated with blank padding rows (invisible tab-only entries, ProtocolLib).
-  # Built on the 1.21.2+ player-list order index (Paper setPlayerListOrder). Servers running
-  # NBT-injector packet patchers (NBTAPI / Triton) are auto-detected and skip the ordering
-  # to avoid kicks; set this to true/false to force it either way. When off, the TAB keeps
-  # vanilla order and the players' styled list names during matches.
+  # TAB list grouping during a match, modelled on the TAB plugin's layout feature: a duel
+  # shows "In-Game Players" + "Spectators", a party fight one column per team headed by
+  # "● Red Team" / "● Blue Team" (the roster as "Name ●", fallen players as "Name ● - Death"),
+  # then the spectator column. Every column is exactly 20 rows — header, blank spacer, roster,
+  # then blank filler rows — because the client starts a new column on the 21st entry. The
+  # header/filler rows are fake player-list entries sent to that viewer as ordinary player-info
+  # packets (no packet plugin needed); real players are positioned with the 1.21.2+ list order
+  # index (Paper setPlayerListOrder), which places the grid above every lobby order. While the
+  # grid is shown, the viewer's list holds that grid only (lobby and other-match rows are
+  # unlisted for them, and re-listed when they leave). Servers
+  # running NBT-injector packet patchers (NBTAPI / Triton) are auto-detected and skip the
+  # ordering to avoid kicks; set this to true/false to force it either way. When off, the TAB
+  # keeps vanilla order and the players' styled list names during matches.
   tab-columns-enabled: true
   # In-match action bar content.
   #   score = the pinned scoreline (names + kills / alive counts)  [default]

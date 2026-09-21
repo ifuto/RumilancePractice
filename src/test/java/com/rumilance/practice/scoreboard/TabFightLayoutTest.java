@@ -6,75 +6,51 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TabFightLayoutTest {
 
     @Test
-    void duelDetectedOnlyWhenEveryTeamIsSingle() {
-        assertEquals(TabFightLayout.Scheme.DUEL, TabFightLayout.schemeFor(List.of(1, 1)));
-        assertEquals(TabFightLayout.Scheme.TEAMS, TabFightLayout.schemeFor(List.of(2, 2)));
-        assertEquals(TabFightLayout.Scheme.TEAMS, TabFightLayout.schemeFor(List.of(1, 3, 1)));
+    void duelOnlyForAnActual1v1() {
+        assertEquals(TabFightLayout.Scheme.DUEL, TabFightLayout.schemeFor(false, List.of(1, 1, 0)));
+        assertEquals(TabFightLayout.Scheme.TEAMS, TabFightLayout.schemeFor(false, List.of(2, 2)));
+        assertEquals(TabFightLayout.Scheme.TEAMS, TabFightLayout.schemeFor(false, List.of(1, 3, 1)));
+        // A party fight stays a team grid even when it happens to be 1 player per side.
+        assertEquals(TabFightLayout.Scheme.TEAMS, TabFightLayout.schemeFor(true, List.of(1, 1)));
     }
 
     @Test
-    void duelWithSpectatorsBuildsCombatThenSpectatingColumns() {
-        List<TabFightLayout.Column> columns = TabFightLayout.plan(List.of(1, 1), 3);
-        assertEquals(2, columns.size());
-        // Combat column: header + spacer + 2 fighters -> 16 pads -> 20 rows exactly.
-        TabFightLayout.Column combat = columns.get(0);
-        assertEquals(2, combat.rosterSize());
-        assertEquals(16, combat.padCount());
-        assertEquals(20, combat.rows());
-        // Spectating column: header + spacer + 3 spectators -> 15 pads.
-        TabFightLayout.Column spectating = columns.get(1);
-        assertEquals(3, spectating.rosterSize());
-        assertEquals(15, spectating.padCount());
-        assertEquals(20, spectating.rows());
+    void everyColumnIsPaddedToOneClientColumn() {
+        // 2 fighters + header/spacer = 4 rows -> 16 blank rows so the column ends on row 20.
+        assertEquals(16, TabFightLayout.padCount(2));
+        assertEquals(20, TabFightLayout.columnRows(2));
+        // 3 spectators behind the header/spacer -> 15 blanks.
+        assertEquals(15, TabFightLayout.padCount(3));
+        assertEquals(20, TabFightLayout.columnRows(3));
     }
 
     @Test
-    void duelWithoutSpectatorsHasOnlyTheCombatColumn() {
-        List<TabFightLayout.Column> columns = TabFightLayout.plan(List.of(1, 1), 0);
-        assertEquals(1, columns.size());
-        assertEquals(20, columns.get(0).rows());
-    }
-
-    @Test
-    void teamFightBuildsOneColumnPerTeamInOrderPlusSpectating() {
-        List<TabFightLayout.Column> columns = TabFightLayout.plan(List.of(3, 0, 4), 2);
-        assertEquals(3, columns.size());
-        assertEquals(3, columns.get(0).rosterSize());
-        assertEquals(15, columns.get(0).padCount());
-        assertEquals(4, columns.get(1).rosterSize());
-        assertEquals(14, columns.get(1).padCount());
-        assertEquals(2, columns.get(2).rosterSize());
-        assertEquals(16, columns.get(2).padCount());
-    }
-
-    @Test
-    void bigRosterOverflowsWholeClientColumns() {
-        // 22-person team: 2 header rows + 22 roster = 24 -> pads to 40 rows (2 client columns).
-        assertEquals(16, TabFightLayout.padCount(22));
-        List<TabFightLayout.Column> columns = TabFightLayout.plan(List.of(22, 5), 0);
-        assertEquals(40, columns.get(0).rows());
-    }
-
-    @Test
-    void exactFullColumnNeedsNoPads() {
-        // header 2 + roster 18 = 20 exactly.
+    void fullColumnsNeedNoFillers() {
         assertEquals(0, TabFightLayout.padCount(18));
-        // roster 38 fills two client columns exactly.
+        assertEquals(20, TabFightLayout.columnRows(18));
         assertEquals(0, TabFightLayout.padCount(38));
+        assertEquals(40, TabFightLayout.columnRows(38));
+    }
+
+    @Test
+    void oversizedRosterSpansWholeClientColumns() {
+        // 22 players: header + spacer + 22 = 24 rows -> 16 fillers -> 40 rows (two columns).
+        assertEquals(16, TabFightLayout.padCount(22));
+        assertEquals(40, TabFightLayout.columnRows(22));
+    }
+
+    @Test
+    void emptyColumnIsStillOneClientColumn() {
+        assertEquals(18, TabFightLayout.padCount(0));
+        assertEquals(20, TabFightLayout.columnRows(0));
     }
 
     @Test
     void negativeRosterSizeIsRejected() {
         assertThrows(IllegalArgumentException.class, () -> TabFightLayout.padCount(-1));
-    }
-
-    @Test
-    void emptyMatchProducesNoColumns() {
-        assertTrue(TabFightLayout.plan(List.of(), 0).isEmpty());
     }
 }

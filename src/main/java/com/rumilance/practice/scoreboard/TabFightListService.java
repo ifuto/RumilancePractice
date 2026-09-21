@@ -3,8 +3,10 @@ package com.rumilance.practice.scoreboard;
 import com.rumilance.practice.session.MatchSession;
 import com.rumilance.practice.state.MatchState;
 import com.rumilance.practice.state.TeamColor;
+import com.rumilance.practice.util.RealPlayers;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.entity.Player;
@@ -12,90 +14,76 @@ import org.bukkit.entity.Player;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
 
 /**
- * Groups the TAB (player list) into labeled columns for an active fight:
+ * Renders the fight TAB grid — the column layout of the operator's TAB sample:
+ *
  * <ul>
- *   <li><b>1v1 duel</b> — one merged <i>Players in Combat</i> column holding both fighters,
- *       styled with each player's own colour (name-colour cosmetic, falling back to their
- *       rank colour); a <i>Players in Spectating</i> column follows when anyone watches.</li>
- *   <li><b>Team fight</b> — one column per team, headed by the team label in the team
- *       colour, then the <i>Players in Spectating</i> column.</li>
+ *   <li><b>1v1</b> — one merged <i>In-Game Players</i> column (the "your mcid / opponent mcid"
+ *       pair, coloured by team) followed by the <i>Spectators</i> column.</li>
+ *   <li><b>Party fight</b> — one column per team headed by "● Red Team" / "● Blue Team" in the
+ *       team colour, the roster as "Name ●", fallen players kept in their team column as the
+ *       faded "Name ● - Death" row, then the <i>Spectators</i> column.</li>
  * </ul>
- * Every column is a header row, one blank spacer row, the alphabetical roster and blank
- * padding to a multiple of 20 rows so the next column starts at the top.
  *
- * <p><b>Mechanism — the 1.21.2+ list-order index.</b> Since 1.21.2 the vanilla client no
- * longer sorts the tab list by scoreboard team name; the server controls the order through
- * a non-negative priority per player (snapshot 24w33a) and the client sorts it <i>highest
- * to lowest</i>. Paper exposes it for real players as {@link Player#setPlayerListOrder(int)}.
- * Roster columns are built by assigning each team its own priority band: the first team the
- * highest values, later teams lower bands, descending values inside a band yielding an
- * alphabetical top-to-bottom roster.</p>
+ * <p><b>The grid model (TAB's layout model).</b> The client sorts the player list by the
+ * server-provided list order (highest first) and starts a new column every 20 entries, so a
+ * half-empty team only forms its own column when the remaining rows are filled with disposable
+ * entries. Every column here is therefore exactly 20 rows — header, blank spacer, roster, then
+ * blank fillers — each row is given the absolute order
+ * {@code Integer.MAX_VALUE - matchBand - slot} (slot 1 = first row of the first column, exactly
+ * like TAB's {@code COLUMNS} direction), and the header/filler rows are sent to each viewer as
+ * fake player-info entries ({@link TabEntryPackets}). Putting the grid at the very top of the
+ * list keeps it clear of the lobby ordering of {@code tab-layout.csv} (which tops out around
+ * 5.9M): the two used to share a band and the lobby rows pushed the fight grid into the wrong
+ * columns.</p>
  *
- * <p><b>Blank padding &amp; headers.</b> The client wraps the list into a new column every 20
- * entries, so a 3-person roster alone would never form its own column. Every column is
- * therefore padded up to a multiple of 20 rows with invisible fake player-info entries sent
- * per viewer via ProtocolLib — the same technique layout plugins use. Header rows and spacer
- * rows are pads with a styled display name instead of a blank one. Each running match
- * reserves a stable priority band ({@link #slotFor(UUID)}) so simultaneous matches never
- * interleave; lobby players keep priority 0 and sort last.</p>
+ * <p><b>Real players vs filler.</b> Participants keep their real entries (chat completion,
+ * {@code /msg}, other plugins) and are positioned by {@link Player#setPlayerListOrder(int)};
+ * only the rows they do not occupy are sent as filler per viewer, and the filler is removed
+ * again when the viewer leaves the match. While the grid is shown to a viewer, everyone the
+ * grid does not place — lobby players, players of another match, their spectators — is hidden
+ * from that viewer's list with a {@code listed = false} entry: an outside entry carries its own
+ * match's order, which would otherwise sit above the grid and shift every column break by a
+ * row. Leaving the layout re-lists them. Bots are never touched — they are not part of
+ * {@code RealPlayers.online()} and stay stripped from the list by {@code PacketBot}.</p>
  *
  * <p><b>Safety switches.</b> Servers running NBT-injector style packet patchers (NBTAPI /
- * Triton) can crash inside their patched {@code ClientboundPlayerInfoUpdatePacket} writer
- * on the 1.21.2 list-order action, which disconnects receivers when a match starts. Such
- * plugins are probed once and ordering auto-disables for them; operators can override
- * either way with {@code match.tab-columns-enabled}. Without ProtocolLib the layout still
- * groups real players via priorities — only the padding and headers are skipped. Every
- * packet write is wrapped so a failure can never take down the scoreboard refresh.</p>
- *
- * <p><b>Display-name side.</b> In team fights the custom list name is cleared so the client
- * renders team prefix + team-coloured names from the scoreboard visuals. In duels the
- * player's personal styled name (name colour, else rank colour) is applied instead. Both are
- * restored by {@link #clear(Player)} when the layout ends.</p>
+ * Triton) can crash inside their patched player-info writer on the list-order field, which
+ * disconnects receivers when a match starts. Such plugins are probed once and the layout
+ * auto-disables for them; operators can override either way with
+ * {@code match.tab-columns-enabled}.</p>
  */
 public final class TabFightListService {
 
-    /** One team column: enough headroom for any realistic roster + padding. */
-    private static final int SLOT_WIDTH = 1000;
-    /** Priority space reserved per match: 7 team columns + the spectator column. */
-    private static final int MATCH_SPAN = 8 * SLOT_WIDTH;
-    /** Highest priority handed out; the client lists higher values first. */
-    private static final int ORDER_TOP = 1_000_000;
-    /** Vanilla wraps the tab list into a new column every 20 entries. */
-    private static final int ROWS_PER_COLUMN = 20;
-    /** Shared pool of pad entries (headers, spacers and blank pads). */
-    private static final int PAD_COUNT = 160;
-    private static final UUID[] PAD_IDS = new UUID[PAD_COUNT];
-    private static final String[] PAD_NAMES = new String[PAD_COUNT];
-    private static final Map<UUID, String> PAD_NAME_BY_ID = new HashMap<>();
+    /** Client slots reserved per running match: the grid of one match never touches the next. */
+    static final int SLOTS_PER_MATCH = TabFightLayout.SLOTS_PER_COLUMN * TabFightLayout.MAX_COLUMNS;
+    /** Highest list order handout — the fight grid sits above every lobby order. */
+    static final int ORDER_TOP = Integer.MAX_VALUE;
+    /** Namespace of the deterministic filler UUIDs (0x4E4152454E41 = "NARENA"). */
+    private static final long FILLER_NAMESPACE = 0x4E4152454E410000L;
 
-    static {
-        for (int i = 0; i < PAD_COUNT; i++) {
-            PAD_IDS[i] = UUID.randomUUID();
-            PAD_NAMES[i] = String.format(java.util.Locale.ROOT, "NPad%03d", i);
-            PAD_NAME_BY_ID.put(PAD_IDS[i], PAD_NAMES[i]);
-        }
-    }
-
-    /** Column header texts, legacy-formatted for the fake-entry display names. */
-    private static final String HEADER_COMBAT = "\u00A7bIn-Game Players";
-    private static final String HEADER_SPECTATING = "\u00A7aSpectators";
-    private static final String BLANK = " ";
+    private static final Component HEADER_COMBAT =
+            Component.text("In-Game Players", NamedTextColor.AQUA);
+    private static final Component HEADER_SPECTATING =
+            Component.text("Spectators", NamedTextColor.GREEN);
+    private static final Component BLANK = Component.empty();
+    private static final TextColor SPECTATOR_COLOR = NamedTextColor.GRAY;
+    private static final TextColor DEATH_COLOR = NamedTextColor.DARK_GRAY;
 
     /** Plugins known to patch the player-info packet writer and crash on the 1.21.2 action. */
     private static final String[] PACKET_PATCHERS = {"NBTAPI", "Item-NBT-API", "TritonSpigot", "Triton"};
-
-    private static final LegacyComponentSerializer LEGACY = LegacyComponentSerializer.legacySection();
 
     private final org.bukkit.plugin.Plugin plugin;
     private com.rumilance.practice.rank.RankService rankService;
@@ -107,11 +95,15 @@ public final class TabFightListService {
     private final Map<UUID, Component> layoutNames = new HashMap<>();
     /** Stable column-band slot per running match id. */
     private final Map<UUID, Integer> matchSlots = new HashMap<>();
-    /** Per viewer: pad id -> entry state currently sent to that client. */
+    /** Per viewer: filler id -> entry state currently sent to that client. */
     private final Map<UUID, Map<UUID, PadState>> sentPads = new ConcurrentHashMap<>();
+    /** Per viewer: real players whose list entry this grid hid (re-listed when they leave). */
+    private final Map<UUID, Set<UUID>> unlisted = new ConcurrentHashMap<>();
     private volatile Boolean patcherCache;
-    /** Set once a pad packet fails; padding then stays off for this boot. */
+    /** Set once a filler packet fails; the grid then stays off for this boot. */
     private volatile boolean padsBroken;
+    /** One INFO line per boot so operators can confirm the grid reaches clients. */
+    private volatile boolean layoutLogged;
 
     public TabFightListService(org.bukkit.plugin.Plugin plugin) {
         this.plugin = plugin;
@@ -151,9 +143,9 @@ public final class TabFightListService {
         for (String name : PACKET_PATCHERS) {
             if (Bukkit.getPluginManager().getPlugin(name) != null) {
                 patcherCache = true;
-                plugin.getLogger().warning("TAB fight columns disabled: packet-patcher plugin '"
-                        + name + "' crashes on 1.21.2 list-order packets. "
-                        + "Set match.tab-columns-enabled: true to force them anyway.");
+                log(Level.WARNING, "TAB fight columns disabled: packet-patcher plugin '"
+                        + name + "' crashes on player-info list-order packets. "
+                        + "Set match.tab-columns-enabled: true to force them anyway.", null);
                 return true;
             }
         }
@@ -161,26 +153,32 @@ public final class TabFightListService {
         return false;
     }
 
-    /** Blank padding & headers need the ordering packets plus ProtocolLib for the fake entries. */
+    /** Headers and blank filler rows need the player-info packets to reach the client. */
     private boolean padsUsable() {
         if (padsBroken || !columnsEnabled()) {
             return false;
         }
-        // Check the plain Bukkit side first so TabPadPackets (ProtocolLib types) is never
-        // even class-loaded on servers without the soft-depend.
-        if (Bukkit.getPluginManager().getPlugin("ProtocolLib") == null) {
-            return false;
-        }
+        boolean usable;
         try {
-            return TabPadPackets.available();
+            usable = TabEntryPackets.available();
         } catch (Throwable t) {
+            usable = false;
+        }
+        if (!usable) {
+            if (padsBroken) {
+                return false;
+            }
             padsBroken = true;
+            log(Level.WARNING, "TAB fight layout: the server's player-info packet classes are"
+                    + " unavailable — the fight TAB keeps the team order but loses the column"
+                    + " headers and blank rows.", null);
             return false;
         }
+        return true;
     }
 
     /** Reserves a stable column band for a match (lowest free slot). */
-    private int slotFor(UUID matchId) {
+    int slotFor(UUID matchId) {
         return matchSlots.computeIfAbsent(matchId, id -> {
             Set<Integer> used = new HashSet<>(matchSlots.values());
             int slot = 0;
@@ -196,80 +194,86 @@ public final class TabFightListService {
         matchSlots.keySet().retainAll(activeMatches);
     }
 
-    /** Applies the fight layout (real players' priorities) for one match. */
+    /**
+     * Client list order of one grid slot. Higher orders are listed first, so every row of the
+     * grid sorts above the lobby ranks ({@code tab-layout.csv} maxes out at 5.9M) and the rows
+     * of a match keep their reading order inside the match's own band.
+     */
+    static int orderOf(long matchSlot, int slot) {
+        long order = (long) ORDER_TOP - matchSlot * (long) SLOTS_PER_MATCH - slot;
+        return order < 1 ? 1 : (int) order;
+    }
+
+    /** Deterministic filler UUID — one per (match band, slot), never a real player's. */
+    static UUID padId(long matchSlot, int slot) {
+        return new UUID(FILLER_NAMESPACE, matchSlot * (long) SLOTS_PER_MATCH + slot);
+    }
+
+    /** Applies the fight grid (real players' order + names) for one match. */
     public void apply(MatchSession session, Collection<? extends Player> online) {
-        if (session == null) {
-            return;
-        }
-        if (session.state() != MatchState.ACTIVE && session.state() != MatchState.ENDING) {
+        if (!running(session)) {
             return;
         }
         layoutApplied.removeIf(id -> Bukkit.getPlayer(id) == null);
         boolean ordering = columnsEnabled();
-        Comparator<Player> byName = Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER);
-        Plan plan = planColumns(session, online, byName);
-        int matchTop = ORDER_TOP - slotFor(session.id()) * MATCH_SPAN;
-        int columnIndex = 0;
-        for (Column column : plan.columns()) {
-            int order = matchTop - columnIndex * SLOT_WIDTH - TabFightLayout.HEADER_ROWS;
-            for (Player p : column.roster()) {
-                applyListEntry(p, ordering, order--, column.personalStyle() ? personalListName(p) : null);
+        Grid grid = buildGrid(session, online);
+        long matchSlot = slotFor(session.id());
+        int slot = 0;
+        for (GridRow row : grid.rows()) {
+            slot++;
+            if (row.player() == null || slot > SLOTS_PER_MATCH) {
+                continue;
             }
-            columnIndex++;
+            applyListEntry(row.player(), ordering, orderOf(matchSlot, slot), row.display());
         }
     }
 
     /**
-     * Syncs the header / spacer / blank padding entries of one viewer with the layout of the
-     * match they are in (or watching). Pads fill each column up to a multiple of 20 rows so
-     * every column starts at the top of its own client-side column.
+     * Syncs the header / spacer / blank filler rows of one viewer with the grid of the match
+     * they are in (or watching). Only the rows without a real entry are sent, so the client
+     * sees every column exactly 20 rows tall.
      */
     public void applyViewerPads(Player viewer, MatchSession session) {
         sentPads.keySet().removeIf(id -> Bukkit.getPlayer(id) == null);
+        unlisted.keySet().removeIf(id -> Bukkit.getPlayer(id) == null);
         Map<UUID, PadState> sent =
                 sentPads.computeIfAbsent(viewer.getUniqueId(), id -> new ConcurrentHashMap<>());
-        boolean want = padsUsable() && session != null
-                && (session.state() == MatchState.ACTIVE || session.state() == MatchState.ENDING);
-        if (!want) {
+        if (!running(session) || !padsUsable()) {
             removeAllPads(viewer, sent);
+            restoreListing(viewer);
             return;
         }
-        Comparator<Player> byName = Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER);
-        Plan plan = planColumns(session, Bukkit.getOnlinePlayers(), byName);
-        int matchTop = ORDER_TOP - slotFor(session.id()) * MATCH_SPAN;
-        Map<UUID, PadState> needed = new HashMap<>();
-        int columnIndex = 0;
-        int padIndex = 0;
-        outer:
-        for (Column column : plan.columns()) {
-            int base = matchTop - columnIndex * SLOT_WIDTH;
-            // Header row + spacer row.
-            if (!reserve(needed, padIndex, base, column.header())) {
+        Grid grid = buildGrid(session, RealPlayers.online());
+        if (grid.rows().isEmpty()) {
+            removeAllPads(viewer, sent);
+            restoreListing(viewer);
+            return;
+        }
+        // The grid is the whole list for a viewer inside a match (TAB hides the real entries of
+        // everyone outside its layout for the same reason): an entry from another match carries
+        // its own match's order and would otherwise sit above this grid and shift every column
+        // break by a row.
+        syncListing(viewer, grid);
+        long matchSlot = slotFor(session.id());
+        Map<UUID, PadState> needed = new LinkedHashMap<>();
+        int slot = 0;
+        for (GridRow row : grid.rows()) {
+            slot++;
+            if (slot > SLOTS_PER_MATCH) {
                 break;
             }
-            padIndex++;
-            if (!reserve(needed, padIndex, base - 1, BLANK)) {
-                break;
+            if (row.player() != null) {
+                continue;
             }
-            padIndex++;
-            int rosterSize = column.roster().size();
-            int padCount = TabFightLayout.padCount(rosterSize);
-            for (int j = 0; j < padCount; j++) {
-                int priority = base - TabFightLayout.HEADER_ROWS - rosterSize - j;
-                if (!reserve(needed, padIndex, priority, BLANK)) {
-                    break outer;
-                }
-                padIndex++;
-            }
-            columnIndex++;
+            needed.put(padId(matchSlot, slot), new PadState(orderOf(matchSlot, slot), row.display()));
         }
 
         List<UUID> stale = sent.keySet().stream().filter(id -> !needed.containsKey(id)).toList();
         if (!stale.isEmpty()) {
             try {
-                TabPadPackets.removePads(viewer, stale);
+                TabEntryPackets.remove(viewer, stale);
             } catch (Throwable t) {
-                padsBroken = true;
+                fail(t);
                 return;
             }
             stale.forEach(sent::remove);
@@ -281,33 +285,75 @@ public final class TabFightListService {
             if (desired.equals(current)) {
                 continue;
             }
-            String padName = PAD_NAME_BY_ID.get(padId);
             try {
                 if (current == null) {
-                    TabPadPackets.addPad(viewer, padId, padName, desired.priority(), desired.display());
+                    TabEntryPackets.add(viewer, padId, desired.display(), desired.order());
                 } else {
-                    if (!Objects.equals(current.display(), desired.display())) {
-                        TabPadPackets.updateDisplayName(viewer, padId, padName, desired.display());
-                    }
-                    if (current.priority() != desired.priority()) {
-                        TabPadPackets.updatePriority(viewer, padId, padName, desired.priority());
-                    }
+                    TabEntryPackets.update(viewer, padId, desired.display(), desired.order());
                 }
                 sent.put(padId, desired);
             } catch (Throwable t) {
-                padsBroken = true;
+                fail(t);
                 removeAllPads(viewer, sent);
                 return;
             }
         }
+        logLayoutOnce(grid, needed.size());
     }
 
-    private boolean reserve(Map<UUID, PadState> needed, int padIndex, int priority, String display) {
-        if (padIndex >= PAD_COUNT) {
-            return false;
+    /**
+     * Keeps {@code viewer}'s list down to the grid: every real player that the grid does not
+     * place is hidden from this viewer's player list, and re-listed as soon as they belong to
+     * it (or when the viewer leaves the layout). Bots are never touched — they are not part of
+     * {@link RealPlayers#online()} and stay stripped from the list by {@code PacketBot}.
+     */
+    private void syncListing(Player viewer, Grid grid) {
+        Set<UUID> gridPlayers = new HashSet<>();
+        for (GridRow row : grid.rows()) {
+            if (row.player() != null) {
+                gridPlayers.add(row.player().getUniqueId());
+            }
         }
-        needed.put(PAD_IDS[padIndex], new PadState(priority, display));
-        return true;
+        Set<UUID> hidden = unlisted.computeIfAbsent(
+                viewer.getUniqueId(), id -> ConcurrentHashMap.newKeySet());
+        Set<UUID> wanted = new HashSet<>();
+        for (Player other : RealPlayers.online()) {
+            // Never hide the viewer's own row, even if the grid did not place it.
+            if (!other.getUniqueId().equals(viewer.getUniqueId())
+                    && !gridPlayers.contains(other.getUniqueId())) {
+                wanted.add(other.getUniqueId());
+            }
+        }
+        for (UUID id : List.copyOf(hidden)) {
+            if (!wanted.contains(id)) {
+                hidden.remove(id);
+                sendListed(viewer, id, true);
+            }
+        }
+        for (UUID id : wanted) {
+            if (hidden.add(id)) {
+                sendListed(viewer, id, false);
+            }
+        }
+    }
+
+    /** Re-lists every entry this layout hid from {@code viewer}. */
+    private void restoreListing(Player viewer) {
+        Set<UUID> hidden = unlisted.remove(viewer.getUniqueId());
+        if (hidden == null || hidden.isEmpty()) {
+            return;
+        }
+        for (UUID id : Set.copyOf(hidden)) {
+            sendListed(viewer, id, true);
+        }
+    }
+
+    private void sendListed(Player viewer, UUID id, boolean listed) {
+        try {
+            TabEntryPackets.setListed(viewer, id, listed);
+        } catch (Throwable t) {
+            fail(t);
+        }
     }
 
     private void removeAllPads(Player viewer, Map<UUID, PadState> sent) {
@@ -316,86 +362,222 @@ public final class TabFightListService {
         }
         List<UUID> ids = List.copyOf(sent.keySet());
         sent.clear();
-        if (!TabPadPackets.available()) {
+        if (!TabEntryPackets.available()) {
             return;
         }
         try {
-            TabPadPackets.removePads(viewer, ids);
+            TabEntryPackets.remove(viewer, ids);
         } catch (Throwable t) {
-            padsBroken = true;
+            fail(t);
         }
+    }
+
+    private void fail(Throwable error) {
+        padsBroken = true;
+        log(Level.WARNING, "TAB fight layout: the filler/header packets were rejected — column"
+                + " headers and blank rows are off for this boot (team order still applies).", error);
+    }
+
+    private void logLayoutOnce(Grid grid, int fillers) {
+        if (layoutLogged || plugin == null) {
+            return;
+        }
+        layoutLogged = true;
+        int columns = grid.rows().size() / TabFightLayout.SLOTS_PER_COLUMN;
+        plugin.getLogger().info("TAB fight layout active: " + columns + " columns x "
+                + TabFightLayout.SLOTS_PER_COLUMN + " rows, " + fillers
+                + " header/blank rows sent as player-info entries.");
+    }
+
+    private void log(Level level, String message, Throwable error) {
+        if (plugin == null) {
+            return;
+        }
+        if (error == null) {
+            plugin.getLogger().log(level, message);
+        } else {
+            plugin.getLogger().log(level, message, error);
+        }
+    }
+
+    /** True while a match is being fought or finished (the layout only exists then). */
+    private static boolean running(MatchSession session) {
+        return session != null
+                && (session.state() == MatchState.ACTIVE || session.state() == MatchState.ENDING);
     }
 
     /**
-     * Builds the column plan for one match — the single source of truth shared by the real
-     * priority assignment and the per-viewer padding, so both can never drift apart.
+     * Builds the whole grid of one match as a flat row list in client order (row {@code i}
+     * occupies slot {@code i + 1}). Header, spacer and blank rows carry no player and are sent
+     * to each viewer as filler entries; everything else is a real participant or spectator.
      */
-    private Plan planColumns(MatchSession session, Collection<? extends Player> online,
-                             Comparator<Player> byName) {
-        Groups groups = collectGroups(session, online);
-        boolean duel = groups.rosters().values().stream().allMatch(r -> r.size() <= 1);
-        List<Column> columns = new ArrayList<>();
-        if (duel && !groups.rosters().isEmpty()) {
-            List<Player> combat = new ArrayList<>();
+    Grid buildGrid(MatchSession session, Collection<? extends Player> online) {
+        List<Member> members = new ArrayList<>();
+        for (Player player : online) {
+            UUID id = player.getUniqueId();
+            if (session.isParticipant(id)) {
+                TeamColor color = session.teamColor(id);
+                boolean fallen = session.isEliminated(id) || player.getGameMode() == GameMode.SPECTATOR;
+                members.add(fallen
+                        ? Member.ofFallen(id, player.getName(), color)
+                        : Member.ofFighter(id, player.getName(), color));
+            } else if (player.getGameMode() == GameMode.SPECTATOR) {
+                members.add(Member.ofSpectator(id, player.getName()));
+            }
+        }
+        boolean teamMatch = session.isTeamMatch();
+        TabFightLayout.Scheme scheme = TabFightLayout.schemeFor(teamMatch, aliveSizes(members));
+        List<GridRow> rows = new ArrayList<>();
+        for (ColumnPlan column : planGrid(teamMatch, members)) {
+            rows.add(new GridRow(null, column.header()));
+            rows.add(new GridRow(null, BLANK));
+            for (Member member : column.rows()) {
+                rows.add(new GridRow(Bukkit.getPlayer(member.id()), rowDisplay(member, scheme)));
+            }
+            int fillers = TabFightLayout.padCount(column.rows().size());
+            for (int i = 0; i < fillers; i++) {
+                rows.add(new GridRow(null, BLANK));
+            }
+        }
+        return new Grid(rows);
+    }
+
+    /**
+     * Pure grid plan: which columns exist in which order and which real players sit in them.
+     * A duel merges both fighters into one column, a party fight renders one column per team in
+     * canonical battle order, fallen players stay in their team column, and the spectator column
+     * comes last.
+     */
+    static List<ColumnPlan> planGrid(boolean teamMatch, List<Member> members) {
+        List<Member> alive = new ArrayList<>();
+        List<Member> fallen = new ArrayList<>();
+        List<Member> spectators = new ArrayList<>();
+        for (Member member : members) {
+            if (member.spectator()) {
+                spectators.add(member);
+            } else if (member.fallen()) {
+                fallen.add(member);
+            } else {
+                alive.add(member);
+            }
+        }
+        sortByName(alive);
+        sortByName(fallen);
+        sortByName(spectators);
+        List<ColumnPlan> columns = new ArrayList<>();
+        if (TabFightLayout.schemeFor(teamMatch, aliveSizes(members)) == TabFightLayout.Scheme.DUEL) {
+            List<Member> rows = new ArrayList<>();
+            appendTeams(rows, alive);
+            appendTeams(rows, fallen);
+            if (!rows.isEmpty()) {
+                columns.add(new ColumnPlan(HEADER_COMBAT, rows));
+            }
+        } else {
             for (TeamColor color : TeamColor.values()) {
-                List<Player> roster = groups.rosters().get(color);
-                if (roster != null) {
-                    combat.addAll(roster);
+                List<Member> rows = new ArrayList<>();
+                appendTeam(rows, alive, color);
+                appendTeam(rows, fallen, color);
+                if (!rows.isEmpty()) {
+                    columns.add(new ColumnPlan(teamHeader(color), rows));
                 }
             }
-            combat.sort(byName);
-            if (!combat.isEmpty()) {
-                columns.add(new Column(HEADER_COMBAT, combat, true));
+        }
+        if (!spectators.isEmpty()) {
+            columns.add(new ColumnPlan(HEADER_SPECTATING, spectators));
+        }
+        return columns;
+    }
+
+    /** Display text of one row: team-coloured in a duel, "Name ●" in a party fight. */
+    static Component rowDisplay(Member member, TabFightLayout.Scheme scheme) {
+        if (member.spectator()) {
+            return Component.text(member.name(), SPECTATOR_COLOR);
+        }
+        TeamColor color = member.color();
+        if (member.fallen()) {
+            return Component.text(member.name(), DEATH_COLOR)
+                    .append(Component.text(" "))
+                    .append(Component.text("●", fadedTeamColor(color)))
+                    .append(Component.text(" - Death", DEATH_COLOR));
+        }
+        if (scheme == TabFightLayout.Scheme.DUEL) {
+            return Component.text(member.name(), teamColor(color));
+        }
+        return Component.text(member.name(), NamedTextColor.WHITE)
+                .append(Component.text(" "))
+                .append(Component.text("●", teamColor(color)));
+    }
+
+    /** Column header of the sample: "● Red Team" in the team's own colour. */
+    static Component teamHeader(TeamColor color) {
+        return Component.text("● " + teamLabel(color), teamColor(color));
+    }
+
+    /** "Red Team" / "Blue Team" — the sample never shows the bare enum name. */
+    static String teamLabel(TeamColor color) {
+        String lower = color.name().toLowerCase(Locale.ROOT);
+        return Character.toUpperCase(lower.charAt(0)) + lower.substring(1) + " Team";
+    }
+
+    private static TextColor teamColor(TeamColor color) {
+        return color == null ? NamedTextColor.WHITE : TextColor.color(color.leatherColor().asRGB());
+    }
+
+    /** Faded team colour of the death row's dot (the sample greys the whole row). */
+    private static TextColor fadedTeamColor(TeamColor color) {
+        if (color == null) {
+            return DEATH_COLOR;
+        }
+        int rgb = color.leatherColor().asRGB();
+        int red = fade((rgb >> 16) & 0xFF);
+        int green = fade((rgb >> 8) & 0xFF);
+        int blue = fade(rgb & 0xFF);
+        return TextColor.color((red << 16) | (green << 8) | blue);
+    }
+
+    private static int fade(int channel) {
+        return channel + (255 - channel) * 55 / 100;
+    }
+
+    private static void appendTeams(List<Member> target, List<Member> source) {
+        for (TeamColor color : TeamColor.values()) {
+            appendTeam(target, source, color);
+        }
+    }
+
+    private static void appendTeam(List<Member> target, List<Member> source, TeamColor color) {
+        for (Member member : source) {
+            if (member.color() == color) {
+                target.add(member);
             }
-        } else if (!duel) {
-            for (TeamColor color : TeamColor.values()) { // canonical battle order RED -> GOLD
-                List<Player> roster = groups.rosters().get(color);
-                if (roster == null || roster.isEmpty()) {
-                    continue;
+        }
+    }
+
+    private static List<Integer> aliveSizes(List<Member> members) {
+        List<Integer> sizes = new ArrayList<>();
+        for (TeamColor color : TeamColor.values()) {
+            int count = 0;
+            for (Member member : members) {
+                if (!member.spectator() && !member.fallen() && member.color() == color) {
+                    count++;
                 }
-                roster.sort(byName);
-                columns.add(new Column(teamHeader(color), roster, false));
             }
+            sizes.add(count);
         }
-        if (!groups.spectators().isEmpty()) {
-            groups.spectators().sort(byName);
-            columns.add(new Column(HEADER_SPECTATING, new ArrayList<>(groups.spectators()), false));
-        }
-        return new Plan(columns);
+        return sizes;
     }
 
-    /** Team column header: the team label in its own colour, legacy-formatted. */
-    private static String teamHeader(TeamColor color) {
-        // PDF サンプルの「● Red Team / ● Blue Team」に合わせる。
-        return LEGACY.serialize(Component.text("● " + color.label(), color.textColor()));
-    }
-
-    /** Live fighters grouped by team colour plus every spectator, for one match. */
-    private Groups collectGroups(MatchSession session, Collection<? extends Player> online) {
-        Map<TeamColor, List<Player>> rosters = new EnumMap<>(TeamColor.class);
-        List<Player> spectators = new ArrayList<>();
-        for (Player p : online) {
-            boolean fighting = session.isParticipant(p.getUniqueId())
-                    && !session.isEliminated(p.getUniqueId())
-                    && p.getGameMode() != GameMode.SPECTATOR;
-            if (fighting) {
-                rosters.computeIfAbsent(session.teamColor(p.getUniqueId()), k -> new ArrayList<>()).add(p);
-            } else if (p.getGameMode() == GameMode.SPECTATOR) {
-                spectators.add(p);
-            }
-        }
-        return new Groups(rosters, spectators);
+    private static void sortByName(List<Member> members) {
+        members.sort(Comparator.comparing(Member::name, String.CASE_INSENSITIVE_ORDER));
     }
 
     /**
      * Applies one tablist entry. Ordering is only written when it changed (this runs on the
      * periodic scoreboard refresh and must not re-broadcast identical player-info updates
      * every cycle). The list name is taken over once on entering the layout, and re-synced
-     * if the styled content changes (e.g. a colour switch or a duel/team scheme flip during
-     * eliminations). {@code personalName == null} means "clear the custom name" (team
-     * fights), which reveals the scoreboard team's prefix and colour.
+     * when the styled content changes (e.g. a fighter falling to the "- Death" row).
      */
-    private void applyListEntry(Player player, boolean ordering, int order, Component personalName) {
+    private void applyListEntry(Player player, boolean ordering, int order, Component display) {
         if (ordering) {
             try {
                 if (player.getPlayerListOrder() != order) {
@@ -408,38 +590,23 @@ public final class TabFightListService {
         UUID id = player.getUniqueId();
         boolean entering = layoutApplied.add(id);
         if (entering) {
-            player.playerListName(personalName);
-            layoutNames.put(id, personalName);
-        } else if (!Objects.equals(layoutNames.get(id), personalName)) {
-            player.playerListName(personalName);
-            layoutNames.put(id, personalName);
+            player.playerListName(display);
+            layoutNames.put(id, display);
+        } else if (!Objects.equals(layoutNames.get(id), display)) {
+            player.playerListName(display);
+            layoutNames.put(id, display);
         }
     }
 
-    /**
-     * The player's own coloured name for the duel combat column: name-colour cosmetic when
-     * active, otherwise the rank-styled name, otherwise null (falls back to team visuals).
-     */
-    private Component personalListName(Player player) {
-        com.rumilance.practice.cosmetic.namecolor.NameColorService ncs = nameColorService;
-        if (ncs != null && ncs.selection(player.getUniqueId()).active()) {
-            return ncs.styledName(player);
-        }
-        com.rumilance.practice.rank.RankService ranks = rankService;
-        if (ranks != null) {
-            return ranks.styledComponentName(player);
-        }
-        return null;
-    }
-
-    /** Restores vanilla ordering, the styled list name and removes pads for one player. */
+    /** Restores vanilla ordering, the styled list name and removes fillers for one player. */
     public void clear(Player player) {
+        restoreListing(player);
         Map<UUID, PadState> sent = sentPads.remove(player.getUniqueId());
-        if (sent != null && !sent.isEmpty() && TabPadPackets.available()) {
+        if (sent != null && !sent.isEmpty() && TabEntryPackets.available()) {
             try {
-                TabPadPackets.removePads(player, List.copyOf(sent.keySet()));
+                TabEntryPackets.remove(player, List.copyOf(sent.keySet()));
             } catch (Throwable t) {
-                padsBroken = true;
+                fail(t);
             }
         }
         layoutNames.remove(player.getUniqueId());
@@ -462,17 +629,35 @@ public final class TabFightListService {
         }
     }
 
-    private record Groups(Map<TeamColor, List<Player>> rosters, List<Player> spectators) {
+    /** One online player the grid knows about. */
+    record Member(UUID id, String name, TeamColor color, boolean fallen, boolean spectator) {
+
+        static Member ofFighter(UUID id, String name, TeamColor color) {
+            return new Member(id, name, color, false, false);
+        }
+
+        static Member ofFallen(UUID id, String name, TeamColor color) {
+            return new Member(id, name, color, true, false);
+        }
+
+        static Member ofSpectator(UUID id, String name) {
+            return new Member(id, name, null, false, true);
+        }
     }
 
-    /** One planned TAB column: header text, roster and whether duel names are style-taken-over. */
-    private record Column(String header, List<Player> roster, boolean personalStyle) {
+    /** One planned column: header text and the real players below the header/spacer rows. */
+    record ColumnPlan(Component header, List<Member> rows) {
     }
 
-    private record Plan(List<Column> columns) {
+    /** One flattened grid row: {@code player == null} means a filler entry. */
+    record GridRow(Player player, Component display) {
     }
 
-    /** What a pad entry currently shows: priority + display text. */
-    private record PadState(int priority, String display) {
+    /** The whole grid of one match, in client order. */
+    record Grid(List<GridRow> rows) {
+    }
+
+    /** What a filler entry currently shows: list order + display text. */
+    private record PadState(int order, Component display) {
     }
 }

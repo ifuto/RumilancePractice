@@ -1,100 +1,122 @@
 package com.rumilance.practice.scoreboard;
 
 import com.rumilance.practice.state.TeamColor;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.junit.jupiter.api.Test;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Since 1.21.2 the vanilla client sorts the player list by the server-provided non-negative
- * ordering index (highest first) — team-name sorting is gone — so the columns are built
- * from {@code Player#setPlayerListOrder} index bands: one band per team in canonical battle
- * order, then the spectator band, lobby players on the default 0 sorting last. Because the
- * client wraps the list into a new column every 20 entries, each team band is additionally
- * padded to a multiple of 20 rows with invisible fake entries (the blank column gaps the
- * operators asked for).
+ * The fight TAB grid follows the TAB plugin's layout model: the client sorts the player list by
+ * the server-provided order (highest first) and wraps it into a new column every 20 entries, so
+ * every column is padded to exactly 20 rows — header, blank spacer, roster, blank fillers — and
+ * each row is placed with an absolute order {@code Integer.MAX_VALUE - band - slot}.
+ *
+ * <p>The grid must sit above the lobby ordering of {@code tab-layout.csv} (which reaches
+ * 5,900,000). Both used to share the 1M band, so a rank-holding lobby player (owner/VIP) was
+ * listed above the whole fight grid and pushed every column break one row off.</p>
  */
 class TabFightListServiceTest {
 
+    /** The highest list order the lobby CSV can hand out: 900_000 + priority(500) * 10_000. */
+    private static final int MAX_LOBBY_ORDER = 900_000 + 500 * 10_000;
+
     @Test
-    void padPoolIsUniqueAndProtocolValid() throws Exception {
-        // The blank padding entries are fake player-info entries: unique random UUIDs and
-        // profile names that satisfy the ADD_PLAYER constraints (1-16 chars, [A-Za-z0-9_]).
-        Field idsField = TabFightListService.class.getDeclaredField("PAD_IDS");
-        Field namesField = TabFightListService.class.getDeclaredField("PAD_NAMES");
-        idsField.setAccessible(true);
-        namesField.setAccessible(true);
-        UUID[] ids = (UUID[]) idsField.get(null);
-        String[] names = (String[]) namesField.get(null);
-        assertTrue(ids.length >= 152, "enough pads for 7 team columns + spectator padding");
-        Set<UUID> unique = new HashSet<>(List.of(ids));
-        assertEquals(ids.length, unique.size(), "pad UUIDs must be unique");
-        for (String name : names) {
-            assertTrue(name.length() >= 1 && name.length() <= 16, "name length: " + name);
-            assertTrue(name.matches("[A-Za-z0-9_]+"), "name charset: " + name);
-        }
+    void fightRowsSortAboveEveryLobbyOrder() {
+        assertTrue(TabFightListService.orderOf(0, 1) > MAX_LOBBY_ORDER);
+        assertTrue(TabFightListService.orderOf(0, TabFightListService.SLOTS_PER_MATCH)
+                > MAX_LOBBY_ORDER);
+        assertEquals(Integer.MAX_VALUE - 1, TabFightListService.orderOf(0, 1));
     }
 
     @Test
-    void sortKeysFollowCanonicalBattleOrder() {
-        // Team columns are assigned in TeamColor declaration order, so the one-char sort
-        // keys must keep matching canonical battle order: RED, BLUE, GREEN, YELLOW, AQUA,
-        // PURPLE, GOLD.
-        List<TeamColor> canonical = List.of(TeamColor.values());
-        for (int i = 0; i + 1 < canonical.size(); i++) {
-            String before = canonical.get(i).sortKey();
-            String after = canonical.get(i + 1).sortKey();
-            assertTrue(before.compareTo(after) < 0,
-                    canonical.get(i) + " (" + before + ") must sort before "
-                            + canonical.get(i + 1) + " (" + after + ")");
-        }
+    void gridKeepsReadingOrderAndBandsDoNotOverlap() {
+        assertTrue(TabFightListService.orderOf(0, 1) > TabFightListService.orderOf(0, 2));
+        assertTrue(TabFightListService.orderOf(0, 20) > TabFightListService.orderOf(0, 21),
+                "the row after a full column is the top of the next one");
+        assertTrue(TabFightListService.orderOf(0, TabFightListService.SLOTS_PER_MATCH)
+                > TabFightListService.orderOf(1, 1), "a second match starts below the first band");
     }
 
     @Test
-    void fightersSortBeforeSpectators() {
-        // Fight team names start with "0", the shared spectator team is "9_spec" (nametag
-        // colours still come through scoreboard teams).
-        String spectatorTeam = "9_spec";
-        for (TeamColor color : TeamColor.values()) {
-            String fightTeam = "0" + color.sortKey() + "player";
-            assertTrue(fightTeam.compareTo(spectatorTeam) < 0,
-                    color + " fighters must be listed before spectators");
+    void fillerIdsAreDeterministicAndUnique() {
+        assertEquals(TabFightListService.padId(0, 1), TabFightListService.padId(0, 1));
+        Set<UUID> ids = new HashSet<>();
+        for (int slot = 1; slot <= TabFightListService.SLOTS_PER_MATCH; slot++) {
+            ids.add(TabFightListService.padId(0, slot));
+            ids.add(TabFightListService.padId(1, slot));
         }
+        assertEquals(TabFightListService.SLOTS_PER_MATCH * 2, ids.size());
     }
 
     @Test
-    void serviceHasNoProtocolLibDependency() {
-        // Construction must work without ProtocolLib on the classpath; the pad packets
-        // live in a separate class that is only touched after a runtime availability check.
+    void duelGridMergesBothFightersIntoOneColumn() {
+        List<TabFightListService.Member> members = List.of(
+                TabFightListService.Member.ofFighter(UUID.randomUUID(), "Alpha", TeamColor.RED),
+                TabFightListService.Member.ofFighter(UUID.randomUUID(), "Bravo", TeamColor.BLUE),
+                TabFightListService.Member.ofSpectator(UUID.randomUUID(), "Watcher"));
+        List<TabFightListService.ColumnPlan> columns = TabFightListService.planGrid(false, members);
+        assertEquals(2, columns.size(), "In-Game Players + Spectators");
+        assertEquals("In-Game Players", plain(columns.get(0).header()));
+        assertEquals(List.of("Alpha", "Bravo"), names(columns.get(0)));
+        assertEquals("Spectators", plain(columns.get(1).header()));
+        assertEquals(List.of("Watcher"), names(columns.get(1)));
+        // The duel rows are the two mcid names on their own, coloured by team.
+        assertEquals("Alpha", plain(TabFightListService.rowDisplay(
+                members.get(0), TabFightLayout.Scheme.DUEL)));
+    }
+
+    @Test
+    void partyGridSplitsTeamsAndKeepsFallenPlayers() {
+        List<TabFightListService.Member> members = List.of(
+                TabFightListService.Member.ofFighter(UUID.randomUUID(), "PlayerA", TeamColor.RED),
+                TabFightListService.Member.ofFallen(UUID.randomUUID(), "PlayerH", TeamColor.RED),
+                TabFightListService.Member.ofFighter(UUID.randomUUID(), "PlayerD", TeamColor.BLUE));
+        List<TabFightListService.ColumnPlan> columns = TabFightListService.planGrid(true, members);
+        assertEquals(2, columns.size());
+        assertEquals("● Red Team", plain(columns.get(0).header()));
+        assertEquals("● Blue Team", plain(columns.get(1).header()));
+        assertEquals(List.of("PlayerA", "PlayerH"), names(columns.get(0)));
+        assertEquals("PlayerA ●", plain(TabFightListService.rowDisplay(
+                columns.get(0).rows().get(0), TabFightLayout.Scheme.TEAMS)));
+        assertEquals("PlayerH ● - Death", plain(TabFightListService.rowDisplay(
+                columns.get(0).rows().get(1), TabFightLayout.Scheme.TEAMS)));
+    }
+
+    @Test
+    void serviceHasNoPacketPluginDependency() {
+        // Construction and the no-session path must not require ProtocolLib or any packet
+        // plugin: the filler rows are built from the server's own classes.
         TabFightListService service = new TabFightListService(null);
-        assertTrue(service != null);
+        assertNotNull(service);
+        service.apply(null, List.of());
     }
 
     @Test
-    void applyWithNullSessionIsNoOp() {
-        // Must not throw with a null session (defensive guard used by the scoreboard loop).
-        new TabFightListService(null).apply(null, java.util.List.of());
-    }
-
-    @Test
-    void matchSlotsAreStableAndFreedByPrune() throws Exception {
+    void matchSlotsAreStableAndFreedByPrune() {
         TabFightListService service = new TabFightListService(null);
-        Method slotFor = TabFightListService.class.getDeclaredMethod("slotFor", UUID.class);
-        slotFor.setAccessible(true);
         UUID matchA = UUID.randomUUID();
         UUID matchB = UUID.randomUUID();
-        assertEquals(0, slotFor.invoke(service, matchA), "first match gets slot 0");
-        assertEquals(1, slotFor.invoke(service, matchB), "second match gets slot 1");
-        assertEquals(0, slotFor.invoke(service, matchA), "slot assignment is stable");
+        assertEquals(0, service.slotFor(matchA), "first match gets slot 0");
+        assertEquals(1, service.slotFor(matchB), "second match gets slot 1");
+        assertEquals(0, service.slotFor(matchA), "slot assignment is stable");
         service.prune(Set.of(matchB));
-        assertEquals(0, slotFor.invoke(service, matchA), "pruned match frees its band");
+        assertEquals(0, service.slotFor(matchA), "pruned match frees its band");
+    }
+
+    private static String plain(Component component) {
+        return PlainTextComponentSerializer.plainText().serialize(component);
+    }
+
+    private static List<String> names(TabFightListService.ColumnPlan column) {
+        return column.rows().stream().map(TabFightListService.Member::name).toList();
     }
 }
