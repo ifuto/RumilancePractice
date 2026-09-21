@@ -94,8 +94,9 @@ public final class EkitSelectGui extends AbstractGui {
                                 ? UiTheme.status("Crystal FFA Kit", UiTheme.SUCCESS)
                                 : UiTheme.line(line(player, "gui.kit-edit-hint")),
                         UiTheme.blank(),
-                        UiTheme.hint(line(player, "menu.click")))
-                .action("kit:" + kit.name())
+                        UiTheme.hint(line(player, "gui.kit-button-hint")))
+                // 木時差式ボタン: 押して0.2秒後に開く(AFKC のキット選択と同じ押し心地)。
+                .action(com.rumilance.practice.gui.DelayedButton.wrap("kit:" + kit.name()))
                 .build();
     }
 

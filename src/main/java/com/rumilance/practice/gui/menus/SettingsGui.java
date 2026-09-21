@@ -9,6 +9,7 @@ import com.rumilance.practice.gui.MenuScaffold;
 import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.item.FunctionalItemListener;
 import com.rumilance.practice.model.PlayerSettings;
+import com.rumilance.practice.settings.SettingPolicy;
 import com.rumilance.practice.settings.SettingsService;
 import com.rumilance.practice.sound.SoundService;
 import com.rumilance.practice.util.GuiSlots;
@@ -35,6 +36,10 @@ public final class SettingsGui extends AbstractGui {
     private com.rumilance.practice.cosmetic.namecolor.NameColorService nameColorService;
     private NameColorGui nameColorGui;
     private ChatSettingsGui chatSettingsGui;
+    /**
+     * VIP+ 判定。注入されない場合は誰もロックされない(設定 GUI 単体でも壊れない)。
+     */
+    private java.util.function.Predicate<Player> premiumCheck = player -> true;
 
     public SettingsGui(GuiSessionRegistry registry, SoundService sounds, SettingsService settingsService) {
         super(registry, sounds, GuiType.SETTINGS, 6, true);
@@ -52,6 +57,11 @@ public final class SettingsGui extends AbstractGui {
 
     public void setChatSettingsGui(ChatSettingsGui chatSettingsGui) {
         this.chatSettingsGui = chatSettingsGui;
+    }
+
+    /** 有料プラン判定を注入する({@code rankService::isVipOrAbove})。 */
+    public void setPremiumCheck(java.util.function.Predicate<Player> premiumCheck) {
+        this.premiumCheck = premiumCheck == null ? player -> true : premiumCheck;
     }
 
     public void setToggleCooldownSeconds(int seconds) {
@@ -181,6 +191,19 @@ public final class SettingsGui extends AbstractGui {
 
     private ItemStack toggle(Player player, Material material, String nameKey, boolean enabled,
                              String key, String descriptionKey) {
+        // 容量を食う項目は無料プランでは鍵付き(押せない・常に OFF 扱い)。
+        if (SettingPolicy.isLocked(key, premium(player))) {
+            return ItemBuilder.of(Material.BARRIER)
+                    .name(t(player, nameKey).color(UiTheme.MUTED))
+                    .lore(
+                            UiTheme.divider(),
+                            UiTheme.line(line(player, descriptionKey)),
+                            UiTheme.blank(),
+                            UiTheme.status(line(player, "gui.premium-locked"), UiTheme.WARNING),
+                            UiTheme.hint(line(player, "gui.premium-required")))
+                    .action("locked:" + key)
+                    .build();
+        }
         return ItemBuilder.of(material)
                 .name(t(player, nameKey).color(enabled ? UiTheme.SUCCESS : UiTheme.MUTED))
                 .lore(
@@ -198,8 +221,22 @@ public final class SettingsGui extends AbstractGui {
                 .build();
     }
 
+    /** この人が有料プラン(VIP / VIP+)かどうか。 */
+    private boolean premium(Player player) {
+        try {
+            return premiumCheck.test(player);
+        } catch (Throwable ignored) {
+            return true;
+        }
+    }
+
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot, String action) {
+        if (action != null && action.startsWith("locked:")) {
+            sounds.play(player, "error");
+            messages().send(player, "gui.premium-required");
+            return;
+        }
         if ("close".equals(action)) {
             player.closeInventory();
             return;

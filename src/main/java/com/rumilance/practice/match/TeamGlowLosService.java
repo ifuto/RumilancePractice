@@ -30,6 +30,7 @@ import java.util.logging.Level;
  */
 public final class TeamGlowLosService {
 
+    private java.util.function.Predicate<Player> premiumCheck = player -> true;
     private static final byte GLOW_BIT = 0x40;
 
     private final Plugin plugin;
@@ -89,12 +90,29 @@ public final class TeamGlowLosService {
         glowVisible.remove(player.getUniqueId());
     }
 
+    /**
+     * 有料プラン判定。注入されなければ全員が使える(従来動作)。味方グロウは毎 tick の
+     * 視線判定とグロウ状態の再送を伴うため、無料プランでは常に OFF 扱いにする。
+     */
+    public void setPremiumCheck(java.util.function.Predicate<Player> premiumCheck) {
+        this.premiumCheck = premiumCheck == null ? player -> true : premiumCheck;
+    }
+
+    private boolean premium(Player player) {
+        try {
+            return premiumCheck.test(player);
+        } catch (Throwable ignored) {
+            return true;
+        }
+    }
+
     private void tickLos() {
         if (!enabled) {
             return;
         }
         for (Player viewer : Bukkit.getOnlinePlayers()) {
-            if (!settingsService.get(viewer).teamGlow()) {
+            if (!com.rumilance.practice.settings.SettingPolicy.allows(
+                    "team_glow", settingsService.get(viewer).teamGlow(), premium(viewer))) {
                 clearViewerGlows(viewer);
                 continue;
             }

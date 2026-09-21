@@ -650,6 +650,8 @@ gui:
   toggle-on: "开启"
   toggle-off: "关闭"
   toggle-hint: "点击切换"
+gui.premium-locked: "VIP+ 专属"
+gui.premium-required: "此设置需要 VIP+ 或更高等级。"
   spectate-title: "观战"
   spectate-empty: "没有比赛"
   spectate-empty-lore: "正在进行的比赛会显示在这里。"

@@ -650,6 +650,8 @@ gui:
   toggle-on: "Sí"
   toggle-off: "No"
   toggle-hint: "Clic para alternar"
+gui.premium-locked: "Solo VIP+"
+gui.premium-required: "Este ajuste requiere VIP+ o superior."
   spectate-title: "Espectar"
   spectate-empty: "Sin partidas"
   spectate-empty-lore: "Las partidas en vivo aparecerán aquí."

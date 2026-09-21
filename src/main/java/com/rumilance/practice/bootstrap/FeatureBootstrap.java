@@ -788,6 +788,15 @@ public final class FeatureBootstrap {
         duelRequestGui.setMapSelectGui(duelMapSelectGui);
 
         SettingsGui settingsGui = new SettingsGui(guiSessions, soundService, settingsService);
+        // 容量を食む設定(味方グロウ / マッチレポート)は有料プラン限定。GUI の表示と
+        // 実際の適用が同じ判定を通るように、三箇所へ同じ判定を注入する。
+        settingsGui.setPremiumCheck(rankServiceRef::isVipOrAbove);
+        if (matchService != null) {
+            matchService.setPremiumCheck(rankServiceRef::isVipOrAbove);
+        }
+        if (teamGlowLosService != null) {
+            teamGlowLosService.setPremiumCheck(rankServiceRef::isVipOrAbove);
+        }
         settingsGui.setToggleCooldownSeconds(configService.config().getInt("gui.toggle-cooldown-seconds", 2));
         settingsGui.setTeamColoredArmorService(teamColoredArmor);
         NameColorGui nameColorGui = new NameColorGui(guiSessions, soundService, nameColorService);

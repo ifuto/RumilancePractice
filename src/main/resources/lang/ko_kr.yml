@@ -650,6 +650,8 @@ gui:
   toggle-on: "On"
   toggle-off: "Off"
   toggle-hint: "Click to toggle"
+gui.premium-locked: "VIP+ 전용"
+gui.premium-required: "이 설정은 VIP+ 이상에서 사용할 수 있습니다."
   spectate-title: "Spectate"
   spectate-empty: "No matches"
   spectate-empty-lore: "Live matches will appear here."

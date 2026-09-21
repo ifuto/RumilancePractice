@@ -652,6 +652,8 @@ gui:
   toggle-on: "On"
   toggle-off: "Off"
   toggle-hint: "Click to toggle"
+gui.premium-locked: "VIP+ only"
+gui.premium-required: "This setting needs VIP+ or above."
   spectate-title: "Spectate"
   spectate-empty: "No matches"
   spectate-empty-lore: "Live matches will appear here."
