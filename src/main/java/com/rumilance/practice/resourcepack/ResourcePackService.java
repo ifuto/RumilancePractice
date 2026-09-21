@@ -202,6 +202,37 @@ public final class ResourcePackService implements Listener {
         }
     }
 
+    /** Players already noted (in the log) as running a client too old for this pack. */
+    private final java.util.Set<UUID> tooOldNotified = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /** Cached {@code Player#getProtocolVersion} lookup; resolved lazily, may stay null. */
+    private static volatile java.lang.reflect.Method protocolMethod;
+    private static volatile boolean protocolMethodResolved;
+
+    /**
+     * The client's protocol version, or {@link PackFormatPolicy#UNKNOWN} when this server API
+     * does not expose it. Reflected because {@code getProtocolVersion()} is not part of the
+     * compile-time API surface here; failing to read it must never lock a player out of the
+     * pack, so an unreadable value falls back to "no data".
+     */
+    private static int clientProtocolOf(Player player) {
+        try {
+            java.lang.reflect.Method method = protocolMethod;
+            if (method == null) {
+                if (protocolMethodResolved) {
+                    return PackFormatPolicy.UNKNOWN;
+                }
+                protocolMethodResolved = true;
+                method = player.getClass().getMethod("getProtocolVersion");
+                protocolMethod = method;
+            }
+            Object value = method.invoke(player);
+            return value instanceof Integer protocol ? protocol : PackFormatPolicy.UNKNOWN;
+        } catch (Throwable t) {
+            return PackFormatPolicy.UNKNOWN;
+        }
+    }
+
     /** Sends the pack to the player (no-op when disabled or misconfigured). */
     public void applyTo(Player player) {
         ResourcePackRequest toSend = this.request;
