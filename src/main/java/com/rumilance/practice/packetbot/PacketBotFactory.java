@@ -49,13 +49,15 @@ public final class PacketBotFactory {
                                             org.bukkit.entity.Player template, double maxHp,
                                             boolean shieldUp, String displayName) {
         // The bot wears the template player's skin: copy the signed textures property.
-        GameProfile profile = new GameProfile(UUID.randomUUID(),
-                BotNames.uniqueProfileName(displayName));
-        if (template != null) {
-            for (ProfileProperty prop : template.getPlayerProfile().getProperties()) {
-                profile.properties().put(prop.getName(),
-                        new Property(prop.getName(), prop.getValue(), prop.getSignature()));
-            }
+        UUID profileId = UUID.randomUUID();
+        String profileName = BotNames.uniqueProfileName(displayName);
+        GameProfile profile = new GameProfile(profileId, profileName);
+        // authlib 7.x: GameProfile#properties() は不変なので put すると必ず落ちる。
+        // テンプレート玩家のプロパティを持つプロファイルを 3 引数コンストラクタで作る。
+        // (GameProfile は record 化されているので getId()/getName() には頼らない)
+        if (template instanceof org.bukkit.craftbukkit.entity.CraftPlayer craft) {
+            profile = new GameProfile(profileId, profileName,
+                    craft.getHandle().getGameProfile().properties());
         }
         return spawn(location, profile, maxHp, displayName);
     }

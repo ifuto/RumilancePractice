@@ -1562,7 +1562,13 @@ public final class MatchService {
         lethalSet.add(victimId);
         // Self-inflicted blasts, environmental deaths and non-participants are all null here.
         // This same normalized value is used by the draw check and the winner selection.
-        attackerMap.put(victimId, creditedAttacker);
+        // ConcurrentHashMap は null 値を許さないので、 attacker 不在は「エントリ無し」で表現する
+        // (latest.log の DeathBridge revive hook failed = NullPointerException の原因)。
+        if (creditedAttacker == null) {
+            attackerMap.remove(victimId);
+        } else {
+            attackerMap.put(victimId, creditedAttacker);
+        }
         final UUID lethalAttacker = creditedAttacker;
         Bukkit.getScheduler().runTaskLater(plugin, () -> resolveSoloOutcome(session, victimId, lethalAttacker, now), 1L);
     }

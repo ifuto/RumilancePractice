@@ -114,9 +114,12 @@ public final class HeroBotRegistry {
                 : UUID.nameUUIDFromBytes(("OfflinePlayer:" + name).getBytes(StandardCharsets.UTF_8));
         GameProfile profile = new GameProfile(uuid, name);
         if (skinTemplate != null) {
-            for (var prop : skinTemplate.getPlayerProfile().getProperties()) {
-                profile.properties().put(prop.getName(),
-                        new Property(prop.getName(), prop.getValue(), prop.getSignature()));
+            // authlib 7.x では GameProfile#properties() が不変(PropertyMap.EMPTY が
+            // ImmutableMultimap へ委譲)なので、あとから put すると必ず
+            // UnsupportedOperationException になる。プロパティを持ったプロファイルを
+            // 3引数コンストラクタで最初から作る。
+            if (skinTemplate instanceof org.bukkit.craftbukkit.entity.CraftPlayer craft) {
+                profile = new GameProfile(uuid, name, craft.getHandle().getGameProfile().properties());
             }
         } else {
             net.minecraft.server.level.ServerPlayer online =

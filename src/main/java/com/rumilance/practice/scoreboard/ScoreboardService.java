@@ -99,11 +99,26 @@ public final class ScoreboardService {
     private volatile long streakRankAt;
     private BukkitTask task;
 
+    /** タイトル変更判定用の文字列化(同じ見た目を毎 tick 送り直さないため)。 */
+    private static String titleString(Component title) {
+        if (title == null) {
+            return "";
+        }
+        try {
+            return net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
+                    .plainText().serialize(title);
+        } catch (Throwable ignored) {
+            return String.valueOf(title);
+        }
+    }
+
     private static final class BoardHandle {
         final Scoreboard board;
         final Objective objective;
         final String[] lines = new String[16];
         String lastTabSig = "";
+        /** 最後に設定したサイドバーのタイトル(MiniMessage 文字列)。 */
+        String lastTitle = null;
 
         BoardHandle(Scoreboard board, Objective objective) {
             this.board = board;
@@ -763,9 +778,14 @@ public final class ScoreboardService {
                 ensureLineTeam(board, score);
             }
             handle = new BoardHandle(board, objective);
+            handle.lastTitle = titleString(title);
             boards.put(id, handle);
-        } else {
+        } else if (!java.util.Objects.equals(handle.lastTitle, titleString(title))) {
+            // タイトルが変わったときだけ設定する。displayName は毎回コンポーネントを
+            // シリアライズして全員のクライアントへ送るため、毎 tick やるとサーバスレッドが
+            // Codec エンコードで詰まる(latest.log の Watchdog ダンプがまさにこの位置)。
             handle.objective.displayName(title);
+            handle.lastTitle = titleString(title);
         }
         for (int score = 1; score <= 15; score++) {
             String old = handle.lines[score];
