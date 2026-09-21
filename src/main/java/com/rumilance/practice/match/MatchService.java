@@ -493,6 +493,19 @@ public final class MatchService {
                           int bestOf, Map<UUID, Integer> carrySeriesWins, String preferredArena,
                           UUID carryArenaInstanceId,
                           com.rumilance.practice.team.OriginalKitRef originalKit) {
+        startDuel(playerA, playerB, kitId, mode, bestOf, carrySeriesWins, preferredArena,
+                carryArenaInstanceId, originalKit, com.rumilance.practice.match.FirstTo.UNLIMITED);
+    }
+
+    /**
+     * Duel start with an FT (先取点数). Only the duel flow sets this: queue matches always
+     * pass {@link com.rumilance.practice.match.FirstTo#UNLIMITED}, so a queue series never
+     * ends on score.
+     */
+    public void startDuel(UUID playerA, UUID playerB, String kitId, MatchMode mode,
+                          int bestOf, Map<UUID, Integer> carrySeriesWins, String preferredArena,
+                          UUID carryArenaInstanceId,
+                          com.rumilance.practice.team.OriginalKitRef originalKit, int firstTo) {
         // Hard gates before anything is reserved: a solo duel must never start for a player who
         // is in a party (parties fight together as a team, never 1v1), and never for a player
         // committed to a fight — including someone ELIMINATED from a team match (watching the
@@ -524,6 +537,7 @@ public final class MatchService {
         MatchSession session = new MatchSession(
                 UUID.randomUUID(), mode, kitId, List.of(playerA, playerB), null, bestOf);
         session.applySeries(carrySeriesWins);
+        session.setFirstTo(firstTo);
         session.setOriginalKitRef(originalKit);
         if (preferredArena != null && !preferredArena.isBlank()
                 && !"random".equalsIgnoreCase(preferredArena)) {
@@ -2189,6 +2203,15 @@ public final class MatchService {
                     returnPlayersToLobby(session);
                     return;
                 }
+                // FT: once somebody reached the limit the series is decided — no follow-up
+                // round, both players go home with the final score.
+                if (com.rumilance.practice.match.FirstTo.isComplete(session.firstTo(),
+                        session.topSeriesWins())) {
+                    announceSeriesComplete(session);
+                    clearRematchItems(session);
+                    returnPlayersToLobby(session);
+                    return;
+                }
                 if (!session.tryBeginRematch()) {
                     return;
                 }
@@ -2206,6 +2229,7 @@ public final class MatchService {
                 String kit = session.kitName();
                 MatchMode mode = session.mode();
                 int bestOf = session.bestOf();
+                int firstTo = session.firstTo();
                 Map<UUID, Integer> carrySeries = session.seriesWinsSnapshot();
                 String preferredArena = session.preferredArenaName();
                 UUID carryArena = session.arenaInstanceId();
@@ -2235,7 +2259,8 @@ public final class MatchService {
                             friendlyFire, carrySeries, carryArena, carryTeamKits, carryTeamConfigs,
                             carryOriginalKit);
                 } else {
-                    startDuel(a, b, kit, mode, bestOf, carrySeries, preferredArena, carryArena);
+                    startDuel(a, b, kit, mode, bestOf, carrySeries, preferredArena, carryArena,
+                            null, firstTo);
                 }
             }
         });
@@ -2259,6 +2284,31 @@ public final class MatchService {
             current.add(id);
         }
         return current;
+    }
+
+    /** Tells both fighters that the FT limit was reached, with the final score. */
+    private void announceSeriesComplete(MatchSession session) {
+        int wins = session.topSeriesWins();
+        String winnerName = "";
+        for (UUID id : session.participants()) {
+            if (session.seriesWinsOf(id) == wins) {
+                Player online = Bukkit.getPlayer(id);
+                if (online != null) {
+                    winnerName = online.getName();
+                    break;
+                }
+            }
+        }
+        for (UUID id : session.participants()) {
+            Player online = Bukkit.getPlayer(id);
+            if (online == null || messageService == null) {
+                continue;
+            }
+            messageService.send(online, "match.ft-complete", MessageService.tags(
+                    "player", winnerName,
+                    "wins", String.valueOf(wins),
+                    "ft", com.rumilance.practice.match.FirstTo.label(session.firstTo())));
+        }
     }
 
     private void clearRematchItems(MatchSession session) {

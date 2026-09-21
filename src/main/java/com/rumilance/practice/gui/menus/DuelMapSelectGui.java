@@ -51,6 +51,7 @@ public final class DuelMapSelectGui extends AbstractGui {
         session.setSelectedKit(parent.selectedKit());
         session.setSelectedMap(parent.selectedMap());
         session.setBestOf(parent.bestOf());
+        session.setFirstTo(parent.firstTo());
         session.setFromBattleMenu(parent.fromBattleMenu());
         session.setFromGameMenu(parent.fromGameMenu());
         PracticeGuiOpen.open(this, player, session);

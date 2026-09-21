@@ -22,7 +22,8 @@ public final class DuelRequestService {
             int bestOf,
             Instant createdAt,
             Instant expiresAt,
-            String arenaName
+            String arenaName,
+            int firstTo
     ) {
         public boolean isExpired(Instant now) {
             return now.isAfter(expiresAt);
@@ -72,11 +73,21 @@ public final class DuelRequestService {
     public synchronized Optional<RichDuelRequest> create(
             UUID sender, UUID target, String kit, boolean ranked, int bestOf
     ) {
-        return create(sender, target, kit, ranked, bestOf, null);
+        return create(sender, target, kit, ranked, bestOf, null,
+                com.rumilance.practice.match.FirstTo.UNLIMITED);
     }
 
     public synchronized Optional<RichDuelRequest> create(
             UUID sender, UUID target, String kit, boolean ranked, int bestOf, String arenaName
+    ) {
+        return create(sender, target, kit, ranked, bestOf, arenaName,
+                com.rumilance.practice.match.FirstTo.UNLIMITED);
+    }
+
+    /** Duel request with an FT (先取点数). Queue never carries one. */
+    public synchronized Optional<RichDuelRequest> create(
+            UUID sender, UUID target, String kit, boolean ranked, int bestOf, String arenaName,
+            int firstTo
     ) {
         if (sender.equals(target)) {
             return Optional.empty();
@@ -96,7 +107,8 @@ public final class DuelRequestService {
                 Math.max(1, bestOf),
                 created,
                 created.plusSeconds(ttlSeconds),
-                map
+                map,
+                com.rumilance.practice.match.FirstTo.normalise(firstTo)
         );
         byId.put(request.id(), request);
         byTarget.put(target, now);

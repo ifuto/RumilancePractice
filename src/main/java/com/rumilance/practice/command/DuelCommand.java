@@ -252,9 +252,11 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
         }
         duelRequestService.invalidateForPlayer(sender.getUniqueId());
         duelRequestService.invalidateForPlayer(target.getUniqueId());
+        // Queue は常に FT∞。デュエルだけリクエストで選ばれた先取点数を持つ。
         matchService.startDuel(request.sender(), request.target(), request.kitName(),
                 request.ranked() ? MatchMode.RANKED : MatchMode.UNRANKED,
-                request.bestOf(), Map.of(), request.preferredArena().orElse(null));
+                request.bestOf(), Map.of(), request.preferredArena().orElse(null), null, null,
+                request.firstTo());
     }
 
     public void handleCancel(Player player) {

@@ -37,6 +37,11 @@ public final class MatchSession {
     private final Map<UUID, TeamColor> teamColors = new ConcurrentHashMap<>();
     /** Per-participant win count of the current rematch chain (0-0 on a fresh match). */
     private final Map<UUID, Integer> seriesWins = new ConcurrentHashMap<>();
+    /**
+     * FT — 先取点数. {@code 0} means unlimited: queue matches always run unlimited, only
+     * duels carry a limit set in the request GUI.
+     */
+    private volatile int firstTo = com.rumilance.practice.match.FirstTo.UNLIMITED;
     private volatile UUID arenaInstanceId;
     private final Map<UUID, Integer> kills = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> roundWins = new ConcurrentHashMap<>();
@@ -406,6 +411,24 @@ public final class MatchSession {
 
     public Map<UUID, Integer> seriesWinsSnapshot() {
         return Map.copyOf(seriesWins);
+    }
+
+    /** @return the FT limit, or {@code 0} for unlimited. */
+    public int firstTo() {
+        return firstTo;
+    }
+
+    public void setFirstTo(int firstTo) {
+        this.firstTo = com.rumilance.practice.match.FirstTo.normalise(firstTo);
+    }
+
+    /** Highest series score on either side — what the FT limit is compared against. */
+    public int topSeriesWins() {
+        int top = 0;
+        for (UUID id : participants) {
+            top = Math.max(top, seriesWinsOf(id));
+        }
+        return top;
     }
 
     public MatchState state() {

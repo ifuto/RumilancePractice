@@ -186,6 +186,22 @@ public final class DuelRequestGui extends AbstractGui {
                 messageService.render(locale, session.ranked() ? "duel-gui.mode-ranked" : "duel-gui.mode-unranked"), "mode");
         modeButton.editMeta(meta -> meta.setEnchantmentGlintOverride(session.ranked()));
         inventory.setItem(GuiSlots.slot(3, 4), modeButton);
+        // FT (先取点数): click +1, shift-click +5, 40 → ∞ → 1. ∞ means no score limit.
+        inventory.setItem(GuiSlots.slot(3, 6),
+                com.rumilance.practice.gui.ItemBuilder.of(Material.NETHERITE_SCRAP)
+                        .name(messageService.render(locale, "duel-gui.ft", MessageService.tags(
+                                "n", com.rumilance.practice.match.FirstTo.label(session.firstTo()))))
+                        .lore(
+                                com.rumilance.practice.gui.UiTheme.divider(),
+                                com.rumilance.practice.gui.UiTheme.line(
+                                        messageService.render(locale, "duel-gui.ft-lore")),
+                                com.rumilance.practice.gui.UiTheme.blank(),
+                                com.rumilance.practice.gui.UiTheme.hint(
+                                        messageService.render(locale, "duel-gui.ft-hint"))
+                        )
+                        .glint(session.firstTo() > 0)
+                        .action("ft")
+                        .build());
         inventory.setItem(GuiSlots.slot(4, 2), GuiDecorator.button(Material.BARRIER,
                 messageService.render(locale, "duel-gui.cancel"), "cancel"));
         inventory.setItem(GuiSlots.slot(4, 4), GuiDecorator.button(Material.CLOCK,
@@ -194,6 +210,23 @@ public final class DuelRequestGui extends AbstractGui {
         inventory.setItem(GuiSlots.slot(4, 6), GuiDecorator.button(
                 pending ? Material.YELLOW_GLAZED_TERRACOTTA : Material.EMERALD,
                 messageService.render(locale, pending ? "duel-gui.pending" : "duel-gui.send"), "send"));
+    }
+
+    /** FT needs the click type: plain click +1, shift click +5. */
+    @Override
+    public void handleClick(Player player, GuiSession session, Inventory inventory, int slot,
+                            String action, org.bukkit.event.inventory.ClickType clickType) {
+        if ("ft".equals(action)) {
+            boolean shift = clickType == org.bukkit.event.inventory.ClickType.SHIFT_LEFT
+                    || clickType == org.bukkit.event.inventory.ClickType.SHIFT_RIGHT;
+            session.setFirstTo(com.rumilance.practice.match.FirstTo.step(session.firstTo(),
+                    shift ? com.rumilance.practice.match.FirstTo.STEP_LARGE
+                          : com.rumilance.practice.match.FirstTo.STEP_SMALL));
+            sounds.play(player, "gui-click");
+            render(player, session, inventory);
+            return;
+        }
+        handleClick(player, session, inventory, slot, action);
     }
 
     @Override
@@ -279,7 +312,7 @@ public final class DuelRequestGui extends AbstractGui {
             return;
         }
         if (duelRequestService.create(player.getUniqueId(), targetId, kit, session.ranked(),
-                session.bestOf(), map).isEmpty()) {
+                session.bestOf(), map, session.firstTo()).isEmpty()) {
             sounds.play(player, "error");
             messageService.send(player, "duel.could-not-send");
             return;

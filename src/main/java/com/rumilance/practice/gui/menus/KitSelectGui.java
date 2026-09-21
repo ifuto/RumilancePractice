@@ -42,6 +42,7 @@ public final class KitSelectGui extends AbstractGui {
         session.setSelectedKit(parent.selectedKit());
         session.setSelectedMap(parent.selectedMap());
         session.setBestOf(parent.bestOf());
+        session.setFirstTo(parent.firstTo());
         session.setFromBattleMenu(parent.fromBattleMenu());
         PracticeGuiOpen.open(this, player, session);
         sounds.play(player, "gui-open");

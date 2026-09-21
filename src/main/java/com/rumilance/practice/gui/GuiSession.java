@@ -21,6 +21,8 @@ public final class GuiSession {
     private volatile String kitCategory;
     private volatile int page;
     private volatile int bestOf = 1;
+    /** Duel FT (先取点数); 0 = ∞. Queue never sets it. */
+    private volatile int firstTo = com.rumilance.practice.match.FirstTo.UNLIMITED;
     private volatile boolean ranked = true;
     private volatile UUID targetPlayer;
     /** True when this GUI was opened from the Game Menu (Esc/Close then returns to it). */
@@ -87,6 +89,14 @@ public final class GuiSession {
 
     public int bestOf() {
         return bestOf;
+    }
+
+    public int firstTo() {
+        return firstTo;
+    }
+
+    public void setFirstTo(int firstTo) {
+        this.firstTo = com.rumilance.practice.match.FirstTo.normalise(firstTo);
     }
 
     public void setBestOf(int bestOf) {
