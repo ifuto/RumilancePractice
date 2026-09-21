@@ -209,6 +209,23 @@ public final class ResourcePackService implements Listener {
         if (toSend == null || currentPackId == null || player == null || !player.isOnline()) {
             return;
         }
+        // ViaVersion translates the protocol but never the resource pack: an old client
+        // receives this pack byte for byte and answers "broken or incompatible", and the
+        // custom-font glyphs would stay missing even if it were forced. Skip the prompt
+        // instead — the UI already falls back for players without the pack.
+        int minProtocol = configService.config().getInt("resource-pack.min-client-protocol", 0);
+        if (minProtocol > 0) {
+            int clientProtocol = clientProtocolOf(player);
+            if (PackFormatPolicy.tooOld(clientProtocol, minProtocol)) {
+                if (!tooOldNotified.add(player.getUniqueId())) {
+                    logger.info(() -> "Resource pack not offered to " + player.getName()
+                            + ": client protocol " + clientProtocol + " is older than "
+                            + minProtocol + " (resource-pack.min-client-protocol).");
+                }
+                packApplied.put(player.getUniqueId(), Boolean.FALSE);
+                return;
+            }
+        }
         UUID playerId = player.getUniqueId();
         pendingRequests.put(playerId, currentPackId);
         // A new request is not applied until its own success event arrives. This prevents a

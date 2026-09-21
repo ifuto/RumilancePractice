@@ -44,6 +44,11 @@ icons:
 resource-pack:
   # Master switch. When false the plugin does not send any resource pack.
   enabled: true
+  # ViaVersion/ViaBackwards translate the protocol, never the resource pack: an older client
+  # gets this pack byte for byte and reports it as broken/incompatible, and the custom-font
+  # glyphs stay missing even when forced. Set this to the protocol number of the version the
+  # pack was built for and older clients are simply not offered it (0 = offer to everyone).
+  min-client-protocol: 0
   # Direct GitHub Release asset URL. Releases are immutable, so clients never receive a
   # half-pushed branch zip; update this together with gradle.properties and the release asset.
   url: "https://github.com/ifuto/RumilancePractice/releases/download/v1.76.52/RumilanceResourcePack.zip"

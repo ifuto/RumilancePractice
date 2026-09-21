@@ -1176,6 +1176,22 @@ public final class MatchService {
      *
      * @return true when a running countdown was actually skipped
      */
+    /**
+     * 有料プラン判定を注入する({@code rankService::isVipOrAbove})。注入されなければ
+     * 全員が使える(従来動作)。
+     */
+    public void setPremiumCheck(java.util.function.Predicate<org.bukkit.entity.Player> premiumCheck) {
+        this.premiumCheck = premiumCheck == null ? player -> true : premiumCheck;
+    }
+
+    private boolean premiumFor(org.bukkit.entity.Player player) {
+        try {
+            return premiumCheck.test(player);
+        } catch (Throwable ignored) {
+            return true;
+        }
+    }
+
     public boolean skipCountdown(UUID matchId) {
         MatchSession session = registry().get(matchId).orElse(null);
         if (session == null || session.state() != MatchState.COUNTDOWN) {
