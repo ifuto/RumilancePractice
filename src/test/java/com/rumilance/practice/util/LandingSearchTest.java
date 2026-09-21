@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -60,6 +61,28 @@ class LandingSearchTest {
         int[] back = LandingSearch.nearbyOffsets(1, bias[0], bias[1]).get(0);
         assertEquals(1, back[0]);
         assertEquals(1, back[1]);
+    }
+
+    @Test
+    void ownColumnComesFirstSoTheSmallestCorrectionWins() {
+        List<int[]> columns = LandingSearch.columnCandidates(1, -1.0d, 0.0d);
+        assertEquals(9, columns.size(), "own column + 8 neighbours");
+        assertEquals(0, columns.get(0)[0], "the landing's own block is tried first");
+        assertEquals(0, columns.get(0)[1]);
+        assertEquals(-1, columns.get(1)[0], "then the thrower's side");
+    }
+
+    @Test
+    void onlyASmallDownwardStepCountsAsAFloorSnap() {
+        // Pearl died a quarter block inside the floor it came down on -> snap onto the surface.
+        assertTrue(LandingSearch.floorSnap(65.0d, 64.75d));
+        // A side hit one block below the wall's top must never be lifted onto the wall.
+        assertFalse(LandingSearch.floorSnap(66.0d, 65.3d));
+        assertFalse(LandingSearch.floorSnap(66.0d, 65.0d));
+        // Dropping onto a surface just below the feet is fine.
+        assertTrue(LandingSearch.floorSnap(64.0d, 64.5d));
+        // ... but not falling a whole block or more.
+        assertFalse(LandingSearch.floorSnap(64.0d, 65.5d));
     }
 
     @Test

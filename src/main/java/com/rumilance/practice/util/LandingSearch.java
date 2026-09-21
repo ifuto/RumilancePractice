@@ -32,6 +32,27 @@ public final class LandingSearch {
      * @return {@code {dx, dz}} block-column offsets, never {@code {0, 0}} (the landing itself
      *         is always tried first by the caller)
      */
+    /**
+     * The columns to try for a landing: its own column first (the smallest possible correction
+     * is "step back to the centre of my own block"), then {@link #nearbyOffsets}.
+     */
+    public static List<int[]> columnCandidates(int radius, double biasX, double biasZ) {
+        List<int[]> columns = new ArrayList<>();
+        columns.add(new int[]{0, 0});
+        columns.addAll(nearbyOffsets(radius, biasX, biasZ));
+        return columns;
+    }
+
+    /**
+     * A landing that died inside the surface it hit may be put down on that surface — but only
+     * for a small step ({@code <= 0.5} up, {@code <= 1.0} down). A side hit is never lifted onto
+     * the block it touched, which is what used to park players on top of the wall they pearled.
+     */
+    public static boolean floorSnap(double surfaceTopY, double feetY) {
+        double rise = surfaceTopY - feetY;
+        return rise >= -1.0d && rise <= 0.5d;
+    }
+
     public static List<int[]> nearbyOffsets(int radius, double biasX, double biasZ) {
         List<int[]> offsets = new ArrayList<>();
         int cap = Math.max(1, radius);

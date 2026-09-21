@@ -8,6 +8,7 @@ import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.util.BoundingBox;
 
+import java.util.List;
 import java.util.function.IntPredicate;
 
 /**
@@ -27,6 +28,9 @@ public final class SpawnFooting {
     public static int maxLiftForUnbury() {
         return FORCE_UP;
     }
+
+    /** Same-column pop allowance offered to {@link #standNearby} for pinned spawns. */
+    public static final int PIN_UP_LIMIT = PIN_UP;
     private static final double HALF_WIDTH = 0.3d;
     private static final double HEIGHT = 1.8d;
     private static final double EPS = 1.0e-3d;
@@ -131,33 +135,79 @@ public final class SpawnFooting {
     }
 
     /**
-     * First fitting pose in the columns around {@code spawn}, nearest ring first and biased
-     * towards {@code biasX/biasZ} (see {@link LandingSearch}). Used when the spawn's own column
-     * has no free spot at all — a spawn configured inside a wall, a landing next to a one-block
-     * wall — so a teleport can be moved to a free column <em>instead of</em> into a block.
+     * First fitting pose in the columns around {@code spawn}, own column first and then nearest
+     * ring first, biased towards {@code biasX/biasZ} (see {@link LandingSearch}). Used when a
+     * landing is inside a block — a pearl inside a one-block wall, a spawn configured inside a
+     * wall — so the move is corrected <em>before</em> it happens.
+     *
+     * <p>Two passes: first <strong>without changing the height at all</strong> (this is the
+     * "stop in front of the wall" answer, and it keeps a pearl's Y and momentum), then — only
+     * when {@code stepUp >= 0} and nothing free exists at that height — a step of at most
+     * {@code stepUp} blocks onto a surface in the same column family.</p>
      *
      * @param requireFloor when {@code true} the candidate must stand on a surface (pinned
-     *                     spawns); when {@code false} a same-height free column is enough, which
-     *                     is what keeps a pearl landing at the height and momentum it had
+     *                     spawns); when {@code false} a free column at the same height is enough
+     * @param stepUp       max blocks the second pass may climb, or {@code -1} for "never"
      */
     public static Location standNearby(Location spawn, int radius, double biasX, double biasZ,
-                                       boolean requireFloor) {
+                                       boolean requireFloor, int stepUp) {
         if (spawn == null || spawn.getWorld() == null) {
             return null;
         }
         World world = spawn.getWorld();
-        for (int[] offset : LandingSearch.nearbyOffsets(radius, biasX, biasZ)) {
-            Location column = spawn.clone().add(offset[0], 0.0d, offset[1]);
-            if (!requireFloor && playerFits(world, column.getX(), column.getY(), column.getZ())) {
-                // Same height, free column: the landing keeps its Y (pearl momentum).
-                return pose(column, column.getX(), column.getY(), column.getZ());
+        List<int[]> columns = LandingSearch.columnCandidates(radius, biasX, biasZ);
+        for (int[] offset : columns) {
+            Location at = spawn.clone().add(offset[0], 0.0d, offset[1]);
+            Location fit = sameHeight(world, at, requireFloor);
+            if (fit != null) {
+                return fit;
             }
-            Location stand = standClearPearl(column, PIN_UP);
-            if (stand != null && playerFits(world, stand.getX(), stand.getY(), stand.getZ())) {
-                return stand;
+        }
+        if (stepUp < 0) {
+            return null;
+        }
+        for (int[] offset : columns) {
+            Location at = spawn.clone().add(offset[0], 0.0d, offset[1]);
+            Location stepped = stepIn(world, at, stepUp);
+            if (stepped != null) {
+                return stepped;
+            }
+            Location steppedCentre = stepIn(world, centred(at), stepUp);
+            if (steppedCentre != null) {
+                return steppedCentre;
             }
         }
         return null;
+    }
+
+    /** The landing's own spot or the centre of its block, whichever fits at the same height. */
+    private static Location sameHeight(World world, Location at, boolean requireFloor) {
+        if (playerFits(world, at.getX(), at.getY(), at.getZ())
+                && (!requireFloor || supported(world, at.getX(), at.getY(), at.getZ()))) {
+            return pose(at, at.getX(), at.getY(), at.getZ());
+        }
+        Location centre = centred(at);
+        if (playerFits(world, centre.getX(), centre.getY(), centre.getZ())
+                && (!requireFloor || supported(world, centre.getX(), centre.getY(), centre.getZ()))) {
+            return pose(centre, centre.getX(), centre.getY(), centre.getZ());
+        }
+        return null;
+    }
+
+    private static Location stepIn(World world, Location at, int stepUp) {
+        Location stepped = standClearPearl(at, stepUp);
+        if (stepped == null || !playerFits(world, stepped.getX(), stepped.getY(), stepped.getZ())) {
+            return null;
+        }
+        return stepped;
+    }
+
+    /** The same pose moved to the centre of its block (smallest sideways correction). */
+    private static Location centred(Location at) {
+        Location centre = at.clone();
+        centre.setX(at.getBlockX() + 0.5d);
+        centre.setZ(at.getBlockZ() + 0.5d);
+        return centre;
     }
 
     /** True when a player standing at {@code location} fits without overlapping any block. */

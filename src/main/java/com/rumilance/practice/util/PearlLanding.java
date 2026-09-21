@@ -13,12 +13,17 @@ import org.bukkit.block.Block;
  * ({@link LandingSearch}), so the player lands on their own side of the wall with the Y and
  * momentum the pearl had — never inside it and never through it.</p>
  *
- * <p><b>Order of preference.</b>
+ * <p><b>Order of preference — nothing ever climbs the block that was hit.</b>
  * <ol>
- *   <li>the pearl's own position, untouched, whenever the hitbox fits there (vanilla play,</li>
- *   <li>the same column snapped onto a surface at the same height,</li>
- *   <li>the nearest free column at the same height (the wall case),</li>
- *   <li>the same column lifted onto the surface above (ledge / pillar pearls),</li>
+ *   <li>the pearl's own position, untouched, whenever the hitbox fits there — a pearl that
+ *       really does land on top of a wall stays on top of it;</li>
+ *   <li><b>stop in front at the pearl's own height</b>: own block centre first, then the nearest
+ *       free column, always biased back towards the thrower, so a wall throw lands on the
+ *       player's own side with the Y and momentum the pearl had;</li>
+ *   <li>only when nothing is free at that height (the pearl came down into a floor or slab):
+ *       put the player on top of that surface, and at most half a block up — a side hit can
+ *       never be lifted onto the block it touched;</li>
+ *   <li>a one-block step in the same column family, same half-block rule;</li>
  *   <li>otherwise {@code null}: the teleport is cancelled rather than burying the player.</li>
  * </ol>
  */
@@ -67,51 +72,46 @@ public final class PearlLanding {
     }
 
     /**
-     * The preventive decision: never return a point whose hitbox overlaps a block. Returns
-     * {@code null} when no free spot is reachable nearby, so the caller can cancel instead of
-     * burying the player.
+     * The preventive decision: never return a point whose hitbox overlaps a block, and never
+     * climb the block that was hit. Returns {@code null} when no free spot is reachable nearby,
+     * so the caller can cancel instead of burying the player.
      */
     private static Location resolve(Location dest, Location from, int maxLiftBlocks) {
         if (dest == null || dest.getWorld() == null) {
             return dest;
         }
-        // 1) Vanilla: the pearl's own position is legal -> leave it completely untouched.
+        // 1) Vanilla: the pearl's own position is legal -> leave it completely untouched. A
+        //    pearl that genuinely lands on a ledge / on top of a wall stays there.
         if (SpawnFooting.fits(dest)) {
             return dest;
         }
-        // 2) Same height, own column (a slab under the landing, the pearl one block into the
-        //    floor, ...): the smallest possible correction.
-        Location ownColumn = SpawnFooting.standClearPearl(dest, maxLiftBlocks);
-        if (keepsHeight(dest, ownColumn)) {
-            return ownColumn;
-        }
-        // 3) Same height, neighbouring column - the one-block wall case. Biased back towards
-        //    the thrower, so the player lands on their own side of the wall.
         double[] bias = from == null || from.getWorld() == null
                 ? new double[]{0.0d, 0.0d}
                 : LandingSearch.towards(from.getX(), from.getZ(), dest.getX(), dest.getZ());
-        Location nearby = SpawnFooting.standNearby(dest, SEARCH_RADIUS, bias[0], bias[1], false);
-        if (keepsHeight(dest, nearby)) {
-            return nearby;
+        // 2) Stop in front of what was hit, at the pearl's own height: own column first, then
+        //    the nearest free column, always biased back towards the thrower. This is the
+        //    one-block wall answer — the player lands on their side of the wall, never on top
+        //    of it and never through it.
+        Location front = SpawnFooting.standNearby(dest, SEARCH_RADIUS, bias[0], bias[1], false, -1);
+        if (front != null) {
+            return front;
         }
-        // 4) A real lift is now allowed (ledge / pillar pearls): own column, then neighbours.
-        if (ownColumn != null) {
-            return ownColumn;
+        // 3) Nothing free at that height: the pearl died inside the surface it came down onto
+        //    (a floor, a slab) — put the player on top of it, but only for a small step so a
+        //    side hit can never climb the block it touched.
+        Location sameColumn = SpawnFooting.standClearPearl(dest, 1);
+        if (sameColumn != null && SpawnFooting.fits(sameColumn)
+                && LandingSearch.floorSnap(sameColumn.getY(), dest.getY())) {
+            return sameColumn;
         }
-        if (nearby != null) {
-            return nearby;
-        }
-        Location floored = SpawnFooting.standNearby(dest, SEARCH_RADIUS, bias[0], bias[1], true);
-        if (floored != null) {
-            return floored;
+        // 4) Last resort before cancelling: a one-block step in the same column family.
+        Location stepped = SpawnFooting.standNearby(dest, SEARCH_RADIUS, bias[0], bias[1], false,
+                Math.max(1, Math.min(maxLiftBlocks, 2)));
+        if (stepped != null && LandingSearch.floorSnap(stepped.getY(), dest.getY())) {
+            return stepped;
         }
         // Nothing free anywhere near: the caller cancels the teleport instead of burying.
         return null;
-    }
-
-    /** True when the candidate sits at (about) the pearl's own height. */
-    private static boolean keepsHeight(Location dest, Location candidate) {
-        return candidate != null && Math.abs(candidate.getY() - dest.getY()) < 1.0d;
     }
 
     private static boolean isBorderGlass(Block block) {

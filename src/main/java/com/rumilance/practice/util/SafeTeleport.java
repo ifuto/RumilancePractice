@@ -76,9 +76,12 @@ public final class SafeTeleport {
             } else {
                 // The spawn's own column has no standable spot at all (spawn points inside a
                 // wall, an arena floor that moved): move to the nearest free column instead of
-                // teleporting into blocks. Prevention first — the landing watch below is only
-                // the net for blocks that appear after the move (a paste still running).
-                Location nearby = SpawnFooting.standNearby(dest, NEARBY_COLUMN_RADIUS, 0.0d, 0.0d, true);
+                // teleporting into blocks. Same height first, so a pinned spawn is not moved
+                // upwards onto whatever it happens to be next to. Prevention first — the
+                // landing watch below is only the net for blocks that appear after the move
+                // (a paste still running).
+                Location nearby = SpawnFooting.standNearby(dest, NEARBY_COLUMN_RADIUS,
+                        0.0d, 0.0d, true, SpawnFooting.PIN_UP_LIMIT);
                 if (nearby != null) {
                     target = nearby;
                 }
