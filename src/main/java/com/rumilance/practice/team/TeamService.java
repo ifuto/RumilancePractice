@@ -42,6 +42,9 @@ public final class TeamService {
     private volatile PartyHotbar partyHotbar;
     private volatile java.util.function.BooleanSupplier hasPartyMaps = () -> false;
 
+    /** 解散演出: カン(block.anvil.use)を鳴らし始めてから break 音までの間隔。 */
+    private static final long DISBAND_BREAK_DELAY_TICKS = 15L;
+
     private final Map<UUID, Team> byId = new ConcurrentHashMap<>();
     private final Map<UUID, Team> byMember = new ConcurrentHashMap<>();
     private final Map<UUID, Invite> invites = new ConcurrentHashMap<>();
@@ -235,6 +238,34 @@ public final class TeamService {
                 team.friendlyFire());
     }
 
+    /**
+     * 解散の演出: GUI を閉じて {@code block.anvil.use}(カン)、鳴らし始めた 15 tick 後に
+     * {@code entity.item.break}(パキン)。
+     * カンの連なりに break が重なるタイミングで壊れた感触になる。
+     */
+    private void playDisbandCue(Player player) {
+        if (player == null) {
+            return;
+        }
+        try {
+            // クリック処理の途中でインベントリを閉じないよう、閉じるのは次の tick。
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (player.isOnline()) {
+                    player.closeInventory();
+                }
+            });
+            player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_ANVIL_USE, 1.0f, 1.0f);
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (player.isOnline()) {
+                    player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_ITEM_BREAK,
+                            1.0f, 1.0f);
+                }
+            }, DISBAND_BREAK_DELAY_TICKS);
+        } catch (RuntimeException ignored) {
+            // 演出が解散処理そのものを止めてはいけない。
+        }
+    }
+
     private void restoreLobby(Player player) {
         PartyHotbar bar = partyHotbar;
         if (bar != null && player != null) {
@@ -292,6 +323,7 @@ public final class TeamService {
             invites.entrySet().removeIf(e -> e.getValue().teamId().equals(team.id()));
             Player m = Bukkit.getPlayer(member);
             if (m != null) {
+                playDisbandCue(m);
                 restoreLobby(m);
             }
         }
