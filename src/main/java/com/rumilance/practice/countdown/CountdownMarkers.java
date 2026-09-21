@@ -54,9 +54,9 @@ import java.util.function.Consumer;
 public final class CountdownMarkers implements Listener {
 
     /** How far in front of the spawn the pair floats. */
-    private static final double FORWARD = 2.0;
+    private static final double FORWARD = 5.0;
     /** Half the gap between the two blocks. */
-    private static final double SIDE = 1.0;
+    private static final double SIDE = 2.0;
     /** Eye height of the blocks above the spawn's feet. */
     private static final double EYE = 1.55;
     /** One turn every 4 seconds: slow enough to look like it is hovering. */
@@ -301,7 +301,8 @@ public final class CountdownMarkers implements Listener {
     private Component gazeLine(Player player, Marker marker, int readyCount) {
         String key = marker.kind == Kind.READY ? "countdown.gaze-ready" : "countdown.gaze-leave";
         String number = (readyCount > 0 ? "<color:#4ADE80>" : "<color:#94A3B8>") + readyCount + "</color>";
-        Component rendered = render(player, key, MessageService.tags("n", number));
+        // 数値は「色付きマークアップ」を値にしているので unparsed だとそのまま表示される。
+        Component rendered = render(player, key, MessageService.tagsParsed("n", number));
         if (rendered != null) {
             return rendered;
         }
@@ -315,6 +316,21 @@ public final class CountdownMarkers implements Listener {
 
     /** The line shown when the opponent pressed Ready and this player is not looking anywhere. */
     private Component opponentReadyLine(Player player, Player other) {
+        MessageService messages = messageService;
+        if (messages != null) {
+            try {
+                String template = messages.raw(player, "countdown.opponent-ready");
+                if (template != null && template.contains("<name>")) {
+                    // プレースホルダ解決を待たずに名前を差し込む。プレイヤー名は
+                    // [A-Za-z0-9_] のみだが、念のため山括弧は落としてから入れる。
+                    String safe = other.getName().replace("<", "").replace(">", "");
+                    return net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
+                            .deserialize(template.replace("<name>", safe));
+                }
+            } catch (RuntimeException ignored) {
+                // キー欠落やパース失敗は下のフォールバックが拾う
+            }
+        }
         Component rendered = render(player, "countdown.opponent-ready",
                 MessageService.tags("name", other.getName()));
         if (rendered != null) {

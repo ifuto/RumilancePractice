@@ -65,6 +65,28 @@ public final class TabVisibilityService {
         }
     }
 
+    /**
+     * 試合から戻った人向けの両方向の復帰処理。
+     *
+     * <p>{@link #showAll} は「この人から全員が見える」だけを直す。試合中は他の isol 中の
+     * プレイヤーがこの人を隠しているので、逆方向も解かないと TAB に人が戻らない。まだ
+     * 試合中の人には見せない(試合中の TAB は戦闘者だけに絞る仕様を維持する)。</p>
+     */
+    public void showEverywhere(Player player) {
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+        for (Player other : Bukkit.getOnlinePlayers()) {
+            if (other.equals(player)) {
+                continue;
+            }
+            if (!other.canSee(player) && !isMatchOrSpectate(other.getUniqueId())) {
+                other.showPlayer(plugin, player);
+            }
+        }
+        showAll(player);
+    }
+
     private boolean isMatchOrSpectate(UUID playerId) {
         MatchSession session = matchRegistry.byPlayer(playerId).orElse(null);
         if (session != null) {

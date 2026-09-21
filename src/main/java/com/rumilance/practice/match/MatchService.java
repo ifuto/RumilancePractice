@@ -1197,7 +1197,9 @@ public final class MatchService {
             spectatorService.attachCarried(session);
         }
         // 浮遊する Ready / Leave ブロックを出す(試合がどの経路で終わっても cancelTask が回収)。
-        if (countdownMarkers != null) {
+        // チームファイト(Party vs Party / 赤青戦)では出さない: 大人数に Ready を押させる
+        // 運用ではなく、カウントダウンだけで始める。
+        if (countdownMarkers != null && !session.isTeamMatch()) {
             countdownMarkers.spawn(session);
         }
         final int[] remaining = {countdownSeconds};
@@ -2414,7 +2416,9 @@ public final class MatchService {
                 }
                 MatchTeamVisuals.clear(player.getScoreboard());
                 if (tabVisibilityService != null) {
-                    tabVisibilityService.showAll(player);
+                    // showAll だけだと「自分は全員見える」で終わる。相手側の非表示も
+                    // 解かないと TAB に人が戻ってこないので両方向やる。
+                    tabVisibilityService.showEverywhere(player);
                 }
                 stateManager.resetToLobby(id);
                 sendHome(player);
@@ -2422,6 +2426,33 @@ public final class MatchService {
                 stateManager.resetToLobby(id);
             }
         }
+        // 安全網: テレポートが何らかの理由で効かなかった参加者を拾い直す。状態は既に
+        // LOBBY なので、判定は「ロビー領域の外に居るかどうか」だけにする。リプレイ視聴中
+        // と、直後にリマッチへ入った人は触らない。
+        final java.util.List<UUID> returningHome = new java.util.ArrayList<>(session.participants());
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            for (UUID id : returningHome) {
+                Player player = Bukkit.getPlayer(id);
+                if (player == null || !player.isOnline()) {
+                    continue;
+                }
+                if (replayService != null && replayService.isReplaying(id)) {
+                    continue;
+                }
+                if (matchRegistry.byPlayer(id).isPresent()) {
+                    continue;
+                }
+                try {
+                    if (lobbyService != null && lobbyService.region() != null
+                            && !lobbyService.region().contains(player.getLocation())) {
+                        sendHome(player);
+                    }
+                } catch (Throwable t) {
+                    plugin.getLogger().log(java.util.logging.Level.WARNING,
+                            "Post-match hub return failed for " + player.getName(), t);
+                }
+            }
+        }, 30L);
         cleanupSession(session, true);
         // Keep combat stats around a little longer so players who open the report book after the
         // 5s rematch window still see their numbers. The report GUI itself degrades gracefully if

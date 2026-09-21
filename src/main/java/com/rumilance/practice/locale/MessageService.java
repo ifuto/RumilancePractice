@@ -101,6 +101,25 @@ public final class MessageService {
         return resolvers;
     }
 
+    /**
+     * Same as {@link #tags(String...)} but the values ARE parsed as MiniMessage.
+     *
+     * <p>Use this when the value itself carries markup — a coloured number, for example.
+     * {@link Placeholder#unparsed} would print {@code <color:#4ADE80>1</color>} literally,
+     * which is exactly the "value never lands" bug the countdown line had.</p>
+     */
+    public static TagResolver[] tagsParsed(String... keyValuePairs) {
+        if (keyValuePairs.length % 2 != 0) {
+            throw new IllegalArgumentException("Placeholder pairs must be name/value, got odd count: "
+                    + keyValuePairs.length);
+        }
+        TagResolver[] resolvers = new TagResolver[keyValuePairs.length / 2];
+        for (int i = 0; i < resolvers.length; i++) {
+            resolvers[i] = Placeholder.parsed(keyValuePairs[i * 2], keyValuePairs[i * 2 + 1]);
+        }
+        return resolvers;
+    }
+
     /** Localised word for the match mode ("ranked"/"unranked") for {@code target}'s locale. */
     public String modeWord(CommandSender target, boolean ranked) {
         return modeWord(resolveLocale(target), ranked);
