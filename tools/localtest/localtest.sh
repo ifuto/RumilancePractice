@@ -95,6 +95,78 @@ if [ -f "$PACK_ZIP" ] && [ -f "$PACK_CFG" ]; then
   echo "local-test: resource-pack.sha1 matches dist zip ($actual)"
 fi
 
+# Guard: every bundled YAML must actually parse, and every locale must expose the same key
+# set. A key written at the wrong indentation does not fail grep — it silently breaks the
+# whole file at load time, LocaleService logs a warning, and LocaleServiceTest turns that
+# warning into a CI failure far from the file that caused it.
+if python3 -c 'import yaml' 2>/dev/null; then
+  python3 - "$ROOT/src/main/resources" <<'PY' || exit 1
+import glob, os, sys, yaml
+
+class Loader(yaml.SafeLoader):
+    pass
+
+def no_duplicates(loader, node, deep=False):
+    seen = set()
+    for key_node, _ in node.value:
+        key = loader.construct_object(key_node, deep=deep)
+        if key in seen:
+            raise ValueError('duplicate key %r' % (key,))
+        seen.add(key)
+    return yaml.SafeLoader.construct_mapping(loader, node, deep)
+
+Loader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, no_duplicates)
+
+def flatten(node, prefix=''):
+    out = {}
+    for key, value in node.items():
+        path = ('%s.%s' % (prefix, key)) if prefix else str(key)
+        if isinstance(value, dict):
+            out.update(flatten(value, path))
+        else:
+            out[path] = value
+    return out
+
+root = sys.argv[1]
+files = sorted(glob.glob(os.path.join(root, 'lang', '*.yml')))
+for name in ('config.yml', 'plugin.yml'):
+    candidate = os.path.join(root, name)
+    if os.path.exists(candidate):
+        files.append(candidate)
+
+sets = {}
+failed = False
+for path in files:
+    label = os.path.relpath(path, root)
+    try:
+        with open(path, encoding='utf-8') as handle:
+            document = yaml.load(handle, Loader=Loader)
+        if '/lang/' in path.replace(os.sep, '/'):
+            sets[label] = set(flatten(document or {}))
+        print('yaml-ok %s (%d keys)' % (label, len(flatten(document or {}))))
+    except Exception as error:
+        failed = True
+        print('local-test: FAIL — %s does not parse: %s' % (label, str(error)[:200]), file=sys.stderr)
+
+if sets:
+    base_label = 'ja_jp.yml' if 'ja_jp.yml' in sets else sorted(sets)[0]
+    base = sets[base_label]
+    for label, keys in sorted(sets.items()):
+        missing = sorted(base - keys)
+        extra = sorted(keys - base)
+        if missing or extra:
+            failed = True
+            print('local-test: FAIL — %s differs from %s; missing=%s extra=%s'
+                  % (label, base_label, missing[:5], extra[:5]), file=sys.stderr)
+    if not failed:
+        print('yaml-ok %d locales share the same %d keys' % (len(sets), len(base)))
+
+sys.exit(1 if failed else 0)
+PY
+else
+  echo "local-test: PyYAML not installed — skipping the YAML guard"
+fi
+
 "$JAVA" -ea -cp "$OUT/classes" LocalTestRunner "$OUT/classes"
 RC=$?
 echo "local-test: exit=$RC"
