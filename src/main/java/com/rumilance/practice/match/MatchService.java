@@ -97,6 +97,9 @@ public final class MatchService {
      * this streak resets on server restart.)
      */
     private final Map<UUID, Integer> countdownLeaveStreak = new ConcurrentHashMap<>();
+
+    /** Floating Ready/Leave blocks shown during the countdown (null = feature off). */
+    private com.rumilance.practice.countdown.CountdownMarkers countdownMarkers;
     private final MatchCombatTracker combatTracker = new MatchCombatTracker();
     /** Each player's most recent match id, retained for a short time so /matchreport works. */
     private final Map<UUID, UUID> recentMatch = new ConcurrentHashMap<>();
@@ -1163,6 +1166,25 @@ public final class MatchService {
         ensureParticipantsInsideArena(session, () -> beginCountdown(session));
     }
 
+    public void setCountdownMarkers(com.rumilance.practice.countdown.CountdownMarkers markers) {
+        this.countdownMarkers = markers;
+    }
+
+    /**
+     * 双方が Ready ブロックを押したのでカウントダウンを飛ばして即開始する。
+     *
+     * @return true when a running countdown was actually skipped
+     */
+    public boolean skipCountdown(UUID matchId) {
+        MatchSession session = registry().get(matchId).orElse(null);
+        if (session == null || session.state() != MatchState.COUNTDOWN) {
+            return false;
+        }
+        cancelTask(matchId);
+        beginFight(session);
+        return true;
+    }
+
     private void beginCountdown(MatchSession session) {
         session.setState(MatchState.COUNTDOWN);
         if (!transitionAll(session, PlayerState.COUNTDOWN)) {
@@ -1173,6 +1195,10 @@ public final class MatchService {
         // spectators of the previous match can be bound to this one and moved in.
         if (spectatorService != null) {
             spectatorService.attachCarried(session);
+        }
+        // 浮遊する Ready / Leave ブロックを出す(試合がどの経路で終わっても cancelTask が回収)。
+        if (countdownMarkers != null) {
+            countdownMarkers.spawn(session);
         }
         final int[] remaining = {countdownSeconds};
         BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
@@ -2755,6 +2781,9 @@ public final class MatchService {
     }
 
     private void cancelTask(UUID matchId) {
+        if (countdownMarkers != null) {
+            countdownMarkers.remove(matchId);
+        }
         BukkitTask task = tasks.remove(matchId);
         if (task != null) {
             task.cancel();

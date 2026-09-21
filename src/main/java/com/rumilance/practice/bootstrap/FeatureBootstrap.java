@@ -370,6 +370,17 @@ public final class FeatureBootstrap {
         matchService.setSettingsService(settingsService);
         matchService.setMessageService(messageService);
 
+        // カウントダウン中の浮遊 Ready / Leave ブロック。視線を合わせたブロックを
+        // 右クリック(Ready) / 左クリック(Leave)し、双方 Ready ならカウントダウンを
+        // スキップして即開始する。
+        com.rumilance.practice.countdown.CountdownMarkers countdownMarkers =
+                new com.rumilance.practice.countdown.CountdownMarkers(plugin);
+        countdownMarkers.setSessionLookup(id -> matchService.registry().get(id).orElse(null));
+        countdownMarkers.setBothReadyHandler(id -> matchService.skipCountdown(id));
+        countdownMarkers.setLeaveHandler(player -> matchService.leaveDuringCountdown(player));
+        matchService.setCountdownMarkers(countdownMarkers);
+        plugin.getServer().getPluginManager().registerEvents(countdownMarkers, plugin);
+
         DuelLogStore duelLogStore = new DuelLogStore(new File(PluginIdentity.dataFolder(plugin), "duels.rpd").toPath());
         matchService.setDuelLogStore(duelLogStore);
         matchService.setActionRecorder(matchActionRecorder);
