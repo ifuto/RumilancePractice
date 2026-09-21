@@ -644,8 +644,13 @@ public final class FeatureBootstrap {
         // speed cap). Both are stripped on every teleport and reconciled 5x per second.
         com.rumilance.practice.lobby.LobbyWearService lobbyWearService =
                 new com.rumilance.practice.lobby.LobbyWearService(plugin, stateManager, rankService);
+        lobbyWearService.setLobbyService(lobbyService);
         plugin.getServer().getPluginManager().registerEvents(lobbyWearService, plugin);
         lobbyWearService.startTask();
+        // Hub gliding: firework-style boost on right-click (2s cooldown, silent while cooling)
+        // and the mace-smash landing effect.
+        plugin.getServer().getPluginManager().registerEvents(
+                new com.rumilance.practice.lobby.LobbyGlideListener(plugin, lobbyWearService), plugin);
 
         // VIP+ custom name colors: single color or two-color gradient, editable in the
         // settings GUI, rate-limited to one change per three days.

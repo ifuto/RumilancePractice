@@ -48,6 +48,8 @@ public final class LobbyWearService implements Listener {
     private final Plugin plugin;
     private final PlayerStateManager stateManager;
     private final RankService rankService;
+    /** Hub bounds: the wear belongs inside the lobby region only. */
+    private volatile LobbyService lobbyService;
 
     public LobbyWearService(Plugin plugin, PlayerStateManager stateManager, RankService rankService) {
         this.plugin = plugin;
@@ -75,10 +77,32 @@ public final class LobbyWearService implements Listener {
         }
     }
 
-    /** Hub-ish states: the wear belongs to all of them, not just {@code LOBBY}. */
-    private boolean isInLobby(Player player) {
-        return stateManager != null
-                && PracticeGuards.lobbyProtectedStates(stateManager.getState(player.getUniqueId()));
+    public void setLobbyService(LobbyService lobbyService) {
+        this.lobbyService = lobbyService;
+    }
+
+    /**
+     * Hub check: a lobby-ish state AND inside the configured lobby region. The region matters
+     * because the AFK rooms and practice plots sit far away in the same world while their
+     * players are still in a lobby state — hub cosmetics must never be injected there, and
+     * hub gliding rules must not apply to them either.
+     */
+    public boolean isInLobby(Player player) {
+        if (stateManager == null
+                || !PracticeGuards.lobbyProtectedStates(stateManager.getState(player.getUniqueId()))) {
+            return false;
+        }
+        LobbyService service = lobbyService;
+        if (service == null) {
+            return true;
+        }
+        com.rumilance.practice.util.Cuboid region = service.region();
+        if (region != null) {
+            return region.contains(player.getLocation());
+        }
+        org.bukkit.Location spawn = service.spawn();
+        return spawn == null || spawn.getWorld() == null
+                || spawn.getWorld().equals(player.getWorld());
     }
 
     /** Fills the boots slot (everyone) and the chest slot (VIP and VIP+) when they are free. */
