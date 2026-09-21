@@ -1276,6 +1276,7 @@ practice:
 
 killfeed:
   view-inventory-hover: "<yellow>クリックで最終インベントリを表示"
+  score: "<gray>☠</gray> <white><a></white> <gray>-</gray> <white><b></white> <gray>☠</gray>"
 
 chat:
   spam-blocked: "<red>スパムと判定されたためメッセージを送信できません。"

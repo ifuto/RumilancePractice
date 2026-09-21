@@ -1275,6 +1275,7 @@ practice:
 
 killfeed:
   view-inventory-hover: "<yellow>Clic pour voir l'inventaire final"
+  score: "<gray>☠</gray> <white><a></white> <gray>-</gray> <white><b></white> <gray>☠</gray>"
 
 chat:
   spam-blocked: "<red>Message bloqué : détecté comme spam."

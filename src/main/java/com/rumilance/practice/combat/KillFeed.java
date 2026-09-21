@@ -66,6 +66,42 @@ public final class KillFeed {
         broadcast(killer, victim, killerTeam, killer.getHealth(), maxHealth(killer), matchId);
     }
 
+    /**
+     * Duel kill line plus the running score: a second {@code ☠ 2 - 1 ☠} line under the kill
+     * (lang key {@code killfeed.score}). {@code killerPoints} already includes this round.
+     */
+    public static void broadcast(Player killer, Player victim, TeamColor killerTeam, UUID matchId,
+                                 int killerPoints, int victimPoints) {
+        if (killer == null || victim == null) {
+            return;
+        }
+        broadcast(killer, victim, killerTeam, killer.getHealth(), maxHealth(killer), matchId);
+        MessageService ms = messageService;
+        if (ms == null) {
+            return;
+        }
+        Component score = scoreLine(ms, killer, killerPoints, victimPoints);
+        if (score != null) {
+            killer.sendMessage(score);
+            Player onlineVictim = Bukkit.getPlayer(victim.getUniqueId());
+            if (onlineVictim != null) {
+                onlineVictim.sendMessage(score);
+            }
+        }
+    }
+
+    /** The {@code {head}{point} - {point}{head}} line; null when the key is missing. */
+    private static Component scoreLine(MessageService ms, Player viewer, int killerPoints,
+                                       int victimPoints) {
+        try {
+            return ms.render(viewer, "killfeed.score", MessageService.tags(
+                    "a", String.valueOf(killerPoints),
+                    "b", String.valueOf(victimPoints)));
+        } catch (RuntimeException ignored) {
+            return null; // an untranslated key must never swallow the kill line
+        }
+    }
+
     public static void broadcast(Player killer, Player victim, TeamColor killerTeam,
                                  double killerHealth, double killerMax) {
         broadcast(killer, victim, killerTeam, killerHealth, killerMax, null);

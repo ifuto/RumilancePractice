@@ -1275,6 +1275,7 @@ practice:
 
 killfeed:
   view-inventory-hover: "<yellow>클릭해서 최종 인벤토리 보기"
+  score: "<gray>☠</gray> <white><a></white> <gray>-</gray> <white><b></white> <gray>☠</gray>"
 
 chat:
   spam-blocked: "<red>스팸으로 감지되어 메시지를 보낼 수 없습니다."

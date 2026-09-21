@@ -1275,6 +1275,7 @@ practice:
 
 killfeed:
   view-inventory-hover: "<yellow>点击查看最终物品栏"
+  score: "<gray>☠</gray> <white><a></white> <gray>-</gray> <white><b></white> <gray>☠</gray>"
 
 chat:
   spam-blocked: "<red>消息被判定为垃圾信息,无法发送。"

@@ -1582,7 +1582,9 @@ public final class MatchService {
         if (winner == null || loser == null) {
             return;
         }
-        KillFeed.broadcast(winner, loser, session.teamColor(winnerId), session.id());
+        // FT の点数はこのラウンドを含めて表示する(addSeriesWin は endMatch 側で走る)。
+        KillFeed.broadcast(winner, loser, session.teamColor(winnerId), session.id(),
+                session.seriesWinsOf(winnerId) + 1, session.seriesWinsOf(loserId));
     }
 
     private void handleTeamLethal(MatchSession session, UUID victimId, UUID attackerId) {
