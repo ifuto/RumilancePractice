@@ -1,6 +1,8 @@
 package com.rumilance.practice.gsit;
 
 import com.rumilance.practice.config.ConfigService;
+import com.rumilance.practice.guard.PracticeGuards;
+import com.rumilance.practice.session.PlayerStateManager;
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.LuckPermsProvider;
 import net.luckperms.api.model.user.User;
@@ -25,46 +27,48 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * GSit permission bridge (soft dependency on LuckPerms).
  *
- * <p>This plugin no longer implements sitting itself — the external <strong>GSit</strong> plugin
- * owns that interaction, and the built-in lobby seats were removed so the two can never fight
- * over the same right-click (both used to cancel {@code PlayerInteractEvent} and spawn their own
- * seat armour stand for the very same stair/slab click).</p>
+ * <p>This plugin does not implement sitting — the external <strong>GSit</strong> plugin owns
+ * that interaction. What this bridge owns is GSit's <em>surface</em>: how much of it a player
+ * may use, and when.</p>
  *
- * <p>To keep GSit's surface exactly as small as this server wants it, every joining player is
- * normalised in LuckPerms:</p>
- * <ol>
- *   <li>ALL {@code GSit.*} nodes are removed from the player's own data — including the wildcard
- *       node {@code gsit.*} and negated variants ({@code -gsit.sit}), so nothing can re-grant or
- *       veto the rest;</li>
- *   <li>exactly {@code GSit.SitClick} is granted, i.e. "sit down by clicking a block" and nothing
- *       else (no {@code /sit} command, no crawling, no belt/seat extras).</li>
- * </ol>
+ * <p>GSit's nodes normally reach a player through a <strong>group</strong>, so deleting the
+ * player's own nodes changes nothing. The shape that works is the one in
+ * {@link GsitPolicy}: the player always carries an explicit {@code -gsit.*} deny (which vetoes
+ * everything inherited, wildcards included), and in the hub additionally carries
+ * {@code GSit.SitClick = true} — LuckPerms resolves the most specific node, so that exact grant
+ * beats the wildcard deny and clicking a stair or slab sits you down. Nothing else GSit offers
+ * survives: no {@code /sit}, no crawling, no belt.</p>
  *
- * <p>The edit is applied to the LuckPerms user object, which recalculates the player's
- * permissions immediately, and is then persisted asynchronously. When the player already is in
- * the wanted state nothing is written, so joins stay free of database churn. If LuckPerms is not
- * installed the bridge logs once and does nothing — GSit then works with whatever permissions the
- * server gives it.</p>
+ * <p>Outside the hub the grant is denied explicitly as well, so GSit is completely off during a
+ * match. A reconciler walks the online players once a second and writes only when somebody's
+ * data differs from the wanted state, so joins and mode changes cost one LuckPerms write at
+ * most — never a per-tick database hit.</p>
+ *
+ * <p>Without LuckPerms installed the bridge logs once and does nothing.</p>
  */
 public final class GsitPermissionService implements Listener {
 
-    /** Prefix of every GSit permission node (matched case-insensitively). */
-    private static final String GSIT_PREFIX = "gsit.";
-    /** Root node: {@code gsit} alone is LuckPerms' wildcard for the whole plugin. */
-    private static final String GSIT_ROOT = "gsit";
     /** Fallback when config.yml has no usable value. */
     private static final String DEFAULT_GRANT = "GSit.SitClick";
+    /** Reconciler interval: fast enough to catch a match start, slow enough to be free. */
+    private static final long RECONCILE_TICKS = 20L;
 
     private final Plugin plugin;
     private final ConfigService configService;
-    /** Players whose normalisation is in flight, so a reconnect cannot double-apply. */
+    /** Players with a write in flight, so the reconciler cannot double-apply. */
     private final Set<UUID> inFlight = ConcurrentHashMap.newKeySet();
     private volatile LuckPerms luckPerms;
+    private volatile PlayerStateManager stateManager;
     private boolean reportedMissing;
 
     public GsitPermissionService(Plugin plugin, ConfigService configService) {
         this.plugin = plugin;
         this.configService = configService;
+    }
+
+    /** Needed to tell the hub from a match; without it everybody is treated as hub. */
+    public void setStateManager(PlayerStateManager stateManager) {
+        this.stateManager = stateManager;
     }
 
     // ------------------------------------------------------------------ configuration
@@ -76,9 +80,17 @@ public final class GsitPermissionService implements Listener {
         }
         luckPerms = resolveApi();
         if (luckPerms != null) {
-            plugin.getLogger().info("[GSit] permission bridge active: every join strips GSit.* and grants "
-                    + grantNode());
+            plugin.getLogger().info("[GSit] permission bridge active: -" + GsitPolicy.WILDCARD
+                    + " for everyone, +" + grantNode() + " in the hub only");
         }
+    }
+
+    /** Starts the once-a-second reconciler (hub = sit by click, everywhere else = off). */
+    public void startReconciler() {
+        if (!enabled()) {
+            return;
+        }
+        Bukkit.getScheduler().runTaskTimer(plugin, this::reconcileAll, RECONCILE_TICKS, RECONCILE_TICKS);
     }
 
     public void shutdown() {
@@ -91,67 +103,55 @@ public final class GsitPermissionService implements Listener {
         return configService != null && configService.config().getBoolean("gsit.enabled", true);
     }
 
-    /** The single GSit node players end up with. */
+    /** The single GSit node players end up with in the hub. */
     public String grantNode() {
         String node = configService == null ? null : configService.config().getString("gsit.grant");
         return node == null || node.isBlank() ? DEFAULT_GRANT : node.trim();
     }
 
-    // ------------------------------------------------------------------ node classification
-
-    /**
-     * True for every node this bridge owns: {@code gsit.*}, the bare {@code gsit} wildcard, and
-     * any negated variant of those. Group inheritance nodes ({@code inheritance.*}) and meta are
-     * NOT touched — removing a group would change far more than sitting.
-     */
+    /** @deprecated use {@link GsitPolicy#isGsitNode(String)}. */
     static boolean isGsitNode(String key) {
-        if (key == null) {
-            return false;
-        }
-        String trimmed = key.trim();
-        // LuckPerms writes negations as a leading '-' ("--" for an explicit false), and a
-        // negated GSit node is still a GSit node: leaving "-gsit.*" behind would keep the
-        // wildcard in the player's data.
-        int from = 0;
-        while (from < trimmed.length() && trimmed.charAt(from) == '-') {
-            from++;
-        }
-        String plain = trimmed.substring(from);
-        return plain.equalsIgnoreCase(GSIT_ROOT)
-                || plain.regionMatches(true, 0, GSIT_PREFIX, 0, GSIT_PREFIX.length());
+        return GsitPolicy.isGsitNode(key);
     }
 
-    /**
-     * The wanted end state for one player: which of their permission nodes have to go, and
-     * whether the single granted node is already present.
-     *
-     * @param permissionNodes the player's own permission node keys (no inheritance, no meta)
-     * @param grant           the node to keep / add ({@code GSit.SitClick})
-     */
-    static Normalisation plan(List<String> permissionNodes, String grant) {
-        List<String> remove = new ArrayList<>();
-        boolean granted = false;
-        for (String key : permissionNodes) {
-            if (key == null) {
-                continue;
-            }
-            if (key.trim().equalsIgnoreCase(grant)) {
-                granted = true;
-                continue;
-            }
-            if (isGsitNode(key)) {
-                remove.add(key);
-            }
+    /** Hub states keep the click-to-sit grant; anything else (a match, queue, AFK) does not. */
+    private GsitPolicy.Mode modeOf(UUID playerId) {
+        PlayerStateManager manager = stateManager;
+        if (manager == null) {
+            return GsitPolicy.Mode.LOBBY;
         }
-        return new Normalisation(remove, granted);
+        return PracticeGuards.lobbyProtectedStates(manager.getState(playerId))
+                ? GsitPolicy.Mode.LOBBY
+                : GsitPolicy.Mode.MATCH;
     }
 
-    /** Result of {@link #plan}: nodes to remove, and whether the grant already exists. */
-    record Normalisation(List<String> remove, boolean granted) {
-        /** True when nothing has to be written at all. */
-        boolean isNoop() {
-            return remove.isEmpty() && granted;
+    // ------------------------------------------------------------------ reconciler
+
+    private void reconcileAll() {
+        if (!enabled()) {
+            return;
         }
+        LuckPerms api = luckPerms != null ? luckPerms : resolveApi();
+        if (api == null) {
+            return;
+        }
+        luckPerms = api;
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            reconcile(api, player);
+        }
+    }
+
+    private void reconcile(LuckPerms api, Player player) {
+        UUID id = player.getUniqueId();
+        if (!inFlight.add(id)) {
+            return; // a write for this player is already running
+        }
+        User user = api.getUserManager().getUser(id);
+        if (user == null) {
+            inFlight.remove(id);
+            return; // not loaded yet; the join handler loads and applies it
+        }
+        apply(user, api.getUserManager(), id, player.getName(), modeOf(id));
     }
 
     // ------------------------------------------------------------------ join handling
@@ -190,12 +190,13 @@ public final class GsitPermissionService implements Listener {
         if (!inFlight.add(id)) {
             return;
         }
+        GsitPolicy.Mode mode = modeOf(id);
         UserManager users = api.getUserManager();
         User cached = users.getUser(id);
         if (cached != null) {
             // Normal case: LuckPerms loads users during login, so the data is already here and
             // the permission applies before the player can click anything.
-            apply(cached, users, id, name);
+            apply(cached, users, id, name, mode);
             return;
         }
         users.loadUser(id).whenComplete((user, error) -> {
@@ -206,28 +207,29 @@ public final class GsitPermissionService implements Listener {
                 return;
             }
             // Permission edits are thread safe; nothing here touches the Bukkit API.
-            apply(user, users, id, name);
+            apply(user, users, id, name, mode);
         });
     }
 
-    private void apply(User user, UserManager users, UUID id, String name) {
-        String grant = grantNode();
-        List<String> keys = new ArrayList<>();
+    private void apply(User user, UserManager users, UUID id, String name, GsitPolicy.Mode mode) {
+        List<GsitPolicy.Owned> owned = new ArrayList<>();
         for (Node node : user.getNodes(NodeType.PERMISSION)) {
-            keys.add(node.getKey());
+            owned.add(new GsitPolicy.Owned(node.getKey(), node.getValue()));
         }
-        Normalisation plan = plan(keys, grant);
+        GsitPolicy.Plan plan = GsitPolicy.plan(owned, grantNode(), mode);
         if (plan.isNoop()) {
             inFlight.remove(id);
             return; // already exactly the wanted state: no write, no save
         }
-        for (Node node : user.getNodes(NodeType.PERMISSION)) {
-            if (plan.remove().contains(node.getKey())) {
-                user.data().remove(node);
+        for (GsitPolicy.Owned wanted : plan.remove()) {
+            for (Node node : new ArrayList<>(user.getNodes(NodeType.PERMISSION))) {
+                if (node.getKey().equalsIgnoreCase(wanted.key()) && node.getValue() == wanted.value()) {
+                    user.data().remove(node);
+                }
             }
         }
-        if (!plan.granted()) {
-            user.data().add(Node.builder(grant).build());
+        for (GsitPolicy.Owned wanted : plan.add()) {
+            user.data().add(Node.builder(wanted.key()).value(wanted.value()).build());
         }
         users.saveUser(user).whenComplete((ignored, error) -> {
             inFlight.remove(id);
@@ -236,7 +238,18 @@ public final class GsitPermissionService implements Listener {
                         + error.getMessage());
                 return;
             }
-            plugin.getLogger().info("[GSit] " + name + ": removed " + plan.remove() + ", granted " + grant);
+            // LuckPerms recalculates on its own; this only makes sure an online player sees the
+            // change before their next click.
+            Player online = Bukkit.getPlayer(id);
+            if (online != null) {
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (online.isOnline()) {
+                        online.recalculatePermissions();
+                    }
+                });
+            }
+            plugin.getLogger().info("[GSit] " + name + " (" + mode + "): added " + plan.add()
+                    + ", removed " + plan.remove());
         });
     }
 }

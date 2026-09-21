@@ -936,7 +936,10 @@ public final class FeatureBootstrap {
             try {
                 com.rumilance.practice.gsit.GsitPermissionService gsitPermissions =
                         new com.rumilance.practice.gsit.GsitPermissionService(plugin, configService);
+                // ロビーは「クリックで座る」だけ、それ以外(試合中)は GSit 完全オフ。
+                gsitPermissions.setStateManager(stateManager);
                 gsitPermissions.hook();
+                gsitPermissions.startReconciler();
                 services.register(com.rumilance.practice.gsit.GsitPermissionService.class, gsitPermissions);
                 plugin.getServer().getPluginManager().registerEvents(gsitPermissions, plugin);
             } catch (LinkageError | RuntimeException e) {
