@@ -159,26 +159,26 @@ public final class LobbyService {
             // border before the teleport used to leave players clamped into a stale wall
             // (and burying on return) because the border present during the teleport was
             // the OLD arena/lobby one.
-            player.teleportAsync(safe).thenAccept(ok -> {
+            //
+            // SafeTeleport rather than a raw teleportAsync: it loads the destination chunk off
+            // the main thread exactly like teleportAsync did, but then lands the player on the
+            // column's standable surface and watches the landing for late paste/chunk burial.
+            // Returning from the AFK room (/afkc) buried players because this path skipped the
+            // footing entirely; a failed move is retried once shortly after.
+            com.rumilance.practice.util.SafeTeleport.teleport(player, safe).thenAccept(ok -> {
                 player.setCompassTarget(destination);
                 if (Boolean.TRUE.equals(ok)) {
                     applySightAfterTeleport(player, hook);
                     return;
                 }
-                com.rumilance.practice.util.SafeTeleport.teleport(player, safe).thenAccept(retry -> {
-                    if (Boolean.TRUE.equals(retry)) {
-                        applySightAfterTeleport(player, hook);
-                        return;
-                    }
-                    org.bukkit.Bukkit.getScheduler().runTaskLater(
-                            org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(LobbyService.class),
-                            () -> {
-                                if (player.isOnline()) {
-                                    com.rumilance.practice.util.SafeTeleport.teleport(player, safe);
-                                    applySightAfterTeleport(player, hook);
-                                }
-                            }, 8L);
-                });
+                org.bukkit.Bukkit.getScheduler().runTaskLater(
+                        org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(LobbyService.class),
+                        () -> {
+                            if (player.isOnline()) {
+                                com.rumilance.practice.util.SafeTeleport.teleport(player, safe);
+                                applySightAfterTeleport(player, hook);
+                            }
+                        }, 8L);
             });
             player.setCompassTarget(destination);
         } else if (hook != null) {

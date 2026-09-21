@@ -1430,6 +1430,9 @@ public final class FeatureBootstrap {
         com.rumilance.practice.guard.TimeoutChannelGuard timeoutChannelGuard =
                 new com.rumilance.practice.guard.TimeoutChannelGuard(plugin.getLogger());
         pm.registerEvents(new com.rumilance.practice.guard.KickGuardListener(timeoutChannelGuard), plugin);
+        // Every teleport (ours and other plugins') arms the anti-bury landing watch, so a
+        // disposable arena pasted around the fight start can no longer swallow a player.
+        pm.registerEvents(new com.rumilance.practice.guard.TeleportLandingGuard(), plugin);
         for (Player online : Bukkit.getOnlinePlayers()) {
             timeoutChannelGuard.disableReadTimeout(online);
         }

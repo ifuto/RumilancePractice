@@ -152,6 +152,30 @@ public final class SpawnFooting {
     }
 
     /**
+     * Suffocation-class burial: the blocks at the player's feet <em>and</em> head are both
+     * solid, i.e. the player is inside the ground, not merely brushing a wall corner while
+     * walking. The post-teleport watch uses this stricter test so normal movement can never
+     * trigger a lift.
+     */
+    public static boolean isDeeplyBuried(Player player) {
+        if (player == null || player.getGameMode() == GameMode.SPECTATOR) {
+            return false;
+        }
+        World world = player.getWorld();
+        BoundingBox box = player.getBoundingBox();
+        double middle = (box.getMinY() + box.getMaxY()) / 2.0d;
+        BoundingBox lower = new BoundingBox(
+                box.getMinX(), box.getMinY() + EPS, box.getMinZ(),
+                box.getMaxX(), middle - EPS, box.getMaxZ());
+        BoundingBox upper = new BoundingBox(
+                box.getMinX(), middle + EPS, box.getMinZ(),
+                box.getMaxX(), box.getMaxY() - EPS, box.getMaxZ());
+        // Solid inside both the lower and the upper half of the body: genuinely buried, not
+        // just touching a wall with one corner of the hitbox.
+        return overlapsSolid(world, lower) && overlapsSolid(world, upper);
+    }
+
+    /**
      * Integer-column search used by tests. Stays within {@link #PIN_DOWN}/{@link #PIN_UP}
      * of {@code startY} so a pinned マス cannot fall through to a cave.
      */

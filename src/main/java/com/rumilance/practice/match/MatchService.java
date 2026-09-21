@@ -100,6 +100,12 @@ public final class MatchService {
 
     /** Floating Ready/Leave blocks shown during the countdown (null = feature off). */
     private com.rumilance.practice.countdown.CountdownMarkers countdownMarkers;
+    /**
+     * How close a fighter must already be to their spawn to be left standing when the
+     * Ready/Leave blocks appear: the blocks hang in front of the spawn, so anyone further
+     * away is re-pinned onto it (team fights place sides 1.2 blocks apart).
+     */
+    private static final double SPAWN_TOLERANCE = 2.5d;
     private final MatchCombatTracker combatTracker = new MatchCombatTracker();
     /** Each player's most recent match id, retained for a short time so /matchreport works. */
     private final Map<UUID, UUID> recentMatch = new ConcurrentHashMap<>();
@@ -1200,7 +1206,8 @@ public final class MatchService {
         // チームファイト(Party vs Party / 赤青戦)では出さない: 大人数に Ready を押させる
         // 運用ではなく、カウントダウンだけで始める。
         if (countdownMarkers != null && !session.isTeamMatch()) {
-            countdownMarkers.spawn(session);
+            // 浮遊ブロックは「TP先の座標と向き」から算出する(プレイヤーの現在位置ではない)。
+            countdownMarkers.spawn(session, participantSpawns(session, arenaInstanceOf(session)));
         }
         final int[] remaining = {countdownSeconds};
         BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
@@ -1282,24 +1289,19 @@ public final class MatchService {
         Location spawnBBase = LocationUtil.safeTeleportLocation(arenaService.spawnB(instance));
 
         java.util.List<java.util.concurrent.CompletableFuture<Boolean>> teleports = new ArrayList<>();
+        java.util.Map<UUID, Location> spawns = participantSpawns(session, instance);
+        // A duel shows the Ready/Leave pair in front of each spawn, so a fighter who is merely
+        // somewhere inside the arena must still be pinned onto that spawn.
+        boolean anchorRequired = countdownMarkers != null && !session.isTeamMatch();
         for (UUID id : session.participants()) {
             Player player = Bukkit.getPlayer(id);
             if (player == null) {
                 failMatch(session, "Player offline during prepare");
                 return;
             }
-            if (isCorrectlyPlaced(player, bounds)) {
+            Location spawn = spawns.get(id);
+            if (isCorrectlyPlaced(player, bounds, anchorRequired ? spawn : null)) {
                 continue;
-            }
-            TeamColor color = session.teamColor(id);
-            Location spawn = teamSpawnBase(session, instance, color);
-            if (session.isTeamMatch()) {
-                List<UUID> side = session.team(color);
-                int withinTeam = side.indexOf(id);
-                double offset = (withinTeam - (side.size() - 1) / 2.0) * 1.2;
-                spawn = spawn.clone().add(offset, 0, 0);
-                spawn.setYaw(spawn.getYaw());
-                spawn.setPitch(spawn.getPitch());
             }
             teleports.add(SafeTeleport.teleport(player, LocationUtil.safeTeleportLocation(spawn)));
         }
@@ -1342,6 +1344,17 @@ public final class MatchService {
 
     /** Inside the arena horizontal bounds, within its vertical span, and not overlapping blocks. */
     private boolean isCorrectlyPlaced(Player player, com.rumilance.practice.util.Cuboid bounds) {
+        return isCorrectlyPlaced(player, bounds, null);
+    }
+
+    /**
+     * Inside the arena, not buried and — when {@code spawn} is given — standing on that spawn
+     * (within {@link #SPAWN_TOLERANCE} blocks). The anchor form is used while the Ready/Leave
+     * blocks hang in front of the spawn: a fighter parked somewhere else in the arena could
+     * not reach them.
+     */
+    private boolean isCorrectlyPlaced(Player player, com.rumilance.practice.util.Cuboid bounds,
+                                      Location spawn) {
         Location at = player.getLocation();
         if (at == null || at.getWorld() == null || bounds == null) {
             return false;
@@ -1352,7 +1365,53 @@ public final class MatchService {
         if (!bounds.contains(at)) {
             return false;
         }
-        return !com.rumilance.practice.util.SpawnFooting.isBuried(player);
+        if (com.rumilance.practice.util.SpawnFooting.isBuried(player)) {
+            return false;
+        }
+        if (spawn == null) {
+            return true;
+        }
+        if (spawn.getWorld() == null || at.getWorld() != spawn.getWorld()) {
+            return false;
+        }
+        double dx = at.getX() - spawn.getX();
+        double dz = at.getZ() - spawn.getZ();
+        return dx * dx + dz * dz <= SPAWN_TOLERANCE * SPAWN_TOLERANCE
+                && Math.abs(at.getY() - spawn.getY()) <= SPAWN_TOLERANCE + 1.0d;
+    }
+
+    /**
+     * Where each participant is pinned for the countdown: the team spawn (A / B / a point on
+     * the A-B line for the extra teams of a party battle) with the team's lateral offset,
+     * already moved onto a standable surface so the anchor matches the teleport target.
+     */
+    private java.util.Map<UUID, Location> participantSpawns(MatchSession session,
+                                                            ArenaInstance instance) {
+        java.util.Map<UUID, Location> spawns = new java.util.LinkedHashMap<>();
+        if (session == null || instance == null) {
+            return spawns;
+        }
+        for (UUID id : session.participants()) {
+            TeamColor color = session.teamColor(id);
+            Location spawn = teamSpawnBase(session, instance, color);
+            if (session.isTeamMatch()) {
+                List<UUID> side = session.team(color);
+                int withinTeam = side.indexOf(id);
+                double offset = (withinTeam - (side.size() - 1) / 2.0) * 1.2;
+                spawn = spawn.clone().add(offset, 0, 0);
+            }
+            Location stand = com.rumilance.practice.util.SpawnFooting.standOneAbove(spawn);
+            spawns.put(id, stand != null ? stand : spawn);
+        }
+        return spawns;
+    }
+
+    /** The arena instance of a match, or null when it has none (or was released). */
+    private ArenaInstance arenaInstanceOf(MatchSession session) {
+        if (session == null || session.arenaInstanceId() == null) {
+            return null;
+        }
+        return arenaService.get(session.arenaInstanceId()).orElse(null);
     }
 
     private void beginFight(MatchSession session) {

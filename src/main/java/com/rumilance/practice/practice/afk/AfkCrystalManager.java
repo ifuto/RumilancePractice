@@ -378,7 +378,10 @@ public final class AfkCrystalManager implements Listener, CommandExecutor,
         buildFloor(s);
         player.setGameMode(GameMode.SURVIVAL);
         player.setFallDistance(0f);
-        player.teleport(s.spawn());
+        // The private room is carved in the void at +60k, so the chunk is usually brand new:
+        // let SafeTeleport load it and put the player on the floor instead of a raw teleport
+        // that can land inside terrain while generation finishes.
+        com.rumilance.practice.util.SafeTeleport.teleport(player, s.spawn());
         hideOthers(player);
         player.getInventory().clear();
         // 入室直後から「編集済みのキット」を配る: 紐づけキット > 個人保存キット >
@@ -1200,7 +1203,9 @@ public final class AfkCrystalManager implements Listener, CommandExecutor,
         if (event.getCause() == EntityDamageEvent.DamageCause.VOID) {
             event.setCancelled(true);
             player.setFallDistance(0f);
-            player.teleport(s.spawn());
+            // Void rescue: land on the room floor through SafeTeleport (chunk load + footing),
+            // never a raw teleport that can drop the player into the platform.
+            com.rumilance.practice.util.SafeTeleport.teleport(player, s.spawn());
             return;
         }
         // FALL is REAL here: fall-stacked crystal / mace plays need the landing damage
@@ -2300,7 +2305,7 @@ public final class AfkCrystalManager implements Listener, CommandExecutor,
         }
         World w = Bukkit.getWorlds().isEmpty() ? null : Bukkit.getWorlds().get(0);
         if (w != null) {
-            player.teleport(w.getSpawnLocation());
+            com.rumilance.practice.util.SafeTeleport.teleport(player, w.getSpawnLocation());
         }
         player.setGameMode(GameMode.SURVIVAL);
     }

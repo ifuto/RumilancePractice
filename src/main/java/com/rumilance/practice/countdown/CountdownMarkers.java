@@ -39,11 +39,13 @@ import java.util.function.Consumer;
 /**
  * The floating Ready / Leave blocks of the pre-match countdown.
  *
- * <p>Two blocks hang in front of every fighter, derived from <em>their own</em> spawn yaw so
- * diagonal spawns are correct too: two blocks ahead of the spawn, one to the right is the
- * emerald block (Ready), one to the left the redstone block (Leave), both at eye height.
- * They spin slowly on the spot — {@link #SPIN_DEGREES_PER_TICK} is one turn every four
- * seconds, which reads as "idle" rather than "machinery".</p>
+ * <p>Two blocks hang in front of every fighter's <em>arena spawn</em>
+ * ({@link CountdownAnchor}), so diagonal spawns are correct too: five blocks ahead of the
+ * spawn, one to the right is the emerald block (Ready), one to the left the redstone block
+ * (Leave), both at eye height. The anchor is the teleport destination, not the player's
+ * current position, so the pair is where the fighter is being pinned. They spin slowly on the
+ * spot — {@link #SPIN_DEGREES_PER_TICK} is one turn every four seconds, which reads as
+ * "idle" rather than "machinery".</p>
  *
  * <p>Looking at a block makes it glow (green / red) and swaps the action bar for
  * {@code 1/2 - Ready ✓} or {@code 0/2 - Leave ☓}, where the leading number is 1 when the
@@ -53,12 +55,6 @@ import java.util.function.Consumer;
  */
 public final class CountdownMarkers implements Listener {
 
-    /** How far in front of the spawn the pair floats. */
-    private static final double FORWARD = 5.0;
-    /** Half the gap between the two blocks. */
-    private static final double SIDE = 2.0;
-    /** Eye height of the blocks above the spawn's feet. */
-    private static final double EYE = 1.55;
     /** One turn every 4 seconds: slow enough to look like it is hovering. */
     private static final float SPIN_DEGREES_PER_TICK = 1.5f;
     private static final float BLOCK_SCALE = 0.9f;
@@ -128,8 +124,14 @@ public final class CountdownMarkers implements Listener {
         this.messageService = messages;
     }
 
-    /** Spawns one Ready/Leave pair per participant, facing the way their spawn faces. */
-    public void spawn(MatchSession session) {
+    /**
+     * Spawns one Ready/Leave pair per participant. The pair is derived from
+     * {@code spawnAnchors} — the arena spawn each fighter is being teleported onto, with the
+     * yaw they will face — so the blocks belong to the arena's start layout instead of to
+     * wherever the player happened to be standing when the countdown began. A participant
+     * without an anchor falls back to their live position.
+     */
+    public void spawn(MatchSession session, java.util.Map<UUID, Location> spawnAnchors) {
         if (session == null) {
             return;
         }
@@ -140,20 +142,28 @@ public final class CountdownMarkers implements Listener {
             if (player == null) {
                 continue;
             }
-            Location at = player.getLocation();
-            World world = player.getWorld();
-            Vector forward = horizontal(at.getYaw());
-            Vector right = horizontal(at.getYaw() + 90f);
-            Location centre = at.clone().add(forward.clone().multiply(FORWARD));
-            centre.setY(at.getY() + EYE);
-            set.markers.add(spawnBlock(world, centre.clone().add(right.clone().multiply(SIDE)),
+            Location at = spawnAnchors == null ? null : spawnAnchors.get(id);
+            if (at == null || at.getWorld() == null) {
+                at = player.getLocation();
+            }
+            World world = at.getWorld() == null ? player.getWorld() : at.getWorld();
+            CountdownAnchor.Pair pair = CountdownAnchor.pair(
+                    at.getX(), at.getY(), at.getZ(), at.getYaw());
+            set.markers.add(spawnBlock(world,
+                    new Location(world, pair.readyX(), pair.readyY(), pair.readyZ()),
                     Material.EMERALD_BLOCK, id, Kind.READY));
-            set.markers.add(spawnBlock(world, centre.clone().add(right.clone().multiply(-SIDE)),
+            set.markers.add(spawnBlock(world,
+                    new Location(world, pair.leaveX(), pair.leaveY(), pair.leaveZ()),
                     Material.REDSTONE_BLOCK, id, Kind.LEAVE));
         }
         if (!set.markers.isEmpty()) {
             sets.put(session.id(), set);
         }
+    }
+
+    /** Spawns the pair from the players' current positions (no known spawn anchor). */
+    public void spawn(MatchSession session) {
+        spawn(session, java.util.Map.of());
     }
 
     /** Removes a match's markers. Safe to call when there are none. */
@@ -229,11 +239,6 @@ public final class CountdownMarkers implements Listener {
         Vector3f offset = spin.transform(new Vector3f(half)).mul(-1f);
         return new Transformation(offset, spin,
                 new Vector3f(BLOCK_SCALE, BLOCK_SCALE, BLOCK_SCALE), new Quaternionf());
-    }
-
-    private static Vector horizontal(float yawDegrees) {
-        double yaw = Math.toRadians(yawDegrees);
-        return new Vector(-Math.sin(yaw), 0, Math.cos(yaw)).normalize();
     }
 
     /** Every tick: spin the blocks, glow the one being looked at, drive the action bar. */

@@ -17,6 +17,13 @@ import java.util.function.Supplier;
  * so a configured spawn inside a schematic / under a pasted floor never buries the player,
  * then teleports on the main thread. A post-teleport burial check lifts the player out
  * of any block the client/server still reports overlapping.
+ *
+ * <p><strong>Late-landing guard.</strong> A disposable arena is pasted around the fight start,
+ * and a teleport can land <em>before</em> the paste finishes: at that moment the column is still
+ * air, nothing is buried yet, and the player ends up inside the floor a tick or two later. The
+ * landing is therefore watched for a short window after every teleport (and for teleports made
+ * by other plugins, via the {@code PlayerTeleportEvent} monitor) — as soon as the player is
+ * genuinely inside blocks, they are lifted to the surface of their own column.</p>
  */
 public final class SafeTeleport {
 
@@ -83,8 +90,95 @@ public final class SafeTeleport {
         boolean ok = player.teleport(target);
         if (ok) {
             unBury(player);
+            watchLanding(player);
         }
         return ok;
+    }
+
+    /**
+     * Watches a fresh landing for a short window and lifts the player out of blocks that
+     * appear afterwards (schematic paste still running, chunk arriving late). Only a genuine
+     * burial — solid material inside both halves of the hitbox — triggers a lift, so ordinary
+     * movement against a wall is never disturbed. Stops early once the landing is stable.
+     */
+    public static void watchLanding(Player player) {
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+        // One watch per player: SafeTeleport arms it directly and the teleport monitor arms it
+        // again for the same move.
+        if (!WATCHED.add(player.getUniqueId())) {
+            return;
+        }
+        try {
+            new LandingWatch(player.getUniqueId()).start();
+        } catch (Throwable ignored) {
+            WATCHED.remove(player.getUniqueId());
+            // A guard that cannot be scheduled must never break the teleport itself.
+        }
+    }
+
+    /** Players with an armed landing watch (see {@link #watchLanding(Player)}). */
+    private static final java.util.Set<java.util.UUID> WATCHED =
+            java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /** Ticks the landing watch stays armed; long enough for a paste that lands after the TP. */
+    private static final int WATCH_TICKS = 60;
+    /** How often the landing is checked while the watch is armed. */
+    private static final int WATCH_INTERVAL = 2;
+    /** Consecutive clean checks before the watch stands down early. */
+    private static final int WATCH_CLEAN_CHECKS = 12;
+
+    private static final class LandingWatch implements Runnable {
+
+        private final java.util.UUID playerId;
+        private org.bukkit.scheduler.BukkitTask task;
+        private int ticks;
+        private int clean;
+
+        LandingWatch(java.util.UUID playerId) {
+            this.playerId = playerId;
+        }
+
+        void start() {
+            task = Bukkit.getScheduler().runTaskTimer(plugin(), this, WATCH_INTERVAL, WATCH_INTERVAL);
+        }
+
+        @Override
+        public void run() {
+            ticks += WATCH_INTERVAL;
+            Player player = Bukkit.getPlayer(playerId);
+            if (player == null || !player.isOnline() || ticks > WATCH_TICKS) {
+                cancel();
+                return;
+            }
+            if (!SpawnFooting.isDeeplyBuried(player)) {
+                if (++clean >= WATCH_CLEAN_CHECKS) {
+                    cancel();
+                }
+                return;
+            }
+            clean = 0;
+            Location at = player.getLocation();
+            Location lifted = SpawnFooting.standClearPearl(at, SpawnFooting.maxLiftForUnbury());
+            if (lifted == null) {
+                lifted = SpawnFooting.forceLift(at);
+            }
+            if (lifted == null || SpawnFooting.isBuried(lifted)) {
+                return;
+            }
+            player.setFallDistance(0f);
+            player.setVelocity(new Vector());
+            player.teleport(lifted);
+        }
+
+        private void cancel() {
+            WATCHED.remove(playerId);
+            if (task != null) {
+                task.cancel();
+                task = null;
+            }
+        }
     }
 
     private static void resetPersonalBorder(Player player) {
