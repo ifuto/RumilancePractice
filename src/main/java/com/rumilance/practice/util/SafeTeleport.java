@@ -18,14 +18,19 @@ import java.util.function.Supplier;
  * then teleports on the main thread. A post-teleport burial check lifts the player out
  * of any block the client/server still reports overlapping.
  *
- * <p><strong>Late-landing guard.</strong> A disposable arena is pasted around the fight start,
- * and a teleport can land <em>before</em> the paste finishes: at that moment the column is still
- * air, nothing is buried yet, and the player ends up inside the floor a tick or two later. The
- * landing is therefore watched for a short window after every teleport (and for teleports made
- * by other plugins, via the {@code PlayerTeleportEvent} monitor) — as soon as the player is
- * genuinely inside blocks, they are lifted to the surface of their own column.</p>
+ * <p><strong>Prevention first.</strong> The destination is chosen so the player can never end
+ * up inside a block: own column first, then the nearest free column, and the pearl path resolves
+ * its landing the same way ({@link PearlLanding}). The only case no pre-check can see is terrain
+ * that does not exist yet — a disposable arena pasted around the fight start can finish after the
+ * teleport already landed — so the landing is additionally watched for a short window after every
+ * teleport (and for teleports made by other plugins, via the {@code PlayerTeleportEvent}
+ * monitor): as soon as the player is genuinely inside blocks, they are lifted to the surface of
+ * their own column. That watch is a net, not the mechanism.</p>
  */
 public final class SafeTeleport {
+
+    /** How far a pinned spawn may be moved sideways when its own column is unusable. */
+    private static final int NEARBY_COLUMN_RADIUS = 3;
 
     private SafeTeleport() {
     }
@@ -68,11 +73,16 @@ public final class SafeTeleport {
             Location clear = SpawnFooting.standOneAbove(dest);
             if (clear != null) {
                 target = clear;
+            } else {
+                // The spawn's own column has no standable spot at all (spawn points inside a
+                // wall, an arena floor that moved): move to the nearest free column instead of
+                // teleporting into blocks. Prevention first — the landing watch below is only
+                // the net for blocks that appear after the move (a paste still running).
+                Location nearby = SpawnFooting.standNearby(dest, NEARBY_COLUMN_RADIUS, 0.0d, 0.0d, true);
+                if (nearby != null) {
+                    target = nearby;
+                }
             }
-            // No footing found (void / incomplete schematic): still teleport to the raw
-            // desired point instead of failing. Lobby spawns are configured safe, and a
-            // failed footing attempt must not strand players with "could not teleport".
-            // The post-teleport un-bury sweep catches anyone still overlapping blocks.
         }
         // Reset any stale per-player WorldBorder (lobby / previous arena) BEFORE the
         // teleport. Paper enforces the border during teleport and would otherwise reject

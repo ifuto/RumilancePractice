@@ -130,6 +130,42 @@ public final class SpawnFooting {
         return down != null ? down : forceLift(desired);
     }
 
+    /**
+     * First fitting pose in the columns around {@code spawn}, nearest ring first and biased
+     * towards {@code biasX/biasZ} (see {@link LandingSearch}). Used when the spawn's own column
+     * has no free spot at all — a spawn configured inside a wall, a landing next to a one-block
+     * wall — so a teleport can be moved to a free column <em>instead of</em> into a block.
+     *
+     * @param requireFloor when {@code true} the candidate must stand on a surface (pinned
+     *                     spawns); when {@code false} a same-height free column is enough, which
+     *                     is what keeps a pearl landing at the height and momentum it had
+     */
+    public static Location standNearby(Location spawn, int radius, double biasX, double biasZ,
+                                       boolean requireFloor) {
+        if (spawn == null || spawn.getWorld() == null) {
+            return null;
+        }
+        World world = spawn.getWorld();
+        for (int[] offset : LandingSearch.nearbyOffsets(radius, biasX, biasZ)) {
+            Location column = spawn.clone().add(offset[0], 0.0d, offset[1]);
+            if (!requireFloor && playerFits(world, column.getX(), column.getY(), column.getZ())) {
+                // Same height, free column: the landing keeps its Y (pearl momentum).
+                return pose(column, column.getX(), column.getY(), column.getZ());
+            }
+            Location stand = standClearPearl(column, PIN_UP);
+            if (stand != null && playerFits(world, stand.getX(), stand.getY(), stand.getZ())) {
+                return stand;
+            }
+        }
+        return null;
+    }
+
+    /** True when a player standing at {@code location} fits without overlapping any block. */
+    public static boolean fits(Location location) {
+        return location != null && location.getWorld() != null
+                && playerFits(location.getWorld(), location.getX(), location.getY(), location.getZ());
+    }
+
     public static boolean bothReady(Location spawnA, Location spawnB) {
         return standClear(spawnA) != null && standClear(spawnB) != null;
     }

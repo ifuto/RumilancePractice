@@ -55,10 +55,12 @@ public final class PracticePearlListener implements Listener {
             return;
         }
         Player player = event.getPlayer();
-        if (!isCombatant(player) || event.getTo() == null) {
+        if (event.getTo() == null) {
             return;
         }
-        Cuboid bounds = playBounds(player);
+        // Arena wall / border rules only apply to fighters; the anti-burial resolution below
+        // runs for everyone, because a pearl into a one-block wall buries anyone.
+        Cuboid bounds = isCombatant(player) ? playBounds(player) : null;
         Location to = PearlLanding.safePearlLanding(
                 event.getFrom(), event.getTo(), bounds, sightSettings.pearlMaxLiftBlocks());
         if (to == null || (bounds != null && !bounds.containsHorizontal(to))) {
