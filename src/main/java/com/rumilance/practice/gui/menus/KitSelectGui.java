@@ -85,27 +85,31 @@ public final class KitSelectGui extends AbstractGui {
         int mainCount = kitService.enabled(com.rumilance.practice.model.KitCategory.MAIN).size();
         int subCount = kitService.enabled(com.rumilance.practice.model.KitCategory.SUB).size();
         inventory.setItem(MenuScaffold.gridSlot(9),
-                categoryButton(player, "gui.kit-main-button", "gui.kit-main-button-lore",
-                        mainCount, UiTheme.SUCCESS, "cat:MAIN"));
+                categoryButton(player, com.rumilance.practice.model.KitCategory.MAIN,
+                        "gui.kit-main-button", "gui.kit-main-button-lore",
+                        mainCount, UiTheme.SUCCESS));
         inventory.setItem(MenuScaffold.gridSlot(11),
-                categoryButton(player, "gui.kit-sub-button", "gui.kit-sub-button-lore",
-                        subCount, UiTheme.SECONDARY, "cat:SUB"));
+                categoryButton(player, com.rumilance.practice.model.KitCategory.SUB,
+                        "gui.kit-sub-button", "gui.kit-sub-button-lore",
+                        subCount, UiTheme.SECONDARY));
     }
 
-    private ItemStack categoryButton(Player player, String nameKey, String loreKey, int count,
-                                     net.kyori.adventure.text.format.TextColor color, String action) {
-        return ItemBuilder.of(Material.OAK_BUTTON)
-                .name(t(player, nameKey).color(color))
-                .lore(
+    /**
+     * Main = 大自然風の鍛冶型(Wild)、Sub = ネジ型の装飾(Bolt)。押すと木のボタン音がして
+     * カーソルがその鍛冶型を持ち、0.2秒後に離れる音と同時に一覧が開く。
+     */
+    private ItemStack categoryButton(Player player, com.rumilance.practice.model.KitCategory category,
+                                     String nameKey, String loreKey, int count,
+                                     net.kyori.adventure.text.format.TextColor color) {
+        return com.rumilance.practice.gui.KitSections.categoryButton(category,
+                t(player, nameKey).color(color),
+                java.util.List.of(
                         UiTheme.divider(),
                         UiTheme.line(line(player, loreKey)),
                         UiTheme.blank(),
                         UiTheme.labelValue(line(player, "gui.kit-count-label"), String.valueOf(count)),
                         UiTheme.blank(),
-                        UiTheme.hint(line(player, "gui.kit-button-hint"))
-                )
-                .action(com.rumilance.practice.gui.DelayedButton.wrap(action))
-                .build();
+                        UiTheme.hint(line(player, "gui.kit-button-hint"))));
     }
 
     /** One category's kits, paginated over the standard content grid. */

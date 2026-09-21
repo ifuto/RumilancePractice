@@ -38,6 +38,34 @@ public final class KitSections {
     }
 
     /**
+     * Chooser tile for the two-step pickers (kit select, queue kit select).
+     *
+     * <p>Icons: <b>Main Kits = 大自然風の鍛冶型</b> (Wild armor trim smithing template),
+     * <b>Sub Kits = ネジ型の装飾</b> (Bolt armor trim smithing template). The press/release
+     * sound stays a wooden button — {@code DelayedButton} supplies that — while the tile the
+     * cursor picks up is the trim template itself.</p>
+     *
+     * @param lore already-rendered lore lines (divider, description, count, hint)
+     */
+    public static ItemStack categoryButton(KitCategory category, Component name,
+                                           List<Component> lore) {
+        boolean main = category == KitCategory.MAIN;
+        return ItemBuilder.of(main ? Material.WILD_ARMOR_TRIM_SMITHING_TEMPLATE
+                                   : Material.BOLT_ARMOR_TRIM_SMITHING_TEMPLATE)
+                .name(name)
+                .lore(lore.toArray(new Component[0]))
+                // 木時差式ボタン: 押して0.2秒後に開く。
+                .action(DelayedButton.wrap("cat:" + (main ? "MAIN" : "SUB")))
+                .build();
+    }
+
+    /** The trim-template icon for a category (shared by headers and chooser tiles). */
+    public static Material icon(KitCategory category) {
+        return category == KitCategory.MAIN ? Material.WILD_ARMOR_TRIM_SMITHING_TEMPLATE
+                                            : Material.BOLT_ARMOR_TRIM_SMITHING_TEMPLATE;
+    }
+
+    /**
      * Header tile for a section row. The icons are the vanilla smithing templates
      * themselves: the Wild armor trim template (nature) for Main, the Bolt armor trim
      * template (bolted) for Sub.

@@ -72,6 +72,9 @@ public final class QueueKitGui extends AbstractGui {
     @Override
     protected void configureSession(GuiSession session, Player player) {
         session.setRanked(ranked);
+        // 開き直すたびに2アイコンの画面から始める(前のカテゴリ選択を持ち越さない)。
+        session.setKitCategory(null);
+        session.setPage(0);
     }
 
     @Override
@@ -95,38 +98,13 @@ public final class QueueKitGui extends AbstractGui {
         paintFrame(player, session, inventory);
 
         List<KitDefinition> kits = kitService.enabled();
-        // Two labelled sections: row 1 = Main Kits (azalea header), row 2 = Sub Kits
-        // (iron-trapdoor header); rows 3-4 continue the Main line-up when it is long.
-        List<KitDefinition> main = kitService.enabled(com.rumilance.practice.model.KitCategory.MAIN);
-        List<KitDefinition> sub = kitService.enabled(com.rumilance.practice.model.KitCategory.SUB);
-        int index = 0;
-        inventory.setItem(MenuScaffold.gridSlot(index++),
-                com.rumilance.practice.gui.KitSections.header(
-                        com.rumilance.practice.model.KitCategory.MAIN, main.size(),
-                        line(player, "gui.queue-join-hint")));
-        for (KitDefinition kit : main) {
-            if (index >= 7) {
-                break; // row 1: header column + up to 6 main kits
-            }
-            inventory.setItem(MenuScaffold.gridSlot(index++), kitIcon(player, kit));
-        }
-        if (!sub.isEmpty()) {
-            inventory.setItem(MenuScaffold.gridSlot(index++),
-                    com.rumilance.practice.gui.KitSections.header(
-                            com.rumilance.practice.model.KitCategory.SUB, sub.size(),
-                            line(player, "gui.queue-join-hint")));
-            for (KitDefinition kit : sub) {
-                if (index >= 14) {
-                    break; // row 2: header column + up to 6 sub kits
-                }
-                inventory.setItem(MenuScaffold.gridSlot(index++), kitIcon(player, kit));
-            }
-        }
-        for (KitDefinition kit : main.subList(Math.min(6, main.size()), main.size())) {
-            if (index >= MenuScaffold.gridPageSize()) {
-                break;
-            }
-            inventory.setItem(MenuScaffold.gridSlot(index++), kitIcon(player, kit));
+        // Queue も 2 ステップ: まず Main / Sub の2アイコンだけ。押すと木のボタン音がして
+        // カーソルがその鍛冶型を持ち、0.2秒後に離れる音と同時にそのカテゴリの一覧が出る。
+        if (session.kitCategory() == null) {
+            renderChooser(player, inventory);
+        } else {
+            renderCategory(player, session, inventory);
+            MenuScaffold.returnButton(inventory, t(player, "menu.back"));
         }
 
         // Info tile showing total queue depth.
@@ -155,6 +133,51 @@ public final class QueueKitGui extends AbstractGui {
                         .build());
 
         paintNav(player, session, inventory);
+    }
+
+    /** Main = 大自然風の鍛冶型(Wild)、Sub = ネジ型の装飾(Bolt)。 */
+    private void renderChooser(Player player, Inventory inventory) {
+        int mainCount = kitService.enabled(com.rumilance.practice.model.KitCategory.MAIN).size();
+        int subCount = kitService.enabled(com.rumilance.practice.model.KitCategory.SUB).size();
+        inventory.setItem(MenuScaffold.gridSlot(9),
+                com.rumilance.practice.gui.KitSections.categoryButton(
+                        com.rumilance.practice.model.KitCategory.MAIN,
+                        t(player, "gui.kit-main-button").color(UiTheme.SUCCESS),
+                        java.util.List.of(
+                                UiTheme.divider(),
+                                UiTheme.line(line(player, "gui.kit-main-button-lore")),
+                                UiTheme.blank(),
+                                UiTheme.labelValue(line(player, "gui.kit-count-label"),
+                                        String.valueOf(mainCount)),
+                                UiTheme.blank(),
+                                UiTheme.hint(line(player, "gui.kit-button-hint")))));
+        inventory.setItem(MenuScaffold.gridSlot(11),
+                com.rumilance.practice.gui.KitSections.categoryButton(
+                        com.rumilance.practice.model.KitCategory.SUB,
+                        t(player, "gui.kit-sub-button").color(UiTheme.SECONDARY),
+                        java.util.List.of(
+                                UiTheme.divider(),
+                                UiTheme.line(line(player, "gui.kit-sub-button-lore")),
+                                UiTheme.blank(),
+                                UiTheme.labelValue(line(player, "gui.kit-count-label"),
+                                        String.valueOf(subCount)),
+                                UiTheme.blank(),
+                                UiTheme.hint(line(player, "gui.kit-button-hint")))));
+    }
+
+    /** 選ばれたカテゴリのキットをグリッド一杯に並べる(Main と Sub が別画面になった)。 */
+    private void renderCategory(Player player, GuiSession session, Inventory inventory) {
+        boolean sub = "SUB".equalsIgnoreCase(session.kitCategory());
+        List<KitDefinition> kits = kitService.enabled(sub
+                ? com.rumilance.practice.model.KitCategory.SUB
+                : com.rumilance.practice.model.KitCategory.MAIN);
+        int index = 0;
+        for (KitDefinition kit : kits) {
+            if (index >= MenuScaffold.gridPageSize()) {
+                break;
+            }
+            inventory.setItem(MenuScaffold.gridSlot(index++), kitIcon(player, kit));
+        }
     }
 
     private ItemStack kitIcon(Player player, KitDefinition kit) {
@@ -222,6 +245,23 @@ public final class QueueKitGui extends AbstractGui {
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot,
                             String action, org.bukkit.event.inventory.ClickType clickType) {
+        // 木時差式ボタンは 0.2 秒の押下/復帰を済ませてからここに来る。
+        if (action != null && action.startsWith("cat:")) {
+            session.setKitCategory(action.substring(4));
+            session.setPage(0);
+            sounds.play(player, "gui-click");
+            refresh(player, session, inventory);
+            return;
+        }
+        if ("back".equals(action)) {
+            if (session.kitCategory() != null) {
+                session.setKitCategory(null);
+                session.setPage(0);
+                sounds.play(player, "gui-back");
+                refresh(player, session, inventory);
+                return;
+            }
+        }
         if ("close".equals(action)) {
             sounds.play(player, "gui-back");
             player.closeInventory();
