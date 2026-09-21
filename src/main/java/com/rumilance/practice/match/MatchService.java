@@ -72,7 +72,6 @@ import java.util.logging.Level;
  */
 public final class MatchService {
 
-    private java.util.function.Predicate<org.bukkit.entity.Player> premiumCheck = player -> true;
     private final Plugin plugin;
     private final ArenaService arenaService;
     private final KitService kitService;
@@ -1176,22 +1175,6 @@ public final class MatchService {
      *
      * @return true when a running countdown was actually skipped
      */
-    /**
-     * 有料プラン判定を注入する({@code rankService::isVipOrAbove})。注入されなければ
-     * 全員が使える(従来動作)。
-     */
-    public void setPremiumCheck(java.util.function.Predicate<org.bukkit.entity.Player> premiumCheck) {
-        this.premiumCheck = premiumCheck == null ? player -> true : premiumCheck;
-    }
-
-    private boolean premiumFor(org.bukkit.entity.Player player) {
-        try {
-            return premiumCheck.test(player);
-        } catch (Throwable ignored) {
-            return true;
-        }
-    }
-
     public boolean skipCountdown(UUID matchId) {
         MatchSession session = registry().get(matchId).orElse(null);
         if (session == null || session.state() != MatchState.COUNTDOWN) {
@@ -2587,9 +2570,7 @@ public final class MatchService {
 
         // Only hand the report book to players who opted in via /setting; everyone else can open
         // the same GUI with /matchreport if they want the numbers.
-        // マッチレポートは毎回アイテムとパケットを余分に作るため有料プラン限定。
-        if (settingsService != null && com.rumilance.practice.settings.SettingPolicy.allows(
-                "match_report", settingsService.get(player).showMatchReport(), premiumFor(player))) {
+        if (settingsService != null && settingsService.get(player).showMatchReport()) {
             ItemStack report = new ItemStack(Material.WRITABLE_BOOK);
             ItemMeta reportMeta = report.getItemMeta();
             reportMeta.displayName(title(player, "match.item-report",

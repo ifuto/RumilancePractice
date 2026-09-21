@@ -61,7 +61,13 @@ public final class TeamService {
         OK, ALREADY_IN_TEAM, NOT_OWNER, NOT_IN_TEAM, TEAM_FULL, TARGET_OFFLINE,
         TARGET_IN_TEAM, NO_INVITE, INVITE_EXPIRED, INVALID_NAME, TOO_SMALL,
         UNBALANCED, OWNER_CANNOT_LEAVE, INVALID_SIDE, KIT_NOT_FOUND, NO_ARENA, COOLDOWN,
-        MEMBER_BUSY, SELF_BUSY
+        MEMBER_BUSY, SELF_BUSY,
+        /** Team Fight Queue に既に入っている。 */
+        ALREADY_QUEUED,
+        /** 受けるべき Team Duel Request がない。 */
+        NO_PENDING_DUEL,
+        /** 自分のパーティーには申し込めない。 */
+        DUEL_SELF
     }
 
     private volatile com.rumilance.practice.session.PlayerStateManager stateManager;
@@ -158,6 +164,9 @@ public final class TeamService {
                 case INVALID_SIDE -> "party.err-invalid-side";
                 case KIT_NOT_FOUND -> "party.err-kit";
                 case NO_ARENA -> "party.err-arena";
+                case ALREADY_QUEUED -> "party.err-already-queued";
+                case NO_PENDING_DUEL -> "party.err-no-pending-duel";
+                case DUEL_SELF -> "party.err-duel-self";
                 case COOLDOWN, OK, MEMBER_BUSY, SELF_BUSY -> "";
             };
             if (key.isEmpty()) {
@@ -181,6 +190,9 @@ public final class TeamService {
             case INVALID_SIDE -> "Invalid side.";
             case KIT_NOT_FOUND -> "Kit not found.";
             case NO_ARENA -> "No arena available.";
+            case ALREADY_QUEUED -> "Already waiting in the team fight queue.";
+            case NO_PENDING_DUEL -> "No pending team duel request.";
+            case DUEL_SELF -> "You cannot challenge your own party.";
             case COOLDOWN -> {
                 int secs = remainingInviteCooldownSeconds(player.getUniqueId(), cooldownTarget);
                 yield "Wait " + Math.max(1, secs) + "s before inviting that player again.";
@@ -317,6 +329,8 @@ public final class TeamService {
         if (!team.isOwner(player.getUniqueId())) {
             return Result.NOT_OWNER;
         }
+        // 解散したパーティーが Queue / Duel に残ると、抽選で幽霊と組まされてしまう。
+        clearPartyFightState(team.id());
         broadcast(team, Component.text("Team '" + team.name() + "' disbanded.", NamedTextColor.RED));
         for (UUID member : team.members()) {
             byMember.remove(member);
@@ -842,6 +856,202 @@ public final class TeamService {
             }
         }
         invites.remove(player);
+    }
+
+    // ---- Party vs Party: Team Fight Queue / Team Duel Request ----
+
+    /** Team Fight Queue の待ち行列(純粋ロジックは {@link TeamFightQueue})。 */
+    private final TeamFightQueue teamFightQueue = new TeamFightQueue();
+    /** Team Duel Request の保留中申し込み({@link TeamDuelRequests})。 */
+    private final TeamDuelRequests teamDuelRequests = new TeamDuelRequests();
+    /** Queue / Duel で使うキット(パーティーは普段キットを持たないので申込時に覚える)。 */
+    private final Map<UUID, String> partyFightKits = new ConcurrentHashMap<>();
+
+    /** 今の待ち人数(GUI とアナウンス用)。 */
+    public int queueWaitingCount() {
+        return teamFightQueue.waitingCount();
+    }
+
+    public boolean isQueued(UUID partyId) {
+        return teamFightQueue.isQueued(partyId);
+    }
+
+    /** 自分のパーティーを Team Fight Queue に入れる(相手チームはランダムに引かれる)。 */
+    public Result queueFight(Player owner, String kitId) {
+        Team team = byMember.get(owner.getUniqueId());
+        if (team == null) return Result.NOT_IN_TEAM;
+        if (!team.isOwner(owner.getUniqueId())) return Result.NOT_OWNER;
+        if (team.size() < MIN_TEAM_SIZE) return Result.TOO_SMALL;
+        if (!team.isSplitReady()) return Result.UNBALANCED;
+        if (teamFightQueue.isQueued(team.id())) return Result.ALREADY_QUEUED;
+        Result preflight = partyFightPreflight(team);
+        if (preflight != Result.OK) return preflight;
+        partyFightKits.put(team.id(), kitId);
+        teamFightQueue.enqueue(team.id(), team.size());
+        broadcast(team, Component.text("Waiting for an opponent team... ("
+                + teamFightQueue.waitingCount() + " in queue)", NamedTextColor.AQUA));
+        return Result.OK;
+    }
+
+    /** Queue から抜ける。 */
+    public Result cancelQueueFight(Player owner) {
+        Team team = byMember.get(owner.getUniqueId());
+        if (team == null) return Result.NOT_IN_TEAM;
+        if (!team.isOwner(owner.getUniqueId())) return Result.NOT_OWNER;
+        partyFightKits.remove(team.id());
+        boolean removed = teamFightQueue.cancel(team.id());
+        teamDuelRequests.cancelFrom(team.id());
+        if (removed) {
+            broadcast(team, Component.text("Left the team fight queue.", NamedTextColor.GRAY));
+        }
+        return removed ? Result.OK : Result.ALREADY_QUEUED;
+    }
+
+    /**
+     * Queue の抽選。スケジューラから毎秒呼ばれ、成立した分だけ試合を始める。
+     *
+     * @return 開始した Party vs Party の数
+     */
+    public int tickTeamFightQueue() {
+        int started = 0;
+        for (int guard = 0; guard < 8; guard++) {
+            Optional<TeamFightQueue.Match> match = teamFightQueue.pollMatch();
+            if (match.isEmpty()) {
+                break;
+            }
+            Team a = byId.get(match.get().partyA());
+            Team b = byId.get(match.get().partyB());
+            if (a == null || b == null) {
+                continue;
+            }
+            if (startPartyFight(a, b)) {
+                started++;
+            }
+        }
+        return started;
+    }
+
+    /** 相手パーティーのオーナーへ Team vs Team を申し込む。 */
+    public Result requestTeamDuel(Player owner, String targetPartyName, String kitId) {
+        Team team = byMember.get(owner.getUniqueId());
+        if (team == null) return Result.NOT_IN_TEAM;
+        if (!team.isOwner(owner.getUniqueId())) return Result.NOT_OWNER;
+        if (team.size() < MIN_TEAM_SIZE) return Result.TOO_SMALL;
+        if (!team.isSplitReady()) return Result.UNBALANCED;
+        Team target = findByName(targetPartyName).orElse(null);
+        if (target == null) return Result.INVALID_NAME;
+        Result preflight = partyFightPreflight(team);
+        if (preflight != Result.OK) return preflight;
+        partyFightKits.put(team.id(), kitId);
+        TeamDuelRequests.Outcome outcome = teamDuelRequests.send(
+                team.id(), team.name(), owner.getUniqueId(), target.id());
+        switch (outcome) {
+            case SENT -> {
+                broadcast(team, Component.text("Team duel sent to " + target.name()
+                        + ". Their owner has 60 seconds to accept.", NamedTextColor.AQUA));
+                Player targetOwner = Bukkit.getPlayer(target.owner());
+                if (targetOwner != null) {
+                    targetOwner.sendMessage(Component.text(team.name()
+                            + " challenged your team to a duel. /team accept or /team deny",
+                            NamedTextColor.GOLD));
+                }
+                return Result.OK;
+            }
+            case SELF -> {
+                return Result.DUEL_SELF;
+            }
+            case ALREADY_PENDING -> {
+                return Result.ALREADY_QUEUED;
+            }
+            default -> {
+                return Result.INVALID_NAME;
+            }
+        }
+    }
+
+    /** 保留中の Team Duel Request を受けて試合を始める。 */
+    public Result acceptTeamDuel(Player owner) {
+        Team team = byMember.get(owner.getUniqueId());
+        if (team == null) return Result.NOT_IN_TEAM;
+        if (!team.isOwner(owner.getUniqueId())) return Result.NOT_OWNER;
+        Optional<TeamDuelRequests.Request> pending = teamDuelRequests.pendingFor(team.id());
+        if (pending.isEmpty()) return Result.NO_PENDING_DUEL;
+        Team challenger = byId.get(pending.get().fromParty());
+        if (challenger == null) {
+            teamDuelRequests.deny(team.id());
+            return Result.NO_PENDING_DUEL;
+        }
+        teamDuelRequests.accept(team.id());
+        return startPartyFight(challenger, team) ? Result.OK : Result.MEMBER_BUSY;
+    }
+
+    /** 保留中の Team Duel Request を断る。 */
+    public Result denyTeamDuel(Player owner) {
+        Team team = byMember.get(owner.getUniqueId());
+        if (team == null) return Result.NOT_IN_TEAM;
+        if (!team.isOwner(owner.getUniqueId())) return Result.NOT_OWNER;
+        if (!teamDuelRequests.deny(team.id())) return Result.NO_PENDING_DUEL;
+        broadcast(team, Component.text("Team duel declined.", NamedTextColor.GRAY));
+        return Result.OK;
+    }
+
+    /** 解散 / 離脱時に待ち行列と保留中の申し込みを掃除する。 */
+    public void clearPartyFightState(UUID partyId) {
+        if (partyId == null) return;
+        teamFightQueue.cancel(partyId);
+        teamDuelRequests.cancelFrom(partyId);
+        partyFightKits.remove(partyId);
+    }
+
+    /** 保留中の Team Duel Request(ホットバーや GUI の表示用)。 */
+    public Optional<TeamDuelRequests.Request> pendingDuelFor(UUID partyId) {
+        return teamDuelRequests.pendingFor(partyId);
+    }
+
+    /**
+     * Party vs Party の共通前検査。パーティー内 RED/BLUE 戦と違い、こちらは
+     * 「メンバー全員がロビーで暇」であることを両パーティーに要求する。
+     */
+    private Result partyFightPreflight(Team team) {
+        if (team.selectedArena() == null || team.selectedArena().isBlank()) {
+            if (!Boolean.TRUE.equals(hasPartyMaps.getAsBoolean())) {
+                return Result.NO_ARENA;
+            }
+        }
+        return checkMembersAvailable(team);
+    }
+
+    /**
+     * 2つのパーティーを RED / BLUE としてぶつける。パーティー内の色分けではなく
+     * 「かたまり同士」なので、メンバー一覧をそのまま1チームずつにする。
+     */
+    private boolean startPartyFight(Team partyA, Team partyB) {
+        Result readyA = partyFightPreflight(partyA);
+        Result readyB = partyFightPreflight(partyB);
+        if (readyA != Result.OK || readyB != Result.OK) {
+            if (readyA != Result.OK) teamFightQueue.enqueue(partyA.id(), partyA.size());
+            if (readyB != Result.OK) teamFightQueue.enqueue(partyB.id(), partyB.size());
+            return false;
+        }
+        String kitId = partyFightKits.get(partyA.id());
+        if (kitId == null) kitId = partyFightKits.get(partyB.id());
+        if (kitId == null) {
+            return false;
+        }
+        String arenaName = partyA.selectedArena() != null && !partyA.selectedArena().isBlank()
+                ? partyA.selectedArena()
+                : partyB.selectedArena();
+        List<UUID> sideA = new ArrayList<>(partyA.members());
+        List<UUID> sideB = new ArrayList<>(partyB.members());
+        partyFightKits.remove(partyA.id());
+        partyFightKits.remove(partyB.id());
+        broadcast(partyA, Component.text("Match found: " + partyA.name() + " vs "
+                + partyB.name() + "!", NamedTextColor.GOLD, TextDecoration.BOLD));
+        broadcast(partyB, Component.text("Match found: " + partyB.name() + " vs "
+                + partyA.name() + "!", NamedTextColor.GOLD, TextDecoration.BOLD));
+        Bukkit.getScheduler().runTask(plugin, () -> matchService.startTeamMatch(
+                sideA, sideB, kitId, MatchMode.TEAM, 1, arenaName, false));
+        return true;
     }
 
     private boolean isInActiveTeamMatch(UUID player) {

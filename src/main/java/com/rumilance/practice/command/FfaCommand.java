@@ -60,6 +60,29 @@ public final class FfaCommand implements CommandExecutor, TabCompleter {
         }
 
         return switch (sub) {
+            // Private / Team FFA: 招待した人だけが入れる。閉じるとクールダウンが入る。
+            case "private" -> {
+                if (!(sender instanceof Player player) || args.length < 2) {
+                    sender.sendMessage(Component.text(
+                            "Usage: /ffa private <arena> [player...]", NamedTextColor.YELLOW));
+                    yield true;
+                }
+                java.util.List<String> invited = new java.util.ArrayList<>();
+                for (int i = 2; i < args.length; i++) {
+                    invited.add(args[i]);
+                }
+                ffaService.openPrivateFfa(player, args[1], invited);
+                yield true;
+            }
+            case "closeprivate" -> {
+                if (!(sender instanceof Player player) || args.length < 2) {
+                    sender.sendMessage(Component.text(
+                            "Usage: /ffa closeprivate <arena>", NamedTextColor.YELLOW));
+                    yield true;
+                }
+                ffaService.closePrivateFfa(player, args[1]);
+                yield true;
+            }
             case "create" -> {
                 if (!(sender instanceof Player player) || args.length < 2) {
                     sender.sendMessage(Component.text("Usage: /ffa create <arena>", NamedTextColor.YELLOW));

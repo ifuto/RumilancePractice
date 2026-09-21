@@ -788,12 +788,9 @@ public final class FeatureBootstrap {
         duelRequestGui.setMapSelectGui(duelMapSelectGui);
 
         SettingsGui settingsGui = new SettingsGui(guiSessions, soundService, settingsService);
-        // 容量を食む設定(味方グロウ / マッチレポート)は有料プラン限定。GUI の表示と
-        // 実際の適用が同じ判定を通るように、三箇所へ同じ判定を注入する。
+        // 容量を食む設定(味方グロウ)は有料プラン限定。GUI の表示と実際の適用が同じ判定を
+        // 通るように、両方へ同じ判定を注入する。マッチレポートは全員が使える。
         settingsGui.setPremiumCheck(rankServiceRef::isVipOrAbove);
-        if (matchService != null) {
-            matchService.setPremiumCheck(rankServiceRef::isVipOrAbove);
-        }
         if (teamGlowLosService != null) {
             teamGlowLosService.setPremiumCheck(rankServiceRef::isVipOrAbove);
         }
@@ -838,6 +835,17 @@ public final class FeatureBootstrap {
         teamService.setPartyHotbar(partyHotbar);
         teamService.setHasPartyMaps(() -> !arenaStore.partyArenas().isEmpty());
         ffaService.setTeamService(teamService);
+        // Team Fight Queue の抽選: 毎秒回して、揃った Party vs Party を開始する。
+        // プラグイン停止時にタスクは自動で止まるので、別途 cancel は不要。
+        final TeamService teamQueueTicker = teamService;
+        plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
+            try {
+                teamQueueTicker.tickTeamFightQueue();
+            } catch (Throwable t) {
+                plugin.getLogger().log(java.util.logging.Level.WARNING,
+                        "Team fight queue tick failed", t);
+            }
+        }, 20L, 20L);
         lobbyService.setHubInventoryCustomizer(player -> {
             var team = teamService.teamOf(player.getUniqueId());
             if (team.isEmpty()) {

@@ -450,13 +450,20 @@ public final class FfaService {
             messageService.send(player, "ffa.cannot-join");
             return false;
         }
-        if (teamService != null && teamService.teamOf(player.getUniqueId()).isPresent()) {
+        FfaArena arena = findArena(arenaId);
+        // Team FFA: 招待された人だけはパーティー所属でも入れる(通常 FFA はソロ限定)。
+        boolean invitedPrivate = arena != null && isInvited(arena.id(), player.getUniqueId());
+        if (teamService != null && !invitedPrivate
+                && teamService.teamOf(player.getUniqueId()).isPresent()) {
             messageService.send(player, "party.solo-only");
             return false;
         }
-        FfaArena arena = findArena(arenaId);
         if (arena == null || !arena.enabled() || Boolean.TRUE.equals(resetting.get(arena.id()))) {
             messageService.send(player, "ffa.unavailable");
+            return false;
+        }
+        if (privateInvites.containsKey(arena.id()) && !invitedPrivate) {
+            messageService.send(player, "ffa.cannot-join");
             return false;
         }
         PlayerState state = stateManager.getState(player.getUniqueId());
@@ -1729,5 +1736,96 @@ public final class FfaService {
         yaml.set(path + ".settings.tpa", arena.tpaEnabled());
         yaml.set(path + ".settings.rtpqueue", arena.rtpQueueEnabled());
         configService.save(ConfigService.FFA);
+    }
+
+    // ---- Private / Team FFA: 招待した人だけが入れる FFA + 閉じた後のクールダウン ----
+
+    /** arenaId -> 招待リスト。マップにキーがある間、そのアリーナは招待制になる。 */
+    private final Map<String, java.util.Set<UUID>> privateInvites = new ConcurrentHashMap<>();
+    /** arenaId -> 開いた人(閉じる権限の判定用)。 */
+    private final Map<String, UUID> privateOwners = new ConcurrentHashMap<>();
+    /** 開いた人 -> 前回閉じた時刻(クールダウンの起点)。 */
+    private final Map<UUID, java.time.Instant> privateClosedAt = new ConcurrentHashMap<>();
+
+    private boolean isInvited(String arenaId, UUID player) {
+        java.util.Set<UUID> invites = privateInvites.get(arenaId);
+        return invites != null && invites.contains(player);
+    }
+
+    /** このアリーナが今、招待制になっているか。 */
+    public boolean isPrivate(String arenaId) {
+        return privateInvites.containsKey(arenaId);
+    }
+
+    /** 閉じた後の残りクールダウン秒(0 なら今すぐ開ける)。 */
+    public long privateCooldownSeconds(UUID owner) {
+        return PrivateFfaPolicy.remainingSeconds(java.time.Instant.now(),
+                privateClosedAt.get(owner), null);
+    }
+
+    /**
+     * 招待制(Team)FFA を開く。指定した人だけが入れるようになり、閉じるまでの間はその
+     * アリーナに他の人は入れない。
+     *
+     * @param invitedNames 招待するプレイヤー名(オンラインのみ解決される)
+     * @return 開けたかどうか
+     */
+    public boolean openPrivateFfa(Player owner, String arenaId, java.util.Collection<String> invitedNames) {
+        FfaArena arena = findArena(arenaId);
+        if (owner == null || arena == null || !arena.enabled()) {
+            messageService.send(owner, "ffa.unavailable");
+            return false;
+        }
+        long wait = privateCooldownSeconds(owner.getUniqueId());
+        if (wait > 0) {
+            owner.sendMessage(net.kyori.adventure.text.Component.text(
+                    "Wait " + wait + "s before opening another private FFA.",
+                    net.kyori.adventure.text.format.NamedTextColor.RED));
+            return false;
+        }
+        java.util.List<UUID> invited = new java.util.ArrayList<>();
+        invited.add(owner.getUniqueId());
+        if (invitedNames != null) {
+            for (String name : invitedNames) {
+                if (name == null || name.isBlank()) {
+                    continue;
+                }
+                Player target = org.bukkit.Bukkit.getPlayerExact(name.trim());
+                if (target != null) {
+                    invited.add(target.getUniqueId());
+                }
+            }
+        }
+        privateInvites.put(arena.id(), PrivateFfaPolicy.normalizeInvites(invited));
+        privateOwners.put(arena.id(), owner.getUniqueId());
+        privateClosedAt.remove(owner.getUniqueId());
+        owner.sendMessage(net.kyori.adventure.text.Component.text(
+                "Private FFA open on " + arena.id() + " for "
+                        + privateInvites.get(arena.id()).size() + " invited players.",
+                net.kyori.adventure.text.format.NamedTextColor.AQUA));
+        return true;
+    }
+
+    /** 招待制 FFA を閉じる。閉じた瞬間からクールダウンが始まる。 */
+    public boolean closePrivateFfa(Player owner, String arenaId) {
+        FfaArena arena = findArena(arenaId);
+        if (owner == null || arena == null) {
+            return false;
+        }
+        UUID opener = privateOwners.get(arena.id());
+        if (opener == null || !opener.equals(owner.getUniqueId())) {
+            owner.sendMessage(net.kyori.adventure.text.Component.text(
+                    "You did not open this private FFA.",
+                    net.kyori.adventure.text.format.NamedTextColor.RED));
+            return false;
+        }
+        privateInvites.remove(arena.id());
+        privateOwners.remove(arena.id());
+        privateClosedAt.put(owner.getUniqueId(), java.time.Instant.now());
+        owner.sendMessage(net.kyori.adventure.text.Component.text(
+                "Private FFA closed. Cooldown: "
+                        + PrivateFfaPolicy.CLOSE_COOLDOWN.getSeconds() + "s.",
+                net.kyori.adventure.text.format.NamedTextColor.GRAY));
+        return true;
     }
 }

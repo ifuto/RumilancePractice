@@ -162,6 +162,45 @@ public final class TeamCommand implements CommandExecutor, TabCompleter {
                 TeamService.Result r = teamService.start(player, kitId);
                 if (r != TeamService.Result.OK) player.sendMessage(err(r));
             }
+            case "queue" -> {
+                if (args.length < 2) {
+                    player.sendMessage(Component.text("Usage: /team queue <kit>", NamedTextColor.YELLOW));
+                    return true;
+                }
+                String queueKit = args[1].toLowerCase(Locale.ROOT);
+                if (kitService.get(queueKit).filter(k -> k.enabled()).isEmpty()) {
+                    player.sendMessage(err(TeamService.Result.KIT_NOT_FOUND));
+                    return true;
+                }
+                TeamService.Result qr = teamService.queueFight(player, queueKit);
+                if (qr != TeamService.Result.OK) player.sendMessage(err(qr));
+            }
+            case "unqueue" -> {
+                TeamService.Result ur = teamService.cancelQueueFight(player);
+                if (ur != TeamService.Result.OK) player.sendMessage(err(ur));
+            }
+            case "duel" -> {
+                if (args.length < 3) {
+                    player.sendMessage(Component.text("Usage: /team duel <party> <kit>",
+                            NamedTextColor.YELLOW));
+                    return true;
+                }
+                String duelKit = args[2].toLowerCase(Locale.ROOT);
+                if (kitService.get(duelKit).filter(k -> k.enabled()).isEmpty()) {
+                    player.sendMessage(err(TeamService.Result.KIT_NOT_FOUND));
+                    return true;
+                }
+                TeamService.Result dr = teamService.requestTeamDuel(player, args[1], duelKit);
+                if (dr != TeamService.Result.OK) player.sendMessage(err(dr));
+            }
+            case "accept" -> {
+                TeamService.Result ar = teamService.acceptTeamDuel(player);
+                if (ar != TeamService.Result.OK) player.sendMessage(err(ar));
+            }
+            case "deny" -> {
+                TeamService.Result dr = teamService.denyTeamDuel(player);
+                if (dr != TeamService.Result.OK) player.sendMessage(err(dr));
+            }
             case "disband" -> teamService.disband(player);
             case "list" -> {
                 player.sendMessage(Component.text("Public teams:", NamedTextColor.AQUA));
@@ -172,19 +211,41 @@ public final class TeamCommand implements CommandExecutor, TabCompleter {
                         player.sendMessage(Component.text("  " + t.name() + " - " + t.size() + " players",
                                 NamedTextColor.GRAY)));
             }
-            default -> sendHelp(player);
+            default -> sendHelp(player, label);
         }
         return true;
     }
 
-    private void sendHelp(Player p) {
-        p.sendMessage(Component.text("Team commands:", NamedTextColor.AQUA));
-        p.sendMessage(Component.text("/team create [public] [name]", NamedTextColor.GRAY));
-        p.sendMessage(Component.text("/team invite <player>", NamedTextColor.GRAY));
-        p.sendMessage(Component.text("/team join <name|list>", NamedTextColor.GRAY));
+    /**
+     * 案内を2層に分ける。{@code /party} は「大きなひとかたまり」(作成・招待・参加・
+     * Party 戦)、{@code /team} は「最小分解」(赤/青への色分けとパーティー内戦)。
+     * 同じ実行部を共有しているので、どちらからでも全サブコマンドは動く。
+     */
+    private void sendHelp(Player p, String label) {
+        String used = label == null || label.isBlank() ? "team" : label.toLowerCase(Locale.ROOT);
+        boolean party = used.equals("party") || used.equals("p");
+        if (party) {
+            p.sendMessage(Component.text("Party commands (the whole group):", NamedTextColor.AQUA));
+            p.sendMessage(Component.text("/party create [public] [name]", NamedTextColor.GRAY));
+            p.sendMessage(Component.text("/party invite <player> | /party join <name|list>",
+                    NamedTextColor.GRAY));
+            p.sendMessage(Component.text("/party leave | /party kick <player> | /party disband",
+                    NamedTextColor.GRAY));
+            p.sendMessage(Component.text("/party queue <kit> | /party unqueue", NamedTextColor.GRAY));
+            p.sendMessage(Component.text("/party duel <party> <kit> | /party accept | /party deny",
+                    NamedTextColor.GRAY));
+            p.sendMessage(Component.text("Red/blue split: /team side | /team autosplit",
+                    NamedTextColor.DARK_GRAY));
+            return;
+        }
+        p.sendMessage(Component.text("Team commands (red/blue split inside a party):",
+                NamedTextColor.AQUA));
         p.sendMessage(Component.text("/team side <player> <red|blue>", NamedTextColor.GRAY));
-        p.sendMessage(Component.text("/team autosplit | /team clearsides", NamedTextColor.GRAY));
-        p.sendMessage(Component.text("/team start <kit> | /team disband", NamedTextColor.GRAY));
+        p.sendMessage(Component.text("/team autosplit | /team clearsides | /team teamcount <n>",
+                NamedTextColor.GRAY));
+        p.sendMessage(Component.text("/team start <kit>", NamedTextColor.GRAY));
+        p.sendMessage(Component.text("Party level: /party create | /party invite | /party queue",
+                NamedTextColor.DARK_GRAY));
     }
 
     private Component err(TeamService.Result r) {
@@ -205,6 +266,9 @@ public final class TeamCommand implements CommandExecutor, TabCompleter {
             case KIT_NOT_FOUND -> "Kit not found.";
             case NO_ARENA -> "No arena available right now.";
             case COOLDOWN -> "Wait before sending another invite.";
+            case ALREADY_QUEUED -> "Already waiting in the team fight queue.";
+            case NO_PENDING_DUEL -> "No pending team duel request.";
+            case DUEL_SELF -> "You cannot challenge your own party.";
             default -> r.name();
         };
         return Component.text(msg, NamedTextColor.RED);
@@ -223,6 +287,7 @@ public final class TeamCommand implements CommandExecutor, TabCompleter {
             } else {
                 subs.addAll(List.of("info", "leave"));
                 if (teamOpt.get().isOwner(player.getUniqueId())) {
+                    subs.addAll(List.of("queue", "unqueue", "duel", "accept", "deny"));
                     subs.addAll(List.of("invite", "kick", "public", "side",
                             "autosplit", "clearsides", "teamcount", "start", "disband"));
                 }

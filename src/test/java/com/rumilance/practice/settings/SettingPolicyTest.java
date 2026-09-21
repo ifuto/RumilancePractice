@@ -12,12 +12,19 @@ import org.junit.jupiter.api.Test;
  */
 public class SettingPolicyTest {
 
-    /** 味方グロウとマッチレポートは毎 tick / 毎試合の余分な処理を伴うので有料プラン限定。 */
+    /** 毎 tick の視線判定とグロウ再送を伴う味方グロウだけが有料プラン限定。 */
     @Test
     void heavySettingsArePremiumOnly() {
         assertTrue(SettingPolicy.isPremiumOnly("team_glow"));
-        assertTrue(SettingPolicy.isPremiumOnly("match_report"));
-        assertEquals(2, SettingPolicy.premiumOnlyKeys().size());
+        assertEquals(1, SettingPolicy.premiumOnlyKeys().size());
+    }
+
+    /** マッチレポートは全員が使える(有料限定にしない)。 */
+    @Test
+    void matchReportStaysFreeForEveryone() {
+        assertFalse(SettingPolicy.isPremiumOnly("match_report"));
+        assertFalse(SettingPolicy.isLocked("match_report", false));
+        assertTrue(SettingPolicy.allows("match_report", true, false));
     }
 
     /** 軽い設定は誰でも使える。 */
@@ -36,7 +43,7 @@ public class SettingPolicyTest {
     @Test
     void lockAppliesOnlyToTheFreePlan() {
         assertTrue(SettingPolicy.isLocked("team_glow", false));
-        assertTrue(SettingPolicy.isLocked("match_report", false));
+        assertFalse(SettingPolicy.isLocked("match_report", false));
         assertFalse(SettingPolicy.isLocked("team_glow", true));
         assertFalse(SettingPolicy.isLocked("sounds", false));
     }

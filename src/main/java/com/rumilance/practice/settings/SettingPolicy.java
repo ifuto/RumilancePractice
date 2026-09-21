@@ -7,11 +7,11 @@ import java.util.Set;
 /**
  * Which personal settings the free plan may use.
  *
- * <p>A few toggles cost the server real work per player: ally glow keeps re-evaluating line of
- * sight and pushing glowing state to every viewer, and the match report builds and sends an
- * extra item plus its packets after every match. Those are paid-plan features — the free plan
- * simply keeps them off, and the toggle is shown locked instead of clickable so the reason is
- * visible rather than silent.</p>
+ * <p>Ally glow is the one toggle that costs the server real work per player: it keeps
+ * re-evaluating line of sight and pushes glowing state to every viewer, so it is a paid-plan
+ * feature. The free plan keeps it off and sees a locked tile with the reason in the lore
+ * instead of a switch that silently does nothing. Everything else — the match report included —
+ * stays available to everyone.</p>
  *
  * <p>Pure on purpose: no Bukkit, no plugin state, so the rule set is unit-testable and the GUI
  * and the backend gates cannot drift apart.</p>
@@ -24,7 +24,6 @@ public final class SettingPolicy {
     static {
         Set<String> keys = new LinkedHashSet<>();
         keys.add("team_glow");
-        keys.add("match_report");
         PREMIUM_ONLY = Collections.unmodifiableSet(keys);
     }
 
