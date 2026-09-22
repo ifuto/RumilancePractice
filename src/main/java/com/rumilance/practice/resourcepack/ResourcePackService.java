@@ -696,16 +696,31 @@ public final class ResourcePackService implements Listener {
             conn.setReadTimeout(20_000);
             conn.setUseCaches(false);
             conn.setInstanceFollowRedirects(true);
+            // GitHub serves release assets from a signed redirect and does not care about the
+            // agent, but some proxies/object stores do - be explicit instead of "Java/21".
+            conn.setRequestProperty("User-Agent", "RumilancePractice/1.2");
             if (conn.getResponseCode() >= 400) {
                 return null;
             }
+            // A wrong hash is worse than no hash: the client would download the real pack, fail
+            // the check and end up with no badge at all ("リソパが読み込めない"). So refuse to hash
+            // anything that is obviously not the pack - an HTML error/landing page, or nothing.
+            String contentType = conn.getContentType();
+            if (contentType != null && contentType.toLowerCase(java.util.Locale.ROOT).contains("text/html")) {
+                return null;
+            }
             java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-1");
+            long total = 0L;
             try (java.io.InputStream in = conn.getInputStream()) {
                 byte[] buf = new byte[16 * 1024];
                 int read;
                 while ((read = in.read(buf)) != -1) {
                     digest.update(buf, 0, read);
+                    total += read;
                 }
+            }
+            if (total == 0L) {
+                return null;
             }
             byte[] hash = digest.digest();
             StringBuilder hex = new StringBuilder(40);
