@@ -1667,6 +1667,12 @@ public final class FeatureBootstrap {
         practiceAdmin.setSignQueueService(signQueueService);
         practiceAdmin.setScoreboardService(scoreboardService);
         practiceAdmin.setPracticeService(practiceService);
+        practiceAdmin.setQueueService(queueService);
+        practiceAdmin.setStatsResetService(statsResetService);
+        practiceAdmin.setPlayerRepository(playerRepository);
+        practiceAdmin.setAsyncExecutor(asyncExecutor);
+        practiceAdmin.setBanService(banService);
+        practiceAdmin.setResourcePackService(resourcePackService);
         AdminCommand adminCommand = new AdminCommand(
                 plugin, statsResetService, playerRepository, asyncExecutor, originalKitService);
         adminCommand.setScoreboardService(scoreboardService);

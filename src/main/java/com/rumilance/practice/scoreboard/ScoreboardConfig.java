@@ -254,6 +254,21 @@ public final class ScoreboardConfig {
                 .replace("{s}", Long.toString(secs % 60L));
     }
 
+    /** Human countdown for a future deadline (e.g. FFA reset): {@code 42s}, {@code 3:12}, {@code 1:02:09}. */
+    public String formatCountdown(long seconds) {
+        long secs = Math.max(0L, seconds);
+        long h = secs / 3600L;
+        long m = (secs % 3600L) / 60L;
+        long s = secs % 60L;
+        if (h > 0L) {
+            return String.format(Locale.ROOT, "%d:%02d:%02d", h, m, s);
+        }
+        if (m > 0L) {
+            return String.format(Locale.ROOT, "%d:%02d", m, s);
+        }
+        return secs + "s";
+    }
+
     public String colorRed() {
         return colorRed;
     }

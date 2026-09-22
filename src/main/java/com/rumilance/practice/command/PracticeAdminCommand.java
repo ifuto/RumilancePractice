@@ -4,17 +4,28 @@ import com.rumilance.practice.RumilancePractice;
 import com.rumilance.practice.admin.AdminTools;
 import com.rumilance.practice.arena.ArenaService;
 import com.rumilance.practice.arena.ArenaTemplateStore;
+import com.rumilance.practice.ban.BanService;
 import com.rumilance.practice.config.ConfigService;
 import com.rumilance.practice.config.RuntimeFlags;
+import com.rumilance.practice.database.repository.PlayerRepository;
+import com.rumilance.practice.ffa.FfaResetTimes;
 import com.rumilance.practice.ffa.FfaService;
 import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.lobby.LobbyService;
 import com.rumilance.practice.match.MatchService;
+import com.rumilance.practice.model.PlayerData;
+import com.rumilance.practice.queue.QueueService;
+import com.rumilance.practice.resourcepack.ResourcePackService;
 import com.rumilance.practice.sound.SoundService;
+import com.rumilance.practice.state.MatchMode;
+import com.rumilance.practice.stats.StatsResetService;
+import com.rumilance.practice.util.AsyncExecutor;
 import com.rumilance.practice.util.Cuboid;
 import com.rumilance.practice.util.LocationUtil;
+import com.rumilance.practice.util.TickHealth;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -25,6 +36,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
 public final class PracticeAdminCommand implements CommandExecutor, TabCompleter {
 
@@ -42,6 +54,12 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
     private volatile com.rumilance.practice.signqueue.SignQueueService signQueueService;
     private java.util.function.Consumer<Player> openAdminMenu;
     private com.rumilance.practice.scoreboard.ScoreboardService scoreboardService;
+    private volatile QueueService queueService;
+    private volatile StatsResetService statsResetService;
+    private volatile PlayerRepository playerRepository;
+    private volatile AsyncExecutor asyncExecutor;
+    private volatile BanService banService;
+    private volatile ResourcePackService resourcePackService;
 
     public PracticeAdminCommand(
             RumilancePractice plugin,
@@ -83,6 +101,30 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
         this.scoreboardService = scoreboardService;
     }
 
+    public void setQueueService(QueueService queueService) {
+        this.queueService = queueService;
+    }
+
+    public void setStatsResetService(StatsResetService statsResetService) {
+        this.statsResetService = statsResetService;
+    }
+
+    public void setPlayerRepository(PlayerRepository playerRepository) {
+        this.playerRepository = playerRepository;
+    }
+
+    public void setAsyncExecutor(AsyncExecutor asyncExecutor) {
+        this.asyncExecutor = asyncExecutor;
+    }
+
+    public void setBanService(BanService banService) {
+        this.banService = banService;
+    }
+
+    public void setResourcePackService(ResourcePackService resourcePackService) {
+        this.resourcePackService = resourcePackService;
+    }
+
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command,
                              @NotNull String label, @NotNull String[] args) {
@@ -106,7 +148,8 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
         }
 
         if (args.length == 0) {
-            sender.sendMessage(Component.text("/practiceadmin <menu|tool|sign|reload|status|matches|cleanup|maintenance|ffacommand>",
+            sender.sendMessage(Component.text(
+                    "/practiceadmin <menu|tool|sign|reload|status|matches|cleanup|maintenance|ffacommand|ffa|statsreset|broadcast|time|kick|forceend|forcematch|toggle|packpolicy>",
                     NamedTextColor.YELLOW));
             return true;
         }
@@ -180,8 +223,22 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
                 yield true;
             }
             case "status" -> {
+                if (args.length > 1 && args[1].equalsIgnoreCase("tps")) {
+                    double mspt = TickHealth.emaMspt();
+                    double tps = mspt <= 0.0d ? 20.0d : Math.min(20.0d, 1000.0d / mspt);
+                    boolean lagging = TickHealth.lagging();
+                    sender.sendMessage(Component.text(String.format(
+                                    "MSPT %.1fms (EMA) | TPS %.1f | %s",
+                                    mspt, tps, lagging ? "LAGGING" : "OK"),
+                            lagging ? NamedTextColor.RED : NamedTextColor.GREEN));
+                    yield true;
+                }
                 sender.sendMessage(Component.text("Active matches: " + matchService.registry().activeCount()
-                        + " | maintenance=" + runtimeFlags.maintenance(), NamedTextColor.AQUA));
+                        + " | maintenance=" + runtimeFlags.maintenance()
+                        + " | online=" + com.rumilance.practice.util.RealPlayers.count()
+                        + " | FFA players=" + ffaService.occupantIds().size()
+                        + " | queued=" + (queueService == null ? 0 : queueService.totalWaiting()),
+                        NamedTextColor.AQUA));
                 yield true;
             }
             case "matches" -> {
@@ -205,6 +262,77 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
             }
             case "ffacommand" -> {
                 yield handleFfaCommand(sender, args);
+            }
+            case "ffa" -> {
+                yield handleFfa(sender, args);
+            }
+            case "statsreset" -> {
+                yield handleStatsReset(sender, args);
+            }
+            case "broadcast" -> {
+                yield handleBroadcast(sender, args);
+            }
+            case "time" -> {
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage(Component.text("In-game only.", NamedTextColor.RED));
+                    yield true;
+                }
+                if (args.length >= 2) {
+                    String token = args[1].toLowerCase(Locale.ROOT);
+                    Long t = switch (token) {
+                        case "day" -> 1000L;
+                        case "noon" -> 6000L;
+                        case "night" -> 13000L;
+                        case "midnight" -> 18000L;
+                        default -> null;
+                    };
+                    if (t != null) {
+                        player.getWorld().setTime(t);
+                        sender.sendMessage(Component.text("World time set to " + token + ".",
+                                NamedTextColor.GREEN));
+                        yield true;
+                    }
+                    if (token.equals("sun") || token.equals("clear")) {
+                        player.getWorld().setStorm(false);
+                        player.getWorld().setThundering(false);
+                        sender.sendMessage(Component.text("Weather cleared.", NamedTextColor.GREEN));
+                        yield true;
+                    }
+                }
+                sender.sendMessage(Component.text(
+                        "Usage: /practiceadmin time <day|noon|night|midnight|sun>  |  time now "
+                                + player.getWorld().getTime() + " tick, "
+                                + (player.getWorld().hasStorm() ? "storm" : "clear"),
+                        NamedTextColor.YELLOW));
+                yield true;
+            }
+            case "kick" -> {
+                yield handleKick(sender, args);
+            }
+            case "forceend" -> {
+                yield handleForceEnd(sender, args);
+            }
+            case "forcematch" -> {
+                yield handleForceMatch(sender, args);
+            }
+            case "toggle" -> {
+                yield handleToggle(sender, args);
+            }
+            case "packpolicy" -> {
+                boolean required = true;
+                if (args.length > 1 && (args[1].equalsIgnoreCase("recommended")
+                        || args[1].equalsIgnoreCase("optional") || args[1].equalsIgnoreCase("off"))) {
+                    required = false;
+                }
+                if (resourcePackService == null) {
+                    sender.sendMessage(Component.text("Pack policy service not wired.", NamedTextColor.RED));
+                    yield true;
+                }
+                resourcePackService.setRequired(required);
+                sender.sendMessage(Component.text("Resource pack policy: "
+                        + (required ? "REQUIRED" : "RECOMMENDED"), required
+                        ? NamedTextColor.RED : NamedTextColor.GREEN));
+                yield true;
             }
             default -> {
                 sender.sendMessage(Component.text("Unknown subcommand.", NamedTextColor.RED));
@@ -278,6 +406,346 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
         return true;
     }
 
+    /**
+     * /practiceadmin ffa — per-arena FFA control that used to live only in {@code /ffa}:
+     * {@code list}, {@code info <arena>}, {@code reset <arena>}, {@code resettime <arena> <token>},
+     * {@code enable|disable <arena>}, {@code count}.
+     */
+    private boolean handleFfa(CommandSender sender, String[] args) {
+        String sub = args.length > 1 ? args[1].toLowerCase(Locale.ROOT) : "";
+        switch (sub) {
+            case "" -> {
+                sender.sendMessage(Component.text(
+                        "/practiceadmin ffa <list|info|reset|resettime|enable|disable|count> [arena]",
+                        NamedTextColor.YELLOW));
+            }
+            case "list" -> {
+                List<FfaService.FfaArena> arenas = ffaService.list();
+                if (arenas.isEmpty()) {
+                    sender.sendMessage(Component.text("No FFA arenas.", NamedTextColor.GRAY));
+                    break;
+                }
+                for (FfaService.FfaArena arena : arenas) {
+                    int remaining = ffaService.resetRemainingSeconds(arena.id());
+                    String timer = remaining < 0 ? "off"
+                            : FfaResetTimes.format(remaining);
+                    sender.sendMessage(Component.text(arena.id(), arena.enabled()
+                                    ? NamedTextColor.GREEN : NamedTextColor.DARK_GRAY)
+                            .append(Component.text("  kit=" + arena.kitId()
+                                    + "  players=" + ffaService.occupantCount(arena.id())
+                                    + "  reset=" + timer
+                                    + (arena.enabled() ? "" : "  [disabled]"),
+                                    NamedTextColor.GRAY)));
+                }
+            }
+            case "count" -> {
+                sender.sendMessage(Component.text("FFA players: " + ffaService.occupantIds().size()
+                        + " across " + ffaService.list().size() + " arenas.", NamedTextColor.AQUA));
+            }
+            case "info" -> {
+                if (args.length < 3) {
+                    sender.sendMessage(Component.text("Usage: /practiceadmin ffa info <arena>",
+                            NamedTextColor.YELLOW));
+                    break;
+                }
+                handleFfaInfo(sender, args[2]);
+            }
+            case "reset" -> {
+                if (args.length < 3) {
+                    sender.sendMessage(Component.text("Usage: /practiceadmin ffa reset <arena>",
+                            NamedTextColor.YELLOW));
+                    break;
+                }
+                if (ffaService.get(args[2]).isEmpty()) {
+                    sender.sendMessage(Component.text("Unknown arena: " + args[2], NamedTextColor.RED));
+                    break;
+                }
+                ffaService.reset(args[2], true);
+                sender.sendMessage(Component.text("Forced reset of " + args[2] + " FFA.",
+                        NamedTextColor.GREEN));
+            }
+            case "resettime" -> {
+                if (args.length < 4) {
+                    sender.sendMessage(Component.text(
+                            "Usage: /practiceadmin ffa resettime <arena> <30s|5min|2hour|off>",
+                            NamedTextColor.YELLOW));
+                    break;
+                }
+                java.util.OptionalInt parsed = FfaResetTimes.parse(args[3]);
+                if (parsed.isEmpty()) {
+                    sender.sendMessage(Component.text("Bad time token: " + args[3], NamedTextColor.RED));
+                    break;
+                }
+                int seconds = parsed.getAsInt();
+                if (!ffaService.setResetIntervalSeconds(args[2], seconds)) {
+                    sender.sendMessage(Component.text("Unknown arena: " + args[2], NamedTextColor.RED));
+                    break;
+                }
+                sender.sendMessage(Component.text(args[2] + " FFA resets every "
+                        + FfaResetTimes.format(seconds) + ".", NamedTextColor.GREEN));
+            }
+            case "enable", "disable" -> {
+                if (args.length < 3) {
+                    sender.sendMessage(Component.text(
+                            "Usage: /practiceadmin ffa " + sub + " <arena>", NamedTextColor.YELLOW));
+                    break;
+                }
+                if (ffaService.get(args[2]).isEmpty()) {
+                    sender.sendMessage(Component.text("Unknown arena: " + args[2], NamedTextColor.RED));
+                    break;
+                }
+                boolean on = sub.equals("enable");
+                ffaService.setEnabled(args[2], on);
+                sender.sendMessage(Component.text(args[2] + " FFA "
+                        + (on ? "enabled" : "disabled") + ".", NamedTextColor.GREEN));
+            }
+            default -> {
+                sender.sendMessage(Component.text(
+                        "Usage: /practiceadmin ffa <list|info|reset|resettime|enable|disable|count> [arena]",
+                        NamedTextColor.YELLOW));
+            }
+        }
+        return true;
+    }
+
+    private void handleFfaInfo(CommandSender sender, String arenaId) {
+        var arena = ffaService.get(arenaId);
+        if (arena.isEmpty()) {
+            sender.sendMessage(Component.text("Unknown arena: " + arenaId, NamedTextColor.RED));
+            return;
+        }
+        FfaService.FfaArena a = arena.get();
+        int remaining = ffaService.resetRemainingSeconds(a.id());
+        String timer = remaining < 0 ? "off" : FfaResetTimes.format(remaining);
+        sender.sendMessage(Component.text("=== " + a.id() + " FFA ===", NamedTextColor.AQUA));
+        sender.sendMessage(Component.text("Kit: " + a.kitId(), NamedTextColor.GRAY));
+        sender.sendMessage(Component.text("Enabled: " + a.enabled(), NamedTextColor.GRAY));
+        sender.sendMessage(Component.text("Players: " + ffaService.occupantCount(a.id()), NamedTextColor.GRAY));
+        sender.sendMessage(Component.text("Reset interval: " + FfaResetTimes.format(a.resetIntervalSeconds())
+                        + (a.resetIntervalSeconds() > 0 ? "  (next in " + timer + ")" : ""),
+                NamedTextColor.GRAY));
+        sender.sendMessage(Component.text("TPA: " + a.tpaEnabled() + " | RTP queue: "
+                + a.rtpQueueEnabled(), NamedTextColor.GRAY));
+        if (a.region() != null) {
+            sender.sendMessage(Component.text("Region: " + a.region().worldName()
+                    + " (" + a.sizeX() + "x" + a.sizeZ() + ")", NamedTextColor.GRAY));
+        }
+    }
+
+    /**
+     * /practiceadmin statsreset [player] — mirrors {@code /admin reset point} so the wipe
+     * lives under the admin banner. No player argument wipes EVERYONE (rating + all stats).
+     */
+    private boolean handleStatsReset(CommandSender sender, String[] args) {
+        if (statsResetService == null) {
+            sender.sendMessage(Component.text("Stats reset service not wired.", NamedTextColor.RED));
+            return true;
+        }
+        // Resolve player UUIDs on the main thread, DB work off-thread, report back on main —
+        // the same shape as {@code /admin reset point}.
+        java.util.function.Consumer<Runnable> main = runnable -> Bukkit.getScheduler().runTask(plugin, runnable);
+        if (args.length >= 2) {
+            UUID target = resolveUuid(args[1]);
+            if (target == null && playerRepository != null) {
+                try {
+                    target = playerRepository.findByUsername(args[1]).map(PlayerData::uuid).orElse(null);
+                } catch (Exception ignored) {
+                }
+            }
+            if (target == null) {
+                sender.sendMessage(Component.text("Player not found: " + args[1], NamedTextColor.RED));
+                return true;
+            }
+            UUID done = target;
+            Runnable work = () -> {
+                try {
+                    statsResetService.resetPlayer(done);
+                    main.accept(() -> sender.sendMessage(Component.text("Stats & rating reset for "
+                            + args[1] + " (" + done + ").", NamedTextColor.GREEN)));
+                } catch (Exception e) {
+                    plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                            "Stats reset failed for " + args[1], e);
+                    main.accept(() -> sender.sendMessage(Component.text("Stats reset failed.",
+                            NamedTextColor.RED)));
+                }
+            };
+            if (asyncExecutor != null) {
+                asyncExecutor.execute(work);
+            } else {
+                work.run();
+            }
+            return true;
+        }
+        Runnable workAll = () -> {
+            try {
+                statsResetService.resetAll();
+                main.accept(() -> sender.sendMessage(Component.text("ALL stats & ratings reset.",
+                        NamedTextColor.GREEN)));
+            } catch (Exception e) {
+                plugin.getLogger().log(java.util.logging.Level.SEVERE, "Stats reset all failed", e);
+                main.accept(() -> sender.sendMessage(Component.text("Stats reset failed.",
+                        NamedTextColor.RED)));
+            }
+        };
+        if (asyncExecutor != null) {
+            asyncExecutor.execute(workAll);
+        } else {
+            workAll.run();
+        }
+        return true;
+    }
+
+    /** /practiceadmin broadcast <message...> — server-wide (except bots) announcement. */
+    private boolean handleBroadcast(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage(Component.text("Usage: /practiceadmin broadcast <message...>",
+                    NamedTextColor.YELLOW));
+            return true;
+        }
+        String message = String.join(" ", java.util.Arrays.copyOfRange(args, 1, args.length));
+        Component line = Component.text("[", NamedTextColor.YELLOW)
+                .append(Component.text("お知らせ", NamedTextColor.GOLD))
+                .append(Component.text("] ", NamedTextColor.YELLOW))
+                .append(net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
+                        .legacySection().deserialize(message));
+        for (Player viewer : com.rumilance.practice.util.RealPlayers.online()) {
+            viewer.sendMessage(line);
+        }
+        sender.sendMessage(Component.text("Broadcast sent.", NamedTextColor.GREEN));
+        return true;
+    }
+
+    /** /practiceadmin kick <player> [reason] — routes through {@link BanService} for the announce. */
+    private boolean handleKick(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage(Component.text("Usage: /practiceadmin kick <player> [reason]",
+                    NamedTextColor.YELLOW));
+            return true;
+        }
+        Player target = Bukkit.getPlayerExact(args[1].charAt(0) == '@' ? args[1].substring(1) : args[1]);
+        if (target == null) {
+            sender.sendMessage(Component.text("Player not found: " + args[1], NamedTextColor.RED));
+            return true;
+        }
+        String reason = args.length > 2
+                ? String.join(" ", java.util.Arrays.copyOfRange(args, 2, args.length))
+                : "Kicked by staff";
+        if (banService != null) {
+            banService.kick(target, sender.getName(), reason);
+        } else {
+            target.kick(Component.text(reason, NamedTextColor.RED));
+        }
+        return true;
+    }
+
+    /** /practiceadmin forceend <player> — draw-end the match the player is in (or watching). */
+    private boolean handleForceEnd(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage(Component.text("Usage: /practiceadmin forceend <player>",
+                    NamedTextColor.YELLOW));
+            return true;
+        }
+        Player target = Bukkit.getPlayerExact(args[1]);
+        if (target == null) {
+            sender.sendMessage(Component.text("Player not found: " + args[1], NamedTextColor.RED));
+            return true;
+        }
+        if (matchService.forceEndMatch(target.getUniqueId())) {
+            sender.sendMessage(Component.text("Force-ended the match of " + target.getName() + ".",
+                    NamedTextColor.GREEN));
+        } else {
+            sender.sendMessage(Component.text(target.getName() + " is not in a live match.",
+                    NamedTextColor.RED));
+        }
+        return true;
+    }
+
+    /** /practiceadmin forcematch <p1> <p2> <kit> [arena] — force-start a duel between free players. */
+    private boolean handleForceMatch(CommandSender sender, String[] args) {
+        if (args.length < 4) {
+            sender.sendMessage(Component.text(
+                    "Usage: /practiceadmin forcematch <player1> <player2> <kit> [arena]",
+                    NamedTextColor.YELLOW));
+            return true;
+        }
+        Player a = Bukkit.getPlayerExact(args[1]);
+        Player b = Bukkit.getPlayerExact(args[2]);
+        if (a == null || b == null) {
+            sender.sendMessage(Component.text("One of the players is offline.", NamedTextColor.RED));
+            return true;
+        }
+        if (a.getUniqueId().equals(b.getUniqueId())) {
+            sender.sendMessage(Component.text("Pick two different players.", NamedTextColor.RED));
+            return true;
+        }
+        if (kitService.get(args[3]).isEmpty()) {
+            sender.sendMessage(Component.text("Unknown kit: " + args[3], NamedTextColor.RED));
+            return true;
+        }
+        String busyA = matchService.busyReason(a.getUniqueId());
+        if (busyA != null) {
+            sender.sendMessage(Component.text(a.getName() + " is busy (" + busyA + ").",
+                    NamedTextColor.RED));
+            return true;
+        }
+        String busyB = matchService.busyReason(b.getUniqueId());
+        if (busyB != null) {
+            sender.sendMessage(Component.text(b.getName() + " is busy (" + busyB + ").",
+                    NamedTextColor.RED));
+            return true;
+        }
+        String arena = args.length >= 5 ? args[4] : null;
+        matchService.startDuel(a.getUniqueId(), b.getUniqueId(), args[3],
+                MatchMode.UNRANKED, 1, java.util.Map.of(), arena);
+        sender.sendMessage(Component.text("Match started: " + a.getName() + " vs "
+                + b.getName() + " [" + args[3] + (arena != null ? " @ " + arena : "") + "]",
+                NamedTextColor.GREEN));
+        return true;
+    }
+
+    /** /practiceadmin toggle <queue|map> <enable|disable> <id> — global queue/map switch. */
+    private boolean handleToggle(CommandSender sender, String[] args) {
+        if (args.length < 4) {
+            sender.sendMessage(Component.text("/practiceadmin toggle <queue|map> <enable|disable> <id>",
+                    NamedTextColor.YELLOW));
+            return true;
+        }
+        boolean enable = args[2].equalsIgnoreCase("enable");
+        if (args[1].equalsIgnoreCase("queue")) {
+            kitService.setQueueEnabled(args[3], enable);
+            sender.sendMessage(Component.text("Queue " + args[3] + " " + (enable ? "enabled" : "disabled"),
+                    NamedTextColor.GREEN));
+            return true;
+        }
+        if (args[1].equalsIgnoreCase("map")) {
+            arenaStore.setEnabled(args[3], enable);
+            arenaService.setTemplates(arenaStore.templates());
+            sender.sendMessage(Component.text("Map " + args[3] + " " + (enable ? "enabled" : "disabled"),
+                    NamedTextColor.GREEN));
+            return true;
+        }
+        sender.sendMessage(Component.text("Usage: /practiceadmin toggle <queue|map> <enable|disable> <id>",
+                NamedTextColor.YELLOW));
+        return true;
+    }
+
+    private static UUID resolveUuid(String raw) {
+        try {
+            return UUID.fromString(raw);
+        } catch (IllegalArgumentException ignored) {
+            // username path
+        }
+        Player online = Bukkit.getPlayerExact(raw);
+        if (online != null) {
+            return online.getUniqueId();
+        }
+        org.bukkit.OfflinePlayer cached = Bukkit.getOfflinePlayerIfCached(raw);
+        if (cached != null && (cached.hasPlayedBefore() || cached.isOnline())) {
+            return cached.getUniqueId();
+        }
+        return null;
+    }
+
     private boolean handleSlobby(CommandSender sender, String[] args) {
         if (!(sender instanceof Player player)) {
             return true;
@@ -338,24 +806,88 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
             return TabCompletions.filter(current, "pos1", "pos2", "spawn", "info", "validate");
         }
         if (args.length == 1) {
-            return TabCompletions.filter(current, "menu", "sign", "tool", "reload", "status", "matches", "cleanup", "maintenance", "ffacommand");
+            return TabCompletions.filter(current, "menu", "sign", "tool", "reload", "status",
+                    "matches", "cleanup", "maintenance", "ffacommand", "ffa", "statsreset",
+                    "broadcast", "time", "kick", "forceend", "forcematch", "toggle", "packpolicy");
         }
-        if (args.length == 2 && args[0].equalsIgnoreCase("maintenance")) {
-            return TabCompletions.filter(current, "on", "off");
+        String sub = args[0].toLowerCase(Locale.ROOT);
+        if (args.length == 2) {
+            switch (sub) {
+                case "maintenance", "packpolicy" -> {
+                    return TabCompletions.filter(current, "on", "off");
+                }
+                case "ffacommand" -> {
+                    return TabCompletions.filter(current, "on", "off", "add", "remove", "list", "clear");
+                }
+                case "ffa" -> {
+                    return TabCompletions.filter(current, "list", "info", "reset", "resettime",
+                            "enable", "disable", "count");
+                }
+                case "toggle" -> {
+                    return TabCompletions.filter(current, "queue", "map");
+                }
+                case "time" -> {
+                    return TabCompletions.filter(current, "day", "noon", "night", "midnight", "sun");
+                }
+                case "kick", "forceend" -> {
+                    return TabCompletions.filter(current,
+                            Bukkit.getOnlinePlayers().stream().map(Player::getName).toList());
+                }
+                case "forcematch" -> {
+                    return TabCompletions.filter(current,
+                            Bukkit.getOnlinePlayers().stream().map(Player::getName).toList());
+                }
+                case "status" -> {
+                    return TabCompletions.filter(current, "tps");
+                }
+                default -> {
+                }
+            }
         }
-        if (args.length == 2 && args[0].equalsIgnoreCase("ffacommand")) {
-            return TabCompletions.filter(current, "on", "off", "add", "remove", "list", "clear");
+        if (args.length == 3) {
+            switch (sub) {
+                case "ffacommand" -> {
+                    if (args[1].equalsIgnoreCase("remove")) {
+                        return TabCompletions.filter(current,
+                                ffaService.whitelistedCommands().toArray(String[]::new));
+                    }
+                    if (args[1].equalsIgnoreCase("add")) {
+                        return TabCompletions.filter(current, "spawn", "msg", "baltop", "pay");
+                    }
+                }
+                case "ffa" -> {
+                    if (List.of("info", "reset", "resettime", "enable", "disable").contains(
+                            args[1].toLowerCase(Locale.ROOT))) {
+                        return TabCompletions.filter(current,
+                                ffaService.list().stream().map(FfaService.FfaArena::id).toList());
+                    }
+                }
+                case "toggle" -> {
+                    return TabCompletions.filter(current, "enable", "disable");
+                }
+                default -> {
+                }
+            }
         }
-        if (args.length == 3 && args[0].equalsIgnoreCase("ffacommand")
-                && args[1].equalsIgnoreCase("remove")) {
+        if (args.length == 4 && sub.equals("toggle")) {
+            if (args[1].equalsIgnoreCase("queue")) {
+                return TabCompletions.filter(current,
+                        kitService.all().stream().map(k -> k.name()).toList());
+            }
+            if (args[1].equalsIgnoreCase("map")) {
+                return TabCompletions.filter(current,
+                        arenaStore.templates().stream().map(
+                                t -> t.name()).toList());
+            }
+        }
+        if (args.length == 4 && sub.equals("ffa") && args[1].equalsIgnoreCase("resettime")) {
+            return TabCompletions.filter(current, "30s", "5min", "10min", "1hour", "2hour", "off");
+        }
+        if (args.length == 4 && sub.equals("forcematch")) {
             return TabCompletions.filter(current,
-                    ffaService.whitelistedCommands().toArray(String[]::new));
+                    kitService.enabled().stream().map(k -> k.name()).toList());
         }
-        if (args.length == 3 && args[0].equalsIgnoreCase("ffacommand")
-                && args[1].equalsIgnoreCase("add")) {
-            return TabCompletions.filter(current, "spawn", "msg", "baltop", "pay");
-        }
-        if (args.length == 2 && args[0].equalsIgnoreCase("sign")) {
+        if (args.length == 2 && sub.equals("sign")) {
             return TabCompletions.filter(current,
                     kitService.enabled().stream().map(k -> k.name()).toList());
         }

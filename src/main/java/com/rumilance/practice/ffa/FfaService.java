@@ -1377,6 +1377,45 @@ public final class FfaService {
         return arena == null ? 0 : arena.resetIntervalSeconds();
     }
 
+    /**
+     * Epoch millis when the given arena's periodic reset is next due (0 = timer off,
+     * arena unknown, or not yet armed). Read-only peek for scoreboards / admin views.
+     */
+    public long nextResetAtMillis(String arenaId) {
+        Long deadline = nextResetAtMillis.get(arenaId);
+        return deadline == null ? 0L : deadline;
+    }
+
+    /**
+     * Whole seconds until the given arena's next periodic reset. Returns {@code -1} when the
+     * arena (or its timer) is off/unknown, so callers can distinguish "soon" from "never".
+     */
+    public int resetRemainingSeconds(String arenaId) {
+        FfaArena arena = findArena(arenaId);
+        if (arena == null || arena.resetIntervalSeconds() <= 0) {
+            return -1;
+        }
+        Long deadline = nextResetAtMillis.get(arenaId);
+        if (deadline == null || deadline <= 0L) {
+            return arena.resetIntervalSeconds();
+        }
+        return (int) Math.max(0L, (deadline - System.currentTimeMillis() + 999L) / 1000L);
+    }
+
+    /** How many players are currently inside the given FFA arena. */
+    public int occupantCount(String arenaId) {
+        if (arenaId == null) {
+            return 0;
+        }
+        int count = 0;
+        for (String occupying : playerArena.values()) {
+            if (arenaId.equals(occupying)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     /** Sets and persists the periodic reset interval for one arena. */
     public boolean setResetIntervalSeconds(String arenaId, int seconds) {
         FfaArena existing = findArena(arenaId);

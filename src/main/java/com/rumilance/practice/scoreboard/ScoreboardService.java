@@ -470,12 +470,19 @@ public final class ScoreboardService {
     }
 
     private ScoreboardContext baseContext(Player player, int onlineCount, ScoreboardConfig cfg) {
+        double mspt = TickHealth.emaMspt();
+        double tps = mspt <= 0.0d ? 20.0d : Math.min(20.0d, 1000.0d / mspt);
         return new ScoreboardContext()
                 .put("server_name", cfg.serverName())
                 .put("server_ip", cfg.serverIp())
                 .put("online", onlineCount)
                 .put("player", player.getName())
-                .put("ping", player.getPing());
+                .put("world", player.getWorld().getName())
+                .put("ping", player.getPing())
+                .put("tps", String.format(Locale.ROOT, "%.1f", tps))
+                .put("mspt", String.format(Locale.ROOT, "%.1f", mspt))
+                .put("server_time", java.time.LocalTime.now(java.time.ZoneId.systemDefault())
+                        .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")));
     }
 
     private String modeLabel(MatchMode mode, ScoreboardConfig cfg) {
@@ -624,9 +631,12 @@ public final class ScoreboardService {
                     - entry.get().joinedAt().getEpochSecond());
             ctx.put("kit", com.rumilance.practice.util.KitNames.pretty(entry.get().kitId()))
                     .put("wait", cfg.formatTime(waited))
-                    .put("mode", modeLabel(entry.get().mode(), cfg));
+                    .put("mode", modeLabel(entry.get().mode(), cfg))
+                    .put("queue_position", queueService.positionOf(player.getUniqueId()))
+                    .put("queue_total", queueService.listSizeOf(player.getUniqueId()));
         } else {
-            ctx.put("kit", "").put("wait", "").put("mode", "");
+            ctx.put("kit", "").put("wait", "").put("mode", "")
+                    .put("queue_position", 0).put("queue_total", 0);
         }
         registerMonthStreakDirective(ctx);
         registerBestStreakDirective(ctx);
@@ -724,10 +734,20 @@ public final class ScoreboardService {
                 : ffaService.stats(player.getUniqueId());
         int streak = ffaService == null ? 0 : ffaService.killStreak(player.getUniqueId());
         String arenaLabel = arenaId == null || arenaId.isBlank() ? "FFA" : arenaId;
+        int occupants = ffaService == null || arenaId == null ? 0 : ffaService.occupantCount(arenaId);
+        int totalFfa = ffaService == null ? 0 : ffaService.occupantIds().size();
+        String resetLabel = "-";
+        if (ffaService != null && arenaId != null && !arenaId.isBlank()) {
+            int remaining = ffaService.resetRemainingSeconds(arenaId);
+            resetLabel = remaining < 0 ? "-" : cfg.formatCountdown(remaining);
+        }
         ctx.put("arena", arenaLabel)
                 .put("ffa_kills", stats.kills())
                 .put("ffa_deaths", stats.deaths())
-                .put("ffa_streak", streak);
+                .put("ffa_streak", streak)
+                .put("ffa_reset", resetLabel)
+                .put("ffa_occupants", occupants)
+                .put("ffa_total", totalFfa);
         final String arenaKey = arenaId;
         ctx.directive("ffa_streak_top", c -> {
             List<FfaService.StreakRank> top = ffaService == null

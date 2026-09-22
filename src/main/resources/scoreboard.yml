@@ -97,7 +97,7 @@ tab:
     footer:
       - "<aqua>{server_ip}"
       - "<aqua>────────────────────────────────"
-      - "<white>Online <aqua>{online}"
+      - "<white>Online <aqua>{online}  <white>TPS <aqua>{tps}  <white>{server_time}"
   match:
     header:
       - "<white>{player} <gray>vs <white>{opponent}"
@@ -135,6 +135,7 @@ layouts:
     lines:
       - "<white>Queue <aqua>{kit}"
       - "<white>Wait <aqua>{wait}"
+      - "<white>Slot <aqua>{queue_position}<white>/<aqua>{queue_total}"
       - "<white>Mode <aqua>{mode}"
       - "<white>Ping <aqua>{ping}ms"
       - "<dark_aqua>今月連勝"
@@ -196,6 +197,8 @@ layouts:
       - "<aqua>{arena} <white>FFA"
       - "<white>Kills <aqua>{ffa_kills}  <white>Deaths <aqua>{ffa_deaths}"
       - "<white>Streak <aqua>{ffa_streak}"
+      - "<white>Reset <aqua>{ffa_reset}"
+      - "<white>Players <aqua>{ffa_occupants}<white>/<aqua>{ffa_total}"
       - "<white>Ping <aqua>{ping}ms"
       - "<dark_aqua>FFA 連勝"
       - "@ffa_streak_top"
@@ -209,6 +212,8 @@ layouts:
       - "<aqua>{arena} <white>観戦"
       - "<white>Kills <aqua>{ffa_kills}  <white>Deaths <aqua>{ffa_deaths}"
       - "<white>Streak <aqua>{ffa_streak}"
+      - "<white>Reset <aqua>{ffa_reset}"
+      - "<white>Players <aqua>{ffa_occupants}<white>/<aqua>{ffa_total}"
       - "<white>Ping <aqua>{ping}ms"
       - "<dark_aqua>FFA 連勝"
       - "@ffa_streak_top"
@@ -216,12 +221,12 @@ layouts:
 # =============================================================================
 # プレースホルダ一覧
 #
-# 共通: {server_name} {server_ip} {online} {player} {ping}
+# 共通: {server_name} {server_ip} {online} {player} {ping} {world} {tps} {mspt} {server_time}
 # ロビー: {wins} {losses} {kd} {rating} {best_rating} {best_elo} {elo} {best_streak} {matches} {kits}
-# キュー: {kit} {wait} {mode}
+# キュー: {kit} {wait} {mode} {queue_position} {queue_total}
 # 1v1: {opponent} {my_color} {opp_color} {my_series} {opp_series} {time} {duel_id}
 # TAB: {spectators}
 # チーム: {ally_alive} {ally_size} {enemy_alive} {enemy_size} {my_kills}
 # 観戦: {red_series} {blue_series} / リスト: {rank} {name} {streak} {hearts} {totems} {extra}
-# FFA: {arena} {ffa_kills} {ffa_deaths} {ffa_streak}
+# FFA: {arena} {ffa_kills} {ffa_deaths} {ffa_streak} {ffa_reset} {ffa_occupants} {ffa_total}
 # =============================================================================

@@ -86,6 +86,36 @@ public final class QueueService {
         return byPlayer.containsKey(playerId);
     }
 
+    /** 1-based position of {@code playerId} within their own kit+mode+platform wait list. */
+    public int positionOf(UUID playerId) {
+        QueueEntry entry = byPlayer.get(playerId);
+        if (entry == null) {
+            return 0;
+        }
+        List<QueueEntry> list = byQueue.get(
+                queueKey(entry.mode(), entry.kitId(), entry.platform()));
+        if (list == null) {
+            return 0;
+        }
+        for (int i = 0; i < list.size(); i++) {
+            if (list.get(i).playerId().equals(playerId)) {
+                return i + 1;
+            }
+        }
+        return 0;
+    }
+
+    /** Total waiters in the same kit+mode+platform list as {@code playerId}. */
+    public int listSizeOf(UUID playerId) {
+        QueueEntry entry = byPlayer.get(playerId);
+        if (entry == null) {
+            return 0;
+        }
+        List<QueueEntry> list = byQueue.get(
+                queueKey(entry.mode(), entry.kitId(), entry.platform()));
+        return list == null ? 0 : list.size();
+    }
+
     public int waitingCount(MatchMode mode, String kitId, PlayerPlatform platform) {
         List<QueueEntry> list = byQueue.get(queueKey(mode, kitId, platform));
         return list == null ? 0 : list.size();
