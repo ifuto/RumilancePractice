@@ -56,7 +56,7 @@ menu:
   titles: "击杀称号"
   titles-lore: "装备击杀与胜利称号特效。"
   teams: "组队"
-  teams-lore: "创建或加入队伍。每队最多15人。"
+  teams-lore: "创建或加入队伍。每队最多20人。"
   click: "点击打开"
   close: "关闭"
   back: "返回"

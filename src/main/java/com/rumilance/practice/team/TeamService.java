@@ -1,6 +1,7 @@
 package com.rumilance.practice.team;
 
 import com.rumilance.practice.match.MatchService;
+import com.rumilance.practice.session.MatchSession;
 import com.rumilance.practice.state.MatchMode;
 import com.rumilance.practice.state.TeamColor;
 import net.kyori.adventure.text.Component;
@@ -32,7 +33,7 @@ public final class TeamService {
     private static final int MAX_TEAM_SIZE = 30;
     private static final int MIN_TEAM_SIZE = 2;
     /** Hard cap per battle side (matches {@link com.rumilance.practice.session.MatchSession#MAX_SIDE_SIZE}). */
-    private static final int MAX_SIDE_SIZE = 15;
+    private static final int MAX_SIDE_SIZE = MatchSession.MAX_SIDE_SIZE;
     private static final Duration INVITE_TTL = Duration.ofSeconds(60);
     private static final Duration INVITE_COOLDOWN = Duration.ofSeconds(30);
 
@@ -519,7 +520,7 @@ public final class TeamService {
         if (!team.activeColors().contains(color)) {
             return Result.INVALID_SIDE;
         }
-        // Enforce the 15-per-side cap (moving within the same side is always fine).
+        // Enforce the per-side cap (moving within the same side is always fine).
         if (team.sideOf(target.getUniqueId()) != color && team.side(color).size() >= MAX_SIDE_SIZE) {
             return Result.TEAM_FULL;
         }

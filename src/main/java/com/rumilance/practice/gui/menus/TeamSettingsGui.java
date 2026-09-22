@@ -200,6 +200,26 @@ public final class TeamSettingsGui extends AbstractGui {
                 });
     }
 
+    /**
+     * Reopens the party browser after the disband cue has fully played. That cue is
+     * anvil now + item-break 15 ticks later (see {@code TeamService#DISBAND_BREAK_DELAY_TICKS});
+     * opening any inventory sooner makes its own open/close sounds land right on the break, so
+     * the browser comes back one tick after the break instead.
+     */
+    private void openBrowserAfterBreak(Player player) {
+        if (browser == null) {
+            return;
+        }
+        org.bukkit.Bukkit.getScheduler().runTaskLater(
+                org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
+                () -> {
+                    if (player.isOnline()) {
+                        browser.open(player);
+                    }
+                },
+                16L);
+    }
+
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot,
                             String action, ClickType click) {
@@ -271,9 +291,10 @@ public final class TeamSettingsGui extends AbstractGui {
                                 sounds.play(who, "select");
                                 teamService.disband(who);
                                 who.closeInventory();
-                                if (browser != null) {
-                                    browser.open(who);
-                                }
+                                // The disband cue is anvil -> 15-tick-later break. Reopen the
+                                // browser a beat after the break so its gui-open sound never
+                                // lands on top of the break.
+                                openBrowserAfterBreak(who);
                             },
                             who -> {
                                 sounds.play(who, "gui-back");
@@ -283,9 +304,7 @@ public final class TeamSettingsGui extends AbstractGui {
                     sounds.play(player, "select");
                     teamService.disband(player);
                     player.closeInventory();
-                    if (browser != null) {
-                        browser.open(player);
-                    }
+                    openBrowserAfterBreak(player);
                 } else {
                     sounds.play(player, "error");
                 }

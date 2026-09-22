@@ -6,6 +6,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TabFightLayoutTest {
 
@@ -52,5 +53,27 @@ class TabFightLayoutTest {
     @Test
     void negativeRosterSizeIsRejected() {
         assertThrows(IllegalArgumentException.class, () -> TabFightLayout.padCount(-1));
+    }
+
+    @Test
+    void rotateStartIsZeroWhileTheRosterFitsOneColumn() {
+        for (int size = 0; size <= TabFightLayout.ROSTER_ROWS_PER_COLUMN; size++) {
+            assertEquals(0, TabFightLayout.rotateStart(size, 0), "size " + size + " fits, no rotation");
+            assertEquals(0, TabFightLayout.rotateStart(size, 1_000_000L), "size " + size + " never rotates");
+        }
+    }
+
+    @Test
+    void rotateStartSlidesOneRowPerIntervalAndWraps() {
+        int size = TabFightLayout.ROSTER_ROWS_PER_COLUMN + 2; // 20, exceeds a column by 2
+        int per = TabFightLayout.ROTATE_EVERY_TICKS;
+        assertEquals(0, TabFightLayout.rotateStart(size, 0));
+        assertEquals(1, TabFightLayout.rotateStart(size, per));
+        assertEquals(2, TabFightLayout.rotateStart(size, 2L * per));
+        // windowCount = size - (fit-1) = 3, so it wraps to 0 every 3 steps.
+        assertEquals(0, TabFightLayout.rotateStart(size, 3L * per));
+        assertEquals(1, TabFightLayout.rotateStart(size, 4L * per));
+        // Huge tick values stay in range (no overflow).
+        assertTrue(TabFightLayout.rotateStart(size, Long.MAX_VALUE) < size);
     }
 }

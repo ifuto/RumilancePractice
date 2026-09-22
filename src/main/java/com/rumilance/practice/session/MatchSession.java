@@ -18,14 +18,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Runtime representation of a single ongoing (or recently finished) match.
  *
  * <p>Supports 1v1 duels (2 participants, index 0=RED / index 1=BLUE) and team matches with
- * an explicit RED/BLUE split of up to 15 players per side (ratios may be arbitrarily uneven,
- * e.g. 1v15). Team assignment is stored explicitly per player so a rematch chain keeps every
+ * an explicit RED/BLUE split of up to 20 players per side (ratios may be arbitrarily uneven,
+ * e.g. 1v20). Team assignment is stored explicitly per player so a rematch chain keeps every
  * player on the same side.</p>
  */
 public final class MatchSession {
 
     /** Hard cap per side in a team battle. */
-    public static final int MAX_SIDE_SIZE = 15;
+    public static final int MAX_SIDE_SIZE = 20;
 
     private final UUID id;
     private final MatchMode mode;
@@ -103,7 +103,7 @@ public final class MatchSession {
     }
 
     /**
-     * Team-battle constructor: explicit RED/BLUE rosters. Each side may hold 1..15 players,
+     * Team-battle constructor: explicit RED/BLUE rosters. Each side may hold 1..20 players,
      * ratios can be arbitrarily uneven — both sides just need to be non-empty.
      */
     public MatchSession(UUID id, MatchMode mode, String kitName,
@@ -116,7 +116,7 @@ public final class MatchSession {
 
     /**
      * Multi-team battle factory: one roster per team, in canonical color order
-     * (index 0 = RED, 1 = BLUE, 2 = GREEN, ...). Every roster must hold 1..15 players.
+     * (index 0 = RED, 1 = BLUE, 2 = GREEN, ...). Every roster must hold 1..20 players.
      * A static factory (not a constructor) because {@code List<List<UUID>>} and the duel
      * constructor's {@code List<UUID>} parameters erase to the same signature.
      */
@@ -300,7 +300,7 @@ public final class MatchSession {
         return participants;
     }
 
-    /** @return the members of the given team (1 player in a duel, up to 15 in a team battle). */
+    /** @return the members of the given team (1 player in a duel, up to 20 in a team battle). */
     public List<UUID> team(TeamColor color) {
         List<UUID> out = new ArrayList<>();
         for (UUID p : participants) {

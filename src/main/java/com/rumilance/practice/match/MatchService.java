@@ -666,7 +666,7 @@ public final class MatchService {
     }
 
     /**
-     * Starts a RED-vs-BLUE team battle. Each side may hold 1..15 players and the ratio can be
+     * Starts a RED-vs-BLUE team battle. Each side may hold 1..20 players and the ratio can be
      * arbitrarily uneven (e.g. 2v7). RED spawns at spawn A, BLUE at spawn B (each player gets a
      * small horizontal offset so teammates don't stack), and friendly fire is disabled. This is
      * the no-queue entry point used by the team hub GUI / {@code /team start}.

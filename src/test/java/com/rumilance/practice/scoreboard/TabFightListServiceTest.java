@@ -5,6 +5,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -98,6 +99,35 @@ class TabFightListServiceTest {
         TabFightListService service = new TabFightListService(null);
         assertNotNull(service);
         service.apply(null, List.of());
+    }
+
+    @Test
+    void oversizedColumnRotatesItsRosterAndKeepsOneColumnHeight() {
+        int fit = TabFightLayout.ROSTER_ROWS_PER_COLUMN;
+        List<TabFightListService.Member> roster = new ArrayList<>();
+        for (int i = 0; i < fit + 2; i++) {
+            roster.add(TabFightListService.Member.ofFighter(UUID.randomUUID(), "P" + i, TeamColor.RED));
+        }
+        TabFightListService.ColumnPlan column = new TabFightListService.ColumnPlan(null, roster);
+        List<TabFightListService.Member> window = TabFightListService.windowOf(column, 0);
+        assertEquals(fit, window.size(), "the window is exactly one client column of members");
+        assertEquals("P0", window.get(0).name(), "rotates from the top at tick 0");
+        assertEquals("P19", window.get(fit - 1).name());
+
+        window = TabFightListService.windowOf(column, TabFightLayout.ROTATE_EVERY_TICKS);
+        assertEquals("P1", window.get(0).name(), "slides one row after one interval");
+        assertEquals("P20", window.get(fit - 1).name(), "the last row wraps around to the top");
+    }
+
+    @Test
+    void smallColumnNeverRotates() {
+        TabFightListService.ColumnPlan column = new TabFightListService.ColumnPlan(null, List.of(
+                TabFightListService.Member.ofFighter(UUID.randomUUID(), "A", TeamColor.RED),
+                TabFightListService.Member.ofFighter(UUID.randomUUID(), "B", TeamColor.BLUE)));
+        List<TabFightListService.Member> window = TabFightListService.windowOf(column, 99_999_999L);
+        assertEquals(2, window.size());
+        assertEquals("A", window.get(0).name());
+        assertEquals("B", window.get(1).name());
     }
 
     @Test

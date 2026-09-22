@@ -20,6 +20,14 @@ public final class TabFightLayout {
     public static final int SLOTS_PER_COLUMN = 20;
     /** Header row + blank spacer row at the top of every column. */
     public static final int HEADER_ROWS = 2;
+    /**
+     * Member rows that fit under the header/spacer inside one client column. A team roster of
+     * 20 (the side cap) exceeds this by 2, so oversized columns are shown as a rotating window
+     * of exactly this many rows — an auto-looping "infinite scroll" of the team list.
+     */
+    public static final int ROSTER_ROWS_PER_COLUMN = SLOTS_PER_COLUMN - HEADER_ROWS;
+    /** One member-row advance of the auto-loop every N ticks (60 = 3 seconds). */
+    public static final int ROTATE_EVERY_TICKS = 60;
     /** Hard cap on the client columns one match may occupy (7 team columns + spectators + slack). */
     public static final int MAX_COLUMNS = 16;
 
@@ -48,6 +56,22 @@ public final class TabFightLayout {
             }
         }
         return Scheme.DUEL;
+    }
+
+    /**
+     * Start index (0-based) of the auto-loop window for a roster of {@code size} rows at
+     * {@code tick}. Returns 0 while the roster fits in one column; otherwise the window slides
+     * one row every {@link #ROTATE_EVERY_TICKS} ticks and wraps around — exactly one client
+     * column tall, reading like an infinite button-less scroll. Pure arithmetic so it can be
+     * unit tested without a server.
+     */
+    public static int rotateStart(int size, long tick) {
+        int fit = ROSTER_ROWS_PER_COLUMN;
+        if (size <= fit) {
+            return 0;
+        }
+        int windowCount = Math.max(1, size - (fit - 1));
+        return (int) Math.floorMod(tick / Math.max(1L, (long) ROTATE_EVERY_TICKS), (long) windowCount);
     }
 
     /** Blank rows after {@code contentRows} so the column ends exactly on a 20-row boundary. */

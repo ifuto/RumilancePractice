@@ -37,7 +37,7 @@ import java.util.UUID;
  *   <li>Left-click a member — cycle their side (RED → BLUE → unassigned)</li>
  *   <li>Right-click (or shift-click) a member — kick (owner only)</li>
  * </ul>
- * Sides may be arbitrarily uneven (max 15 per side); paging kicks in past 28 members.
+ * Sides may be arbitrarily uneven (max 20 per side); paging kicks in past 28 members.
  * Party members that are not the owner get a leave button instead of the owner bar.
  */
 public final class TeamHubGui extends AbstractGui {

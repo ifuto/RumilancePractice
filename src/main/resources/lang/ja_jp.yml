@@ -57,7 +57,7 @@ menu:
   titles: "キルタイトル"
   titles-lore: "キル／勝利時の演出。"
   teams: "パーティ"
-  teams-lore: "パーティを作って戦う。1サイド最大15人。"
+  teams-lore: "パーティを作って戦う。1サイド最大20人。"
   click: "クリックで開く"
   close: "閉じる"
   back: "戻る"

@@ -189,7 +189,11 @@ public final class TabFightListService {
         });
     }
 
-    /** Drops column-band reservations of matches that were not applied this refresh cycle. */
+    /**
+     * Drops column-band reservations of matches that were not applied this refresh cycle.
+     * A rotating match keeps its {@code SLOTS_PER_MATCH} band for the whole fight — the unused
+     * slots below a trimmed window are blank filler, the client just stops showing rows.
+     */
     public void prune(Set<UUID> activeMatches) {
         matchSlots.keySet().retainAll(activeMatches);
     }
@@ -431,15 +435,41 @@ public final class TabFightListService {
         for (ColumnPlan column : planGrid(teamMatch, members)) {
             rows.add(new GridRow(null, column.header()));
             rows.add(new GridRow(null, BLANK));
-            for (Member member : column.rows()) {
+            List<Member> window = windowOf(column, org.bukkit.Bukkit.getCurrentTick());
+            for (Member member : window) {
                 rows.add(new GridRow(Bukkit.getPlayer(member.id()), rowDisplay(member, scheme)));
             }
-            int fillers = TabFightLayout.padCount(column.rows().size());
+            // Pad to a 20-row boundary from the rows actually drawn (the window, not the full
+            // roster), so a trimmed column still ends exactly on a client column boundary and
+            // the next column header starts at the top of its own column.
+            int fillers = TabFightLayout.padCount(window.size());
             for (int i = 0; i < fillers; i++) {
                 rows.add(new GridRow(null, BLANK));
             }
         }
         return new Grid(rows);
+    }
+
+    /**
+     * Auto-loop window of a column. When a team holds more members than one client column fits
+     * (see {@link TabFightLayout#ROSTER_ROWS_PER_COLUMN}), the roster is shown as a sliding
+     * window of that many rows: the start index advances by one member every
+     * {@link TabFightLayout#ROTATE_EVERY_TICKS} ticks and wraps around. The frame is derived
+     * from the server tick only — no mutable per-viewer cursor — so every viewer sees the same
+     * list, and the column's height stays exactly one client column (the pad count stays in
+     * lock-step because the column still reports its full roster size).
+     */
+    static List<Member> windowOf(ColumnPlan column, long tick) {
+        int fit = TabFightLayout.ROSTER_ROWS_PER_COLUMN;
+        if (column.rows().size() <= fit) {
+            return column.rows();
+        }
+        int step = TabFightLayout.rotateStart(column.rows().size(), tick);
+        List<Member> window = new ArrayList<>(fit);
+        for (int i = 0; i < fit; i++) {
+            window.add(column.rows().get(Math.floorMod(step + i, column.rows().size())));
+        }
+        return window;
     }
 
     /**
