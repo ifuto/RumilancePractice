@@ -37,16 +37,10 @@ public final class TeamKitSelectGui extends AbstractGui {
     private PartyMapSelectGui partyMapSelectGui;
     /** Owner's original-kit store (null = original kits unavailable here). */
     private com.rumilance.practice.originalkit.OriginalKitService originalKitService;
-    /** Rules kit used when fighting with an original kit (config, falls back to first kit). */
-    private volatile String originalKitRulesKitId;
 
     public void setOriginalKitService(
             com.rumilance.practice.originalkit.OriginalKitService originalKitService) {
         this.originalKitService = originalKitService;
-    }
-
-    public void setOriginalKitRulesKitId(String kitId) {
-        this.originalKitRulesKitId = kitId;
     }
 
     public TeamKitSelectGui(GuiSessionRegistry registry, SoundService sounds,
@@ -161,8 +155,7 @@ public final class TeamKitSelectGui extends AbstractGui {
         }
 
         // The owner's own original kits are also selectable for the party battle: everyone
-        // fights with the owner's saved layout, while the match rules come from the shared
-        // rules kit.
+        // fights with that kit alone — its saved layout AND its settings supply every rule.
         if (originalKitService != null && index < MenuScaffold.gridPageSize()) {
             com.rumilance.practice.originalkit.OriginalKitService.Plan plan =
                     originalKitService.planOf(player);
@@ -215,8 +208,8 @@ public final class TeamKitSelectGui extends AbstractGui {
                             .ifPresent(team -> team.setOriginalKitSlot(null));
                     proceedWithKit(player, action.substring("kit:".length()));
                 } else if (action.startsWith("origkit:")) {
-                    // Original kit selected: remember the owner's slot and fight under the
-                    // shared rules kit's map rules.
+                    // Original kit selected: remember the owner's slot. The match then fights
+                    // on that kit alone — loadout AND rules — with no shared match kit at all.
                     int origSlot;
                     try {
                         origSlot = Integer.parseInt(action.substring("origkit:".length()));
@@ -225,21 +218,32 @@ public final class TeamKitSelectGui extends AbstractGui {
                     }
                     teamService.teamOf(player.getUniqueId())
                             .ifPresent(team -> team.setOriginalKitSlot(origSlot));
-                    proceedWithKit(player, resolveOriginalRulesKit());
+                    proceedWithOriginalKit(player, origSlot);
                 }
             }
         }
     }
 
-    /** The kit whose RULES govern an original-kit battle (config override or first enabled). */
-    private String resolveOriginalRulesKit() {
-        String configured = originalKitRulesKitId;
-        if (configured != null && !configured.isBlank()
-                && kitService.get(configured).map(KitDefinition::enabled).orElse(false)) {
-            return configured;
+    /**
+     * Original-kit selection: validate readiness, then start directly through TeamService with
+     * the original kit slot. The owner's kit supplies the whole fight, so no match kit is needed.
+     */
+    private void proceedWithOriginalKit(Player player, int origSlot) {
+        TeamService.Result precheck = teamService.preflightStart(player);
+        if (precheck != TeamService.Result.OK) {
+            sounds.play(player, "error");
+            player.sendMessage(Component.text(teamService.errorMessage(player, precheck), UiTheme.DANGER)
+                    .decoration(TextDecoration.ITALIC, false));
+            return;
         }
-        List<KitDefinition> enabled = kitService.enabled();
-        return enabled.isEmpty() ? "nodebuff" : enabled.get(0).name();
+        sounds.play(player, "gui-click");
+        player.closeInventory();
+        TeamService.Result r = teamService.startOriginal(player, origSlot);
+        sounds.play(player, r == TeamService.Result.OK ? "match-found" : "error");
+        if (r != TeamService.Result.OK) {
+            player.sendMessage(Component.text(teamService.errorMessage(player, r), UiTheme.DANGER)
+                    .decoration(TextDecoration.ITALIC, false));
+        }
     }
 
     /** Validates readiness, then enters the map-select flow (or starts directly without it). */

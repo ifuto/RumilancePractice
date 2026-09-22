@@ -285,6 +285,78 @@ public final class MatchService {
         this.originalKitService = originalKitService;
     }
 
+    /** Rules kits synthesized from original-kit settings, keyed by synthetic kit name. */
+    private final java.util.Map<String, KitDefinition> syntheticKits = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * Resolves the rule-bearing kit for a session. Parties fighting with the owner's original
+     * kit address a synthesized rules kit ({@code @original:...}); everything else resolves the
+     * shared match kit from {@link KitService} as before.
+     */
+    public KitDefinition resolveKit(MatchSession session) {
+        String name = session.kitName();
+        if (name.startsWith("@original:")) {
+            KitDefinition synthetic = syntheticKits.get(name);
+            if (synthetic != null) {
+                return synthetic;
+            }
+            // Rebuild on demand if the cache was never populated (rematch after reload).
+            com.rumilance.practice.team.OriginalKitRef ref = session.originalKitRef();
+            if (ref != null && originalKitService != null) {
+                return originalKitService.synthesizeKit(ref.owner(), ref.slot());
+            }
+            return null;
+        }
+        return kitService.get(name).orElse(null);
+    }
+
+    public KitDefinition resolveKitFor(MatchSession session, UUID playerId) {
+        String name = session.kitFor(playerId);
+        if (name == null || name.startsWith("@original:")) {
+            return resolveKit(session);
+        }
+        KitDefinition resolved = kitService.get(name).orElse(null);
+        return resolved != null ? resolved : resolveKit(session);
+    }
+
+    /**
+     * Whether a (possibly original-kit) match should let fall damage through. Original-kit
+     * fights read the owner slot's {@code fallDamage} switch; every other match is vanilla
+     * (fall damage on). Detection keys off the synthesized kit name, so the sign-queue's
+     * "first waiter's layout" solo duel (rules still from the sign kit) stays untouched.
+     */
+    public boolean fallDamageEnabled(MatchSession session) {
+        String name = session.kitName();
+        if (name == null || !name.startsWith("@original:")) {
+            return true;
+        }
+        com.rumilance.practice.team.OriginalKitRef ref = session.originalKitRef();
+        if (ref != null && originalKitService != null) {
+            return originalKitService.settingsOf(ref.owner(), ref.slot()).fallDamage();
+        }
+        return true;
+    }
+
+    /** Applies the original-kit body scale for a synthesized original-kit fight (no-op otherwise). */
+    private void applyOriginalBodyScale(Player player, MatchSession session) {
+        String name = session.kitName();
+        if (name == null || !name.startsWith("@original:")) {
+            return;
+        }
+        com.rumilance.practice.team.OriginalKitRef ref = session.originalKitRef();
+        if (ref == null || originalKitService == null) {
+            return;
+        }
+        PlayerVitals.applyBodyScale(player,
+                originalKitService.settingsOf(ref.owner(), ref.slot()).bodyScale());
+    }
+
+    /** True when this session fights on the owner's original kit alone (synthesized rules kit). */
+    private boolean isOriginalFight(MatchSession session) {
+        String name = session.kitName();
+        return name != null && name.startsWith("@original:");
+    }
+
     public void setDailyStatsRepository(
             com.rumilance.practice.database.repository.DailyRankedStatsRepository dailyStatsRepository) {
         this.dailyStatsRepository = dailyStatsRepository;
@@ -745,14 +817,40 @@ public final class MatchService {
                 return;
             }
         }
-        KitDefinition kit = kitService.get(kitId).orElse(null);
-        if (kit == null || !kit.enabled()) {
-            return;
+        // When the party fights with the owner's original kit, the loadout AND the rules both
+        // come from that slot: a synthesized rules kit is cached under its synthetic name and
+        // used as the session kit, so every rule lookup reads the owner's settings. No shared
+        // match kit is required (kitId may be null).
+        boolean originalFight = originalKit != null && originalKitService != null;
+        String sessionKitName = kitId;
+        if (originalFight) {
+            String synthetic = com.rumilance.practice.originalkit.OriginalKitService
+                    .syntheticKitName(originalKit.owner(), originalKit.slot());
+            originalKitService.find(originalKit.owner(), originalKit.slot())
+                    .ifPresent(snapshot -> syntheticKits.put(synthetic,
+                            originalKitService.synthesizeKit(originalKit.owner(), originalKit.slot(),
+                                    snapshot.settings())));
+            sessionKitName = synthetic;
+        }
+
+        // Resolve the rule-bearing kit: synthesized for original fights, shared kit otherwise.
+        KitDefinition rulesKit;
+        if (originalFight) {
+            rulesKit = syntheticKits.get(sessionKitName);
+            if (rulesKit == null) {
+                return;
+            }
+        } else {
+            KitDefinition shared = kitService.get(kitId).orElse(null);
+            if (shared == null || !shared.enabled()) {
+                return;
+            }
+            rulesKit = shared;
         }
 
         MatchSession session;
         try {
-            session = MatchSession.forTeams(UUID.randomUUID(), mode, kitId, rosters, null, bestOf);
+            session = MatchSession.forTeams(UUID.randomUUID(), mode, sessionKitName, rosters, null, bestOf);
         } catch (IllegalArgumentException e) {
             return;
         }
@@ -794,7 +892,7 @@ public final class MatchService {
         logMatchStart(session);
 
         if (tryBeginWithCarriedArena(session, carryArenaInstanceId,
-                instance -> teleportAndPrepareTeam(session, kit, instance))) {
+                instance -> teleportAndPrepareTeam(session, rulesKit, instance))) {
             return;
         }
 
@@ -802,7 +900,7 @@ public final class MatchService {
         if (partyArenaName != null && !partyArenaName.isBlank()) {
             reservation = arenaService.reserveNamed(partyArenaName, session.id());
         } else {
-            reservation = reservePartyArenaFor(kit, session.id());
+            reservation = reservePartyArenaFor(rulesKit, session.id());
         }
         reservation.whenComplete((opt, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
                     if (error != null || opt == null || opt.isEmpty()) {
@@ -817,7 +915,7 @@ public final class MatchService {
                     }
                     registry.bindArena(session.id(), instance.id());
                     session.setState(MatchState.WAITING_FOR_PLAYERS);
-                    teleportAndPrepareTeam(session, kit, instance);
+                    teleportAndPrepareTeam(session, rulesKit, instance);
                 }));
     }
 
@@ -863,18 +961,30 @@ public final class MatchService {
             if (originalKit != null && originalKitService != null) {
                 originalLayout = originalKitService.loadLayout(originalKit.owner(), originalKit.slot());
             }
+            // The rule kit for this fight: the synthesized original-kit rules when the party
+            // fights on an original kit, otherwise the shared match kit.
+            KitDefinition rulesKit = resolveKit(session);
+            if (rulesKit == null) {
+                rulesKit = kit;
+            }
             for (UUID id : session.participants()) {
                 Player player = Bukkit.getPlayer(id);
                 if (player != null) {
                     PlayerVitals.clearCombatState(player);
                     boolean ownKitOverride = !session.kitFor(id).equals(session.kitName());
-                    KitDefinition playerKit = kitService.get(session.kitFor(id)).orElse(kit);
+                    KitDefinition playerKit = resolveKitFor(session, id);
                     // Owner's original kit supplies the loadout for everyone who does not run
-                    // a per-team kit override; rules always stay with the shared match kit.
+                    // a per-team kit override; rules follow the resolved rules kit (which IS the
+                    // original kit when this is an original-kit fight).
                     if (originalLayout != null && !ownKitOverride) {
-                        applyKit(player, kit, originalLayout);
+                        applyKit(player, rulesKit, originalLayout);
                     } else {
                         applyKit(player, playerKit);
+                    }
+                    // Original-kit fights take their body size from the slot's settings; the
+                    // per-team config keeps governing HP/size only for shared-kit battles.
+                    if (isOriginalFight(session)) {
+                        applyOriginalBodyScale(player, session);
                     }
                     applySight(player, session);
                 }
@@ -1318,7 +1428,7 @@ public final class MatchService {
             if (error != null || !allTeleportsSucceeded(teleports) || !allParticipantsPlaced(session, bounds)) {
                 // A spawn could not be resolved (freshly pasted / broken arena): reset the arena
                 // and retry the whole prepare once, matching the teleport-failure path.
-                KitDefinition kit = kitService.get(session.kitName()).orElse(null);
+                KitDefinition kit = resolveKit(session);
                 retryPrepareAfterBadArena(session, kit, instance, false);
                 return;
             }
@@ -1420,7 +1530,7 @@ public final class MatchService {
             failMatch(session, "Could not start fight");
             return;
         }
-        KitDefinition kit = kitService.get(session.kitName()).orElse(null);
+        KitDefinition kit = resolveKit(session);
         for (UUID id : session.participants()) {
             countdownLeaveStreak.remove(id);
             Player player = Bukkit.getPlayer(id);
@@ -1457,10 +1567,17 @@ public final class MatchService {
                     applyStartEffects(player, kit);
                     runStartCommands(player, kit);
                 }
+                if (isOriginalFight(session)) {
+                    applyOriginalBodyScale(player, session);
+                }
                 if (session.isTeamMatch()) {
                     // Team config (max HP / body scale / always-on effects). HP + scale are
                     // attribute-based and reliably reset by PlayerVitals when the fight ends.
-                    session.teamConfigOf(id).apply(player);
+                    // Original-kit fights skip this: those values ALL come from the slot's
+                    // settings, not the per-team config.
+                    if (!isOriginalFight(session)) {
+                        session.teamConfigOf(id).apply(player);
+                    }
                 }
                 soundService.play(player, "match-start");
                 player.showTitle(Title.title(
@@ -1523,7 +1640,7 @@ public final class MatchService {
     }
 
     private void scheduleMatchTimeout(MatchSession session) {
-        KitDefinition kit = kitService.get(session.kitName()).orElse(null);
+        KitDefinition kit = resolveKit(session);
         int kitTimeout = kit == null ? 0 : kit.timeoutSeconds();
         int seconds = kitTimeout > 0 ? kitTimeout : maxDurationSeconds;
         if (seconds <= 0) {
@@ -1586,7 +1703,7 @@ public final class MatchService {
         // lethal routed here by an unforeseen path turns into a totem pop instead of a loss.
         Player totemVictim = Bukkit.getPlayer(victimId);
         if (totemVictim != null && com.rumilance.practice.combat.PracticeDeath.tryPopTotem(
-                totemVictim, kitService.get(session.kitFor(victimId)).orElse(null))) {
+                totemVictim, resolveKitFor(session, victimId))) {
             Bukkit.getLogger().warning("[N Arena][TotemGuard] handleLethal popped a totem for "
                     + totemVictim.getName() + " instead of ending the match");
             return;

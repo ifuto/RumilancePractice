@@ -130,6 +130,23 @@ public final class PlayerVitals {
         }
     }
 
+    /** Applies an original-kit body size to the SCALE attribute (vanilla default = 1.0). */
+    public static void applyBodyScale(Player player, double scale) {
+        if (player == null) {
+            return;
+        }
+        try {
+            org.bukkit.attribute.AttributeInstance scaleAttr =
+                    player.getAttribute(org.bukkit.attribute.Attribute.SCALE);
+            if (scaleAttr != null) {
+                double value = Double.isNaN(scale) || scale <= 0.0d ? 1.0d : scale;
+                scaleAttr.setBaseValue(value);
+            }
+        } catch (RuntimeException | NoSuchFieldError | NoClassDefFoundError ignored) {
+            // Pre-1.20.5 servers have no SCALE attribute.
+        }
+    }
+
     /**
      * Duel / FFA start (and kit apply): full health, full hunger bar, zero hidden saturation.
      * Attribute values are left untouched.

@@ -727,6 +727,22 @@ public final class TeamService {
     }
 
     public Result start(Player owner, String kitId) {
+        return startInternal(owner, kitId);
+    }
+
+    /**
+     * Original-kit battle start: the owner's selected original kit supplies the loadout AND
+     * every rule — no shared match kit is used at all.
+     */
+    public Result startOriginal(Player owner, int slot) {
+        Team team = byMember.get(owner.getUniqueId());
+        if (team == null) return Result.NOT_IN_TEAM;
+        if (!team.isOwner(owner.getUniqueId())) return Result.NOT_OWNER;
+        team.setOriginalKitSlot(slot);
+        return startInternal(owner, null);
+    }
+
+    private Result startInternal(Player owner, String kitId) {
         Team team = byMember.get(owner.getUniqueId());
         if (team == null) return Result.NOT_IN_TEAM;
         if (!team.isOwner(owner.getUniqueId())) return Result.NOT_OWNER;
@@ -775,6 +791,11 @@ public final class TeamService {
         com.rumilance.practice.team.OriginalKitRef originalKit = originalSlot == null
                 ? null
                 : new com.rumilance.practice.team.OriginalKitRef(owner.getUniqueId(), originalSlot);
+        // An original-kit battle uses that kit ALONE — no shared match kit and no per-team
+        // custom kit override. Everything (loadout + rules) comes from the owner's slot.
+        if (originalKit != null) {
+            teamKits.clear();
+        }
         Bukkit.getScheduler().runTask(plugin, () ->
                 matchService.startTeamMatch(rosters, kitId, MatchMode.TEAM, 1, arenaName, ff,
                         Map.of(), null, teamKits, configs, originalKit));

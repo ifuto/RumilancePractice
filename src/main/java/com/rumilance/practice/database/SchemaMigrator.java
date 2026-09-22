@@ -435,6 +435,15 @@ public final class SchemaMigrator {
                         + " ADD COLUMN receive_stranger_join_quit INTEGER NOT NULL DEFAULT 1"
         )));
 
+        migrations.add(new Migration(33, "add settings_json column to original_kit_slots",
+                connection -> {
+                    // Per-slot original-kit battle settings (fall damage, pearl, totem, ...).
+                    // TEXT so the lightweight OriginalKitSettings.serialize() format fits and stays
+                    // human-editable; absent rows read back as vanilla defaults.
+                    String table = databaseService.table("original_kit_slots");
+                    databaseService.ensureColumn(connection, table, "settings_json", "TEXT");
+                }));
+
         return migrations;
     }
 }

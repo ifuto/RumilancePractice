@@ -3,7 +3,6 @@ package com.rumilance.practice.originalkit;
 import com.rumilance.practice.item.SaveSignItem;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import org.bukkit.GameMode;
 import org.bukkit.Bukkit;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
@@ -118,19 +117,19 @@ public final class OriginalKitRoomListener implements Listener {
         if (event.getAction() != Action.RIGHT_CLICK_BLOCK || clicked == null) {
             return;
         }
-        // The save triggers only on the room's registered SAVE button block (an oak button).
-        if (clicked.getType().name().equals("OAK_BUTTON")
+        // The save triggers only on the room's registered SAVE sign block.
+        if (SaveSignItem.SIGN_MATERIALS.contains(clicked.getType())
                 && roomService.inRoom(clicked.getLocation())
                 && roomService.isSaveButton(clicked.getLocation())) {
             event.setCancelled(true);
             save(player);
             return;
         }
-        // Holding the save-sign item does not save — press the placed save button in the room.
+        // Holding the save-sign item does not save — press the placed SAVE sign in the room.
         if (SaveSignItem.isSaveButton(item) && roomService.inRoom(clicked.getLocation())) {
             event.setCancelled(true);
             player.sendActionBar(Component.text(
-                    "Press the placed SAVE button on the wall/floor to save your kit.",
+                    "Press the placed SAVE sign to save your kit.",
                     NamedTextColor.YELLOW));
         }
     }
@@ -282,10 +281,10 @@ public final class OriginalKitRoomListener implements Listener {
             return;
         }
         OriginalKitService.EditContext ctx = originalKitService.context(player.getUniqueId());
-        int slot = ctx != null ? ctx.slot : 0;
-        originalKitService.saveLayout(player, slot, contents);
-        player.setGameMode(GameMode.SURVIVAL);
+        int slot = ctx != null ? ctx.slot : 22;
+        // Save the snapshot, swap back to survival, leave the room and hand the stashed lobby
+        // inventory back in one place (finishRoomEdit), so the exit always restores cleanly.
+        originalKitService.finishRoomEdit(player, slot);
         player.sendActionBar(Component.text("Kit saved!", NamedTextColor.GREEN));
-        roomService.exit(player);
     }
 }

@@ -366,7 +366,7 @@ public final class CombatSyncListener implements Listener {
     private KitDefinition kitForCombatant(Player player) {
         MatchSession session = matchService.registry().byPlayer(player.getUniqueId()).orElse(null);
         if (session != null && session.state() == MatchState.ACTIVE) {
-            return kitService.get(session.kitFor(player.getUniqueId())).orElse(null);
+            return matchService.resolveKitFor(session, player.getUniqueId());
         }
         if (ffaService.isInFfa(player.getUniqueId())) {
             return ffaService.arenaOf(player.getUniqueId())

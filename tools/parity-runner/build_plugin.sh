@@ -54,6 +54,28 @@ SOURCES=(
   src/main/java/com/rumilance/practice/kit/KitLoadout.java
   src/main/java/com/rumilance/practice/model/KitItemEntry.java
   src/main/java/com/rumilance/practice/command/ArenaKitAdminCommand.java
+  # オリジナルキット設定機能 (設定画面/合成キット/看板保存/体サイズ VC)。
+  # ここを忘れると「ソースは直っているのに挙動が変わらない」= delivery jar の古いクラスが使われ続ける。
+  src/main/java/com/rumilance/practice/model/OriginalKitSettings.java
+  src/main/java/com/rumilance/practice/model/OriginalKitSnapshot.java
+  src/main/java/com/rumilance/practice/database/SchemaMigrator.java
+  src/main/java/com/rumilance/practice/database/repository/OriginalKitRepository.java
+  src/main/java/com/rumilance/practice/originalkit/OriginalKitService.java
+  src/main/java/com/rumilance/practice/originalkit/OriginalKitRoomService.java
+  src/main/java/com/rumilance/practice/originalkit/OriginalKitRoomListener.java
+  src/main/java/com/rumilance/practice/gui/GuiType.java
+  src/main/java/com/rumilance/practice/gui/GuiListener.java
+  src/main/java/com/rumilance/practice/gui/menus/OriginalKitGui.java
+  src/main/java/com/rumilance/practice/gui/menus/OriginalKitSlotMenuGui.java
+  src/main/java/com/rumilance/practice/gui/menus/OriginalKitSettingsGui.java
+  src/main/java/com/rumilance/practice/gui/menus/TeamKitSelectGui.java
+  src/main/java/com/rumilance/practice/item/SaveSignItem.java
+  src/main/java/com/rumilance/practice/match/MatchService.java
+  src/main/java/com/rumilance/practice/match/MatchListener.java
+  src/main/java/com/rumilance/practice/combat/CombatSyncListener.java
+  src/main/java/com/rumilance/practice/team/TeamService.java
+  src/main/java/com/rumilance/practice/team/OriginalKitRef.java
+  src/main/java/com/rumilance/practice/util/PlayerVitals.java
   # @NotNull/@Nullable の最小スタブ (annotations jar が無い環境用)
   tools/parity-runner/stubs/org/jetbrains/annotations
 )

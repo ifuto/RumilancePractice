@@ -4,11 +4,9 @@ import com.rumilance.practice.gui.AbstractGui;
 import com.rumilance.practice.gui.GuiSession;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.GuiType;
-import com.rumilance.practice.gui.MenuScaffold;
 import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.originalkit.OriginalKitService;
 import com.rumilance.practice.sound.SoundService;
-import com.rumilance.practice.util.GuiSlots;
 import com.rumilance.practice.util.ItemKeys;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -24,29 +22,20 @@ import java.util.List;
 /**
  * Original kit paper grid (5x9). One paper = one original kit slot.
  * Locked slots are barrier blocks labelled with the tier that unlocks them.
+ * Clicking a paper opens the per-slot {@link OriginalKitSlotMenuGui} (edit loadout / settings).
  */
 public final class OriginalKitGui extends AbstractGui {
 
     private final OriginalKitService service;
-    private ConfirmGui confirmGui;
-    private OriginalKitEditGui editGui;
-    private EkitChoiceGui choiceGui;
+    private OriginalKitSlotMenuGui slotMenuGui;
 
     public OriginalKitGui(GuiSessionRegistry registry, SoundService sounds, OriginalKitService service) {
         super(registry, sounds, GuiType.ORIGINAL_KIT, 5, false);
         this.service = service;
     }
 
-    public void setConfirmGui(ConfirmGui confirmGui) {
-        this.confirmGui = confirmGui;
-    }
-
-    public void setEditGui(OriginalKitEditGui editGui) {
-        this.editGui = editGui;
-    }
-
-    public void setChoiceGui(EkitChoiceGui choiceGui) {
-        this.choiceGui = choiceGui;
+    public void setSlotMenuGui(OriginalKitSlotMenuGui slotMenuGui) {
+        this.slotMenuGui = slotMenuGui;
     }
 
     @Override
@@ -112,38 +101,15 @@ public final class OriginalKitGui extends AbstractGui {
             return;
         }
         if (action.startsWith("paper:")) {
-            int kitSlot = Integer.parseInt(action.substring(6));
-            OriginalKitService.Plan plan = service.planOf(player);
-            if (service.canEditWithoutConfirm(plan) || confirmGui == null) {
-                startEdit(player, kitSlot);
+            int kitSlot;
+            try {
+                kitSlot = Integer.parseInt(action.substring(6));
+            } catch (NumberFormatException e) {
                 return;
             }
-            confirmGui.open(
-                    player,
-                    t(player, "gui.original-confirm").color(UiTheme.DANGER),
-                    List.of(t(player, "gui.original-remaining",
-                            com.rumilance.practice.locale.MessageService.tags(
-                                    "n", service.remainingEditsLabel(player)))),
-                    p -> startEdit(p, kitSlot),
-                    p -> originalGuiOpen(p)
-            );
-        }
-    }
-
-    private void originalGuiOpen(Player player) {
-        open(player);
-    }
-
-    private void startEdit(Player player, int kitSlot) {
-        service.stashInventory(player);
-        if (!service.hasSaved(player.getUniqueId(), kitSlot)) {
-            if (choiceGui != null) {
-                choiceGui.open(player, kitSlot);
+            if (slotMenuGui != null) {
+                slotMenuGui.open(player, kitSlot);
             }
-            return;
-        }
-        if (editGui != null) {
-            editGui.open(player, kitSlot, service.loadLayout(player.getUniqueId(), kitSlot));
         }
     }
 }

@@ -127,7 +127,18 @@ public final class MatchListener implements Listener {
             return;
         }
 
-        KitDefinition kit = kitService.get(session.kitName()).orElse(null);
+        KitDefinition kit = matchService.resolveKit(session);
+
+        // Original-kit fall-damage switch: a kit with fall damage off never takes FALL, and the
+        // accumulated fall distance is reset so a later landing cannot bank the cancelled drop.
+        if (event.getCause() == EntityDamageEvent.DamageCause.FALL
+                && !matchService.fallDamageEnabled(session)) {
+            event.setCancelled(true);
+            event.setDamage(0);
+            victim.setFallDistance(0f);
+            return;
+        }
+
         if (kit != null && event instanceof EntityDamageByEntityEvent byEntity) {
             applyCombatRules(byEntity, victim, kit);
         }
@@ -229,7 +240,7 @@ public final class MatchListener implements Listener {
             return;
         }
         if (session.state() == MatchState.ACTIVE) {
-            KitDefinition kit = kitService.get(session.kitName()).orElse(null);
+            KitDefinition kit = matchService.resolveKit(session);
             if (!KitBlockRules.mayPlace(kit)) {
                 event.setCancelled(true);
                 return;
@@ -251,7 +262,7 @@ public final class MatchListener implements Listener {
             return;
         }
         if (session.state() == MatchState.ACTIVE) {
-            KitDefinition kit = kitService.get(session.kitName()).orElse(null);
+            KitDefinition kit = matchService.resolveKit(session);
             String scope = session.id().toString();
             boolean playerPlaced = playerPlacedBlocks != null
                     && playerPlacedBlocks.isPlacedInScope(event.getBlock(), scope);
@@ -332,7 +343,7 @@ public final class MatchListener implements Listener {
         if (session == null || session.state() != MatchState.ACTIVE) {
             return;
         }
-        KitDefinition kit = kitService.get(session.kitName()).orElse(null);
+        KitDefinition kit = matchService.resolveKit(session);
         if (kit != null && kit.autoFood()) {
             event.setCancelled(true);
             player.setFoodLevel(20);
@@ -349,7 +360,7 @@ public final class MatchListener implements Listener {
         if (session == null || session.state() != MatchState.ACTIVE) {
             return;
         }
-        KitDefinition kit = kitService.get(session.kitName()).orElse(null);
+        KitDefinition kit = matchService.resolveKit(session);
         if (kit != null && !kit.naturalHealthRegen()
                 && event.getRegainReason() == EntityRegainHealthEvent.RegainReason.SATIATED) {
             event.setCancelled(true);
@@ -372,7 +383,7 @@ public final class MatchListener implements Listener {
             event.setCancelled(true);
             return;
         }
-        KitDefinition kit = kitService.get(session.kitName()).orElse(null);
+        KitDefinition kit = matchService.resolveKit(session);
         if (kit != null && !kit.pearl()) {
             event.setCancelled(true);
         }

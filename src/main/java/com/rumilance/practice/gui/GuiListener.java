@@ -289,12 +289,6 @@ public final class GuiListener implements Listener {
                     clickSafely(handler, player, session, top, event.getSlot(),
                             "slot:" + layoutIndex, event.getClick());
                 }
-            } else if (handler instanceof com.rumilance.practice.gui.menus.OriginalKitEditGui) {
-                int layoutIndex = com.rumilance.practice.gui.menus.OriginalKitEditGui.layoutIndexForGuiSlot(event.getSlot());
-                if (layoutIndex >= 0) {
-                    clickSafely(handler, player, session, top, event.getSlot(),
-                            "slot:" + layoutIndex, event.getClick());
-                }
             }
             return;
         }

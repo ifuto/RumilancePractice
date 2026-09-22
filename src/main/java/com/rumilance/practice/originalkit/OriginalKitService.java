@@ -4,6 +4,7 @@ import com.rumilance.practice.config.ConfigService;
 import com.rumilance.practice.database.repository.OriginalKitRepository;
 import com.rumilance.practice.model.KitDefinition;
 import com.rumilance.practice.model.KitItemEntry;
+import com.rumilance.practice.model.OriginalKitSettings;
 import com.rumilance.practice.model.OriginalKitSnapshot;
 import com.rumilance.practice.util.AsyncExecutor;
 import com.rumilance.practice.util.ItemSerializer;
@@ -15,7 +16,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import java.time.Instant;
-import java.time.YearMonth;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -25,8 +25,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Original kit management: per-paper-slot kits, plan-gated slot unlocks, monthly edit
- * budget, and the inventory stash/restore lifecycle used by the OrPlusGUI editor.
+ * Original kit management: per-paper-slot kits, plan-gated slot unlocks, per-slot battle
+ * settings, and the inventory stash/restore lifecycle used by the physical kit room.
  *
  * <p>Plans: DEFAULT (1 paper) / MEMBER (5 papers) / VIP (cross, svip is an alias of vip) /
  * VIP_PLUS (all except slot 44).</p>
@@ -40,8 +40,6 @@ public final class OriginalKitService {
     private final Logger logger;
     private final ConfigService configService;
     private volatile OriginalKitRoomService roomService;
-    private final Map<UUID, Integer> monthlyEdits = new ConcurrentHashMap<>();
-    private final Map<UUID, YearMonth> monthKey = new ConcurrentHashMap<>();
     private final Map<UUID, ItemStack[]> pendingInventory = new ConcurrentHashMap<>();
     private final Map<UUID, EditContext> editContexts = new ConcurrentHashMap<>();
     private final Set<UUID> navigating = ConcurrentHashMap.newKeySet();
@@ -111,45 +109,6 @@ public final class OriginalKitService {
         return isVipCross(slot) ? "SVIP以上で開放" : "VIPで開放";
     }
 
-    /** Top plan (VIP_PLUS) skips the confirm screen. */
-    public boolean canEditWithoutConfirm(Plan plan) {
-        return plan == Plan.VIP_PLUS;
-    }
-
-    public int monthlyEdits(UUID uuid) {
-        YearMonth now = YearMonth.now();
-        YearMonth stored = monthKey.get(uuid);
-        if (stored == null || !stored.equals(now)) {
-            monthKey.put(uuid, now);
-            monthlyEdits.put(uuid, 0);
-        }
-        return monthlyEdits.getOrDefault(uuid, 0);
-    }
-
-    public int monthlyEditLimit(Plan plan) {
-        String path = "original-kit.monthly-edits." + switch (plan) {
-            case DEFAULT -> "default";
-            case MEMBER -> "member";
-            case VIP -> "vip";
-            case VIP_PLUS -> "vip_plus";
-        };
-        return configService.plans().getInt(path, switch (plan) {
-            case DEFAULT -> 10;
-            case MEMBER -> 30;
-            case VIP -> 100;
-            case VIP_PLUS -> -1;
-        });
-    }
-
-    /** Label for the confirm screen: "今月の残り編集可能回数 : <n>" (∞ for unlimited). */
-    public String remainingEditsLabel(Player player) {
-        int limit = monthlyEditLimit(planOf(player));
-        if (limit < 0) {
-            return "∞";
-        }
-        return String.valueOf(Math.max(0, limit - monthlyEdits(player.getUniqueId())));
-    }
-
     public boolean hasSaved(UUID uuid, int slot) {
         return find(uuid, slot).isPresent();
     }
@@ -186,19 +145,32 @@ public final class OriginalKitService {
         return new ItemStack[41];
     }
 
-    public void saveLayout(Player player, int slot, ItemStack[] layout) {
-        Plan plan = planOf(player);
-        int limit = monthlyEditLimit(plan);
-        int used = monthlyEdits(player.getUniqueId());
-        if (limit >= 0 && used >= limit) {
-            player.sendMessage(Component.text("今月のオリジナルキット編集回数の上限に達しました (" + limit + "回).",
-                    NamedTextColor.RED));
+    /** The settings for a slot (vanilla defaults when never configured or the row is missing). */
+    public OriginalKitSettings settingsOf(UUID uuid, int slot) {
+        return find(uuid, slot).map(OriginalKitSnapshot::settings)
+                .orElseGet(OriginalKitSettings::defaults);
+    }
+
+    /** Persists only the settings for a slot, leaving the kit loadout untouched. */
+    public void saveSettings(Player player, int slot, OriginalKitSettings settings) {
+        UUID uuid = player.getUniqueId();
+        Optional<OriginalKitSnapshot> current = find(uuid, slot);
+        if (current.isEmpty()) {
+            // No loadout yet: store an empty layout row so the slot shows as "saved" and the
+            // settings stick even though there is nothing to equip yet.
+            OriginalKitSnapshot fresh = new OriginalKitSnapshot(uuid, slot,
+                    ItemSerializer.toBase64(new ItemStack[41]), null,
+                    settings == null ? null : settings.serialize(), Instant.now());
+            persist(fresh);
+            player.sendMessage(Component.text("オリジナルキットの設定を保存しました。", NamedTextColor.GREEN));
             return;
         }
-        String items = ItemSerializer.toBase64(layout);
-        OriginalKitSnapshot snapshot = new OriginalKitSnapshot(player.getUniqueId(), slot, items, null, Instant.now());
-        monthlyEdits.merge(player.getUniqueId(), 1, Integer::sum);
-        monthKey.put(player.getUniqueId(), YearMonth.now());
+        OriginalKitSnapshot updated = current.get().withSettings(settings);
+        persist(updated);
+        player.sendMessage(Component.text("オリジナルキットの設定を保存しました。", NamedTextColor.GREEN));
+    }
+
+    private void persist(OriginalKitSnapshot snapshot) {
         asyncExecutor.execute(() -> {
             try {
                 repository.upsert(snapshot);
@@ -206,6 +178,20 @@ public final class OriginalKitService {
                 logger.log(Level.WARNING, "Failed saving original kit", e);
             }
         });
+    }
+
+    private void persistLayout(Player player, int slot, ItemStack[] layout) {
+        String items = ItemSerializer.toBase64(layout);
+        // Keep any settings already configured on this slot across a loadout re-save.
+        UUID uuid = player.getUniqueId();
+        Optional<OriginalKitSnapshot> current = find(uuid, slot);
+        String settings = current.map(OriginalKitSnapshot::settingsJson).orElse(null);
+        OriginalKitSnapshot snapshot = new OriginalKitSnapshot(uuid, slot, items, null, settings, Instant.now());
+        persist(snapshot);
+    }
+
+    public void saveLayout(Player player, int slot, ItemStack[] layout) {
+        persistLayout(player, slot, layout);
         player.sendMessage(Component.text("オリジナルキットを保存しました。", NamedTextColor.GREEN));
     }
 
@@ -288,10 +274,10 @@ public final class OriginalKitService {
 
     /**
      * Emergency teardown when a match starts while the player is still editing an original kit:
-     * force-save the in-progress kit (bypassing the monthly limit — the edit already happened,
-     * losing it would punish the player for a match they did not choose), then clear the edit
-     * session and leave the room so room isolation (no-collision, hidden) never leaks into the
-     * fight — a leftover {@code collidable=false} makes melee attacks pass straight through.
+     * force-save the in-progress kit (losing it would punish the player for a match they did
+     * not choose), then clear the edit session and leave the room so room isolation
+     * (no-collision, hidden) never leaks into the fight — a leftover {@code collidable=false}
+     * makes melee attacks pass straight through.
      */
     public void forceSaveAndExitForMatch(Player player) {
         if (player == null || !player.isOnline()) {
@@ -328,21 +314,21 @@ public final class OriginalKitService {
         }
     }
 
-    /** Saves a kit layout ignoring the monthly edit cap (still counts as one edit). */
+    /** Saves a kit layout, bypassing any guards, when a match forcibly ends the edit session. */
     public void forceSaveLayout(Player player, int slot, ItemStack[] layout) {
-        String items = ItemSerializer.toBase64(layout);
-        OriginalKitSnapshot snapshot = new OriginalKitSnapshot(player.getUniqueId(), slot, items, null, Instant.now());
-        monthlyEdits.merge(player.getUniqueId(), 1, Integer::sum);
-        monthKey.put(player.getUniqueId(), YearMonth.now());
-        asyncExecutor.execute(() -> {
-            try {
-                repository.upsert(snapshot);
-            } catch (Exception e) {
-                logger.log(Level.WARNING, "Failed force-saving original kit", e);
-            }
-        });
+        persistLayout(player, slot, layout);
         player.sendMessage(Component.text("試合が始まるため、編集中のオリジナルキットを強制保存しました。",
                 NamedTextColor.GREEN));
+    }
+
+    /** Saves the room editor's inventory, leaves the room and hands the stashed lobby items back. */
+    public void finishRoomEdit(Player player, int slot) {
+        saveLayout(player, slot, player.getInventory().getContents());
+        player.setGameMode(org.bukkit.GameMode.SURVIVAL);
+        if (roomService != null) {
+            roomService.exit(player);
+        }
+        endEdit(player);
     }
 
     public boolean isStashed(UUID uuid) {
@@ -379,6 +365,47 @@ public final class OriginalKitService {
             return;
         }
         endEdit(Bukkit.getPlayer(uuid));
+    }
+
+    // ---- rules synthesis ----
+
+    /** Name under which a synthesized rules kit for {@code owner}+{@code slot} is addressed. */
+    public static String syntheticKitName(UUID owner, int slot) {
+        return "@original:" + owner.toString() + ":" + slot;
+    }
+
+    /**
+     * Builds a rules-only {@link KitDefinition} from the slot's {@link OriginalKitSettings}.
+     * The loadout comes from the saved original layout, not from {@link #syntheticKitName}
+     * items — the synthesized kit simply carries the rule switches so the match runtime's
+     * existing {@code kitService.get(session.kitName())} lookups read the owner's settings
+     * instead of a shared match kit. This is how "fight with the original kit, rules included"
+     * reuses every existing enforcement path without changing the listeners.
+     */
+    public KitDefinition synthesizeKit(UUID owner, int slot) {
+        return synthesizeKit(owner, slot, settingsOf(owner, slot));
+    }
+
+    public KitDefinition synthesizeKit(UUID owner, int slot, OriginalKitSettings settings) {
+        String name = syntheticKitName(owner, slot);
+        String display = "Original Kit #" + (slot + 1);
+        return KitDefinition.builder(name)
+                .displayName(display)
+                .icon("PAPER")
+                .enabled(true)
+                .maxHealth(settings.maxHealth())
+                .naturalHealthRegen(settings.naturalRegen())
+                .autoFood(settings.autoFood())
+                .swordShieldBreak(settings.swordShieldBreak())
+                .blockPlace(settings.blockPlace())
+                .blockBreak(settings.blockBreak())
+                .breakPlayerPlacedOnly(false)
+                .pearl(settings.pearl())
+                .totem(settings.totem())
+                .forceAdventure(settings.forceAdventure())
+                .timeoutSeconds(settings.timeoutSeconds())
+                .bedExplosion(settings.bedExplosion())
+                .build();
     }
 
     // ---- helpers ----

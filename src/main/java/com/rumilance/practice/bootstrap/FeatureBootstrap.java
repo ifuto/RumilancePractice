@@ -102,10 +102,7 @@ import com.rumilance.practice.gui.menus.DuelMapSelectGui;
 import com.rumilance.practice.gui.menus.DuelRequestGui;
 import com.rumilance.practice.gui.menus.EditKitGui;
 import com.rumilance.practice.gui.menus.EkitAdminGui;
-import com.rumilance.practice.gui.menus.EkitChoiceGui;
-import com.rumilance.practice.gui.menus.EkitCopyGui;
 import com.rumilance.practice.gui.menus.EkitSelectGui;
-import com.rumilance.practice.gui.menus.EnchantGui;
 import com.rumilance.practice.gui.menus.FfaListGui;
 import com.rumilance.practice.gui.menus.ArenaSourceGui;
 import com.rumilance.practice.gui.menus.GameMenuGui;
@@ -120,12 +117,10 @@ import com.rumilance.practice.gui.menus.MatchHistoryGui;
 import com.rumilance.practice.gui.menus.MatchInventoryGui;
 import com.rumilance.practice.gui.menus.MatchReportGui;
 import com.rumilance.practice.gui.menus.NameColorGui;
-import com.rumilance.practice.gui.menus.OriginalKitEditGui;
 import com.rumilance.practice.gui.menus.OriginalKitGui;
 import com.rumilance.practice.gui.menus.PartyInviteGui;
 import com.rumilance.practice.gui.menus.PartyMapSelectGui;
 import com.rumilance.practice.gui.menus.PlayersGui;
-import com.rumilance.practice.gui.menus.PotionGui;
 import com.rumilance.practice.gui.menus.PracticeBotGui;
 import com.rumilance.practice.gui.menus.BotDifficultyGui;
 import com.rumilance.practice.gui.menus.PracticeBotSelectGui;
@@ -984,26 +979,16 @@ public final class FeatureBootstrap {
         confirmGui.setOriginalKitService(originalKitService);
         teamSettingsGui.setConfirmGui(confirmGui);
         teamHubGui.setStateManager(stateManager);
-        OriginalKitEditGui originalKitEditGui =
-                new OriginalKitEditGui(guiSessions, soundService, originalKitService, ekitItems);
-        EnchantGui enchantGui =
-                new EnchantGui(guiSessions, soundService, originalKitService, originalKitEditGui);
-        PotionGui potionGui =
-                new PotionGui(guiSessions, soundService, originalKitService, originalKitEditGui);
-        EkitCopyGui ekitCopyGui =
-                new EkitCopyGui(guiSessions, soundService, kitService, originalKitEditGui, originalKitService);
-        EkitChoiceGui ekitChoiceGui = new EkitChoiceGui(
-                guiSessions, soundService, originalKitService, originalKitEditGui, ekitCopyGui);
+        // Original kits: paper grid -> per-slot hub -> (room edit | big settings screen).
+        com.rumilance.practice.gui.menus.OriginalKitSettingsGui originalKitSettingsGui =
+                new com.rumilance.practice.gui.menus.OriginalKitSettingsGui(
+                        guiSessions, soundService, originalKitService);
+        com.rumilance.practice.gui.menus.OriginalKitSlotMenuGui originalKitSlotMenuGui =
+                new com.rumilance.practice.gui.menus.OriginalKitSlotMenuGui(
+                        guiSessions, soundService, originalKitService);
+        originalKitSlotMenuGui.setSettingsGui(originalKitSettingsGui);
         OriginalKitGui originalKitGui = new OriginalKitGui(guiSessions, soundService, originalKitService);
-        originalKitGui.setConfirmGui(confirmGui);
-        originalKitGui.setEditGui(originalKitEditGui);
-        originalKitGui.setChoiceGui(ekitChoiceGui);
-        originalKitEditGui.setEnchantGui(enchantGui);
-        originalKitEditGui.setPotionGui(potionGui);
-        originalKitEditGui.setConfirmGui(confirmGui);
-        originalKitEditGui.setOriginalKitGui(originalKitGui);
-        ekitCopyGui.setChoiceGui(ekitChoiceGui);
-        ekitChoiceGui.setOriginalKitGui(originalKitGui);
+        originalKitGui.setSlotMenuGui(originalKitSlotMenuGui);
 
         EkitSelectGui ekitSelectGui = new EkitSelectGui(guiSessions, soundService, kitService);
         ekitSelectGui.setEditKitGui(editKitGui);
@@ -1378,7 +1363,7 @@ public final class FeatureBootstrap {
                 id -> {
                     com.rumilance.practice.session.MatchSession s =
                             matchService.registry().byPlayer(id).orElse(null);
-                    return s == null ? null : kitService.get(s.kitFor(id)).orElse(null);
+                    return s == null ? null : matchService.resolveKitFor(s, id);
                 },
                 id -> {
                     com.rumilance.practice.session.MatchSession s =
@@ -1515,7 +1500,7 @@ public final class FeatureBootstrap {
                     return s != null && s.state() == com.rumilance.practice.state.MatchState.ACTIVE;
                 },
                 id -> matchService.registry().byPlayer(id)
-                        .flatMap(s -> kitService.get(s.kitFor(id)))
+                        .map(s -> matchService.resolveKitFor(s, id))
                         .orElse(null)));
         bedExplosion.addContext(new com.rumilance.practice.combat.BedExplosionListener.Context(
                 ffaService::isInFfa,

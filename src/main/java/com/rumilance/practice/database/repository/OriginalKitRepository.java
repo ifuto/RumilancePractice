@@ -25,7 +25,7 @@ public final class OriginalKitRepository {
     }
 
     public Optional<OriginalKitSnapshot> find(UUID uuid, int slot) throws SQLException {
-        String sql = "SELECT uuid, slot, item_data, armor_data, saved_at FROM "
+        String sql = "SELECT uuid, slot, item_data, armor_data, settings_json, saved_at FROM "
                 + databaseService.table("original_kit_slots") + " WHERE uuid = ? AND slot = ?";
         try (Connection connection = databaseService.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -41,7 +41,7 @@ public final class OriginalKitRepository {
     }
 
     public List<OriginalKitSnapshot> findAllForPlayer(UUID uuid) throws SQLException {
-        String sql = "SELECT uuid, slot, item_data, armor_data, saved_at FROM "
+        String sql = "SELECT uuid, slot, item_data, armor_data, settings_json, saved_at FROM "
                 + databaseService.table("original_kit_slots") + " WHERE uuid = ? ORDER BY slot";
         List<OriginalKitSnapshot> result = new ArrayList<>();
         try (Connection connection = databaseService.getConnection();
@@ -58,15 +58,16 @@ public final class OriginalKitRepository {
 
     public void upsert(OriginalKitSnapshot snapshot) throws SQLException {
         String sql = "INSERT INTO " + databaseService.table("original_kit_slots")
-                + " (uuid, slot, item_data, armor_data, saved_at) VALUES (?, ?, ?, ?, ?) "
-                + databaseService.upsertClause("uuid, slot", "item_data", "armor_data", "saved_at");
+                + " (uuid, slot, item_data, armor_data, settings_json, saved_at) VALUES (?, ?, ?, ?, ?, ?) "
+                + databaseService.upsertClause("uuid, slot", "item_data", "armor_data", "settings_json", "saved_at");
         try (Connection connection = databaseService.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, snapshot.uuid().toString());
             statement.setInt(2, snapshot.slot());
             statement.setString(3, snapshot.itemDataBase64());
             statement.setString(4, snapshot.armorDataBase64());
-            statement.setTimestamp(5, Timestamp.from(snapshot.savedAt()));
+            statement.setString(5, snapshot.settingsJson());
+            statement.setTimestamp(6, Timestamp.from(snapshot.savedAt()));
             statement.executeUpdate();
         }
     }
@@ -87,6 +88,7 @@ public final class OriginalKitRepository {
                 rs.getInt("slot"),
                 rs.getString("item_data"),
                 rs.getString("armor_data"),
+                rs.getString("settings_json"),
                 rs.getTimestamp("saved_at").toInstant()
         );
     }

@@ -5,9 +5,9 @@ import java.util.UUID;
 
 /**
  * Reference to a party owner's saved original kit (paper slot in the original-kit GUI).
- * When a party battle starts with this reference, every fighter receives the owner's
- * original-kit layout as their loadout; all RULES (block place/break, pearls, timeouts,
- * max HP of the base kit) still come from the chosen match kit.
+ * When a party battle starts with this reference, the loadout AND every rule come from
+ * that slot alone: the owner's original-kit settings are synthesized into the session's
+ * rules kit, so no shared match kit is used at all.
  */
 public record OriginalKitRef(UUID owner, int slot) {
 
