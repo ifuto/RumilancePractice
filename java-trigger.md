@@ -304,3 +304,5 @@ herobot MOD が Brigadier ノードとして直接 dispatcher に載せている
 IDを作っていた（`npc:tick.mcfunction`）。そのため **タグ（#minecraft:tick など）が1つも解決できず**、
 移植側ではマップのAI本体が毎tick動いていなかった（動いていたのはバニラ側が読んだ我々の
 ハーネスタグだけ）。バニラと同じ `ns:path` に正規化して修正。
+
+<!-- trigger: build + plugin-delivery for side-cap-20 TAB loop work -->
