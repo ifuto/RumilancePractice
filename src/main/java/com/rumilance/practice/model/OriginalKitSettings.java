@@ -209,7 +209,10 @@ public record OriginalKitSettings(
         try {
             return Double.parseDouble(value);
         } catch (NumberFormatException e) {
-            return DEFAULT_MAX_HEALTH;
+            // NaN flows into clampHealth / clampScale, which map it back to that field's
+            // vanilla default (20 HP / 1.0 scale). Returning DEFAULT_MAX_HEALTH here wrongly
+            // clamped a garbled bodyScale to MAX_BODY_SCALE (4.0) instead of 1.0.
+            return Double.NaN;
         }
     }
 }

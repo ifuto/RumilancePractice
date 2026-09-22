@@ -2251,13 +2251,14 @@ public final class MatchService {
                     Title.Times.times(Duration.ZERO, Duration.ofSeconds(2), Duration.ofMillis(400))
             ));
             // Distinct end sting by outcome: winner hears the celebratory level-up jingle,
-            // loser/draw hears the heavy anvil thud. (Previously both played to both players.)
+            // loser hears the heavy anvil thud, a draw stays silent (there is no loser to
+            // hear a loss sting). (Previously both played to both players.)
             if (win) {
                 soundService.play(player, "match-end-levelup");
                 if (titleService != null) {
                     titleService.showWinTitle(player);
                 }
-            } else {
+            } else if (!draw) {
                 soundService.play(player, "match-end-anvil");
             }
             // Disconnect forfeits skip the rematch offer entirely — the opponent is gone.

@@ -83,4 +83,15 @@ class OriginalKitSettingsTest {
         assertEquals(OriginalKitSettings.DEFAULT_BODY_SCALE,
                 OriginalKitSettings.defaults().withBodyScale(Double.POSITIVE_INFINITY).bodyScale());
     }
+
+    @Test
+    void garbledNumbersFallBackToTheirOwnVanillaDefaultNotAnotherFields() {
+        // A hand-edited settings_json with non-numeric values must fall back to THIS field's
+        // vanilla default: bodyScale=garbage must be 1.0 (not clamped from parseDouble's old
+        // DEFAULT_MAX_HEALTH fallback, which produced MAX_BODY_SCALE), and maxHealth=garbage
+        // must be 20.0.
+        OriginalKitSettings settings = OriginalKitSettings.parse("bodyScale=garbage;maxHealth=garbage");
+        assertEquals(OriginalKitSettings.DEFAULT_BODY_SCALE, settings.bodyScale());
+        assertEquals(OriginalKitSettings.DEFAULT_MAX_HEALTH, settings.maxHealth());
+    }
 }
