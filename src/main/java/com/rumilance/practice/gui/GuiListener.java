@@ -53,8 +53,6 @@ public final class GuiListener implements Listener {
     private java.util.function.Consumer<Player> menuReturn;
     /** Opens the Battle Menu for screens marked {@link GuiSession#fromBattleMenu()}. */
     private java.util.function.Consumer<Player> battleMenuReturn;
-    /** Re-opens the original-kit editor after a nested confirm/enchant flow. */
-    private java.util.function.Consumer<Player> reopenOriginalEditor;
 
     private static final long CLICK_DEBOUNCE_MS = 350L;
     private static final java.util.logging.Logger LOG =
@@ -127,10 +125,6 @@ public final class GuiListener implements Listener {
 
     public void setBattleMenuReturn(java.util.function.Consumer<Player> battleMenuReturn) {
         this.battleMenuReturn = battleMenuReturn;
-    }
-
-    public void setReopenOriginalEditor(java.util.function.Consumer<Player> reopenOriginalEditor) {
-        this.reopenOriginalEditor = reopenOriginalEditor;
     }
 
     /** True when the player may be bounced back to the Game Menu (lobby-ish states only). */
@@ -517,22 +511,9 @@ public final class GuiListener implements Listener {
             stateManager.resetToLobby(player.getUniqueId());
         }
         if (originalKitService != null) {
-            if (holder.type() == GuiType.EKIT_EDIT) {
-                originalKitService.onEditGuiClosed(player.getUniqueId());
-            } else if (holder.type() == GuiType.CONFIRM) {
+            if (holder.type() == GuiType.CONFIRM) {
                 boolean navigating = originalKitService.consumeNavigating(player.getUniqueId());
-                if (!navigating
-                        && event.getReason() == InventoryCloseEvent.Reason.PLAYER
-                        && reopenOriginalEditor != null
-                        && originalKitService.context(player.getUniqueId()) != null) {
-                    org.bukkit.plugin.Plugin plugin =
-                            org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(GuiListener.class);
-                    org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
-                        if (player.isOnline() && originalKitService.context(player.getUniqueId()) != null) {
-                            reopenOriginalEditor.accept(player);
-                        }
-                    });
-                } else if (!navigating && originalKitService.isStashed(player.getUniqueId())) {
+                if (!navigating && originalKitService.isStashed(player.getUniqueId())) {
                     originalKitService.abortFlow(player.getUniqueId());
                 }
             } else if (originalKitService.isStashed(player.getUniqueId())

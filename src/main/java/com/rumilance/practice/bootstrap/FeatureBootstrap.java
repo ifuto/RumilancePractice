@@ -1158,12 +1158,9 @@ public final class FeatureBootstrap {
         guiListener.register(crystalKitSlotsGui);
         guiListener.register(crystalKitQuickGui);
         guiListener.register(originalKitGui);
+        guiListener.register(originalKitSlotMenuGui);
+        guiListener.register(originalKitSettingsGui);
         guiListener.register(confirmGui);
-        guiListener.register(ekitChoiceGui);
-        guiListener.register(ekitCopyGui);
-        guiListener.register(originalKitEditGui);
-        guiListener.register(enchantGui);
-        guiListener.register(potionGui);
         guiListener.register(ekitAdminGui);
         guiListener.register(presetAdminGui);
         guiListener.register(adminMenuGui);
@@ -1205,12 +1202,9 @@ public final class FeatureBootstrap {
         guiListener.register(localeSelectGui);
         guiListener.setMenuReturn(gameMenuGui::open);
         guiListener.setBattleMenuReturn(battleMenuGui::open);
-        guiListener.setReopenOriginalEditor(player -> {
-            OriginalKitService.EditContext ctx = originalKitService.context(player.getUniqueId());
-            if (ctx != null) {
-                originalKitEditGui.open(player, ctx.slot, ctx.layout);
-            }
-        });
+        // The old chest-GUI editors are gone: a player who closes the original-kit confirm
+        // mid-flow is simply returned to the lobby items, with no GUI to reopen. Room editing
+        // is now the only loadout path, launched from the per-slot hub.
         // Keep open party/queue/FFA/menu GUIs visually in sync while they are on screen:
         // re-render once per second so toggles, counts and rosters never go stale.
         liveGuiTask = org.bukkit.Bukkit.getScheduler().runTaskTimer(plugin,
