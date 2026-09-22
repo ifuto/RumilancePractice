@@ -244,6 +244,14 @@ public final class CombatSyncListener implements Listener {
         Location to = event.getTo();
         boolean lookOnly = isLookOnly(event.getFrom(), to);
         if (CombatNetTracker.isVoidLike(to) || belowPlayFloor(player, to)) {
+            if (isLiveCombatant(player.getUniqueId())) {
+                // Live fight on a floorless arena: let the fall happen — void damage is the
+                // lethal end and the venue's death handlers score it. "Rescuing" here was the
+                // infinite no-death loop: the knocked player never reaches the world void, so
+                // no void damage ever fires and the match can never finish.
+                event.setAllowed(true);
+                return;
+            }
             event.setAllowed(false);
             if (!lookOnly) {
                 rescue(player);
@@ -297,6 +305,12 @@ public final class CombatSyncListener implements Listener {
         }
 
         if (CombatNetTracker.isVoidLike(to) || belowPlayFloor(player, to)) {
+            if (isLiveCombatant(player.getUniqueId())) {
+                // Live fight on a floorless arena: allow the fall. Void clamping here was the
+                // infinite no-death loop — the shoved player could never reach the void, so a
+                // void kill (the canonical crystal/mace-arena end) never fired.
+                return;
+            }
             event.setCancelled(true);
             rescue(player);
             return;
@@ -319,6 +333,12 @@ public final class CombatSyncListener implements Listener {
                 if (!CombatNetTracker.isVoidLike(clamped) && insidePlayArea(player, clamped)) {
                     event.setTo(clamped);
                 } else if (CombatNetTracker.isVoidLike(clamped) || belowPlayFloor(player, clamped)) {
+                    if (isLiveCombatant(player.getUniqueId())) {
+                        // Void fall in a live floorless-arena fight is a legitimate kill; the
+                        // burst clamp must not rescue the player out of it (same infinite-
+                        // no-death loop as the move/FailMove void guards above).
+                        return;
+                    }
                     event.setCancelled(true);
                     rescue(player);
                     return;
@@ -418,6 +438,13 @@ public final class CombatSyncListener implements Listener {
 
     public void rescue(Player player) {
         if (player == null || !player.isOnline()) {
+            return;
+        }
+        // Never "rescue" a fighter mid-fight: blasting someone into the floorless-arena void
+        // is a legitimate kill, and teleporting them back up is the infinite no-death loop.
+        // This is the inner safety net for any future call path in addition to the caller-side
+        // live-combatant guards.
+        if (isLiveCombatant(player.getUniqueId())) {
             return;
         }
         player.setFallDistance(0f);
