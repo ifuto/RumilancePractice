@@ -2,6 +2,7 @@ package com.rumilance.practice.countdown;
 
 import com.rumilance.practice.session.MatchSession;
 import com.rumilance.practice.locale.MessageService;
+import com.rumilance.practice.sound.SoundService;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -106,6 +107,8 @@ public final class CountdownMarkers implements Listener {
     private volatile Consumer<Player> leaveHandler;
     /** Localised action bar lines; null falls back to the built-in palette. */
     private volatile MessageService messageService;
+    /** Plays the Ready click sound; null makes the click silent (bootstrap wires it). */
+    private volatile SoundService soundService;
 
     public CountdownMarkers(Plugin plugin) {
         this.plugin = plugin;
@@ -114,6 +117,10 @@ public final class CountdownMarkers implements Listener {
 
     public void setBothReadyHandler(Consumer<UUID> handler) {
         this.bothReadyHandler = handler;
+    }
+
+    public void setSoundService(SoundService soundService) {
+        this.soundService = soundService;
     }
 
     public void setLeaveHandler(Consumer<Player> handler) {
@@ -468,16 +475,28 @@ public final class CountdownMarkers implements Listener {
         if (set == null) {
             return;
         }
+        boolean alreadyReady = set.ready.contains(player.getUniqueId());
         set.ready.add(player.getUniqueId());
         UUID matchId = matchIdOf(set);
         if (matchId == null) {
             return;
         }
         if (allReady(sessionOf(matchId))) {
+            // Second Ready: this press starts the fight, so it skips the Ready click sound —
+            // beginFight() plays the match-start sting for everyone instead.
             Consumer<UUID> handler = bothReadyHandler;
             if (handler != null) {
                 remove(matchId);
                 handler.accept(matchId);
+            }
+            return;
+        }
+        // First Ready (opponent still waiting): the anvil "land" thud confirms the press.
+        // Re-clicking the block while already Ready stays silent.
+        if (!alreadyReady) {
+            SoundService sounds = soundService;
+            if (sounds != null) {
+                sounds.play(player, "ready");
             }
         }
     }

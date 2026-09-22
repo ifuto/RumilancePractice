@@ -374,6 +374,7 @@ public final class FeatureBootstrap {
         countdownMarkers.setBothReadyHandler(id -> matchService.skipCountdown(id));
         countdownMarkers.setLeaveHandler(player -> matchService.leaveDuringCountdown(player));
         countdownMarkers.setMessageService(messageService);
+        countdownMarkers.setSoundService(soundService);
         matchService.setCountdownMarkers(countdownMarkers);
         plugin.getServer().getPluginManager().registerEvents(countdownMarkers, plugin);
 
