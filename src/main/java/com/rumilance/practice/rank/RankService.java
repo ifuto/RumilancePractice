@@ -45,6 +45,8 @@ public final class RankService {
     private boolean expirySchedulerStarted;
     /** Fired on the main thread whenever an online player's effective rank changes. */
     private volatile java.util.function.Consumer<Player> rankChangeListener;
+    /** Immediate refresh hook: scoreboard / TAB badges for one player after a rank change. */
+    private volatile java.util.function.Consumer<Player> rankAppliedListener;
 
     public RankService(Plugin plugin, RankRepository repository, AsyncExecutor asyncExecutor) {
         this.plugin = plugin;
@@ -152,6 +154,7 @@ public final class RankService {
             Player online = Bukkit.getPlayer(uuid);
             if (online != null) {
                 applyNametag(online);
+                Bukkit.getScheduler().runTask(plugin, () -> fireRankApplied(online));
                 // Strip premium trims whenever the loaded rank is below VIP+ (covers expiry
                 // while offline, where the cache had no previous rank to compare).
                 if (!rank.isVipPlusOrAbove()) {
@@ -198,6 +201,10 @@ public final class RankService {
         Player online = Bukkit.getPlayer(uuid);
         if (online != null) {
             applyNametag(online);
+            // Immediate visibility: refresh the scoreboard / TAB icon layer for this player on
+            // the next tick (the change is already in the cache, so the refresh reads the new
+            // rank). The periodic tick alone left up to a second of stale badges.
+            Bukkit.getScheduler().runTask(plugin, () -> fireRankApplied(online));
             if (downgraded) {
                 Bukkit.getScheduler().runTask(plugin, () -> fireRankChange(online));
             }
@@ -230,6 +237,7 @@ public final class RankService {
                             Player online = Bukkit.getPlayer(uuid);
                             if (online != null) {
                                 applyNametag(online);
+                                fireRankApplied(online);
                             }
                         });
                     }
@@ -238,6 +246,31 @@ public final class RankService {
                 }
             }
         });
+    }
+
+    /** Registers the immediate-visibility hook (scoreboard / TAB refresh for one player). */
+    public void setRankAppliedListener(java.util.function.Consumer<Player> listener) {
+        this.rankAppliedListener = listener;
+    }
+
+    /**
+     * Makes a rank change visible at once: the name everywhere (nametag, TAB entry, chat) is
+     * rewritten and the scoreboard / TAB icon layer is refreshed for that player immediately
+     * instead of waiting for its next periodic tick.
+     */
+    private void fireRankApplied(Player player) {
+        if (player == null) {
+            return;
+        }
+        java.util.function.Consumer<Player> listener = rankAppliedListener;
+        if (listener == null) {
+            return;
+        }
+        try {
+            listener.accept(player);
+        } catch (RuntimeException e) {
+            plugin.getLogger().log(Level.WARNING, "Rank refresh listener failed", e);
+        }
     }
 
     private void fireRankChange(Player player) {
@@ -272,6 +305,7 @@ public final class RankService {
                     lastKnownRanks.put(uuid, PlayerRank.NORM);
                     if (online != null) {
                         applyNametag(online);
+                        fireRankApplied(online);
                         if (lostPremiumAccess(before, PlayerRank.NORM)) {
                             fireRankChange(online);
                         }

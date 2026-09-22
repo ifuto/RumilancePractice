@@ -26,35 +26,52 @@ import java.util.logging.Logger;
 /**
  * Distributes the server resource pack to players directly from the plugin — no
  * {@code resource-pack=} / {@code require-resource-pack=} entries in server.properties are
- * needed. Every player receives the pack shortly after joining
- * ({@code resource-pack.*} in config.yml controls URL, hash and behaviour).
+ * needed.
+ *
+ * <p><b>Where the pack comes from ({@code resource-pack.json} in the plugin data folder).</b>
+ * The operator edits this file by hand:</p>
+ *
+ * <pre>
+ * {
+ *   "url": "https://github.com/&lt;owner&gt;/&lt;repo&gt;/releases/download/vX.Y.Z/RumilanceResourcePack.zip",
+ *   "prompt": "...",                 (optional)
+ *   "required": false,               (optional)
+ *   "min-client-protocol": 0,        (optional)
+ *   "sha1": "..."                    (written by the server — do not edit)
+ * }
+ * </pre>
+ *
+ * <ul>
+ *   <li>the {@code url} in the file wins; when the key is missing the shipped Release URL is
+ *       used, so a fresh install works out of the box;</li>
+ *   <li><b>the SHA-1 is fetched from that URL on every server start</b> (the zip itself is
+ *       downloaded and hashed), then written back into the file — the hash can therefore never
+ *       drift from the published pack, which is what used to make every client reject it;</li>
+ *   <li>if the URL cannot be reached, the last known hash in the file is used (offline / LAN
+ *       setups keep working);</li>
+ *   <li>Craft the release with {@code dist/RumilanceResourcePack.zip} attached — the
+ *       {@code Release resource pack} workflow uploads it (and the {@code .sha1}) for you.</li>
+ * </ul>
  *
  * <p><b>Policy</b> (choosable in the admin GUI, persisted to {@code pack-policy.yml}):
  * <ul>
  *   <li><b>required</b> — players who decline the pack or whose download fails are kicked
  *       (the classic behaviour),</li>
  *   <li><b>recommended</b> (default) — players may decline and keep playing; the rank badges
- *       then fall back to plain-text prefixes ({@code N} / {@code N+} / {@code OWNER}) on
- *       their client because the custom-font glyphs only render with the pack installed.</li>
+ *       are image-only, so such a client simply sees no badge.</li>
  * </ul>
- * The service tracks who actually applied the pack ({@link #hasPack(Player)}) so the
- * scoreboard / TAB prefix layers can pick glyphs vs. text badges per viewer.</p>
- *
- * <p>Uses Paper's Adventure resource-pack API ({@link ResourcePackRequest}); the client
- * verifies the pack by its SHA-1 hash, which must match the shipped zip exactly
- * ({@code dist/RumilanceResourcePack.sha1}). If the URL or hash in config.yml is malformed
- * the service logs a warning and simply sends nothing (players are never kicked because of
- * an admin typo).</p>
+ * The service tracks who actually applied the pack ({@link #hasPack(Player)}).</p>
  *
  * <p>Note: when this service is enabled, remove any {@code resource-pack*} lines from
  * server.properties — otherwise clients may be asked to apply the pack twice.</p>
  */
 public final class ResourcePackService implements Listener {
 
-    /** Shipped default: immutable GitHub Release asset (not a mutable branch zip). */
-    private static final String DEFAULT_URL =
-            "https://github.com/ifuto/RumilancePractice/releases/download/v1.76.45/RumilanceResourcePack.zip";
-    private static final String DEFAULT_SHA1 = "4dcb7fc7801734a97217115a69a2eda15fb960d4";
+    /** Shipped default: the immutable GitHub Release asset (used when the JSON has no url). */
+    public static final String DEFAULT_URL =
+            "https://github.com/ifuto/RumilancePractice/releases/download/v1.76.52/RumilanceResourcePack.zip";
+    /** Operator-owned pack definition (url + prompt + the hash the server maintains). */
+    private static final String JSON_FILE_NAME = "resource-pack.json";
 
     /** Small delay after join so login-time packets settle before the pack prompt. */
     private static final long APPLY_DELAY_TICKS = 10L;
@@ -84,14 +101,23 @@ public final class ResourcePackService implements Listener {
     private final Map<UUID, Boolean> packApplied = new ConcurrentHashMap<>();
     /** Request id most recently sent to each player; status events from another pack are ignored. */
     private final Map<UUID, UUID> pendingRequests = new ConcurrentHashMap<>();
-    /** Admin-GUI policy override ({@code pack-policy.yml}); null = use config.yml default. */
+    /** Admin-GUI policy override ({@code pack-policy.yml}); null = use the JSON/config default. */
     private volatile Boolean requiredOverride;
+    /** Values read from {@code resource-pack.json} (operator-owned). */
+    private volatile String jsonUrl;
+    private volatile String jsonPrompt;
+    private volatile String jsonSha1;
+    private volatile Boolean jsonRequired;
+    private volatile int jsonMinProtocol = -1;
+    /** SHA-1 hashed from the actual zip at the configured URL on this start (null = unknown). */
+    private volatile String liveSha1;
 
     public ResourcePackService(Plugin plugin, ConfigService configService) {
         this.plugin = plugin;
         this.configService = configService;
         this.logger = plugin.getLogger();
         loadPolicy();
+        loadJson();
         reload();
     }
 
@@ -101,6 +127,7 @@ public final class ResourcePackService implements Listener {
      * unchanged URL + SHA-1 pair). Safe to call from {@code /rumireload}.
      */
     public void reload() {
+        loadJson();
         this.request = buildRequest();
         ResourcePackRequest built = this.request;
         if (built == null) {
@@ -113,12 +140,22 @@ public final class ResourcePackService implements Listener {
         for (Player online : Bukkit.getOnlinePlayers()) {
             applyTo(online);
         }
-        startLiveHashCheck();
+        resolveHashFromUrl();
     }
 
     /** Whether plugin-side distribution is enabled at all. */
     public boolean enabled() {
         return configService.config().getBoolean("resource-pack.enabled", true);
+    }
+
+    /** URL the clients are told to download from (JSON value, else the shipped Release URL). */
+    public String packUrl() {
+        return configuredUrl();
+    }
+
+    /** SHA-1 announced to clients: resolved from the URL this start, else the stored value. */
+    public String packSha1() {
+        return liveSha1 != null ? liveSha1 : jsonSha1;
     }
 
     /**
@@ -130,6 +167,10 @@ public final class ResourcePackService implements Listener {
         Boolean override = this.requiredOverride;
         if (override != null) {
             return override;
+        }
+        Boolean fromJson = this.jsonRequired;
+        if (fromJson != null) {
+            return fromJson;
         }
         return configService.config().getBoolean("resource-pack.required", false);
     }
@@ -244,7 +285,7 @@ public final class ResourcePackService implements Listener {
         // receives this pack byte for byte and answers "broken or incompatible", and the
         // custom-font glyphs would stay missing even if it were forced. Skip the prompt
         // instead — the UI already falls back for players without the pack.
-        int minProtocol = configService.config().getInt("resource-pack.min-client-protocol", 0);
+        int minProtocol = configuredMinProtocol();
         if (minProtocol > 0) {
             int clientProtocol = clientProtocolOf(player);
             if (PackFormatPolicy.tooOld(clientProtocol, minProtocol)) {
@@ -406,33 +447,166 @@ public final class ResourcePackService implements Listener {
         player.kick(Component.text(message));
     }
 
+    // ------------------------------------------------------------------ resource-pack.json
+
+    /** The operator-owned pack file. */
+    private File jsonFile() {
+        return new File(com.rumilance.practice.PluginIdentity.dataFolder(plugin), JSON_FILE_NAME);
+    }
+
     /**
-     * Builds the pack request from config, or {@code null} when disabled/misconfigured
-     * (a warning is logged for the latter so admins can spot the problem).
+     * The URL the server serves, in order of authority: {@code resource-pack.json} (the file the
+     * operator edits by hand) → {@code resource-pack.url} in config.yml (legacy/offline setups)
+     * → the shipped Release URL, so a fresh install always works.
+     */
+    String configuredUrl() {
+        if (jsonUrl != null && !jsonUrl.isBlank()) {
+            return jsonUrl.trim();
+        }
+        String legacy = configService.config().getString("resource-pack.url", "");
+        return legacy == null || legacy.isBlank() ? DEFAULT_URL : legacy.trim();
+    }
+
+    /** Prompt text: the JSON value, else config.yml, else the built-in default. */
+    private String configuredPrompt() {
+        if (jsonPrompt != null && !jsonPrompt.isBlank()) {
+            return jsonPrompt;
+        }
+        return configService.config().getString("resource-pack.prompt",
+                "Required for N Arena icons.");
+    }
+
+    /** Protocol gate: the JSON value, else config.yml. */
+    private int configuredMinProtocol() {
+        if (jsonMinProtocol >= 0) {
+            return jsonMinProtocol;
+        }
+        return configService.config().getInt("resource-pack.min-client-protocol", 0);
+    }
+
+    /**
+     * Reads {@code resource-pack.json}, creating it with the shipped Release URL on first start
+     * so the operator only has to replace the URL (or paste a new release's URL) by hand.
+     */
+    private void loadJson() {
+        File file = jsonFile();
+        try {
+            if (!file.isFile()) {
+                Map<String, String> defaults = new java.util.LinkedHashMap<>();
+                defaults.put("url", ResourcePackJson.quote(DEFAULT_URL));
+                defaults.put("prompt", ResourcePackJson.quote(
+                        configService.config().getString("resource-pack.prompt",
+                                "Required for N Arena icons.")));
+                defaults.put("required", "false");
+                defaults.put("min-client-protocol", "0");
+                defaults.put("sha1", ResourcePackJson.quote(""));
+                File parent = file.getParentFile();
+                if (parent != null) {
+                    java.nio.file.Files.createDirectories(parent.toPath());
+                }
+                java.nio.file.Files.writeString(file.toPath(), ResourcePackJson.write(defaults),
+                        StandardCharsets.UTF_8);
+                logger.info("Created " + JSON_FILE_NAME + " — edit its \"url\" to point at your"
+                        + " Release asset (the SHA-1 is filled in automatically on startup).");
+            }
+            Map<String, String> values = ResourcePackJson.parse(
+                    java.nio.file.Files.readString(file.toPath(), StandardCharsets.UTF_8));
+            jsonUrl = values.get("url");
+            jsonPrompt = values.get("prompt");
+            jsonSha1 = normalizeSha1(values.get("sha1"));
+            String required = values.get("required");
+            jsonRequired = parseBoolean(required);
+            String minProtocol = values.get("min-client-protocol");
+            if (minProtocol != null && minProtocol.matches("\\d+")) {
+                jsonMinProtocol = Integer.parseInt(minProtocol);
+            }
+        } catch (Exception e) {
+            logger.log(Level.WARNING, "Could not read " + JSON_FILE_NAME
+                    + " — falling back to the shipped Release pack URL.", e);
+        }
+    }
+
+    /** Writes the resolved URL/hash back so the file always shows what clients are told. */
+    private void saveJson(String url, String sha1) {
+        File file = jsonFile();
+        try {
+            Map<String, String> values = new java.util.LinkedHashMap<>();
+            values.put("url", ResourcePackJson.quote(url == null || url.isBlank()
+                    ? configuredUrl() : url));
+            // (keys below mirror what this service resolved, so the file always documents the
+            // pack clients are actually told about)
+            values.put("prompt", ResourcePackJson.quote(configuredPrompt()));
+            values.put("required", String.valueOf(required()));
+            values.put("min-client-protocol", String.valueOf(configuredMinProtocol()));
+            values.put("sha1", ResourcePackJson.quote(sha1));
+            java.nio.file.Files.writeString(file.toPath(), ResourcePackJson.write(values),
+                    StandardCharsets.UTF_8);
+        } catch (java.io.IOException e) {
+            logger.log(Level.WARNING, "Could not update " + JSON_FILE_NAME, e);
+        }
+    }
+
+    private static Boolean parseBoolean(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String value = raw.trim().toLowerCase(java.util.Locale.ROOT);
+        if (value.equals("true")) {
+            return Boolean.TRUE;
+        }
+        if (value.equals("false")) {
+            return Boolean.FALSE;
+        }
+        return null;
+    }
+
+    /** 40 hex chars or null (an empty/"auto" placeholder means "not resolved yet"). */
+    private static String normalizeSha1(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String value = raw.trim().toLowerCase(java.util.Locale.ROOT);
+        return value.matches("[0-9a-f]{40}") ? value : null;
+    }
+
+    // ------------------------------------------------------------------------ pack request
+
+    /**
+     * Builds the pack request from {@code resource-pack.json} (URL, prompt, protocol gate) and
+     * the best known SHA-1, or {@code null} while impossible (disabled / no URL / no hash yet).
      */
     private ResourcePackRequest buildRequest() {
         if (!enabled()) {
             return null;
         }
-        String url = configService.config().getString("resource-pack.url", DEFAULT_URL);
-        String sha1Hex = configService.config().getString("resource-pack.sha1", DEFAULT_SHA1);
+        String url = configuredUrl();
+        // Authority: the hash resolved from the URL on this start → the value stored in the
+        // JSON by an earlier start → the config.yml fallback (offline / LAN setups).
+        String sha1Hex = liveSha1 != null ? liveSha1 : jsonSha1;
+        if (sha1Hex == null) {
+            sha1Hex = normalizeSha1(configService.config()
+                    .getString("resource-pack.sha1", ""));
+        }
+        if (sha1Hex == null) {
+            return null; // still resolving: the fetch completion pushes the request
+        }
         return buildRequest(url, sha1Hex);
     }
 
     /**
-     * Builds the pack request with explicit url/hash (also used by the live-hash check when
-     * it heals a stale configured SHA-1). Returns {@code null} when disabled/misconfigured.
+     * Builds the pack request with explicit url/hash. Returns {@code null} when misconfigured
+     * (a warning is logged so admins can spot the problem).
      */
     private ResourcePackRequest buildRequest(String url, String sha1Hex) {
-        String prompt = configService.config().getString("resource-pack.prompt",
-                "Required for N Arena icons.");
+        String prompt = configuredPrompt();
         if (url == null || url.isBlank()) {
-            logger.warning("resource-pack.url is empty — plugin pack distribution disabled.");
+            logger.warning("resource-pack.json has no url — plugin pack distribution disabled.");
             return null;
         }
         if (sha1Hex == null || !sha1Hex.matches("[0-9a-fA-F]{40}")) {
-            logger.warning("resource-pack.sha1 must be exactly 40 hex characters "
-                    + "(see dist/RumilanceResourcePack.sha1) — plugin pack distribution disabled.");
+            logger.warning("No usable SHA-1 for the resource pack — plugin pack distribution"
+                    + " disabled (the hash is fetched on startup and stored in "
+                    + JSON_FILE_NAME + ").");
             return null;
         }
         URI uri;
@@ -440,10 +614,10 @@ public final class ResourcePackService implements Listener {
             uri = URI.create(url.trim());
         } catch (IllegalArgumentException e) {
             logger.log(Level.WARNING,
-                    "resource-pack.url is not a valid URL — plugin pack distribution disabled.", e);
+                    "resource-pack.json url is not a valid URL — plugin pack distribution disabled.", e);
             return null;
         }
-        // Stable, config-derived id so repeat requests refer to the same pack entry.
+        // Stable, URL+hash-derived id so repeat requests refer to the same pack entry.
         UUID packId = UUID.nameUUIDFromBytes(
                 (url.trim() + "|" + sha1Hex.toLowerCase(java.util.Locale.ROOT))
                         .getBytes(StandardCharsets.UTF_8));
@@ -462,48 +636,47 @@ public final class ResourcePackService implements Listener {
     }
 
     /**
-     * Startup self-heal (server owner's idea): the SHA-1 announced to clients is re-verified
-     * against the ACTUAL zip at the configured URL, asynchronously after every reload. A
-     * hash that silently drifted from the zip was the exact "pack can never be applied on
-     * the server" breakage this used to have — now, when the live zip's hash differs from
-     * the configured one, the live hash wins for this session (with a loud warning so the
-     * config/dist drift gets fixed). An unreachable URL only logs at INFO: offline/LAN
-     * setups keep using the configured hash.
+     * <b>Startup hash resolution.</b> The zip at the configured URL is downloaded and hashed
+     * (asynchronously) on every start / reload, because the announced SHA-1 must match the
+     * published file exactly — a drifted hash makes every client reject the pack, which is the
+     * breakage this class used to suffer from. The resolved hash is persisted into
+     * {@code resource-pack.json} and the pack is (re-)pushed to everyone online. An unreachable
+     * URL keeps the hash from the previous start.
      */
-    private void startLiveHashCheck() {
-        ResourcePackRequest built = this.request;
-        if (built == null) {
+    private void resolveHashFromUrl() {
+        if (!enabled()) {
             return;
         }
-        String url = configService.config().getString("resource-pack.url", DEFAULT_URL);
-        String configured = configService.config()
-                .getString("resource-pack.sha1", DEFAULT_SHA1);
+        String url = configuredUrl();
         if (url == null || url.isBlank() || !url.startsWith("http")) {
-            return; // file:-style or blank URLs cannot be re-hashed from here
+            return; // file:-style or blank URLs cannot be hashed from here
         }
-        String trimmedUrl = url.trim();
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            String actual = fetchSha1(trimmedUrl);
+            String actual = fetchSha1(url);
             if (actual == null) {
-                logger.info(() -> "resource-pack.live-hash: could not fetch " + trimmedUrl
-                        + " to verify the announced SHA-1 — keeping the configured value"
-                        + " (offline/LAN environment?).");
+                if (liveSha1 == null && jsonSha1 == null) {
+                    logger.warning("Could not download the resource pack at " + url
+                            + " to resolve its SHA-1 — no pack is sent until a hash is known.");
+                } else {
+                    logger.info(() -> "Could not reach " + url
+                            + " — using the hash stored in " + JSON_FILE_NAME + ".");
+                }
                 return;
             }
-            if (actual.equalsIgnoreCase(configured)) {
-                return; // config and zip agree — nothing to heal
-            }
-            logger.warning("resource-pack.sha1 is STALE: config announces " + configured
-                    + " but the zip at the URL hashes to " + actual
-                    + ". Every client download was being rejected by the hash check until"
-                    + " now — this session uses the LIVE hash. Persist the fix by syncing"
-                    + " config.yml with dist/ (the localtest guard blocks future drift).");
-            ResourcePackRequest healed = buildRequest(trimmedUrl, actual);
-            if (healed == null) {
+            if (actual.equalsIgnoreCase(liveSha1)) {
                 return;
+            }
+            logger.info(() -> "Resource pack SHA-1 resolved from " + url + ": " + actual);
+            liveSha1 = actual;
+            if (!actual.equalsIgnoreCase(jsonSha1)) {
+                saveJson(url, actual);
             }
             Bukkit.getScheduler().runTask(plugin, () -> {
-                this.request = healed;
+                ResourcePackRequest built = buildRequest();
+                if (built == null) {
+                    return;
+                }
+                this.request = built;
                 for (Player online : Bukkit.getOnlinePlayers()) {
                     applyTo(online);
                 }

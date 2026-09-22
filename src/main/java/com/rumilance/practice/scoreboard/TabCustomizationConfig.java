@@ -91,10 +91,14 @@ public final class TabCustomizationConfig {
         return entries.getOrDefault(group, fallback);
     }
 
+    /**
+     * Display group of a player, taken from the <strong>stored rank</strong> (the same value the
+     * rank badge uses) — never from permissions. Bukkit answers {@code true} for an unregistered
+     * permission node on any OP, so a permission-based group silently turned every operator into
+     * the CSV "owner" group (the reported "OP に自動で OWNER が付く"). OWNER is granted only by
+     * {@code /rank <player> owner} (or {@code admin}).
+     */
     private static String groupOf(Player player, RankService rankService) {
-        if (player.hasPermission("rumilance.owner")) {
-            return "owner";
-        }
         PlayerRank rank = RankIconNameTags.effectiveRank(rankService, player);
         return switch (rank) {
             case ADMIN -> "admin";

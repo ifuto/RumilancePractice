@@ -692,18 +692,14 @@ public final class FeatureBootstrap {
                 resourcePackService);
         plugin.getServer().getPluginManager().registerEvents(resourcePackService, plugin);
         final RankService rankServiceRef = rankService;
-        final com.rumilance.practice.resourcepack.ResourcePackService packServiceRef =
-                resourcePackService;
         com.rumilance.practice.match.MatchTeamVisuals.setPrefixResolver((viewer, player, session) -> {
             net.kyori.adventure.text.Component prefix = net.kyori.adventure.text.Component.empty();
             // Badge identity is the UUID-backed stored rank. Permission nodes remain useful
             // for feature access, but OP/admin inheritance must not turn every test operator
             // into an OWNER badge.
             com.rumilance.practice.rank.PlayerRank effective = rankServiceRef.get(player);
-            // Glyphs only render on clients that applied the pack; pack-less viewers get the
-            // text badges (N / N+ / OWNER) instead.
-            net.kyori.adventure.text.Component rankIcon = iconFontService.rankIcon(effective,
-                    packServiceRef == null || packServiceRef.hasPack(viewer));
+            // Image-only badges: the glyph is the only form (no text fallback).
+            net.kyori.adventure.text.Component rankIcon = iconFontService.rankIcon(effective);
             if (!rankIcon.equals(net.kyori.adventure.text.Component.empty())) {
                 prefix = prefix.append(rankIcon).append(net.kyori.adventure.text.Component.space());
             }
@@ -739,6 +735,13 @@ public final class FeatureBootstrap {
         final KitLayoutRepository kitLayoutRepositoryRef = kitLayoutRepository;
         final AsyncExecutor asyncExecutorRef = asyncExecutor;
         final org.slf4j.Logger trimLogger = plugin.getSLF4JLogger();
+        // A rank change must be visible at once: refresh the scoreboard / TAB badge layer for
+        // that player on the spot (the rank cache is already updated when this fires).
+        rankService.setRankAppliedListener(player -> {
+            if (scoreboardService != null) {
+                scoreboardService.refreshNow(player);
+            }
+        });
         rankService.setRankChangeListener(player -> {
             try {
                 int worn = com.rumilance.practice.cosmetic.ArmorTrimReset.stripPremiumTrims(

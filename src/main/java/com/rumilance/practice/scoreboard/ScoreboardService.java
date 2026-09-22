@@ -289,6 +289,39 @@ public final class ScoreboardService {
         }
     }
 
+    /**
+     * Refreshes the scoreboard (and with it the TAB rank badges / fight layout) for ONE player
+     * right now. Used after a rank change so the new badge is visible immediately instead of on
+     * the next periodic tick (up to a second later).
+     */
+    public void refreshNow(Player player) {
+        ScoreboardConfig cfg = this.config;
+        if (player == null || cfg == null || !cfg.enabled() || !player.isOnline()) {
+            return;
+        }
+        try {
+            int onlineCount = com.rumilance.practice.util.RealPlayers.online().size();
+            if (settingsService.get(player).scoreboardEnabled()) {
+                update(player, onlineCount, cfg);
+                BoardHandle handle = boards.get(player.getUniqueId());
+                if (handle != null && cfg.tabHeaderFooter()) {
+                    applyTab(player, handle, onlineCount, cfg);
+                }
+            } else {
+                boards.remove(player.getUniqueId());
+                if (player.getScoreboard() != Bukkit.getScoreboardManager().getMainScoreboard()) {
+                    player.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
+                }
+            }
+            if (tabVisibilityService != null) {
+                tabVisibilityService.refresh(java.util.List.of(player));
+            }
+        } catch (RuntimeException e) {
+            plugin.getLogger().log(java.util.logging.Level.WARNING,
+                    "Immediate scoreboard refresh failed for " + player.getName(), e);
+        }
+    }
+
     private CachedStats cachedStats(UUID uuid, ScoreboardConfig cfg) {
         long now = System.currentTimeMillis();
         CachedStats cached = statsCache.get(uuid);
@@ -526,10 +559,9 @@ public final class ScoreboardService {
 
         MatchSession visualSession = match.orElseGet(() -> spectated.flatMap(matchRegistry::get).orElse(null));
         BoardHandle handle = boards.get(player.getUniqueId());
-        // Pack-less viewers get the text rank badges (N / N+ / OWNER) — glyphs would render
-        // as missing-glyph boxes on their client. The CSV also owns the lobby/queue/FFA
-        // priority; fight columns below intentionally take priority while a match is active.
-        boolean viewerHasPack = resourcePackService == null || resourcePackService.hasPack(player);
+        // Rank badges are image-only (resource-pack glyphs): no text fallback badges. The CSV
+        // also owns the lobby/queue/FFA priority; fight columns below intentionally take
+        // priority while a match is active.
         if (visualSession == null && tabCustomizationConfig != null && rankService != null) {
             try {
                 player.setPlayerListOrder(tabCustomizationConfig.order(player, rankService));
@@ -561,7 +593,7 @@ public final class ScoreboardService {
                     && iconFontService.enabled()) {
                 com.rumilance.practice.font.RankIconNameTags.apply(
                         handle.board, iconFontService, rankService,
-                        Bukkit.getOnlinePlayers(), viewerHasPack,
+                        Bukkit.getOnlinePlayers(),
                         tabCustomizationConfig == null ? null
                                 : other -> tabCustomizationConfig.prefix(other, rankService));
             } else if (handle != null) {

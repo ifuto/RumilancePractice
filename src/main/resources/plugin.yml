@@ -426,6 +426,12 @@ commands:
     permission: rumilance.user
 
 permissions:
+  # Declared on purpose: an UNDECLARED node answers true for every OP on Bukkit, which used to
+  # turn operators into the OWNER display group. The rank itself is stored data and can only be
+  # granted with /rank (command), never by OP.
+  rumilance.owner:
+    description: Reserved owner-only hook. Does NOT grant the OWNER rank/badge.
+    default: false
   rumilance.user:
     description: Base practice player permission.
     default: true

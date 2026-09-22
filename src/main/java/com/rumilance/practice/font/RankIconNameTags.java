@@ -24,26 +24,25 @@ public final class RankIconNameTags {
     private RankIconNameTags() {
     }
 
-    /**
-     * Applies the rank-icon prefix for every online ranked player on {@code board}.
-     * {@code viewerHasPack} decides whether the owner of this scoreboard sees the
-     * resource-pack glyphs or the text fallback badges.
-     */
+    /** Applies the rank-icon prefix for every online ranked player on {@code board}. */
     public static void apply(Scoreboard board, IconFontService icons, RankService ranks,
-                             Collection<? extends Player> online, boolean viewerHasPack) {
-        apply(board, icons, ranks, online, viewerHasPack, null);
+                             Collection<? extends Player> online) {
+        apply(board, icons, ranks, online, null);
     }
 
-    /** Applies an optional plugin-owned CSV prefix after the rank icon. */
+    /**
+     * Applies an optional plugin-owned CSV prefix after the rank icon. The badge itself is
+     * always the resource-pack glyph — there is no per-viewer text fallback anymore.
+     */
     public static void apply(Scoreboard board, IconFontService icons, RankService ranks,
-                             Collection<? extends Player> online, boolean viewerHasPack,
+                             Collection<? extends Player> online,
                              Function<Player, Component> customPrefix) {
         if (board == null || icons == null || ranks == null || !icons.enabled()) {
             return;
         }
         for (Player other : online) {
             PlayerRank effective = effectiveRank(ranks, other);
-            Component icon = icons.rankIcon(effective, viewerHasPack);
+            Component icon = icons.rankIcon(effective);
             if (customPrefix != null) {
                 Component suffix = customPrefix.apply(other);
                 if (suffix != null && !suffix.equals(Component.empty())) {
@@ -107,7 +106,8 @@ public final class RankIconNameTags {
     /**
      * Rank badges are UUID-backed social state, not a side effect of the permission graph.
      * In particular, {@code rumilance.admin} is normally inherited by every OP on a test
-     * server and must not make every player display the OWNER badge.
+     * server and must not make every player display the OWNER badge: the stored rank (set with
+     * {@code /rank}) is the only source.
      */
     public static PlayerRank effectiveRank(RankService ranks, Player player) {
         return ranks.get(player);

@@ -17,11 +17,10 @@ import net.kyori.adventure.text.Component;
  * <p>Team identification during team fights is deliberately NOT a pack glyph — it is a plain
  * coloured {@code ●} (see the MatchTeamVisuals prefix resolver), so it works for everyone even
  * without the resource pack. Everything here is config-driven ({@code icons.*} in config.yml)
- * so glyphs can be remapped or the whole feature disabled without touching code. Players
- * without the resource pack never see glyphs — {@link #rankIcon(PlayerRank, boolean)} falls
- * back to the plain-text badges ({@code N} / {@code N+} / {@code OWNER}), and the pack policy
- * (required = kick on decline, recommended = join anyway) is chosen in the admin GUI
- * ({@code resource-pack.*} in config.yml,
+ * so glyphs can be remapped or the whole feature disabled without touching code. The badges are
+ * <strong>image-only</strong>: there is no text fallback, so a client that never applied the
+ * pack simply sees no badge — the pack policy (required = kick on decline, recommended = join
+ * anyway) is chosen in the admin GUI ({@code resource-pack.*} in config.yml,
  * {@link com.rumilance.practice.resourcepack.ResourcePackService}).</p>
  */
 public final class IconFontService {
@@ -56,23 +55,15 @@ public final class IconFontService {
         return Key.key(parts[0], parts[1]);
     }
 
-    /** Rank badge for the player name prefix, or {@link Component#empty()} for NORM / disabled. */
-    public Component rankIcon(PlayerRank rank) {
-        return rankIcon(rank, true);
-    }
-
     /**
-     * Rank badge for a player name prefix, chosen for the VIEWER's client: the resource-pack
-     * glyph when the viewer applied the pack, otherwise the plain-text legacy-style badge
-     * ({@code N} / {@code N+} / {@code OWNER}) — glyphs render as missing-glyph boxes on
-     * clients without the pack.
+     * Rank badge shown in front of a player name, or {@link Component#empty()} for NORM /
+     * disabled. Always the resource-pack glyph: the badges are image-only by design, so nothing
+     * here ever degrades into text such as {@code OWNER} / {@code N} / {@code N+} (which used to
+     * leak a "text-style" prefix into the TAB list and nametags).
      */
-    public Component rankIcon(PlayerRank rank, boolean viewerHasPack) {
+    public Component rankIcon(PlayerRank rank) {
         if (!enabled() || rank == null) {
             return Component.empty();
-        }
-        if (!viewerHasPack) {
-            return textBadge(rank);
         }
         String glyph = switch (rank) {
             case ADMIN -> glyph("icons.glyphs.admin", "\uE001");
@@ -82,27 +73,9 @@ public final class IconFontService {
             default -> null;
         };
         if (glyph == null || glyph.isEmpty()) {
-            return textBadge(rank);
-        }
-        return icon(glyph);
-    }
-
-    /** Text fallback badge for clients without the resource pack (legacy N / N+ / OWNER). */
-    public Component textBadge(PlayerRank rank) {
-        if (rank == null) {
             return Component.empty();
         }
-        return switch (rank) {
-            case ADMIN -> Component.text("OWNER", net.kyori.adventure.text.format.NamedTextColor.RED,
-                    net.kyori.adventure.text.format.TextDecoration.BOLD);
-            case VIP_PLUS -> Component.text("N+", net.kyori.adventure.text.format.NamedTextColor.GOLD,
-                    net.kyori.adventure.text.format.TextDecoration.BOLD);
-            case VIP -> Component.text("N", net.kyori.adventure.text.format.NamedTextColor.YELLOW,
-                    net.kyori.adventure.text.format.TextDecoration.BOLD);
-            case PRO -> Component.text("PRO", net.kyori.adventure.text.format.NamedTextColor.AQUA,
-                    net.kyori.adventure.text.format.TextDecoration.BOLD);
-            default -> Component.empty();
-        };
+        return icon(glyph);
     }
 
     private String glyph(String path, String fallback) {

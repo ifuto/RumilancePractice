@@ -3,7 +3,10 @@ package com.rumilance.practice.match;
 import com.rumilance.practice.session.MatchSession;
 import com.rumilance.practice.spectator.SpectatorService;
 import com.rumilance.practice.state.MatchState;
+import io.papermc.paper.chat.ChatRenderer;
 import io.papermc.paper.event.player.AsyncChatEvent;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -14,21 +17,28 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Scopes chat while a player is in an active duel / team match.
+ * Scopes a fighter's own chat line while a duel / team match is running.
  *
  * <ul>
- *   <li><b>Team match</b> — a fighter's message is delivered only to people inside that match:
- *       their own team (combat allies) AND the enemy team (opponents), plus anyone spectating it.</li>
- *   <li><b>1v1 duel</b> — the message goes to the two fighters and its spectators only.</li>
+ *   <li><b>What a fighter says</b> is tagged {@code [Duel]} in aqua (a party battle uses
+ *       {@code [Match]}) and is delivered to that match only: the fighters and whoever is
+ *       spectating it. It never reaches the lobby, another match, or FFA.</li>
+ *   <li><b>What a fighter reads</b> is untouched — lobby chat, announcements, private messages
+ *       and other players' lines all arrive normally (the fight isolation hides players from the
+ *       TAB list and the world, never from chat). Only the speaker's own recipients and tag are
+ *       rewritten.</li>
  * </ul>
  *
- * <p>Everyone else (lobby players, FFA players, spectators of other matches) is removed from the
- * recipients, so match chat never leaks out and outside chat never matters to fighters (their own
- * lines are simply not broadcast to the world). System messages that must reach a fighter (duel
- * requests, countdown, end screens, party chat UI) are sent directly by their owning code and are
- * not affected — this listener only rewrites the recipient <em>viewers</em> of a chat message.</p>
+ * <p>System messages that must reach a fighter (duel requests, countdown, end screens, party
+ * chat UI) are sent directly by their owning code and are not affected — this listener only
+ * rewrites the recipient <em>viewers</em> and the renderer of a chat message.</p>
  */
 public final class MatchChatListener implements Listener {
+
+    /** Aqua tag in front of a fighter's own line (the requested duel chat marker). */
+    private static final String DUEL_TAG = "[Duel]";
+    /** The same marker for a party battle. */
+    private static final String MATCH_TAG = "[Match]";
 
     private final MatchRegistry registry;
     private final SpectatorService spectatorService;
@@ -61,5 +71,14 @@ public final class MatchChatListener implements Listener {
             }
             return !allowed.contains(viewer.getUniqueId());
         });
+        // Tag the speaker's own line so the scoped channel is obvious: [Duel] aqua in a 1v1,
+        // [Match] in a party battle. Wrapped around the existing renderer so the line keeps its
+        // rank / team styling.
+        Component tag = Component.text(
+                session.isTeamMatch() ? MATCH_TAG : DUEL_TAG, NamedTextColor.AQUA);
+        ChatRenderer original = event.renderer();
+        event.renderer((source, sourceDisplayName, message, viewer) -> tag
+                .append(Component.space())
+                .append(original.render(source, sourceDisplayName, message, viewer)));
     }
 }

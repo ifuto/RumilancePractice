@@ -43,18 +43,23 @@ icons:
 # asked to apply the pack twice.
 resource-pack:
   # Master switch. When false the plugin does not send any resource pack.
+  #
+  # The pack itself is defined in plugins/NARENA/resource-pack.json (created on first start):
+  # edit its "url" by hand to point at your release asset. If the file has no url the shipped
+  # Release URL below is used, and the SHA-1 is fetched from that URL on every server start
+  # (then written back into the JSON) so the hash can never drift from the published zip.
+  # The values here are only fallbacks for an offline server that cannot reach the URL.
   enabled: true
   # ViaVersion/ViaBackwards translate the protocol, never the resource pack: an older client
   # gets this pack byte for byte and reports it as broken/incompatible, and the custom-font
   # glyphs stay missing even when forced. Set this to the protocol number of the version the
   # pack was built for and older clients are simply not offered it (0 = offer to everyone).
   min-client-protocol: 0
-  # Direct GitHub Release asset URL. Releases are immutable, so clients never receive a
-  # half-pushed branch zip; update this together with gradle.properties and the release asset.
+  # Fallback Release URL, used only when resource-pack.json has no "url".
   url: "https://github.com/ifuto/RumilancePractice/releases/download/v1.76.52/RumilanceResourcePack.zip"
-  # SHA-1 of the zip as 40 hex characters (must match the file exactly; see
-  # dist/RumilanceResourcePack.sha1). The client rejects a hash mismatch — the localtest
-  # guard (tools/localtest/localtest.sh) refuses a build whose sha1 drifts from the zip.
+  # Fallback SHA-1 (40 hex). The live hash is what clients are actually told: it is computed
+  # from the zip at the URL on every start and stored in resource-pack.json. This value only
+  # covers an offline server that has never reached the URL.
   sha1: "2ad094674379fb5cc9e1f224647b9f30c26e2072"
   # true  = REQUIRED: kick players who decline the pack or fail to download it.
   # false = RECOMMENDED: they may decline and keep playing (text rank badges instead of
