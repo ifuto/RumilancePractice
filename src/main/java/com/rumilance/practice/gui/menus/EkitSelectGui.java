@@ -8,8 +8,10 @@ import com.rumilance.practice.gui.ItemBuilder;
 import com.rumilance.practice.gui.MenuScaffold;
 import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.kit.KitService;
+import com.rumilance.practice.model.KitCategory;
 import com.rumilance.practice.model.KitDefinition;
 import com.rumilance.practice.sound.SoundService;
+import com.rumilance.practice.util.GuiSlots;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.minimessage.MiniMessage;
@@ -62,14 +64,73 @@ public final class EkitSelectGui extends AbstractGui {
         return t(player, "gui.kit-edit-title").color(UiTheme.PRIMARY);
     }
 
+    /** 開き直すたびに「Main / Sub」の2択から始める（前のカテゴリを持ち越さない）。 */
+    @Override
+    protected void configureSession(GuiSession session, Player player) {
+        session.setKitCategory(null);
+        session.setPage(0);
+    }
+
+    /**
+     * Two-step picker (Queue と同じ構成): first screen is just the two wooden category
+     * buttons (Main Kits / Sub Kits); pressing one plays the wooden-button sting, holds for
+     * 0.2s, then opens that category's kit list. Originl Kit の紙は2択画面からも出しておく。
+     */
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
         paintFrame(player, session, inventory);
 
-        List<KitDefinition> kits = kitService.enabled();
-        int shown = Math.min(kits.size(), MenuScaffold.gridPageSize());
-        for (int i = 0; i < shown; i++) {
-            inventory.setItem(MenuScaffold.gridSlot(i), kitIcon(player, kits.get(i)));
+        if (session.kitCategory() == null) {
+            renderChooser(player, inventory);
+            inventory.setItem(GuiSlots.slot(5, 1), originalPaper(player));
+            paintNav(player, session, inventory);
+            return;
+        }
+        renderCategory(player, session, inventory, session.kitCategory());
+        inventory.setItem(GuiSlots.slot(5, 1), originalPaper(player));
+        MenuScaffold.returnButton(inventory, t(player, "menu.back"));
+    }
+
+    /** MAIN KITS / SUB KITS — the two wooden buttons of the first screen. */
+    private void renderChooser(Player player, Inventory inventory) {
+        int mainCount = kitService.enabled(KitCategory.MAIN).size();
+        int subCount = kitService.enabled(KitCategory.SUB).size();
+        inventory.setItem(MenuScaffold.gridSlot(9),
+                com.rumilance.practice.gui.KitSections.categoryButton(
+                        KitCategory.MAIN,
+                        t(player, "gui.kit-main-button").color(UiTheme.SUCCESS),
+                        java.util.List.of(
+                                UiTheme.divider(),
+                                UiTheme.line(line(player, "gui.kit-main-button-lore")),
+                                UiTheme.blank(),
+                                UiTheme.labelValue(line(player, "gui.kit-count-label"),
+                                        String.valueOf(mainCount)),
+                                UiTheme.blank(),
+                                UiTheme.hint(line(player, "gui.kit-button-hint")))));
+        inventory.setItem(MenuScaffold.gridSlot(11),
+                com.rumilance.practice.gui.KitSections.categoryButton(
+                        KitCategory.SUB,
+                        t(player, "gui.kit-sub-button").color(UiTheme.SECONDARY),
+                        java.util.List.of(
+                                UiTheme.divider(),
+                                UiTheme.line(line(player, "gui.kit-sub-button-lore")),
+                                UiTheme.blank(),
+                                UiTheme.labelValue(line(player, "gui.kit-count-label"),
+                                        String.valueOf(subCount)),
+                                UiTheme.blank(),
+                                UiTheme.hint(line(player, "gui.kit-button-hint")))));
+    }
+
+    /** One category's kits, paginated over the standard content grid. */
+    private void renderCategory(Player player, GuiSession session, Inventory inventory, String category) {
+        List<KitDefinition> kits = kitService.enabled(
+                "SUB".equalsIgnoreCase(category) ? KitCategory.SUB : KitCategory.MAIN);
+        int pageSize = MenuScaffold.gridPageSize();
+        int pages = Math.max(1, (kits.size() + pageSize - 1) / pageSize);
+        int page = Math.min(Math.max(0, session.page()), pages - 1);
+        int from = page * pageSize;
+        for (int i = 0; i < pageSize && from + i < kits.size(); i++) {
+            inventory.setItem(MenuScaffold.gridSlot(i), kitIcon(player, kits.get(from + i)));
         }
         if (kits.isEmpty()) {
             inventory.setItem(MenuScaffold.gridSlot(13),
@@ -79,9 +140,7 @@ public final class EkitSelectGui extends AbstractGui {
                             .action("decorate")
                             .build());
         }
-
-        inventory.setItem(com.rumilance.practice.util.GuiSlots.slot(5, 1), originalPaper(player));
-        paintNav(player, session, inventory);
+        paintPaging(player, inventory, page, kits.size());
     }
 
     private ItemStack kitIcon(Player player, KitDefinition kit) {
@@ -113,7 +172,34 @@ public final class EkitSelectGui extends AbstractGui {
 
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot, String action) {
+        if (action != null && action.startsWith("cat:")) {
+            session.setKitCategory(action.substring(4));
+            session.setPage(0);
+            sounds.play(player, "gui-click");
+            refresh(player, session, inventory);
+            return;
+        }
+        if (action != null && action.startsWith("page:")) {
+            List<KitDefinition> kits = kitService.enabled(
+                    "SUB".equalsIgnoreCase(session.kitCategory())
+                            ? KitCategory.SUB : KitCategory.MAIN);
+            int pages = Math.max(1, (kits.size() + MenuScaffold.gridPageSize() - 1)
+                    / MenuScaffold.gridPageSize());
+            int page = "page:next".equals(action) ? session.page() + 1 : session.page() - 1;
+            session.setPage(Math.min(Math.max(0, page), pages - 1));
+            sounds.play(player, "gui-click");
+            refresh(player, session, inventory);
+            return;
+        }
         if ("close".equals(action) || "back".equals(action)) {
+            if (session.kitCategory() != null) {
+                // Back from a category returns to the two wooden buttons, not out of /ekit.
+                session.setKitCategory(null);
+                session.setPage(0);
+                sounds.play(player, "gui-back");
+                refresh(player, session, inventory);
+                return;
+            }
             sounds.play(player, "gui-back");
             player.closeInventory();
             return;

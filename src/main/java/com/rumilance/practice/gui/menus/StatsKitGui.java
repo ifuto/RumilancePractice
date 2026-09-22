@@ -8,6 +8,7 @@ import com.rumilance.practice.gui.ItemBuilder;
 import com.rumilance.practice.gui.MenuScaffold;
 import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.kit.KitService;
+import com.rumilance.practice.model.KitCategory;
 import com.rumilance.practice.model.KitDefinition;
 import com.rumilance.practice.model.RankedKitStats;
 import com.rumilance.practice.locale.MessageService;
@@ -53,6 +54,8 @@ public final class StatsKitGui extends AbstractGui {
         GuiSession session = registry.open(viewer.getUniqueId(), type(), rows);
         session.setTargetPlayer(target);
         session.setRanked(true);
+        session.setKitCategory(null);
+        session.setPage(0);
         PracticeGuiOpen.open(this, viewer, session);
         sounds.play(viewer, "gui-open");
     }
@@ -93,9 +96,45 @@ public final class StatsKitGui extends AbstractGui {
                         .action("decorate")
                         .build());
 
-        List<KitDefinition> kits = com.rumilance.practice.gui.KitSections.ordered(kitService);
+        if (session.kitCategory() == null) {
+            // Step 1: Main Kits / Sub Kits — the two wooden buttons (Queue と同じ2択)。
+            int mainCount = kitService.enabled(KitCategory.MAIN).size();
+            int subCount = kitService.enabled(KitCategory.SUB).size();
+            inventory.setItem(MenuScaffold.gridSlot(9),
+                    com.rumilance.practice.gui.KitSections.categoryButton(
+                            KitCategory.MAIN,
+                            t(player, "gui.kit-main-button").color(UiTheme.SUCCESS),
+                            java.util.List.of(
+                                    UiTheme.divider(),
+                                    UiTheme.line(line(player, "gui.kit-main-button-lore")),
+                                    UiTheme.blank(),
+                                    UiTheme.labelValue(line(player, "gui.kit-count-label"),
+                                            String.valueOf(mainCount)),
+                                    UiTheme.blank(),
+                                    UiTheme.hint(line(player, "menu.click")))));
+            inventory.setItem(MenuScaffold.gridSlot(11),
+                    com.rumilance.practice.gui.KitSections.categoryButton(
+                            KitCategory.SUB,
+                            t(player, "gui.kit-sub-button").color(UiTheme.SECONDARY),
+                            java.util.List.of(
+                                    UiTheme.divider(),
+                                    UiTheme.line(line(player, "gui.kit-sub-button-lore")),
+                                    UiTheme.blank(),
+                                    UiTheme.labelValue(line(player, "gui.kit-count-label"),
+                                            String.valueOf(subCount)),
+                                    UiTheme.blank(),
+                                    UiTheme.hint(line(player, "menu.click")))));
+            MenuScaffold.closeButton(inventory, t(player, "menu.close"));
+            return;
+        }
+
+        // Step 2: one category's kits, paginated over the standard content grid.
+        List<KitDefinition> kits = kitService.enabled(
+                "SUB".equalsIgnoreCase(session.kitCategory())
+                        ? KitCategory.SUB : KitCategory.MAIN);
         int perPage = MenuScaffold.gridPageSize();
-        int page = session.page();
+        int pages = Math.max(1, (kits.size() + perPage - 1) / perPage);
+        int page = Math.min(Math.max(0, session.page()), pages - 1);
         int offset = page * perPage;
 
         int placed = 0;
@@ -143,19 +182,33 @@ public final class StatsKitGui extends AbstractGui {
 
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot, String action) {
-        if ("close".equals(action)) {
-            sounds.play(player, "gui-back");
-            player.closeInventory();
-            return;
-        }
-        if ("page:prev".equals(action)) {
-            session.setPage(session.page() - 1);
+        if (action != null && action.startsWith("cat:")) {
+            session.setKitCategory(action.substring(4));
+            session.setPage(0);
             sounds.play(player, "gui-click");
             refresh(player, session, inventory);
             return;
         }
-        if ("page:next".equals(action)) {
-            session.setPage(session.page() + 1);
+        if ("close".equals(action)) {
+            if (session.kitCategory() != null) {
+                // Close from a category returns to the two wooden buttons, not out of stats.
+                session.setKitCategory(null);
+                session.setPage(0);
+                sounds.play(player, "gui-back");
+                refresh(player, session, inventory);
+                return;
+            }
+            sounds.play(player, "gui-back");
+            player.closeInventory();
+            return;
+        }
+        if ("page:prev".equals(action) || "page:next".equals(action)) {
+            int pages = Math.max(1,
+                    (kitService.enabled("SUB".equalsIgnoreCase(session.kitCategory())
+                            ? KitCategory.SUB : KitCategory.MAIN).size()
+                            + MenuScaffold.gridPageSize() - 1) / MenuScaffold.gridPageSize());
+            int page = "page:next".equals(action) ? session.page() + 1 : session.page() - 1;
+            session.setPage(Math.min(Math.max(0, page), pages - 1));
             sounds.play(player, "gui-click");
             refresh(player, session, inventory);
         }

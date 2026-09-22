@@ -8,6 +8,7 @@ import com.rumilance.practice.gui.ItemBuilder;
 import com.rumilance.practice.gui.MenuScaffold;
 import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.kit.KitService;
+import com.rumilance.practice.model.KitCategory;
 import com.rumilance.practice.model.KitDefinition;
 import com.rumilance.practice.locale.MessageService;
 import com.rumilance.practice.sound.SoundService;
@@ -81,6 +82,12 @@ public final class TeamKitSelectGui extends AbstractGui {
     }
 
     @Override
+    protected void configureSession(GuiSession session, Player player) {
+        session.setKitCategory(null);
+        session.setPage(0);
+    }
+
+    @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
         paintFrame(player, session, inventory);
 
@@ -121,33 +128,48 @@ public final class TeamKitSelectGui extends AbstractGui {
                         .glintIf(ready)
                         .action("decorate").build());
 
-        // Two labelled sections, matching the duel/queue kit pickers: row 1 = Main Kits
-        // (azalea header), row 2 = Sub Kits (iron-trapdoor header), rows 3-4 continue Main.
-        List<KitDefinition> main = kitService.enabled(com.rumilance.practice.model.KitCategory.MAIN);
-        List<KitDefinition> sub = kitService.enabled(com.rumilance.practice.model.KitCategory.SUB);
+        String category = session.kitCategory();
+        if (category == null) {
+            // Step 1: the two wooden category buttons (Queue と同じ2択画面)。
+            List<KitDefinition> main = kitService.enabled(KitCategory.MAIN);
+            List<KitDefinition> sub = kitService.enabled(KitCategory.SUB);
+            inventory.setItem(MenuScaffold.gridSlot(9),
+                    com.rumilance.practice.gui.KitSections.categoryButton(
+                            KitCategory.MAIN,
+                            t(player, "gui.kit-main-button").color(UiTheme.SUCCESS),
+                            java.util.List.of(
+                                    UiTheme.divider(),
+                                    UiTheme.line(line(player, "gui.kit-main-button-lore")),
+                                    UiTheme.blank(),
+                                    UiTheme.labelValue(line(player, "gui.kit-count-label"),
+                                            String.valueOf(main.size())),
+                                    UiTheme.blank(),
+                                    UiTheme.hint(line(player, "gui.party-start-click")))));
+            inventory.setItem(MenuScaffold.gridSlot(11),
+                    com.rumilance.practice.gui.KitSections.categoryButton(
+                            KitCategory.SUB,
+                            t(player, "gui.kit-sub-button").color(UiTheme.SECONDARY),
+                            java.util.List.of(
+                                    UiTheme.divider(),
+                                    UiTheme.line(line(player, "gui.kit-sub-button-lore")),
+                                    UiTheme.blank(),
+                                    UiTheme.labelValue(line(player, "gui.kit-count-label"),
+                                            String.valueOf(sub.size())),
+                                    UiTheme.blank(),
+                                    UiTheme.hint(line(player, "gui.party-start-click")))));
+            MenuScaffold.returnButton(inventory, t(player, "menu.back"));
+            return;
+        }
+
+        // Step 2: one category's kit list. Continue onto leftover grid rows so original
+        // kits (Owner の Original Kit 星) stay selectable like on the old mixed screen.
+        List<KitDefinition> kits = kitService.enabled(
+                "SUB".equalsIgnoreCase(category) ? KitCategory.SUB : KitCategory.MAIN);
         int index = 0;
         inventory.setItem(MenuScaffold.gridSlot(index++), com.rumilance.practice.gui.KitSections.header(
-                com.rumilance.practice.model.KitCategory.MAIN, main.size(),
-                line(player, "gui.party-start-click")));
-        for (KitDefinition kit : main) {
-            if (index >= com.rumilance.practice.gui.KitSections.ROW1_END) {
-                break;
-            }
-            inventory.setItem(MenuScaffold.gridSlot(index++), partyKitTile(player, kit));
-        }
-        if (!sub.isEmpty()) {
-            inventory.setItem(MenuScaffold.gridSlot(index++), com.rumilance.practice.gui.KitSections.header(
-                    com.rumilance.practice.model.KitCategory.SUB, sub.size(),
-                    line(player, "gui.party-start-click")));
-            for (KitDefinition kit : sub) {
-                if (index >= com.rumilance.practice.gui.KitSections.ROW2_END) {
-                    break;
-                }
-                inventory.setItem(MenuScaffold.gridSlot(index++), partyKitTile(player, kit));
-            }
-        }
-        for (KitDefinition kit : main.subList(Math.min(
-                com.rumilance.practice.gui.KitSections.PER_ROW, main.size()), main.size())) {
+                "SUB".equalsIgnoreCase(category) ? KitCategory.SUB : KitCategory.MAIN,
+                kits.size(), line(player, "gui.party-start-click")));
+        for (KitDefinition kit : kits) {
             if (index >= MenuScaffold.gridPageSize()) {
                 break;
             }
@@ -196,8 +218,23 @@ public final class TeamKitSelectGui extends AbstractGui {
 
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot, String action) {
+        if (action != null && action.startsWith("cat:")) {
+            session.setKitCategory(action.substring(4));
+            session.setPage(0);
+            sounds.play(player, "gui-click");
+            refresh(player, session, inventory);
+            return;
+        }
         switch (action) {
             case "close", "back" -> {
+                if (session.kitCategory() != null) {
+                    // Back from a category returns to the two wooden buttons, not the hub.
+                    session.setKitCategory(null);
+                    session.setPage(0);
+                    sounds.play(player, "gui-back");
+                    refresh(player, session, inventory);
+                    return;
+                }
                 sounds.play(player, "gui-back");
                 player.closeInventory();
                 player.performCommand("team");
