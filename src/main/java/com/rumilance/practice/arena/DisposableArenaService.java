@@ -43,6 +43,17 @@ public final class DisposableArenaService extends AbstractArenaService {
     private static final Logger LOGGER = Logger.getLogger(DisposableArenaService.class.getName());
     private static final int MAX_PLACEMENT_ATTEMPTS = 60;
 
+    /**
+     * Release barrier: how many 2-tick re-checks (1s) the copy waits for the match-end
+     * teleports to land before it stops trusting them.
+     */
+    private static final int OCCUPIED_RECHECKS = 10;
+    /**
+     * Extra 2-tick re-checks (5s) granted after the stragglers were walked to the lobby by
+     * {@link #evacuator}, so their teleport has time to actually land.
+     */
+    private static final int EVACUATED_RECHECKS = 50;
+
     private final org.bukkit.plugin.Plugin plugin;
     private final FaweBridge faweBridge;
     private final File schematicRoot;
@@ -54,6 +65,14 @@ public final class DisposableArenaService extends AbstractArenaService {
     /** Live pasted copies (instanceId -> instance); used for overlap checks and cleanup. */
     private final Map<UUID, ArenaInstance> liveCopies = new ConcurrentHashMap<>();
 
+    /**
+     * Optional "get this player out of the arena" hook (wired to the lobby return). When a copy
+     * is released while somebody is still standing inside, the service calls this instead of
+     * erasing the ground under their feet. Without it the old behaviour (clear anyway, log a
+     * warning) is kept, so the service still works standalone.
+     */
+    private java.util.function.Consumer<org.bukkit.entity.Player> evacuator;
+
     public DisposableArenaService(org.bukkit.plugin.Plugin plugin, FaweBridge faweBridge, File schematicRoot,
                                   int placementRange, int spacing, int centerX, int centerZ) {
         this.plugin = plugin;
@@ -63,6 +82,11 @@ public final class DisposableArenaService extends AbstractArenaService {
         this.spacing = Math.max(16, spacing);
         this.centerX = centerX;
         this.centerZ = centerZ;
+    }
+
+    /** See {@link #evacuator}; normally {@code lobbyService::sendToLobby}. Main thread only. */
+    public void setEvacuator(java.util.function.Consumer<org.bukkit.entity.Player> evacuator) {
+        this.evacuator = evacuator;
     }
 
     @Override
@@ -213,46 +237,53 @@ public final class DisposableArenaService extends AbstractArenaService {
         }
         // Arena is only erased AFTER every player was confirmed teleported out: match-end
         // teleports are async, so without this barrier FAWE could rip the ground out from
-        // under someone mid-teleport on a busy tick. Re-checks every 2 ticks, 1s hard cap,
-        // then proceeds (a logged path so a stuck player cannot leak a copy).
+        // under someone mid-teleport on a busy tick. Re-checks every 2 ticks for 1s; if the
+        // teleport still has not landed we do not clear under a live player - we send them to
+        // the lobby ourselves and wait a few more seconds (see releaseWhenEmpty). Erasing the
+        // copy stays guaranteed, but only ever once the region is actually empty, so nothing
+        // can be left standing over the void.
         java.util.concurrent.CompletableFuture<Void> result = new java.util.concurrent.CompletableFuture<>();
-        releaseWhenEmpty(instance, world, result, 0);
+        releaseWhenEmpty(instance, world, result, 0, false);
         return result;
     }
 
     private void releaseWhenEmpty(ArenaInstance instance, World world,
-                                  java.util.concurrent.CompletableFuture<Void> result, int attempt) {
+                                  java.util.concurrent.CompletableFuture<Void> result,
+                                  int attempt, boolean evacuated) {
         if (!plugin.isEnabled()) {
             result.complete(null);
             return;
         }
-        boolean occupied = false;
-        for (org.bukkit.entity.Player player : world.getPlayers()) {
-            org.bukkit.Location loc = player.getLocation();
-            int x = loc.getBlockX(), y = loc.getBlockY(), z = loc.getBlockZ();
-            if (x >= instance.minX() && x <= instance.maxX()
-                    && y >= instance.minY() && y <= instance.maxY()
-                    && z >= instance.minZ() && z <= instance.maxZ()) {
-                occupied = true;
-                break;
+        List<org.bukkit.entity.Player> inside = playersInside(world, instance);
+        if (!inside.isEmpty()) {
+            int grace = evacuated ? EVACUATED_RECHECKS : OCCUPIED_RECHECKS;
+            if (attempt < grace) {
+                Bukkit.getScheduler().runTaskLater(plugin,
+                        () -> releaseWhenEmpty(instance, world, result, attempt + 1, evacuated), 2L);
+                return;
             }
-        }
-        if (occupied && attempt < 10) {
-            Bukkit.getScheduler().runTaskLater(plugin,
-                    () -> releaseWhenEmpty(instance, world, result, attempt + 1), 2L);
-            return;
-        }
-        if (occupied) {
-            LOGGER.warning("Clearing disposable copy " + instance.id()
-                    + " while a player still bounds inside (teleport barrier exhausted).");
+            if (!evacuated && evacuator != null) {
+                // The barrier ran out: whoever is still in there either got a teleport that is
+                // very late or never got one at all. Push them to the lobby first, then give the
+                // move time to land - clearing now would drop them through the deleted floor.
+                LOGGER.info("Disposable copy " + describe(instance) + " is still occupied by "
+                        + names(inside) + " after the release barrier; sending them to the lobby.");
+                for (org.bukkit.entity.Player player : inside) {
+                    evacuator.accept(player);
+                }
+                releaseWhenEmpty(instance, world, result, 0, true);
+                return;
+            }
+            LOGGER.warning("Clearing disposable copy " + describe(instance) + " while "
+                    + inside.size() + " player(s) still bound inside: " + names(inside)
+                    + " (teleport barrier exhausted).");
         }
         faweBridge.clearRegion(world,
                         instance.minX(), instance.minY(), instance.minZ(),
                         instance.maxX(), instance.maxY(), instance.maxZ())
                 .handle((success, throwable) -> {
                     if (throwable != null || !Boolean.TRUE.equals(success)) {
-                        LOGGER.warning("Failed to clear disposable arena copy " + instance.id()
-                                + " (template=" + instance.template().name() + ").");
+                        LOGGER.warning("Failed to clear disposable arena copy " + describe(instance) + ".");
                     }
                     // Unpin the chunk tickets so the area can unload normally again.
                     if (plugin.isEnabled()) {
@@ -261,6 +292,35 @@ public final class DisposableArenaService extends AbstractArenaService {
                     result.complete(null);
                     return null;
                 });
+    }
+
+    /** Players whose feet are inside the copy's box right now. Main thread only. */
+    private List<org.bukkit.entity.Player> playersInside(World world, ArenaInstance instance) {
+        List<org.bukkit.entity.Player> inside = new java.util.ArrayList<>();
+        for (org.bukkit.entity.Player player : world.getPlayers()) {
+            org.bukkit.Location loc = player.getLocation();
+            int x = loc.getBlockX(), y = loc.getBlockY(), z = loc.getBlockZ();
+            if (x >= instance.minX() && x <= instance.maxX()
+                    && y >= instance.minY() && y <= instance.maxY()
+                    && z >= instance.minZ() && z <= instance.maxZ()) {
+                inside.add(player);
+            }
+        }
+        return inside;
+    }
+
+    /** "id (template='name')" - both halves always print something, even for a nameless template. */
+    private String describe(ArenaInstance instance) {
+        String name = instance.template() == null ? "" : instance.template().name();
+        return instance.id() + " (template='" + (name == null || name.isBlank() ? "<unnamed>" : name) + "')";
+    }
+
+    private String names(List<org.bukkit.entity.Player> players) {
+        java.util.StringJoiner joiner = new java.util.StringJoiner(", ");
+        for (org.bukkit.entity.Player player : players) {
+            joiner.add(player.getName());
+        }
+        return joiner.toString();
     }
 
     /** Removes every live copy's blocks; called on plugin disable so no copies leak. */

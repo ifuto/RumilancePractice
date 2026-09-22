@@ -512,6 +512,10 @@ public final class FeatureBootstrap {
                 configService.config().getInt("arena.placement-center-x", 0),
                 configService.config().getInt("arena.placement-center-z", 0));
         if (arenaService instanceof DisposableArenaService disposableArenas) {
+            // A released copy must never be cleared under a live player: if the match-end
+            // teleport has not landed by the time the barrier runs out, the arena service asks
+            // the lobby to take the stragglers instead of deleting the floor beneath them.
+            disposableArenas.setEvacuator(player -> lobbyService.sendToLobby(player));
             practiceCloneService.setExternalOverlaps(() -> disposableArenas.liveCopies().stream()
                     .map(inst -> new PracticeCloneService.OverlapBox(
                             inst.template().world(),
