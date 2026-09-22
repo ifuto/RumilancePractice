@@ -112,11 +112,19 @@ class TabFightListServiceTest {
         List<TabFightListService.Member> window = TabFightListService.windowOf(column, 0);
         assertEquals(fit, window.size(), "the window is exactly one client column of members");
         assertEquals("P0", window.get(0).name(), "rotates from the top at tick 0");
-        assertEquals("P19", window.get(fit - 1).name());
+        assertEquals("P" + (fit - 1), window.get(fit - 1).name());
 
-        window = TabFightListService.windowOf(column, TabFightLayout.ROTATE_EVERY_TICKS);
+        long per = TabFightLayout.ROTATE_EVERY_TICKS;
+        window = TabFightListService.windowOf(column, per);
         assertEquals("P1", window.get(0).name(), "slides one row after one interval");
-        assertEquals("P20", window.get(fit - 1).name(), "the last row wraps around to the top");
+        assertEquals("P" + fit, window.get(fit - 1).name());
+
+        // Two intervals reach the roster tail; three wrap back to the start (windowCount = 3).
+        window = TabFightListService.windowOf(column, 2L * per);
+        assertEquals("P2", window.get(0).name());
+        assertEquals("P" + (fit + 1), window.get(fit - 1).name(), "the last member enters the frame");
+        window = TabFightListService.windowOf(column, 3L * per);
+        assertEquals("P0", window.get(0).name(), "wraps around to the top");
     }
 
     @Test

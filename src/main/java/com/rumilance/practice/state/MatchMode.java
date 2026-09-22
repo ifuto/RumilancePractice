@@ -7,7 +7,7 @@ public enum MatchMode {
     RANKED,
     UNRANKED,
     FFA,
-    /** RED-vs-BLUE team battle (up to 15 per side, uneven ratios allowed). No Elo changes. */
+    /** RED-vs-BLUE team battle (up to 20 per side, uneven ratios allowed). No Elo changes. */
     TEAM;
 
     public boolean isRanked() {

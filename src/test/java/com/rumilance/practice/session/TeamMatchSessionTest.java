@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Team-battle {@link MatchSession} invariants: explicit RED/BLUE rosters, arbitrarily uneven
- * ratios (1v15 is legal), max 15 per side, no duplicate players.
+ * ratios (1v20 is legal), max 20 per side, no duplicate players.
  */
 class TeamMatchSessionTest {
 
@@ -35,12 +35,12 @@ class TeamMatchSessionTest {
     @Test
     void unevenSplitIsAllowed() {
         List<UUID> red = players(1);
-        List<UUID> blue = players(15);
+        List<UUID> blue = players(20);
         MatchSession session = team(red, blue);
         assertTrue(session.isTeamMatch());
         assertEquals(1, session.teamSize(TeamColor.RED));
-        assertEquals(15, session.teamSize(TeamColor.BLUE));
-        assertEquals(16, session.participants().size());
+        assertEquals(20, session.teamSize(TeamColor.BLUE));
+        assertEquals(21, session.participants().size());
         assertEquals(TeamColor.RED, session.teamColor(red.get(0)));
         for (UUID b : blue) {
             assertEquals(TeamColor.BLUE, session.teamColor(b));
@@ -48,9 +48,9 @@ class TeamMatchSessionTest {
     }
 
     @Test
-    void sideLargerThanFifteenIsRejected() {
-        assertThrows(IllegalArgumentException.class, () -> team(players(16), players(1)));
-        assertThrows(IllegalArgumentException.class, () -> team(players(1), players(16)));
+    void sideLargerThanTwentyIsRejected() {
+        assertThrows(IllegalArgumentException.class, () -> team(players(21), players(1)));
+        assertThrows(IllegalArgumentException.class, () -> team(players(1), players(21)));
     }
 
     @Test
