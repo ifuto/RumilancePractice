@@ -9,6 +9,8 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Base64;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 /**
  * Serializes {@link ItemStack} arrays (e.g. full player inventories/kit loadouts) to a
@@ -24,8 +26,54 @@ public final class ItemSerializer {
     private ItemSerializer() {
     }
 
+    /**
+     * Packs an {@link ItemStack} array to a compact binary form. The serialized frame is
+     * always GZIP-compressed and prefixed with a magic byte so legacy (uncompressed) rows in
+     * the database still decode. NBT for a full inventory is highly redundant (counts, ids,
+     * empty-slot markers, repeated enchantment keys), so deflate routinely shrinks a saved
+     * original-kit row to 10-20% of its raw size. Kept in the array codec itself so every
+     * persisted store (original kits, lobby inventory, practice blocks, layout deltas) gets
+     * the saving without any per-caller change.
+     */
+    static final byte[] SERIALIZE_MAGIC = new byte[]{(byte) 0x52, (byte) 0x50, (byte) 0x47}; // "RPG"
+
+    /** Magic-prefixed GZIP wrapper, split out so the codec is unit-testable without Bukkit. */
+    static byte[] pack(byte[] frame) {
+        try {
+            ByteArrayOutputStream packed = new ByteArrayOutputStream(frame.length + 16);
+            packed.write(SERIALIZE_MAGIC);
+            try (GZIPOutputStream gz = new GZIPOutputStream(packed)) {
+                gz.write(frame);
+            }
+            return packed.toByteArray();
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to gzip ItemStack frame", e);
+        }
+    }
+
+    /** Inflates a {@link #pack}ed frame; uncompressed (legacy) data passes through untouched. */
+    static byte[] unpack(byte[] data) {
+        if (data != null && data.length > SERIALIZE_MAGIC.length
+                && data[0] == SERIALIZE_MAGIC[0]
+                && data[1] == SERIALIZE_MAGIC[1]
+                && data[2] == SERIALIZE_MAGIC[2]) {
+            try {
+                ByteArrayOutputStream inflated = new ByteArrayOutputStream(Math.max(64, data.length * 2));
+                try (GZIPInputStream gz = new GZIPInputStream(
+                        new ByteArrayInputStream(data, SERIALIZE_MAGIC.length, data.length - SERIALIZE_MAGIC.length))) {
+                    gz.transferTo(inflated);
+                }
+                return inflated.toByteArray();
+            } catch (IOException e) {
+                throw new UncheckedIOException("Failed to gunzip ItemStack frame", e);
+            }
+        }
+        return data;
+    }
+
     public static byte[] serialize(ItemStack[] items) {
-        try (ByteArrayOutputStream bytes = new ByteArrayOutputStream(); DataOutputStream out = new DataOutputStream(bytes)) {
+        try (ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+             DataOutputStream out = new DataOutputStream(bytes)) {
             out.writeInt(items.length);
             for (ItemStack item : items) {
                 if (item == null || item.getType().isAir()) {
@@ -37,14 +85,14 @@ public final class ItemSerializer {
                 out.write(itemBytes);
             }
             out.flush();
-            return bytes.toByteArray();
+            return pack(bytes.toByteArray());
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to serialize ItemStack array", e);
         }
     }
 
     public static ItemStack[] deserialize(byte[] data) {
-        try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(data))) {
+        try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(unpack(data)))) {
             int length = in.readInt();
             ItemStack[] items = new ItemStack[length];
             for (int i = 0; i < length; i++) {

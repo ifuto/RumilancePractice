@@ -1,6 +1,7 @@
 package com.rumilance.practice.gui.menus;
 
 import com.rumilance.practice.gui.AbstractGui;
+import com.rumilance.practice.gui.DelayedButton;
 import com.rumilance.practice.gui.GuiSession;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.GuiType;
@@ -78,8 +79,10 @@ public final class OriginalKitGui extends AbstractGui {
         meta.lore(List.of(
                 t(player, "gui.original-slot", com.rumilance.practice.locale.MessageService.tags(
                         "slot", String.valueOf(slot + 1), "saved", saved)).color(UiTheme.MUTED),
-                t(player, "gui.original-click-edit").color(UiTheme.MUTED)));
-        meta.getPersistentDataContainer().set(ItemKeys.guiAction(), PersistentDataType.STRING, "paper:" + slot);
+                t(player, "gui.original-click-edit").color(UiTheme.MUTED),
+                t(player, "gui.kit-button-hint").color(UiTheme.MUTED)));
+        meta.getPersistentDataContainer().set(ItemKeys.guiAction(), PersistentDataType.STRING,
+                DelayedButton.wrap("paper:" + slot));
         stack.setItemMeta(meta);
         return stack;
     }

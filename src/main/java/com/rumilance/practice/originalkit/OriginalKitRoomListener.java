@@ -38,6 +38,10 @@ public final class OriginalKitRoomListener implements Listener {
     private final OriginalKitRoomService roomService;
     private final OriginalKitService originalKitService;
     private final org.bukkit.plugin.Plugin plugin;
+    /** Last sign-save tick per player; re-pressing the sign inside this window is swallowed. */
+    private final java.util.Map<java.util.UUID, Integer> lastSaveTick = new java.util.concurrent.ConcurrentHashMap<>();
+    /** Minimum gap between two saves from the same player, in ticks (1.5s). */
+    private static final int SAVE_COOLDOWN_TICKS = 30;
 
     public OriginalKitRoomListener(OriginalKitRoomService roomService,
                                    OriginalKitService originalKitService,
@@ -243,6 +247,14 @@ public final class OriginalKitRoomListener implements Listener {
     // never bypass validation; it only pre-fills the creative screen.
 
     private void save(Player player) {
+        // Cooldown: one save every SAVE_COOLDOWN_TICKS. A panicked double-click must not run
+        // the (costly) snapshot + validation + DB write twice.
+        int now = org.bukkit.Bukkit.getCurrentTick();
+        Integer last = lastSaveTick.get(player.getUniqueId());
+        if (last != null && now - last < SAVE_COOLDOWN_TICKS) {
+            return;
+        }
+        lastSaveTick.put(player.getUniqueId(), now);
         if (!roomService.hasSaveButton()) {
             player.sendActionBar(Component.text(
                     "No save button in this room — ask an admin to place one.",

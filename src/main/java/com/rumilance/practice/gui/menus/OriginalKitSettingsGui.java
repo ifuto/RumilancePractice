@@ -74,7 +74,7 @@ public final class OriginalKitSettingsGui extends AbstractGui {
     protected void render(Player player, GuiSession session, Inventory inventory) {
         paintFrame(player, session, inventory);
         int kitSlot = slotOf(session);
-        OriginalKitSettings settings = service.settingsOf(player.getUniqueId(), kitSlot);
+        OriginalKitSettings settings = draftOf(player, session, kitSlot);
 
         // Movement / defence
         inventory.setItem(GuiSlots.slot(1, 2), toggle(player, settings.fallDamage(),
@@ -201,21 +201,22 @@ public final class OriginalKitSettingsGui extends AbstractGui {
                 player.closeInventory();
             }
             case "reset" -> {
-                service.saveSettings(player, kitSlot, OriginalKitSettings.defaults());
+                session.put("draft", OriginalKitSettings.defaults());
                 sounds.play(player, "select");
                 render(player, session, inventory);
             }
             case "save" -> {
-                // Settings are already persisted per-change; the button is a clear exit point.
+                // Single write: every change above only touched the in-memory draft, so this
+                // is the ONLY persist point — no per-click DB spamming.
+                service.saveSettings(player, kitSlot, draftOf(player, session, kitSlot));
                 sounds.play(player, "select");
                 player.closeInventory();
             }
             default -> {
                 if (action.startsWith("toggle:")) {
                     String key = action.substring("toggle:".length());
-                    boolean on = currentBoolean(service.settingsOf(player.getUniqueId(), kitSlot), key);
-                    service.saveSettings(player, kitSlot,
-                            service.settingsOf(player.getUniqueId(), kitSlot).with(key, !on));
+                    OriginalKitSettings current = draftOf(player, session, kitSlot);
+                    session.put("draft", current.with(key, !currentBoolean(current, key)));
                     sounds.play(player, "select");
                     render(player, session, inventory);
                 }
@@ -230,32 +231,46 @@ public final class OriginalKitSettingsGui extends AbstractGui {
         // Numeric tiles use click direction: left = increase, right = decrease, shift = +10/-10.
         if (action != null && action.startsWith("health:")) {
             int kitSlot = slotOf(session);
-            OriginalKitSettings current = service.settingsOf(player.getUniqueId(), kitSlot);
+            OriginalKitSettings current = draftOf(player, session, kitSlot);
             double delta = delta(clickType, 2.0d);
-            service.saveSettings(player, kitSlot, current.withMaxHealth(current.maxHealth() + delta));
+            session.put("draft", current.withMaxHealth(current.maxHealth() + delta));
             sounds.play(player, "select");
             render(player, session, inventory);
             return;
         }
         if (action != null && action.startsWith("timeout:")) {
             int kitSlot = slotOf(session);
-            OriginalKitSettings current = service.settingsOf(player.getUniqueId(), kitSlot);
+            OriginalKitSettings current = draftOf(player, session, kitSlot);
             int delta = (int) delta(clickType, 15.0d);
-            service.saveSettings(player, kitSlot, current.withTimeoutSeconds(current.timeoutSeconds() + delta));
+            session.put("draft", current.withTimeoutSeconds(current.timeoutSeconds() + delta));
             sounds.play(player, "select");
             render(player, session, inventory);
             return;
         }
         if (action != null && action.startsWith("scale:")) {
             int kitSlot = slotOf(session);
-            OriginalKitSettings current = service.settingsOf(player.getUniqueId(), kitSlot);
+            OriginalKitSettings current = draftOf(player, session, kitSlot);
             double delta = delta(clickType, 0.1d);
-            service.saveSettings(player, kitSlot, current.withBodyScale(current.bodyScale() + delta));
+            session.put("draft", current.withBodyScale(current.bodyScale() + delta));
             sounds.play(player, "select");
             render(player, session, inventory);
             return;
         }
         handleClick(player, session, inventory, slot, action);
+    }
+
+    /**
+     * The in-memory settings draft for this session. On first open it starts from the slot's
+     * persisted settings, and every edit only replaces this draft — the database is written
+     * once, on SAVE. Escaping or closing discards the draft (nothing was persisted).
+     */
+    private OriginalKitSettings draftOf(Player player, GuiSession session, int kitSlot) {
+        OriginalKitSettings draft = session.get("draft", OriginalKitSettings.class);
+        if (draft == null) {
+            draft = service.settingsOf(player.getUniqueId(), kitSlot);
+            session.put("draft", draft);
+        }
+        return draft;
     }
 
     private static boolean currentBoolean(OriginalKitSettings settings, String key) {
