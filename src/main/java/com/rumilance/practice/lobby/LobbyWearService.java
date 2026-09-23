@@ -15,8 +15,9 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerTeleportEvent;
-import org.bukkit.inventory.EntityEquipment;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
@@ -105,31 +106,37 @@ public final class LobbyWearService implements Listener {
                 || spawn.getWorld().equals(player.getWorld());
     }
 
-    /** Fills the boots slot (everyone) and the chest slot (VIP and VIP+) when they are free. */
+    /**
+     * Fills the boots slot (everyone) and the chest slot (VIP and VIP+) when they are free.
+     * Written via {@code PlayerInventory#setItem(EquipmentSlot, ...)} (the same inventory
+     * mutation {@code /item replace entity @s armor.feet ...} performs) so the pieces land in
+     * the armour slot the client actually renders from — EntityEquipment-only writes were
+     * silently dropped there, which is why lobby boots / elytra stopped appearing.
+     */
     public void equip(Player player) {
-        EntityEquipment equipment = player.getEquipment();
-        if (equipment == null) {
+        PlayerInventory inventory = player.getInventory();
+        if (inventory == null) {
             return;
         }
-        if (isEmpty(equipment.getBoots())) {
-            equipment.setBoots(boots());
+        if (isEmpty(inventory.getItem(EquipmentSlot.FEET))) {
+            inventory.setItem(EquipmentSlot.FEET, boots());
         }
-        if (hasElytra(player) && isEmpty(equipment.getChestplate())) {
-            equipment.setChestplate(elytra());
+        if (hasElytra(player) && isEmpty(inventory.getItem(EquipmentSlot.CHEST))) {
+            inventory.setItem(EquipmentSlot.CHEST, elytra());
         }
     }
 
     /** Removes our boots / elytra — and only ours. */
     public void strip(Player player) {
-        EntityEquipment equipment = player.getEquipment();
-        if (equipment == null) {
+        PlayerInventory inventory = player.getInventory();
+        if (inventory == null) {
             return;
         }
-        if (isLobbyWear(equipment.getBoots())) {
-            equipment.setBoots(null);
+        if (isLobbyWear(inventory.getItem(EquipmentSlot.FEET))) {
+            inventory.setItem(EquipmentSlot.FEET, null);
         }
-        if (isLobbyWear(equipment.getChestplate())) {
-            equipment.setChestplate(null);
+        if (isLobbyWear(inventory.getItem(EquipmentSlot.CHEST))) {
+            inventory.setItem(EquipmentSlot.CHEST, null);
         }
     }
 
