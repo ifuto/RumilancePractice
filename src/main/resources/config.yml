@@ -317,23 +317,28 @@ turbo:
   # ---------------------------------------------------------------------------
   # バックグラウンド GC (「GC をバックエンドに回す」)
   #   完全な無停止はどの GC でも原理的に不可能です (回収には必ず安全点が要る)。
-  #   そこで、停止が「試合中に突然来る」ことをやめさせる: 誰もいない瞬間に、あらかじめ
-  #   GC を済ませておいて、次の試合はきれいなヒープから始める方式です。
-  #   - enabled: スイッチ。無人在中のみ動作します。
-  #   - interval-seconds: 何秒おきに判定するか。判定は tick の先頭ではなく、
-  #     サーバーワーカースレッドで System.gc() を呼ぶので、停止コストは tick 予算に
-  #     足されません。
-  #   - clearance-percent: tick の健康度がこの%以上 (既定90) のときだけ実行。
-  #     空っぽでもサーバースレッドが忙しいなら見送ります。
+  #   だから狙いは「停止タイミングを自分で選ぶ」こと: 常に人がいる鯖でも瀬戸際まで
+  #   溜め込まず、安く回収できる瞬間に先回りします。経路は2つ:
+  #     (1) 圧力検知 [セーフティネット・常時武装]: ヒープ使用率が pressure-percent
+  #         (既定85%) に達したら、人がいようがいまいが即 GC。90%超のフルGC数秒や
+  #         OOM で死ぬより、85%時点の短い回収の方が遥かに安い。
+  #     (2) アイドル先行回収 [暇なら先払い]: 誰もいない かつ tick 健康度が
+  #         clearance-percent (既定90) 以上のときだけ、試合前にヒープを綺麗にしておく。
+  #   - interval-seconds: 何秒おきに監視するか。判定はメインスレッドの軽い値読みで、
+  #     実際の System.gc() はサーバーワーカースレッドで呼ぶので、停止コストは
+  #     tick 予算に足されません。
   #   - min-interval-seconds: 最後の GC からこれ未満は再実行しない (連打防止)。
-  #   注意: ZGC で起動している場合はフル GC が並行なのでこの機能は安全にスキップします
+  #     常時高負荷でも「毎秒GC嵐」にはなりません。
+  #   - pressure-percent: このヒープ使用率以上で圧力GCを発火。
+  #   注意: ZGC で起動している場合はフル GC が並行なので安全にスキップします
   #   (start.bat の ZGC が有効な間は何もしません)。
   # ---------------------------------------------------------------------------
   gc-background:
     enabled: true
-    interval-seconds: 60
-    min-interval-seconds: 30
+    interval-seconds: 5
+    min-interval-seconds: 15
     clearance-percent: 90
+    pressure-percent: 85
 
 # Ping-aware combat netcode. This controls crit rewind and rubber-band/anti-void handling.
 # Knockback shaping (coefficients, horizontal/vertical KB, ping-based KB sync) is NOT done

@@ -187,9 +187,10 @@ public final class TurboCommand implements CommandExecutor, TabCompleter {
             java.nio.file.Files.writeString(out.toPath(), text, java.nio.charset.StandardCharsets.UTF_8);
             sender.sendMessage(Component.text("最適化済み起動スクリプトを生成しました: "
                     + out.getAbsolutePath(), NamedTextColor.GREEN));
-            sender.sendMessage(Component.text(
-                    "内容: ZGC(低停止GC) + ヒープ固定(-Xms=-Xmx) + GCスレッド自動割当。",
-                    NamedTextColor.WHITE));
+        sender.sendMessage(Component.text(
+                "内容: ZGC(低停止GC) + ヒープサイズを冒頭の set HEAP= に分離 (あなたが編集) + "
+                        + "GCスレッド自動割当。",
+                NamedTextColor.WHITE));
             sender.sendMessage(Component.text(
                     "使い方: サーバーを /stop で落とし、上記 start.bat を paper.jar と同じ階層へ置いて"
                             + " jar 名を合わせ、start.bat から再起動してください。",
@@ -219,9 +220,9 @@ public final class TurboCommand implements CommandExecutor, TabCompleter {
                 "自動切替: turbo.auto.enabled: true なら「最後の人が抜けたら省電力化、人が来たら即フルパワー復帰」。",
                 NamedTextColor.GRAY));
         sender.sendMessage(Component.text(
-                "バックグラウンドGC: turbo.gc-background.enabled: true なら、無人在中かつ tick に"
-                        + " 余裕があるときだけ System.gc() をワーカースレッドで先行実行し、"
-                        + " 試合中の突然のGC停止を減らします。",
+                "バックグラウンドGC: turbo.gc-background.enabled: true なら (1) ヒープ使用率が"
+                        + " pressure-percent (既定85%) を超えた瞬間、人の有無に関係なく即 GC して"
+                        + " OOM/大フリーズを防ぎ、(2) 無人在中かつ tick に余裕があれば先回り回収します。",
                 NamedTextColor.GRAY));
         sender.sendMessage(Component.text("危険性・推奨事項は config.yml の turbo: セクションを参照。", NamedTextColor.GRAY));
     }
