@@ -504,7 +504,13 @@ public final class QuantumRuntime {
             // datapack `function` commands retain permission 4, then switch only the execution
             // entity and position to the bot. This avoids the 1.21.11 PermissionSet internals
             // while preserving @s, execute, return, and scheduled-function semantics.
-            source = server.createCommandSourceStack();
+            //
+            // That console-owned source would also echo every datapack "function X ran" line to
+            // the log — the per-tick qbot_N:tick driver alone would spam 「関数qbot_…を
+            // 実行しました」 twenty times a second and wedge admin consoles. Suppress the output
+            // (vanilla's own toggle, the same one `gamerule sendCommandFeedback false` flips) so
+            // the bot-driven functions stay silent while human /quantum runs keep their feedback.
+            source = server.createCommandSourceStack().withSuppressedOutput();
             line = "execute as " + player.getUniqueId() + " at @s run " + line;
         } else if (sender instanceof Player player) {
             source = ((org.bukkit.craftbukkit.entity.CraftPlayer) player).getHandle()
