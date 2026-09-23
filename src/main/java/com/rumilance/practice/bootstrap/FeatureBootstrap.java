@@ -211,6 +211,7 @@ import com.rumilance.practice.team.TeamListener;
 import com.rumilance.practice.team.TeamService;
 import com.rumilance.practice.tnt.PracticeTntListener;
 import com.rumilance.practice.tnt.PracticeTntSettings;
+import com.rumilance.practice.turbo.WindowsOptimizationService;
 import com.rumilance.practice.util.AsyncExecutor;
 import com.rumilance.practice.util.Cuboid;
 import com.rumilance.practice.util.KitNames;
@@ -291,6 +292,12 @@ public final class FeatureBootstrap {
         PracticeLayoutRepository practiceLayoutRepository = services.get(PracticeLayoutRepository.class);
         RankRepository rankRepository = services.get(RankRepository.class);
         MessageService messageService = services.get(MessageService.class);
+
+        // Windows 10 system-level optimization: delegates to powercfg.exe with a single UAC
+        // elevation per /turbo on|off (see docs/system-level-optimization-design.md).
+        WindowsOptimizationService turboService =
+                new WindowsOptimizationService(plugin, asyncExecutor, configService);
+        services.register(WindowsOptimizationService.class, turboService);
 
         RuntimeFlags runtimeFlags = new RuntimeFlags(settings.maintenanceMode());
         services.register(RuntimeFlags.class, runtimeFlags);
@@ -1722,6 +1729,8 @@ public final class FeatureBootstrap {
         bind("slobby", practiceAdmin);
         bind("setlobbyitem", practiceAdmin);
         bind("rumireload", new RumilanceReloadCommand(services));
+        bind("turbo", new com.rumilance.practice.turbo.TurboCommand(
+                plugin, services.get(com.rumilance.practice.turbo.WindowsOptimizationService.class)));
         bind("rankicon", new com.rumilance.practice.command.RankIconCommand(services));
         bind("arena", arenaKitAdmin);
         bind("kit", arenaKitAdmin);

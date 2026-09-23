@@ -238,6 +238,43 @@ performance:
   # Soft cap on particles spawned per player per visual effect (region selection, arrow trails).
   particle-limit-per-player: 40
 
+# ---------------------------------------------------------------------------------------------
+# TURBO — Windows 10 システム最適化 (サーバを軽快に保つための電源管理チューニング)
+# ---------------------------------------------------------------------------------------------
+# ・これは Linux では何もしません。Windows 10 上で /turbo on を実行したときだけ動作します。
+# ・実装はネイティブコードを使わず、Microsoft 標準ツール powercfg.exe へ委任します。
+# ・/turbo on の初回に UAC (管理者権限) ダイアログが 1 回だけ表示されます。承認しないと何も変更されません。
+# ・デフォルトでは現在の電源プランを書き換えず、下記のベースプランを複製した専用プランを
+#   編集・有効化します。/turbo off で元のプランへ戻り、複製プランは残ります (何度 on しても増殖しません)。
+# ・設定の意味:
+#     proc-throttle-min-100 : プロセッサ最小状態を 100% に固定 → P-state(周波数)低下を防ぐ
+#     core-parking-min-cores: 100 にするとコアパーキング(未使用コアの休止)を解除
+#     utility-distribution : 0 で低負荷時も全コアへ均等分散(一部コアへの偏りを防ぐ)
+#     disable-idle         : true でプロセッサ・アイドル無効化(深いC-stateを避けレイテンシ安定化)
+# ・注意:
+#     - disable-idle / proc-throttle-min-100 は消費電力・発熱が増えます。デスクトップ推奨、ノート/バッテリ駆動は非推奨です。
+#     - 構成によっては性能が下がる場合もあるため、変更後は必ず実測 (15-20分の試合で TPS/lagspike 確認) してください。
+#     - ポータブルPCや出先でバッテリ駆動する場合は off に戻す事を推奨します。
+# ---------------------------------------------------------------------------------------------
+turbo:
+  # 複製元の電源プラン GUID。既定は Ultimate Performance (Windows 10 build 17101+ で利用可)。
+  # 旧Windowsや無効化環境では複製に失敗し、変更は一切行わずに終了します。
+  #   High Performance を使う場合: "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c"
+  #   空文字 "" にすると、複製せず現在アクティブなプランを直接編集します (自己責任・復元はできません)。
+  accent-power-plan: "e9a42b02-d5df-448d-aa00-03f14749eb61"
+  # プロセッサ最小状態を 100% に固定 (P-state 下限 = 定格維持)。
+  proc-throttle-min-100: true
+  # コアパーキング最小コア (%)。100 = 全コア駐車解除。負値 (-1) で変更しない。
+  core-parking-min-cores: 100
+  # ユーティリティ分散。0 = 低負荷時も全コアへ均等分散。負値 (-1) で変更しない。
+  utility-distribution: 0
+  # プロセッサ・アイドル無効化 (深い C-state 回避)。消費電力増のため任意。false 推奨の環境もあり。
+  disable-idle: true
+  # /turbo off 時に IDLEDISABLE を 0 (アイドル許可) へ戻すか。
+  revert-idle-on-off: true
+  # UAC ダイアログでの承認待ち時間 (秒)。この時間内に承認されない場合は中止します。
+  uac-wait-seconds: 90
+
 # Ping-aware combat netcode. This controls crit rewind and rubber-band/anti-void handling.
 # Knockback shaping (coefficients, horizontal/vertical KB, ping-based KB sync) is NOT done
 # here: install an external knockback plugin such as KnockBackSync and configure it there.
