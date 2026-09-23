@@ -815,7 +815,6 @@ if ($ok) { Write-Output 'ECO:OK' } else { Write-Output 'ECO:FAIL' }
             b.append("    [void]$sb.AppendLine('#DEFENDEREXIT:0')\n");
             b.append("  } catch {\n");
             b.append("    [void]$sb.AppendLine('#DEFENDEREXIT:-1')\n");
-            b.append("    $anyFail = 1\n");
             b.append("  }\n");
         }
         // Optional coarse stop of chunky services (e.g. wuauserv). Start type and state are
@@ -835,7 +834,6 @@ if ($ok) { Write-Output 'ECO:OK' } else { Write-Output 'ECO:FAIL' }
             b.append("    [void]$sb.AppendLine('#SERVICEEXIT:0')\n");
             b.append("  } catch {\n");
             b.append("    [void]$sb.AppendLine('#SERVICEEXIT:-1')\n");
-            b.append("    $anyFail = 1\n");
             b.append("  }\n");
         }
         b.append("  $t = & $pcf -setactive $target 2>&1 | Out-String\n");
@@ -887,7 +885,7 @@ if ($ok) { Write-Output 'ECO:OK' } else { Write-Output 'ECO:FAIL' }
         b.append("try {\n");
         b.append("  if (Test-Path -LiteralPath $svcStateFile) {\n");
         b.append("    $line = Get-Content -LiteralPath $svcStateFile | Select-Object -First 1\n");
-        b.append("    $parts = $line -split '\|',2\n");
+        b.append("    $parts = $line -split '\\|',2\n");
         b.append("    if ($parts.Count -ge 2) {\n");
         b.append("      $svcName = $parts[0]\n");
         b.append("      $oldType = $parts[1]\n");
