@@ -314,6 +314,26 @@ turbo:
   safe-tick:
     # 負荷分散タグを有効にするか。
     enabled: true
+  # ---------------------------------------------------------------------------
+  # バックグラウンド GC (「GC をバックエンドに回す」)
+  #   完全な無停止はどの GC でも原理的に不可能です (回収には必ず安全点が要る)。
+  #   そこで、停止が「試合中に突然来る」ことをやめさせる: 誰もいない瞬間に、あらかじめ
+  #   GC を済ませておいて、次の試合はきれいなヒープから始める方式です。
+  #   - enabled: スイッチ。無人在中のみ動作します。
+  #   - interval-seconds: 何秒おきに判定するか。判定は tick の先頭ではなく、
+  #     サーバーワーカースレッドで System.gc() を呼ぶので、停止コストは tick 予算に
+  #     足されません。
+  #   - clearance-percent: tick の健康度がこの%以上 (既定90) のときだけ実行。
+  #     空っぽでもサーバースレッドが忙しいなら見送ります。
+  #   - min-interval-seconds: 最後の GC からこれ未満は再実行しない (連打防止)。
+  #   注意: ZGC で起動している場合はフル GC が並行なのでこの機能は安全にスキップします
+  #   (start.bat の ZGC が有効な間は何もしません)。
+  # ---------------------------------------------------------------------------
+  gc-background:
+    enabled: true
+    interval-seconds: 60
+    min-interval-seconds: 30
+    clearance-percent: 90
 
 # Ping-aware combat netcode. This controls crit rewind and rubber-band/anti-void handling.
 # Knockback shaping (coefficients, horizontal/vertical KB, ping-based KB sync) is NOT done

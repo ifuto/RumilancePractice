@@ -282,6 +282,11 @@ if ($ok) { Write-Output 'ECO:OK' } else { Write-Output 'ECO:FAIL' }
         return configService.config().getBoolean("turbo.auto.enabled", true);
     }
 
+    /** {@code true} when at least one player is online (used by background GC gating). */
+    public boolean playersOnline() {
+        return !Bukkit.getOnlinePlayers().isEmpty();
+    }
+
     /** Seconds to wait after the last player leaves before entering idle (config, 0 = immediate). */
     public int autoIdleDelaySeconds() {
         return Math.max(0, configService.config().getInt("turbo.auto.idle-delay-seconds", 0));

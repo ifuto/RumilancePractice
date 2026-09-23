@@ -298,8 +298,17 @@ public final class FeatureBootstrap {
         WindowsOptimizationService turboService =
                 new WindowsOptimizationService(plugin, asyncExecutor, configService);
         services.register(WindowsOptimizationService.class, turboService);
-        services.register(com.rumilance.practice.turbo.JvmGcService.class,
-                new com.rumilance.practice.turbo.JvmGcService());
+        com.rumilance.practice.turbo.JvmGcService jvmGcService =
+                new com.rumilance.practice.turbo.JvmGcService();
+        services.register(com.rumilance.practice.turbo.JvmGcService.class, jvmGcService);
+
+        // Background GC: only while nobody is online and the tick has headroom, run System.gc()
+        // on the worker pool so old-gen pause-work is paid during idle instead of mid-fight.
+        com.rumilance.practice.turbo.GcBackgroundSweeper gcBackgroundSweeper =
+                new com.rumilance.practice.turbo.GcBackgroundSweeper(
+                        plugin, turboService, jvmGcService, asyncExecutor);
+        services.register(com.rumilance.practice.turbo.GcBackgroundSweeper.class, gcBackgroundSweeper);
+        gcBackgroundSweeper.start();
 
         RuntimeFlags runtimeFlags = new RuntimeFlags(settings.maintenanceMode());
         services.register(RuntimeFlags.class, runtimeFlags);

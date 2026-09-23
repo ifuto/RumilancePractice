@@ -218,6 +218,11 @@ public final class TurboCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text(
                 "自動切替: turbo.auto.enabled: true なら「最後の人が抜けたら省電力化、人が来たら即フルパワー復帰」。",
                 NamedTextColor.GRAY));
+        sender.sendMessage(Component.text(
+                "バックグラウンドGC: turbo.gc-background.enabled: true なら、無人在中かつ tick に"
+                        + " 余裕があるときだけ System.gc() をワーカースレッドで先行実行し、"
+                        + " 試合中の突然のGC停止を減らします。",
+                NamedTextColor.GRAY));
         sender.sendMessage(Component.text("危険性・推奨事項は config.yml の turbo: セクションを参照。", NamedTextColor.GRAY));
     }
 

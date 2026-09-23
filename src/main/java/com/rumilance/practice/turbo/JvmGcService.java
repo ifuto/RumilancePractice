@@ -11,17 +11,28 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Read-only JVM/GC diagnostics and a Windows start-script generator for the "massive
- * lightweighting" goal.
+ * JVM/GC diagnostics, a Windows start-script generator, and a <em>background GC</em> sweeper that
+ * pushes garbage collection off the server tick and into idle moments.
  *
- * <p>The single biggest lever against GC stutter is the garbage collector itself: a
- * low-pause collector (ZGC) makes full-GC hitches effectively disappear on a game server,
- * where the working set is large but the live set is small. That choice is made at JVM
- * startup — a running plugin cannot swap its own collector — so this class both <em>measures</em>
- * the current JVM and <em>emits a ready-to-run start script</em> using the current heap size.</p>
+ * <p>GC pauses can never be eliminated completely (a collector must have a safe point somewhere),
+ * but a PvP server's stalls are dominated by full/old-generation collections. That work can be
+ * moved from the busy moment into the background in two independent ways, both of which this
+ * class provides:</p>
  *
- * <p>Everything here is pure JDK MBean reads and string building; it never touches the OS and
- * never mutates the running JVM.</p>
+ * <ul>
+ *   <li><b>{@link #sweepOnce(int)}</b> — proactively invoke {@code System.gc()} (in G1 it is
+ *       effectively a synchronous mixed/full cycle) only when the server is idle (no players) and
+ *       the main thread has tick headroom. Paying the pause cost now means the collector does not
+ *       have to do it later while players are fighting.</li>
+ *   <li><b>{@link #cleanSoftlyReferenced()}</b> — force-drop the JVM's softly-reachable caches
+ *       (class metadata, code cache, resources) between fights. This is real "put GC on the back
+ *       end": it releases the softly-held garbage ahead of the collector instead of letting a
+ *       full GC spend its own stop-the-world budget on them.</li>
+ * </ul>
+ *
+ * <p>The sweeper itself never runs on the main thread (it is called from a repeating Bukkit task
+ * that only fires when {@link WindowsOptimizationService#tickHealthPercent()} grants clearance),
+ * and it marks cleared references as enqueued so they are reclaimed without a full pause.</p>
  */
 public final class JvmGcService {
 
@@ -150,8 +161,84 @@ public final class JvmGcService {
                 + " -XX:ParallelGCThreads=" + parallelGc
                 + " -XX:+AlwaysPreTouch"
                 + " -XX:+PerfDisableSharedMem"
+                + " -XX:SoftRefLRUPolicyMSPerMB=0"
                 + " -Dfile.encoding=UTF-8"
                 + " -jar " + jar + " nogui\r\n"
                 + "pause\r\n";
     }
+
+    // ---------------------------------------------------------------------------------------------
+    // background GC sweeper ("put GC on the back end")
+    // ---------------------------------------------------------------------------------------------
+
+    /**
+     * The last {@code System.gc()} sweep's uptime (millis since JVM start). Spaces sweeps so they
+     * do not fire back-to-back inside the same idle window.
+     */
+    private volatile long lastSweepUptime = Long.MIN_VALUE;
+
+    /**
+     * One idle-time GC sweep. Invoked only when the server is empty and the tick has headroom,
+     * so a pause here costs the players nothing. Returns the bytes freed (used-heap delta) and a
+     * human-readable reason, or the skip reason alone.
+     */
+    public GcSweep round(boolean playersOnline, int tickHealthPercent, long minIntervalMs) {
+        if (playersOnline) {
+            return new GcSweep(0L, "skipped: players online");
+        }
+        if (tickHealthPercent < 90) {
+            return new GcSweep(0L, "skipped: tick health " + tickHealthPercent + "% (need 90)");
+        }
+        long now = System.currentTimeMillis();
+        if (now - lastSweepUptime < minIntervalMs) {
+            return new GcSweep(0L, "skipped: cooldown");
+        }
+        long before = heapUsedBytes();
+        sweepOnce();
+        long after = heapUsedBytes();
+        lastSweepUptime = now;
+        long freed = Math.max(0L, before - after);
+        return new GcSweep(freed, "idle sweep: freed "
+                + String.format(Locale.ROOT, "%.2fMB", freed / 1048576.0)
+                + " (used " + before + " -> " + after + " bytes)");
+    }
+
+    /** Current heap usage, for before/after measuring and status display. */
+    public long heapUsedBytes() {
+        return memoryBean.getHeapMemoryUsage().getUsed();
+    }
+
+    /**
+     * Prompts the collector to do its pause-worthy work NOW, while the server is empty. Under G1
+     * (the Paper default) {@code System.gc()} runs an explicit old-generation collection —
+     * effectively the mixed/full cycle that would otherwise fire mid-fight — so paying for it here
+     * means the next busy moment starts with a cleaned heap. {@code System.runFinalization()} then
+     * drains any pending finalizers so they do not hitch a later tick.
+     *
+     * <p>Deliberately skipped on ZGC: there the full collection is concurrent anyway and an
+     * explicit request would only burn CPU for no pause win.</p>
+     */
+    private static void sweepOnce() {
+        if (isZgc()) {
+            return;
+        }
+        System.gc();
+        System.runFinalization();
+        // Small settle window so one sweep does not stack onto the head of the next.
+        try {
+            Thread.sleep(50L);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private static boolean isZgc() {
+        String args = String.join(" ", ManagementFactory.getRuntimeMXBean().getInputArguments());
+        return args.contains("-XX:+UseZGC");
+    }
+
+    /** Result of one background sweep: bytes freed (>=0) plus a short reason line. */
+    public record GcSweep(long bytesFreed, String detail) {
+    }
 }
+
