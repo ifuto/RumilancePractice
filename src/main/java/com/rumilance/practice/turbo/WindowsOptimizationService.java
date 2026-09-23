@@ -163,20 +163,29 @@ if ($ok) { Write-Output 'ECO:OK' } else { Write-Output 'ECO:FAIL' }
             int utilityDistribution,
             boolean disableIdle,
             boolean revertIdleOnOff,
-            int uacWaitSeconds
+            int uacWaitSeconds,
+            boolean processPriorityHigh,
+            boolean defenderExclude,
+            boolean disableSleep,
+            String stopService
     ) {
         public Parameters validated() {
             String accent = (accentPowerPlan == null || accentPowerPlan.isBlank())
                     ? null : accentPowerPlan.trim();
             int park = coreParkingMinCores < 0 ? -1 : clamp(coreParkingMinCores, 0, 100);
             int util = utilityDistribution < 0 ? -1 : clamp(utilityDistribution, 0, 100);
+            String service = (stopService == null || stopService.isBlank())
+                    ? null : stopService.trim().toLowerCase(Locale.ROOT);
             return new Parameters(accent, procThrottleMin100, park, util,
-                    disableIdle, revertIdleOnOff, clamp(uacWaitSeconds, 10, 300));
+                    disableIdle, revertIdleOnOff, clamp(uacWaitSeconds, 10, 300),
+                    processPriorityHigh, defenderExclude, disableSleep, service);
         }
 
         public boolean touchesSettings() {
             return procThrottleMin100 || coreParkingMinCores >= 0
-                    || utilityDistribution >= 0 || disableIdle;
+                    || utilityDistribution >= 0 || disableIdle
+                    || processPriorityHigh || defenderExclude || disableSleep
+                    || stopService != null;
         }
     }
 
@@ -215,9 +224,12 @@ if ($ok) { Write-Output 'ECO:OK' } else { Write-Output 'ECO:FAIL' }
     private final Path stateFile;
     private final Path cmdFile;
     private final Path resFile;
+    private final Path defenderFile;
+    private final Path serviceFile;
     private final long ownPid;
     private volatile boolean runtimeApplied;
     private volatile boolean ecoThrottled;
+    private volatile boolean priorityRaised;
 
     /** Tick-health triage: mirrors sampled-tick health into a dummy scoreboard objective. */
     private static final String SAMETICK_OBJECTIVE = "rTickHealth";
@@ -234,6 +246,8 @@ if ($ok) { Write-Output 'ECO:OK' } else { Write-Output 'ECO:FAIL' }
         this.stateFile = dataFolder.resolve("turbo-state.txt");
         this.cmdFile = dataFolder.resolve("turbo-cmd.txt");
         this.resFile = dataFolder.resolve("turbo-result.txt");
+        this.defenderFile = dataFolder.resolve("turbo-defender.txt");
+        this.serviceFile = dataFolder.resolve("turbo-services.txt");
         this.ownPid = ProcessHandle.current().pid();
     }
 
@@ -246,7 +260,11 @@ if ($ok) { Write-Output 'ECO:OK' } else { Write-Output 'ECO:FAIL' }
                 cfg.getInt("turbo.utility-distribution", 0),
                 cfg.getBoolean("turbo.disable-idle", true),
                 cfg.getBoolean("turbo.revert-idle-on-off", true),
-                cfg.getInt("turbo.uac-wait-seconds", 90)
+                cfg.getInt("turbo.uac-wait-seconds", 90),
+                cfg.getBoolean("turbo.process-priority-high", true),
+                cfg.getBoolean("turbo.defender-exclude", true),
+                cfg.getBoolean("turbo.disable-sleep", true),
+                cfg.getString("turbo.stop-services", "")
         ).validated();
     }
 
@@ -464,6 +482,18 @@ if ($ok) { Write-Output 'ECO:OK' } else { Write-Output 'ECO:FAIL' }
             noteSetting(lines, markers, "IDLEDISABLE",
                     "プロセッサ・アイドル無効化=1 (深いC-state回避・任意)");
         }
+        if (p.disableSleep()) {
+            noteSetting(lines, markers, "STANDBYIDLE",
+                    "睡眠/休止/モニタ/HDD停止を無効化 (24hサーバーのスリープ落ち防止)");
+        }
+        if (p.defenderExclude()) {
+            boolean defOk = "0".equals(markers.get("DEFENDEREXIT"));
+            lines.add((defOk ? "✓ " : "✗ ") + "Defender リアルタイムスキャン除外 (データフォルダ)");
+        }
+        if (p.stopService() != null) {
+            boolean svcOk = "0".equals(markers.get("SERVICEEXIT"));
+            lines.add((svcOk ? "✓ " : "✗ ") + "サービス停止: " + p.stopService());
+        }
         boolean activeOk = "0".equals(markers.get("ACTIVEEXIT"));
         lines.add((activeOk ? "✓ " : "✗ ") + "プラン適用: " + printable(target));
 
@@ -471,6 +501,11 @@ if ($ok) { Write-Output 'ECO:OK' } else { Write-Output 'ECO:FAIL' }
         if (succeeded) {
             persistState(new State(target, blankToNull(original), p.disableIdle(), true));
             runtimeApplied = true;
+            // Root-level scheduler boost for the server process itself (unelevated, immediate,
+            // driven only by the explicit admin command — the auto idle path never touches it).
+            if (p.processPriorityHigh()) {
+                setPriorityBlocking(true);
+            }
             lines.add("保持: サーバ再起動前は維持されます。解除は /turbo off (または自動省電力) で。");
         } else {
             runtimeApplied = false;
@@ -494,6 +529,10 @@ if ($ok) { Write-Output 'ECO:OK' } else { Write-Output 'ECO:FAIL' }
         if (state.attempted() == null && state.backup() == null) {
             lines.add("適用中のTurbo状態が見つかりません (turbo-state が存在しません)。");
             runtimeApplied = false;
+            if (priorityRaised) {
+                priorityRaised = false;
+                setPriorityBlocking(false);
+            }
             return new RevertResult(true, false, lines);
         }
         // Quiet mode: never raise a UAC prompt (auto idle transition only).
@@ -530,6 +569,8 @@ if ($ok) { Write-Output 'ECO:OK' } else { Write-Output 'ECO:FAIL' }
             // Keep the duplicated plan GUID so the next apply reuses it instead of piling plans up.
             persistState(new State(state.attempted(), state.backup(), false, false));
             runtimeApplied = false;
+            priorityRaised = false;
+            setPriorityBlocking(false);
             lines.add("Turbo最適化を解除しました。");
         } else {
             lines.add("一部の解除に失敗しました。管理者権限を確認して再度 /turbo off を実行してください。");
@@ -581,6 +622,27 @@ if ($ok) { Write-Output 'ECO:OK' } else { Write-Output 'ECO:FAIL' }
             return false;
         }
         return snapshot.output().contains("ECO:OK");
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // process priority (unelevated — works even on any 32-bit Qt or ServiceRunEx JVM)
+    // ---------------------------------------------------------------------------------------------
+
+    /** Sets the server process's scheduler priority class (High while turbo, Normal otherwise). */
+    public boolean setPriorityBlocking(boolean high) {
+        if (!isWindows()) {
+            return false;
+        }
+        String priorityClass = high ? "High" : "Normal";
+        Snapshot snapshot = capture(List.of(powershellExe(),
+                "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                "-Command", "(Get-Process -Id " + ownPid + ").PriorityClass = '" + priorityClass + "'"),
+                45);
+        if (snapshot == null || snapshot.exit() != 0) {
+            return false;
+        }
+        priorityRaised = high;
+        return true;
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -675,6 +737,8 @@ if ($ok) { Write-Output 'ECO:OK' } else { Write-Output 'ECO:FAIL' }
         StringBuilder b = new StringBuilder();
         b.append("$pcf = '").append(singleQuote(powercfgExe())).append("'\n");
         b.append("$res = '").append(singleQuote(resFile.toString())).append("'\n");
+        b.append("$defStateFile = '").append(singleQuote(defenderFile.toString())).append("'\n");
+        b.append("$svcStateFile = '").append(singleQuote(serviceFile.toString())).append("'\n");
         b.append("$sb = New-Object System.Text.StringBuilder\n");
         b.append("$anyFail = 0\n");
         b.append("$m = $null\n");
@@ -719,6 +783,61 @@ if ($ok) { Write-Output 'ECO:OK' } else { Write-Output 'ECO:FAIL' }
         if (p.disableIdle()) {
             setAcIndex(b, "IDLEDISABLE", "1");
         }
+        // Root-level: never let the box sleep/hibernate/turn the disk off under turbo, and never
+        // deep-throttle the CPU. Each value belongs to its own powercfg subgroup. All are written
+        // onto the duplicated plan (never the user's own plan), so reverting undoes them at once.
+        if (p.disableSleep()) {
+            // Subgroups by GUID (aliases differ across builds; GUIDs never change):
+            //   sleep 238c9fa8-0aad-41ed-83f4-97be242c8f20, video 7516b95f-f776-4464-8c53-06167f40cc99,
+            //   disk  0012ee47-9041-4b5d-9b77-535fba8b1442.
+            setAcIndexIn(b, "238c9fa8-0aad-41ed-83f4-97be242c8f20", "STANDBYIDLE", "0");
+            setAcIndexIn(b, "238c9fa8-0aad-41ed-83f4-97be242c8f20", "HIBERNATEIDLE", "0");
+            setAcIndexIn(b, "7516b95f-f776-4464-8c53-06167f40cc99", "VIDEOIDLE", "0");
+            setAcIndexIn(b, "0012ee47-9041-4b5d-9b77-535fba8b1442", "DISKIDLE", "0");
+            setAcIndexIn(b, "sub_processor", "PERFBOOSTMODE", "2");
+        }
+        // Windows Defender: skip real-time scanning of the server data folder (world writes, BOT
+        // logs, database files). Only the newly added exclusions are recorded in $defStateFile so
+        // /turbo off removes exactly those. Never touches the user's own exclusions.
+        if (p.defenderExclude()) {
+            b.append("  try {\n");
+            b.append("    $root = [System.IO.Path]::GetFullPath('")
+                    .append(singleQuote(PluginIdentity.dataFolder(plugin).getAbsolutePath()))
+                    .append("')\n");
+            b.append("    $pref = Get-MpPreference -ErrorAction SilentlyContinue\n");
+            b.append("    $existing = @($pref.ExclusionPath)\n");
+            b.append("    $added = @()\n");
+            b.append("    if (-not ($existing -contains $root)) { $added += $root }\n");
+            b.append("    if ($added.Count -gt 0) {\n");
+            b.append("      Set-Content -LiteralPath $defStateFile -Value $added -Encoding ascii\n");
+            b.append("      Add-MpPreference -ExclusionPath $added\n");
+            b.append("    }\n");
+            b.append("    [void]$sb.AppendLine('#DEFENDEREXIT:0')\n");
+            b.append("  } catch {\n");
+            b.append("    [void]$sb.AppendLine('#DEFENDEREXIT:-1')\n");
+            b.append("    $anyFail = 1\n");
+            b.append("  }\n");
+        }
+        // Optional coarse stop of chunky services (e.g. wuauserv). Start type and state are
+        // captured first, then the service is stopped and set to manual. Reverted on /turbo off.
+        if (p.stopService() != null) {
+            b.append("  try {\n");
+            b.append("    $svc = '").append(singleQuote(p.stopService())).append("'\n");
+            b.append("    $got = Get-Service -Name $svc -ErrorAction SilentlyContinue\n");
+            b.append("    if ($null -eq $got) { throw 'no such service' }\n");
+            b.append("    $w = Get-CimInstance -ClassName Win32_Service -Filter \"Name='$svc'\" "
+                    + "-ErrorAction SilentlyContinue\n");
+            b.append("    $oldType = if ($w) { $w.StartMode } else { '' }\n");
+            b.append("    Set-Content -LiteralPath $svcStateFile -Value ($svc + '|' + $oldType) "
+                    + "-Encoding ascii\n");
+            b.append("    Set-Service -Name $svc -StartupType Manual -ErrorAction SilentlyContinue\n");
+            b.append("    Stop-Service -Name $svc -Force -ErrorAction SilentlyContinue\n");
+            b.append("    [void]$sb.AppendLine('#SERVICEEXIT:0')\n");
+            b.append("  } catch {\n");
+            b.append("    [void]$sb.AppendLine('#SERVICEEXIT:-1')\n");
+            b.append("    $anyFail = 1\n");
+            b.append("  }\n");
+        }
         b.append("  $t = & $pcf -setactive $target 2>&1 | Out-String\n");
         b.append("  if ($LASTEXITCODE -ne 0) { $anyFail = 1 }\n");
         b.append("  [void]$sb.AppendLine('#ACTIVEEXIT:' + $LASTEXITCODE)\n");
@@ -738,6 +857,8 @@ if ($ok) { Write-Output 'ECO:OK' } else { Write-Output 'ECO:FAIL' }
         StringBuilder b = new StringBuilder();
         b.append("$pcf = '").append(singleQuote(powercfgExe())).append("'\n");
         b.append("$res = '").append(singleQuote(resFile.toString())).append("'\n");
+        b.append("$defStateFile = '").append(singleQuote(defenderFile.toString())).append("'\n");
+        b.append("$svcStateFile = '").append(singleQuote(serviceFile.toString())).append("'\n");
         b.append("$sb = New-Object System.Text.StringBuilder\n");
         b.append("$anyFail = 0\n");
 
@@ -749,6 +870,38 @@ if ($ok) { Write-Output 'ECO:OK' } else { Write-Output 'ECO:FAIL' }
         } else {
             b.append("[void]$sb.AppendLine('#IDLERESETEXIT:0')\n");
         }
+        // Defender: remove exactly the exclusions this plugin added (recorded at apply time).
+        b.append("try {\n");
+        b.append("  if (Test-Path -LiteralPath $defStateFile) {\n");
+        b.append("    $added = @(Get-Content -LiteralPath $defStateFile)\n");
+        b.append("    if ($added.Count -gt 0) { Remove-MpPreference -ExclusionPath $added "
+                + "-ErrorAction SilentlyContinue }\n");
+        b.append("    Remove-Item -LiteralPath $defStateFile -Force\n");
+        b.append("  }\n");
+        b.append("  [void]$sb.AppendLine('#DEFENDERRESETEXIT:0')\n");
+        b.append("} catch {\n");
+        b.append("  [void]$sb.AppendLine('#DEFENDERRESETEXIT:-1')\n");
+        b.append("  $anyFail = 1\n");
+        b.append("}\n");
+        // Services: restart and restore the original start type captured at apply time.
+        b.append("try {\n");
+        b.append("  if (Test-Path -LiteralPath $svcStateFile) {\n");
+        b.append("    $line = Get-Content -LiteralPath $svcStateFile | Select-Object -First 1\n");
+        b.append("    $parts = $line -split '\|',2\n");
+        b.append("    if ($parts.Count -ge 2) {\n");
+        b.append("      $svcName = $parts[0]\n");
+        b.append("      $oldType = $parts[1]\n");
+        b.append("      if ($oldType -ne '') { Set-Service -Name $svcName -StartupType $oldType "
+                + "-ErrorAction SilentlyContinue }\n");
+        b.append("      Start-Service -Name $svcName -ErrorAction SilentlyContinue\n");
+        b.append("    }\n");
+        b.append("    Remove-Item -LiteralPath $svcStateFile -Force\n");
+        b.append("  }\n");
+        b.append("  [void]$sb.AppendLine('#SERVICERESETEXIT:0')\n");
+        b.append("} catch {\n");
+        b.append("  [void]$sb.AppendLine('#SERVICERESETEXIT:-1')\n");
+        b.append("  $anyFail = 1\n");
+        b.append("}\n");
         if (state.backup() != null && !state.backup().equalsIgnoreCase(state.attempted())) {
             b.append("$t = & $pcf -setactive '").append(singleQuote(state.backup()))
                     .append("' 2>&1 | Out-String\n");
@@ -768,7 +921,12 @@ if ($ok) { Write-Output 'ECO:OK' } else { Write-Output 'ECO:FAIL' }
     }
 
     private static void setAcIndex(StringBuilder b, String alias, String value) {
-        b.append("  $t = & $pcf -setacvalueindex $target sub_processor ").append(alias)
+        setAcIndexIn(b, "sub_processor", alias, value);
+    }
+
+    private static void setAcIndexIn(StringBuilder b, String subgroupAlias, String alias, String value) {
+        b.append("  $t = & $pcf -setacvalueindex $target ").append(subgroupAlias)
+                .append(' ').append(alias)
                 .append(' ').append(value).append(" 2>&1 | Out-String\n");
         b.append("  if ($LASTEXITCODE -ne 0) { $anyFail = 1 }\n");
         b.append("  [void]$sb.AppendLine('#").append(alias).append("EXIT:' + $LASTEXITCODE)\n");
@@ -787,6 +945,14 @@ if ($ok) { Write-Output 'ECO:OK' } else { Write-Output 'ECO:FAIL' }
             if (ecoThrottled) {
                 runEcoQos(false);
                 ecoThrottled = false;
+            }
+        } catch (Exception ignored) {
+            // never break plugin shutdown
+        }
+        try {
+            if (priorityRaised) {
+                priorityRaised = false;
+                setPriorityBlocking(false);
             }
         } catch (Exception ignored) {
             // never break plugin shutdown

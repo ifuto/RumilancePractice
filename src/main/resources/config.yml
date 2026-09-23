@@ -272,6 +272,19 @@ turbo:
   disable-idle: true
   # /turbo off 時に IDLEDISABLE を 0 (アイドル許可) へ戻すか。
   revert-idle-on-off: true
+  # サーバープロセスのスケジューラ優先度を High に引き上げる (Windows 根幹の最大レバー)。
+  # サーバーJVMは非昇格のままでも変更可能で、/turbo off で Normal へ戻ります。
+  process-priority-high: true
+  # Windows Defender のリアルタイムスキャンからサーバーデータフォルダ (plugins/n-arena) を
+  # 除外する (チャンク書込・BOTログ・DB書込の I/O を根から軽くする)。適用前に追加分だけを
+  # 記録し /turbo off で正確に除去します。既存のユーザー設定には触れません。
+  defender-exclude: true
+  # ターボ中はスリープ/休止/モニタ/HDD 停止を無効化 (= 複製プラン側の STANDBYIDLE 等を 0 に)。
+  # 元プランへ戻すと自然に復元されます。24h稼働サーバーの突然のスリープ落ち防止。
+  disable-sleep: true
+  # ターボ中に停止する重いサービス (例: wuauserv)。空 "" = 停止しない。
+  # 開始種別と状態を保存し /turbo off で復元します。
+  stop-services: ""
 #   UAC ダイアログでの承認待ち時間 (秒)。この時間内に承認されない場合は中止します。
   uac-wait-seconds: 90
   # ---------------------------------------------------------------------------

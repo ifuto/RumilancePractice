@@ -219,6 +219,14 @@ Microsoft 標準ツール `powercfg.exe` への委任として実装した（`/t
     再起動して初めて低停止 GC が効く。
   - ホットパスのアロケーション削減（GC 回数そのものの削減）は、まず計測基盤（GC ログ/
     Spark）を回して from/to を揃えて測る作業が前提で、本コミットの範囲では未実施。
+- **根幹レベルの Windows チューニングを `/turbo on|off` に統合** (すべて可逆・初回 UAC 1回):
+  - サーバープロセスのスケジューラ優先度を High → Normal (`process-priority-high`)。無昇格・即時。
+  - Windows Defender リアルタイムスキャンからサーバーデータフォルダを除外 (`defender-exclude`)。
+    適用前に追加分のみ記録し、`/turbo off` で正確に除去（既存のユーザー除外には触れない）。
+  - スリープ/休止/モニタ/HDD 停止を無効化 (`disable-sleep`)。複製プラン側 (STANDBYIDLE/HIBERNATEIDLE/
+    VIDEOIDLE/DISKIDLE=0, PERFBOOSTMODE=2) に書くため、元プランへ戻すだけで自然に復元。
+  - 任意の重いサービスの停止＋開始種別 Manual (`stop-services`)。適用前の状態を保存し `/turbo off` で復元。
+  - **auto省電力（在/不在切替）はこれら防御的変更を触らない**（明示の `/turbo on|off` のみ）。
 - 未実装（残る設計上の宿題）：Linux 側の governor/HugeTLB/isolcpus、Rust `cdylib` による
   スレッド親和性ピン・`/dev/cpu_dma_latency` 保持。これらは別 OS・別配布物になるため、
   本リポジトリの Gradle ビルドには同梱していない。
