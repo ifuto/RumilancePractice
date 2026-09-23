@@ -85,6 +85,11 @@ public final class RumilanceReloadCommand implements CommandExecutor, TabComplet
                 .ifPresent(PresetItems::reload));
         safe(done, failed, "resource-pack", () -> services.find(ResourcePackService.class)
                 .ifPresent(ResourcePackService::reload));
+        // turbo requires no warm reload: its recipes read config.yml on every command. Only the
+        // presence-based auto idle/wake flags are cached, so refresh them here.
+        safe(done, failed, "turbo", () -> services
+                .find(com.rumilance.practice.turbo.TurboIdleManager.class)
+                .ifPresent(com.rumilance.practice.turbo.TurboIdleManager::reload));
         safe(done, failed, "scoreboard", () -> services.find(ScoreboardService.class)
                 .ifPresent(s -> s.reload(new ScoreboardConfig(services.get(ConfigService.class).scoreboard()))));
 

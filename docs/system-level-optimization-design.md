@@ -197,6 +197,18 @@ Microsoft 標準ツール `powercfg.exe` への委任として実装した（`/t
     昇格子プロセスに閉じ込め、初回に UAC を 1 回だけ出す。各呼び出しはタイムアウト付きで
     メインスレッド外で実行。
 - `src/main/java/com/rumilance/practice/turbo/TurboCommand.java` — コマンド実体（`rumilance.admin`）。
+- `src/main/java/com/rumilance/practice/turbo/TurboIdleManager.java` — プレイヤー在/不在による
+  自動切替（「誰もいないなら休ませる・人が来たら即復帰」）。EcoQoS(プロセス電力スロットリング,
+  非昇格で自プロセスに適用可能) と電源プラン復元/再適用を組み合わせる。`/stop` のような
+  コールドスタートは行わず、サーバープロセスは終始生きたまま（復帰は数秒）。
+  - 退出側: 最後のプレイヤーが抜けたら（`turbo.auto.idle-delay-seconds` 秒後）プランを通常へ
+    戻し、サーバープロセスを EcoQoS で省エネ化。
+  - 復帰側: `PlayerJoinEvent` で EcoQoS 解除→ターボプラン再適用。
+  - **自動切替は無プロンプト**: 管理者が一度 `/turbo on` で立てた常駐ヘルパー（コンフィグ
+    セクション参照）だけを使い、ヘルパー不在時は静かにスキップ。乗っ取り等でも自動で
+    UAC ダイアログを出すことはない。
+- `src/main/java/com/rumilance/practice/turbo/TurboCommand.java` — コマンド実体（`rumilance.admin`）。
+  `status` に EcoQoS / 自動切替の状態も表示。
 - 未実装（残る設計上の宿題）：Linux 側の governor/HugeTLB/isolcpus、Rust `cdylib` による
   スレッド親和性ピン・`/dev/cpu_dma_latency` 保持。これらは別 OS・別配布物になるため、
   本リポジトリの Gradle ビルドには同梱していない。

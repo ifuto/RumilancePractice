@@ -1414,6 +1414,14 @@ public final class FeatureBootstrap {
                 })));
         pm.registerEvents(totemGuard, plugin);
 
+        // Presence-based auto idle/wake: nobody online -> revert the turbo plan and engage
+        // per-process EcoQoS throttling; first join -> full power again (no cold start, ever).
+        com.rumilance.practice.turbo.TurboIdleManager turboIdle =
+                new com.rumilance.practice.turbo.TurboIdleManager(plugin,
+                        services.get(com.rumilance.practice.turbo.WindowsOptimizationService.class));
+        pm.registerEvents(turboIdle, plugin);
+        services.register(com.rumilance.practice.turbo.TurboIdleManager.class, turboIdle);
+
         pm.registerEvents(new com.rumilance.practice.replay.ReplayControlListener(replayService), plugin);
         pm.registerEvents(new BanLoginListener(banService), plugin);
         pm.registerEvents(new com.rumilance.practice.listener.ChatBanGuardListener(chatBanService), plugin);
@@ -1902,6 +1910,11 @@ public final class FeatureBootstrap {
         if (afkCrystalManager != null) {
             afkCrystalManager.shutdown();
         }
+        services.find(com.rumilance.practice.turbo.TurboIdleManager.class)
+                .ifPresent(com.rumilance.practice.turbo.TurboIdleManager::shutdown);
+        // Revert the power plan / EcoQoS and stop the resident elevated helper on shutdown.
+        services.find(com.rumilance.practice.turbo.WindowsOptimizationService.class)
+                .ifPresent(com.rumilance.practice.turbo.WindowsOptimizationService::shutdown);
         if (queueCoordinator != null) {
             queueCoordinator.stop();
         }

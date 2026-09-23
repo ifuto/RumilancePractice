@@ -122,10 +122,12 @@ public final class TurboCommand implements CommandExecutor, TabCompleter {
                 }
                 sender.sendMessage(Component.text("==== Turbo / システム最適化 ====", NamedTextColor.AQUA));
                 sender.sendMessage(Component.text("OS: Windows", NamedTextColor.WHITE));
-                sender.sendMessage(Component.text("管理者権限: " + (report.privileged() ? "あり" : "なし (UAC昇格を使用)"),
+                sender.sendMessage(Component.text("管理者権限: " + adminWord(report),
                         NamedTextColor.WHITE));
                 sender.sendMessage(Component.text("Turbo適用中: " + (report.applied() ? "はい" : "いいえ"),
                         report.applied() ? NamedTextColor.GREEN : NamedTextColor.WHITE));
+                sender.sendMessage(Component.text("省電力スロットリング(EcoQoS): " + (report.ecoThrottled() ? "有効" : "無効"),
+                        report.ecoThrottled() ? NamedTextColor.GREEN : NamedTextColor.WHITE));
                 sender.sendMessage(Component.text("現在のアクティブプラン: " + safe(report.activeScheme()),
                         NamedTextColor.WHITE));
                 if (report.applied()) {
@@ -154,12 +156,23 @@ public final class TurboCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("==== Turbo 使い方 ====", NamedTextColor.AQUA));
         sender.sendMessage(Component.text("/" + label + " on      - Windows 電源プランを最適化 (P-state固定・コアパーキング解除)。", NamedTextColor.WHITE));
         sender.sendMessage(Component.text("/" + label + " off     - 元の電源プランへ戻して解除。", NamedTextColor.WHITE));
-        sender.sendMessage(Component.text("/" + label + " status  - 現在の状態を表示。", NamedTextColor.WHITE));
+        sender.sendMessage(Component.text("/" + label + " status  - 現在の状態 (プラン/省電力) を表示。", NamedTextColor.WHITE));
+        sender.sendMessage(Component.text(
+                "自動切替: turbo.auto.enabled: true なら「最後の人が抜けたら省電力化、人が来たら即フルパワー復帰」。",
+                NamedTextColor.GRAY));
         sender.sendMessage(Component.text("危険性・推奨事項は config.yml の turbo: セクションを参照。", NamedTextColor.GRAY));
     }
 
     private static String safe(String value) {
         return value == null || value.isBlank() ? "(不明)" : value;
+    }
+
+    private static String adminWord(WindowsOptimizationService.StateReport report) {
+        if (report.privileged()) {
+            return "あり (サーバーコンソールが管理者)";
+        }
+        // Server JVM is not elevated; privileged work runs in the resident helper (UAC once).
+        return report.applied() ? "ヘルパー経由 (サーバーJVMは非管理者)" : "ヘルパー経由 (UAC昇格を使用)";
     }
 
     @Override

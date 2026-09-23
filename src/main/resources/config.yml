@@ -272,8 +272,21 @@ turbo:
   disable-idle: true
   # /turbo off 時に IDLEDISABLE を 0 (アイドル許可) へ戻すか。
   revert-idle-on-off: true
-  # UAC ダイアログでの承認待ち時間 (秒)。この時間内に承認されない場合は中止します。
+#   UAC ダイアログでの承認待ち時間 (秒)。この時間内に承認されない場合は中止します。
   uac-wait-seconds: 90
+  # ---------------------------------------------------------------------------
+  # プレイヤー在/不在による自動切替 (「誰もいないなら休ませる」機能)
+  #   - enabled: true にすると、最後のプレイヤーが抜けたら省電力化し、誰かが来たら即フルパワー復帰。
+  #     /stop のようなコールドスタートはしません (サーバープロセスはずっと起動したまま)。
+  #   - 省電力化の内容: (1) サーバープロセスを Windows の EcoQoS (電力スロットリング) にして
+  #     CPU を後回し、(2) 電源プランを適用前の通常プランへ戻す。復帰時はその逆を即時適用。
+  #   - 常駐の昇格ヘルパーが一度だけ UAC を立て、以後の自動切替ではダイアログは出ません。
+  # ---------------------------------------------------------------------------
+  auto:
+    # 自動切替のマスタースイッチ。
+    enabled: true
+    # 最後のプレイヤーが抜けてから省電力化するまでの待ち時間 (秒)。0 = 即時。
+    idle-delay-seconds: 0
 
 # Ping-aware combat netcode. This controls crit rewind and rubber-band/anti-void handling.
 # Knockback shaping (coefficients, horizontal/vertical KB, ping-based KB sync) is NOT done
