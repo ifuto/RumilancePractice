@@ -43,8 +43,11 @@ public final class BotGuiCommand implements CommandExecutor, TabCompleter {
         }
         try {
             HeroBotPlayer bot = quantum.spawnBot(player.getLocation(), player);
+            boolean started = quantum.startBot(bot);
             player.sendMessage(Component.text(
-                    "QuantumBOT spawned: " + bot.profileName(), NamedTextColor.GREEN));
+                    "QuantumBOT spawned: " + bot.profileName()
+                            + (started ? "" : " — could not start the match"),
+                    started ? NamedTextColor.GREEN : NamedTextColor.YELLOW));
         } catch (RuntimeException error) {
             String detail = error.getMessage();
             if (detail == null || detail.isBlank()) {

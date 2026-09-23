@@ -219,10 +219,15 @@ public final class PracticeBotSelectGui extends AbstractGui {
                     try {
                         HeroBotPlayer bot = this.quantumRuntime.spawnBot(player.getLocation(), player);
                         boolean configured = this.quantumRuntime.setOptionFor(bot, quantumOption(mode));
+                        // Spawn + option alone leaves the bot in the passive/idle hub state
+                        // (creative bots have their start flag reset every tick by the map's
+                        // main_tick). Begin the actual round, or the bot stands still forever.
+                        boolean started = this.quantumRuntime.startBot(bot);
                         player.sendMessage(Component.text(
                                 "QuantumBOT spawned: " + bot.profileName()
-                                        + (configured ? " (" + mode.name() + ")" : ""),
-                                UiTheme.SUCCESS));
+                                        + (configured ? " (" + mode.name() + ")" : "")
+                                        + (started ? "" : " — could not start the match"),
+                                started ? UiTheme.SUCCESS : UiTheme.WARNING));
                     } catch (RuntimeException error) {
                         String detail = error.getMessage();
                         if (detail == null || detail.isBlank()) {

@@ -21,11 +21,22 @@ public record QuantumInstance(
         String holderPrefix
 ) {
     public String tickFunction() {
-        return this.namespace + ":tick";
+        // The per-instance copy of quantum:tick now lives under qbot_N:quantum/tick (the source
+        // namespace is part of the instance path — see QuantumFunctionRegistry.install).
+        return this.function("tick");
     }
 
     public String initFunction() {
         return this.namespace + ":instance_init";
+    }
+
+    /**
+     * Id of an instance copy of a {@code quantum:}-namespace function. Instance copies are keyed
+     * by source namespace + path ({@code qbot_N:quantum/<path>}), so both the tick driver and the
+     * option/difficulty/toggle drivers must target exactly that form.
+     */
+    public String function(String path) {
+        return this.namespace + ":quantum/" + path;
     }
 
     public String botHolder(String name) {

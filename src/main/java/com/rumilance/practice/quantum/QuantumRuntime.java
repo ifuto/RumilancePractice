@@ -74,7 +74,7 @@ public final class QuantumRuntime {
     private YamlConfiguration config;
     private boolean enabled;
     private BukkitTask watchdog;
-    /** Drives each private qbot_N:tick once per server tick; no shared quantum:tick tag is used. */
+    /** Drives each private qbot_N:quantum/tick once per server tick; no shared quantum:tick tag is used. */
     private BukkitTask instanceTicker;
     private final Map<UUID, QuantumInstance> instances = new LinkedHashMap<>();
     private final AtomicInteger nextInstanceNumber = new AtomicInteger(1);
@@ -506,7 +506,7 @@ public final class QuantumRuntime {
             // while preserving @s, execute, return, and scheduled-function semantics.
             //
             // That console-owned source would also echo every datapack "function X ran" line to
-            // the log — the per-tick qbot_N:tick driver alone would spam 「関数qbot_…を
+            // the log — the per-tick qbot_N:quantum/tick driver alone would spam 「関数qbot_…を
             // 実行しました」 twenty times a second and wedge admin consoles. Suppress the output
             // (vanilla's own toggle, the same one `gamerule sendCommandFeedback false` flips) so
             // the bot-driven functions stay silent while human /quantum runs keep their feedback.
@@ -560,7 +560,7 @@ public final class QuantumRuntime {
                 continue;
             }
             ok &= this.runQuietly(bot.getBukkitEntity(),
-                    "function " + instance.namespace() + ":" + relativeFunction);
+                    "function " + instance.function(relativeFunction));
         }
         return ok;
     }
@@ -591,7 +591,7 @@ public final class QuantumRuntime {
             return false;
         }
         boolean ok = this.runQuietly(bot.getBukkitEntity(),
-                "function " + instance.namespace() + ":options/" + name);
+                "function " + instance.function("options/" + name));
         if (ok) {
             this.applyConfiguredBotLoadout(bot);
         }
@@ -625,9 +625,35 @@ public final class QuantumRuntime {
         boolean ok = true;
         for (QuantumInstance instance : List.copyOf(this.instances.values())) {
             HeroBotPlayer bot = this.instanceBot(instance);
-            ok &= bot != null && this.runQuietly(bot.getBukkitEntity(), "scoreboard players set @s start 1");
+            ok &= bot != null && this.startInstance(instance, bot);
         }
         return ok;
+    }
+
+    /** Starts the fight for one specific bot (the player-facing {@code /bot} and GUI flow). */
+    public boolean startBot(HeroBotPlayer bot) {
+        if (bot == null) {
+            return false;
+        }
+        QuantumInstance instance = this.instances.get(bot.getUUID());
+        return instance != null && this.startInstance(instance, bot);
+    }
+
+    private boolean startInstance(QuantumInstance instance, HeroBotPlayer bot) {
+        // The map's hub logic force-resets `.start` to 0 while the bot is creative —
+        // main_tick keeps `execute as @a[tag=xlib_bot,gamemode=creative] run scoreboard
+        // players set .start start 0`, so a round cannot begin until the bot is in
+        // survival. The reference map's own start sequence flips everyone to survival
+        // before raising the flag (map/start2's `gamemode survival @a`); mirror that here,
+        // otherwise the start write is erased by the very next tick and the bot never
+        // leaves the passive (idle) state.
+        bot.gameMode.changeGameModeForPlayer(GameType.SURVIVAL);
+        // `start` is one of the map's dotted globals: the transformed functions read
+        // `q<N>_start`, so the value must land on the per-instance holder, not on the bot's
+        // personal score (writing `@s` would leave the holder unset and the match would
+        // never start).
+        return this.runQuietly(bot.getBukkitEntity(),
+                "scoreboard players set " + instance.holderPrefix() + "start start 1");
     }
 
     public boolean stop(CommandSender sender) {
@@ -637,7 +663,8 @@ public final class QuantumRuntime {
         boolean ok = true;
         for (QuantumInstance instance : List.copyOf(this.instances.values())) {
             HeroBotPlayer bot = this.instanceBot(instance);
-            ok &= bot != null && this.runQuietly(bot.getBukkitEntity(), "scoreboard players set @s start 0");
+            ok &= bot != null && this.runQuietly(bot.getBukkitEntity(),
+                    "scoreboard players set " + instance.holderPrefix() + "start start 0");
         }
         return ok;
     }
@@ -756,9 +783,12 @@ public final class QuantumRuntime {
                     + " for profile " + bot.profileName() + " (functions=" + result.functions()
                     + ", failures=" + result.failures().size() + ")");
             this.runQuietly(bot.getBukkitEntity(), "function " + instance.initFunction());
-            this.runQuietly(bot.getBukkitEntity(), "scoreboard players set @s mode "
-                    + this.config.getInt("mode", 0));
-            this.runQuietly(bot.getBukkitEntity(), "scoreboard players set @s difficulty "
+            this.runQuietly(bot.getBukkitEntity(), "scoreboard players set "
+                    + instance.holderPrefix() + "mode mode " + this.config.getInt("mode", 0));
+            this.runQuietly(bot.getBukkitEntity(), "scoreboard players set "
+                    + instance.holderPrefix() + "start start 0");
+            this.runQuietly(bot.getBukkitEntity(), "scoreboard players set "
+                    + instance.holderPrefix() + "difficulty difficulty "
                     + this.config.getInt("difficulty", 0));
             this.applyConfiguredBotLoadout(bot);
             this.ensureInstanceTicker();

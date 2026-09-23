@@ -195,7 +195,15 @@ public final class QuantumFunctionRegistry {
         }
         for (QuantumInstance instance : this.instances.values()) {
             for (Map.Entry<Identifier, List<String>> entry : this.sourcePack.functions().entrySet()) {
-                Identifier id = Identifier.fromNamespaceAndPath(instance.namespace(), entry.getKey().getPath());
+                // Include the source namespace in the path. The map ships the same function path
+                // under several namespaces (tick, main_tick, botgear/neth, botgear/dia, …), and
+                // copying every namespace's entries under `qbot_N:<path only>` made them collide —
+                // whichever source namespace the pack loader walked last silently won, so the
+                // bot's `qbot_N:tick` could resolve to stats:tick's body instead of quantum:tick's,
+                // nondeterministically. `qbot_N:<namespace>/<path>` keeps every copy distinct, and
+                // the function-reference rewrite below emits exactly that form.
+                Identifier id = Identifier.fromNamespaceAndPath(instance.namespace(),
+                        entry.getKey().getNamespace() + "/" + entry.getKey().getPath());
                 CompileResult result = compile(dispatcher, compileSource, id, entry.getValue(),
                         new InstanceTransform(instance, sourceNamespaces), failures);
                 if (result.function() != null) {
@@ -204,7 +212,8 @@ public final class QuantumFunctionRegistry {
                 rewritten += result.rewritten();
             }
             List<String> init = instanceInit(this.sourcePack, instance);
-            Identifier initId = Identifier.fromNamespaceAndPath(instance.namespace(), "instance_init");
+            Identifier initId = Identifier.fromNamespaceAndPath(instance.namespace(),
+                    "instance_init");
             CompileResult result = compile(dispatcher, compileSource, initId, init,
                     new InstanceTransform(instance, sourceNamespaces), failures);
             if (result.function() != null) {
@@ -258,7 +267,9 @@ public final class QuantumFunctionRegistry {
                 lines.add("# QuantumRuntime owns QuantumBOT spawning for this instance");
                 continue;
             }
-            if (transform != null && id.getPath().equals("miscellaneous/tags")) {
+            // Instance copies now embed the source namespace in the path (`qbot_N:quantum/…`),
+            // so this legacy helper's instance id is `qbot_N:quantum/miscellaneous/tags`.
+            if (transform != null && id.getPath().equals("quantum/miscellaneous/tags")) {
                 // This legacy helper clears and reassigns the global xlib_* tags. Java already
                 // assigned qtarget_N/qpart_N, so running it would reintroduce cross-instance tags.
                 lines.add("# QuantumRuntime owns per-instance bot and target tags");
@@ -315,7 +326,7 @@ public final class QuantumFunctionRegistry {
             if (entry.getKey().toString().equals("minecraft:tick")
                     || entry.getKey().toString().equals("minecraft:load")) {
                 // The old global entry points are intentionally not put back into the vanilla
-                // tags. QuantumRuntime invokes qbot_N:tick and initializes objectives itself.
+                // tags. QuantumRuntime invokes qbot_N:quantum/tick and initializes objectives itself.
                 continue;
             }
             result.put(entry.getKey(), entry.getValue());
@@ -364,9 +375,16 @@ public final class QuantumFunctionRegistry {
                 }
             }
         }
-        lines.add("scoreboard players set @s mode 0");
-        lines.add("scoreboard players set @s start 0");
-        lines.add("scoreboard players set @s difficulty 0");
+        // mode / start / difficulty are the map's *dotted* pseudo-player globals; the instance
+        // transform rewrites `.mode` → `q<N>_mode` etc., and the (transformed) map functions read
+        // exactly those per-instance holders. Writing them to `@s` would park the value on the
+        // bot's personal score, which nothing reads — so the instance would start with the
+        // holders unset and, e.g., a configured non-zero difficulty would never take effect.
+        // death / resetcd / Health are entity scores the map reads through @s[scores={…}] lives,
+        // so they stay on `@s`.
+        lines.add("scoreboard players set .mode mode 0");
+        lines.add("scoreboard players set .start start 0");
+        lines.add("scoreboard players set .difficulty difficulty 0");
         lines.add("scoreboard players set @s bots 1");
         lines.add("scoreboard players set @s toggles 0");
         lines.add("scoreboard players set @s death 0");
@@ -410,8 +428,12 @@ public final class QuantumFunctionRegistry {
             while (matcher.find()) {
                 String namespace = matcher.group(2);
                 if (this.namespaces.contains(namespace)) {
+                    // Instance copies are keyed by source namespace + path (qbot_N:<ns>/<path>),
+                    // so a rewrite takes the whole `<ns>:` (namespace, colon) prefix and replaces
+                    // it with `qbot_N:<ns>/`, yielding e.g. `function qbot_N:quantum/tick`.
                     matcher.appendReplacement(out,
-                            Matcher.quoteReplacement(matcher.group(1) + this.instance.namespace() + ":"));
+                            Matcher.quoteReplacement(matcher.group(1) + this.instance.namespace()
+                                    + ":" + namespace + "/"));
                 }
             }
             matcher.appendTail(out);
