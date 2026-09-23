@@ -180,6 +180,29 @@ Minecraft の「普段 20TPS なのに突然 1 秒固まる」は、CPU がア�
 
 ---
 
+## 6. 実装状況 (2026-09-23)
+
+フェーズ1〜3相当のうち「Windows のマシン全体設定」を、**ネイティブコードを一切使わず**
+Microsoft 標準ツール `powercfg.exe` への委任として実装した（`/turbo on|off|status`）。
+
+- `src/main/java/com/rumilance/practice/turbo/WindowsOptimizationService.java`
+  - `powercfg -getactivescheme / -duplicatescheme / -setacvalueindex / -setactive` を
+    単一の使い捨て昇格 PowerShell で実行。`config.yml` の `turbo:` セクションで全項目を制御。
+  - 適用項目: `PROCTHROTTLEMIN 100`（P-state 下限）、`CPMINCORES 100`（コアパーキング解除）、
+    `DISTRIBUTEUTIL 0`（低負荷時の全コア分散）、`IDLEDISABLE 1`（深い C-state 回避・任意/電力増）。
+  - **可逆性**: 既定では現在のプランを書き換えず、ベースプラン（既定 Ultimate Performance）を
+    複製して編集・有効化。`/turbo off` で適用前プランへ復元し、IDLEDISABLE を 0 に戻す。
+    複製に失敗した場合は一切書き込まずに中止（オペレーターの現行プランを汚さない）。
+  - **昇格**: サーバー JVM は非昇格のまま。mutation は毎回 `Start-Process -Verb RunAs` で
+    昇格子プロセスに閉じ込め、初回に UAC を 1 回だけ出す。各呼び出しはタイムアウト付きで
+    メインスレッド外で実行。
+- `src/main/java/com/rumilance/practice/turbo/TurboCommand.java` — コマンド実体（`rumilance.admin`）。
+- 未実装（残る設計上の宿題）：Linux 側の governor/HugeTLB/isolcpus、Rust `cdylib` による
+  スレッド親和性ピン・`/dev/cpu_dma_latency` 保持。これらは別 OS・別配布物になるため、
+  本リポジトリの Gradle ビルドには同梱していない。
+
+---
+
 ## 参考文献
 
 - Li, Sharma, Ports, Gribble. *Tales of the Tail: Hardware, OS, and Application-level Sources of
