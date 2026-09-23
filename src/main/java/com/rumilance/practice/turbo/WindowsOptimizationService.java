@@ -3,8 +3,14 @@ package com.rumilance.practice.turbo;
 import com.rumilance.practice.PluginIdentity;
 import com.rumilance.practice.config.ConfigService;
 import com.rumilance.practice.util.AsyncExecutor;
+import com.rumilance.practice.util.TickHealth;
+import net.kyori.adventure.text.Component;
+import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scoreboard.Criteria;
+import org.bukkit.scoreboard.Objective;
+import org.bukkit.scoreboard.Scoreboard;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -213,6 +219,12 @@ if ($ok) { Write-Output 'ECO:OK' } else { Write-Output 'ECO:FAIL' }
     private volatile boolean runtimeApplied;
     private volatile boolean ecoThrottled;
 
+    /** Tick-health triage: mirrors sampled-tick health into a dummy scoreboard objective. */
+    private static final String SAMETICK_OBJECTIVE = "rTickHealth";
+    private static final String SAMETICK_PLAYER = "narena_sametick";
+    private static final int MAX_TAGS = 5;
+    private volatile int sameTickLevel;
+
     public WindowsOptimizationService(JavaPlugin plugin, AsyncExecutor asyncExecutor,
                                       ConfigService configService) {
         this.plugin = plugin;
@@ -313,6 +325,70 @@ if ($ok) { Write-Output 'ECO:OK' } else { Write-Output 'ECO:FAIL' }
 
     public CompletableFuture<Boolean> setEcoQosAsync(boolean throttle) {
         return asyncExecutor.supplyAsync(() -> setEcoQosBlocking(throttle));
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Tick-health triage (root-level load shedding)
+    // ---------------------------------------------------------------------------------------------
+
+    /**
+     * Returns the current sampled-tick health in percent (100 = a tick under 50ms, floor at 0).
+     * Optional integration point: safe ignition and round scheduling can refuse to start new work
+     * while this is low, keeping the server thread light under stress instead of stalling ditches.
+     */
+    public int tickHealthPercent() {
+        long lastTick = TickHealth.lastTickNanos();
+        if (lastTick > 0) {
+            double ms = lastTick / 1.0e6;
+            double pct = (50.0 / ms) * 100.0;
+            if (pct < 0) {
+                return 0;
+            }
+            if (pct > 100) {
+                return 100;
+            }
+            return (int) Math.round(pct);
+        }
+        return 100;
+    }
+
+    /**
+     * Reflects the current tick health into a main-scoreboard dummy objective, readable from any
+     * datapack / command block via
+     * {@code execute if score narena_sametick rTickHealth matches ..4 run ...}.
+     * The store is blocked behind a one-integer bucket comparison, so in steady state a tick costs
+     * nothing beyond reading the cached {@link TickHealth} volatile and an int compare — no
+     * allocation, no score writes, no spawn, no tick request.
+     */
+    public void gaugeTickHealth() {
+        if (!configService.config().getBoolean("turbo.safe-tick.enabled", true)) {
+            if (sameTickLevel != 0) {
+                applySameTick(0);
+                sameTickLevel = 0;
+            }
+            return;
+        }
+        int percent = tickHealthPercent();
+        int level = (percent + 24) / 25;              // 1..4 buckets
+        level = Math.max(1, Math.min(MAX_TAGS - 1, level));
+        if (level != sameTickLevel) {
+            applySameTick(level);
+            sameTickLevel = level;
+        }
+    }
+
+    private void applySameTick(int level) {
+        try {
+            Scoreboard board = Bukkit.getScoreboardManager().getMainScoreboard();
+            Objective objective = board.getObjective(SAMETICK_OBJECTIVE);
+            if (objective == null) {
+                objective = board.registerNewObjective(SAMETICK_OBJECTIVE, Criteria.DUMMY,
+                        Component.empty());
+            }
+            objective.getScore(SAMETICK_PLAYER).setScore(level);
+        } catch (RuntimeException ignored) {
+            // SDK safety-net: rooms, skids, or a scoreboard manager that failed to load.
+        }
     }
 
     // ---------------------------------------------------------------------------------------------

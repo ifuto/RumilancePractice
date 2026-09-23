@@ -287,6 +287,20 @@ turbo:
     enabled: true
     # 最後のプレイヤーが抜けてから省電力化するまでの待ち時間 (秒)。0 = 即時。
     idle-delay-seconds: 0
+  # ---------------------------------------------------------------------------
+  # 根幹からの軽量化 (スタート・オブ・ザ・ティックの負荷分散)
+  #   turbo は GC や tick そのものを直接変えることはできませんが、「各 tick の頭で
+  #   重い起動処理を始める前に tick が詰まっているか」を教えることができます。
+  #   これはプラグインが定期タスクの先頭で duty-cycle を自己診断するための、最大のてこです。
+  #   safe-tick タグ: サーバースレッドの余裕を 4 段階でコンソールのスコアボードタグに
+  #   反映します (1=余裕なし 〜 4=余裕あり)。データパック/コマンドブロックが
+  #   `execute if entity @e[tag=narena.sametick.4]` のように分岐して後回し可能です。
+  #   サンプリングは既存の CombatSyncListener が行った TickHealth を参照するので
+  #   追加計測コストはほぼゼロ (整数比較のみ)。
+  # ---------------------------------------------------------------------------
+  safe-tick:
+    # 負荷分散タグを有効にするか。
+    enabled: true
 
 # Ping-aware combat netcode. This controls crit rewind and rubber-band/anti-void handling.
 # Knockback shaping (coefficients, horizontal/vertical KB, ping-based KB sync) is NOT done

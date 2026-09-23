@@ -1424,6 +1424,11 @@ public final class FeatureBootstrap {
         pm.registerEvents(turboIdle, plugin);
         services.register(com.rumilance.practice.turbo.TurboIdleManager.class, turboIdle);
 
+        // Root-level load shedding: mirror sampled-tick health into console scoreboard tags so
+        // datapacks/command blocks can shed work while the duty cycle is stuck deep.
+        pm.registerEvents(new com.rumilance.practice.turbo.TurboTickGauge(
+                services.get(com.rumilance.practice.turbo.WindowsOptimizationService.class)), plugin);
+
         pm.registerEvents(new com.rumilance.practice.replay.ReplayControlListener(replayService), plugin);
         pm.registerEvents(new BanLoginListener(banService), plugin);
         pm.registerEvents(new com.rumilance.practice.listener.ChatBanGuardListener(chatBanService), plugin);
