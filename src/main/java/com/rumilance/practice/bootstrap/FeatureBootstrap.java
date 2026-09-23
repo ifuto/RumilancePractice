@@ -298,6 +298,8 @@ public final class FeatureBootstrap {
         WindowsOptimizationService turboService =
                 new WindowsOptimizationService(plugin, asyncExecutor, configService);
         services.register(WindowsOptimizationService.class, turboService);
+        services.register(com.rumilance.practice.turbo.JvmGcService.class,
+                new com.rumilance.practice.turbo.JvmGcService());
 
         RuntimeFlags runtimeFlags = new RuntimeFlags(settings.maintenanceMode());
         services.register(RuntimeFlags.class, runtimeFlags);
@@ -1738,7 +1740,8 @@ public final class FeatureBootstrap {
         bind("setlobbyitem", practiceAdmin);
         bind("rumireload", new RumilanceReloadCommand(services));
         bind("turbo", new com.rumilance.practice.turbo.TurboCommand(
-                plugin, services.get(com.rumilance.practice.turbo.WindowsOptimizationService.class)));
+                plugin, services.get(com.rumilance.practice.turbo.WindowsOptimizationService.class),
+                services.get(com.rumilance.practice.turbo.JvmGcService.class)));
         bind("rankicon", new com.rumilance.practice.command.RankIconCommand(services));
         bind("arena", arenaKitAdmin);
         bind("kit", arenaKitAdmin);

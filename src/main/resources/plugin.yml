@@ -264,8 +264,8 @@ commands:
     usage: /rumireload
     permission: rumilance.admin
   turbo:
-    description: Windows system-level optimization (power plan, core parking) via powercfg; UAC prompt on first use.
-    usage: /turbo <on|off|status>
+    description: Windows system-level optimization (power plan, core parking, auto idle) and JVM/GC diagnostics.
+    usage: /turbo <on|off|status|jvm|make-start>
     permission: rumilance.admin
   rankicon:
     description: Diagnose resource-pack rank icons (client pack state, icon render test).

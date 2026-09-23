@@ -209,6 +209,16 @@ Microsoft 標準ツール `powercfg.exe` への委任として実装した（`/t
     UAC ダイアログを出すことはない。
 - `src/main/java/com/rumilance/practice/turbo/TurboCommand.java` — コマンド実体（`rumilance.admin`）。
   `status` に EcoQoS / 自動切替の状態も表示。
+- JVM/GC 層（GC 起因のカクつき＝大フリーズ対策）は起動時に決まるため、プラグインは
+  診断＋起動スクリプト生成を担う:
+  - `src/main/java/com/rumilance/practice/turbo/JvmGcService.java` — JDK MBean で GC 種別・
+    ヒープ使用/上限・起動引数を読み取り、**低停止GC(ZGC)未使用・ヒープ上下限未固定**を検出。
+  - `/turbo jvm` で現状診断、`/turbo make-start` で「`-Xms=-Xmx`（現行ヒープ値から算出）+
+    ZGC + ZGenerational + GCスレッド自動割当 + AlwaysPreTouch」の `start.bat` を
+    `plugins/n-arena/` へ生成。**実行中は自分の GC を変えられない**ので、このスクリプトで
+    再起動して初めて低停止 GC が効く。
+  - ホットパスのアロケーション削減（GC 回数そのものの削減）は、まず計測基盤（GC ログ/
+    Spark）を回して from/to を揃えて測る作業が前提で、本コミットの範囲では未実施。
 - 未実装（残る設計上の宿題）：Linux 側の governor/HugeTLB/isolcpus、Rust `cdylib` による
   スレッド親和性ピン・`/dev/cpu_dma_latency` 保持。これらは別 OS・別配布物になるため、
   本リポジトリの Gradle ビルドには同梱していない。
