@@ -31,6 +31,15 @@ import java.util.Locale;
  */
 public final class JvmGcService {
 
+    /** Values for {@code turbo.jvm.gc-mode}. */
+    public static final String GC_MODE_AUTO = "auto";
+    public static final String GC_MODE_G1 = "g1";
+    public static final String GC_MODE_ZGC = "zgc";
+
+    /** Which collector {@code /turbo make-start} should emit, and why. */
+    public record ModeDecision(String mode, String reason) {
+    }
+
     /** Diagnostic snapshot of the running JVM's GC/heap state. */
     public record Report(
             String vmName,
@@ -44,7 +53,9 @@ public final class JvmGcService {
             boolean zgc,
             boolean shenandoah,
             boolean heapFixed,
-            List<String> recommendations
+            List<String> recommendations,
+            String recommendedGcMode,
+            String recommendedGcModeReason
     ) {
     }
 
@@ -83,8 +94,9 @@ public final class JvmGcService {
         boolean hasMaxFlag = args.contains("-Xmx");
         boolean explicitlyFixed = hasMinFlag && hasMaxFlag;
 
+        ModeDecision decision = modeDecision(memoryBean, osBean);
         List<String> recommendations = buildRecommendations(
-                zgc, shenandoah, explicitlyFixed, heap, collectorSummary.toString());
+                zgc, explicitlyFixed, heap, collectorSummary.toString(), decision);
 
         return new Report(
                 runtimeBean.getVmName(),
@@ -98,25 +110,67 @@ public final class JvmGcService {
                 zgc,
                 shenandoah,
                 explicitlyFixed,
-                List.copyOf(recommendations));
+                List.copyOf(recommendations),
+                decision.mode(),
+                decision.reason());
     }
 
-    private static List<String> buildRecommendations(boolean zgc, boolean shenandoah,
+    /**
+     * Chooses the collector for a restart based on the host's real resources — the one number the
+     * current JVM already knows without touching any OS. Small CPUs and modest heaps get G1
+     * (Aikar flags), because ZGC's concurrent GC threads and 15-30% memory overhead make it
+     * LAGGIER, not better, there. Big hosts (many cores plus a large configured heap) get
+     * Generational ZGC, where sub-millisecond pauses are strictly better.
+     */
+    public static ModeDecision modeDecision(MemoryMXBean memoryBean, OperatingSystemMXBean osBean) {
+        long max = memoryBean.getHeapMemoryUsage().getMax();
+        long maxGb = max > 0 ? max >> 30 : 0;
+        int cpus = osBean.getAvailableProcessors();
+        int feature = Runtime.version().feature();
+        if (feature >= 21 && cpus >= 6 && maxGb >= 14) {
+            return new ModeDecision(GC_MODE_ZGC,
+                    "CPU 6コア以上 + ヒープ14GB以上 → 世代別ZGC (フルGC並行で停止 <1ms)");
+        }
+        return new ModeDecision(GC_MODE_G1,
+                "CPU/ヒープの余裕が限定的 (現状 " + cpus + "コア / ヒープ "
+                        + (max > 0 ? maxGb + "GB" : "不明") + ") → G1 (Aikar)");
+    }
+
+    /**
+     * Resolves the configured {@code turbo.jvm.gc-mode} into a concrete decision. {@code auto}
+     * falls back to {@link #modeDecision} using the current host's resources; {@code g1} and
+     * {@code zgc} force the choice so the operator can override even against the heuristic.
+     */
+    public ModeDecision modeDecisionFromConfig(String configured) {
+        String mode = configured == null || configured.isBlank() ? "auto" : configured.toLowerCase(Locale.ROOT);
+        switch (mode) {
+            case "zgc", "z" -> {
+                return new ModeDecision(GC_MODE_ZGC, "config で zgc が明示指定されています。");
+            }
+            case "g1", "g" -> {
+                return new ModeDecision(GC_MODE_G1, "config で g1 が明示指定されています。");
+            }
+            default -> {
+                return modeDecision(memoryBean, osBean);
+            }
+        }
+    }
+
+    private static List<String> buildRecommendations(boolean zgc,
                                                      boolean explicitlyFixed,
                                                      MemoryUsage heap,
-                                                     String collectorSummary) {
+                                                     String collectorSummary,
+                                                     ModeDecision decision) {
         List<String> out = new ArrayList<>();
-        if (!zgc && !shenandoah) {
-            out.add("低停止GCが未使用です (現在: " + collectorSummary.trim() + ")。"
-                    + "ZGC に切り替えると GC によるカクつき(フリーズ)がほぼ見えなくなります。"
-                    + "プラグインは実行中のGCを変更できないため /turbo make-start で生成した"
-                    + " start.bat から再起動してください。");
-        } else if (shenandoah) {
-            out.add("Shenandoah が有効です。Windows では ZGC の方が実績が多いため、"
-                    + "/turbo make-start の ZGC 版も検討できます。");
+        if (zgc) {
+            out.add("ZGC が有効です。フルGC起因の大フリーズはほぼ抑えられています。"
+                    + "ただし CPU/メモリの余裕が無い場合は並行スレッド分が重くなるため、"
+                    + " /turbo jvm の推奨モードを確認してください。");
         } else {
-            out.add("ZGC が有効です。フルGC起因の大フリーズはほぼ抑えられています。");
+            out.add("現在は " + collectorSummary.trim() + " です。");
         }
+        out.add("推奨GCモード: " + (decision.mode().equals(GC_MODE_ZGC) ? "ZGC" : "G1")
+                + " — " + decision.reason());
         if (!explicitlyFixed) {
             out.add("ヒープ上下限 (-Xms / -Xmx) が固定されていません。起動直後のヒープ拡張が"
                     + "ティックを揺らすので、生成 start.bat のように両方を同じ値に固定してください。");
@@ -129,19 +183,49 @@ public final class JvmGcService {
     }
 
     /**
-     * Generates a Windows {@code start.bat} for a low-pause restart. The heap size is a single
-     * variable at the top of the file — the operator edits {@code HEAP} there and leaves the rest
-     * of the benchmarked flags alone.
+     * Generates a Windows {@code start.bat} sized to the CURRENT {@code -Xmx} (fallen back to
+     * 4G). The heap is a single variable at the top of the file for the operator to edit, and the
+     * collector follows {@code mode}:
      *
-     * <p>Defaults to ZGC: generational ZGC where the running JVM supports it ({@code -XX:+UseZGC
-     * -XX:+ZGenerational} on JDK 21/22; JDK 23+ is generational by default, so the flag is dropped
-     * to keep the log clean; pre-21 gets plain single-generation ZGC because {@code ZGenerational}
-     * does not exist there and would abort startup). That keeps full-GC freezes concurrent by
-     * design, plus a fixed heap, pre-touching ({@code AlwaysPreTouch}), and
-     * {@code -XX:SoftRefLRUPolicyMSPerMB=0} so soft caches (class metadata, code cache) are
-     * reclaimed at the next minor cycle instead of carrying into a full GC.</p>
+     * <ul>
+     *   <li><b>{@link #GC_MODE_G1}</b> — G1 with Aikar-style flags. Light on CPU and ~15-30% less
+     *       memory than ZGC, the right choice on limited hosts (few cores, modest RAM) where ZGC's
+     *       concurrent threads would compete with the server thread.</li>
+     *   <li><b>{@link #GC_MODE_ZGC}</b> — Generational ZGC (emitting {@code -XX:+ZGenerational}
+     *       on JDK 21/22, dropping it on 23+ where it is the default) for low-pause operation on
+     *       hosts with spare cores and a large heap.</li>
+     * </ul>
      */
-    public String startScriptText() {
+    public String startScriptText(String mode) {
+        if (mode == null) {
+            mode = GC_MODE_G1;
+        }
+        boolean useZgc = GC_MODE_ZGC.equalsIgnoreCase(mode);
+        return useZgc ? buildZgcScript() : buildG1Script();
+    }
+
+    private String buildG1Script() {
+        return commonHeader()
+                + "java -Xms%HEAP% -Xmx%HEAP% -XX:+UseG1GC"
+                + " -XX:+ParallelRefProcEnabled"
+                + " -XX:MaxGCPauseMillis=130"
+                + " -XX:+UnlockExperimentalVMOptions"
+                + " -XX:+DisableExplicitGC"
+                + " -XX:+AlwaysPreTouch"
+                + " -XX:G1NewSizePercent=28"
+                + " -XX:G1MaxNewSizePercent=40"
+                + " -XX:G1HeapRegionSize=16M"
+                + " -XX:G1ReservePercent=20"
+                + " -XX:G1MixedGCCountTarget=10"
+                + " -XX:G1MixedGCLiveThresholdPercent=65"
+                + " -XX:InitiatingHeapOccupancyPercent=38"
+                + " -XX:SurvivorRatio=32"
+                + " -XX:+PerfDisableSharedMem"
+                + " -Dfile.encoding=UTF-8 -jar %JAR% nogui\r\n"
+                + "pause\r\n";
+    }
+
+    private String buildZgcScript() {
         long maxBytes = memoryBean.getHeapMemoryUsage().getMax();
         String gb;
         if (maxBytes > 0) {
@@ -152,26 +236,42 @@ public final class JvmGcService {
         int processors = osBean.getAvailableProcessors();
         int concGc = Math.max(1, processors / 4);
         int parallelGc = Math.max(2, processors / 2);
-        String jar = "paper.jar";
-        // Generational ZGC: required on JDK 21/22, the (silent) default on 23+, and nonexistent
-        // before 21 — emitting it on a too-old JVM would make java refuse to start entirely.
         int feature = Runtime.version().feature();
         String zGenerational = (feature >= 21 && feature <= 22) ? " -XX:+ZGenerational" : "";
-        return "@echo off\r\n"
+        String header = "@echo off\r\n"
                 + "rem ==== N Arena optimized start script (generated by /turbo make-start) ====\r\n"
                 + "rem  1) MEMORY: edit the value below — keep -Xms and -Xmx EQUAL\r\n"
-                + "rem     (a fixed heap stops the JVM from resizing it mid-fight).\r\n"
                 + "set HEAP=" + gb + "\r\n"
                 + "rem  2) JAR: point this at your actual server jar if it is not paper.jar\r\n"
-                + "set JAR=" + jar + "\r\n"
-                + "rem  3) Leave the flags below alone — they are the low-pause / no-stutter tune.\r\n"
-                + "chcp 65001 >nul\r\n"
+                + "set JAR=paper.jar\r\n"
+                + "rem  3) Collector here is Generational ZGC — leave the flags alone.\r\n"
+                + "chcp 65001 >nul\r\n";
+        return header
                 + "java -Xms%HEAP% -Xmx%HEAP% -XX:+UseZGC" + zGenerational
                 + " -XX:ConcGCThreads=" + concGc
                 + " -XX:ParallelGCThreads=" + parallelGc
                 + " -XX:+AlwaysPreTouch -XX:+PerfDisableSharedMem"
                 + " -XX:SoftRefLRUPolicyMSPerMB=0 -Dfile.encoding=UTF-8 -jar %JAR% nogui\r\n"
                 + "pause\r\n";
+    }
+
+    /** Shared top-of-file for the generated {@code start.bat} with a user-editable heap. */
+    private String commonHeader() {
+        long maxBytes = memoryBean.getHeapMemoryUsage().getMax();
+        String gb;
+        if (maxBytes > 0) {
+            gb = String.format(Locale.ROOT, "%.1f", maxBytes / 1073741824.0).replace(".0", "") + "G";
+        } else {
+            gb = "4G";
+        }
+        return "@echo off\r\n"
+                + "rem ==== N Arena optimized start script (generated by /turbo make-start) ====\r\n"
+                + "rem  1) MEMORY: edit the value below — keep -Xms and -Xmx EQUAL\r\n"
+                + "set HEAP=" + gb + "\r\n"
+                + "rem  2) JAR: point this at your actual server jar if it is not paper.jar\r\n"
+                + "set JAR=paper.jar\r\n"
+                + "rem  3) Collector here is G1 (Aikar-style) — light on this host. Leave the flags.\r\n"
+                + "chcp 65001 >nul\r\n";
     }
 
     // ---------------------------------------------------------------------------------------------

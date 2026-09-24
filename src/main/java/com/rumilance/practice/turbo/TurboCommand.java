@@ -167,6 +167,8 @@ public final class TurboCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("GCモード: " + (report.zgc() ? "ZGC(低停止) " : "")
                         + (report.shenandoah() ? "Shenandoah(低停止)" : ""),
                 NamedTextColor.WHITE));
+        sender.sendMessage(Component.text("推奨GC: " + report.recommendedGcMode(), NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("  理由: " + report.recommendedGcModeReason(), NamedTextColor.GRAY));
         if (!report.jvmArgs().isEmpty()) {
             sender.sendMessage(Component.text("起動引数: " + String.join(" ", report.jvmArgs()),
                     NamedTextColor.GRAY));
@@ -175,22 +177,27 @@ public final class TurboCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(Component.text("→ " + recommendation, NamedTextColor.YELLOW));
         }
         sender.sendMessage(Component.text(
-                "低停止GC化には再起動が必要です: /turbo make-start が最適化済み start.bat を plugins/n-arena/ に生成します。",
+                "再起動には /turbo make-start が最適化済み start.bat を plugins/n-arena/ に生成します。",
                 NamedTextColor.GRAY));
     }
 
     private void writeStartScript(CommandSender sender) {
-        String text = jvmGc.startScriptText();
+        String configured = plugin.getConfig().getString("turbo.jvm.gc-mode", "auto");
+        JvmGcService.ModeDecision decision = jvmGc.modeDecisionFromConfig(configured);
+        String text = jvmGc.startScriptText(decision.mode());
         java.io.File dataFolder = com.rumilance.practice.PluginIdentity.dataFolder(plugin);
         java.io.File out = new java.io.File(dataFolder, "start.bat");
         try {
             java.nio.file.Files.writeString(out.toPath(), text, java.nio.charset.StandardCharsets.UTF_8);
             sender.sendMessage(Component.text("最適化済み起動スクリプトを生成しました: "
                     + out.getAbsolutePath(), NamedTextColor.GREEN));
-        sender.sendMessage(Component.text(
-                "内容: ZGC(低停止GC) + ヒープサイズを冒頭の set HEAP= に分離 (あなたが編集) + "
-                        + "GCスレッド自動割当。",
-                NamedTextColor.WHITE));
+            sender.sendMessage(Component.text(
+                    "GCモード: " + (JvmGcService.GC_MODE_ZGC.equals(decision.mode()) ? "Generational ZGC (低停止)"
+                            : "G1 (Aikar風・軽量)") + " — " + decision.reason(),
+                    NamedTextColor.WHITE));
+            sender.sendMessage(Component.text(
+                    "ヒープサイズは冒頭の set HEAP= に分離してあります (あなたが編集、-Xms=-Xmx は同値で)。",
+                    NamedTextColor.GRAY));
             sender.sendMessage(Component.text(
                     "使い方: サーバーを /stop で落とし、上記 start.bat を paper.jar と同じ階層へ置いて"
                             + " jar 名を合わせ、start.bat から再起動してください。",
@@ -215,7 +222,7 @@ public final class TurboCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("/" + label + " off     - 元の電源プランへ戻して解除。", NamedTextColor.WHITE));
         sender.sendMessage(Component.text("/" + label + " status  - 現在の状態 (プラン/省電力) を表示。", NamedTextColor.WHITE));
         sender.sendMessage(Component.text("/" + label + " jvm     - GC/ヒープの現状診断と改善提案。", NamedTextColor.WHITE));
-        sender.sendMessage(Component.text("/" + label + " make-start - 低停止GC(ZGC)+ヒープ固定の start.bat を生成。", NamedTextColor.WHITE));
+        sender.sendMessage(Component.text("/" + label + " make-start - start.bat を生成 (turbo.jvm.gc-mode: auto=今のマシンに最適なGCを自動選択)。", NamedTextColor.WHITE));
         sender.sendMessage(Component.text(
                 "自動切替: turbo.auto.enabled: true なら「最後の人が抜けたら省電力化、人が来たら即フルパワー復帰」。",
                 NamedTextColor.GRAY));
