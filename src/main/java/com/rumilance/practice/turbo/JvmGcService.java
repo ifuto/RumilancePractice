@@ -208,18 +208,29 @@ public final class JvmGcService {
         return commonHeader()
                 + "java -Xms%HEAP% -Xmx%HEAP% -XX:+UseG1GC"
                 + " -XX:+ParallelRefProcEnabled"
-                + " -XX:MaxGCPauseMillis=130"
+                + " -XX:MaxGCPauseMillis=200"
                 + " -XX:+UnlockExperimentalVMOptions"
-                + " -XX:+DisableExplicitGC"
+                // ExplicitGCInvokesConcurrent (NOT DisableExplicitGC): the plugin's pressure/idle
+                // System.gc() must keep working, but tun it as a concurrent cycle so it never
+                // becomes a multi-second stop-the-world full GC.
+                + " -XX:+ExplicitGCInvokesConcurrent"
                 + " -XX:+AlwaysPreTouch"
-                + " -XX:G1NewSizePercent=28"
+                // Young gen is kept large and collected often: most Minecraft objects die young,
+                // so cheap young-only pauses soak up the garbage before it reaches old gen.
+                + " -XX:G1NewSizePercent=30"
                 + " -XX:G1MaxNewSizePercent=40"
-                + " -XX:G1HeapRegionSize=16M"
+                + " -XX:G1HeapRegionSize=8M"
                 + " -XX:G1ReservePercent=20"
-                + " -XX:G1MixedGCCountTarget=10"
-                + " -XX:G1MixedGCLiveThresholdPercent=65"
-                + " -XX:InitiatingHeapOccupancyPercent=38"
+                + " -XX:G1HeapWastePercent=5"
+                // Split old-gen cleanup across several short mixed cycles (frequent + small)
+                // instead of one giant pause, and start concurrent marking at 15% old-gen (not the
+                // 45% default) so the full-GC fallback is never reached.
+                + " -XX:G1MixedGCCountTarget=4"
+                + " -XX:G1MixedGCLiveThresholdPercent=90"
+                + " -XX:G1RSetUpdatingPauseTimePercent=5"
+                + " -XX:InitiatingHeapOccupancyPercent=15"
                 + " -XX:SurvivorRatio=32"
+                + " -XX:MaxTenuringThreshold=1"
                 + " -XX:+PerfDisableSharedMem"
                 + " -Dfile.encoding=UTF-8 -jar %JAR% nogui\r\n"
                 + "pause\r\n";
