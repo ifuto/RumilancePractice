@@ -208,7 +208,10 @@ public final class JvmGcService {
         return commonHeader()
                 + "java -Xms%HEAP% -Xmx%HEAP% -XX:+UseG1GC"
                 + " -XX:+ParallelRefProcEnabled"
-                + " -XX:MaxGCPauseMillis=200"
+                // Latency-first: keep individual stop-the-world pauses short even if they happen
+                // slightly more often. 130 vs the Aikar 200 buys a crisper PvP tick at the cost
+                // of a bit more collection frequency — the soft target G1 shapes young gen around.
+                + " -XX:MaxGCPauseMillis=130"
                 + " -XX:+UnlockExperimentalVMOptions"
                 // ExplicitGCInvokesConcurrent (NOT DisableExplicitGC): the plugin's pressure/idle
                 // System.gc() must keep working, but tun it as a concurrent cycle so it never
@@ -259,6 +262,10 @@ public final class JvmGcService {
                 + "chcp 65001 >nul\r\n";
         return header
                 + "java -Xms%HEAP% -Xmx%HEAP% -XX:+UseZGC" + zGenerational
+                // Dynamic GC threads (JDK 17+): scale concurrent workers up/down instead of
+                // keeping {ConcGCThreads} busy at all times. ZGC is the "server stays running
+                // during GC" collector — this keeps it from stealing CPU while doing it.
+                + " -XX:+UseDynamicNumberOfGCThreads"
                 + " -XX:ConcGCThreads=" + concGc
                 + " -XX:ParallelGCThreads=" + parallelGc
                 + " -XX:+AlwaysPreTouch -XX:+PerfDisableSharedMem"
