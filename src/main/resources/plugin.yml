@@ -200,6 +200,11 @@ commands:
     usage: /team <gui|create|invite|join|decline|leave|kick|public|list|info|side|autosplit|clearsides|start|disband>
     aliases: [party, p]
     permission: rumilance.user
+  tournament:
+    description: Party color-team tournament — bracket over the party's assigned sides (owner only).
+    usage: /tournament <start|info|cancel>
+    aliases: [tourney]
+    permission: rumilance.user
   title:
     description: Open the kill/win title selector.
     usage: /title

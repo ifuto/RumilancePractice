@@ -218,6 +218,18 @@ public final class MatchService {
         this.playerPlacedBlocks = playerPlacedBlocks;
     }
 
+    /**
+     * Optional tournament completion callback. When set, every match whose
+     * {@link MatchSession#tournamentTag()} is non-null reports its outcome (winner, draw, or
+     * no-result failure) back to the tournament instead of being silently cleaned up. Regular
+     * matches never carry the tag, so this callback stays a no-op for them.
+     */
+    private com.rumilance.practice.tournament.PartyTournamentHook tournamentHook;
+
+    public void setTournamentHook(com.rumilance.practice.tournament.PartyTournamentHook tournamentHook) {
+        this.tournamentHook = tournamentHook;
+    }
+
     private volatile TeamColoredArmorService teamColoredArmorService;
     private volatile TeamService teamService;
     private volatile TabVisibilityService tabVisibilityService;
@@ -799,6 +811,21 @@ public final class MatchService {
                                Map<TeamColor, String> teamKits,
                                Map<TeamColor, com.rumilance.practice.team.TeamConfig> teamConfigs,
                                com.rumilance.practice.team.OriginalKitRef originalKit) {
+        startTeamMatch(rosters, kitId, mode, bestOf, partyArenaName, friendlyFire,
+                carrySeriesWins, carryArenaInstanceId, teamKits, teamConfigs, originalKit, null);
+    }
+
+    /**
+     * Terminal roster start. {@code tournamentTag} (nullable) marks this match as a card of a
+     * running tournament so the outcome is reported back to the tournament hook.
+     */
+    public void startTeamMatch(List<List<UUID>> rosters, String kitId, MatchMode mode, int bestOf,
+                               String partyArenaName, boolean friendlyFire,
+                               Map<UUID, Integer> carrySeriesWins, UUID carryArenaInstanceId,
+                               Map<TeamColor, String> teamKits,
+                               Map<TeamColor, com.rumilance.practice.team.TeamConfig> teamConfigs,
+                               com.rumilance.practice.team.OriginalKitRef originalKit,
+                               String tournamentTag) {
         if (rosters == null || rosters.size() < 2 || rosters.size() > TeamColor.MAX_TEAMS) {
             return;
         }
@@ -863,6 +890,9 @@ public final class MatchService {
             teamConfigs.forEach(session::setTeamConfig);
         }
         session.setOriginalKitRef(originalKit);
+        if (tournamentTag != null && !tournamentTag.isBlank()) {
+            session.setTournamentTag(tournamentTag);
+        }
         if (partyArenaName != null && !partyArenaName.isBlank()
                 && !"random".equalsIgnoreCase(partyArenaName)) {
             session.setPreferredArenaName(partyArenaName);
@@ -2128,6 +2158,7 @@ public final class MatchService {
         if (spectatorService != null) {
             spectatorService.clearMatch(session.id());
         }
+        reportTournamentFailure(session);
         for (UUID id : session.participants()) {
             Player p = Bukkit.getPlayer(id);
             if (p != null) {
@@ -2178,6 +2209,39 @@ public final class MatchService {
                     + (session.isDisconnectForfeit() ? " (disconnect forfeit)" : ""));
         } catch (RuntimeException ignored) {
             // Logging must never break the match flow.
+        }
+    }
+
+    /**
+     * Forward a finished tournament card to the tournament hook. Guards every failure mode
+     * (no hook, no tag) so it can never disturb a normal match. Only cards carrying a
+     * tournament tag are reported.
+     */
+    private void reportTournamentOutcome(MatchSession session, UUID winnerId, boolean draw) {
+        if (tournamentHook == null || session.tournamentTag() == null) {
+            return;
+        }
+        try {
+            TeamColor winner = null;
+            if (!draw && winnerId != null && session.isTeamMatch()) {
+                winner = session.teamColor(winnerId);
+            }
+            tournamentHook.completeMatch(session.tournamentTag(), session.id(), winner, draw);
+        } catch (RuntimeException ignored) {
+            // Tournament bookkeeping must never break the match flow.
+        }
+    }
+
+    /** A tournament card that never properly started/finished - hand it back to be cleared. */
+    private void reportTournamentFailure(MatchSession session) {
+        if (tournamentHook == null || session.tournamentTag() == null) {
+            return;
+        }
+        try {
+            tournamentHook.matchFailed(session.tournamentTag(),
+                    new java.util.HashSet<>(session.participants()));
+        } catch (RuntimeException ignored) {
+            // Tournament bookkeeping must never break the fail/cancel flow.
         }
     }
 
@@ -2262,7 +2326,8 @@ public final class MatchService {
                 soundService.play(player, "match-end-anvil");
             }
             // Disconnect forfeits skip the rematch offer entirely — the opponent is gone.
-            if (!session.isDisconnectForfeit()) {
+            // Tournament cards never offer a rematch: the bracket decides the next opponent.
+            if (!session.isDisconnectForfeit() && session.tournamentTag() == null) {
                 giveRematchItems(player, session);
             }
             recentMatch.put(id, session.id());
@@ -2294,6 +2359,10 @@ public final class MatchService {
             // Replay capture must never break match end.
         }
         recordHistory(session);
+        // Tournament card finished: report the winner/draw so the bracket can advance. Runs
+        // after recordHistory but before the rematch-window bookkeeping so the losers never get
+        // a rematch offer they cannot use inside a tournament. The hook handles null/no-tag.
+        reportTournamentOutcome(session, winnerId, draw);
 
         MatchResultProcessor processor = switch (session.mode()) {
             case RANKED -> rankedResultProcessor;
@@ -2308,13 +2377,34 @@ public final class MatchService {
             }
         });
 
+        // Tournament cards never offer a rematch: settle on the very next tick so the bracket
+        // rolls straight into the next card (better pacing than waiting out the rematch window).
+        long settleDelay = session.tournamentTag() != null ? 1L : rematchSeconds * 20L;
         BukkitTask rematchTimeout = Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (session.bothRematchRequested()) {
                 return;
             }
             returnPlayersToLobby(session);
-        }, rematchSeconds * 20L);
+            settleTournament(session);
+        }, settleDelay);
         tasks.put(session.id(), rematchTimeout);
+    }
+
+    /**
+     * Called at the moment a finished match is fully settled and its players have been sent
+     * back to the lobby (the rematch window expired) — the tournament hook's signal to
+     * advance the bracket. Deferred to this exact point so the tournament never races the
+     * state machine's ENDING→LOBBY transition or a pending rematch.
+     */
+    private void settleTournament(MatchSession session) {
+        if (tournamentHook == null || session.tournamentTag() == null) {
+            return;
+        }
+        try {
+            tournamentHook.settled(session.tournamentTag(), session.id());
+        } catch (RuntimeException ignored) {
+            // Tournament bookkeeping must never break the lobby return.
+        }
     }
 
     /**
@@ -2385,6 +2475,10 @@ public final class MatchService {
             }
             if (session.isDisconnectForfeit()) {
                 // A forfeit win never offers a rematch: the loser left the server.
+                return;
+            }
+            if (session.tournamentTag() != null) {
+                // Tournament cards advance the bracket instead of re-fighting.
                 return;
             }
             if (session.isTeamMatch()) {
@@ -2754,6 +2848,7 @@ public final class MatchService {
     private void failMatch(MatchSession session, String reason) {
         plugin.getLogger().warning("Match " + session.id() + " failed: " + reason);
         session.setState(MatchState.FAILED);
+        reportTournamentFailure(session);
         for (UUID id : session.participants()) {
             Player player = Bukkit.getPlayer(id);
             if (player != null) {

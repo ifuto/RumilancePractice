@@ -1815,6 +1815,15 @@ public final class FeatureBootstrap {
         // フレンド機能は未実装: いまは「実装予定」の告知だけ返す(コマンド名は先に確保)。
         bind("friend", new com.rumilance.practice.command.FriendCommand(messageService));
         bind("team", new TeamCommand(teamService, kitService, teamHubGui, teamsBrowserGui, messageService));
+        // Party color-team tournament: reuses startTeamMatch + the spectator service; the
+        // bracket lives in TournamentService, wired through MatchService's tag/hook.
+        com.rumilance.practice.tournament.TournamentService tournamentService =
+                new com.rumilance.practice.tournament.TournamentService(
+                        plugin, teamService, matchService, spectatorService, stateManager,
+                        lobbyService, soundService);
+        matchService.setTournamentHook(tournamentService);
+        bind("tournament", new com.rumilance.practice.tournament.TournamentCommand(
+                tournamentService, teamService, kitService));
         bind("prac", new PracCommand(practiceService));
         bind("tier", new com.rumilance.practice.command.TierCommand(tierService, messageService));
         // Server-wide crafting restriction: log -> planks only (lobby OPs exempt).

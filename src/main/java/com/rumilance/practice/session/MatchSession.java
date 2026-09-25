@@ -199,6 +199,21 @@ public final class MatchSession {
     }
 
     /**
+     * Optional tournament key. Non-null when this match is one card of a running
+     * {@code /tournament}; parties reuse it to avoid wiring separate match lifecycle
+     * machinery on top of the team flow. Regular party fights leave it null.
+     */
+    private volatile String tournamentTag;
+
+    public String tournamentTag() {
+        return tournamentTag;
+    }
+
+    public void setTournamentTag(String tournamentTag) {
+        this.tournamentTag = tournamentTag;
+    }
+
+    /**
      * Kit id for a participant. Team battles may assign one team a different loadout kit;
      * map-level rules (block place/break etc.) always follow the shared match kit.
      */
