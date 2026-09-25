@@ -54,6 +54,7 @@ public final class TeamHubGui extends AbstractGui {
     private com.rumilance.practice.session.PlayerStateManager stateManager;
     private TeamConfigGui teamConfigGui;
     private TeamSettingsGui teamSettingsGui;
+    private com.rumilance.practice.gui.menus.TournamentGui tournamentGui;
 
     public void setTeamConfigGui(TeamConfigGui teamConfigGui) {
         this.teamConfigGui = teamConfigGui;
@@ -61,6 +62,11 @@ public final class TeamHubGui extends AbstractGui {
 
     public void setTeamSettingsGui(TeamSettingsGui teamSettingsGui) {
         this.teamSettingsGui = teamSettingsGui;
+    }
+
+    /** Opens the tournament setup screen; owner-gated inside the target GUI itself. */
+    public void setTournamentGui(com.rumilance.practice.gui.menus.TournamentGui tournamentGui) {
+        this.tournamentGui = tournamentGui;
     }
 
     public void setStateManager(com.rumilance.practice.session.PlayerStateManager stateManager) {
@@ -111,7 +117,10 @@ public final class TeamHubGui extends AbstractGui {
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return t(player, "party.hub-title").color(UiTheme.PRIMARY);
+        Team team = teamService.teamOf(player.getUniqueId()).orElse(null);
+        boolean isTeam = team != null && team.kind() == com.rumilance.practice.team.GroupKind.TEAM;
+        return t(player, isTeam ? "party.hub-title-team" : "party.hub-title")
+                .color(UiTheme.PRIMARY);
     }
 
     @Override
@@ -197,6 +206,16 @@ public final class TeamHubGui extends AbstractGui {
             Component blockedHint = !team.isSplitReady()
                     ? UiTheme.line(line(player, "gui.party-assign-first"))
                     : UiTheme.line(line(player, "party.start-wait-lobby"));
+            if (team.kind() == com.rumilance.practice.team.GroupKind.PARTY) {
+                inventory.setItem(GuiSlots.slot(5, 3),
+                        ItemBuilder.of(Material.GOLDEN_SWORD)
+                                .name(t(player, "tournament.hub-button").color(UiTheme.SECONDARY))
+                                .lore(UiTheme.divider(),
+                                        UiTheme.line(line(player, "tournament.hub-button-lore")),
+                                        UiTheme.blank(),
+                                        UiTheme.hint(line(player, "tournament.hub-button-hint")))
+                                .action("open_tournament").build());
+            }
             inventory.setItem(GuiSlots.slot(5, 4),
                     ItemBuilder.of(Material.DIAMOND_SWORD)
                             .name(t(player, "gui.party-start").color(ready ? UiTheme.SUCCESS : UiTheme.MUTED))
@@ -373,6 +392,21 @@ public final class TeamHubGui extends AbstractGui {
                         () -> {
                             if (player.isOnline()) {
                                 teamSettingsGui.open(player);
+                            }
+                        });
+            }
+            case "open_tournament" -> {
+                if (!owner) {
+                    sounds.play(player, "error");
+                    player.sendMessage(t(player, "gui.party-owner-only"));
+                    return;
+                }
+                sounds.play(player, "gui-open");
+                org.bukkit.Bukkit.getScheduler().runTask(
+                        org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
+                        () -> {
+                            if (player.isOnline() && tournamentGui != null) {
+                                tournamentGui.open(player);
                             }
                         });
             }

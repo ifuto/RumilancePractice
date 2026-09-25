@@ -49,13 +49,25 @@ public final class Team {
         this.originalKitSlot = slot;
     }
 
+    /** Team vs Party. Set at creation and used only to route entry points + wording. */
+    private final GroupKind kind;
+
     public Team(UUID id, UUID owner, String name, boolean isPublic) {
+        this(id, owner, name, isPublic, GroupKind.PARTY);
+    }
+
+    public Team(UUID id, UUID owner, String name, boolean isPublic, GroupKind kind) {
         this.id = Objects.requireNonNull(id, "id");
         this.owner = Objects.requireNonNull(owner, "owner");
         this.name = name == null || name.isBlank() ? "Team" : name;
         this.isPublic = isPublic;
+        this.kind = kind == null ? GroupKind.PARTY : kind;
         this.createdAt = Instant.now();
         this.members.add(owner);
+    }
+
+    public GroupKind kind() {
+        return kind;
     }
 
     // ---- multi-team slots + per-team battle config ----

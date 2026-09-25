@@ -63,10 +63,16 @@ public final class TeamCommand implements CommandExecutor, TabCompleter {
         switch (args[0].toLowerCase(Locale.ROOT)) {
             case "create" -> {
                 boolean isPublic = args.length > 1 && args[1].equalsIgnoreCase("public");
+                // /party creates a party (external fights + tournament); /team creates an
+                // internal color-team group. The label routing keeps the two words honest.
+                String lower = label == null ? "team" : label.toLowerCase(Locale.ROOT);
+                boolean party = lower.equals("party") || lower.equals("p");
                 String name = args.length > 2
                         ? String.join(" ", java.util.Arrays.copyOfRange(args, 2, args.length))
-                        : player.getName() + "'s Team";
-                TeamService.Result r = teamService.create(player, name, isPublic);
+                        : player.getName() + (party ? "'s Party" : "'s Team");
+                TeamService.Result r = teamService.create(player, name, isPublic,
+                        party ? com.rumilance.practice.team.GroupKind.PARTY
+                                : com.rumilance.practice.team.GroupKind.TEAM);
                 if (r != TeamService.Result.OK) player.sendMessage(err(r));
             }
             case "invite" -> {

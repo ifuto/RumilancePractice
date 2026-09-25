@@ -26,12 +26,18 @@ public final class TournamentCommand implements CommandExecutor, TabCompleter {
     private final TournamentService tournamentService;
     private final TeamService teamService;
     private final KitService kitService;
+    private com.rumilance.practice.gui.menus.TournamentGui tournamentGui;
 
     public TournamentCommand(TournamentService tournamentService, TeamService teamService,
                              KitService kitService) {
         this.tournamentService = tournamentService;
         this.teamService = teamService;
         this.kitService = kitService;
+    }
+
+    /** Opens the setup screen; {@code /tournament start} becomes the GUI entry point. */
+    public void setTournamentGui(com.rumilance.practice.gui.menus.TournamentGui tournamentGui) {
+        this.tournamentGui = tournamentGui;
     }
 
     @Override
@@ -43,7 +49,7 @@ public final class TournamentCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         if (args.length == 0) {
-            printUsage(player);
+            start(player, args);
             return true;
         }
         switch (args[0].toLowerCase(Locale.ROOT)) {
@@ -57,11 +63,6 @@ public final class TournamentCommand implements CommandExecutor, TabCompleter {
     }
 
     private void start(Player player, String[] args) {
-        if (args.length < 2) {
-            player.sendMessage(Component.text(
-                    "Usage: /tournament start <kit> [parallel|sequential]", NamedTextColor.YELLOW));
-            return;
-        }
         var teamOpt = teamService.teamOf(player.getUniqueId());
         if (teamOpt.isEmpty()) {
             player.sendMessage(Component.text("You are not in a team.", NamedTextColor.RED));
@@ -72,13 +73,14 @@ public final class TournamentCommand implements CommandExecutor, TabCompleter {
                     NamedTextColor.RED));
             return;
         }
-        String kitId = args[1].toLowerCase(Locale.ROOT);
-        if (kitService.get(kitId).filter(k -> k.enabled()).isEmpty()) {
-            player.sendMessage(Component.text("Kit not found.", NamedTextColor.RED));
+        if (tournamentGui == null) {
+            player.sendMessage(Component.text("Tournament GUI unavailable.",
+                    NamedTextColor.RED));
             return;
         }
-        String modeArg = args.length > 2 ? args[2] : null;
-        tournamentService.start(player, kitId, modeArg);
+        // Opening an inventory from inside a command handler is safe; the GUI dedupes state
+        // and drops the player back on the hub on Close.
+        tournamentGui.open(player);
     }
 
     private void info(Player player) {
@@ -100,7 +102,7 @@ public final class TournamentCommand implements CommandExecutor, TabCompleter {
 
     private void printUsage(Player player) {
         player.sendMessage(Component.text("Tournament commands:", NamedTextColor.AQUA));
-        player.sendMessage(Component.text("/tournament start <kit> [parallel|sequential]",
+        player.sendMessage(Component.text("/tournament  |  /tournament start  — open the setup screen",
                 NamedTextColor.GRAY));
         player.sendMessage(Component.text("/tournament info  |  /tournament cancel",
                 NamedTextColor.GRAY));
@@ -121,12 +123,6 @@ public final class TournamentCommand implements CommandExecutor, TabCompleter {
                 subs.add("cancel");
             }
             return filter(args[0], subs);
-        }
-        if (args.length == 2 && args[0].equalsIgnoreCase("start") && owner) {
-            return filter(args[1], kitService.enabled().stream().map(k -> k.name()).toList());
-        }
-        if (args.length == 3 && args[0].equalsIgnoreCase("start") && owner) {
-            return filter(args[2], List.of("parallel", "sequential"));
         }
         return List.of();
     }

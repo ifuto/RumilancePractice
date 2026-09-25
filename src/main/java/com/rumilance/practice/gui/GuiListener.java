@@ -48,7 +48,7 @@ public final class GuiListener implements Listener {
             GuiType.TEAM_HUB, GuiType.TEAMS_BROWSER, GuiType.TEAM_CONFIG,
             GuiType.TEAM_KIT_SELECT, GuiType.PARTY_MAP,
             GuiType.RANKED_QUEUE, GuiType.UNRANKED_QUEUE, GuiType.FFA_LIST,
-            GuiType.GAME_MENU, GuiType.BATTLE_MENU);
+            GuiType.GAME_MENU, GuiType.BATTLE_MENU, GuiType.TOURNAMENT);
     /** Opens the Game Menu; wired from bootstrap (null = feature disabled). */
     private java.util.function.Consumer<Player> menuReturn;
     /** Opens the Battle Menu for screens marked {@link GuiSession#fromBattleMenu()}. */

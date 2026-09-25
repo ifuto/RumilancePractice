@@ -301,6 +301,10 @@ public final class TeamService {
     // ---- create / disband ----
 
     public Result create(Player owner, String name, boolean isPublic) {
+        return create(owner, name, isPublic, GroupKind.PARTY);
+    }
+
+    public Result create(Player owner, String name, boolean isPublic, GroupKind kind) {
         if (byMember.containsKey(owner.getUniqueId())) {
             return Result.ALREADY_IN_TEAM;
         }
@@ -312,7 +316,7 @@ public final class TeamService {
         if (name != null && name.length() > 24) {
             return Result.INVALID_NAME;
         }
-        Team team = new Team(UUID.randomUUID(), owner.getUniqueId(), name, isPublic);
+        Team team = new Team(UUID.randomUUID(), owner.getUniqueId(), name, isPublic, kind);
         byId.put(team.id(), team);
         byMember.put(owner.getUniqueId(), team);
         applyHotbar(owner, team);

@@ -85,6 +85,37 @@ public final class TournamentService implements PartyTournamentHook {
         return team != null && byTag.containsKey(baseTag(team.id()));
     }
 
+    /** Number of color teams that would enter a tournament for {@code owner}'s party right now. */
+    public int entrantCount(Player owner) {
+        Team team = teamService.teamOf(owner.getUniqueId()).orElse(null);
+        return team == null ? 0 : nonEmptySides(team).size();
+    }
+
+    /**
+     * @return a short human-readable reason a tournament cannot start for {@code owner}, or
+     *         {@code null} when it can. Mirrors {@link #start} without side effects, so the
+     *         tournament GUI can show the exact blocker before the owner clicks start.
+     */
+    public String readinessError(Player owner) {
+        Team team = teamService.teamOf(owner.getUniqueId()).orElse(null);
+        if (team == null) {
+            return "You are not in a team.";
+        }
+        if (!team.isOwner(owner.getUniqueId())) {
+            return "Only the team owner can start a tournament.";
+        }
+        if (nonEmptySides(team).size() < 2) {
+            return "Assign members to at least two color sides first.";
+        }
+        for (UUID memberId : team.members()) {
+            Player member = Bukkit.getPlayer(memberId);
+            if (member == null || !freeInLobby(memberId)) {
+                return "Every member must be online and in the lobby.";
+            }
+        }
+        return null;
+    }
+
     /** Starts a tournament for the owner's party. Kit name validated by the caller. */
     public boolean start(Player owner, String kitId, String modeArg) {
         Team team = teamService.teamOf(owner.getUniqueId()).orElse(null);

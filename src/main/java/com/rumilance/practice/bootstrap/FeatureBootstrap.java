@@ -877,6 +877,13 @@ public final class FeatureBootstrap {
                     !arenaStore.partyArenas().isEmpty(), t.friendlyFire());
             return true;
         });
+        // Party color-team tournament: reuses startTeamMatch + the spectator service; the
+        // bracket lives in TournamentService, wired through MatchService's tag/hook.
+        com.rumilance.practice.tournament.TournamentService tournamentService =
+                new com.rumilance.practice.tournament.TournamentService(
+                        plugin, teamService, matchService, spectatorService, stateManager,
+                        lobbyService, soundService);
+        matchService.setTournamentHook(tournamentService);
         TeamsBrowserGui teamsBrowserGui =
                 new TeamsBrowserGui(guiSessions, soundService, teamService, null, messageService);
         TeamKitSelectGui teamKitSelectGui =
@@ -888,6 +895,15 @@ public final class FeatureBootstrap {
         teamConfigGui.setTeamHubGui(teamHubGui);
         teamHubGui.setTeamConfigGui(teamConfigGui);
         teamsBrowserGui.setHub(teamHubGui);
+        com.rumilance.practice.gui.menus.TournamentGui tournamentGui =
+                new com.rumilance.practice.gui.menus.TournamentGui(
+                        guiSessions, soundService, tournamentService, teamService, kitService);
+        tournamentGui.setReturnToHub(teamHubGui::open);
+        teamHubGui.setTournamentGui(tournamentGui);
+        final com.rumilance.practice.tournament.TournamentCommand tournamentCommand =
+                new com.rumilance.practice.tournament.TournamentCommand(
+                        tournamentService, teamService, kitService);
+        tournamentCommand.setTournamentGui(tournamentGui);
         PartyInviteGui partyInviteGui = new PartyInviteGui(
                 guiSessions, soundService, teamService, messageService);
         partyInviteGui.setTeamHubGui(teamHubGui);
@@ -1205,6 +1221,7 @@ public final class FeatureBootstrap {
         guiListener.register(teamKitSelectGui);
         guiListener.register(partyInviteGui);
         guiListener.register(partyMapSelectGui);
+        guiListener.register(tournamentGui);
         guiListener.register(arenaAdminGui);
         guiListener.register(gameMenuGui);
         guiListener.register(battleMenuGui);
@@ -1815,15 +1832,7 @@ public final class FeatureBootstrap {
         // フレンド機能は未実装: いまは「実装予定」の告知だけ返す(コマンド名は先に確保)。
         bind("friend", new com.rumilance.practice.command.FriendCommand(messageService));
         bind("team", new TeamCommand(teamService, kitService, teamHubGui, teamsBrowserGui, messageService));
-        // Party color-team tournament: reuses startTeamMatch + the spectator service; the
-        // bracket lives in TournamentService, wired through MatchService's tag/hook.
-        com.rumilance.practice.tournament.TournamentService tournamentService =
-                new com.rumilance.practice.tournament.TournamentService(
-                        plugin, teamService, matchService, spectatorService, stateManager,
-                        lobbyService, soundService);
-        matchService.setTournamentHook(tournamentService);
-        bind("tournament", new com.rumilance.practice.tournament.TournamentCommand(
-                tournamentService, teamService, kitService));
+        bind("tournament", tournamentCommand);
         bind("prac", new PracCommand(practiceService));
         bind("tier", new com.rumilance.practice.command.TierCommand(tierService, messageService));
         // Server-wide crafting restriction: log -> planks only (lobby OPs exempt).

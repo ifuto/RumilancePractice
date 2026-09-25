@@ -67,7 +67,7 @@ public final class TeamsBrowserGui extends AbstractGui {
     protected void render(Player player, GuiSession session, Inventory inventory) {
         paintFrame(player, session, inventory);
 
-        // Create buttons (top of content area).
+        // Create buttons (top of content area): party (public / private) or an internal team.
         inventory.setItem(GuiSlots.slot(1, 2),
                 ItemBuilder.of(Material.WHITE_BANNER)
                         .name(t(player, "party.create-public").color(UiTheme.SUCCESS))
@@ -76,6 +76,14 @@ public final class TeamsBrowserGui extends AbstractGui {
                                 UiTheme.blank(),
                                 UiTheme.hint(line(player, "menu.click")))
                         .action("create_public").build());
+        inventory.setItem(GuiSlots.slot(1, 3),
+                ItemBuilder.of(Material.IRON_SWORD)
+                        .name(t(player, "party.create-team").color(UiTheme.SECONDARY))
+                        .lore(UiTheme.divider(),
+                                UiTheme.line(line(player, "party.create-team-lore")),
+                                UiTheme.blank(),
+                                UiTheme.hint(line(player, "party.create-team-hint")))
+                        .action("create_team").build());
         inventory.setItem(GuiSlots.slot(1, 4),
                 ItemBuilder.of(Material.LIGHT_GRAY_BANNER)
                         .name(t(player, "party.create-private").color(UiTheme.MUTED))
@@ -146,12 +154,22 @@ public final class TeamsBrowserGui extends AbstractGui {
             }
             case "create_public" -> {
                 sounds.play(player, "select");
-                teamService.create(player, player.getName() + "'s Team", true);
+                teamService.create(player, player.getName() + "'s Party", true,
+                        com.rumilance.practice.team.GroupKind.PARTY);
                 teamHubGui.open(player);
             }
             case "create_private" -> {
                 sounds.play(player, "select");
-                teamService.create(player, player.getName() + "'s Team", false);
+                teamService.create(player, player.getName() + "'s Party", false,
+                        com.rumilance.practice.team.GroupKind.PARTY);
+                teamHubGui.open(player);
+            }
+            case "create_team" -> {
+                boolean isPublic = click == org.bukkit.event.inventory.ClickType.RIGHT
+                        || click == org.bukkit.event.inventory.ClickType.SHIFT_RIGHT;
+                sounds.play(player, "select");
+                teamService.create(player, player.getName() + "'s Team", isPublic,
+                        com.rumilance.practice.team.GroupKind.TEAM);
                 teamHubGui.open(player);
             }
             case "page:prev" -> {

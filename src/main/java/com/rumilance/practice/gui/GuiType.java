@@ -70,5 +70,6 @@ public enum GuiType {
     NAME_COLOR,
     ADMIN_PLAYER_DATA,
     SIGN_KIT_SELECT,
-    CHAT_SETTINGS
+    CHAT_SETTINGS,
+    TOURNAMENT
 }
