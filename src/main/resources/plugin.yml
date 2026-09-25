@@ -160,9 +160,13 @@ commands:
     usage: /tpadeny
     permission: rumilance.user
   rtp:
+    description: Teleport to a random safe spot in your current FFA arena (out of combat; default OFF per arena).
+    usage: /rtp
+    permission: rumilance.user
+  rtpqueue:
     description: Join/leave the random-teleport duel queue of your current FFA arena.
-    usage: /rtp [join|leave]
-    aliases: [rtpqueue, rtpq]
+    usage: /rtpqueue [join|leave]
+    aliases: [rtpq]
     permission: rumilance.user
   tier:
     description: "Shows your per-kit skill tiers from real PvP rankings"
@@ -192,8 +196,8 @@ commands:
     usage: /narena-harness <ground|room|dummy|fight|status|stop>
     permission: rumilance.admin
   testarena:
-    description: Create or delete a temporary 100x100 smooth terrain test map.
-    usage: /testarena <spawn|delete|cancel> [grass-stone|sand-sandstone|red-sand-red-sandstone]
+    description: Create or delete temporary smooth terrain test maps (side length selectable).
+    usage: /testarena <spawn [size] [map]|delete [id|all]|list|cancel>
     permission: rumilance.admin
   team:
     description: Owner-invite style teams with public/private visibility and red-blue team battles.

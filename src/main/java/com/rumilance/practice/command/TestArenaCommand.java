@@ -20,14 +20,18 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ThreadLocalRandom;
 
-/** Admin entry point and settings menu for the generated smooth terrain test map.
+/**
+ * Admin entry point and settings menu for the generated smooth terrain test maps.
  *
- * <p>This command only builds/removes a temporary map. It does not register an arena template;
- * maps created with {@code /arena draft} remain valid and are selected independently.</p>
+ * <p>Several temporary maps may coexist: spawning a new one no longer requires deleting the
+ * previous one. Each map keyed by a short id, so it can be removed individually
+ * ({@code /testarena delete <id>}), in bulk ({@code /testarena delete all}) or listed. The map
+ * side length is selectable both from the menu and from the {@code /testarena spawn} command.</p>
  */
 public final class TestArenaCommand implements CommandExecutor, TabCompleter, Listener {
 
@@ -41,6 +45,9 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
     private static final int HEIGHT_ZERO_SLOT = 37;
     private static final int HEIGHT_TWO_SLOT = 39;
     private static final int HEIGHT_FOUR_SLOT = 41;
+    private static final int SIZE_32_SLOT = 3;
+    private static final int SIZE_64_SLOT = 4;
+    private static final int SIZE_100_SLOT = 5;
     private static final int START_SLOT = 49;
 
     private final SmoothTerrainGenerator generator;
@@ -56,42 +63,92 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
             sender.sendMessage("Players only: run /testarena spawn to create a temporary test map.");
             return true;
         }
+        int size = defaultSideLength();
         if (args.length == 0) {
-            player.sendMessage(Component.text(
-                    "/testarena spawn | /testarena delete | /testarena cancel", NamedTextColor.YELLOW));
+            openSettingsMenu(player, size);
             return true;
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
-        if (sub.equals("cancel")) {
-            generator.cancel(player.getUniqueId());
-            player.sendMessage(Component.text("Test map operation cancelled.", NamedTextColor.YELLOW));
-            return true;
-        }
-        if (sub.equals("delete")) {
-            delete(player);
-            return true;
-        }
-        if (sub.equals("spawn") || sub.equals("spawnde")) {
-            if (args.length >= 2) {
-                SmoothTerrainGenerator.TerrainMap map =
-                        SmoothTerrainGenerator.TerrainMap.parse(args[1]);
-                if (map == null) {
-                    player.sendMessage(Component.text(
-                            "Unknown map. Use grass-stone, sand-sandstone, or red-sand-red-sandstone.",
-                            NamedTextColor.RED));
-                    return true;
-                }
-                start(player, new SmoothTerrainGenerator.TerrainSettings(
-                        map, SmoothTerrainGenerator.TerrainShape.RANDOM, false,
-                        SmoothTerrainGenerator.MAX_HEIGHT_DELTA));
-            } else {
-                openMapMenu(player);
+        switch (sub) {
+            case "cancel" -> {
+                generator.cancel(player.getUniqueId());
+                player.sendMessage(Component.text("Test map operation cancelled.", NamedTextColor.YELLOW));
+                return true;
             }
-            return true;
+            case "list" -> {
+                listMaps(player);
+                return true;
+            }
+            case "delete" -> {
+                delete(player, args);
+                return true;
+            }
+            case "spawn", "spawnde", "create" -> {
+                spawn(player, args);
+                return true;
+            }
+            default -> {
+                player.sendMessage(Component.text(
+                        "/testarena spawn [size] [map] | /testarena delete [id|all] | " +
+                        "/testarena list | /testarena cancel", NamedTextColor.YELLOW));
+                return true;
+            }
         }
-        player.sendMessage(Component.text(
-                "Unknown testarena action. Use /testarena spawn.", NamedTextColor.RED));
-        return true;
+    }
+
+    private static int defaultSideLength() {
+        return SmoothTerrainGenerator.WIDTH;
+    }
+
+    private static Integer parseSize(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        int size;
+        try {
+            size = Integer.parseInt(raw);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+        if (size < SmoothTerrainGenerator.MIN_WIDTH || size > SmoothTerrainGenerator.MAX_WIDTH) {
+            return null;
+        }
+        return size;
+    }
+
+    private void spawn(Player player, String[] args) {
+        int size = defaultSideLength();
+        String mapKey = null;
+        for (int i = 1; i < args.length; i++) {
+            String raw = args[i];
+            SmoothTerrainGenerator.TerrainMap parsed = SmoothTerrainGenerator.TerrainMap.parse(raw);
+            if (parsed != null) {
+                mapKey = raw;
+                continue;
+            }
+            Integer parsedSize = parseSize(raw);
+            if (parsedSize != null) {
+                size = parsedSize;
+                continue;
+            }
+            player.sendMessage(Component.text(
+                    "Unknown argument '" + raw + "'. Use a size (" +
+                            SmoothTerrainGenerator.MIN_WIDTH + "-" + SmoothTerrainGenerator.MAX_WIDTH +
+                            ") and/or a map (grass-stone, sand-sandstone, red-sand-red-sandstone).",
+                    NamedTextColor.RED));
+            return;
+        }
+        if (args.length == 1) {
+            // Bare /testarena spawn: open the two-stage settings menu.
+            openSettingsMenu(player, size);
+            return;
+        }
+        SmoothTerrainGenerator.TerrainMap map = mapKey == null
+                ? SmoothTerrainGenerator.TerrainMap.GRASS_STONE
+                : SmoothTerrainGenerator.TerrainMap.parse(mapKey);
+        start(player, new SmoothTerrainGenerator.TerrainSettings(
+                map, size, SmoothTerrainGenerator.TerrainShape.RANDOM, false,
+                SmoothTerrainGenerator.MAX_HEIGHT_DELTA));
     }
 
     private void start(Player player, SmoothTerrainGenerator.TerrainSettings settings) {
@@ -100,51 +157,55 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
                     "A test map operation is already running for you.", NamedTextColor.YELLOW));
             return;
         }
-        if (generator.hasPreviousMap()) {
-            player.sendMessage(Component.text(
-                    "Delete the previous test map first: /testarena delete", NamedTextColor.YELLOW));
-            return;
-        }
-        long seed = ThreadLocalRandom.current().nextLong();
+        int size = settings.sideLength();
         String foundation = settings.surfaceOnly() ? "surface-only (2 underground layers)" :
                 "200 underground layers";
-        player.sendMessage(Component.text(
-                "Planning a 100x100 smooth " + settings.shape().label().toLowerCase(Locale.ROOT)
-                        + " terrain with " + settings.map().displayName() + ", " + foundation
-                        + ", max height difference " + settings.maxHeightDelta()
-                        + ". Block placement is batched to protect TPS...",
+        player.sendMessage(Component.text(String.format(
+                        "Planning a %dx%d smooth %s terrain with %s, %s, max height difference %d. "
+                                + "Block placement is batched to protect TPS...",
+                        size, size, settings.shape().label().toLowerCase(Locale.ROOT),
+                        settings.map().displayName(), foundation, settings.maxHeightDelta()),
                 NamedTextColor.AQUA));
+        long seed = ThreadLocalRandom.current().nextLong();
         generator.generate(player, settings, seed, result -> player.sendMessage(Component.text(
                 "Test map ready: " + result.map().displayName() + ", " + result.width() + "x"
                         + result.width() + ", " + foundation + " + bedrock, height " + result.minimumHeight() + ".."
                         + result.maximumHeight() + " (range " + result.heightRange() + "), seed "
-                        + result.seed() + ". Use /testarena delete when finished.",
+                        + result.seed() + ". Use /testarena delete to remove it.",
                 NamedTextColor.GREEN)),
                 error -> player.sendMessage(Component.text(error, NamedTextColor.RED)));
     }
 
-    private void delete(Player player) {
-        if (generator.isRunning(player.getUniqueId())) {
-            player.sendMessage(Component.text(
-                    "Wait for the current test map operation to finish.", NamedTextColor.YELLOW));
-            return;
+    private void delete(Player player, String[] args) {
+        String target = args.length > 1 ? args[1] : null;
+        if (target != null && target.equalsIgnoreCase("all")) {
+            target = null;
         }
-        player.sendMessage(Component.text(
-                "Deleting the previous test map, including its underground foundation and bedrock, in low-lag batches...",
-                NamedTextColor.AQUA));
-        generator.delete(player,
+        generator.delete(player, target,
                 columns -> player.sendMessage(Component.text(
-                        "Deleted the previous test map (" + columns + " columns).", NamedTextColor.GREEN)),
+                        "Deleted test map(s) (" + columns + " columns).", NamedTextColor.GREEN)),
                 error -> player.sendMessage(Component.text(error, NamedTextColor.RED)));
     }
 
-    private void openMapMenu(Player player) {
-        if (generator.hasPreviousMap()) {
-            player.sendMessage(Component.text(
-                    "Delete the previous test map first: /testarena delete", NamedTextColor.YELLOW));
+    private void listMaps(Player player) {
+        var maps = generator.maps();
+        if (maps.isEmpty()) {
+            player.sendMessage(Component.text("No test maps yet. Create one with /testarena spawn.",
+                    NamedTextColor.YELLOW));
             return;
         }
+        player.sendMessage(Component.text("Test maps (" + maps.size() + "):", NamedTextColor.AQUA));
+        for (SmoothTerrainGenerator.Area area : maps.values()) {
+            player.sendMessage(Component.text("  " + area.id() + "  " + area.width() + "x"
+                    + area.width() + "  " + area.settings().map().displayName() + "  @ "
+                    + area.centerX() + "," + area.centerZ(), NamedTextColor.GRAY));
+        }
+    }
+
+    private void openSettingsMenu(Player player, int size) {
         MapMenuHolder holder = new MapMenuHolder();
+        holder.size = Math.max(SmoothTerrainGenerator.MIN_WIDTH,
+                Math.min(SmoothTerrainGenerator.MAX_WIDTH, size));
         Inventory inventory = Bukkit.createInventory(holder, 54,
                 Component.text("TestArena: map settings", NamedTextColor.DARK_AQUA));
         holder.bind(inventory);
@@ -156,7 +217,8 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
         Inventory inventory = holder.getInventory();
         inventory.clear();
         inventory.setItem(4, item(Material.NETHER_STAR, "TestArena settings",
-                "100 x 100 surface, automatically smoothed", "Choose material, shape, underground and height."));
+                holder.size + " x " + holder.size + " surface, automatically smoothed",
+                "Choose material, shape, underground, height and size."));
 
         inventory.setItem(GRASS_SLOT, item(Material.GRASS_BLOCK,
                 selected(holder.map == SmoothTerrainGenerator.TerrainMap.GRASS_STONE, "Grass / Stone"),
@@ -193,8 +255,18 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
                 selected(holder.maxHeightDelta == 4, "Max height difference: 4"),
                 "Maximum smooth variation"));
 
+        inventory.setItem(SIZE_32_SLOT, item(Material.BRICKS,
+                selected(holder.size == 32, "Side length: 32"),
+                "32 x 32 blocks"));
+        inventory.setItem(SIZE_64_SLOT, item(Material.STONE_BRICKS,
+                selected(holder.size == 64, "Side length: 64"),
+                "64 x 64 blocks"));
+        inventory.setItem(SIZE_100_SLOT, item(Material.DEEPSLATE_BRICKS,
+                selected(holder.size == 100, "Side length: 100"),
+                "100 x 100 blocks (default)"));
+
         inventory.setItem(START_SLOT, item(Material.EMERALD_BLOCK, "Generate test map",
-                "Click to create the selected 100 x 100 map"));
+                "Click to create the selected " + holder.size + " x " + holder.size + " map"));
         inventory.setItem(53, item(Material.BARRIER, "Close", "No map will be created."));
     }
 
@@ -234,9 +306,19 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
             case HEIGHT_ZERO_SLOT -> holder.maxHeightDelta = 0;
             case HEIGHT_TWO_SLOT -> holder.maxHeightDelta = 2;
             case HEIGHT_FOUR_SLOT -> holder.maxHeightDelta = 4;
+            case SIZE_32_SLOT -> holder.size = 32;
+            case SIZE_64_SLOT -> holder.size = 64;
+            case SIZE_100_SLOT -> holder.size = 100;
             case START_SLOT -> {
                 player.closeInventory();
-                start(player, holder.settings());
+                SmoothTerrainGenerator.TerrainMap map = holder.map;
+                boolean surfaceOnly = holder.surfaceOnly;
+                int maxHeightDelta = holder.maxHeightDelta;
+                int side = holder.size;
+                player.sendMessage(Component.text("Generating " + side + "x" + side + " test map...",
+                        NamedTextColor.AQUA));
+                start(player, new SmoothTerrainGenerator.TerrainSettings(
+                        map, side, holder.shape, surfaceOnly, maxHeightDelta));
                 return;
             }
             case 53 -> {
@@ -250,13 +332,23 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
 
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command,
-                                       @NotNull String alias, @NotNull String[] args) {
+                                      @NotNull String alias, @NotNull String[] args) {
+        List<String> options = new ArrayList<>();
         if (args.length == 1) {
-            return TabCompletions.filter(args[0], "spawn", "delete", "cancel");
+            return TabCompletions.filter(args[0], "spawn", "create", "delete", "list", "cancel");
         }
         if (args.length == 2 && (args[0].equalsIgnoreCase("spawn")
-                || args[0].equalsIgnoreCase("spawnde"))) {
-            return TabCompletions.filter(args[1], "grass-stone", "sand-sandstone", "red-sand-red-sandstone");
+                || args[0].equalsIgnoreCase("spawnde") || args[0].equalsIgnoreCase("create"))) {
+            options.add("grass-stone");
+            options.add("sand-sandstone");
+            options.add("red-sand-red-sandstone");
+            options.add(String.valueOf(defaultSideLength()));
+            return TabCompletions.filter(args[1], options.toArray(String[]::new));
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("delete")) {
+            options.add("all");
+            generator.maps().keySet().forEach(options::add);
+            return TabCompletions.filter(args[1], options.toArray(String[]::new));
         }
         return List.of();
     }
@@ -267,13 +359,10 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
         private SmoothTerrainGenerator.TerrainShape shape = SmoothTerrainGenerator.TerrainShape.RANDOM;
         private boolean surfaceOnly;
         private int maxHeightDelta = SmoothTerrainGenerator.MAX_HEIGHT_DELTA;
+        private int size = SmoothTerrainGenerator.WIDTH;
 
         void bind(Inventory inventory) {
             this.inventory = inventory;
-        }
-
-        SmoothTerrainGenerator.TerrainSettings settings() {
-            return new SmoothTerrainGenerator.TerrainSettings(map, shape, surfaceOnly, maxHeightDelta);
         }
 
         @Override

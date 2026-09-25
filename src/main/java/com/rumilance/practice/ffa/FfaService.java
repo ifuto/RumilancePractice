@@ -62,6 +62,7 @@ public final class FfaService {
             int resetIntervalSeconds,
             String iconMaterial,
             boolean tpaEnabled,
+            boolean rtpEnabled,
             boolean rtpQueueEnabled
     ) {
         public FfaArena {
@@ -73,44 +74,49 @@ public final class FfaService {
 
         public FfaArena withResetInterval(int seconds) {
             return new FfaArena(id, kitId, world, region, spawn, enabled, Math.max(0, seconds), iconMaterial,
-                    tpaEnabled, rtpQueueEnabled);
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled);
         }
 
         public FfaArena withEnabled(boolean value) {
             return new FfaArena(id, kitId, world, region, spawn, value, resetIntervalSeconds, iconMaterial,
-                    tpaEnabled, rtpQueueEnabled);
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled);
         }
 
         public FfaArena withKit(String kit) {
             return new FfaArena(id, kit, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
-                    tpaEnabled, rtpQueueEnabled);
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled);
         }
 
         public FfaArena withRegion(Cuboid newRegion) {
             return new FfaArena(id, kitId, newRegion.worldName(), newRegion, spawn, enabled,
-                    resetIntervalSeconds, iconMaterial, tpaEnabled, rtpQueueEnabled);
+                    resetIntervalSeconds, iconMaterial, tpaEnabled, rtpEnabled, rtpQueueEnabled);
         }
 
         public FfaArena withSpawn(Location newSpawn) {
             // null = back to "random standing spot far from occupants" spawning.
             return new FfaArena(id, kitId, world, region,
                     newSpawn != null ? newSpawn.clone() : null, enabled,
-                    resetIntervalSeconds, iconMaterial, tpaEnabled, rtpQueueEnabled);
+                    resetIntervalSeconds, iconMaterial, tpaEnabled, rtpEnabled, rtpQueueEnabled);
         }
 
         public FfaArena withId(String newId) {
             return new FfaArena(newId, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
-                    tpaEnabled, rtpQueueEnabled);
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled);
         }
 
         public FfaArena withTpa(boolean value) {
             return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
-                    value, rtpQueueEnabled);
+                    value, rtpEnabled, rtpQueueEnabled);
+        }
+
+        public FfaArena withRtp(boolean value) {
+            return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
+                    tpaEnabled, value, rtpQueueEnabled);
         }
 
         public FfaArena withRtpQueue(boolean value) {
             return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
-                    tpaEnabled, value);
+                    tpaEnabled, rtpEnabled, value);
         }
 
         /** Region size seen from above: X x Z block counts. */
@@ -124,7 +130,7 @@ public final class FfaService {
 
         public FfaArena withIconMaterial(String material) {
             return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, material,
-                    tpaEnabled, rtpQueueEnabled);
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled);
         }
     }
 
@@ -347,6 +353,7 @@ public final class FfaService {
                     interval,
                     entry.getString("icon", "IRON_SWORD"),
                     entry.getBoolean("settings.tpa", false),
+                    entry.getBoolean("settings.rtp", false),
                     entry.getBoolean("settings.rtpqueue", false)
             );
             arenas.put(id, arena);
@@ -1219,7 +1226,7 @@ public final class FfaService {
     }
 
     public void create(String id, Cuboid region, Location spawn, String kitId) {
-        FfaArena arena = new FfaArena(id, kitId, region.worldName(), region, spawn.clone(), false, 0, "IRON_SWORD", false, false);
+        FfaArena arena = new FfaArena(id, kitId, region.worldName(), region, spawn.clone(), false, 0, "IRON_SWORD", false, false, false);
         arenas.put(arena.id(), arena);
         persist(arena);
         armResetTimer(arena, false);
@@ -1271,6 +1278,17 @@ public final class FfaService {
             return false;
         }
         FfaArena updated = existing.withTpa(value);
+        arenas.put(updated.id(), updated);
+        persist(updated);
+        return true;
+    }
+
+    public boolean setRtpEnabled(String id, boolean value) {
+        FfaArena existing = findArena(id);
+        if (existing == null) {
+            return false;
+        }
+        FfaArena updated = existing.withRtp(value);
         arenas.put(updated.id(), updated);
         persist(updated);
         return true;
@@ -1773,6 +1791,7 @@ public final class FfaService {
         }
         yaml.set(path + ".icon", arena.iconMaterial());
         yaml.set(path + ".settings.tpa", arena.tpaEnabled());
+        yaml.set(path + ".settings.rtp", arena.rtpEnabled());
         yaml.set(path + ".settings.rtpqueue", arena.rtpQueueEnabled());
         configService.save(ConfigService.FFA);
     }

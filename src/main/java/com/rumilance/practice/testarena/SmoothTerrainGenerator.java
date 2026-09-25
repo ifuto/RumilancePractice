@@ -31,6 +31,10 @@ import java.util.function.Consumer;
 public final class SmoothTerrainGenerator {
 
     public static final int WIDTH = 100;
+    /** Smallest one-side length whose control grid keeps at least two cells. */
+    public static final int MIN_WIDTH = 21;
+    /** Largest one-side length accepted for a single temporary test map. */
+    public static final int MAX_WIDTH = 256;
     public static final int MAX_HEIGHT_DELTA = 4;
     public static final int UNDERGROUND_DEPTH = 200;
     public static final int SURFACE_ONLY_FOUNDATION_LAYERS = 2;
@@ -46,13 +50,13 @@ public final class SmoothTerrainGenerator {
     private final TerrainEditBridge terrainEditBridge;
     private final ConcurrentMap<UUID, BukkitTask> running = new ConcurrentHashMap<>();
     private final java.util.Set<UUID> busy = ConcurrentHashMap.newKeySet();
-    /** TestArena owns one global map; serialise operations so two clipboards can never overlap. */
+    // TestArena owns zero or more maps; serialise operations so two clipboards can never overlap.
     private final Object operationLock = new Object();
     private long nextOperationId;
     private volatile long activeOperationId;
     private volatile UUID activeOperationOwner;
     private volatile boolean editInFlight;
-    private volatile Area previousMap;
+    private final ConcurrentMap<String, Area> maps = new ConcurrentHashMap<>();
 
     public SmoothTerrainGenerator(Plugin plugin) {
         this(plugin, null);
@@ -61,7 +65,7 @@ public final class SmoothTerrainGenerator {
     public SmoothTerrainGenerator(Plugin plugin, TerrainEditBridge terrainEditBridge) {
         this.plugin = plugin;
         this.terrainEditBridge = terrainEditBridge;
-        this.previousMap = readState();
+        this.maps.putAll(readState());
     }
 
     /** Shape is independent from the material palette, so Grass can also be a bowl. */
@@ -139,8 +143,8 @@ public final class SmoothTerrainGenerator {
     }
 
     /** Settings selected in the PvP map menu. */
-    public record TerrainSettings(TerrainMap map, TerrainShape shape, boolean surfaceOnly,
-                                  int maxHeightDelta) {
+    public record TerrainSettings(TerrainMap map, int sideLength, TerrainShape shape,
+                                  boolean surfaceOnly, int maxHeightDelta) {
         public TerrainSettings {
             if (map == null) {
                 throw new IllegalArgumentException("map is required");
@@ -148,7 +152,18 @@ public final class SmoothTerrainGenerator {
             if (shape == null) {
                 shape = TerrainShape.RANDOM;
             }
+            int length = sideLength == 0 ? WIDTH : sideLength;
+            if (length < MIN_WIDTH || length > MAX_WIDTH) {
+                throw new IllegalArgumentException("sideLength must be within ["
+                        + MIN_WIDTH + ", " + MAX_WIDTH + "]");
+            }
+            sideLength = length;
             maxHeightDelta = Math.max(0, Math.min(MAX_HEIGHT_DELTA, maxHeightDelta));
+        }
+
+        public TerrainSettings(TerrainMap map, TerrainShape shape, boolean surfaceOnly,
+                               int maxHeightDelta) {
+            this(map, WIDTH, shape, surfaceOnly, maxHeightDelta);
         }
 
         /** Number of solid material layers below the surface before the bedrock layer. */
@@ -165,16 +180,33 @@ public final class SmoothTerrainGenerator {
         }
     }
 
-    private record Area(String world, int centerX, int centerZ, int baseY, int width,
-                        TerrainSettings settings, int minY, int maxY) {
+    /** A completed temporary test map. */
+    public record Area(String id, String world, int centerX, int centerZ, int baseY, int width,
+                       TerrainSettings settings, int minY, int maxY) {
+        public int size() {
+            return width * width;
+        }
     }
 
     /** Planned surface column exposed to the optional FAWE clipboard writer. */
     public record ColumnData(int x, int z, int topY) {
     }
 
+    /** A column plus the vertical span to clear, for bulk deletes across several maps. */
+    private record ClearColumn(ColumnData column, int minY, int maxY) {
+    }
+
     public boolean hasPreviousMap() {
-        return previousMap != null;
+        return !maps.isEmpty();
+    }
+
+    /** All temporary test maps, keyed by their unique map id. */
+    public java.util.Map<String, Area> maps() {
+        return java.util.Collections.unmodifiableMap(maps);
+    }
+
+    public boolean hasMap(String mapId) {
+        return mapId != null && maps.containsKey(mapId);
     }
 
     public boolean isRunning(UUID playerId) {
@@ -235,8 +267,9 @@ public final class SmoothTerrainGenerator {
     }
 
     /**
-     * Plans and builds the selected 100 by 100 map centered on the command sender. A previous
-     * map must be deleted first so {@code /testarena delete} always has one unambiguous target.
+     * Plans and builds one smooth terrain map centered on the command sender. Multiple maps can
+     * coexist: a second {@code /testarena spawn} does not require deleting the previous one, so
+     * several test maps may be placed before any are removed again.
      */
     public void generate(Player player, TerrainMap map, long seed,
                           Consumer<Result> complete, Consumer<String> failure) {
@@ -248,10 +281,6 @@ public final class SmoothTerrainGenerator {
                           Consumer<Result> complete, Consumer<String> failure) {
         if (settings == null || settings.map() == null) {
             fail(failure, "Unknown test map settings.");
-            return;
-        }
-        if (previousMap != null) {
-            fail(failure, "Delete the previous test map first with /testarena delete.");
             return;
         }
         UUID playerId = player.getUniqueId();
@@ -276,8 +305,9 @@ public final class SmoothTerrainGenerator {
         int highestSafeSurface = world.getMaxHeight() - CLEAR_ABOVE - settings.maxHeightDelta() - 1;
         baseY = Math.min(baseY, highestSafeSurface);
         int bedrockY = baseY - foundationDepth - 1;
-        Area area = new Area(world.getName(), centerX, centerZ, baseY, WIDTH,
-                settings, bedrockY, baseY + settings.maxHeightDelta() + CLEAR_ABOVE);
+        int width = settings.sideLength();
+        Area area = new Area(nextMapId(world.getName()), world.getName(), centerX, centerZ,
+                baseY, width, settings, bedrockY, baseY + settings.maxHeightDelta() + CLEAR_ABOVE);
 
         // No Bukkit world/block calls are made in this future. This keeps noise generation and
         // the 10,000-column plan off the server thread, then hands only the write phase back to
@@ -308,18 +338,26 @@ public final class SmoothTerrainGenerator {
         running.put(playerId, sentinel);
     }
 
-    /** Removes the last completed map in the same low-lag batches as generation. */
+    /** Removes one completed map (or every map, when {@code mapId} is null) in low-lag batches. */
     public void delete(Player player, Consumer<Integer> complete, Consumer<String> failure) {
-        Area area = previousMap;
+        delete(player, null, complete, failure);
+    }
+
+    public void delete(Player player, String mapId, Consumer<Integer> complete, Consumer<String> failure) {
+        if (mapId == null) {
+            deleteAll(player, complete, failure);
+            return;
+        }
+        Area area = maps.get(mapId);
         if (area == null) {
-            fail(failure, "There is no previous test map to delete.");
+            fail(failure, "There is no test map '" + mapId + "' to delete.");
             return;
         }
         World world = Bukkit.getWorld(area.world());
         if (world == null) {
-            previousMap = null;
-            deleteState();
-            fail(failure, "The world containing the previous test map is not loaded.");
+            maps.remove(mapId);
+            writeState();
+            fail(failure, "The world containing test map '" + mapId + "' is not loaded.");
             return;
         }
         UUID playerId = player.getUniqueId();
@@ -334,7 +372,7 @@ public final class SmoothTerrainGenerator {
             return;
         }
         if (terrainEditBridge != null && terrainEditBridge.isAvailable()) {
-            scheduleFaweClear(player, area, complete, failure, operationId);
+            scheduleFaweClear(player, area, mapId, complete, failure, operationId);
             return;
         }
         List<ColumnData> columns = new ArrayList<>(area.width() * area.width());
@@ -355,14 +393,81 @@ public final class SmoothTerrainGenerator {
                     clearColumn(world, columns.get(index), area.minY(), area.maxY());
                 }
                 if (index >= columns.size()) {
-                    previousMap = null;
-                    deleteState();
+                    maps.remove(mapId);
+                    writeState();
                     running.remove(playerId);
                     busy.remove(playerId);
                     releaseOperation(operationId);
                     holder[0].cancel();
                     if (complete != null) {
                         complete.accept(columns.size());
+                    }
+                }
+            }
+        }, 1L, 1L);
+        running.put(playerId, holder[0]);
+    }
+
+    private void deleteAll(Player player, Consumer<Integer> complete, Consumer<String> failure) {
+        List<Area> all = new ArrayList<>(maps.values());
+        if (all.isEmpty()) {
+            fail(failure, "There is no test map to delete.");
+            return;
+        }
+        World world = Bukkit.getWorld(all.get(0).world());
+        if (world == null) {
+            maps.clear();
+            writeState();
+            fail(failure, "The world containing the test maps is not loaded.");
+            return;
+        }
+        UUID playerId = player.getUniqueId();
+        long operationId = beginOperation(playerId);
+        if (operationId == 0L) {
+            fail(failure, "Wait for the current test map operation to finish.");
+            return;
+        }
+        if (!busy.add(playerId)) {
+            releaseOperation(operationId);
+            fail(failure, "Wait for the current test map operation to finish.");
+            return;
+        }
+        int totalColumns = all.stream().mapToInt(a -> a.width() * a.width()).sum();
+        if (terrainEditBridge != null && terrainEditBridge.isAvailable()) {
+            scheduleFaweClearAll(player, all, totalColumns, complete, failure, operationId);
+            return;
+        }
+        List<ClearColumn> clearColumns = new ArrayList<>(totalColumns);
+        all.forEach(area -> {
+            for (int x = 0; x < area.width(); x++) {
+                for (int z = 0; z < area.width(); z++) {
+                    clearColumns.add(new ClearColumn(
+                            new ColumnData(area.centerX() - area.width() / 2 + x,
+                                    area.centerZ() - area.width() / 2 + z, area.maxY()),
+                            area.minY(), area.maxY()));
+                }
+            }
+        });
+        BukkitTask[] holder = new BukkitTask[1];
+        holder[0] = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+            private int index;
+
+            @Override
+            public void run() {
+                int end = Math.min(clearColumns.size(), index + COLUMNS_PER_TICK);
+                for (; index < end; index++) {
+                    ClearColumn clear = clearColumns.get(index);
+                    clearColumn(world, clear.column(), clear.minY(), clear.maxY());
+                }
+                if (index >= clearColumns.size()) {
+                    maps.clear();
+                    writeState();
+                    running.remove(playerId);
+                    busy.remove(playerId);
+                    releaseOperation(operationId);
+                    holder[0].cancel();
+                    if (complete != null) {
+                        complete.accept(totalColumns);
                     }
                 }
             }
@@ -407,8 +512,8 @@ public final class SmoothTerrainGenerator {
                                 + (error == null ? "unknown error" : error.getMessage()));
                         return;
                     }
-                    previousMap = area;
-                    writeState(area);
+                    maps.put(area.id(), area);
+                    writeState();
                     Result result = new Result(area.settings().map(), area.width(), columns.size(),
                             minimum(columns, area.baseY()), maximum(columns, area.baseY()), seed);
                     if (complete != null && player.isOnline()) {
@@ -417,13 +522,13 @@ public final class SmoothTerrainGenerator {
                 }));
     }
 
-    private void scheduleFaweClear(Player player, Area area, Consumer<Integer> complete,
+    private void scheduleFaweClear(Player player, Area area, String mapId, Consumer<Integer> complete,
                                    Consumer<String> failure, long operationId) {
         World world = Bukkit.getWorld(area.world());
         if (world == null) {
             busy.remove(player.getUniqueId());
             releaseOperation(operationId);
-            fail(failure, "The world containing the previous test map is no longer loaded.");
+            fail(failure, "The world containing the test map is no longer loaded.");
             return;
         }
         int minX = area.centerX() - area.width() / 2;
@@ -451,10 +556,58 @@ public final class SmoothTerrainGenerator {
                                 + (error == null ? "unknown error" : error.getMessage()));
                         return;
                     }
-                    previousMap = null;
-                    deleteState();
+                    maps.remove(mapId);
+                    writeState();
                     if (complete != null) {
                         complete.accept(area.width() * area.width());
+                    }
+                }));
+    }
+
+    private void scheduleFaweClearAll(Player player, List<Area> all,
+                                      int totalColumns, Consumer<Integer> complete,
+                                      Consumer<String> failure, long operationId) {
+        // The maps are independent regions: submit every clear concurrently and complete once
+        // all of them report back. Progress is reported after the whole batch.
+        List<CompletableFuture<Boolean>> futures = new ArrayList<>(all.size());
+        for (Area area : all) {
+            World world = Bukkit.getWorld(area.world());
+            if (world == null) {
+                maps.remove(area.id());
+                continue;
+            }
+            int minX = area.centerX() - area.width() / 2;
+            int minZ = area.centerZ() - area.width() / 2;
+            int maxX = minX + area.width() - 1;
+            int maxZ = minZ + area.width() - 1;
+            try {
+                futures.add(terrainEditBridge.clear(world, minX, area.minY(), minZ,
+                        maxX, area.maxY(), maxZ));
+            } catch (Throwable error) {
+                maps.remove(area.id());
+            }
+        }
+        CompletableFuture<Void> joined = CompletableFuture.allOf(
+                futures.toArray(new CompletableFuture[0]));
+        joined.whenComplete((ignored, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
+                    boolean anyFailed = false;
+                    for (CompletableFuture<Boolean> future : futures) {
+                        if (future.isCompletedExceptionally() || !Boolean.TRUE.equals(future.getNow(false))) {
+                            anyFailed = true;
+                        }
+                    }
+                    maps.clear();
+                    writeState();
+                    running.remove(player.getUniqueId());
+                    busy.remove(player.getUniqueId());
+                    releaseOperation(operationId);
+                    if (anyFailed) {
+                        fail(failure, "FAWE could not fully delete the test maps; some blocks "
+                                + "may remain. Run /testarena delete again.");
+                        return;
+                    }
+                    if (complete != null) {
+                        complete.accept(totalColumns);
                     }
                 }));
     }
@@ -481,8 +634,8 @@ public final class SmoothTerrainGenerator {
                     writeColumn(world, columns.get(index), area.settings(), area.minY(), area.maxY());
                 }
                 if (index >= columns.size()) {
-                    previousMap = area;
-                    writeState(area);
+                    maps.put(area.id(), area);
+                    writeState();
                     running.remove(player.getUniqueId());
                     busy.remove(player.getUniqueId());
                     releaseOperation(operationId);
@@ -549,21 +702,24 @@ public final class SmoothTerrainGenerator {
         return columns.stream().mapToInt(c -> c.topY() - baseY).max().orElse(0);
     }
 
-    private void writeState(Area area) {
+    private void writeState() {
         File file = stateFile();
         YamlConfiguration yaml = new YamlConfiguration();
-        yaml.set("world", area.world());
-        yaml.set("center-x", area.centerX());
-        yaml.set("center-z", area.centerZ());
-        yaml.set("base-y", area.baseY());
-        yaml.set("width", area.width());
-        yaml.set("map", area.settings().map().key());
-        yaml.set("shape", area.settings().shape().name());
-        yaml.set("surface-only", area.settings().surfaceOnly());
-        yaml.set("max-height-delta", area.settings().maxHeightDelta());
-        yaml.set("foundation-depth", area.settings().foundationDepth());
-        yaml.set("min-y", area.minY());
-        yaml.set("max-y", area.maxY());
+        for (Area area : maps.values()) {
+            String path = "maps." + area.id();
+            yaml.set(path + ".world", area.world());
+            yaml.set(path + ".center-x", area.centerX());
+            yaml.set(path + ".center-z", area.centerZ());
+            yaml.set(path + ".base-y", area.baseY());
+            yaml.set(path + ".width", area.width());
+            yaml.set(path + ".map", area.settings().map().key());
+            yaml.set(path + ".shape", area.settings().shape().name());
+            yaml.set(path + ".surface-only", area.settings().surfaceOnly());
+            yaml.set(path + ".max-height-delta", area.settings().maxHeightDelta());
+            yaml.set(path + ".foundation-depth", area.settings().foundationDepth());
+            yaml.set(path + ".min-y", area.minY());
+            yaml.set(path + ".max-y", area.maxY());
+        }
         try {
             yaml.save(file);
         } catch (Exception e) {
@@ -571,43 +727,105 @@ public final class SmoothTerrainGenerator {
         }
     }
 
-    private Area readState() {
+    private java.util.Map<String, Area> readState() {
         File file = stateFile();
         if (!file.isFile()) {
-            return null;
+            return java.util.Map.of();
         }
         try {
             YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
-            TerrainMap map = TerrainMap.parse(yaml.getString("map"));
-            String world = yaml.getString("world");
-            if (map == null || world == null || !yaml.isSet("center-x") || !yaml.isSet("base-y")) {
-                return null;
+            java.util.Map<String, Area> loaded = new java.util.HashMap<>();
+            // New format: maps.<id>.* — several maps can coexist.
+            org.bukkit.configuration.ConfigurationSection mapsSection =
+                    yaml.getConfigurationSection("maps");
+            if (mapsSection != null) {
+                for (String id : mapsSection.getKeys(false)) {
+                    String path = "maps." + id;
+                    Area area = areaOf(yaml, path, id);
+                    if (area != null) {
+                        loaded.put(id, area);
+                    }
+                }
+                return loaded;
             }
-            int baseY = yaml.getInt("base-y");
-            TerrainShape shape;
-            try {
-                shape = TerrainShape.valueOf(yaml.getString("shape", TerrainShape.RANDOM.name()));
-            } catch (IllegalArgumentException ignored) {
-                shape = TerrainShape.RANDOM;
+            // Legacy format: one top-level map (no id). Migrate it under a synthetic id.
+            Area legacy = legacyArea(yaml);
+            if (legacy != null) {
+                loaded.put(legacy.id(), legacy);
             }
-            TerrainSettings settings = new TerrainSettings(map, shape,
-                    yaml.getBoolean("surface-only", false),
-                    yaml.getInt("max-height-delta", MAX_HEIGHT_DELTA));
-            int defaultBedrockY = baseY - settings.foundationDepth() - 1;
-            return new Area(world, yaml.getInt("center-x"), yaml.getInt("center-z"), baseY,
-                    yaml.getInt("width", WIDTH), settings,
-                    yaml.getInt("min-y", defaultBedrockY),
-                    yaml.getInt("max-y", baseY + settings.maxHeightDelta() + CLEAR_ABOVE));
+            return loaded;
         } catch (Exception ignored) {
-            return null;
+            return java.util.Map.of();
         }
     }
 
-    private void deleteState() {
-        File file = stateFile();
-        if (file.isFile() && !file.delete()) {
-            plugin.getLogger().warning("Could not remove " + file.getName());
+    private Area areaOf(YamlConfiguration yaml, String path, String id) {
+        TerrainMap map = TerrainMap.parse(yaml.getString(path + ".map"));
+        String world = yaml.getString(path + ".world");
+        if (map == null || world == null || !yaml.isSet(path + ".center-x")
+                || !yaml.isSet(path + ".base-y")) {
+            return null;
         }
+        int baseY = yaml.getInt(path + ".base-y");
+        TerrainShape shape = parseShape(yaml.getString(path + ".shape"));
+        int width = yaml.getInt(path + ".width", WIDTH);
+        TerrainSettings settings;
+        try {
+            settings = new TerrainSettings(map, width, shape,
+                    yaml.getBoolean(path + ".surface-only", false),
+                    yaml.getInt(path + ".max-height-delta", MAX_HEIGHT_DELTA));
+        } catch (IllegalArgumentException ignored) {
+            settings = new TerrainSettings(map, shape,
+                    yaml.getBoolean(path + ".surface-only", false),
+                    yaml.getInt(path + ".max-height-delta", MAX_HEIGHT_DELTA));
+            width = settings.sideLength();
+        }
+        int defaultBedrockY = baseY - settings.foundationDepth() - 1;
+        return new Area(id, world, yaml.getInt(path + ".center-x"), yaml.getInt(path + ".center-z"),
+                baseY, width, settings,
+                yaml.getInt(path + ".min-y", defaultBedrockY),
+                yaml.getInt(path + ".max-y", baseY + settings.maxHeightDelta() + CLEAR_ABOVE));
+    }
+
+    private Area legacyArea(YamlConfiguration yaml) {
+        TerrainMap map = TerrainMap.parse(yaml.getString("map"));
+        String world = yaml.getString("world");
+        if (map == null || world == null || !yaml.isSet("center-x") || !yaml.isSet("base-y")) {
+            return null;
+        }
+        int baseY = yaml.getInt("base-y");
+        TerrainShape shape = parseShape(yaml.getString("shape"));
+        TerrainSettings settings = new TerrainSettings(map, shape,
+                yaml.getBoolean("surface-only", false),
+                yaml.getInt("max-height-delta", MAX_HEIGHT_DELTA));
+        String id = nextMapId(world);
+        int defaultBedrockY = baseY - settings.foundationDepth() - 1;
+        return new Area(id, world, yaml.getInt("center-x"), yaml.getInt("center-z"), baseY,
+                yaml.getInt("width", WIDTH), settings,
+                yaml.getInt("min-y", defaultBedrockY),
+                yaml.getInt("max-y", baseY + settings.maxHeightDelta() + CLEAR_ABOVE));
+    }
+
+    private TerrainShape parseShape(String raw) {
+        if (raw == null) {
+            return TerrainShape.RANDOM;
+        }
+        try {
+            return TerrainShape.valueOf(raw);
+        } catch (IllegalArgumentException ignored) {
+            return TerrainShape.RANDOM;
+        }
+    }
+
+    /** Stable, filesystem-safe map id unique within the loaded map set. */
+    private String nextMapId(String worldName) {
+        long stamp = System.currentTimeMillis();
+        String candidate;
+        do {
+            candidate = worldName + "-" + Long.toString(stamp, 36);
+            stamp++;
+        } while (maps.containsKey(candidate));
+        return candidate;
     }
 
     private File stateFile() {

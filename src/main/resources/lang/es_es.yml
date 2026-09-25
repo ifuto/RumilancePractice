@@ -251,6 +251,7 @@ party:
   err-already-queued: "Ya estás esperando en la cola de combate de equipos."
   err-no-pending-duel: "No hay ninguna solicitud de duelo de equipo pendiente."
   err-duel-self: "No puedes retar a tu propio equipo."
+  err-wrong-kind: "Eso solo funciona para el tipo de grupo correcto (equipo o party)."
   err-cooldown: "Espera <secs>s antes de invitar de nuevo a ese jugador."
   err-busy-self: "<red>Ahora estás <state> — vuelve al lobby antes de crear o unirte a un equipo."
   err-member-busy: "<red><player> ahora está <state> — la batalla no puede empezar. Espera a que todos estén libres en el lobby."
@@ -575,6 +576,8 @@ gui:
   ffa-settings-tpa-name: "TPA"
   ffa-settings-tpa-lore: "Permite /tpa /tpahere /tpaccept /tpadeny en esta arena."
   ffa-settings-rtpqueue-name: "RTPQueue"
+  ffa-settings-rtp-name: "RTP"
+  ffa-settings-rtp-lore: "Permitir /rtp — teletransporte a un punto aleatorio seguro dentro de la arena."
   ffa-settings-rtpqueue-lore: "Empareja jugadores en cola en un punto aleatorio común."
   arena-source-title: "Orígenes de arenas"
   arena-source-empty: "No hay arenas registradas."
@@ -1353,6 +1356,13 @@ tpa:
   already-outbound: "<red>Ya tienes una solicitud de teletransporte enviada."
   target-busy: "<red>Ese jugador ya tiene una solicitud pendiente."
   moved-out: "<red>El otro jugador ya no está en esta arena."
+
+rtp:
+  teleported: "<green>Teletransportado a un punto aleatorio de la arena."
+  not-in-ffa: "<red>Solo puedes usar /rtp dentro de una arena FFA."
+  disabled: "<red>RTP está desactivado en esta arena."
+  in-combat: "<red>No puedes usar /rtp en combate."
+  no-spot: "<red>No se encontró un punto seguro en esta arena ahora mismo."
 
 rtpqueue:
   joined: "<aqua>En la cola RTP <gray>(<count> esperando)</gray>. /rtpqueue leave para cancelar."

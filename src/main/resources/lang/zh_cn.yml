@@ -251,6 +251,7 @@ party:
   err-already-queued: "已经在团队战队列中等待"
   err-no-pending-duel: "没有待处理的团队决斗请求"
   err-duel-self: "不能向自己的队伍发起挑战"
+  err-wrong-kind: "该操作仅适用于正确的组类型（队伍或派对）。"
   err-cooldown: "请等待 <secs> 秒后再邀请该玩家。"
   err-busy-self: "<red>你当前处于<state> — 创建或加入队伍前请先返回大厅。"
   err-member-busy: "<red><player> 当前处于<state> — 无法开始队伍战。请等所有人回到大厅空闲。"
@@ -575,6 +576,8 @@ gui:
   ffa-settings-tpa-name: "TPA"
   ffa-settings-tpa-lore: "允许本斗场内使用 /tpa /tpahere /tpaccept /tpadeny。"
   ffa-settings-rtpqueue-name: "RTPQueue"
+  ffa-settings-rtp-name: "RTP"
+  ffa-settings-rtp-lore: "允许 /rtp — 传送到竞技场内的随机安全地点。"
   ffa-settings-rtpqueue-lore: "将排队中的两名玩家传送到同一随机地点。"
   arena-source-title: "斗场来源"
   arena-source-empty: "尚未注册任何斗场。"
@@ -1353,6 +1356,13 @@ tpa:
   already-outbound: "<red>你已有发送中的传送请求。"
   target-busy: "<red>该玩家已有待处理请求。"
   moved-out: "<red>对方已不在本斗场。"
+
+rtp:
+  teleported: "<green>已传送到竞技场内的随机地点。"
+  not-in-ffa: "<red>你只能在 FFA 竞技场内使用 /rtp。"
+  disabled: "<red>此竞技场已禁用 RTP。"
+  in-combat: "<red>战斗中无法使用 /rtp。"
+  no-spot: "<red>此刻在此竞技场中找不到安全地点。"
 
 rtpqueue:
   joined: "<aqua>已加入 RTP 队列 <gray>(等待 <count> 人)</gray>。/rtpqueue leave 取消。"

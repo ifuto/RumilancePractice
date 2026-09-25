@@ -68,7 +68,9 @@ public final class TeamService {
         /** 受けるべき Team Duel Request がない。 */
         NO_PENDING_DUEL,
         /** 自分のパーティーには申し込めない。 */
-        DUEL_SELF
+        DUEL_SELF,
+        /** この操作はチーム / パーティのどちらか専用で、種別が合わない。 */
+        WRONG_KIND
     }
 
     private volatile com.rumilance.practice.session.PlayerStateManager stateManager;
@@ -168,6 +170,7 @@ public final class TeamService {
                 case ALREADY_QUEUED -> "party.err-already-queued";
                 case NO_PENDING_DUEL -> "party.err-no-pending-duel";
                 case DUEL_SELF -> "party.err-duel-self";
+                case WRONG_KIND -> "party.err-wrong-kind";
                 case COOLDOWN, OK, MEMBER_BUSY, SELF_BUSY -> "";
             };
             if (key.isEmpty()) {
@@ -194,6 +197,7 @@ public final class TeamService {
             case ALREADY_QUEUED -> "Already waiting in the team fight queue.";
             case NO_PENDING_DUEL -> "No pending team duel request.";
             case DUEL_SELF -> "You cannot challenge your own party.";
+            case WRONG_KIND -> "This works only for the right group kind (team or party).";
             case COOLDOWN -> {
                 int secs = remainingInviteCooldownSeconds(player.getUniqueId(), cooldownTarget);
                 yield "Wait " + Math.max(1, secs) + "s before inviting that player again.";
@@ -418,6 +422,9 @@ public final class TeamService {
             if (invite == null || !invite.teamId().equals(team.id()) || invite.expired(Instant.now())) {
                 return Result.NO_INVITE;
             }
+        } else if (team.kind() != GroupKind.PARTY) {
+            // Public browsing only lists parties — an internal team accepts members by invite.
+            return Result.WRONG_KIND;
         }
         if (team.size() >= MAX_TEAM_SIZE) return Result.TEAM_FULL;
         team.add(player.getUniqueId());
@@ -809,12 +816,38 @@ public final class TeamService {
 
     // ---- queries ----
 
+    /**
+     * Kind gate for one-kind-only lifecycle calls. Returns {@code null} when the caller is the
+     * owner of a group of {@code expected}; otherwise the {@link Result} describing the failure
+     * — {@link Result#NOT_IN_TEAM} when ungrouped, {@link Result#NOT_OWNER} when not the owner
+     * and {@link Result#WRONG_KIND} when the group exists but is the other kind. Keep these in
+     * the party "join" read (invites / public join / queue / duel / tournament) and in the team
+     * "smallest split" read (side assignment / team count / internal battle), so the two flows
+     * cannot cross.
+     */
+    private Result requireKind(UUID ownerId, GroupKind expected, boolean mustBeOwner) {
+        Team team = byMember.get(ownerId);
+        if (team == null) {
+            return Result.NOT_IN_TEAM;
+        }
+        if (mustBeOwner && !team.isOwner(ownerId)) {
+            return Result.NOT_OWNER;
+        }
+        if (team.kind() != expected) {
+            return Result.WRONG_KIND;
+        }
+        return Result.OK;
+    }
+
     public Optional<Team> teamOf(UUID player) {
         return Optional.ofNullable(byMember.get(player));
     }
 
     public List<Team> publicTeams() {
-        return byId.values().stream().filter(Team::isPublic).collect(Collectors.toList());
+        return byId.values().stream()
+                .filter(t -> t.kind() == GroupKind.PARTY)
+                .filter(Team::isPublic)
+                .collect(Collectors.toList());
     }
 
     public Optional<Team> byId(UUID id) {
@@ -904,9 +937,9 @@ public final class TeamService {
 
     /** 自分のパーティーを Team Fight Queue に入れる(相手チームはランダムに引かれる)。 */
     public Result queueFight(Player owner, String kitId) {
+        Result gate = requireKind(owner.getUniqueId(), GroupKind.PARTY, true);
+        if (gate != Result.OK) return gate;
         Team team = byMember.get(owner.getUniqueId());
-        if (team == null) return Result.NOT_IN_TEAM;
-        if (!team.isOwner(owner.getUniqueId())) return Result.NOT_OWNER;
         if (team.size() < MIN_TEAM_SIZE) return Result.TOO_SMALL;
         if (!team.isSplitReady()) return Result.UNBALANCED;
         if (teamFightQueue.isQueued(team.id())) return Result.ALREADY_QUEUED;
@@ -921,9 +954,9 @@ public final class TeamService {
 
     /** Queue から抜ける。 */
     public Result cancelQueueFight(Player owner) {
+        Result gate = requireKind(owner.getUniqueId(), GroupKind.PARTY, true);
+        if (gate != Result.OK) return gate;
         Team team = byMember.get(owner.getUniqueId());
-        if (team == null) return Result.NOT_IN_TEAM;
-        if (!team.isOwner(owner.getUniqueId())) return Result.NOT_OWNER;
         partyFightKits.remove(team.id());
         boolean removed = teamFightQueue.cancel(team.id());
         teamDuelRequests.cancelFrom(team.id());
@@ -959,13 +992,14 @@ public final class TeamService {
 
     /** 相手パーティーのオーナーへ Team vs Team を申し込む。 */
     public Result requestTeamDuel(Player owner, String targetPartyName, String kitId) {
+        Result gate = requireKind(owner.getUniqueId(), GroupKind.PARTY, true);
+        if (gate != Result.OK) return gate;
         Team team = byMember.get(owner.getUniqueId());
-        if (team == null) return Result.NOT_IN_TEAM;
-        if (!team.isOwner(owner.getUniqueId())) return Result.NOT_OWNER;
         if (team.size() < MIN_TEAM_SIZE) return Result.TOO_SMALL;
         if (!team.isSplitReady()) return Result.UNBALANCED;
         Team target = findByName(targetPartyName).orElse(null);
         if (target == null) return Result.INVALID_NAME;
+        if (target.kind() != GroupKind.PARTY) return Result.WRONG_KIND;
         Result preflight = partyFightPreflight(team);
         if (preflight != Result.OK) return preflight;
         partyFightKits.put(team.id(), kitId);
@@ -997,9 +1031,9 @@ public final class TeamService {
 
     /** 保留中の Team Duel Request を受けて試合を始める。 */
     public Result acceptTeamDuel(Player owner) {
+        Result gate = requireKind(owner.getUniqueId(), GroupKind.PARTY, true);
+        if (gate != Result.OK) return gate;
         Team team = byMember.get(owner.getUniqueId());
-        if (team == null) return Result.NOT_IN_TEAM;
-        if (!team.isOwner(owner.getUniqueId())) return Result.NOT_OWNER;
         Optional<TeamDuelRequests.Request> pending = teamDuelRequests.pendingFor(team.id());
         if (pending.isEmpty()) return Result.NO_PENDING_DUEL;
         Team challenger = byId.get(pending.get().fromParty());
@@ -1013,9 +1047,9 @@ public final class TeamService {
 
     /** 保留中の Team Duel Request を断る。 */
     public Result denyTeamDuel(Player owner) {
+        Result gate = requireKind(owner.getUniqueId(), GroupKind.PARTY, true);
+        if (gate != Result.OK) return gate;
         Team team = byMember.get(owner.getUniqueId());
-        if (team == null) return Result.NOT_IN_TEAM;
-        if (!team.isOwner(owner.getUniqueId())) return Result.NOT_OWNER;
         if (!teamDuelRequests.deny(team.id())) return Result.NO_PENDING_DUEL;
         broadcast(team, Component.text("Team duel declined.", NamedTextColor.GRAY));
         return Result.OK;

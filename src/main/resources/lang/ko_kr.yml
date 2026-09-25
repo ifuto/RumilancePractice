@@ -251,6 +251,7 @@ party:
   err-already-queued: "이미 팀전 대기열에서 기다리는 중입니다"
   err-no-pending-duel: "대기 중인 팀 결투 요청이 없습니다"
   err-duel-self: "자기 파티에게는 신청할 수 없습니다"
+  err-wrong-kind: "해당 작업은 올바른 그룹 종류(팀 또는 파티)에서만 동작합니다."
   err-cooldown: "<secs>초 후에 해당 플레이어를 다시 초대할 수 있습니다."
   err-busy-self: "<red>현재 <state> 상태입니다 — 파티를 만들거나 참가하려면 먼저 로비로 돌아가세요."
   err-member-busy: "<red><player> 님은 현재 <state> 상태입니다 — 파티 배틀을 시작할 수 없습니다. 모두 로비에서 대기할 때까지 기다리세요."
@@ -575,6 +576,8 @@ gui:
   ffa-settings-tpa-name: "TPA"
   ffa-settings-tpa-lore: "이 아레나에서 /tpa /tpahere /tpaccept /tpadeny 허용."
   ffa-settings-rtpqueue-name: "RTPQueue"
+  ffa-settings-rtp-name: "RTP"
+  ffa-settings-rtp-lore: "/rtp 허용 — 아레나 내 임의의 안전 지점으로 순간이동합니다."
   ffa-settings-rtpqueue-lore: "대기 중인 두 명을 같은 무작위 지점으로 TP."
   arena-source-title: "아레나 원본"
   arena-source-empty: "등록된 아레나가 없습니다."
@@ -1353,6 +1356,13 @@ tpa:
   already-outbound: "<red>이미 전송한 TP 요청이 있습니다."
   target-busy: "<red>해당 플레이어에게 이미 보류 중인 요청이 있습니다."
   moved-out: "<red>상대방은 더 이상 이 아레나에 없습니다."
+
+rtp:
+  teleported: "<green>아레나의 임의 지점으로 순간이동했습니다."
+  not-in-ffa: "<red>/rtp는 FFA 아레나 안에서만 사용할 수 있습니다."
+  disabled: "<red>이 아레나에서는 RTP가 비활성화되어 있습니다."
+  in-combat: "<red>전투 중에는 /rtp를 사용할 수 없습니다."
+  no-spot: "<red>지금 이 아레나에서 안전한 지점을 찾지 못했습니다."
 
 rtpqueue:
   joined: "<aqua>RTP 큐에 참가했습니다 <gray>(<count>명 대기)</gray>. /rtpqueue leave 로 취소."

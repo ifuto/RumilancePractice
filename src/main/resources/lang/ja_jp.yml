@@ -252,6 +252,7 @@ party:
   err-already-queued: "すでにチーム戦のキューで待機中です"
   err-no-pending-duel: "保留中のチームデュエル申請はありません"
   err-duel-self: "自分のパーティーには申し込めません"
+  err-wrong-kind: "それは正しいグループ種別（チームまたはパーティ）でのみ使えます。"
   err-cooldown: "その相手への招待は30秒に1回です。あと <secs> 秒待ってください。"
   err-busy-self: "<red>あなたは <state> のため、パーティを作成・参加できません。先にロビーへ戻ってください。"
   err-member-busy: "<red><player> は <state> のため、パーティ対戦を開始できません。全員がロビーに集まるのを待ってください。"
@@ -576,6 +577,8 @@ gui:
   ffa-settings-tpa-name: "TPA"
   ffa-settings-tpa-lore: "このアリーナ内で /tpa /tpahere /tpaccept /tpadeny を許可。"
   ffa-settings-rtpqueue-name: "RTPQueue"
+  ffa-settings-rtp-name: "RTP"
+  ffa-settings-rtp-lore: "アリーナ内の安全なランダム地点へテレポートする /rtp を許可する。"
   ffa-settings-rtpqueue-lore: "キュー待ち2人を同じランダム地点へTPして対戦。"
   arena-source-title: "アリーナコピー元"
   arena-source-empty: "登録済みアリーナがありません。"
@@ -1354,6 +1357,13 @@ tpa:
   already-outbound: "<red>送信済みのTPリクエストが残っています。"
   target-busy: "<red>そのプレイヤーには既に保留中のリクエストがあります。"
   moved-out: "<red>相手はもうこのアリーナにいません。"
+
+rtp:
+  teleported: "<green>アリーナ内のランダムな地点にテレポートしました。"
+  not-in-ffa: "<red>/rtp はFFAアリーナ内でのみ使えます。"
+  disabled: "<red>このアリーナではRTPが無効です。"
+  in-combat: "<red>戦闘中は /rtp を使えません。"
+  no-spot: "<red>このアリーナに今、安全な地点が見つかりません。"
 
 rtpqueue:
   joined: "<aqua>RTPキューに参加しました <gray>(待機 <count> 人)</gray>。/rtpqueue leave でキャンセル。"

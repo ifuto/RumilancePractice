@@ -275,6 +275,7 @@ public final class TeamCommand implements CommandExecutor, TabCompleter {
             case ALREADY_QUEUED -> "Already waiting in the team fight queue.";
             case NO_PENDING_DUEL -> "No pending team duel request.";
             case DUEL_SELF -> "You cannot challenge your own party.";
+            case WRONG_KIND -> "That only works for the right group kind (team or party).";
             default -> r.name();
         };
         return Component.text(msg, NamedTextColor.RED);

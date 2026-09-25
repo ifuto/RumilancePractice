@@ -33,6 +33,7 @@ import com.rumilance.practice.command.DuelCommand;
 import com.rumilance.practice.command.EkitAdminCommand;
 import com.rumilance.practice.command.FfaCommand;
 import com.rumilance.practice.command.FfaTpaCommand;
+import com.rumilance.practice.command.FfaRtpCommand;
 import com.rumilance.practice.command.FfaRtpQueueCommand;
 import com.rumilance.practice.command.GiveItemCommand;
 import com.rumilance.practice.command.LangCommand;
@@ -82,6 +83,7 @@ import com.rumilance.practice.ffa.FfaBlockTracker;
 import com.rumilance.practice.ffa.FfaListener;
 import com.rumilance.practice.ffa.FfaService;
 import com.rumilance.practice.ffa.FfaTpaService;
+import com.rumilance.practice.ffa.FfaRtpService;
 import com.rumilance.practice.ffa.FfaRtpQueueService;
 import com.rumilance.practice.guard.ItemFlowGuardListener;
 import com.rumilance.practice.ffa.FfaSpawnIndex;
@@ -1811,8 +1813,10 @@ public final class FeatureBootstrap {
         bind("tpadeny", ffaTpaCommand);
         FfaRtpQueueService ffaRtpQueueService = new FfaRtpQueueService(ffaService, ffaSpawnIndex, messageService);
         FfaRtpQueueCommand ffaRtpQueueCommand = new FfaRtpQueueCommand(ffaRtpQueueService);
-        bind("rtp", ffaRtpQueueCommand);
         bind("rtpqueue", ffaRtpQueueCommand);
+        FfaRtpService ffaRtpService = new FfaRtpService(ffaService, ffaSpawnIndex, messageService);
+        FfaRtpCommand ffaRtpCommand = new FfaRtpCommand(ffaRtpService);
+        bind("rtp", ffaRtpCommand);
         // Drop stale TPA requests / RTP queue entries on quit or when a player leaves an arena.
         pm.registerEvents(new org.bukkit.event.Listener() {
             @org.bukkit.event.EventHandler
@@ -1826,6 +1830,7 @@ public final class FeatureBootstrap {
             ffaRtpQueueService.cancelAll(id);
         });
         services.register(FfaTpaService.class, ffaTpaService);
+        services.register(FfaRtpService.class, ffaRtpService);
         services.register(FfaRtpQueueService.class, ffaRtpQueueService);
         bind("killeffect", new com.rumilance.practice.command.KillEffectCommand(killEffectGui));
         bind("leave", new LeaveCommand(matchService, messageService));

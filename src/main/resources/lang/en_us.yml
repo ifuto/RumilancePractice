@@ -253,6 +253,7 @@ party:
   err-already-queued: "Already waiting in the team fight queue."
   err-no-pending-duel: "No pending team duel request."
   err-duel-self: "You cannot challenge your own party."
+  err-wrong-kind: "That only works for the right group kind (team or party)."
   err-cooldown: "Wait <secs>s before inviting that player again."
   err-busy-self: "<red>You are <state> right now — return to the lobby before creating or joining a party."
   err-member-busy: "<red><player> is <state> right now — the party battle cannot start. Wait until everyone is free in the lobby."
@@ -576,6 +577,8 @@ gui:
   ffa-settings-size-lore: "Region footprint measured from above."
   ffa-settings-tpa-name: "TPA"
   ffa-settings-tpa-lore: "Allow /tpa /tpahere /tpaccept /tpadeny inside this arena."
+  ffa-settings-rtp-name: "RTP"
+  ffa-settings-rtp-lore: "Allow /rtp — random safe spot teleport inside this arena."
   ffa-settings-rtpqueue-name: "RTPQueue"
   ffa-settings-rtpqueue-lore: "Pair queued players onto a shared random spot."
   arena-source-title: "Arena Sources"
@@ -1355,6 +1358,13 @@ tpa:
   already-outbound: "<red>You already have an outgoing teleport request."
   target-busy: "<red>That player already has a pending request."
   moved-out: "<red>The other player is no longer in this arena."
+
+rtp:
+  teleported: "<green>Teleported to a random spot in the arena."
+  not-in-ffa: "<red>You can only use /rtp inside an FFA arena."
+  disabled: "<red>RTP is disabled in this arena."
+  in-combat: "<red>You cannot /rtp while in combat."
+  no-spot: "<red>No safe spot found in this arena right now."
 
 rtpqueue:
   joined: "<aqua>Joined the RTP queue <gray>(<count> waiting)</gray>. /rtpqueue leave to cancel."

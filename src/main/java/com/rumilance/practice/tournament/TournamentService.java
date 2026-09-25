@@ -88,7 +88,10 @@ public final class TournamentService implements PartyTournamentHook {
     /** Number of color teams that would enter a tournament for {@code owner}'s party right now. */
     public int entrantCount(Player owner) {
         Team team = teamService.teamOf(owner.getUniqueId()).orElse(null);
-        return team == null ? 0 : nonEmptySides(team).size();
+        if (team == null || team.kind() != com.rumilance.practice.team.GroupKind.PARTY) {
+            return 0;
+        }
+        return nonEmptySides(team).size();
     }
 
     /**
@@ -103,6 +106,9 @@ public final class TournamentService implements PartyTournamentHook {
         }
         if (!team.isOwner(owner.getUniqueId())) {
             return "Only the team owner can start a tournament.";
+        }
+        if (team.kind() != com.rumilance.practice.team.GroupKind.PARTY) {
+            return "Tournaments run over parties, not internal teams.";
         }
         if (nonEmptySides(team).size() < 2) {
             return "Assign members to at least two color sides first.";
@@ -121,6 +127,10 @@ public final class TournamentService implements PartyTournamentHook {
         Team team = teamService.teamOf(owner.getUniqueId()).orElse(null);
         if (team == null || !team.isOwner(owner.getUniqueId())) {
             owner.sendMessage(msg("Only the team owner can start a tournament.", NamedTextColor.RED));
+            return false;
+        }
+        if (team.kind() != com.rumilance.practice.team.GroupKind.PARTY) {
+            owner.sendMessage(msg("Tournaments run over parties, not internal teams.", NamedTextColor.RED));
             return false;
         }
         if (byTag.containsKey(baseTag(team.id()))) {

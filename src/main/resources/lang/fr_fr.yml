@@ -251,6 +251,7 @@ party:
   err-already-queued: "Déjà en attente dans la file de combat d'équipe."
   err-no-pending-duel: "Aucune demande de duel d'équipe en attente."
   err-duel-self: "Vous ne pouvez pas défier votre propre équipe."
+  err-wrong-kind: "Cela ne fonctionne que pour le bon type de groupe (team ou party)."
   err-cooldown: "Attends <secs>s avant de réinviter ce joueur."
   err-busy-self: "<red>Tu es <state> actuellement — retourne au lobby avant de créer ou rejoindre une équipe."
   err-member-busy: "<red><player> est <state> actuellement — la bataille ne peut pas commencer. Attends que tout le monde soit libre au lobby."
@@ -575,6 +576,8 @@ gui:
   ffa-settings-tpa-name: "TPA"
   ffa-settings-tpa-lore: "Autorise /tpa /tpahere /tpaccept /tpadeny dans cette arène."
   ffa-settings-rtpqueue-name: "RTPQueue"
+  ffa-settings-rtp-name: "RTP"
+  ffa-settings-rtp-lore: "Autoriser /rtp — téléportation aléatoire sûre dans l'arène."
   ffa-settings-rtpqueue-lore: "Associe deux joueurs en file sur un point aléatoire commun."
   arena-source-title: "Sources des arènes"
   arena-source-empty: "Aucune arène enregistrée."
@@ -1353,6 +1356,13 @@ tpa:
   already-outbound: "<red>Tu as déjà une demande de téléportation en cours."
   target-busy: "<red>Ce joueur a déjà une demande en attente."
   moved-out: "<red>L’autre joueur n’est plus dans cette arène."
+
+rtp:
+  teleported: "<green>Téléporté à un point aléatoire de l'arène."
+  not-in-ffa: "<red>Vous ne pouvez utiliser /rtp que dans une arène FFA."
+  disabled: "<red>RTP est désactivé dans cette arène."
+  in-combat: "<red>Impossible d'utiliser /rtp en combat."
+  no-spot: "<red>Aucun point sûr trouvé dans cette arène pour le moment."
 
 rtpqueue:
   joined: "<aqua>Dans la file RTP <gray>(<count> en attente)</gray>. /rtpqueue leave pour annuler."

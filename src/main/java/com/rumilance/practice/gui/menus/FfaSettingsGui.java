@@ -138,6 +138,13 @@ public final class FfaSettingsGui extends AbstractGui {
                 line(player, "gui.ffa-settings-tpa-lore"),
                 "toggle:tpa"));
 
+        inventory.setItem(MenuScaffold.gridSlot(13), toggleItem(player,
+                Material.COMPASS,
+                line(player, "gui.ffa-settings-rtp-name"),
+                arena.rtpEnabled(),
+                line(player, "gui.ffa-settings-rtp-lore"),
+                "toggle:rtp"));
+
         inventory.setItem(MenuScaffold.gridSlot(14), toggleItem(player,
                 Material.MAP,
                 line(player, "gui.ffa-settings-rtpqueue-name"),
@@ -221,6 +228,7 @@ public final class FfaSettingsGui extends AbstractGui {
             }
             switch (action.substring(7)) {
                 case "tpa" -> ffaService.setTpaEnabled(arena.id(), !arena.tpaEnabled());
+                case "rtp" -> ffaService.setRtpEnabled(arena.id(), !arena.rtpEnabled());
                 case "rtpqueue" -> ffaService.setRtpQueueEnabled(arena.id(), !arena.rtpQueueEnabled());
                 default -> { }
             }
