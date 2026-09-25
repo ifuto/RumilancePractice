@@ -48,12 +48,20 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
     private static final int SIZE_32_SLOT = 3;
     private static final int SIZE_64_SLOT = 4;
     private static final int SIZE_100_SLOT = 5;
+    private static final int SIZE_CUSTOM_SLOT = 6;
     private static final int START_SLOT = 49;
 
     private final SmoothTerrainGenerator generator;
+    private final com.rumilance.practice.testarena.SideLengthAnvilService anvilService;
 
     public TestArenaCommand(SmoothTerrainGenerator generator) {
+        this(generator, null);
+    }
+
+    public TestArenaCommand(SmoothTerrainGenerator generator,
+                            com.rumilance.practice.testarena.SideLengthAnvilService anvilService) {
         this.generator = generator;
+        this.anvilService = anvilService;
     }
 
     @Override
@@ -206,6 +214,16 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
         MapMenuHolder holder = new MapMenuHolder();
         holder.size = Math.max(SmoothTerrainGenerator.MIN_WIDTH,
                 Math.min(SmoothTerrainGenerator.MAX_WIDTH, size));
+        openSettingsMenu(player, holder);
+    }
+
+    /** Opens a fresh inventory bound to {@code holder}, preserving its existing selections. */
+    private void openSettingsMenu(Player player, MapMenuHolder holder) {
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+        holder.size = Math.max(SmoothTerrainGenerator.MIN_WIDTH,
+                Math.min(SmoothTerrainGenerator.MAX_WIDTH, holder.size));
         Inventory inventory = Bukkit.createInventory(holder, 54,
                 Component.text("TestArena: map settings", NamedTextColor.DARK_AQUA));
         holder.bind(inventory);
@@ -265,6 +283,13 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
                 selected(holder.size == 100, "Side length: 100"),
                 "100 x 100 blocks (default)"));
 
+        // Custom side length: the anvil prompt. Pressing the fixed Quick sizes first is fine,
+        // but any custom length goes through the anvil naming dialog (21-256).
+        inventory.setItem(SIZE_CUSTOM_SLOT, item(Material.NAME_TAG,
+                selected(holder.size != 32 && holder.size != 64 && holder.size != 100,
+                        "Side length: " + holder.size),
+                "Enter a custom side length (21-256)", "Opens the anvil naming dialog"));
+
         inventory.setItem(START_SLOT, item(Material.EMERALD_BLOCK, "Generate test map",
                 "Click to create the selected " + holder.size + " x " + holder.size + " map"));
         inventory.setItem(53, item(Material.BARRIER, "Close", "No map will be created."));
@@ -309,6 +334,24 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
             case SIZE_32_SLOT -> holder.size = 32;
             case SIZE_64_SLOT -> holder.size = 64;
             case SIZE_100_SLOT -> holder.size = 100;
+            case SIZE_CUSTOM_SLOT -> {
+                if (anvilService != null) {
+                    int current = holder.size;
+                    com.rumilance.practice.testarena.SideLengthAnvilService.OpenResult opened =
+                            anvilService.open(player, current,
+                                    (p, parsed) -> reapplySettings(player, holder, parsed),
+                                    (p, raw) -> openSettingsAndReopen(p, holder),
+                                    p -> openSettingsAndReopen(p, holder));
+                    if (opened == com.rumilance.practice.testarena.SideLengthAnvilService.OpenResult.BUSY) {
+                        player.sendMessage(Component.text(
+                                "A side length prompt is already open.", NamedTextColor.YELLOW));
+                    }
+                } else {
+                    player.sendMessage(Component.text(
+                            "Custom side length is unavailable.", NamedTextColor.RED));
+                }
+                return;
+            }
             case START_SLOT -> {
                 player.closeInventory();
                 SmoothTerrainGenerator.TerrainMap map = holder.map;
@@ -328,6 +371,27 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
             default -> { return; }
         }
         render(holder);
+    }
+
+    private void reapplySettings(Player player, MapMenuHolder holder, int parsed) {
+        holder.size = Math.max(SmoothTerrainGenerator.MIN_WIDTH,
+                Math.min(SmoothTerrainGenerator.MAX_WIDTH, parsed));
+        openSettingsAndReopen(player, holder);
+    }
+
+    /** Reopens the settings menu (the anvil takes the inventory screen). */
+    private void openSettingsAndReopen(Player player, MapMenuHolder holder) {
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+        player.closeInventory();
+        Bukkit.getScheduler().runTask(
+                org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(TestArenaCommand.class),
+                () -> {
+                    if (player.isOnline()) {
+                        openSettingsMenu(player, holder);
+                    }
+                });
     }
 
     @Override

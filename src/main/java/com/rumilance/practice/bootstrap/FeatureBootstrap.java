@@ -1695,6 +1695,15 @@ public final class FeatureBootstrap {
         duelRequestGui.setTeamService(teamService);
         duelRequestGui.setMatchService(matchService);
         queueCoordinator.setTeamService(teamService);
+        // 申請一覧 — the centralised request inbox behind the Battle Menu button. Bedrock
+        // ('.'-prefixed) clients struggle with chat clicks, so this GUI is the accept/deny
+        // surface they get; the Battle Menu shows the button only to those players.
+        com.rumilance.practice.gui.menus.RequestInboxGui requestInboxGui =
+                new com.rumilance.practice.gui.menus.RequestInboxGui(
+                        guiSessions, soundService, duelRequestService, teamService, rankedDuel);
+        guiListener.register(requestInboxGui);
+        battleMenuGui.setRequestInboxGui(requestInboxGui);
+        battleMenuGui.setDuelRequestService(duelRequestService);
         AcceptDenyCommand acceptDeny = new AcceptDenyCommand(rankedDuel, duelRequestService);
         pm.registerEvents(new DuelChatInterceptListener(rankedDuel, duelRequestService), plugin);
         ArenaKitAdminCommand arenaKitAdmin = new ArenaKitAdminCommand(
@@ -1763,8 +1772,11 @@ public final class FeatureBootstrap {
             terrainEditBridge = com.rumilance.practice.arena.fawe.FaweTerrainBridge
                     .createIfAvailable(plugin, asyncExecutor);
         }
-        TestArenaCommand testArenaCommand = new TestArenaCommand(
-                new SmoothTerrainGenerator(plugin, terrainEditBridge));
+        SmoothTerrainGenerator terrainGenerator = new SmoothTerrainGenerator(plugin, terrainEditBridge);
+        com.rumilance.practice.testarena.SideLengthAnvilService sideLengthAnvil =
+                new com.rumilance.practice.testarena.SideLengthAnvilService(plugin, messageService);
+        pm.registerEvents(sideLengthAnvil, plugin);
+        TestArenaCommand testArenaCommand = new TestArenaCommand(terrainGenerator, sideLengthAnvil);
         bind("testarena", testArenaCommand);
         pm.registerEvents(testArenaCommand, plugin);
         bind("admin", adminCommand);

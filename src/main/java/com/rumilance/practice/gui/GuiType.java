@@ -71,5 +71,6 @@ public enum GuiType {
     ADMIN_PLAYER_DATA,
     SIGN_KIT_SELECT,
     CHAT_SETTINGS,
-    TOURNAMENT
+    TOURNAMENT,
+    REQUEST_INBOX
 }

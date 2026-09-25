@@ -62,6 +62,8 @@ public final class BattleMenuGui extends AbstractGui {
     private MatchHistoryGui matchHistoryGui;
     private PracticeBotSelectGui botSelectGui;
     private PracticeService practiceService;
+    private RequestInboxGui requestInboxGui;
+    private com.rumilance.practice.duel.DuelRequestService duelRequestService;
 
     public BattleMenuGui(
             GuiSessionRegistry registry,
@@ -113,6 +115,36 @@ public final class BattleMenuGui extends AbstractGui {
         this.practiceService = practiceService;
     }
 
+    /** Centralised request inbox (申請一覧), opened only by Bedrock players. */
+    public void setRequestInboxGui(RequestInboxGui requestInboxGui) {
+        this.requestInboxGui = requestInboxGui;
+    }
+
+    /** Duel-request service backing the live 申請一覧 count on the Bedrock tile. */
+    public void setDuelRequestService(
+            com.rumilance.practice.duel.DuelRequestService duelRequestService) {
+        this.duelRequestService = duelRequestService;
+    }
+
+    /** Live pending-request count shown on the 申請一覧 tile. */
+    private int pendingRequestCount(Player player) {
+        int count = 0;
+        if (duelRequestService != null) {
+            count += duelRequestService.incoming(player.getUniqueId()).size();
+        }
+        if (teamService != null) {
+            if (teamService.incomingInvite(player.getUniqueId()).isPresent()) {
+                count += 1;
+            }
+            var team = teamService.teamOf(player.getUniqueId()).orElse(null);
+            if (team != null && team.kind() == com.rumilance.practice.team.GroupKind.PARTY
+                    && teamService.pendingDuelFor(team.id()).isPresent()) {
+                count += 1;
+            }
+        }
+        return count;
+    }
+
     @Override
     protected Component title(Player player, GuiSession session) {
         return t(player, "menu.battle-title").color(UiTheme.PRIMARY)
@@ -151,6 +183,26 @@ public final class BattleMenuGui extends AbstractGui {
         }
         if (matchHistoryGui != null) {
             inventory.setItem(GuiSlots.slot(2, 6), historyTile(player, state));
+        }
+
+        // Row 3 — 申請一覧 (Bedrock players only: their platform lacks the chat-click
+        // accept/deny flow, so every incoming request is consolidated here).
+        if (requestInboxGui != null && PlayerPlatform.of(player) == PlayerPlatform.BEDROCK) {
+            int pending = Math.max(0, pendingRequestCount(player));
+            inventory.setItem(GuiSlots.slot(3, 4),
+                    ItemBuilder.of(Material.PAPER)
+                            .name(t(player, "gui.request-inbox").color(UiTheme.SECONDARY))
+                            .lore(UiTheme.divider(),
+                                    UiTheme.line(line(player, "gui.request-inbox-lore")),
+                                    UiTheme.blank(),
+                                    UiTheme.status(line(player, "gui.request-inbox-count")
+                                            .replace("<n>", String.valueOf(pending)),
+                                            pending > 0 ? UiTheme.SUCCESS : UiTheme.MUTED),
+                                    UiTheme.blank(),
+                                    UiTheme.hint(line(player, "gui.request-inbox-hint")))
+                            .glintIf(pending > 0)
+                            .action("requests")
+                            .build());
         }
 
         paintNav(player, session, inventory);
@@ -340,6 +392,11 @@ public final class BattleMenuGui extends AbstractGui {
             case "history" -> {
                 if (matchHistoryGui != null) {
                     openChild(player, matchHistoryGui::open);
+                }
+            }
+            case "requests" -> {
+                if (requestInboxGui != null) {
+                    openChild(player, requestInboxGui::open);
                 }
             }
             default -> {

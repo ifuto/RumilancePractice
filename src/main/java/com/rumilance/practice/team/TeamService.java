@@ -854,6 +854,30 @@ public final class TeamService {
         return Optional.ofNullable(byId.get(id));
     }
 
+    /**
+     * The live group invite currently waiting for a player (party or internal team). The
+     * Battle Menu 申請一覧 (centralised request inbox) reads it next to duel and team-duel
+     * requests. One invite per player: the map key IS the target, so a newer invite replaces
+     * the old one. Expired entries simply report empty (they are removed on consume/join).
+     */
+    public record IncomingInvite(UUID teamId, String teamName, UUID fromOwner, GroupKind kind) {
+    }
+
+    public Optional<IncomingInvite> incomingInvite(UUID playerId) {
+        if (playerId == null) {
+            return Optional.empty();
+        }
+        Invite invite = invites.get(playerId);
+        if (invite == null || invite.expired(Instant.now())) {
+            return Optional.empty();
+        }
+        Team team = byId.get(invite.teamId());
+        if (team == null) {
+            return Optional.empty();
+        }
+        return Optional.of(new IncomingInvite(team.id(), team.name(), team.owner(), team.kind()));
+    }
+
     public Optional<Team> findByName(String name) {
         if (name == null) return Optional.empty();
         String lower = name.toLowerCase(Locale.ROOT);
