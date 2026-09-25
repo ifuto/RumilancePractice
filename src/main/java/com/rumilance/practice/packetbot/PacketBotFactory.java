@@ -1,8 +1,6 @@
 package com.rumilance.practice.packetbot;
 
 import com.mojang.authlib.GameProfile;
-import com.mojang.authlib.properties.Property;
-import com.destroystokyo.paper.profile.ProfileProperty;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ClientInformation;
@@ -56,8 +54,13 @@ public final class PacketBotFactory {
         // テンプレート玩家のプロパティを持つプロファイルを 3 引数コンストラクタで作る。
         // (GameProfile は record 化されているので getId()/getName() には頼らない)
         if (template instanceof org.bukkit.craftbukkit.entity.CraftPlayer craft) {
-            profile = new GameProfile(profileId, profileName,
-                    craft.getHandle().getGameProfile().properties());
+            try {
+                profile = new GameProfile(profileId, profileName,
+                        craft.getHandle().getGameProfile().properties());
+            } catch (Throwable authlibDrift) {
+                // authlib/Paper 形状ドリフトでも spawn 自体は止めない: スキンレスへフォールバック。
+                profile = new GameProfile(profileId, profileName);
+            }
         }
         return spawn(location, profile, maxHp, displayName);
     }

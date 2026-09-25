@@ -1,7 +1,6 @@
 package com.rumilance.practice.herobot;
 
 import com.mojang.authlib.GameProfile;
-import com.mojang.authlib.properties.Property;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ClientInformation;
@@ -119,7 +118,15 @@ public final class HeroBotRegistry {
             // UnsupportedOperationException になる。プロパティを持ったプロファイルを
             // 3引数コンストラクタで最初から作る。
             if (skinTemplate instanceof org.bukkit.craftbukkit.entity.CraftPlayer craft) {
-                profile = new GameProfile(uuid, name, craft.getHandle().getGameProfile().properties());
+                try {
+                    profile = new GameProfile(uuid, name,
+                            craft.getHandle().getGameProfile().properties());
+                } catch (Throwable authlibDrift) {
+                    // authlib/Paper 形状がまた変わっても spawn 自体は止めない: 上で作った
+                    // スキンレスの 2 引数プロファイルへフォールバックする (見た目だけ Alex)。
+                    this.plugin.getLogger().warning("[HeroBot] skin copy unavailable for " + name
+                            + " (" + authlibDrift.getClass().getSimpleName() + "); spawning skinless");
+                }
             }
         } else {
             net.minecraft.server.level.ServerPlayer online =
