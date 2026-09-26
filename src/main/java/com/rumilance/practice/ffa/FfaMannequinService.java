@@ -218,7 +218,7 @@ public final class FfaMannequinService implements Listener {
                 m.setCollidable(true);
                 m.setPersistent(false);       // never written to disk: no dummies after a restart
             });
-        } catch (RuntimeException | IllegalArgumentException error) {
+        } catch (RuntimeException error) {   // IllegalArgumentException is one of these
             plugin.getLogger().warning("[N Arena][FfaBot] mannequin spawn failed: " + error);
             return null;
         }
