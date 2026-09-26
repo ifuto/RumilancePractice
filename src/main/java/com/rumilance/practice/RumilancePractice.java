@@ -179,6 +179,12 @@ public final class RumilancePractice extends JavaPlugin {
         if (featureBootstrap != null) {
             featureBootstrap.disable();
         }
+        // Delayed (debounced) config writes may still be queued: flush them BEFORE the
+        // scheduler is torn down or the last second of edits would be lost on every stop.
+        if (serviceRegistry != null) {
+            serviceRegistry.find(com.rumilance.practice.config.ConfigService.class)
+                    .ifPresent(com.rumilance.practice.config.ConfigService::flushPendingSaves);
+        }
         if (databaseService != null) {
             databaseService.close();
         }

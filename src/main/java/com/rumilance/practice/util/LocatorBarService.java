@@ -38,7 +38,7 @@ public final class LocatorBarService implements Listener {
     /** Vanilla player base for both waypoint ranges. 0 disables the bar per player. */
     public static final double FULL_RANGE = 60_000_000.0d;
     private static final double DISABLED = 0.0d;
-    private static final long SWEEP_PERIOD_TICKS = 40L;
+    private static final long SWEEP_PERIOD_TICKS = 20L;
 
     private final Plugin plugin;
     private final Predicate<UUID> combatant;
@@ -119,6 +119,9 @@ public final class LocatorBarService implements Listener {
 
     @EventHandler
     public void onRespawn(PlayerRespawnEvent event) {
-        apply(event.getPlayer());
+        // Vanilla resets every attribute to its default base while the respawn completes,
+        // AFTER this event fires — writing here would silently restore the dead-state
+        // visibility. Re-apply one tick later so the bar visibility survives deaths.
+        Bukkit.getScheduler().runTask(plugin, () -> apply(event.getPlayer()));
     }
 }

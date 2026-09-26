@@ -556,9 +556,10 @@ public final class FfaService {
         killStreaks.put(player.getUniqueId(), 0);
         combatUntil.remove(player.getUniqueId());
         player.setCanPickupItems(true);
-        // Spawn the joining player at a RANDOM spot on grass in the arena (top-down
-        // column scan); fall back to the indexed/configured spawn when no grass is found.
-        Location dest = randomGrassSpawn(arena);
+        // Spawn the joining player at a RANDOM standable spot in the arena (top-down
+        // column scan) chosen FAR from the players already inside; fall back to the
+        // indexed/configured spawn when no standable column was sampled at all.
+        Location dest = randomGrassSpawn(arena, occupiedLocations(arena, player.getUniqueId()));
         if (dest == null) {
             dest = pickSpawn(arena, player.getUniqueId());
         }
@@ -1166,12 +1167,15 @@ public final class FfaService {
     }
 
     /**
-     * Random join spawn: pick a random column inside the arena, scan it top-down for a
-     * valid ground block ({@link FfaSpawnMath#isSpawnGround}), and drop the player on it
-     * when the two blocks above are passable. Returns {@code null} after 24 attempts
-     * (the caller falls back to the classic spawn logic).
+     * Random join spawn: pick random columns inside the arena, top-down scan each for a
+     * valid ground block ({@link FfaSpawnMath#isSpawnGround}), and prefer columns FAR from
+     * the players already fighting. Returns the first candidate at least
+     * {@link FfaSpawnLocator#MIN_DISTANCE} blocks from every occupant; when 24 attempts
+     * find none, the FARTHEST valid candidate still wins (instead of the caller falling
+     * back to the stale fixed spawn point next to everyone). {@code null} only when no
+     * standable column was sampled at all.
      */
-    private Location randomGrassSpawn(FfaArena arena) {
+    private Location randomGrassSpawn(FfaArena arena, List<Location> occupied) {
         if (arena == null || arena.region() == null || arena.region().world() == null) {
             return null;
         }
@@ -1181,29 +1185,68 @@ public final class FfaService {
         if (minY >= maxY) {
             return null;
         }
+        int[] occX;
+        int[] occZ;
+        if (occupied == null || occupied.isEmpty()) {
+            occX = new int[0];
+            occZ = new int[0];
+        } else {
+            int n = 0;
+            int[] tmpX = new int[occupied.size()];
+            int[] tmpZ = new int[occupied.size()];
+            for (Location loc : occupied) {
+                if (loc == null || loc.getWorld() == null || !loc.getWorld().equals(world)) {
+                    continue;
+                }
+                tmpX[n] = loc.getBlockX();
+                tmpZ[n] = loc.getBlockZ();
+                n++;
+            }
+            occX = new int[n];
+            occZ = new int[n];
+            System.arraycopy(tmpX, 0, occX, 0, n);
+            System.arraycopy(tmpZ, 0, occZ, 0, n);
+        }
+        int minDistSq = FfaSpawnLocator.MIN_DISTANCE * FfaSpawnLocator.MIN_DISTANCE;
         java.util.concurrent.ThreadLocalRandom rng = java.util.concurrent.ThreadLocalRandom.current();
         for (int attempt = 0; attempt < 24; attempt++) {
             int x = rng.nextInt(arena.region().minX(), arena.region().maxX() + 1);
             int z = rng.nextInt(arena.region().minZ(), arena.region().maxZ() + 1);
             int top = Math.min(world.getHighestBlockYAt(x, z), maxY);
-            for (int y = top; y > minY; y--) {
-                if (!FfaSpawnMath.isSpawnGround(world.getBlockAt(x, y - 1, z).getType().name())) {
-                    continue;
-                }
-                if (world.getBlockAt(x, y, z).getType().isOccluding()
-                        || world.getBlockAt(x, y + 1, z).getType().isOccluding()) {
-                    break; // ground under a ceiling: give this column up
-                }
-                return new Location(world, x + 0.5, y, z + 0.5);
+            Location spot = scanColumnSpawnable(world, x, z, minY, top);
+            if (spot == null) {
+                continue;
             }
+            if (occX.length == 0
+                    || FfaSpawnMath.minDistSqToOccupied(x, z, occX, occZ) >= minDistSq) {
+                return spot;
+            }
+        }
+        // Nothing far enough in 24 tries — let the caller fall back to the spawn index /
+        // live locator, which enumerate EVERY standable column and pick the farthest.
+        return null;
+    }
+
+    /** Top-down scan of one column for a standable surface (ground + clear feet + head). */
+    private static Location scanColumnSpawnable(World world, int x, int z, int minY, int top) {
+        for (int y = top; y > minY; y--) {
+            if (!FfaSpawnMath.isSpawnGround(world.getBlockAt(x, y - 1, z).getType().name())) {
+                continue;
+            }
+            if (world.getBlockAt(x, y, z).getType().isOccluding()
+                    || world.getBlockAt(x, y + 1, z).getType().isOccluding()) {
+                break; // ground under a ceiling: give this column up
+            }
+            return new Location(world, x + 0.5, y, z + 0.5);
         }
         return null;
     }
 
-    private Location pickSpawn(FfaArena arena, UUID joining) {
+    /** Live locations of the OTHER players inside the arena (spawn-distance inputs). */
+    private List<Location> occupiedLocations(FfaArena arena, UUID exclude) {
         List<Location> occupied = new ArrayList<>();
         for (Map.Entry<UUID, String> entry : playerArena.entrySet()) {
-            if (!entry.getValue().equals(arena.id()) || entry.getKey().equals(joining)) {
+            if (!entry.getValue().equals(arena.id()) || entry.getKey().equals(exclude)) {
                 continue;
             }
             Player other = Bukkit.getPlayer(entry.getKey());
@@ -1211,6 +1254,11 @@ public final class FfaService {
                 occupied.add(other.getLocation());
             }
         }
+        return occupied;
+    }
+
+    private Location pickSpawn(FfaArena arena, UUID joining) {
+        List<Location> occupied = occupiedLocations(arena, joining);
         if (spawnIndex != null) {
             Location picked = spawnIndex.pick(arena, occupied);
             if (picked != null) {

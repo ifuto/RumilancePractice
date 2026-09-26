@@ -1,10 +1,12 @@
 package com.rumilance.practice.config;
 
 import com.rumilance.practice.PluginIdentity;
+import org.bukkit.Bukkit;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.io.File;
 import java.io.IOException;
@@ -17,6 +19,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -461,7 +464,44 @@ public final class ConfigService {
         loadAll();
     }
 
+    /**
+     * Debounce window for {@link #save(String)}. Settings GUIs (toggles clicked rapidly),
+     * one-line-per-arena migration persists and similar write storms previously forced a
+     * full YAML serialize + disk sync on the main thread for EVERY call. Rapid saves now
+     * coalesce into one physical write per file per window.
+     */
+    private static final long SAVE_DEBOUNCE_TICKS = 20L;
+    private final Map<String, BukkitTask> pendingSaves = new ConcurrentHashMap<>();
+
+    /**
+     * Schedules a coalesced write of {@code fileName}. Any number of calls inside {@link
+     * #SAVE_DEBOUNCE_TICKS} produce at most one disk write; the write happens on the main
+     * thread (so the in-memory YAML is never read off-thread while callers mutate it).
+     * Callers that need immediate durability (shutdown) use {@link #saveNow(String)} /
+     * {@link #flushPendingSaves()}.
+     */
     public void save(String fileName) {
+        if (!configs.containsKey(fileName)) {
+            return;
+        }
+        if (pendingSaves.containsKey(fileName)) {
+            return; // a flush is already scheduled; it picks up the newest contents
+        }
+        try {
+            BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                pendingSaves.remove(fileName);
+                saveNow(fileName);
+            }, SAVE_DEBOUNCE_TICKS);
+            pendingSaves.put(fileName, task);
+        } catch (IllegalStateException notEnabledYet) {
+            // Very early enable paths (or a disabled plugin) have no scheduler: fall back
+            // to a direct synchronous write so nothing is lost.
+            saveNow(fileName);
+        }
+    }
+
+    /** Immediate synchronous write of {@code fileName} (no debounce). */
+    public void saveNow(String fileName) {
         FileConfiguration configuration = configs.get(fileName);
         if (configuration == null) {
             return;
@@ -471,6 +511,18 @@ public final class ConfigService {
         } catch (IOException e) {
             plugin.getLogger().log(Level.WARNING, "Failed to save " + fileName, e);
         }
+    }
+
+    /**
+     * Flushes every delayed save before the scheduler is torn down (called from
+     * {@code onDisable}). Without this, the last {@link #SAVE_DEBOUNCE_TICKS} of config
+     * edits would silently vanish on every stop/reload plug.
+     */
+    public void flushPendingSaves() {
+        for (String fileName : pendingSaves.keySet()) {
+            saveNow(fileName);
+        }
+        pendingSaves.clear();
     }
 
     public FileConfiguration get(String fileName) {
