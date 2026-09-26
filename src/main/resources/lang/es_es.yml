@@ -374,6 +374,11 @@ ffa:
   kill-streak: "<gold>¡Racha de <n> bajas!"
   combat-bar: "<red>Combate: <secs>s"
 
+ffa-bot:
+  spawned: "<gray>Maniquí </gray><aqua><bold>NARENA BOT</bold></aqua><gray> generado. Usa </gray><yellow>/bot</yellow><gray> otra vez para quitarlo."
+  removed: "<gray>Maniquí eliminado."
+  failed: "<red>No se pudo generar el maniquí."
+
 kit:
   created: "<green>Kit <kit> creado."
   deleted: "<green>Kit <kit> eliminado."

@@ -60,7 +60,7 @@ resource-pack:
   # Fallback SHA-1 (40 hex). The live hash is what clients are actually told: it is computed
   # from the zip at the URL on every start and stored in resource-pack.json. This value only
   # covers an offline server that has never reached the URL.
-  sha1: "70b92cbf2d7aed9a688528fa28e99c73e535d609"
+  sha1: "8c0626214919a2eef95bf9a4859b101f54ed8ea5"
   # true  = REQUIRED: kick players who decline the pack or fail to download it.
   # false = RECOMMENDED: they may decline and keep playing (text rank badges instead of
   #         the icon glyphs). Switchable at runtime from the admin GUI; that choice is

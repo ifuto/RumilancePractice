@@ -375,6 +375,11 @@ ffa:
   kill-streak: "<gold><n>キルストリーク!"
   combat-bar: "<red>戦闘中: <secs>秒"
 
+ffa-bot:
+  spawned: "<gray>マネキン </gray><aqua><bold>NARENA BOT</bold></aqua><gray> をスポーンさせました。もう一度 </gray><yellow>/bot</yellow><gray> で削除します。"
+  removed: "<gray>マネキン BOT を削除しました。"
+  failed: "<red>マネキン BOT をスポーンできませんでした。"
+
 kit:
   created: "<green>キット <kit> を作成しました。"
   deleted: "<green>キット <kit> を削除しました。"

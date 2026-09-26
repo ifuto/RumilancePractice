@@ -259,6 +259,8 @@ public final class FeatureBootstrap {
     private ReplayService replayService;
     private PracticeService practiceService;
     private com.rumilance.practice.practice.afk.AfkCrystalManager afkCrystalManager;
+    /** {@code /bot} inside FFA: the unkillable mannequin training dummy. */
+    private com.rumilance.practice.ffa.FfaMannequinService ffaMannequins;
     private TeamGlowLosService teamGlowLosService;
 
     public FeatureBootstrap(RumilancePractice plugin, ServiceRegistry services) {
@@ -1502,6 +1504,13 @@ public final class FeatureBootstrap {
         // MONITOR records only the final uncancelled damage event. Match/FFA listeners use
         // the same resolver immediately and use the ledger for void/fall deaths.
         pm.registerEvents(damageAttribution, plugin);
+        // /bot inside FFA is a mannequin dummy, not the Quantum combat bot: a fighting bot in a
+        // shared arena is not what a mid-FFA player asked for. Created here (not next to FfaService)
+        // because the owner-only damage rule needs the attribution resolver, which resolves the
+        // owner's own crystal / bed blasts so their practice keeps working.
+        ffaMannequins = new com.rumilance.practice.ffa.FfaMannequinService(
+                plugin, ffaService, messageService, damageAttribution);
+        services.register(com.rumilance.practice.ffa.FfaMannequinService.class, ffaMannequins);
         pm.registerEvents(new MatchListener(matchService, kitService, combatNet, practiceTnt,
                 playerPlacedBlockTracker, explosionSources, damageAttribution), plugin);
         pm.registerEvents(new MatchCommandGuardListener(stateManager, messageService), plugin);
@@ -1950,8 +1959,12 @@ public final class FeatureBootstrap {
         bind("quantum", new com.rumilance.practice.quantum.QuantumCommand(plugin, this.quantum,
                 this.quantumBots));
         // /bot is the public entry point for the actual bundled QuantumBOT, not the old
-        // Java-side PracticeBot selector.
-        bind("bot", new com.rumilance.practice.practice.BotGuiCommand(this.quantum));
+        // Java-side PracticeBot selector — except inside FFA, where it toggles the mannequin
+        // training dummy (FfaMannequinService) instead.
+        com.rumilance.practice.practice.BotGuiCommand botCommand =
+                new com.rumilance.practice.practice.BotGuiCommand(this.quantum);
+        botCommand.setFfaMannequins(ffaMannequins);
+        bind("bot", botCommand);
 
         plugin.getLogger().info("Feature services enabled (all player GUIs and admin commands wired).");
     }
@@ -1963,6 +1976,11 @@ public final class FeatureBootstrap {
         }
         if (afkCrystalManager != null) {
             afkCrystalManager.shutdown();
+        }
+        if (ffaMannequins != null) {
+            // Dummies are non-persistent, but a reload must not leave the live ones behind.
+            ffaMannequins.shutdown();
+            ffaMannequins = null;
         }
         services.find(com.rumilance.practice.turbo.TurboIdleManager.class)
                 .ifPresent(com.rumilance.practice.turbo.TurboIdleManager::shutdown);

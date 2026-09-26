@@ -374,6 +374,11 @@ ffa:
   kill-streak: "<gold><n>킬 스트릭!"
   combat-bar: "<red>전투 중: <secs>초"
 
+ffa-bot:
+  spawned: "<gray>마네킹 </gray><aqua><bold>NARENA BOT</bold></aqua><gray>을(를) 소환했습니다. </gray><yellow>/bot</yellow><gray>을(를) 다시 입력하면 제거됩니다."
+  removed: "<gray>마네킹 봇을 제거했습니다."
+  failed: "<red>마네킹 봇을 소환하지 못했습니다."
+
 kit:
   created: "<green>키트 <kit>를 생성했습니다."
   deleted: "<green>키트 <kit>를 삭제했습니다."

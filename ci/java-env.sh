@@ -42,6 +42,30 @@ die() { echo "::error::java-env: $*"; exit 1; }
 # shellcheck disable=SC2064
 trap 'echo "::error::java-env failed at line $LINENO: ${BASH_COMMAND}"' ERR
 
+# ------------------------------------------- Release: リソースパックの公開 ----
+# [なぜここか]
+# エージェント用サンドボックスは uploads.github.com / raw.githubusercontent.com が遮断されていて
+# Release アセットを上げられない。push できるワークフロー (build.yml / customize.yml) は
+# contents: read なので、**contents: write を持つこのジョブが唯一の公開経路**。
+# JDK 取得より先に置くのは、45 分の配送が後半で失敗してもパックだけは公開されるため。
+# 公開はいつでも再実行できる (publish.sh は冪等) ので、配送を止めてはいけない = fail-soft。
+#
+# タグは gradle.properties の version から (プラグインの版と Release を揃える)。
+# --target に GITHUB_SHA を渡すのは、runner の checkout が detached HEAD で
+# publish.sh 側の「現在のブランチ名」解決が "HEAD" になってしまうため。
+step "release: resource pack (tools/release/publish.sh)"
+(
+  export GH_TOKEN="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+  if [ -z "$GH_TOKEN" ]; then
+    echo "::warning::java-env: no GITHUB_TOKEN - skipping the resource-pack release"
+  else
+    PACK_TAG="v$(sed -nE 's/^version[[:space:]]*=[[:space:]]*(.+)$/\1/p' "$WS/gradle.properties" | head -1)"
+    echo "[step] publishing $PACK_TAG from ${GITHUB_SHA:-HEAD}"
+    bash "$WS/tools/release/publish.sh" "$PACK_TAG" --target "${GITHUB_SHA:-HEAD}" \
+      || echo "::warning::java-env: resource-pack release failed for $PACK_TAG (delivery continues)"
+  fi
+) || true
+
 # ---------------------------------------------------------------- JDK -------
 step "portable JDK 21 (Temurin / linux x64)"
 curl -fsSL -o "$BUNDLE/jdk21.tar.gz" \

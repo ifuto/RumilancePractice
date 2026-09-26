@@ -374,6 +374,11 @@ ffa:
   kill-streak: "<gold><n>连杀!"
   combat-bar: "<red>战斗中: <secs>秒"
 
+ffa-bot:
+  spawned: "<gray>已生成假人 </gray><aqua><bold>NARENA BOT</bold></aqua><gray>。再次输入 </gray><yellow>/bot</yellow><gray> 即可移除。"
+  removed: "<gray>已移除假人。"
+  failed: "<red>无法生成假人。"
+
 kit:
   created: "<green>Kit <kit> created."
   deleted: "<green>Kit <kit> deleted."

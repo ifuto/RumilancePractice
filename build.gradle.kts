@@ -222,6 +222,11 @@ tasks.register<Zip>("resourcePackZip") {
     from(layout.projectDirectory.dir("resourcepack"))
     archiveFileName.set("RumilanceResourcePack.zip")
     destinationDirectory.set(layout.buildDirectory.dir("libs"))
+    // Stable output across builds. NOTE: this is NOT byte-identical to
+    // tools/release/build-pack.sh (different deflate settings), and the script's hash is the one
+    // that belongs in config.yml / the Release — treat this task as the local convenience build.
+    isReproducibleFileOrder = true
+    isPreserveFileTimestamps = false
     doLast {
         val zipFile = archiveFile.get().asFile
         val digest = MessageDigest.getInstance("SHA-1").digest(zipFile.readBytes())

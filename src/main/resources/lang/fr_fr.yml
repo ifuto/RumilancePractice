@@ -374,6 +374,11 @@ ffa:
   kill-streak: "<gold>Série de <n> éliminations !"
   combat-bar: "<red>Combat : <secs>s"
 
+ffa-bot:
+  spawned: "<gray>Mannequin </gray><aqua><bold>NARENA BOT</bold></aqua><gray> invoqué. Refaites </gray><yellow>/bot</yellow><gray> pour le retirer."
+  removed: "<gray>Mannequin retiré."
+  failed: "<red>Impossible d'invoquer le mannequin."
+
 kit:
   created: "<green>Kit <kit> créé."
   deleted: "<green>Kit <kit> supprimé."

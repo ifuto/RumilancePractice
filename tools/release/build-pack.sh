@@ -137,12 +137,40 @@ print('[pack]   validation ok')
 PY
 
 # ------------------------------------------------------------------- zip -----
+# 決定論的 zip: エントリ順はソート固定、時刻は 1980-01-01 固定、余計な外部属性なし。
+# `zip` はファイルの mtime をそのまま入れるため、同じ中身でも「作った場所/時刻」で sha1 が
+# 変わってしまう — CI (checkout 時刻) と手元でハッシュがズレると、公開アセットと
+# dist/*.sha1・config.yml のフォールバックが食い違う。python の zipfile で固定する。
 build_zip() {
-  local out="$1"
-  rm -f "$out"
-  # -X: 余計な属性を落とす。pack.mcmeta を先頭に、以降はソート順で固める (差分が読みやすい)。
-  ( cd "$SRC" && zip -q -X -r "$out" pack.mcmeta \
-      $(find . -mindepth 1 -not -name pack.mcmeta -not -name '.*' | sed 's|^\./||' | LC_ALL=C sort) )
+  python3 - "$SRC" "$1" <<'PY'
+import os, sys, zipfile
+
+src, out = sys.argv[1], sys.argv[2]
+FIXED = (1980, 1, 1, 0, 0, 0)          # zip の最小時刻。全ビルドで同一バイトにする
+entries = []
+for root, dirs, files in os.walk(src):
+    dirs.sort()
+    for name in sorted(files):
+        if name.startswith('.'):
+            continue
+        full = os.path.join(root, name)
+        rel = os.path.relpath(full, src).replace(os.sep, '/')
+        entries.append((rel, full))
+entries.sort(key=lambda item: item[0])
+# pack.mcmeta を先頭に (クライアントの期待する並び。他はアルファベット順)
+entries.sort(key=lambda item: 0 if item[0] == 'pack.mcmeta' else 1)
+
+tmp = out + '.tmp'
+with zipfile.ZipFile(tmp, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+    for rel, full in entries:
+        info = zipfile.ZipInfo(rel, date_time=FIXED)
+        info.compress_type = zipfile.ZIP_DEFLATED
+        info.external_attr = 0o644 << 16
+        with open(full, 'rb') as handle:
+            archive.writestr(info, handle.read())
+os.replace(tmp, out)
+print(f'[pack]   {len(entries)} entries, deterministic (mtime pinned to 1980-01-01)')
+PY
 }
 
 mkdir -p "$DIST"
@@ -153,21 +181,24 @@ if [ "$MODE" = "check" ]; then
     exit 1
   fi
   TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
-  build_zip "$TMP/expect.zip"
-  # 中身の一覧+ハッシュで比較 (zip の時刻差を無視するため byte 比較はしない)
-  listing() { unzip -l "$1" | awk 'NR>3 && $4 != "" {print $1, $4}' | LC_ALL=C sort; }
-  if diff -u <(listing "$ZIP") <(listing "$TMP/expect.zip") > "$TMP/diff.txt"; then
+  build_zip "$TMP/expect.zip" >/dev/null
+  # 決定論的ビルドなのでバイト一致で判定できる (sha1 比較)。
+  if [ "$(sha1sum < "$ZIP" | cut -d' ' -f1)" = "$(sha1sum < "$TMP/expect.zip" | cut -d' ' -f1)" ]; then
     echo "[pack] --check: dist の zip は resourcepack/ と一致 (sha1 $(cut -d' ' -f1 "$SHA" 2>/dev/null || echo '?'))"
     exit 0
   fi
-  echo "[pack] --check FAILED: dist/RumilanceResourcePack.zip が resourcepack/ より古い" >&2
-  sed 's/^/[pack]   /' "$TMP/diff.txt" >&2
-  echo "[pack]   → tools/release/build-pack.sh && tools/release/attach-pack.sh <tag> で公開し直してください" >&2
+  echo "[pack] --check FAILED: dist/RumilanceResourcePack.zip が resourcepack/ と違う" >&2
+  diff -u <(unzip -l "$ZIP" | awk 'NR>3 && $4 != "" {print $1, $4}' | LC_ALL=C sort) \
+          <(unzip -l "$TMP/expect.zip" | awk 'NR>3 && $4 != "" {print $1, $4}' | LC_ALL=C sort) \
+      | sed 's/^/[pack]   /' >&2 || true
+  echo "[pack]   → tools/release/publish.sh <tag> で作り直して公開し直してください" >&2
   exit 1
 fi
 
+OLD_SHA1=""
 OLD_LISTING=""
 if [ -f "$ZIP" ]; then
+  OLD_SHA1="$(sha1sum "$ZIP" | cut -d' ' -f1)"
   OLD_LISTING="$(unzip -l "$ZIP" | awk 'NR>3 && $4 != "" {print $1, $4}' | LC_ALL=C sort)"
 fi
 
@@ -179,8 +210,11 @@ NEW_LISTING="$(unzip -l "$ZIP" | awk 'NR>3 && $4 != "" {print $1, $4}' | LC_ALL=
 
 echo "[pack] built $ZIP ($(du -h "$ZIP" | cut -f1), $(echo "$NEW_LISTING" | wc -l | tr -d ' ') entries)"
 echo "[pack] sha1: $(cat "$SHA")"
+if [ -n "$OLD_SHA1" ] && [ "$OLD_SHA1" != "$(cut -d' ' -f1 "$SHA")" ]; then
+  echo "[pack] 旧 sha1: $OLD_SHA1"
+fi
 if [ -n "$OLD_LISTING" ] && [ "$OLD_LISTING" != "$NEW_LISTING" ]; then
-  echo "[pack] 差分 (旧 → 新):"
+  echo "[pack] 中身の差分 (旧 → 新):"
   diff <(echo "$OLD_LISTING") <(echo "$NEW_LISTING") | sed 's/^/[pack]   /' || true
 fi
 ( cd "$DIST" && sha1sum -c RumilanceResourcePack.sha1 >/dev/null ) && echo "[pack] sha1sum -c ok"

@@ -181,7 +181,7 @@ commands:
     usage: /practice <draft|pos1|selection|p1|save|enable|disable|delete|list|info|tp>
     permission: rumilance.admin
   bot:
-    description: Spawn the bundled QuantumBOT.
+    description: In FFA - toggle the unkillable NARENA BOT mannequin dummy. Elsewhere - spawn the bundled QuantumBOT.
     usage: /bot
   botadmin:
     description: Bind a bot fight kit to the arena kit hosting its fights.
