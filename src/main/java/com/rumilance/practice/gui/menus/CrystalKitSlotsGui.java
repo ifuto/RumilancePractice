@@ -95,30 +95,64 @@ public final class CrystalKitSlotsGui extends AbstractGui {
         }
         UUID id = player.getUniqueId();
 
-        // Rows 1, 2 and 4 are flat gray stained glass; only row 3 carries items: one ender
-        // eye per KIT slot. Clicking eye N opens the KIT N editor directly.
-        for (int row = 0; row < 4; row++) {
-            if (row == 2) {
-                continue;
-            }
-            for (int col = 0; col < 9; col++) {
-                inventory.setItem(GuiSlots.slot(row, col), filler(Material.GRAY_STAINED_GLASS_PANE));
-            }
+        // Row 0: gray stained glass panes (decoration)
+        for (int col = 0; col < 9; col++) {
+            inventory.setItem(GuiSlots.slot(0, col), filler(Material.GRAY_STAINED_GLASS_PANE));
         }
+
+        // Row 1: nine signs — bold aqua KIT1..KIT9, each keeping its own saved layout
+        int selectedVariant = store.selectedVariant(id);
         for (int n = 1; n <= CrystalFfaStore.SLOTS; n++) {
+            boolean hasLayout = hasSavedLayout(id, kitId, n);
+            boolean isActive = n == selectedVariant;
+
+            ItemBuilder signBuilder = ItemBuilder.of(Material.OAK_SIGN)
+                    .name(Component.text("KIT" + n, NamedTextColor.AQUA, TextDecoration.BOLD)
+                            .decoration(TextDecoration.ITALIC, false))
+                    .lore(
+                            UiTheme.divider(),
+                            hasLayout
+                                    ? Component.text("Layout saved", NamedTextColor.GREEN)
+                                    : Component.text("Empty slot", NamedTextColor.GRAY),
+                            UiTheme.blank(),
+                            isActive
+                                    ? Component.text("✦ Active Variant ✦", NamedTextColor.GOLD, TextDecoration.BOLD)
+                                    : UiTheme.hint("Click to select")
+                    )
+                    .action("pick:" + n);
+
+            // Enchantment glint marks the active slot.
+            if (isActive) {
+                signBuilder.glint(true);
+            }
+
+            inventory.setItem(GuiSlots.slot(1, n - 1), signBuilder.build());
+        }
+
+        // Row 2: ender eyes — starts editing the layout of that KIT slot
+        for (int n = 1; n <= CrystalFfaStore.SLOTS; n++) {
+            boolean hasLayout = hasSavedLayout(id, kitId, n);
             inventory.setItem(GuiSlots.slot(2, n - 1),
                     ItemBuilder.of(Material.ENDER_EYE)
-                            .name(Component.text("Edit KIT" + n, NamedTextColor.AQUA,
+                            .name(Component.text("Edit K" + n, NamedTextColor.AQUA,
                                             TextDecoration.BOLD)
                                     .decoration(TextDecoration.ITALIC, false))
                             .lore(
                                     UiTheme.divider(),
-                                    UiTheme.line("Edits the KIT" + n + " layout"),
+                                    hasLayout
+                                            ? Component.text("Has saved layout", NamedTextColor.GREEN)
+                                            : Component.text("No layout yet", NamedTextColor.GRAY),
                                     UiTheme.blank(),
-                                    UiTheme.hint("Click to edit")
+                                    UiTheme.hint("Click to edit layout")
                             )
                             .action("edit:" + n)
                             .build());
+        }
+
+        // Row 3: glass panes (plus Back / Close for navigation)
+        for (int col = 0; col < 9; col++) {
+            if (col == 0 || col == 8) continue;
+            inventory.setItem(GuiSlots.slot(3, col), filler(Material.GRAY_STAINED_GLASS_PANE));
         }
         // Navigation stays in the bottom corners.
         inventory.setItem(GuiSlots.slot(3, 0),

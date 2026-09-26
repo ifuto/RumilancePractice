@@ -53,7 +53,7 @@ public final class FfaCommand implements CommandExecutor, TabCompleter {
 
         String sub = args[0].toLowerCase(Locale.ROOT);
         boolean admin = sender.hasPermission("rumilance.admin");
-        if (!admin && List.of("create", "selection", "spawn", "kit", "enable", "disable", "delete", "reset", "rename", "resettime", "icon", "settings", "deletespawn")
+        if (!admin && List.of("create", "selection", "spawn", "kit", "enable", "disable", "delete", "reset", "rename", "resettime", "icon", "settings", "deletespawn", "blockplace", "blockbreak", "breakplayerplaced", "canbreak")
                 .contains(sub)) {
             sender.sendMessage(Component.text("No permission.", NamedTextColor.RED));
             return true;
@@ -283,6 +283,71 @@ public final class FfaCommand implements CommandExecutor, TabCompleter {
                         ok ? NamedTextColor.GREEN : NamedTextColor.RED));
                 yield true;
             }
+            case "blockplace" -> {
+                if (args.length < 3) {
+                    sender.sendMessage(Component.text("Usage: /ffa blockplace <arena> <true|false>", NamedTextColor.YELLOW));
+                    yield true;
+                }
+                boolean ok = ffaService.setBlockPlace(args[1], Boolean.parseBoolean(args[2]));
+                sender.sendMessage(Component.text(
+                        ok ? "Block place set to " + args[2] + " for " + args[1]
+                                : "Arena not found.",
+                        ok ? NamedTextColor.GREEN : NamedTextColor.RED));
+                yield true;
+            }
+            case "blockbreak" -> {
+                if (args.length < 3) {
+                    sender.sendMessage(Component.text("Usage: /ffa blockbreak <arena> <true|false>", NamedTextColor.YELLOW));
+                    yield true;
+                }
+                boolean ok = ffaService.setBlockBreak(args[1], Boolean.parseBoolean(args[2]));
+                sender.sendMessage(Component.text(
+                        ok ? "Block break set to " + args[2] + " for " + args[1]
+                                : "Arena not found.",
+                        ok ? NamedTextColor.GREEN : NamedTextColor.RED));
+                yield true;
+            }
+            case "breakplayerplaced" -> {
+                if (args.length < 3) {
+                    sender.sendMessage(Component.text("Usage: /ffa breakplayerplaced <arena> <true|false>", NamedTextColor.YELLOW));
+                    yield true;
+                }
+                boolean ok = ffaService.setBreakPlayerPlacedOnly(args[1], Boolean.parseBoolean(args[2]));
+                sender.sendMessage(Component.text(
+                        ok ? "Break player-placed only set to " + args[2] + " for " + args[1]
+                                : "Arena not found.",
+                        ok ? NamedTextColor.GREEN : NamedTextColor.RED));
+                yield true;
+            }
+            case "canbreak" -> {
+                if (args.length < 3) {
+                    sender.sendMessage(Component.text("Usage: /ffa canbreak <arena> <material1,material2,...|clear>", NamedTextColor.YELLOW));
+                    yield true;
+                }
+                if (ffaService.get(args[1]).isEmpty()) {
+                    sender.sendMessage(Component.text("Arena not found: " + args[1], NamedTextColor.RED));
+                    yield true;
+                }
+                List<String> materials = new ArrayList<>();
+                if (!args[2].equalsIgnoreCase("clear") && !args[2].equalsIgnoreCase("none")) {
+                    for (String raw : args[2].split(",")) {
+                        String name = raw.trim().toUpperCase(Locale.ROOT);
+                        if (org.bukkit.Material.matchMaterial(name) == null) {
+                            sender.sendMessage(Component.text("Unknown material: " + name, NamedTextColor.RED));
+                            yield true;
+                        }
+                        materials.add(name);
+                    }
+                }
+                boolean ok = ffaService.setCanBreak(args[1], materials);
+                sender.sendMessage(Component.text(
+                        ok ? (materials.isEmpty()
+                                ? "Can-break list cleared for " + args[1]
+                                : "Can-break materials set for " + args[1] + ": " + String.join(", ", materials))
+                                : "Arena not found.",
+                        ok ? NamedTextColor.GREEN : NamedTextColor.RED));
+                yield true;
+            }
             default -> {
                 if (sender instanceof Player player) {
                     ffaListGui.open(player);
@@ -300,7 +365,8 @@ public final class FfaCommand implements CommandExecutor, TabCompleter {
             List<String> base = new ArrayList<>(List.of("leave"));
             if (sender.hasPermission("rumilance.admin")) {
                 base.addAll(List.of("create", "selection", "spawn", "kit", "enable", "disable",
-                        "delete", "reset", "rename", "resettime", "icon", "settings", "deletespawn"));
+                        "delete", "reset", "rename", "resettime", "icon", "settings", "deletespawn",
+                        "blockplace", "blockbreak", "breakplayerplaced", "canbreak"));
             }
             return TabCompletions.filter(current, base);
         }
@@ -308,7 +374,7 @@ public final class FfaCommand implements CommandExecutor, TabCompleter {
         if (!sender.hasPermission("rumilance.admin")) {
             return List.of();
         }
-        if (args.length == 2 && List.of("enable", "disable", "delete", "reset", "spawn", "deletespawn", "kit", "rename", "resettime", "icon")
+        if (args.length == 2 && List.of("enable", "disable", "delete", "reset", "spawn", "deletespawn", "kit", "rename", "resettime", "icon", "blockplace", "blockbreak", "breakplayerplaced", "canbreak")
                 .contains(args[0].toLowerCase(Locale.ROOT))) {
             return TabCompletions.filter(current,
                     ffaService.list().stream().map(FfaService.FfaArena::id).toList());
@@ -326,6 +392,13 @@ public final class FfaCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("resettime")) {
             return TabCompletions.filter(current, "off", "30s", "5min", "10min", "30min", "1hour", "2hour");
+        }
+        if (args.length == 3 && List.of("blockplace", "blockbreak", "breakplayerplaced")
+                .contains(args[0].toLowerCase(Locale.ROOT))) {
+            return TabCompletions.filter(current, "true", "false");
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("canbreak")) {
+            return TabCompletions.filter(current, "clear");
         }
         return List.of();
     }

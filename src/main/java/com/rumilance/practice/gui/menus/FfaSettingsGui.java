@@ -152,6 +152,28 @@ public final class FfaSettingsGui extends AbstractGui {
                 line(player, "gui.ffa-settings-rtpqueue-lore"),
                 "toggle:rtpqueue"));
 
+        // Arena-level block interaction rules (persisted on the arena, not the kit).
+        inventory.setItem(MenuScaffold.gridSlot(15), toggleItem(player,
+                Material.GRASS_BLOCK,
+                "Block Place",
+                arena.blockPlace(),
+                "Allow placing blocks in this arena",
+                "toggle:blockplace"));
+
+        inventory.setItem(MenuScaffold.gridSlot(16), toggleItem(player,
+                Material.IRON_PICKAXE,
+                "Block Break",
+                arena.blockBreak(),
+                "Allow breaking blocks in this arena",
+                "toggle:blockbreak"));
+
+        inventory.setItem(MenuScaffold.gridSlot(17), toggleItem(player,
+                Material.OAK_PLANKS,
+                "Break Player-Placed Only",
+                arena.breakPlayerPlacedOnly(),
+                "Only player-placed blocks may be broken",
+                "toggle:breakplayerplaced"));
+
         inventory.setItem(MenuScaffold.gridSlot(22), ItemBuilder.of(Material.SPYGLASS)
                 .name(t(player, "gui.ffa-settings-size-title").color(UiTheme.SECONDARY))
                 .lore(
@@ -230,6 +252,10 @@ public final class FfaSettingsGui extends AbstractGui {
                 case "tpa" -> ffaService.setTpaEnabled(arena.id(), !arena.tpaEnabled());
                 case "rtp" -> ffaService.setRtpEnabled(arena.id(), !arena.rtpEnabled());
                 case "rtpqueue" -> ffaService.setRtpQueueEnabled(arena.id(), !arena.rtpQueueEnabled());
+                case "blockplace" -> ffaService.setBlockPlace(arena.id(), !arena.blockPlace());
+                case "blockbreak" -> ffaService.setBlockBreak(arena.id(), !arena.blockBreak());
+                case "breakplayerplaced" ->
+                        ffaService.setBreakPlayerPlacedOnly(arena.id(), !arena.breakPlayerPlacedOnly());
                 default -> { }
             }
             sounds.play(player, "gui-click");

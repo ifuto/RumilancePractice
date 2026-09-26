@@ -63,60 +63,91 @@ public final class FfaService {
             String iconMaterial,
             boolean tpaEnabled,
             boolean rtpEnabled,
-            boolean rtpQueueEnabled
+            boolean rtpQueueEnabled,
+            /** Arena-level block interaction rules — no longer on the kit. */
+            boolean blockPlace,
+            boolean blockBreak,
+            boolean breakPlayerPlacedOnly,
+            /** Explicitly allowed materials when breakPlayerPlacedOnly is false. */
+            List<String> canBreak
     ) {
         public FfaArena {
             resetIntervalSeconds = Math.max(0, resetIntervalSeconds);
             if (iconMaterial == null || iconMaterial.isBlank()) {
                 iconMaterial = "IRON_SWORD";
             }
+            // Normalize only; never second-guess admin-set flags here — a reload must
+            // round-trip the arena's block rules exactly as they were saved.
+            if (canBreak == null) {
+                canBreak = List.of();
+            }
         }
 
         public FfaArena withResetInterval(int seconds) {
             return new FfaArena(id, kitId, world, region, spawn, enabled, Math.max(0, seconds), iconMaterial,
-                    tpaEnabled, rtpEnabled, rtpQueueEnabled);
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak);
         }
 
         public FfaArena withEnabled(boolean value) {
             return new FfaArena(id, kitId, world, region, spawn, value, resetIntervalSeconds, iconMaterial,
-                    tpaEnabled, rtpEnabled, rtpQueueEnabled);
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak);
         }
 
         public FfaArena withKit(String kit) {
             return new FfaArena(id, kit, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
-                    tpaEnabled, rtpEnabled, rtpQueueEnabled);
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak);
         }
 
         public FfaArena withRegion(Cuboid newRegion) {
             return new FfaArena(id, kitId, newRegion.worldName(), newRegion, spawn, enabled,
-                    resetIntervalSeconds, iconMaterial, tpaEnabled, rtpEnabled, rtpQueueEnabled);
+                    resetIntervalSeconds, iconMaterial, tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak);
         }
 
         public FfaArena withSpawn(Location newSpawn) {
             // null = back to "random standing spot far from occupants" spawning.
             return new FfaArena(id, kitId, world, region,
                     newSpawn != null ? newSpawn.clone() : null, enabled,
-                    resetIntervalSeconds, iconMaterial, tpaEnabled, rtpEnabled, rtpQueueEnabled);
+                    resetIntervalSeconds, iconMaterial, tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak);
         }
 
         public FfaArena withId(String newId) {
             return new FfaArena(newId, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
-                    tpaEnabled, rtpEnabled, rtpQueueEnabled);
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak);
         }
 
         public FfaArena withTpa(boolean value) {
             return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
-                    value, rtpEnabled, rtpQueueEnabled);
+                    value, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak);
         }
 
         public FfaArena withRtp(boolean value) {
             return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
-                    tpaEnabled, value, rtpQueueEnabled);
+                    tpaEnabled, value, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak);
         }
 
         public FfaArena withRtpQueue(boolean value) {
             return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
-                    tpaEnabled, rtpEnabled, value);
+                    tpaEnabled, rtpEnabled, value, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak);
+        }
+
+        public FfaArena withBlockPlace(boolean value) {
+            return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled, value, blockBreak, breakPlayerPlacedOnly, canBreak);
+        }
+
+        public FfaArena withBlockBreak(boolean value) {
+            return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, value, breakPlayerPlacedOnly, canBreak);
+        }
+
+        public FfaArena withBreakPlayerPlacedOnly(boolean value) {
+            return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, value, canBreak);
+        }
+
+        public FfaArena withCanBreak(List<String> value) {
+            return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, value != null ? List.copyOf(value) : List.of());
         }
 
         /** Region size seen from above: X x Z block counts. */
@@ -130,7 +161,7 @@ public final class FfaService {
 
         public FfaArena withIconMaterial(String material) {
             return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, material,
-                    tpaEnabled, rtpEnabled, rtpQueueEnabled);
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak);
         }
     }
 
@@ -343,9 +374,33 @@ public final class FfaService {
             int interval = entry.contains("reset-interval-seconds")
                     ? entry.getInt("reset-interval-seconds", 0)
                     : globalDefault;
+            String kitId = entry.getString("kit", "nodebuff");
+            boolean hasArenaBlockRules = entry.contains("settings.block-place")
+                    || entry.contains("settings.block-break")
+                    || entry.contains("settings.break-player-placed-only")
+                    || entry.contains("settings.can-break");
+            boolean blockPlace = entry.getBoolean("settings.block-place", false);
+            boolean blockBreak = entry.getBoolean("settings.block-break", false);
+            boolean breakPlayerPlacedOnly = entry.getBoolean("settings.break-player-placed-only", false);
+            List<String> canBreak = entry.getStringList("settings.can-break");
+            boolean migratedFromKit = false;
+            if (!hasArenaBlockRules) {
+                // Migration from the OLD kit-level design: arenas saved before per-arena
+                // block rules existed inherit the kit's block settings once, and the
+                // inherited values are persisted immediately below so a plugin update
+                // never silently changes behavior (later kit edits no longer bleed in).
+                KitDefinition legacyKit = kitService.get(kitId).orElse(null);
+                if (legacyKit != null) {
+                    blockPlace = legacyKit.allowsBlockPlace();
+                    blockBreak = legacyKit.blockBreak();
+                    breakPlayerPlacedOnly = legacyKit.breakPlayerPlacedOnly();
+                    canBreak = new ArrayList<>(legacyKit.canBreak());
+                    migratedFromKit = true;
+                }
+            }
             FfaArena arena = new FfaArena(
                     id,
-                    entry.getString("kit", "nodebuff"),
+                    kitId,
                     world,
                     region,
                     spawn,
@@ -354,9 +409,17 @@ public final class FfaService {
                     entry.getString("icon", "IRON_SWORD"),
                     entry.getBoolean("settings.tpa", false),
                     entry.getBoolean("settings.rtp", false),
-                    entry.getBoolean("settings.rtpqueue", false)
-            );
+                    entry.getBoolean("settings.rtpqueue", false),
+                    blockPlace,
+                    blockBreak,
+                    breakPlayerPlacedOnly,
+                    canBreak != null ? List.copyOf(canBreak) : List.of());
             arenas.put(id, arena);
+            if (migratedFromKit) {
+                // Persist the inherited rules once so the arena block-settings become
+                // explicit in ffa.yml and survive subsequent plugin updates untouched.
+                persist(arena);
+            }
             armResetTimer(arena, false);
         }
     }
@@ -1104,9 +1167,9 @@ public final class FfaService {
 
     /**
      * Random join spawn: pick a random column inside the arena, scan it top-down for a
-     * grass block ("上からチェック"), and drop the player on it when the two blocks above
-     * are passable. Returns {@code null} after 24 attempts (the caller falls back to the
-     * classic spawn logic).
+     * valid ground block ({@link FfaSpawnMath#isSpawnGround}), and drop the player on it
+     * when the two blocks above are passable. Returns {@code null} after 24 attempts
+     * (the caller falls back to the classic spawn logic).
      */
     private Location randomGrassSpawn(FfaArena arena) {
         if (arena == null || arena.region() == null || arena.region().world() == null) {
@@ -1124,12 +1187,12 @@ public final class FfaService {
             int z = rng.nextInt(arena.region().minZ(), arena.region().maxZ() + 1);
             int top = Math.min(world.getHighestBlockYAt(x, z), maxY);
             for (int y = top; y > minY; y--) {
-                if (world.getBlockAt(x, y - 1, z).getType() != org.bukkit.Material.GRASS_BLOCK) {
+                if (!FfaSpawnMath.isSpawnGround(world.getBlockAt(x, y - 1, z).getType().name())) {
                     continue;
                 }
                 if (world.getBlockAt(x, y, z).getType().isOccluding()
                         || world.getBlockAt(x, y + 1, z).getType().isOccluding()) {
-                    break; // grass under a ceiling: give this column up
+                    break; // ground under a ceiling: give this column up
                 }
                 return new Location(world, x + 0.5, y, z + 0.5);
             }
@@ -1226,7 +1289,9 @@ public final class FfaService {
     }
 
     public void create(String id, Cuboid region, Location spawn, String kitId) {
-        FfaArena arena = new FfaArena(id, kitId, region.worldName(), region, spawn.clone(), false, 0, "IRON_SWORD", false, false, false);
+        // Block rules default to "no arena override" so the kit's own rules keep governing
+        // until an admin opts in per-arena (block place/break stay kit-driven by default).
+        FfaArena arena = new FfaArena(id, kitId, region.worldName(), region, spawn.clone(), false, 0, "IRON_SWORD", false, false, false, false, false, false, List.of());
         arenas.put(arena.id(), arena);
         persist(arena);
         armResetTimer(arena, false);
@@ -1444,6 +1509,54 @@ public final class FfaService {
         arenas.put(updated.id(), updated);
         persist(updated);
         armResetTimer(updated, true);
+        return true;
+    }
+
+    /** Sets arena-level block place permission. */
+    public boolean setBlockPlace(String arenaId, boolean value) {
+        FfaArena existing = findArena(arenaId);
+        if (existing == null) {
+            return false;
+        }
+        FfaArena updated = existing.withBlockPlace(value);
+        arenas.put(updated.id(), updated);
+        persist(updated);
+        return true;
+    }
+
+    /** Sets arena-level block break permission. */
+    public boolean setBlockBreak(String arenaId, boolean value) {
+        FfaArena existing = findArena(arenaId);
+        if (existing == null) {
+            return false;
+        }
+        FfaArena updated = existing.withBlockBreak(value);
+        arenas.put(updated.id(), updated);
+        persist(updated);
+        return true;
+    }
+
+    /** Sets arena-level break-player-placed-only rule. */
+    public boolean setBreakPlayerPlacedOnly(String arenaId, boolean value) {
+        FfaArena existing = findArena(arenaId);
+        if (existing == null) {
+            return false;
+        }
+        FfaArena updated = existing.withBreakPlayerPlacedOnly(value);
+        arenas.put(updated.id(), updated);
+        persist(updated);
+        return true;
+    }
+
+    /** Sets arena-level explicitly allowed breakable materials. */
+    public boolean setCanBreak(String arenaId, List<String> value) {
+        FfaArena existing = findArena(arenaId);
+        if (existing == null) {
+            return false;
+        }
+        FfaArena updated = existing.withCanBreak(value);
+        arenas.put(updated.id(), updated);
+        persist(updated);
         return true;
     }
 
@@ -1793,6 +1906,11 @@ public final class FfaService {
         yaml.set(path + ".settings.tpa", arena.tpaEnabled());
         yaml.set(path + ".settings.rtp", arena.rtpEnabled());
         yaml.set(path + ".settings.rtpqueue", arena.rtpQueueEnabled());
+        // Arena-level block interaction rules
+        yaml.set(path + ".settings.block-place", arena.blockPlace());
+        yaml.set(path + ".settings.block-break", arena.blockBreak());
+        yaml.set(path + ".settings.break-player-placed-only", arena.breakPlayerPlacedOnly());
+        yaml.set(path + ".settings.can-break", arena.canBreak());
         configService.save(ConfigService.FFA);
     }
 
