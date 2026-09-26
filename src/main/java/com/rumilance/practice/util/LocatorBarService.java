@@ -29,9 +29,11 @@ import java.util.UUID;
  * <p>The attributes only exist on 1.21.6+ runtimes; the whole service silently disables itself
  * when the registry does not offer them (older server forks).</p>
  *
- * <p>Application is event-driven (join, world change, respawn) plus a low-frequency periodic
- * sweep (every 40 ticks) so temporary desyncs (command teleports, attribute resets after
- * death, renames) always converge back to the correct base value.</p>
+ * <p>Application is event-driven (join, world change, respawn — applied one tick late,
+ * because vanilla resets every attribute to its default base while the respawn completes)
+ * plus a low-frequency periodic sweep (every 20 ticks) so temporary desyncs (command
+ * teleports, attribute resets after death, renames) always converge back to the correct
+ * base value.</p>
  */
 public final class LocatorBarService implements Listener {
 
