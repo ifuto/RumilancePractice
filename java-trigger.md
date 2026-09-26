@@ -310,3 +310,5 @@ IDを作っていた（`npc:tick.mcfunction`）。そのため **タグ（#minec
 <!-- trigger: build + plugin-delivery for per-arena block rules, kit legacy migration, spawn/GUI fixes (arena/01a0dbd6) 2026-09-26 -->
 
 <!-- trigger: far-spawn + locator respawn fix + config debounce 2026-09-26 (arena/01a0dbd6) -->
+
+<!-- trigger: redeliver 1.76.57 with matching gradle.properties 2026-09-26 (arena/01a0dbd6) -->
