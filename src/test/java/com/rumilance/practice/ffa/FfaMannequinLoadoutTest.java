@@ -85,6 +85,6 @@ class FfaMannequinLoadoutTest {
 
     @Test
     void unknownSlotIsRejected() {
-        assertThrows(NullPointerException.class, () -> FfaMannequinLoadout.piece(null));
+        assertThrows(IllegalArgumentException.class, () -> FfaMannequinLoadout.piece(null));
     }
 }

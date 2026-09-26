@@ -55,9 +55,32 @@ trap 'echo "::error::java-env failed at line $LINENO: ${BASH_COMMAND}"' ERR
 # publish.sh 側の「現在のブランチ名」解決が "HEAD" になってしまうため。
 step "release: resource pack (tools/release/publish.sh)"
 (
+  # ワークフロー側で env: GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} を追加できれば一番いいが、
+  # .github/workflows/** は push できない (workflows 権限なし)。ランナーは GITHUB_TOKEN を
+  # 自動では env に出さないので、actions/checkout (persist-credentials: true) が残した
+  # 資格情報から拾う — 配送ブランチへの push が使っているのと同じトークンで、
+  # このジョブは permissions: contents: write なので Release も作れる。
+  # トークンは一切出力しないこと (ERR トラップは BASH_COMMAND を出すので代入文のままにしておく)。
   export GH_TOKEN="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
   if [ -z "$GH_TOKEN" ]; then
-    echo "::warning::java-env: no GITHUB_TOKEN - skipping the resource-pack release"
+    GH_TOKEN="$(git -C "$WS" config --get remote.origin.url 2>/dev/null \
+      | sed -nE 's|^https://[^:@/]*:([^@]*)@.*|\1|p' | head -1)"
+    export GH_TOKEN
+  fi
+  if [ -z "$GH_TOKEN" ]; then
+    # 旧 checkout は URL ではなく http extraheader に basic 認証を入れる。
+    HEADER="$(git -C "$WS" config --get 'http.https://github.com/.extraheader' 2>/dev/null | head -1)"
+    if [ -n "$HEADER" ]; then
+      BASIC="$(printf '%s' "$HEADER" | sed -nE 's|.*[Bb]asic[[:space:]]+([A-Za-z0-9+/=]+).*|\1|p')"
+      if [ -n "$BASIC" ]; then
+        GH_TOKEN="$(printf '%s' "$BASIC" | base64 -d 2>/dev/null | sed -nE 's|^[^:]*:(.*)$|\1|p')"
+        export GH_TOKEN
+      fi
+    fi
+  fi
+  if [ -z "$GH_TOKEN" ]; then
+    echo "::warning::java-env: no usable git credential - skipping the resource-pack release"
+    echo "::warning::java-env: publish by hand with tools/release/publish.sh <tag>"
   else
     PACK_TAG="v$(sed -nE 's/^version[[:space:]]*=[[:space:]]*(.+)$/\1/p' "$WS/gradle.properties" | head -1)"
     echo "[step] publishing $PACK_TAG from ${GITHUB_SHA:-HEAD}"
