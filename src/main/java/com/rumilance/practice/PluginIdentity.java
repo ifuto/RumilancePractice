@@ -47,6 +47,50 @@ public final class PluginIdentity {
     }
 
     /**
+     * Operator-facing file inside {@link #dataFolder} ({@code plugins/n-arena}), with a one-time
+     * carry-over of a same-named file that an older build wrote into Paper's own
+     * {@code plugins/NARENA} folder.
+     *
+     * <p>Use this for every YAML the plugin owns instead of {@code new File(plugin.getDataFolder(),
+     * name)}: the latter silently splits operator data across two folders, which is how
+     * {@code tiers.yml}, {@code crystal-ffa.yml} and the two {@code afk-crystal-*.yml} files ended
+     * up in {@code plugins/NARENA} while the documentation (and every backup script) points at
+     * {@code plugins/n-arena}.</p>
+     *
+     * <p>The carry-over copies and never deletes, and only runs while the destination is missing,
+     * so an existing server keeps its data through the update and a second boot is a no-op.
+     * Deliberately NOT applied to the Quantum side ({@code quantum.yml}, {@code quantum/}) or to
+     * {@code resource-pack.json}: those genuinely live in {@code plugins/NARENA} and are quoted
+     * that way by {@code tools/parity-runner/*} and by config.yml's own comments.</p>
+     */
+    public static File dataFile(Plugin plugin, String fileName) {
+        File folder = dataFolder(plugin);
+        File target = new File(folder, fileName);
+        if (target.exists()) {
+            return target;
+        }
+        File stray = new File(plugin.getDataFolder(), fileName);
+        if (!stray.isFile()) {
+            return target;
+        }
+        try {
+            Files.createDirectories(folder.toPath());
+            Files.copy(stray.toPath(), target.toPath(), StandardCopyOption.COPY_ATTRIBUTES);
+            Plugin named = plugin();
+            java.util.logging.Logger logger = named == null
+                    ? java.util.logging.Logger.getLogger(NAME)
+                    : named.getLogger();
+            logger.info("Carried " + fileName + " over from plugins/" + NAME + " to plugins/"
+                    + DATA_FOLDER_NAME + " — the copy under plugins/" + NAME
+                    + " is no longer used and can be deleted.");
+        } catch (Exception e) {
+            // Falling back to the stray copy beats starting with empty data.
+            return stray;
+        }
+        return target;
+    }
+
+    /**
      * One-shot migration of operator data from the legacy {@code plugins/RumilancePractice}
      * folder into {@code plugins/n-arena}. Only runs when the new folder is missing and the
      * legacy one holds files, so existing servers keep their YAML / database / schematics.

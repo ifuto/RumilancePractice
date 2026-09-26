@@ -199,12 +199,17 @@ public final class QuantumRuntime {
             QuantumFunctionRegistry.Result result = this.installWhenReady();
             if (!this.zeroPackWarned && result.functions() == 0 && result.tags() == 0) {
                 this.zeroPackWarned = true;
+                // Report the paths this runtime ACTUALLY uses (derived, never hardcoded): the
+                // Quantum side lives in Paper's own plugins/NARENA folder, not in the
+                // plugins/n-arena operator data folder the rest of the plugin uses, and both
+                // were previously quoted here by a stale pre-rename name.
                 this.plugin.getLogger().warning("[Quantum] no .mcfunction files under the pack roots "
                         + this.packRoots()
-                        + " — the bundled map pack should deploy to plugins/RumilancePractice/quantum"
-                        + " at boot; check quantum.yml ('packs', 'include-world-datapacks') if the map"
-                        + " should live elsewhere. Set 'enabled: false' in"
-                        + " plugins/RumilancePractice/quantum.yml to silence the runtime.");
+                        + " — the bundled map pack should deploy to " + bundledPackRoot()
+                        + " at boot; check " + this.configFile.getName()
+                        + " ('packs', 'include-world-datapacks') if the map"
+                        + " should live elsewhere. Set 'enabled: false' in "
+                        + this.configFile.getPath() + " to silence the runtime.");
             }
             if (this.functions.isInstalled() && roots) {
                 this.watchdogIntervalMs = 5_000L;
@@ -347,8 +352,8 @@ public final class QuantumRuntime {
             roots.add(path);
         }
         // The bundled pack always deploys to <dataFolder>/quantum — read it no matter what the
-        // (possibly stale, e.g. pre-rename 'plugins/RumilancePractice/quantum') config says.
-        roots.add(this.plugin.getDataFolder().toPath().resolve("quantum"));
+        // (possibly stale, hand-edited) 'packs' list in quantum.yml says.
+        roots.add(bundledPackRoot());
         if (this.config.getBoolean("include-world-datapacks", true)) {
             for (World world : Bukkit.getWorlds()) {
                 File folder = new File(world.getWorldFolder(), "datapacks");
@@ -373,10 +378,25 @@ public final class QuantumRuntime {
     private static final String BUNDLED_PACK_MARKER = ".bundled-pack-sha256";
 
     /**
+     * Where the bundled map pack is deployed and always read back from.
+     *
+     * <p>This is Paper's own {@code plugins/NARENA} folder ({@code JavaPlugin#getDataFolder()} is
+     * final and follows the plugin.yml name), NOT the {@code plugins/n-arena} operator data folder
+     * the rest of the plugin uses via {@link com.rumilance.practice.PluginIdentity#dataFolder}.
+     * The split is deliberate and load-bearing: {@code quantum.yml} plus this pack root are the
+     * paths the parity harness edits ({@code tools/parity-runner/server_kit.py},
+     * {@code server_preset.py}) and that the shipped {@code quantum.yml} 'packs' default quotes.
+     * Everything derived from here so no log line or config default can drift from it again.</p>
+     */
+    private Path bundledPackRoot() {
+        return this.plugin.getDataFolder().toPath().resolve("quantum");
+    }
+
+    /**
      * Deploys the map pack bundled inside the jar (resource {@code quantum-pack/Practicebot/})
-     * into {@code plugins/RumilancePractice/quantum/} — the default {@code packs} entry of
-     * quantum.yml — so a server that only has the jar finds the map's {@code .mcfunction} files
-     * without any manual zip placement.
+     * into {@link #bundledPackRoot()} ({@code plugins/NARENA/quantum/}) — the default
+     * {@code packs} entry of quantum.yml — so a server that only has the jar finds the map's
+     * {@code .mcfunction} files without any manual zip placement.
      *
      * <p>Deployment is marker-based ({@code .bundled-pack-sha256}): the hash of the bundled
      * content is compared against the marker, and a boot with an unchanged bundle writes
@@ -405,7 +425,7 @@ public final class QuantumRuntime {
             this.plugin.getLogger().warning("[Quantum] cannot hash the bundled map pack: " + e);
             return;
         }
-        Path targetRoot = this.plugin.getDataFolder().toPath().resolve("quantum");
+        Path targetRoot = bundledPackRoot();
         Path marker = targetRoot.resolve(BUNDLED_PACK_MARKER);
         try {
             if (Files.exists(marker) && hash.equals(Files.readString(marker).trim())) {

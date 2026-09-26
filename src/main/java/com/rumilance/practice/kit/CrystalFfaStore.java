@@ -1,5 +1,6 @@
 package com.rumilance.practice.kit;
 
+import com.rumilance.practice.PluginIdentity;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.Plugin;
 
@@ -24,7 +25,7 @@ public final class CrystalFfaStore {
     private final YamlConfiguration yaml;
 
     public CrystalFfaStore(Plugin plugin) {
-        this.file = new File(plugin.getDataFolder(), "crystal-ffa.yml");
+        this.file = PluginIdentity.dataFile(plugin, "crystal-ffa.yml");
         this.yaml = YamlConfiguration.loadConfiguration(file);
     }
 

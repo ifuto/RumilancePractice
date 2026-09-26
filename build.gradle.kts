@@ -209,6 +209,13 @@ tasks.build {
 // archive root (the layout the Minecraft client expects). The sha1 printed here (also written
 // next to the zip as RumilanceResourcePack.sha1) is what belongs into server.properties'
 // resource-pack-sha1 — recompute it whenever the zip contents change.
+//
+// The sidecar is written in `sha1sum -c` format ("<hash>  <file>"): a bare hash cannot be
+// verified by any tool, and dist/ is checked with `sha1sum -c` before a release upload
+// (tools/release/attach-pack.sh). tools/release/build-pack.sh does the same job without a
+// JDK, straight into dist/, and additionally fails the build when a font provider points at a
+// texture that is not in the pack (or a texture ships unwired) — that is how the PRO badge
+// (U+E004 / font/pro.png) once went missing from the published zip.
 tasks.register<Zip>("resourcePackZip") {
     group = "build"
     description = "Zips resourcepack/ (pack.mcmeta at the root) for server distribution."
@@ -219,7 +226,8 @@ tasks.register<Zip>("resourcePackZip") {
         val zipFile = archiveFile.get().asFile
         val digest = MessageDigest.getInstance("SHA-1").digest(zipFile.readBytes())
         val sha1 = digest.joinToString("") { b: Byte -> "%02x".format(b) }
-        zipFile.resolveSibling("RumilanceResourcePack.sha1").writeText(sha1 + "\n")
+        zipFile.resolveSibling("RumilanceResourcePack.sha1")
+            .writeText(sha1 + "  " + zipFile.name + "\n")
         logger.lifecycle("[resourcepack] ${zipFile.name} sha1=$sha1")
     }
 }

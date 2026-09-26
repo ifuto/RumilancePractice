@@ -1,5 +1,6 @@
 package com.rumilance.practice.practice.afk;
 
+import com.rumilance.practice.PluginIdentity;
 import com.rumilance.practice.config.ConfigService;
 import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.locale.MessageService;
@@ -164,8 +165,8 @@ public final class AfkCrystalManager implements Listener, CommandExecutor,
     }
 
     public void start() {
-        kitsFile = new File(plugin.getDataFolder(), "afk-crystal-kits.yml");
-        settingsFile = new File(plugin.getDataFolder(), "afk-crystal-settings.yml");
+        kitsFile = PluginIdentity.dataFile(plugin, "afk-crystal-kits.yml");
+        settingsFile = PluginIdentity.dataFile(plugin, "afk-crystal-settings.yml");
         loadKits();
         loadSettings();
         Bukkit.getPluginManager().registerEvents(this, plugin);

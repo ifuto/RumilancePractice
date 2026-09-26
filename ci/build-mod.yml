@@ -1,0 +1,75 @@
+# build-mod — 連携Mod（mod/ ディレクトリ）のGradleビルド。
+#
+# [このファイルの役割]
+# .github/workflows/build-mod.yml に貼る正本。サンドボックスのエージェントは
+# .github/workflows/** を push できない（GitHub App に workflows 権限が無い）ため、
+# 修正はここに書いて **人手で貼り替える**（java-env.workflow.yml と同じ運用）。
+# 貼り替え手順:
+#   1. このファイルを全文コピー
+#   2. GitHub → .github/workflows/build-mod.yml → Edit → 貼り付け → Commit
+#      （mod/ が無い間は削除してしまってもよい。下の「修正点」参照）
+#
+# [修正点（2026-09-26）]
+# 旧版は job レベルの if に hashFiles() を使っていた:
+#     if: ${{ github.event_name == 'push' || hashFiles('mod/gradlew') != '' }}
+# hashFiles は jobs.<job_id>.if では使えない（Contexts reference の特殊関数は
+# always / cancelled / success / failure のみ）ため、テンプレート検証で落ちて
+# **毎 push で 0 ジョブの startup failure（赤バツ）** になっていた。run 名が
+# 「build-mod」ではなくファイルパス表示になるのがそのサイン。
+# → job レベルの if を廃止。push 側の発火は on.push.paths: mod/** が既に絞っており、
+#   mod/ が無い間は手動実行でもステップ側 if（hashFiles は steps.if で使える）で
+#   no-op の success になる。
+#
+# 出力: mod/ があるとき mod-jars アーティファクト (mod/build/libs/*.jar)。
+
+name: build-mod
+
+on:
+  push:
+    paths:
+      - "mod/**"
+      - ".github/workflows/build-mod.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-mod:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        if: hashFiles('mod/gradlew') != ''
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Build mod
+        if: hashFiles('mod/gradlew') != ''
+        run: |
+          chmod +x mod/gradlew
+          (cd mod && ./gradlew build --no-daemon --stacktrace) 2>&1 | tee /tmp/mod-build.log
+
+      - name: Note when there is no mod/ yet
+        if: hashFiles('mod/gradlew') == ''
+        run: echo "mod/gradlew not found - nothing to build (this workflow only matters once mod/ exists)."
+
+      - name: Upload mod jars
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mod-jars
+          path: mod/build/libs/*.jar
+          if-no-files-found: ignore
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mod-build-log
+          path: /tmp/mod-build.log
+          if-no-files-found: ignore

@@ -49,8 +49,14 @@ import java.util.logging.Logger;
  *       drift from the published pack, which is what used to make every client reject it;</li>
  *   <li>if the URL cannot be reached, the last known hash in the file is used (offline / LAN
  *       setups keep working);</li>
- *   <li>Craft the release with {@code dist/RumilanceResourcePack.zip} attached — the
- *       {@code Release resource pack} workflow uploads it (and the {@code .sha1}) for you.</li>
+ *   <li>Publishing the pack is two scripts (there is no release workflow — the app token this
+ *       repository is pushed with cannot write {@code .github/workflows/*}):
+ *       {@code tools/release/build-pack.sh} rebuilds {@code dist/RumilanceResourcePack.zip} from
+ *       {@code resourcepack/} — validating that every font provider's texture exists and that no
+ *       texture is left unwired — and writes the {@code .sha1} in {@code sha1sum -c} format;
+ *       {@code tools/release/attach-pack.sh <tag>} then uploads both to that Release.
+ *       Re-uploading to the tag this URL already points at needs no config change at all,
+ *       because the hash is re-fetched from the URL at boot.</li>
  * </ul>
  *
  * <p><b>Policy</b> (choosable in the admin GUI, persisted to {@code pack-policy.yml}):

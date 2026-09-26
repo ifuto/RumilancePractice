@@ -197,9 +197,19 @@ public final class RumilancePractice extends JavaPlugin {
         getLogger().info("NARENA has been disabled.");
     }
 
+    /** Text of the pointer file, kept here so the note can be refreshed as the layout changes. */
+    private static final String BUKKIT_FOLDER_POINTER_TEXT = """
+            NARENA keeps its operator data (config.yml, kits.yml, arenas.yml, lang/, tiers.yml,
+            crystal-ffa.yml, afk-crystal-*.yml, the database, ...) in plugins/n-arena/.
+
+            This folder (plugins/NARENA) is created by Paper from the plugin name and holds only
+            the Quantum/runtime side, which is addressed by that exact path elsewhere:
+              quantum.yml, quantum/ (the bundled map pack), resource-pack.json.
+            """;
+
     /**
      * Paper still creates {@code plugins/NARENA} from the plugin name. Point operators at the
-     * real data directory.
+     * real data directory, and say which files legitimately stay here.
      */
     private void writeBukkitFolderPointer() {
         File bukkitFolder = getDataFolder();
@@ -207,12 +217,12 @@ public final class RumilancePractice extends JavaPlugin {
             return;
         }
         File pointer = new File(bukkitFolder, "USE_n-arena_FOLDER.txt");
-        if (pointer.exists()) {
-            return;
-        }
         try {
-            java.nio.file.Files.writeString(pointer.toPath(),
-                    "NARENA keeps all YAML and data in plugins/n-arena/\n");
+            if (pointer.isFile()
+                    && BUKKIT_FOLDER_POINTER_TEXT.equals(java.nio.file.Files.readString(pointer.toPath()))) {
+                return;
+            }
+            java.nio.file.Files.writeString(pointer.toPath(), BUKKIT_FOLDER_POINTER_TEXT);
         } catch (java.io.IOException ignored) {
         }
     }

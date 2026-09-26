@@ -11,11 +11,12 @@ Paper 1.21.11 向け Practice PvP プラグイン **N Arena** です。ランク
 ## ビルド
 
 ```bash
-cd RumilancePractice
-./gradlew.bat build
+./gradlew build          # Windows: gradlew.bat build
 ```
 
-成果物: `build/libs/RumilancePractice-1.2.0.jar`
+成果物: `build/libs/RumilancePractice-<version>.jar`（version は `gradle.properties`、例: `1.76.57`）
++ `build/libs/RumilanceResourcePack.zip` / `.sha1`（`resourcePackZip` タスク。配布用パックは
+`tools/release/build-pack.sh` → `tools/release/attach-pack.sh <tag>` で公開します）
 
 ## 導入
 

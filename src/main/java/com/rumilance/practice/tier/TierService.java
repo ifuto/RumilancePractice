@@ -1,5 +1,6 @@
 package com.rumilance.practice.tier;
 
+import com.rumilance.practice.PluginIdentity;
 import com.rumilance.practice.database.repository.RankedStatsRepository;
 import com.rumilance.practice.model.RankedKitStats;
 import com.rumilance.practice.util.AsyncExecutor;
@@ -288,6 +289,6 @@ public final class TierService {
     }
 
     private File dataFile() {
-        return new File(plugin.getDataFolder(), FILE);
+        return PluginIdentity.dataFile(plugin, FILE);
     }
 }
