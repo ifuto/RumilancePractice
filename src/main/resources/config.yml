@@ -56,11 +56,11 @@ resource-pack:
   # pack was built for and older clients are simply not offered it (0 = offer to everyone).
   min-client-protocol: 0
   # Fallback Release URL, used only when resource-pack.json has no "url".
-  url: "https://github.com/ifuto/RumilancePractice/releases/download/v1.76.52/RumilanceResourcePack.zip"
+  url: "https://github.com/ifuto/RumilancePractice/releases/download/v1.76.57/RumilanceResourcePack.zip"
   # Fallback SHA-1 (40 hex). The live hash is what clients are actually told: it is computed
   # from the zip at the URL on every start and stored in resource-pack.json. This value only
   # covers an offline server that has never reached the URL.
-  sha1: "2ad094674379fb5cc9e1f224647b9f30c26e2072"
+  sha1: "70b92cbf2d7aed9a688528fa28e99c73e535d609"
   # true  = REQUIRED: kick players who decline the pack or fail to download it.
   # false = RECOMMENDED: they may decline and keep playing (text rank badges instead of
   #         the icon glyphs). Switchable at runtime from the admin GUI; that choice is

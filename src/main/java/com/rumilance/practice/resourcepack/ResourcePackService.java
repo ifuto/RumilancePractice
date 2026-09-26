@@ -73,9 +73,15 @@ import java.util.logging.Logger;
  */
 public final class ResourcePackService implements Listener {
 
-    /** Shipped default: the immutable GitHub Release asset (used when the JSON has no url). */
+    /**
+     * Shipped default: the immutable GitHub Release asset (used when the JSON has no url).
+     * Bumped together with the pack by {@code tools/release/build-pack.sh --tag <tag>}, which
+     * syncs config.yml's {@code resource-pack.url} / {@code sha1} — keep both on the same tag,
+     * otherwise a fresh install (no resource-pack.json yet) and an offline server would hand
+     * clients a hash that does not match the zip they download.
+     */
     public static final String DEFAULT_URL =
-            "https://github.com/ifuto/RumilancePractice/releases/download/v1.76.52/RumilanceResourcePack.zip";
+            "https://github.com/ifuto/RumilancePractice/releases/download/v1.76.57/RumilanceResourcePack.zip";
     /** Operator-owned pack definition (url + prompt + the hash the server maintains). */
     private static final String JSON_FILE_NAME = "resource-pack.json";
 
