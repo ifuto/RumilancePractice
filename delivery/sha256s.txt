@@ -1,0 +1,2 @@
+ce79869e1307ed8ee1e2baa86a412b1eb5b75d10a01006d788a6f968bcfaee94  jdk21.tar.gz
+5ffef465eeeb5f2a3c23a24419d97c51afd7dbb4923ff42df9a3f58bba1ccfba  paper-1.21.11-132.jar
