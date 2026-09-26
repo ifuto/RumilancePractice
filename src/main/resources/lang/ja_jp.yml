@@ -379,6 +379,7 @@ ffa-bot:
   spawned: "<gray>マネキン </gray><aqua><bold>NARENA BOT</bold></aqua><gray> をスポーンさせました。もう一度 </gray><yellow>/bot</yellow><gray> で削除します。"
   removed: "<gray>マネキン BOT を削除しました。"
   failed: "<red>マネキン BOT をスポーンできませんでした。"
+  arena-disabled: "<red>このアリーナでは FFA Bot は OFF です。</red> <gray>/practiceadmin</gray> <gray>→ FFA Config の</gray> <yellow>FFA Bot</yellow> <gray>を ON にすると</gray> <aqua><bold>NARENA BOT</bold></aqua> <gray>を出せます。</gray>"
 
 kit:
   created: "<green>キット <kit> を作成しました。"
@@ -585,6 +586,8 @@ gui:
   ffa-settings-rtp-name: "RTP"
   ffa-settings-rtp-lore: "アリーナ内の安全なランダム地点へテレポートする /rtp を許可する。"
   ffa-settings-rtpqueue-lore: "キュー待ち2人を同じランダム地点へTPして対戦。"
+  ffa-settings-bot-name: "FFA Bot"
+  ffa-settings-bot-lore: "ONにすると、このアリーナでは /bot がマネキンBOT（NARENA BOT）を出します。既定はOFF。"
   arena-source-title: "アリーナコピー元"
   arena-source-empty: "登録済みアリーナがありません。"
   arena-source-kind: "種類"

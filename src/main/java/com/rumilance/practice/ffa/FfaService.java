@@ -69,7 +69,13 @@ public final class FfaService {
             boolean blockBreak,
             boolean breakPlayerPlacedOnly,
             /** Explicitly allowed materials when breakPlayerPlacedOnly is false. */
-            List<String> canBreak
+            List<String> canBreak,
+            /**
+             * FFA Bot（マネキン BOT）をこのアリーナで許可するか。既定 OFF — 任意で ON にする形式で、
+             * {@code /practiceadmin} → FFA Config → アリーナ detail ページのトグルで切り替える。
+             * OFF のアリーナでは {@code /bot} はマネキンも Quantum BOT も出さない。
+             */
+            boolean botEnabled
     ) {
         public FfaArena {
             resetIntervalSeconds = Math.max(0, resetIntervalSeconds);
@@ -85,69 +91,76 @@ public final class FfaService {
 
         public FfaArena withResetInterval(int seconds) {
             return new FfaArena(id, kitId, world, region, spawn, enabled, Math.max(0, seconds), iconMaterial,
-                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak);
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled);
         }
 
         public FfaArena withEnabled(boolean value) {
             return new FfaArena(id, kitId, world, region, spawn, value, resetIntervalSeconds, iconMaterial,
-                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak);
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled);
         }
 
         public FfaArena withKit(String kit) {
             return new FfaArena(id, kit, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
-                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak);
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled);
         }
 
         public FfaArena withRegion(Cuboid newRegion) {
             return new FfaArena(id, kitId, newRegion.worldName(), newRegion, spawn, enabled,
-                    resetIntervalSeconds, iconMaterial, tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak);
+                    resetIntervalSeconds, iconMaterial, tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled);
         }
 
         public FfaArena withSpawn(Location newSpawn) {
             // null = back to "random standing spot far from occupants" spawning.
             return new FfaArena(id, kitId, world, region,
                     newSpawn != null ? newSpawn.clone() : null, enabled,
-                    resetIntervalSeconds, iconMaterial, tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak);
+                    resetIntervalSeconds, iconMaterial, tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled);
         }
 
         public FfaArena withId(String newId) {
             return new FfaArena(newId, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
-                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak);
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled);
         }
 
         public FfaArena withTpa(boolean value) {
             return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
-                    value, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak);
+                    value, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled);
         }
 
         public FfaArena withRtp(boolean value) {
             return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
-                    tpaEnabled, value, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak);
+                    tpaEnabled, value, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled);
         }
 
         public FfaArena withRtpQueue(boolean value) {
             return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
-                    tpaEnabled, rtpEnabled, value, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak);
+                    tpaEnabled, rtpEnabled, value, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled);
         }
 
         public FfaArena withBlockPlace(boolean value) {
             return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
-                    tpaEnabled, rtpEnabled, rtpQueueEnabled, value, blockBreak, breakPlayerPlacedOnly, canBreak);
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled, value, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled);
         }
 
         public FfaArena withBlockBreak(boolean value) {
             return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
-                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, value, breakPlayerPlacedOnly, canBreak);
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, value, breakPlayerPlacedOnly, canBreak, botEnabled);
         }
 
         public FfaArena withBreakPlayerPlacedOnly(boolean value) {
             return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
-                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, value, canBreak);
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, value, canBreak, botEnabled);
         }
 
         public FfaArena withCanBreak(List<String> value) {
             return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
-                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, value != null ? List.copyOf(value) : List.of());
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, value != null ? List.copyOf(value) : List.of(), botEnabled);
+        }
+
+        /** FFA Bot（マネキン BOT）の可否。既定 OFF。 */
+        public FfaArena withBot(boolean value) {
+            return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly,
+                    canBreak, value);
         }
 
         /** Region size seen from above: X x Z block counts. */
@@ -161,7 +174,7 @@ public final class FfaService {
 
         public FfaArena withIconMaterial(String material) {
             return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, material,
-                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak);
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled);
         }
     }
 
@@ -413,7 +426,8 @@ public final class FfaService {
                     blockPlace,
                     blockBreak,
                     breakPlayerPlacedOnly,
-                    canBreak != null ? List.copyOf(canBreak) : List.of());
+                    canBreak != null ? List.copyOf(canBreak) : List.of(),
+                    entry.getBoolean("settings.bot", false));
             arenas.put(id, arena);
             if (migratedFromKit) {
                 // Persist the inherited rules once so the arena block-settings become
@@ -1339,7 +1353,9 @@ public final class FfaService {
     public void create(String id, Cuboid region, Location spawn, String kitId) {
         // Block rules default to "no arena override" so the kit's own rules keep governing
         // until an admin opts in per-arena (block place/break stay kit-driven by default).
-        FfaArena arena = new FfaArena(id, kitId, region.worldName(), region, spawn.clone(), false, 0, "IRON_SWORD", false, false, false, false, false, false, List.of());
+        // FFA Bot is OFF for a brand-new arena too: it is an opt-in per arena (FFA Config).
+        FfaArena arena = new FfaArena(id, kitId, region.worldName(), region, spawn.clone(), false, 0,
+                "IRON_SWORD", false, false, false, false, false, false, List.of(), false);
         arenas.put(arena.id(), arena);
         persist(arena);
         armResetTimer(arena, false);
@@ -1416,6 +1432,24 @@ public final class FfaService {
         arenas.put(updated.id(), updated);
         persist(updated);
         return true;
+    }
+
+    /** FFA Bot（マネキン BOT）をアリーナ単位で ON/OFF。既定 OFF の任意 ON 形式。 */
+    public boolean setBotEnabled(String id, boolean value) {
+        FfaArena existing = findArena(id);
+        if (existing == null) {
+            return false;
+        }
+        FfaArena updated = existing.withBot(value);
+        arenas.put(updated.id(), updated);
+        persist(updated);
+        return true;
+    }
+
+    /** このアリーナで FFA Bot（マネキン BOT）が許可されているか。未知のアリーナは OFF。 */
+    public boolean botEnabled(String id) {
+        FfaArena arena = findArena(id);
+        return arena != null && arena.botEnabled();
     }
 
     /** Arena definition lookup (lowercased id, exact). */
@@ -1954,6 +1988,7 @@ public final class FfaService {
         yaml.set(path + ".settings.tpa", arena.tpaEnabled());
         yaml.set(path + ".settings.rtp", arena.rtpEnabled());
         yaml.set(path + ".settings.rtpqueue", arena.rtpQueueEnabled());
+        yaml.set(path + ".settings.bot", arena.botEnabled());
         // Arena-level block interaction rules
         yaml.set(path + ".settings.block-place", arena.blockPlace());
         yaml.set(path + ".settings.block-break", arena.blockBreak());

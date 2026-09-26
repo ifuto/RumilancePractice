@@ -1505,11 +1505,12 @@ public final class FeatureBootstrap {
         // the same resolver immediately and use the ledger for void/fall deaths.
         pm.registerEvents(damageAttribution, plugin);
         // /bot inside FFA is a mannequin dummy, not the Quantum combat bot: a fighting bot in a
-        // shared arena is not what a mid-FFA player asked for. Created here (not next to FfaService)
-        // because the owner-only damage rule needs the attribution resolver, which resolves the
-        // owner's own crystal / bed blasts so their practice keeps working.
+        // shared arena is not what a mid-FFA player asked for. The dummy is an opt-in arena feature
+        // (default OFF, /practiceadmin → FFA Config → FFA Bot) and it takes every hit exactly as
+        // vanilla deals it — crystals, anchors, beds and other players included — so unlike the
+        // first cut it needs no damage attribution here.
         ffaMannequins = new com.rumilance.practice.ffa.FfaMannequinService(
-                plugin, ffaService, messageService, damageAttribution);
+                plugin, ffaService, messageService);
         services.register(com.rumilance.practice.ffa.FfaMannequinService.class, ffaMannequins);
         pm.registerEvents(new MatchListener(matchService, kitService, combatNet, practiceTnt,
                 playerPlacedBlockTracker, explosionSources, damageAttribution), plugin);
@@ -1960,7 +1961,8 @@ public final class FeatureBootstrap {
                 this.quantumBots));
         // /bot is the public entry point for the actual bundled QuantumBOT, not the old
         // Java-side PracticeBot selector — except inside FFA, where it toggles the mannequin
-        // training dummy (FfaMannequinService) instead.
+        // training dummy (FfaMannequinService) in arenas that turned FFA Bot on, and reports
+        // that the feature is off everywhere else.
         com.rumilance.practice.practice.BotGuiCommand botCommand =
                 new com.rumilance.practice.practice.BotGuiCommand(this.quantum);
         botCommand.setFfaMannequins(ffaMannequins);

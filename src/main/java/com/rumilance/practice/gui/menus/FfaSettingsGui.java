@@ -21,9 +21,13 @@ import java.util.Locale;
 
 /**
  * Per-FFA settings (admin). First page lists every FFA arena; selecting one opens its detail
- * page with toggleable per-arena features (TPA, RTPQueue — both default OFF) and the arena's
- * top-down size ({@code X blocks x Z blocks}). Persisted to {@code arenas.<id>.settings.*} in
- * ffa.yml. Reached via {@code /ffa settings <arena>} or the admin menu.
+ * page with toggleable per-arena features (TPA, RTPQueue, FFA Bot — all default OFF) and the
+ * arena's top-down size ({@code X blocks x Z blocks}). Persisted to {@code arenas.<id>.settings.*}
+ * in ffa.yml. Reached via {@code /ffa settings <arena>} or the admin menu.
+ *
+ * <p>{@code FFA Bot} ({@code settings.bot}) is the opt-in switch for the mannequin training dummy:
+ * while it is OFF, {@code /bot} inside that arena spawns nothing at all — neither the dummy nor the
+ * Quantum combat bot — and tells the player where the switch is.</p>
  */
 public final class FfaSettingsGui extends AbstractGui {
 
@@ -174,6 +178,15 @@ public final class FfaSettingsGui extends AbstractGui {
                 "Only player-placed blocks may be broken",
                 "toggle:breakplayerplaced"));
 
+        // FFA Bot（マネキン BOT）: 既定 OFF の任意 ON。このアリーナで /bot が
+        // NARENA BOT マネキンを出すかどうかはここだけで決まる。
+        inventory.setItem(MenuScaffold.gridSlot(18), toggleItem(player,
+                Material.TOTEM_OF_UNDYING,
+                line(player, "gui.ffa-settings-bot-name"),
+                arena.botEnabled(),
+                line(player, "gui.ffa-settings-bot-lore"),
+                "toggle:bot"));
+
         inventory.setItem(MenuScaffold.gridSlot(22), ItemBuilder.of(Material.SPYGLASS)
                 .name(t(player, "gui.ffa-settings-size-title").color(UiTheme.SECONDARY))
                 .lore(
@@ -256,6 +269,7 @@ public final class FfaSettingsGui extends AbstractGui {
                 case "blockbreak" -> ffaService.setBlockBreak(arena.id(), !arena.blockBreak());
                 case "breakplayerplaced" ->
                         ffaService.setBreakPlayerPlacedOnly(arena.id(), !arena.breakPlayerPlacedOnly());
+                case "bot" -> ffaService.setBotEnabled(arena.id(), !arena.botEnabled());
                 default -> { }
             }
             sounds.play(player, "gui-click");

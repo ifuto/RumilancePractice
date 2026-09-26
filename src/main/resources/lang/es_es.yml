@@ -378,6 +378,7 @@ ffa-bot:
   spawned: "<gray>Maniquí </gray><aqua><bold>NARENA BOT</bold></aqua><gray> generado. Usa </gray><yellow>/bot</yellow><gray> otra vez para quitarlo."
   removed: "<gray>Maniquí eliminado."
   failed: "<red>No se pudo generar el maniquí."
+  arena-disabled: "<red>FFA Bot está OFF en esta arena.</red> <gray>Activa</gray> <yellow>FFA Bot</yellow> <gray>en /practiceadmin → FFA Config para generar</gray> <aqua><bold>NARENA BOT</bold></aqua><gray>.</gray>"
 
 kit:
   created: "<green>Kit <kit> creado."
@@ -584,6 +585,8 @@ gui:
   ffa-settings-rtp-name: "RTP"
   ffa-settings-rtp-lore: "Permitir /rtp — teletransporte a un punto aleatorio seguro dentro de la arena."
   ffa-settings-rtpqueue-lore: "Empareja jugadores en cola en un punto aleatorio común."
+  ffa-settings-bot-name: "FFA Bot"
+  ffa-settings-bot-lore: "Si está ON, /bot en esta arena genera el maniquí (NARENA BOT). OFF por defecto."
   arena-source-title: "Orígenes de arenas"
   arena-source-empty: "No hay arenas registradas."
   arena-source-kind: "Tipo"

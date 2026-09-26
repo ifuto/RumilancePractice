@@ -525,7 +525,7 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
                         + (a.resetIntervalSeconds() > 0 ? "  (next in " + timer + ")" : ""),
                 NamedTextColor.GRAY));
         sender.sendMessage(Component.text("TPA: " + a.tpaEnabled() + " | RTP queue: "
-                + a.rtpQueueEnabled(), NamedTextColor.GRAY));
+                + a.rtpQueueEnabled() + " | FFA Bot: " + a.botEnabled(), NamedTextColor.GRAY));
         if (a.region() != null) {
             sender.sendMessage(Component.text("Region: " + a.region().worldName()
                     + " (" + a.sizeX() + "x" + a.sizeZ() + ")", NamedTextColor.GRAY));

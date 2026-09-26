@@ -14,3 +14,8 @@ settings:
   kill-streak-announcements: true
   # false = cancel fall/lava/drown/etc. PvP damage is unchanged.
   environment-damage-enabled: false
+  # Per-arena toggles live on arenas.<id>.settings.* and are edited in
+  # /practiceadmin -> FFA Config -> the arena (TPA, RTP, RTPQueue, Block Place / Break,
+  # Break Player-Placed Only, FFA Bot). They are OFF unless an admin turns them on:
+  #   settings.bot: false   # true = /bot in that arena spawns the NARENA BOT mannequin
+  #                         # dummy; false = /bot spawns nothing there (no Quantum bot either)

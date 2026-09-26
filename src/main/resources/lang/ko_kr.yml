@@ -378,6 +378,7 @@ ffa-bot:
   spawned: "<gray>마네킹 </gray><aqua><bold>NARENA BOT</bold></aqua><gray>을(를) 소환했습니다. </gray><yellow>/bot</yellow><gray>을(를) 다시 입력하면 제거됩니다."
   removed: "<gray>마네킹 봇을 제거했습니다."
   failed: "<red>마네킹 봇을 소환하지 못했습니다."
+  arena-disabled: "<red>이 아레나에서는 FFA Bot이 OFF입니다.</red> <gray>/practiceadmin → FFA Config에서</gray> <yellow>FFA Bot</yellow><gray>을 켜면</gray> <aqua><bold>NARENA BOT</bold></aqua><gray>을 소환할 수 있습니다.</gray>"
 
 kit:
   created: "<green>키트 <kit>를 생성했습니다."
@@ -584,6 +585,8 @@ gui:
   ffa-settings-rtp-name: "RTP"
   ffa-settings-rtp-lore: "/rtp 허용 — 아레나 내 임의의 안전 지점으로 순간이동합니다."
   ffa-settings-rtpqueue-lore: "대기 중인 두 명을 같은 무작위 지점으로 TP."
+  ffa-settings-bot-name: "FFA Bot"
+  ffa-settings-bot-lore: "ON이면 이 아레나에서 /bot가 마네킹 BOT(NARENA BOT)을 소환합니다. 기본값은 OFF."
   arena-source-title: "아레나 원본"
   arena-source-empty: "등록된 아레나가 없습니다."
   arena-source-kind: "종류"

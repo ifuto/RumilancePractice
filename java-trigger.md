@@ -316,3 +316,5 @@ IDを作っていた（`npc:tick.mcfunction`）。そのため **タグ（#minec
 <!-- trigger: build + plugin-delivery for FFA /bot mannequin dummy (NARENA BOT) + resource-pack release v1.76.57 + n-arena data-folder fixes 2026-09-26 (arena/01a0dc7c) -->
 
 <!-- trigger: build + plugin-delivery + resource-pack release v1.76.57 (FFA mannequin /bot, token from checkout credentials) 2026-09-26 (arena/01a0dc7c) -->
+
+<!-- trigger: build + plugin-delivery for FFA Bot per-arena opt-in toggle (default OFF) + full damage pass-through 2026-09-26 (arena/01a0dc7c) -->

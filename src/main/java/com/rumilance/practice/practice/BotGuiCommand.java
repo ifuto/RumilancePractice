@@ -19,10 +19,13 @@ import java.util.List;
  *
  * <p>In FFA the command belongs to {@link FfaMannequinService}: it toggles a mannequin dummy
  * (unbreakable netherite, Protection 4 / Blast Protection 4 leggings, a totem in each hand, bold
- * aqua {@code NARENA BOT} nametag) that cannot be killed and disappears again on the second
- * {@code /bot}, on leaving FFA or on disconnect. Spawning the Quantum combat bot into a shared FFA
- * arena instead was the reported "FFAで/botすると別のやつになる" — a full fighting bot is not what
- * someone mid-FFA wants, and it fought the arena's own combat rules.</p>
+ * aqua {@code NARENA BOT} nametag) that takes every hit exactly as vanilla deals it and disappears
+ * again on the second {@code /bot}, on leaving FFA or on disconnect. The dummy is an opt-in arena
+ * feature that is OFF by default — {@code /practiceadmin} → FFA Config → the arena's {@code FFA Bot}
+ * toggle — and while it is OFF {@code /bot} in that arena spawns nothing at all and says why.
+ * Spawning the Quantum combat bot into a shared FFA arena instead was the reported
+ * "FFAで/botすると別のやつになる" — a full fighting bot is not what someone mid-FFA wants, and it
+ * fought the arena's own combat rules.</p>
  *
  * <p>Outside FFA this command intentionally does not open the old Java-side practice-bot selector.
  * The Quantum runtime owns one tagged instance per invocation, using a unique profile name for
@@ -52,8 +55,7 @@ public final class BotGuiCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(Component.text("Only players can spawn the QuantumBOT.", NamedTextColor.RED));
             return true;
         }
-        if (ffaMannequins != null && ffaMannequins.handles(player)) {
-            ffaMannequins.toggle(player);
+        if (ffaMannequins != null && ffaMannequins.handleBotCommand(player)) {
             return true;
         }
         if (!quantum.enabled()) {

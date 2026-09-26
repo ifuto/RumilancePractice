@@ -380,6 +380,7 @@ ffa-bot:
   spawned: "<gray>Spawned the mannequin </gray><aqua><bold>NARENA BOT</bold></aqua><gray>. Run </gray><yellow>/bot</yellow><gray> again to remove it."
   removed: "<gray>Removed the mannequin bot."
   failed: "<red>Could not spawn the mannequin bot."
+  arena-disabled: "<red>FFA Bot is OFF in this arena.</red> <gray>Turn on</gray> <yellow>FFA Bot</yellow> <gray>under /practiceadmin → FFA Config to spawn</gray> <aqua><bold>NARENA BOT</bold></aqua><gray>.</gray>"
 
 kit:
   created: "<green>Kit <kit> created."
@@ -586,6 +587,8 @@ gui:
   ffa-settings-rtp-lore: "Allow /rtp — random safe spot teleport inside this arena."
   ffa-settings-rtpqueue-name: "RTPQueue"
   ffa-settings-rtpqueue-lore: "Pair queued players onto a shared random spot."
+  ffa-settings-bot-name: "FFA Bot"
+  ffa-settings-bot-lore: "When ON, /bot in this arena spawns the mannequin dummy (NARENA BOT). OFF by default."
   arena-source-title: "Arena Sources"
   arena-source-empty: "No arenas registered."
   arena-source-kind: "Type"

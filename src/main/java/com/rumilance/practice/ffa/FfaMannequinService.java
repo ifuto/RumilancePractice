@@ -1,6 +1,5 @@
 package com.rumilance.practice.ffa;
 
-import com.rumilance.practice.combat.DamageAttributionService;
 import com.rumilance.practice.ffa.FfaMannequinLoadout.Piece;
 import com.rumilance.practice.ffa.FfaMannequinLoadout.Slot;
 import com.rumilance.practice.locale.MessageService;
@@ -20,7 +19,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityResurrectEvent;
@@ -58,11 +56,19 @@ import java.util.concurrent.ConcurrentHashMap;
  * slow heal in {@link #tickHeal} brings a popped dummy back to 20 HP a few seconds after the
  * player stops hitting it, so it is ready for the next combo without a re-spawn.</p>
  *
- * <p>Damage from anybody but the owner is cancelled, resolved through
- * {@link DamageAttributionService} so a crystal or a bed blast counts as the player who placed it:
- * the owner's own crystal practice keeps working while another fighter cannot pop their dummy's
- * totems. Unowned environmental damage (fall, fire, suffocation) is left alone — the dummy cannot
- * die from it anyway — except the void, which would carry it out of the arena for good.</p>
+ * <p><b>Default OFF, opt-in per arena.</b> The dummy is an arena feature: {@code /practiceadmin} →
+ * FFA Config → the arena's detail page has an {@code FFA Bot} toggle persisted as
+ * {@code arenas.<id>.settings.bot} in ffa.yml, OFF for every arena until an admin turns it on (and
+ * OFF for arenas created later). Inside an arena whose toggle is OFF, {@code /bot} spawns nothing at
+ * all — neither the mannequin nor the Quantum combat bot — and says why.</p>
+ *
+ * <p><b>Damage is untouched.</b> Every frame lands exactly as vanilla computed it: crystals,
+ * respawn anchors, beds, TNT, arrows, potions and melee — from the owner <i>and</i> from anybody
+ * else in the arena. Nothing is filtered by attacker and no attribution lookup is involved, so a
+ * dummy in a shared FFA is a shared punching bag. The only frames this service interferes with are
+ * one another plugin already cancelled (re-opened, so the dummy can never be made immune by a
+ * global guard) and the void (cancelled and the dummy handed back to its owner, because a dummy
+ * that falls out of the arena is gone for good and its death rebuild would loop).</p>
  */
 public final class FfaMannequinService implements Listener {
 
@@ -71,7 +77,6 @@ public final class FfaMannequinService implements Listener {
     private final Plugin plugin;
     private final FfaService ffaService;
     private final MessageService messages;
-    private final DamageAttributionService damageAttribution;
     /** owner -> dummy. One per player; {@code /bot} again removes it. */
     private final Map<UUID, Mannequin> bots = new ConcurrentHashMap<>();
     /** dummy uuid -> owner, so the damage/death listeners stay O(1). */
@@ -80,21 +85,53 @@ public final class FfaMannequinService implements Listener {
     private final Map<UUID, Long> lastHurtMs = new ConcurrentHashMap<>();
     private BukkitTask healTask;
 
-    public FfaMannequinService(Plugin plugin, FfaService ffaService, MessageService messages,
-                               DamageAttributionService damageAttribution) {
+    public FfaMannequinService(Plugin plugin, FfaService ffaService, MessageService messages) {
         this.plugin = plugin;
         this.ffaService = ffaService;
         this.messages = messages;
-        this.damageAttribution = damageAttribution;
         Bukkit.getPluginManager().registerEvents(this, plugin);
         // Any FFA exit (leave, disconnect, pull into a match) drops the dummy with it.
         ffaService.addLeaveListener(this::removeFor);
         this.healTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tickHeal, 20L, 20L);
     }
 
-    /** True when {@code /bot} should spawn the mannequin rather than the Quantum map bot. */
-    public boolean handles(Player player) {
+    /** True while the player is inside an FFA arena, whatever that arena's FFA Bot toggle says. */
+    public boolean inFfa(Player player) {
         return player != null && ffaService.isInFfa(player.getUniqueId());
+    }
+
+    /**
+     * True when the arena the player is standing in has FFA Bot switched on
+     * ({@code /practiceadmin} → FFA Config → FFA Bot, default OFF, persisted per arena).
+     */
+    public boolean arenaAllows(Player player) {
+        return player != null && arenaAllows(player.getUniqueId());
+    }
+
+    /** Same check by id, for the upkeep sweep that takes dummies away from a switched-off arena. */
+    private boolean arenaAllows(UUID playerId) {
+        return playerId != null
+                && ffaService.arenaOf(playerId).map(ffaService::botEnabled).orElse(false);
+    }
+
+    /**
+     * {@code /bot} inside FFA. Returns true when the command was consumed, i.e. whenever the player
+     * is in an FFA arena: with the arena's FFA Bot toggle ON it spawns/removes the dummy, with it
+     * OFF it explains that the feature is off for this arena. Returning false is what lets
+     * {@code /bot} outside FFA fall through to the Quantum bot unchanged.
+     */
+    public boolean handleBotCommand(Player player) {
+        if (!inFfa(player)) {
+            return false;
+        }
+        if (!arenaAllows(player)) {
+            // Turning the arena's toggle off also takes any dummy that is already out with it.
+            removeFor(player.getUniqueId());
+            send(player, "ffa-bot.arena-disabled");
+            return true;
+        }
+        toggle(player);
+        return true;
     }
 
     /** {@code /bot} in FFA: spawn the dummy, or remove it when this player already has one. */
@@ -293,8 +330,12 @@ public final class FfaMannequinService implements Listener {
     // ---------------------------------------------------------------- damage
 
     /**
-     * Owner-only damage. HIGHEST + no {@code ignoreCancelled}: another guard may have cancelled
-     * the frame first, and then the owner could not train on their own dummy at all.
+     * Damage lands exactly as vanilla computed it: crystals, respawn anchors, beds, TNT, arrows,
+     * potions and melee — from the owner <b>and</b> from anybody else in the arena. No attacker is
+     * filtered out and nothing is attributed, so the dummy is a shared punching bag. HIGHEST with no
+     * {@code ignoreCancelled} on purpose: a global guard may have cancelled the frame first, and
+     * then the dummy would be immune to the very practice it exists for, so it is re-opened here.
+     * The only frame cancelled is the void, which would carry the dummy out of the arena for good.
      */
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onDamage(EntityDamageEvent event) {
@@ -312,37 +353,12 @@ public final class FfaMannequinService implements Listener {
             pullBackToOwner(bot, owner);
             return;
         }
-        UUID attacker = attackerOf(event, owner);
-        if (attacker != null && !attacker.equals(owner)) {
-            event.setCancelled(true);   // somebody else's dummy is not a punching bag
-            return;
-        }
         if (event.isCancelled()) {
-            event.setCancelled(false);  // the owner must be able to hit it
+            event.setCancelled(false);  // nobody may switch the dummy's damage off
         }
         lastHurtMs.put(bot.getUniqueId(), System.currentTimeMillis());
         // Both hands hold totems, so a lethal frame is left ALIVE here on purpose: vanilla pops
         // the real totem and onResurrect restocks it. onDeath is the net for empty hands.
-    }
-
-    /**
-     * Who is behind this frame. {@link DamageAttributionService} resolves crystals, TNT and bed
-     * blasts to the player who placed them, so the owner's own crystal practice is never blocked;
-     * a plain melee/projectile hit falls back to the damager when attribution has no answer.
-     * {@code null} = environmental (fall, fire, suffocation) and always allowed.
-     */
-    private UUID attackerOf(EntityDamageEvent event, UUID owner) {
-        if (damageAttribution != null) {
-            UUID resolved = damageAttribution.resolve(event);
-            if (resolved != null) {
-                return resolved;
-            }
-        }
-        if (event instanceof EntityDamageByEntityEvent byEntity
-                && byEntity.getDamager() instanceof Player attacker) {
-            return attacker.getUniqueId();
-        }
-        return null;
     }
 
     /** Returns a void-saved dummy to its owner (or to the arena spawn when they are gone). */
@@ -490,7 +506,11 @@ public final class FfaMannequinService implements Listener {
 
     // ---------------------------------------------------------------- upkeep
 
-    /** Out-of-combat heal: a popped dummy is back to full a few seconds after the hits stop. */
+    /**
+     * Once a second: drop dummies that are no longer wanted (dead body, or an arena whose FFA Bot
+     * toggle was switched off while one was out) and heal the rest — a popped dummy is back to full
+     * a few seconds after the hits stop.
+     */
     private void tickHeal() {
         if (bots.isEmpty()) {
             return;
@@ -499,6 +519,13 @@ public final class FfaMannequinService implements Listener {
         for (Map.Entry<UUID, Mannequin> entry : bots.entrySet()) {
             Mannequin bot = entry.getValue();
             if (bot == null || !bot.isValid()) {
+                removeFor(entry.getKey());
+                continue;
+            }
+            // Arena switched off under a live dummy. Checked only while the owner is still inside
+            // FFA: leaving is the FFA leave listener's job, and an arena lookup that comes up empty
+            // mid-teleport must not throw away a dummy that is still wanted.
+            if (ffaService.isInFfa(entry.getKey()) && !arenaAllows(entry.getKey())) {
                 removeFor(entry.getKey());
                 continue;
             }

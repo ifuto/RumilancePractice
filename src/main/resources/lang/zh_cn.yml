@@ -378,6 +378,7 @@ ffa-bot:
   spawned: "<gray>已生成假人 </gray><aqua><bold>NARENA BOT</bold></aqua><gray>。再次输入 </gray><yellow>/bot</yellow><gray> 即可移除。"
   removed: "<gray>已移除假人。"
   failed: "<red>无法生成假人。"
+  arena-disabled: "<red>该竞技场的 FFA Bot 处于关闭状态。</red> <gray>在 /practiceadmin → FFA Config 中打开</gray> <yellow>FFA Bot</yellow> <gray>即可生成</gray> <aqua><bold>NARENA BOT</bold></aqua><gray>。</gray>"
 
 kit:
   created: "<green>Kit <kit> created."
@@ -584,6 +585,8 @@ gui:
   ffa-settings-rtp-name: "RTP"
   ffa-settings-rtp-lore: "允许 /rtp — 传送到竞技场内的随机安全地点。"
   ffa-settings-rtpqueue-lore: "将排队中的两名玩家传送到同一随机地点。"
+  ffa-settings-bot-name: "FFA Bot"
+  ffa-settings-bot-lore: "开启后，在该竞技场内 /bot 会生成假人 BOT（NARENA BOT）。默认关闭。"
   arena-source-title: "斗场来源"
   arena-source-empty: "尚未注册任何斗场。"
   arena-source-kind: "类型"
