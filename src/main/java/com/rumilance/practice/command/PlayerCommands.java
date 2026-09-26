@@ -9,6 +9,8 @@ import com.rumilance.practice.gui.menus.EkitSelectGui;
 import com.rumilance.practice.gui.menus.SettingsGui;
 import com.rumilance.practice.gui.menus.SpectateListGui;
 import com.rumilance.practice.gui.menus.StatsKitGui;
+import com.rumilance.practice.database.repository.PlayerRepository;
+import com.rumilance.practice.hiddenrank.HiddenRankService;
 import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.model.MatchHistoryEntry;
 import com.rumilance.practice.model.RankedKitStats;
@@ -32,6 +34,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
 public final class PlayerCommands implements CommandExecutor, TabCompleter {
 
@@ -57,6 +60,8 @@ public final class PlayerCommands implements CommandExecutor, TabCompleter {
     private final ChatBanService chatBanService;
     /** Blocks /ekit while the player is committed to a match/queue/other activity. */
     private java.util.function.Predicate<org.bukkit.entity.Player> kitEditBusyCheck;
+    private HiddenRankService hiddenRankService;
+    private PlayerRepository playerRepository;
 
     public PlayerCommands(
             Type type,
@@ -96,6 +101,14 @@ public final class PlayerCommands implements CommandExecutor, TabCompleter {
 
     public void setKitEditBusyCheck(java.util.function.Predicate<org.bukkit.entity.Player> busyCheck) {
         this.kitEditBusyCheck = busyCheck;
+    }
+
+    public void setHiddenRankService(HiddenRankService hiddenRankService) {
+        this.hiddenRankService = hiddenRankService;
+    }
+
+    public void setPlayerRepository(PlayerRepository playerRepository) {
+        this.playerRepository = playerRepository;
     }
 
     @Override
@@ -159,7 +172,25 @@ public final class PlayerCommands implements CommandExecutor, TabCompleter {
                             "試合・キュー・観戦中はキット編集できません。", NamedTextColor.RED));
                     return true;
                 }
-                ekitSelectGui.open(player);
+                if (args.length == 0) {
+                    ekitSelectGui.open(player);
+                    return true;
+                }
+                if (hiddenRankService == null || !hiddenRankService.hasTester(player.getUniqueId())) {
+                    player.sendMessage(Component.text(
+                            "この形式の /ekit はテスター専用です。", NamedTextColor.RED));
+                    return true;
+                }
+                if (args.length != 1) {
+                    player.sendMessage(Component.text("Usage: /ekit <mcid>", NamedTextColor.YELLOW));
+                    return true;
+                }
+                PlayerTarget target = resolvePlayerTarget(args[0]);
+                if (target == null) {
+                    player.sendMessage(Component.text("Player not found: " + args[0], NamedTextColor.RED));
+                    return true;
+                }
+                ekitSelectGui.openViewer(player, target.uuid(), target.name());
             }
             case ARROW -> {
                 if (!player.hasPermission("rumilance.user.mem")
@@ -238,6 +269,46 @@ public final class PlayerCommands implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    private record PlayerTarget(UUID uuid, String name) {
+    }
+
+    /** Resolves a tester target by online name, cached name, UUID, or the player database. */
+    private PlayerTarget resolvePlayerTarget(String raw) {
+        Player online = Bukkit.getPlayerExact(raw);
+        if (online != null) {
+            return new PlayerTarget(online.getUniqueId(), online.getName());
+        }
+        try {
+            UUID uuid = UUID.fromString(raw);
+            if (playerRepository != null) {
+                var data = playerRepository.findByUuid(uuid).orElse(null);
+                if (data != null) {
+                    return new PlayerTarget(uuid, data.username());
+                }
+            }
+            OfflinePlayer cached = Bukkit.getOfflinePlayerIfCached(raw);
+            return cached == null ? null
+                    : new PlayerTarget(cached.getUniqueId(), cached.getName() == null ? raw : cached.getName());
+        } catch (IllegalArgumentException ignored) {
+            // Not a UUID; continue with the username lookup below.
+        } catch (Exception ignored) {
+            // Database lookup is best-effort; an online/cached target can still be resolved.
+        }
+        if (playerRepository != null) {
+            try {
+                var data = playerRepository.findByUsername(raw).orElse(null);
+                if (data != null) {
+                    return new PlayerTarget(data.uuid(), data.username());
+                }
+            } catch (Exception ignored) {
+                // fall through to Bukkit's cached-name lookup
+            }
+        }
+        OfflinePlayer cached = Bukkit.getOfflinePlayerIfCached(raw);
+        return cached == null ? null
+                : new PlayerTarget(cached.getUniqueId(), cached.getName() == null ? raw : cached.getName());
+    }
+
     private void handleRanking(Player player, String[] args) {
         if (args.length < 1) {
             player.sendMessage(Component.text("Usage: /ranking <elo|streak|kills>", NamedTextColor.YELLOW));
@@ -307,6 +378,13 @@ public final class PlayerCommands implements CommandExecutor, TabCompleter {
         if (type == Type.KDR && args.length == 2) {
             return TabCompletions.filter(current,
                     kitService.enabled().stream().map(k -> k.name()).toList());
+        }
+        if (type == Type.EKIT && args.length == 1
+                && sender instanceof Player player
+                && hiddenRankService != null
+                && hiddenRankService.hasTester(player.getUniqueId())) {
+            return TabCompletions.filter(current,
+                    Bukkit.getOnlinePlayers().stream().map(Player::getName).toList());
         }
         if (args.length == 1 && (type == Type.PING || type == Type.STATS || type == Type.PROFILE || type == Type.SPEC)) {
             return TabCompletions.filter(current,

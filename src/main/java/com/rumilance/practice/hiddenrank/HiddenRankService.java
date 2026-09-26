@@ -17,10 +17,9 @@ import java.util.logging.Level;
  * Hidden ranks ("裏ランク"): ranks that are NEVER displayed anywhere (no nametag, no tab icon)
  * but silently unlock perks. Granted via {@code /urank} — never via {@code /rank}.
  *
- * <p>Currently the only hidden rank is {@code custom_shield}: the holder receives a shield
- * carrying an operator-assigned Custom Model Data in every match, which the resource pack maps
- * to a high-resolution custom artwork. Players holding it lose the VIP+ shield pattern editor
- * (their shield look is fixed by the artwork).</p>
+ * <p>Hidden ranks currently include {@code custom_shield}, which controls the custom shield
+ * artwork, and {@code tester}, which allows read-only inspection of another player's edited
+ * official kits through {@code /ekit <mcid>}.</p>
  *
  * <p>Persisted to {@code hidden_ranks.yml} in the plugin data folder.</p>
  */
@@ -29,6 +28,7 @@ public final class HiddenRankService {
     private final Plugin plugin;
     private final File file;
     private final Map<UUID, Boolean> customShield = new ConcurrentHashMap<>();
+    private final Map<UUID, Boolean> tester = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> shieldModelData = new ConcurrentHashMap<>();
     private final Map<UUID, String> lastKnownName = new ConcurrentHashMap<>();
 
@@ -61,6 +61,30 @@ public final class HiddenRankService {
     /** All holders of the hidden custom_shield rank (for the admin GUI). */
     public Set<UUID> customShieldHolders() {
         return new LinkedHashSet<>(customShield.keySet());
+    }
+
+    // ------------------------------------------------------------------ tester rank
+
+    /** Whether this player may use {@code /ekit <mcid>} to inspect another player's layouts. */
+    public boolean hasTester(UUID playerId) {
+        return tester.getOrDefault(playerId, false);
+    }
+
+    /** Grants or removes the hidden tester rank and persists immediately. */
+    public void setTester(UUID playerId, String name, boolean grant) {
+        if (grant) {
+            tester.put(playerId, true);
+            if (name != null && !name.isBlank()) {
+                lastKnownName.put(playerId, name);
+            }
+        } else {
+            tester.remove(playerId);
+        }
+        save();
+    }
+
+    public Set<UUID> testerHolders() {
+        return new LinkedHashSet<>(tester.keySet());
     }
 
     public String lastName(UUID playerId) {
@@ -96,6 +120,9 @@ public final class HiddenRankService {
                 if (yaml.getBoolean(key + ".custom-shield", false)) {
                     customShield.put(uuid, true);
                 }
+                if (yaml.getBoolean(key + ".tester", false)) {
+                    tester.put(uuid, true);
+                }
                 int cmd = yaml.getInt(key + ".model-data", 0);
                 if (cmd > 0) {
                     shieldModelData.put(uuid, cmd);
@@ -113,10 +140,12 @@ public final class HiddenRankService {
     private synchronized void save() {
         YamlConfiguration yaml = new YamlConfiguration();
         Set<UUID> all = new LinkedHashSet<>(customShield.keySet());
+        all.addAll(tester.keySet());
         all.addAll(shieldModelData.keySet());
         for (UUID uuid : all) {
             String key = uuid.toString();
             yaml.set(key + ".custom-shield", customShield.getOrDefault(uuid, false));
+            yaml.set(key + ".tester", tester.getOrDefault(uuid, false));
             int cmd = shieldModelData.getOrDefault(uuid, 0);
             if (cmd > 0) {
                 yaml.set(key + ".model-data", cmd);

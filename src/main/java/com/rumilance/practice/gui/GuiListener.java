@@ -330,6 +330,13 @@ public final class GuiListener implements Listener {
         }
         GuiSession session = registry.get(player.getUniqueId()).orElse(null);
         AbstractGui handler = handlers.get(holder.type());
+        if (holder.type() == GuiType.EDIT_KIT && session != null
+                && handler instanceof EditKitGui editKit && editKit.isViewOnly(session)) {
+            // A tester view must remain immutable even for drag events, which do not pass
+            // through the normal top-click dispatcher.
+            event.setCancelled(true);
+            return;
+        }
         if (handler instanceof FreeInventoryEdit free
                 && session != null
                 && free.isFreeEditActive(session)) {
@@ -447,7 +454,7 @@ public final class GuiListener implements Listener {
         }
         if (holder.type() == GuiType.EDIT_KIT
                 && handler instanceof EditKitGui editKit
-                && editKit.isPresetEdit(session)) {
+                && (editKit.isPresetEdit(session) || editKit.isViewOnly(session))) {
             event.setCancelled(true);
         }
     }

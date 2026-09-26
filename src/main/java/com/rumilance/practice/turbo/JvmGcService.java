@@ -407,4 +407,3 @@ public final class JvmGcService {
     public record GcSweep(long bytesFreed, String detail) {
     }
 }
-

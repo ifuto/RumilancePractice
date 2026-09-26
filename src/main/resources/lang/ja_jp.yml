@@ -720,6 +720,7 @@ gui:
   kit-none: "有効なキットがありません"
   kit-none-lore: "管理者がキットを有効化するまで待てます。"
   kit-edit-hint: "クリックしてレイアウトを編集"
+  kit-view-only: "閲覧専用（テスター）"
   kit-trim-hint: "➤ 右クリックでトリム"
   kit-rename-hint: "➤ 右クリックで改名"
   original-kit: "オリジナルキット"

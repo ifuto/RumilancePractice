@@ -21,6 +21,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * /ekit entry: click a kit to edit immediately. Original kits sit on the bottom-left.
@@ -49,6 +50,19 @@ public final class EkitSelectGui extends AbstractGui {
         this.crystalKitSlotsGui = crystalKitSlotsGui;
     }
 
+    /** Opens the official-kit picker in read-only mode for a tester inspecting another player. */
+    public void openViewer(Player viewer, UUID targetId, String targetName) {
+        openWithSession(viewer, session -> {
+            session.put("mode", "viewer-picker");
+            session.setTargetPlayer(targetId);
+            session.put("viewer-target-name", targetName == null ? "?" : targetName);
+        });
+    }
+
+    private static boolean isViewer(GuiSession session) {
+        return session != null && "viewer-picker".equals(session.get("mode", String.class));
+    }
+
     @Override
     protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
         return com.rumilance.practice.gui.GuiFrame.Theme.YELLOW;
@@ -61,6 +75,11 @@ public final class EkitSelectGui extends AbstractGui {
 
     @Override
     protected Component title(Player player, GuiSession session) {
+        if (isViewer(session)) {
+            return Component.text("Kit View: "
+                            + session.get("viewer-target-name", String.class), UiTheme.PRIMARY)
+                    .decoration(TextDecoration.ITALIC, false);
+        }
         return t(player, "gui.kit-edit-title").color(UiTheme.PRIMARY);
     }
 
@@ -82,12 +101,16 @@ public final class EkitSelectGui extends AbstractGui {
 
         if (session.kitCategory() == null) {
             renderChooser(player, inventory);
-            inventory.setItem(GuiSlots.slot(5, 1), originalPaper(player));
+            if (!isViewer(session)) {
+                inventory.setItem(GuiSlots.slot(5, 1), originalPaper(player));
+            }
             paintNav(player, session, inventory);
             return;
         }
         renderCategory(player, session, inventory, session.kitCategory());
-        inventory.setItem(GuiSlots.slot(5, 1), originalPaper(player));
+        if (!isViewer(session)) {
+            inventory.setItem(GuiSlots.slot(5, 1), originalPaper(player));
+        }
         MenuScaffold.returnButton(inventory, t(player, "menu.back"));
     }
 
@@ -130,7 +153,8 @@ public final class EkitSelectGui extends AbstractGui {
         int page = Math.min(Math.max(0, session.page()), pages - 1);
         int from = page * pageSize;
         for (int i = 0; i < pageSize && from + i < kits.size(); i++) {
-            inventory.setItem(MenuScaffold.gridSlot(i), kitIcon(player, kits.get(from + i)));
+            inventory.setItem(MenuScaffold.gridSlot(i),
+                    kitIcon(player, kits.get(from + i), isViewer(session)));
         }
         if (kits.isEmpty()) {
             inventory.setItem(MenuScaffold.gridSlot(13),
@@ -143,7 +167,7 @@ public final class EkitSelectGui extends AbstractGui {
         paintPaging(player, inventory, page, kits.size());
     }
 
-    private ItemStack kitIcon(Player player, KitDefinition kit) {
+    private ItemStack kitIcon(Player player, KitDefinition kit, boolean viewer) {
         Material material = Material.matchMaterial(kit.icon());
         return ItemBuilder.of(material == null ? Material.DIAMOND_SWORD : material)
                 .name(MiniMessage.miniMessage().deserialize(kit.prettyDisplayName())
@@ -151,11 +175,13 @@ public final class EkitSelectGui extends AbstractGui {
                 .lore(UiTheme.divider(),
                         kit.crystalFfa()
                                 ? UiTheme.status("Crystal FFA Kit", UiTheme.SUCCESS)
-                                : UiTheme.line(line(player, "gui.kit-edit-hint")),
+                                : UiTheme.line(line(player, viewer ? "gui.kit-view-only" : "gui.kit-edit-hint")),
                         UiTheme.blank(),
                         UiTheme.hint(line(player, "gui.kit-button-hint")))
-                // 木時差式ボタン: 押して0.2秒後に開く(AFKC のキット選択と同じ押し心地)。
-                .action(com.rumilance.practice.gui.DelayedButton.wrap("kit:" + kit.name()))
+                // Keep the wooden-button delay for the normal picker; viewer actions are still
+                // delayed, but use a separate prefix so the editor can remain read-only.
+                .action(com.rumilance.practice.gui.DelayedButton.wrap(
+                        (viewer ? "viewkit:" : "kit:") + kit.name()))
                 .build();
     }
 
@@ -210,6 +236,18 @@ public final class EkitSelectGui extends AbstractGui {
             if (originalKitGui != null) {
                 originalKitGui.open(player);
             }
+            return;
+        }
+        if (action != null && action.startsWith("viewkit:")) {
+            String kitId = action.substring("viewkit:".length());
+            UUID targetId = session.targetPlayer();
+            if (targetId == null || editKitGui == null) {
+                return;
+            }
+            sounds.play(player, "select");
+            session.setNavigatingAway(true);
+            editKitGui.openKitViewer(player, targetId,
+                    session.get("viewer-target-name", String.class), kitId);
             return;
         }
         if (action != null && action.startsWith("kit:")) {

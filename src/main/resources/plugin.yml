@@ -214,8 +214,8 @@ commands:
     usage: /title
     permission: rumilance.user
   ekit:
-    description: Edit official kit layout.
-    usage: /ekit
+    description: Edit your official kit layout, or let the hidden tester role view another player's layout.
+    usage: /ekit [mcid]
     permission: rumilance.user
   leave:
     description: Leave a match during the pre-match countdown.
@@ -298,8 +298,8 @@ commands:
     aliases: [rank]
     permission: rumilance.admin
   urank:
-    description: Manage hidden ranks that never display (OP). Currently custom_shield.
-    usage: /urank <custom_shield|remove|shield|gui|list>
+    description: Manage hidden ranks that never display (OP), including custom_shield and tester.
+    usage: /urank <custom_shield|tester|remove|shield|gui|list>
     permission: rumilance.admin
   forceend:
     description: Force-end the match a player is in (or spectating) as a draw (OP).

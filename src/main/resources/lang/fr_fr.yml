@@ -719,6 +719,7 @@ gui:
   kit-none: "Aucun kit actif"
   kit-none-lore: "Attends qu'un admin active un kit."
   kit-edit-hint: "Clic pour modifier la disposition"
+  kit-view-only: "Vue testeur en lecture seule"
   kit-trim-hint: "➤ Clic droit pour l'ornement"
   kit-rename-hint: "➤ Clic droit pour renommer"
   original-kit: "Kit original"

@@ -1894,6 +1894,8 @@ public final class FeatureBootstrap {
                     settingsGui, ekitSelectGui, playersGui, spectateListGui, spectatorService, ffaListGui,
                     editKitGui, arrowEffectGui, chatBanService);
             commands.setKitEditBusyCheck(p -> matchService.isBusyForKitEdit(p.getUniqueId()));
+            commands.setHiddenRankService(hiddenRankService);
+            commands.setPlayerRepository(playerRepository);
             bind(cmd, commands);
         }
 

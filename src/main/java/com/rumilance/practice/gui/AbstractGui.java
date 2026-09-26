@@ -14,6 +14,7 @@ import org.bukkit.inventory.Inventory;
 
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 /**
  * Base class for all practice GUIs. Labels come from {@link MessageService} / lang YAML.
@@ -113,6 +114,15 @@ public abstract class AbstractGui {
     }
 
     public final void open(Player player) {
+        openWithSession(player, session -> { });
+    }
+
+    /**
+     * Opens this GUI after allowing a caller to add session state before the title and first
+     * render are produced. This is used by read-only views that share an editor screen but
+     * must identify their target before any inventory item is rendered.
+     */
+    protected final void openWithSession(Player player, Consumer<GuiSession> sessionSetup) {
         if (stateManager != null && stateManager.getState(player.getUniqueId()) == PlayerState.LOBBY) {
             try {
                 stateManager.transition(player.getUniqueId(), PlayerState.OPENING_GUI);
@@ -122,6 +132,9 @@ public abstract class AbstractGui {
         }
         GuiSession session = registry.open(player.getUniqueId(), type, rows);
         configureSession(session, player);
+        if (sessionSetup != null) {
+            sessionSetup.accept(session);
+        }
         PracticeGuiHolder holder = new PracticeGuiHolder(session.sessionId(), type, rows);
         Inventory inventory = Bukkit.createInventory(holder, rows * 9, title(player, session));
         holder.bind(inventory);

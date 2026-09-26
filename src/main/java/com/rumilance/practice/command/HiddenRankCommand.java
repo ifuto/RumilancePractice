@@ -20,14 +20,17 @@ import java.util.UUID;
 
 /**
  * OP-only hidden-rank management: {@code /urank}. Hidden ranks never appear in any display —
- * they silently grant perks. Currently the only hidden rank is {@code custom_shield}.
+ * they silently grant perks. The hidden ranks are {@code custom_shield} and {@code tester}.
  *
  * <pre>
- * /urank custom_shield &lt;player&gt;   grant the hidden custom_shield rank
- * /urank remove &lt;player&gt;          remove the hidden rank
- * /urank shield &lt;player&gt; &lt;cmd&gt;    assign the shield Custom Model Data
- * /urank gui                      open the Custom Model Data assignment screen
- * /urank list                     list holders
+ * /urank custom_shield &lt;player&gt;       grant the hidden custom_shield rank
+ * /urank tester &lt;player&gt;              grant the read-only kit tester rank
+ * /urank tester remove &lt;player&gt;       remove the tester rank
+ * /urank remove tester &lt;player&gt;       remove the tester rank
+ * /urank remove &lt;player&gt;              remove custom_shield
+ * /urank shield &lt;player&gt; &lt;cmd&gt;        assign the shield Custom Model Data
+ * /urank gui                          open the Custom Model Data assignment screen
+ * /urank list                         list holders
  * </pre>
  */
 public final class HiddenRankCommand implements CommandExecutor, TabCompleter {
@@ -61,15 +64,21 @@ public final class HiddenRankCommand implements CommandExecutor, TabCompleter {
                 }
             }
             case "list" -> {
-                var holders = hiddenRanks.customShieldHolders();
-                if (holders.isEmpty()) {
-                    sender.sendMessage(Component.text("No hidden custom_shield holders.", NamedTextColor.YELLOW));
+                var shieldHolders = hiddenRanks.customShieldHolders();
+                var testerHolders = hiddenRanks.testerHolders();
+                if (shieldHolders.isEmpty() && testerHolders.isEmpty()) {
+                    sender.sendMessage(Component.text("No hidden-rank holders.", NamedTextColor.YELLOW));
                     return true;
                 }
-                for (UUID uuid : holders) {
+                for (UUID uuid : shieldHolders) {
                     sender.sendMessage(Component.text(
-                            hiddenRanks.lastName(uuid) + "  cmd=" + hiddenRanks.shieldModelData(uuid),
+                            "custom_shield: " + hiddenRanks.lastName(uuid)
+                                    + "  cmd=" + hiddenRanks.shieldModelData(uuid),
                             NamedTextColor.AQUA));
+                }
+                for (UUID uuid : testerHolders) {
+                    sender.sendMessage(Component.text(
+                            "tester: " + hiddenRanks.lastName(uuid), NamedTextColor.LIGHT_PURPLE));
                 }
             }
             case "custom_shield", "customshield", "shield_rank" -> {
@@ -93,6 +102,26 @@ public final class HiddenRankCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(Component.text(
                         "Assign a model data with /urank shield " + name + " <cmd> or /urank gui",
                         NamedTextColor.GRAY));
+            }
+            case "tester", "テスター" -> {
+                boolean grant = !(args.length >= 2 && args[1].equalsIgnoreCase("remove"));
+                int targetIndex = grant ? 1 : 2;
+                if (args.length <= targetIndex) {
+                    usage(sender);
+                    return true;
+                }
+                OfflinePlayer target = Bukkit.getPlayerExact(args[targetIndex]);
+                if (target == null) {
+                    sender.sendMessage(Component.text("Player must be online.", NamedTextColor.RED));
+                    return true;
+                }
+                String name = target.getName() == null ? args[targetIndex] : target.getName();
+                hiddenRanks.setTester(target.getUniqueId(), name, grant);
+                sender.sendMessage(Component.text(
+                        grant
+                                ? "Hidden rank tester (テスター) granted to " + name + "."
+                                : "Hidden rank tester (テスター) removed from " + name + ".",
+                        NamedTextColor.GREEN));
             }
             case "shield", "cmdata", "cmd" -> {
                 if (args.length < 3) {
@@ -120,14 +149,27 @@ public final class HiddenRankCommand implements CommandExecutor, TabCompleter {
                     usage(sender);
                     return true;
                 }
-                OfflinePlayer target = Bukkit.getPlayerExact(args[1]);
+                boolean testerRank = args[1].equalsIgnoreCase("tester")
+                        || args[1].equalsIgnoreCase("テスター");
+                int targetIndex = testerRank ? 2 : 1;
+                if (args.length <= targetIndex) {
+                    usage(sender);
+                    return true;
+                }
+                OfflinePlayer target = Bukkit.getPlayerExact(args[targetIndex]);
                 if (target == null) {
                     sender.sendMessage(Component.text("Player must be online.", NamedTextColor.RED));
                     return true;
                 }
-                hiddenRanks.setCustomShield(target.getUniqueId(), target.getName(), false);
+                String name = target.getName() == null ? args[targetIndex] : target.getName();
+                if (testerRank) {
+                    hiddenRanks.setTester(target.getUniqueId(), name, false);
+                } else {
+                    hiddenRanks.setCustomShield(target.getUniqueId(), name, false);
+                }
                 sender.sendMessage(Component.text(
-                        "Hidden rank removed from " + target.getName() + ".", NamedTextColor.GREEN));
+                        (testerRank ? "Hidden rank tester removed from " : "Hidden custom_shield rank removed from ")
+                                + name + ".", NamedTextColor.GREEN));
             }
             default -> usage(sender);
         }
@@ -136,7 +178,8 @@ public final class HiddenRankCommand implements CommandExecutor, TabCompleter {
 
     private void usage(CommandSender sender) {
         sender.sendMessage(Component.text(
-                "/urank custom_shield <player> | remove <player> | shield <player> <cmd> | gui | list",
+                "/urank custom_shield <player> | tester <player> | tester remove <player> | "
+                        + "remove [tester] <player> | shield <player> <cmd> | gui | list",
                 NamedTextColor.YELLOW));
     }
 
@@ -147,10 +190,29 @@ public final class HiddenRankCommand implements CommandExecutor, TabCompleter {
             return List.of();
         }
         if (args.length == 1) {
-            return filter(List.of("custom_shield", "remove", "shield", "gui", "list"), args[0]);
+            return filter(List.of("custom_shield", "tester", "remove", "shield", "gui", "list"), args[0]);
+        }
+        List<String> onlineNames = Bukkit.getOnlinePlayers().stream().map(Player::getName).toList();
+        if (args.length == 2 && args[0].equalsIgnoreCase("tester")) {
+            List<String> options = new java.util.ArrayList<>(onlineNames);
+            options.add("remove");
+            return filter(options, args[1]);
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("remove")) {
+            List<String> options = new java.util.ArrayList<>(onlineNames);
+            options.add("tester");
+            return filter(options, args[1]);
         }
         if (args.length == 2 && !args[0].equalsIgnoreCase("gui") && !args[0].equalsIgnoreCase("list")) {
-            return filter(Bukkit.getOnlinePlayers().stream().map(Player::getName).toList(), args[1]);
+            return filter(onlineNames, args[1]);
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("tester")
+                && args[1].equalsIgnoreCase("remove")) {
+            return filter(onlineNames, args[2]);
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("remove")
+                && args[1].equalsIgnoreCase("tester")) {
+            return filter(onlineNames, args[2]);
         }
         return List.of();
     }

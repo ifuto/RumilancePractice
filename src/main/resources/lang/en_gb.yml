@@ -719,6 +719,7 @@ gui:
   kit-none: "No enabled kits"
   kit-none-lore: "Wait until an admin enables a kit."
   kit-edit-hint: "Click to edit layout"
+  kit-view-only: "Read-only tester view"
   kit-trim-hint: "➤ Right Click to Trim"
   kit-rename-hint: "➤ Right Click to Rename"
   original-kit: "Original Kit"

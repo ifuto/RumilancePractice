@@ -100,7 +100,7 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
     }
 
     public void stashCurrentLayout(Player player, GuiSession session) {
-        if (kitEditStash == null || session == null || session.selectedKit() == null) {
+        if (isViewOnly(session) || kitEditStash == null || session == null || session.selectedKit() == null) {
             return;
         }
         ItemStack[] layout = session.get("layout", ItemStack[].class);
@@ -202,6 +202,11 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         this.presetItems = presetItems;
     }
 
+    /** True when this session is the tester's immutable view of another player's layout. */
+    public boolean isViewOnly(GuiSession session) {
+        return session != null && "view".equals(session.get("mode", String.class));
+    }
+
     /** True when editing a kit with preset candidates enabled (hotbar palette + Q-drop delete). */
     public boolean isPresetEdit(GuiSession session) {
         if (session == null || presetItems == null || !"edit".equals(session.get("mode", String.class))) {
@@ -215,6 +220,10 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
     }
 
     public void onEditorClosed(Player player, GuiSession session) {
+        if (isViewOnly(session)) {
+            // A tester view never borrowed or changed the viewer's lobby inventory.
+            return;
+        }
         if (kitAnvilRenameService != null && kitAnvilRenameService.isRenaming(player.getUniqueId())) {
             return;
         }
@@ -325,6 +334,16 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         sounds.play(player, "gui-open");
     }
 
+    /** Opens one of another player's saved official-kit layouts without entering edit mode. */
+    public void openKitViewer(Player viewer, UUID targetId, String targetName, String kitName) {
+        openWithSession(viewer, session -> {
+            session.setSelectedKit(kitName);
+            session.setTargetPlayer(targetId);
+            session.put("mode", "view");
+            session.put("viewer-target-name", targetName == null ? "?" : targetName);
+        });
+    }
+
     public void applyTrimmedItem(Player player, String kitId, String preset, int layoutSlot, ItemStack trimmed) {
         ItemStack[] layout = kitEditStash == null ? null : kitEditStash.layoutCopy(player.getUniqueId());
         if (layout == null) {
@@ -372,6 +391,12 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
     protected Component title(Player player, GuiSession session) {
         String kit = session.selectedKit();
         Integer crystal = crystalVariant(session);
+        if (isViewOnly(session)) {
+            return Component.text("Kit View: "
+                            + session.get("viewer-target-name", String.class) + " / "
+                            + com.rumilance.practice.util.KitNames.pretty(kit), UiTheme.PRIMARY)
+                    .decoration(TextDecoration.ITALIC, false);
+        }
         return Component.text(kit == null ? "Edit Kit"
                 : "Edit: " + com.rumilance.practice.util.KitNames.pretty(kit)
                         + (crystal == null ? "" : " (KIT" + crystal + ")"), UiTheme.PRIMARY)
@@ -408,36 +433,50 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             return;
         }
         // Keep in-session rearranges across re-render; reloading from disk wiped swaps before Save.
+        UUID layoutOwner = isViewOnly(session) && session.targetPlayer() != null
+                ? session.targetPlayer() : player.getUniqueId();
         ItemStack[] layout = KitLayoutContents.retainOrLoad(
                 session.get("layout", ItemStack[].class),
-                loadLayout(player.getUniqueId(), kit, crystalVariant(session)));
+                loadLayout(layoutOwner, kit, crystalVariant(session)));
         // armor row visually: helmet/chest/legs/boots + offhand
-        inventory.setItem(GuiSlots.slot(0, 1), tagged(player, layout.length > 36 ? layout[36] : null, "slot:36"));
-        inventory.setItem(GuiSlots.slot(0, 2), tagged(player, layout.length > 37 ? layout[37] : null, "slot:37"));
-        inventory.setItem(GuiSlots.slot(0, 3), tagged(player, layout.length > 38 ? layout[38] : null, "slot:38"));
-        inventory.setItem(GuiSlots.slot(0, 4), tagged(player, layout.length > 39 ? layout[39] : null, "slot:39"));
-        inventory.setItem(GuiSlots.slot(0, 6), tagged(player, layout.length > 40 ? layout[40] : null, "slot:40"));
+        inventory.setItem(GuiSlots.slot(0, 1), tagged(player, layout.length > 36 ? layout[36] : null,
+                isViewOnly(session) ? "decorate" : "slot:36"));
+        inventory.setItem(GuiSlots.slot(0, 2), tagged(player, layout.length > 37 ? layout[37] : null,
+                isViewOnly(session) ? "decorate" : "slot:37"));
+        inventory.setItem(GuiSlots.slot(0, 3), tagged(player, layout.length > 38 ? layout[38] : null,
+                isViewOnly(session) ? "decorate" : "slot:38"));
+        inventory.setItem(GuiSlots.slot(0, 4), tagged(player, layout.length > 39 ? layout[39] : null,
+                isViewOnly(session) ? "decorate" : "slot:39"));
+        inventory.setItem(GuiSlots.slot(0, 6), tagged(player, layout.length > 40 ? layout[40] : null,
+                isViewOnly(session) ? "decorate" : "slot:40"));
         // Main inventory slots 9-35 -> menu rows 1-3, ALL 9 columns (27 slots exactly).
         // (Previously columns 0 and 8 were skipped, hiding the edge slots of each row.)
         for (int inv = 9; inv < 36; inv++) {
             int local = inv - 9;
             int row = 1 + local / 9;
             int col = local % 9;
-            inventory.setItem(GuiSlots.slot(row, col), tagged(player, layout[inv], "slot:" + inv));
+            inventory.setItem(GuiSlots.slot(row, col), tagged(player, layout[inv],
+                    isViewOnly(session) ? "decorate" : "slot:" + inv));
         }
         // hotbar row 4
         for (int hot = 0; hot < 9; hot++) {
-            inventory.setItem(GuiSlots.slot(4, hot), tagged(player, layout[hot], "slot:" + hot));
+            inventory.setItem(GuiSlots.slot(4, hot), tagged(player, layout[hot],
+                    isViewOnly(session) ? "decorate" : "slot:" + hot));
         }
         inventory.setItem(GuiSlots.slot(0, 0),
                 ItemBuilder.action(UiTheme.BACK, t(player, "menu.back"), "back"));
-        inventory.setItem(GuiSlots.slot(0, 5),
-                ItemBuilder.action(UiTheme.CLOSE, t(player, "gui.kit-reset"), "reset"));
-        inventory.setItem(GuiSlots.slot(0, 8),
-                ItemBuilder.action(UiTheme.CONFIRM, t(player, "gui.save"), "save"));
+        if (isViewOnly(session)) {
+            inventory.setItem(GuiSlots.slot(0, 8),
+                    ItemBuilder.action(UiTheme.CLOSE, t(player, "menu.close"), "close"));
+        } else {
+            inventory.setItem(GuiSlots.slot(0, 5),
+                    ItemBuilder.action(UiTheme.CLOSE, t(player, "gui.kit-reset"), "reset"));
+            inventory.setItem(GuiSlots.slot(0, 8),
+                    ItemBuilder.action(UiTheme.CONFIRM, t(player, "gui.save"), "save"));
+        }
         session.put("layout", layout);
         stashCurrentLayout(player, session);
-        if (kit.presetEnabled() && presetItems != null) {
+        if (!isViewOnly(session) && kit.presetEnabled() && presetItems != null) {
             schedulePresetPaletteRender(player);
         }
     }
@@ -627,7 +666,8 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
     public boolean isEditorMode(GuiSession session) {
         return session != null
                 && session.selectedKit() != null
-                && !"picker".equals(session.get("mode", String.class));
+                && !"picker".equals(session.get("mode", String.class))
+                && !isViewOnly(session);
     }
 
     private ItemStack tagged(Player player, ItemStack stack, String action) {
@@ -635,11 +675,13 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             return null;
         }
         java.util.ArrayList<Component> extra = new java.util.ArrayList<>();
-        if (stack.getItemMeta() instanceof org.bukkit.inventory.meta.ArmorMeta) {
+        if (!"decorate".equals(action)
+                && stack.getItemMeta() instanceof org.bukkit.inventory.meta.ArmorMeta) {
             extra.add(t(player, "gui.kit-trim-hint").color(UiTheme.MUTED)
                     .decoration(TextDecoration.ITALIC, false));
         }
-        if (com.rumilance.practice.gui.KitAnvilRenameService.isRenameableTool(stack.getType())) {
+        if (!"decorate".equals(action)
+                && com.rumilance.practice.gui.KitAnvilRenameService.isRenameableTool(stack.getType())) {
             extra.add(t(player, "gui.kit-rename-hint").color(UiTheme.MUTED)
                     .decoration(TextDecoration.ITALIC, false));
         }
@@ -654,7 +696,11 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot,
                             String action, org.bukkit.event.inventory.ClickType clickType) {
-        if (clickType == org.bukkit.event.inventory.ClickType.RIGHT && action.startsWith("slot:")) {
+        if (isViewOnly(session) && !"back".equals(action) && !"close".equals(action)) {
+            return;
+        }
+        if (clickType == org.bukkit.event.inventory.ClickType.RIGHT
+                && action != null && action.startsWith("slot:")) {
             int layoutIndex = Integer.parseInt(action.substring(5));
             ItemStack[] layout = session.get("layout", ItemStack[].class);
             if (layout != null && layoutIndex >= 0 && layoutIndex < layout.length) {
@@ -691,6 +737,16 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             }
         }
         if ("close".equals(action) || "back".equals(action)) {
+            if (isViewOnly(session)) {
+                if ("back".equals(action) && ekitSelectGui != null && session.targetPlayer() != null) {
+                    session.setNavigatingAway(true);
+                    ekitSelectGui.openViewer(player, session.targetPlayer(),
+                            session.get("viewer-target-name", String.class));
+                    return;
+                }
+                player.closeInventory();
+                return;
+            }
             restoreLobbyHands(player);
             if (kitEditStash != null) {
                 kitEditStash.clear(player.getUniqueId());

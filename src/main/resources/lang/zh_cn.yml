@@ -719,6 +719,7 @@ gui:
   kit-none: "没有启用的套件"
   kit-none-lore: "请等待管理员启用套件。"
   kit-edit-hint: "点击编辑布局"
+  kit-view-only: "测试员只读视图"
   kit-trim-hint: "➤ 右键添加纹饰"
   kit-rename-hint: "➤ 右键重命名"
   original-kit: "原创套件"
