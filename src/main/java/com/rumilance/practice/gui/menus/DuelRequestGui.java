@@ -131,7 +131,7 @@ public final class DuelRequestGui extends AbstractGui {
                 session.setSelectedKit(resolved);
             } else {
                 kitService.enabled().stream().findFirst()
-                    .ifPresent(k -> session.setSelectedKit(kitService.playableId(k.name())));
+                        .ifPresent(k -> session.setSelectedKit(kitService.playableId(k.name())));
             }
         }
         PracticeGuiOpen.open(this, sender, session);
@@ -373,7 +373,8 @@ public final class DuelRequestGui extends AbstractGui {
     private String kitLabel(GuiSession session) {
         String kit = session.selectedKit() == null ? "nodebuff" : session.selectedKit();
         String inner = session.get(InnerKitSelectGui.CHOICE_KEY, String.class);
-        String pretty = kitService.get(kit).map(k -> k.prettyDisplayName()).orElse(kit);
+        String pretty = kitService.get(kit)
+                .map(com.rumilance.practice.gui.KitDisplayNames::plain).orElse(kit);
         if (innerKits == null || com.rumilance.practice.kit.InnerKitService.isDefault(inner)) {
             return pretty; // a child is a normal kit; show that kit's own display name
         }

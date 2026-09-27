@@ -169,7 +169,8 @@ public final class InnerKitSelectGui extends AbstractGui {
     @Override
     protected Component title(Player player, GuiSession session) {
         KitDefinition kit = kitService.get(session.selectedKit()).orElse(null);
-        String name = kit == null ? KitNames.pretty(session.selectedKit()) : kit.prettyDisplayName();
+        String name = kit == null ? KitNames.pretty(session.selectedKit())
+                : com.rumilance.practice.gui.KitDisplayNames.plain(kit);
         return t(player, "gui.innerkit-title").color(UiTheme.PRIMARY)
                 .append(Component.text(" " + name, UiTheme.VALUE));
     }
