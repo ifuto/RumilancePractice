@@ -178,6 +178,24 @@ Paper 1.21.11 向け Practice PvP プラグイン **N Arena**(プラグイン名
 
 ## キット・アイテム
 
+- **中キット(プリセット)**: 1つのキットの中に**名前付きの代替ロードアウト**を持てる。
+  例: `Axe` → `HQ Style Axe[Default]` / `Club Style Axe` / `Hatena Style Axe`。
+  - **右クリックで一覧**: **Duel Request**・**Party Fight**・**Kit Edit**(`/ekit`)のキット選択で、
+    中キットを持つキットを右クリックするとプリセット一覧が開く(左クリックは従来どおり)。
+  - **Queue は常にデフォルト**: キューのクリックは今まで通りキット本体を使い、一覧は出ない。
+  - **デフォルトは変更不可**: 一覧の先頭 `[Default]` はキット本体そのもので、保存されるプリセット
+    ではない。削除・改名・別プリセットへの差し替えはできず、`/kit preset add <kit> default` も拒否。
+  - **管理はコマンド**: `/kit preset add <kit> <name>`(キット現在の中身を初期値として複製)、
+    `/kit preset remove <kit> <name>`、`/kit preset list [kit]`。保存先は kits.yml の
+    `kits.<kit>.inner-kits.<id>`(`display-name` / `icon` / スロット別 base64 の `layout`)。
+    キット改名時はプリセットも一緒に移動し、`/practiceadmin reload` で読み直される。
+  - **中身の編集は Kit Edit**: `/ekit` でキットを右クリック → プリセット選択 → 通常のキットエディタが
+    そのプリセットのロードアウトを開く。保存先はプレイヤー個人のレイアウトDBではなく kits.yml の
+    プリセットなので**選んだ全員に同じ中身**が適用される(「初期状態にリセット」もプリセット単位)。
+  - **試合への反映**: デュエルはリクエストにプリセットが乗り(`RichDuelRequest.innerKitName`)、
+    パーティ戦はチーム開始経由で `MatchSession` に記録される。ロードアウト適用時はプリセットが
+    キット本体と個人の並び替えの**両方より優先**され、**再戦でも同じプリセット**が引き継がれる。
+    最大HP・パール・ブロックルールなどの**ルールは親キットのまま**(中キットはロードアウトのみ)。
 - **FFA コマンドゲート(デフォルトOFF)**: `/practiceadmin ffacommand <on|off|add|remove|list|clear> [command]`
   で管理。ONにするとFFA中は**ホワイトリスト登録コマンドのみ**使用でき、しかも**コンバットタグ外のときだけ**
   (戦闘中は全コマンドブロック)。OFFならFFAのコマンドは従来通り無規制。設定は ffa.yml の

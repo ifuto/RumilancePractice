@@ -328,6 +328,12 @@ public final class FeatureBootstrap {
         services.register(LobbyService.class, lobbyService);
 
         KitService kitService = new KitService(configService);
+        // 中キット (inner kits): named preset loadouts stored INSIDE a kit
+        // (kits.yml -> kits.<kit>.inner-kits). Duel Request / Party Fight / Kit Edit offer them on
+        // a right-click; Queue always fights the kit itself, which is the default and cannot be
+        // changed. Created next to KitService because it reads and writes the same kits.yml.
+        com.rumilance.practice.kit.InnerKitService innerKits =
+                new com.rumilance.practice.kit.InnerKitService(configService, plugin.getLogger());
         services.register(KitService.class, kitService);
 
         com.rumilance.practice.hiddenrank.HiddenRankService hiddenRankService =
@@ -1044,6 +1050,29 @@ public final class FeatureBootstrap {
         crystalKitSlotsGui.setEditKitGui(editKitGui);
         crystalKitSlotsGui.setEkitSelectGui(ekitSelectGui);
         ekitSelectGui.setCrystalKitSlotsGui(crystalKitSlotsGui);
+
+        // ---- 中キット (inner kits) -------------------------------------------------------
+        // One preset picker shared by the three screens that offer a right-click: the duel kit
+        // picker, the party kit picker and the kit editor's picker. Queue is deliberately NOT
+        // wired here — clicking a kit in the queue keeps fighting the default loadout.
+        com.rumilance.practice.gui.menus.InnerKitSelectGui innerKitSelectGui =
+                new com.rumilance.practice.gui.menus.InnerKitSelectGui(
+                        guiSessions, soundService, kitService, innerKits);
+        innerKitSelectGui.setKitSelectGui(kitSelectGui);
+        innerKitSelectGui.setDuelRequestGui(duelRequestGui);
+        innerKitSelectGui.setTeamKitSelectGui(teamKitSelectGui);
+        innerKitSelectGui.setEkitSelectGui(ekitSelectGui);
+        innerKitSelectGui.setEditKitGui(editKitGui);
+        kitSelectGui.setInnerKits(innerKits);
+        kitSelectGui.setInnerKitSelectGui(innerKitSelectGui);
+        teamKitSelectGui.setInnerKits(innerKits);
+        teamKitSelectGui.setInnerKitSelectGui(innerKitSelectGui);
+        ekitSelectGui.setInnerKits(innerKits);
+        ekitSelectGui.setInnerKitSelectGui(innerKitSelectGui);
+        editKitGui.setInnerKits(innerKits);
+        editKitGui.setInnerKitSelectGui(innerKitSelectGui);
+        duelRequestGui.setInnerKits(innerKits);
+        matchService.setInnerKits(innerKits);
         ffaService.setCrystalFfaStore(crystalFfaStore);
         // /k quick picker: nine KIT buttons, one click equips (crystal FFA entry hands out
         // nothing, so this is how a fighter gears up after joining or respawning a life).
@@ -1182,6 +1211,7 @@ public final class FeatureBootstrap {
         guiListener.register(rankedGui);
         guiListener.register(unrankedGui);
         guiListener.register(kitSelectGui);
+        guiListener.register(innerKitSelectGui);
         guiListener.register(duelRequestGui);
         guiListener.register(duelMapSelectGui);
         guiListener.register(settingsGui);
@@ -1720,6 +1750,7 @@ public final class FeatureBootstrap {
                 configService, arenaStore, arenaService, kitService, queueService, faweBridge,
                 new File(PluginIdentity.dataFolder(plugin), "schematics"), soundService, kitAdminGui);
         arenaKitAdmin.setPresetItems(presetItems);
+        arenaKitAdmin.setInnerKits(innerKits);
         arenaKitAdmin.setPresetAdminGui(presetAdminGui);
         arenaKitAdmin.setArenaAdminGui(arenaAdminGui);
         arenaKitAdmin.setPartyIconPrompt(partyIconListener::await);
@@ -1740,6 +1771,7 @@ public final class FeatureBootstrap {
         practiceAdmin.setStatsResetService(statsResetService);
         practiceAdmin.setPlayerRepository(playerRepository);
         practiceAdmin.setAsyncExecutor(asyncExecutor);
+        practiceAdmin.setInnerKits(innerKits);
         practiceAdmin.setBanService(banService);
         practiceAdmin.setResourcePackService(resourcePackService);
         AdminCommand adminCommand = new AdminCommand(

@@ -35,6 +35,8 @@ public final class PartyMapSelectGui extends AbstractGui {
     private TeamKitSelectGui teamKitSelectGui;
     /** Kit chosen on the previous screen; copied into the fresh GUI session on open. */
     private volatile String pendingKitId;
+    /** 中キット chosen with the kit (null = the kit's own default loadout). */
+    private volatile String pendingInnerKitId;
 
     public PartyMapSelectGui(GuiSessionRegistry registry, SoundService sounds,
                              TeamService teamService, ArenaTemplateStore arenaStore,
@@ -74,7 +76,18 @@ public final class PartyMapSelectGui extends AbstractGui {
      * kit id is stashed and copied into the fresh GUI session by {@link #configureSession}.
      */
     public void openForKit(Player player, String kitId) {
+        openForKit(player, kitId, null);
+    }
+
+    /**
+     * Party flow with a 中キット: {@code innerKitId} is the preset every member fights with,
+     * {@code null} / blank / {@code default} keeps the kit's own loadout.
+     */
+    public void openForKit(Player player, String kitId, String innerKitId) {
         this.pendingKitId = kitId;
+        this.pendingInnerKitId = com.rumilance.practice.kit.InnerKitService.isDefault(innerKitId)
+                ? null
+                : com.rumilance.practice.kit.InnerKitService.normalizeId(innerKitId);
         open(player);
     }
 
@@ -82,6 +95,9 @@ public final class PartyMapSelectGui extends AbstractGui {
     protected void configureSession(GuiSession session, Player player) {
         if (pendingKitId != null) {
             session.put("kit_id", pendingKitId);
+        }
+        if (pendingInnerKitId != null) {
+            session.put(InnerKitSelectGui.CHOICE_KEY, pendingInnerKitId);
         }
     }
 
@@ -158,9 +174,12 @@ public final class PartyMapSelectGui extends AbstractGui {
                 return;
             }
             player.closeInventory();
+            String innerKitId = session.get(InnerKitSelectGui.CHOICE_KEY, String.class);
             session.put("kit_id", null);
+            session.put(InnerKitSelectGui.CHOICE_KEY, null);
             this.pendingKitId = null;
-            TeamService.Result start = teamService.start(player, kitId);
+            this.pendingInnerKitId = null;
+            TeamService.Result start = teamService.start(player, kitId, innerKitId);
             sounds.play(player, start == TeamService.Result.OK ? "match-found" : "error");
             if (start != TeamService.Result.OK) {
                 player.sendMessage(net.kyori.adventure.text.Component.text(

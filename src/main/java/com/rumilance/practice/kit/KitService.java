@@ -352,8 +352,19 @@ public final class KitService {
             sortOrder.set(orderIndex, newKey);
             configService.kits().set("kit-order", new ArrayList<>(sortOrder));
         }
+        // 中キット (inner kits) live INSIDE the kit's own section, so a rename has to carry them
+        // across: dropping the old section without this would silently delete every preset.
+        ConfigurationSection inner = configService.kits()
+                .getConfigurationSection("kits." + oldKey + ".inner-kits");
+        Map<String, Object> innerSnapshot = inner == null ? null : new LinkedHashMap<>(inner.getValues(true));
         configService.kits().set("kits." + oldKey, null);
         persist(renamed);
+        if (innerSnapshot != null && !innerSnapshot.isEmpty()) {
+            for (Map.Entry<String, Object> entry : innerSnapshot.entrySet()) {
+                configService.kits().set("kits." + newKey + ".inner-kits." + entry.getKey(), entry.getValue());
+            }
+            configService.save(ConfigService.KITS);
+        }
         return RenameResult.OK;
     }
 

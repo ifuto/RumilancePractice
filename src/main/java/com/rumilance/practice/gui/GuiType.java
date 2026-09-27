@@ -72,5 +72,7 @@ public enum GuiType {
     SIGN_KIT_SELECT,
     CHAT_SETTINGS,
     TOURNAMENT,
-    REQUEST_INBOX
+    REQUEST_INBOX,
+    /** 中キット (inner kit) preset picker: right-click a kit in Duel / Party / Kit Edit. */
+    INNER_KIT_SELECT
 }

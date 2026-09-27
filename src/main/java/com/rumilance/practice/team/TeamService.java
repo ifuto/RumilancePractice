@@ -738,7 +738,15 @@ public final class TeamService {
     }
 
     public Result start(Player owner, String kitId) {
-        return startInternal(owner, kitId);
+        return startInternal(owner, kitId, null);
+    }
+
+    /**
+     * Party battle with a 中キット (inner kit): {@code innerKitId} is the preset every member
+     * fights with, {@code null} / blank / {@code default} keeps the kit's own loadout.
+     */
+    public Result start(Player owner, String kitId, String innerKitId) {
+        return startInternal(owner, kitId, innerKitId);
     }
 
     /**
@@ -750,10 +758,10 @@ public final class TeamService {
         if (team == null) return Result.NOT_IN_TEAM;
         if (!team.isOwner(owner.getUniqueId())) return Result.NOT_OWNER;
         team.setOriginalKitSlot(slot);
-        return startInternal(owner, null);
+        return startInternal(owner, null, null);
     }
 
-    private Result startInternal(Player owner, String kitId) {
+    private Result startInternal(Player owner, String kitId, String innerKitId) {
         Team team = byMember.get(owner.getUniqueId());
         if (team == null) return Result.NOT_IN_TEAM;
         if (!team.isOwner(owner.getUniqueId())) return Result.NOT_OWNER;
@@ -809,7 +817,7 @@ public final class TeamService {
         }
         Bukkit.getScheduler().runTask(plugin, () ->
                 matchService.startTeamMatch(rosters, kitId, MatchMode.TEAM, 1, arenaName, ff,
-                        Map.of(), null, teamKits, configs, originalKit));
+                        Map.of(), null, teamKits, configs, originalKit, null, innerKitId));
         broadcast(team, Component.text("Team battle starting!", NamedTextColor.GOLD));
         return Result.OK;
     }

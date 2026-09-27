@@ -23,6 +23,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -38,6 +39,9 @@ public final class TeamKitSelectGui extends AbstractGui {
     private PartyMapSelectGui partyMapSelectGui;
     /** Owner's original-kit store (null = original kits unavailable here). */
     private com.rumilance.practice.originalkit.OriginalKitService originalKitService;
+    /** 中キット (inner kits): shared presets stored inside a kit. */
+    private com.rumilance.practice.kit.InnerKitService innerKits;
+    private InnerKitSelectGui innerKitSelectGui;
 
     public void setOriginalKitService(
             com.rumilance.practice.originalkit.OriginalKitService originalKitService) {
@@ -64,6 +68,15 @@ public final class TeamKitSelectGui extends AbstractGui {
      */
     public void setPartyMapSelectGui(PartyMapSelectGui partyMapSelectGui) {
         this.partyMapSelectGui = partyMapSelectGui;
+    }
+
+    /** 中キット (inner kits) — right-click a kit to pick the preset the battle fights with. */
+    public void setInnerKits(com.rumilance.practice.kit.InnerKitService innerKits) {
+        this.innerKits = innerKits;
+    }
+
+    public void setInnerKitSelectGui(InnerKitSelectGui innerKitSelectGui) {
+        this.innerKitSelectGui = innerKitSelectGui;
     }
 
     @Override
@@ -204,16 +217,46 @@ public final class TeamKitSelectGui extends AbstractGui {
     }
 
     private ItemStack partyKitTile(Player player, KitDefinition kit) {
+        int presets = innerKits == null ? 0 : innerKits.list(kit.name()).size();
+        List<Component> lore = new ArrayList<>(List.of(
+                UiTheme.divider(),
+                UiTheme.labelValue(line(player, "gui.party-arena"), kit.hasFixedArena()
+                        ? com.rumilance.practice.util.KitNames.pretty(kit.arenaName())
+                        : line(player, "gui.queue-random"))));
+        if (presets > 0) {
+            lore.add(UiTheme.blank());
+            lore.add(UiTheme.labelValue(line(player, "gui.innerkit-count-label"),
+                    String.valueOf(presets + 1)));
+            lore.add(UiTheme.hint(line(player, "gui.innerkit-right-hint")));
+        }
+        lore.add(UiTheme.blank());
+        lore.add(UiTheme.hint(line(player, "gui.party-start-click")));
         return ItemBuilder.of(ItemBuilder.materialOr(kit.icon(), Material.DIAMOND_SWORD))
                 .nameMini(kit.prettyDisplayName())
-                .lore(UiTheme.divider(),
-                        UiTheme.labelValue(line(player, "gui.party-arena"), kit.hasFixedArena()
-                                ? com.rumilance.practice.util.KitNames.pretty(kit.arenaName())
-                                : line(player, "gui.queue-random")),
-                        UiTheme.blank(),
-                        UiTheme.hint(line(player, "gui.party-start-click")))
+                .lore(lore.toArray(new Component[0]))
                 .action("kit:" + kit.name())
                 .build();
+    }
+
+    /**
+     * 中キット: RIGHT click on a kit that has presets opens the preset list; the battle then
+     * fights with that loadout. Kits without presets, and every left click, behave as before.
+     */
+    @Override
+    public void handleClick(Player player, GuiSession session, Inventory inventory, int slot,
+                            String action, org.bukkit.event.inventory.ClickType clickType) {
+        if (clickType == org.bukkit.event.inventory.ClickType.RIGHT
+                && action != null && action.startsWith("kit:")
+                && innerKitSelectGui != null && innerKits != null) {
+            String kitId = action.substring("kit:".length());
+            if (innerKits.has(kitId)) {
+                sounds.play(player, "gui-click");
+                session.setNavigatingAway(true);
+                innerKitSelectGui.openForTeam(player, session, kitId);
+                return;
+            }
+        }
+        handleClick(player, session, inventory, slot, action);
     }
 
     @Override
@@ -285,6 +328,14 @@ public final class TeamKitSelectGui extends AbstractGui {
 
     /** Validates readiness, then enters the map-select flow (or starts directly without it). */
     private void proceedWithKit(Player player, String kitId) {
+        proceedWithKit(player, kitId, null);
+    }
+
+    /**
+     * Party battle with a chosen 中キット: {@code innerKitId} is the preset everyone fights with
+     * (null / blank / {@code default} = the kit itself, exactly as before).
+     */
+    public void proceedWithKit(Player player, String kitId, String innerKitId) {
         // Validate split readiness BEFORE entering map selection so the owner
         // gets the same errors as before.
         TeamService.Result precheck = teamService.preflightStart(player);
@@ -297,16 +348,17 @@ public final class TeamKitSelectGui extends AbstractGui {
         sounds.play(player, "gui-click");
         if (partyMapSelectGui != null) {
             final String chosenKit = kitId;
+            final String chosenInner = innerKitId;
             org.bukkit.Bukkit.getScheduler().runTask(
                     org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
                     () -> {
                         if (player.isOnline()) {
-                            partyMapSelectGui.openForKit(player, chosenKit);
+                            partyMapSelectGui.openForKit(player, chosenKit, chosenInner);
                         }
                     });
         } else {
             player.closeInventory();
-            TeamService.Result r = teamService.start(player, kitId);
+            TeamService.Result r = teamService.start(player, kitId, innerKitId);
             sounds.play(player, r == TeamService.Result.OK ? "match-found" : "error");
             if (r != TeamService.Result.OK) {
                 player.sendMessage(Component.text(teamService.errorMessage(player, r), UiTheme.DANGER)

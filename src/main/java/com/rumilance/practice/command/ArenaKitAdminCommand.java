@@ -53,6 +53,12 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
     private final KitAdminGui kitAdminGui;
     private final Map<String, ArenaTemplate> drafts = new ConcurrentHashMap<>();
     private com.rumilance.practice.kit.PresetItems presetItems;
+    /** 中キット (inner kits): shared preset loadouts stored inside a kit. */
+    private com.rumilance.practice.kit.InnerKitService innerKits;
+
+    public void setInnerKits(com.rumilance.practice.kit.InnerKitService innerKits) {
+        this.innerKits = innerKits;
+    }
     private com.rumilance.practice.gui.menus.PresetAdminGui presetAdminGui;
     private com.rumilance.practice.gui.menus.ArenaAdminGui arenaAdminGui;
     private java.util.function.BiConsumer<Player, String> partyIconPrompt;
@@ -176,6 +182,7 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                 player.sendMessage(Component.text("/kit rename <nowname> <newname> - 改名 (入力した大文字小文字がそのまま表示名に)", NamedTextColor.GRAY));
                 player.sendMessage(Component.text("/kit arena <kit> add|remove|list|clear [arena] - デュエル用アリーナプール", NamedTextColor.GRAY));
                 player.sendMessage(Component.text("/kit party-arena <kit> add|remove|list|clear [arena] - パーティ用アリーナプール", NamedTextColor.GRAY));
+                player.sendMessage(Component.text("/kit preset add|remove|list <kit> [name] - 中キット(プリセット)。既定は変更不可", NamedTextColor.GRAY));
                 yield true;
             }
             case "arena" -> {
@@ -183,6 +190,9 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
             }
             case "party-arena" -> {
                 yield handleArenaPool(player, args, true);
+            }
+            case "preset" -> {
+                yield handlePreset(player, args);
             }
             case "rename" -> {
                 if (args.length < 3) {
@@ -673,6 +683,20 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                     "bedexplosion"), args[0]);
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
+        if (sub.equals("preset")) {
+            if (args.length == 2) {
+                return filter(List.of("add", "remove", "list"), args[1]);
+            }
+            if (args.length == 3) {
+                return filter(kitService.all().stream().map(KitDefinition::name).toList(), args[2]);
+            }
+            if (args.length == 4 && (args[1].equalsIgnoreCase("remove") || args[1].equalsIgnoreCase("delete"))) {
+                return filter(innerKits == null ? List.of()
+                        : innerKits.list(args[2]).stream()
+                                .map(com.rumilance.practice.kit.InnerKitService.InnerKit::id).toList(), args[3]);
+            }
+            return List.of();
+        }
         // Subcommands that take a kit name next.
         if (args.length == 2 && List.of("info", "enable", "disable", "delete", "timeout", "order", "rename", "arena",
                 "adventure", "autoregen", "autofood", "blockplace", "blockbreak", "breakplayerplaced", "canbreak", "pearl", "totem",
@@ -758,6 +782,110 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
         }
         String lower = prefix.toLowerCase(Locale.ROOT);
         return options.stream().filter(o -> o.toLowerCase(Locale.ROOT).startsWith(lower)).toList();
+    }
+
+    /**
+     * {@code /kit preset add|remove|list} — 中キット (inner kits).
+     *
+     * <p>A preset is a shared loadout living inside one kit. Duel Request, Party Fight and Kit Edit
+     * offer the list on a RIGHT click; Queue always fights the kit's own loadout. That default is
+     * not a stored preset and cannot be changed, renamed, removed or replaced, so {@code add} with
+     * the name {@code default} is refused. Contents are edited in the kit editor — this command
+     * only creates, lists and removes the entries, seeding a new one with the kit's current items
+     * so the admin edits a copy instead of an empty grid.</p>
+     */
+    private boolean handlePreset(Player player, String[] args) {
+        if (innerKits == null) {
+            player.sendMessage(Component.text("Inner kits are unavailable (not wired).", NamedTextColor.RED));
+            return true;
+        }
+        String action = args.length > 1 ? args[1].toLowerCase(Locale.ROOT) : "list";
+        switch (action) {
+            case "list" -> {
+                String filterKit = args.length > 2 ? args[2] : null;
+                List<KitDefinition> kits;
+                if (filterKit == null) {
+                    kits = kitService.all();
+                } else {
+                    var only = kitService.get(filterKit).orElse(null);
+                    if (only == null) {
+                        player.sendMessage(Component.text("Unknown kit: " + filterKit, NamedTextColor.RED));
+                        return true;
+                    }
+                    kits = List.of(only);
+                }
+                int shown = 0;
+                for (KitDefinition kit : kits) {
+                    var presets = innerKits.list(kit.name());
+                    if (presets.isEmpty()) {
+                        continue;
+                    }
+                    shown++;
+                    player.sendMessage(Component.text(kit.name() + " (" + (presets.size() + 1) + "):",
+                                    NamedTextColor.AQUA)
+                            .append(Component.text("  " + kit.prettyDisplayName() + " "
+                                    + com.rumilance.practice.kit.InnerKitService.DEFAULT_BADGE
+                                    + "  (default, fixed)", NamedTextColor.GRAY)));
+                    for (var preset : presets) {
+                        player.sendMessage(Component.text("  - " + preset.displayName(), NamedTextColor.GREEN)
+                                .append(Component.text("  [" + preset.id() + "]", NamedTextColor.DARK_GRAY)));
+                    }
+                }
+                if (shown == 0) {
+                    player.sendMessage(Component.text(
+                            "No inner kits yet. Create one: /kit preset add <kit> <name>",
+                            NamedTextColor.GRAY));
+                }
+            }
+            case "add" -> {
+                if (args.length < 4) {
+                    player.sendMessage(Component.text("/kit preset add <kit> <name>", NamedTextColor.YELLOW));
+                    return true;
+                }
+                KitDefinition kit = kitService.get(args[2]).orElse(null);
+                if (kit == null) {
+                    player.sendMessage(Component.text("Unknown kit: " + args[2], NamedTextColor.RED));
+                    return true;
+                }
+                String name = String.join(" ", java.util.Arrays.copyOfRange(args, 3, args.length));
+                var result = innerKits.create(kit.name(), name,
+                        com.rumilance.practice.kit.KitLoadout.fromOfficial(kit));
+                player.sendMessage(switch (result) {
+                    case OK -> Component.text("Inner kit added: " + name.trim() + " ["
+                            + com.rumilance.practice.kit.InnerKitService.slug(name) + "] on "
+                            + kit.name() + ". Edit its contents: /ekit -> right-click the kit.",
+                            NamedTextColor.GREEN);
+                    case NO_SUCH_KIT -> Component.text("Unknown kit: " + args[2], NamedTextColor.RED);
+                    case BLANK_NAME -> Component.text(
+                            "Give the inner kit a name with letters or numbers.", NamedTextColor.RED);
+                    case RESERVED_NAME -> Component.text(
+                            "'default' is the kit itself: the default cannot become a preset.",
+                            NamedTextColor.RED);
+                    case ALREADY_EXISTS -> Component.text(
+                            "That inner kit already exists on " + kit.name() + ".", NamedTextColor.RED);
+                });
+            }
+            case "remove", "delete" -> {
+                if (args.length < 4) {
+                    player.sendMessage(Component.text("/kit preset remove <kit> <name>", NamedTextColor.YELLOW));
+                    return true;
+                }
+                String name = String.join(" ", java.util.Arrays.copyOfRange(args, 3, args.length));
+                String id = com.rumilance.practice.kit.InnerKitService.slug(name);
+                boolean removed = innerKits.remove(args[2], id == null ? name : id);
+                player.sendMessage(removed
+                        ? Component.text("Inner kit removed: " + name.trim() + " (" + args[2] + ")",
+                                NamedTextColor.GREEN)
+                        : Component.text(com.rumilance.practice.kit.InnerKitService
+                                        .isDefault(id == null ? name : id)
+                                ? "The default is the kit itself and cannot be removed."
+                                : "No such inner kit: " + name.trim() + " on " + args[2],
+                                NamedTextColor.RED));
+            }
+            default -> player.sendMessage(Component.text(
+                    "/kit preset <add|remove|list> <kit> [name]", NamedTextColor.YELLOW));
+        }
+        return true;
     }
 
     private boolean handleArenaPool(Player player, String[] args, boolean party) {

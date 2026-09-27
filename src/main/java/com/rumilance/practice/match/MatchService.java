@@ -286,6 +286,12 @@ public final class MatchService {
     private com.rumilance.practice.ffa.FfaService ffaService;
     private com.rumilance.practice.combat.CombatNetTracker combatNet;
     private com.rumilance.practice.originalkit.OriginalKitService originalKitService;
+    /** 中キット (inner kits): shared preset loadouts stored inside a kit. Wired from bootstrap. */
+    private com.rumilance.practice.kit.InnerKitService innerKits;
+
+    public void setInnerKits(com.rumilance.practice.kit.InnerKitService innerKits) {
+        this.innerKits = innerKits;
+    }
     private com.rumilance.practice.gui.menus.EditKitGui editKitGui;
 
     public void setEditKitGui(com.rumilance.practice.gui.menus.EditKitGui editKitGui) {
@@ -599,6 +605,20 @@ public final class MatchService {
                           int bestOf, Map<UUID, Integer> carrySeriesWins, String preferredArena,
                           UUID carryArenaInstanceId,
                           com.rumilance.practice.team.OriginalKitRef originalKit, int firstTo) {
+        startDuel(playerA, playerB, kitId, mode, bestOf, carrySeriesWins, preferredArena,
+                carryArenaInstanceId, originalKit, firstTo, null);
+    }
+
+    /**
+     * Terminal duel start. {@code innerKitId} is the 中キット both fighters use — {@code null},
+     * blank or {@code default} keeps the kit's own loadout, which is what Queue and every caller
+     * that never asks for a preset gets.
+     */
+    public void startDuel(UUID playerA, UUID playerB, String kitId, MatchMode mode,
+                          int bestOf, Map<UUID, Integer> carrySeriesWins, String preferredArena,
+                          UUID carryArenaInstanceId,
+                          com.rumilance.practice.team.OriginalKitRef originalKit, int firstTo,
+                          String innerKitId) {
         // Hard gates before anything is reserved: a solo duel must never start for a player who
         // is in a party (parties fight together as a team, never 1v1), and never for a player
         // committed to a fight — including someone ELIMINATED from a team match (watching the
@@ -631,6 +651,7 @@ public final class MatchService {
                 UUID.randomUUID(), mode, kitId, List.of(playerA, playerB), null, bestOf);
         session.applySeries(carrySeriesWins);
         session.setFirstTo(firstTo);
+        session.setInnerKit(innerKitId);
         session.setOriginalKitRef(originalKit);
         if (preferredArena != null && !preferredArena.isBlank()
                 && !"random".equalsIgnoreCase(preferredArena)) {
@@ -826,6 +847,23 @@ public final class MatchService {
                                Map<TeamColor, com.rumilance.practice.team.TeamConfig> teamConfigs,
                                com.rumilance.practice.team.OriginalKitRef originalKit,
                                String tournamentTag) {
+        startTeamMatch(rosters, kitId, mode, bestOf, partyArenaName, friendlyFire,
+                carrySeriesWins, carryArenaInstanceId, teamKits, teamConfigs, originalKit,
+                tournamentTag, null);
+    }
+
+    /**
+     * Terminal roster start with a 中キット: {@code innerKitId} is the preset every roster fights
+     * with ({@code null} / blank / {@code default} = the kit's own loadout). Per-team kit
+     * overrides still win for the teams that declare one.
+     */
+    public void startTeamMatch(List<List<UUID>> rosters, String kitId, MatchMode mode, int bestOf,
+                               String partyArenaName, boolean friendlyFire,
+                               Map<UUID, Integer> carrySeriesWins, UUID carryArenaInstanceId,
+                               Map<TeamColor, String> teamKits,
+                               Map<TeamColor, com.rumilance.practice.team.TeamConfig> teamConfigs,
+                               com.rumilance.practice.team.OriginalKitRef originalKit,
+                               String tournamentTag, String innerKitId) {
         if (rosters == null || rosters.size() < 2 || rosters.size() > TeamColor.MAX_TEAMS) {
             return;
         }
@@ -890,6 +928,7 @@ public final class MatchService {
             teamConfigs.forEach(session::setTeamConfig);
         }
         session.setOriginalKitRef(originalKit);
+        session.setInnerKit(innerKitId);
         if (tournamentTag != null && !tournamentTag.isBlank()) {
             session.setTournamentTag(tournamentTag);
         }
@@ -1009,7 +1048,7 @@ public final class MatchService {
                     if (originalLayout != null && !ownKitOverride) {
                         applyKit(player, rulesKit, originalLayout);
                     } else {
-                        applyKit(player, playerKit);
+                        applyKit(player, playerKit, session);
                     }
                     // Original-kit fights take their body size from the slot's settings; the
                     // per-team config keeps governing HP/size only for shared-kit battles.
@@ -1093,8 +1132,8 @@ public final class MatchService {
                         }
                         PlayerVitals.clearCombatState(p1);
                         PlayerVitals.clearCombatState(p2);
-                        applyKit(p1, kit);
-                        applyKit(p2, kit);
+                        applyKit(p1, kit, session);
+                        applyKit(p2, kit, session);
                         applySight(p1, session);
                         applySight(p2, session);
                         // Teleport FIRST, then a 1s settle beat so both clients finish
@@ -1289,6 +1328,23 @@ public final class MatchService {
             return;
         }
         lobbyService.sendToLobby(player);
+    }
+
+    /**
+     * Kit + the match's 中キット. A preset loadout replaces both the kit's own items and the
+     * player's personal rearrangement, because a preset is shared by everybody in the fight;
+     * without one nothing changes and the player's own layout still applies.
+     */
+    private void applyKit(Player player, KitDefinition kit, MatchSession session) {
+        String inner = session == null ? null : session.innerKit();
+        if (inner != null && innerKits != null) {
+            ItemStack[] preset = innerKits.layout(kit.name(), inner).orElse(null);
+            if (preset != null) {
+                applyKit(player, kit, preset.clone());
+                return;
+            }
+        }
+        applyKit(player, kit);
     }
 
     private void applyKit(Player player, KitDefinition kit) {
@@ -2593,6 +2649,9 @@ public final class MatchService {
                 Map<TeamColor, com.rumilance.practice.team.TeamConfig> carryTeamConfigs =
                         session.teamConfigsSnapshot();
                 com.rumilance.practice.team.OriginalKitRef carryOriginalKit = session.originalKitRef();
+                // 中キット carries like every other choice: a rematch repeats the same preset
+                // instead of silently dropping back to the kit's default loadout.
+                String carryInnerKit = session.innerKit();
                 if (spectatorService != null && !watching.isEmpty()) {
                     spectatorService.scheduleCarry(carried, watching);
                 }
@@ -2600,10 +2659,10 @@ public final class MatchService {
                 if (teamMatch) {
                     startTeamMatch(rosters, kit, mode, bestOf, preferredArena,
                             friendlyFire, carrySeries, carryArena, carryTeamKits, carryTeamConfigs,
-                            carryOriginalKit);
+                            carryOriginalKit, null, carryInnerKit);
                 } else {
                     startDuel(a, b, kit, mode, bestOf, carrySeries, preferredArena, carryArena,
-                            null, firstTo);
+                            null, firstTo, carryInnerKit);
                 }
             }
         });

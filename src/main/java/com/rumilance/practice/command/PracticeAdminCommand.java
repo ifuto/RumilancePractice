@@ -47,6 +47,8 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
     private final LobbyService lobbyService;
     private final RuntimeFlags runtimeFlags;
     private final KitService kitService;
+    /** 中キット (inner kits) — kits.yml のプリセット。reload で読み直す。 */
+    private com.rumilance.practice.kit.InnerKitService innerKits;
     private final ArenaTemplateStore arenaStore;
     private final ArenaService arenaService;
     private final FfaService ffaService;
@@ -111,6 +113,11 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
 
     public void setPlayerRepository(PlayerRepository playerRepository) {
         this.playerRepository = playerRepository;
+    }
+
+    /** 中キット (inner kits): reloaded together with kits.yml on /practiceadmin reload. */
+    public void setInnerKits(com.rumilance.practice.kit.InnerKitService innerKits) {
+        this.innerKits = innerKits;
     }
 
     public void setAsyncExecutor(AsyncExecutor asyncExecutor) {
@@ -207,6 +214,10 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
                 soundService.reload();
                 lobbyService.reload();
                 kitService.reload();
+                if (innerKits != null) {
+                    // 中キット live inside kits.yml, so they reload with the kits.
+                    innerKits.reload();
+                }
                 arenaStore.reload();
                 arenaService.setTemplates(arenaStore.templates());
                 ffaService.reload();

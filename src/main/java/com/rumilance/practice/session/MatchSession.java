@@ -78,6 +78,26 @@ public final class MatchSession {
      */
     private final java.util.Set<UUID> eliminated = ConcurrentHashMap.newKeySet();
 
+    /**
+     * 中キット (inner kit) this match fights with: {@code null} = the kit's own default loadout,
+     * which is all Queue ever asks for. Set by the duel / party start that carried the choice and
+     * read when the loadout is applied; it stays on the session so a rematch repeats the same
+     * preset without asking again.
+     */
+    private volatile String innerKitId;
+
+    /** Stores a preset id, normalising {@code null} / blank / {@code default} to "no preset". */
+    public void setInnerKit(String innerKitId) {
+        this.innerKitId = com.rumilance.practice.kit.InnerKitService.isDefault(innerKitId)
+                ? null
+                : com.rumilance.practice.kit.InnerKitService.normalizeId(innerKitId);
+    }
+
+    /** The 中キット id, or {@code null} for the default (the kit itself). */
+    public String innerKit() {
+        return innerKitId;
+    }
+
     /** 1v1 constructor: exactly two participants, index 0 = RED, index 1 = BLUE. */
     public MatchSession(UUID id, MatchMode mode, String kitName, List<UUID> participants,
                         UUID arenaInstanceId, int bestOf) {

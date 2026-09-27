@@ -23,7 +23,9 @@ public final class DuelRequestService {
             Instant createdAt,
             Instant expiresAt,
             String arenaName,
-            int firstTo
+            int firstTo,
+            /** 中キット (inner kit) preset id; null = the kit's own default loadout. */
+            String innerKitName
     ) {
         public boolean isExpired(Instant now) {
             return now.isAfter(expiresAt);
@@ -89,6 +91,18 @@ public final class DuelRequestService {
             UUID sender, UUID target, String kit, boolean ranked, int bestOf, String arenaName,
             int firstTo
     ) {
+        return create(sender, target, kit, ranked, bestOf, arenaName, firstTo, null);
+    }
+
+    /**
+     * Duel request with a 中キット (inner kit): {@code innerKit} names the preset both fighters
+     * use, {@code null} / blank / {@code default} keeps the kit's own loadout. Queue never carries
+     * a preset — only a duel (or a party fight, which has its own path) can ask for one.
+     */
+    public synchronized Optional<RichDuelRequest> create(
+            UUID sender, UUID target, String kit, boolean ranked, int bestOf, String arenaName,
+            int firstTo, String innerKit
+    ) {
         if (sender.equals(target)) {
             return Optional.empty();
         }
@@ -108,7 +122,10 @@ public final class DuelRequestService {
                 created,
                 created.plusSeconds(ttlSeconds),
                 map,
-                com.rumilance.practice.match.FirstTo.normalise(firstTo)
+                com.rumilance.practice.match.FirstTo.normalise(firstTo),
+                com.rumilance.practice.kit.InnerKitService.isDefault(innerKit)
+                        ? null
+                        : com.rumilance.practice.kit.InnerKitService.normalizeId(innerKit)
         );
         byId.put(request.id(), request);
         byTarget.put(target, now);

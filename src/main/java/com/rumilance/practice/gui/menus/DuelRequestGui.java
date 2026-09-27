@@ -38,6 +38,12 @@ public final class DuelRequestGui extends AbstractGui {
     private DuelMapSelectGui mapSelectGui;
     private com.rumilance.practice.team.TeamService teamService;
     private com.rumilance.practice.match.MatchService matchService;
+    /** 中キット (inner kits): the preset this duel fights with, chosen by right-clicking a kit. */
+    private com.rumilance.practice.kit.InnerKitService innerKits;
+
+    public void setInnerKits(com.rumilance.practice.kit.InnerKitService innerKits) {
+        this.innerKits = innerKits;
+    }
 
     public DuelRequestGui(
             GuiSessionRegistry registry,
@@ -86,7 +92,20 @@ public final class DuelRequestGui extends AbstractGui {
      */
     public void openFor(Player sender, Player target, boolean ranked,
                         String kit, String map, int bestOf) {
+        openFor(sender, target, ranked, kit, map, bestOf, null);
+    }
+
+    /**
+     * Same, carrying the chosen 中キット (inner kit). Like the kit itself the choice MUST be on the
+     * session before the first render, or the kit tile is drawn as if the default were selected.
+     */
+    public void openFor(Player sender, Player target, boolean ranked,
+                        String kit, String map, int bestOf, String innerKit) {
         GuiSession session = registry.open(sender.getUniqueId(), type(), rows);
+        if (!com.rumilance.practice.kit.InnerKitService.isDefault(innerKit)) {
+            session.put(InnerKitSelectGui.CHOICE_KEY,
+                    com.rumilance.practice.kit.InnerKitService.normalizeId(innerKit));
+        }
         session.setTargetPlayer(target.getUniqueId());
         session.setRanked(ranked);
         if (bestOf >= 1) {
@@ -171,9 +190,10 @@ public final class DuelRequestGui extends AbstractGui {
         inventory.setItem(GuiSlots.slot(0, 4), headBuilder.build());
 
         // Configuration tiles.
+        // 中キットを選んでいれば、その名前をキット名に続けて表示する（相手にも同じ文言が届く）。
         inventory.setItem(GuiSlots.slot(2, 3), GuiDecorator.button(Material.DIAMOND_SWORD,
                 messageService.render(locale, "duel-gui.kit-select",
-                        MessageService.tags("kit", session.selectedKit() == null ? "nodebuff" : session.selectedKit())), "kit"));
+                        MessageService.tags("kit", kitLabel(session))), "kit"));
         String mapLabel = session.selectedMap() == null || session.selectedMap().isBlank()
                 || "random".equalsIgnoreCase(session.selectedMap())
                 ? "Random"
@@ -301,6 +321,8 @@ public final class DuelRequestGui extends AbstractGui {
             return;
         }
         String kit = session.selectedKit() == null ? "nodebuff" : session.selectedKit();
+        String innerChoice = session.get(InnerKitSelectGui.CHOICE_KEY, String.class);
+        String kitLabel = kitLabel(session);
         String map = session.selectedMap();
         int cooldown = duelRequestService.remainingCooldownSeconds(player.getUniqueId(), targetId);
         if (cooldown > 0) {
@@ -310,7 +332,7 @@ public final class DuelRequestGui extends AbstractGui {
             return;
         }
         if (duelRequestService.create(player.getUniqueId(), targetId, kit, session.ranked(),
-                session.bestOf(), map, session.firstTo()).isEmpty()) {
+                session.bestOf(), map, session.firstTo(), innerChoice).isEmpty()) {
             sounds.play(player, "error");
             messageService.send(player, "duel.could-not-send");
             return;
@@ -325,13 +347,13 @@ public final class DuelRequestGui extends AbstractGui {
         String targetLocale = messageService.resolveLocale(target);
         player.sendMessage(messageService.render(senderLocale, "duel.request-sent",
                         MessageService.tags("mode", messageService.modeWord(player, ranked),
-                                "kit", kit, "target", target.getName()))
+                                "kit", kitLabel, "target", target.getName()))
                 .append(Component.newline())
                 .append(Component.text("[CANCEL]", NamedTextColor.RED).decorate(TextDecoration.BOLD)
                         .clickEvent(ClickEvent.runCommand("/rpcancel"))));
         target.sendMessage(messageService.render(targetLocale, "duel.request-received",
                         MessageService.tags("mode", messageService.modeWord(target, ranked),
-                                "kit", kit, "sender", player.getName()))
+                                "kit", kitLabel, "sender", player.getName()))
                 .append(Component.newline())
                 .append(Component.text("[ACCEPT]", NamedTextColor.GREEN).decorate(TextDecoration.BOLD)
                         .clickEvent(ClickEvent.runCommand("/rpaccept " + player.getName())))
@@ -339,5 +361,18 @@ public final class DuelRequestGui extends AbstractGui {
                 .append(Component.text("[DENY]", NamedTextColor.RED).decorate(TextDecoration.BOLD)
                         .clickEvent(ClickEvent.runCommand("/rpdeny " + player.getName()))));
         render(player, session, inventory);
+    }
+
+    /**
+     * What the kit tile and both request messages call this fight's kit: the plain kit name, or
+     * the 中キット's display name when one was picked by right-clicking the kit.
+     */
+    private String kitLabel(GuiSession session) {
+        String kit = session.selectedKit() == null ? "nodebuff" : session.selectedKit();
+        String inner = session.get(InnerKitSelectGui.CHOICE_KEY, String.class);
+        if (innerKits == null || com.rumilance.practice.kit.InnerKitService.isDefault(inner)) {
+            return kit;
+        }
+        return innerKits.displayOf(kit, inner, kit);
     }
 }

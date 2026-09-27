@@ -28,6 +28,40 @@ import java.util.UUID;
  */
 public final class EkitSelectGui extends AbstractGui {
 
+    /** 中キット (inner kits): right-click a kit to choose which preset to edit. */
+    private com.rumilance.practice.kit.InnerKitService innerKits;
+    private InnerKitSelectGui innerKitSelectGui;
+
+    public void setInnerKits(com.rumilance.practice.kit.InnerKitService innerKits) {
+        this.innerKits = innerKits;
+    }
+
+    public void setInnerKitSelectGui(InnerKitSelectGui innerKitSelectGui) {
+        this.innerKitSelectGui = innerKitSelectGui;
+    }
+
+    /**
+     * 中キット: RIGHT click on a kit that has presets opens the preset list; LEFT click keeps
+     * editing the kit itself exactly as before. Viewing somebody else's layout is read-only and
+     * never offers presets.
+     */
+    @Override
+    public void handleClick(Player player, GuiSession session, Inventory inventory, int slot,
+                            String action, org.bukkit.event.inventory.ClickType clickType) {
+        if (clickType == org.bukkit.event.inventory.ClickType.RIGHT
+                && action != null && action.startsWith("kit:")
+                && innerKitSelectGui != null && innerKits != null && !isViewer(session)) {
+            String kitId = action.substring("kit:".length());
+            if (innerKits.has(kitId)) {
+                sounds.play(player, "gui-click");
+                session.setNavigatingAway(true);
+                innerKitSelectGui.openForEdit(player, session, kitId);
+                return;
+            }
+        }
+        handleClick(player, session, inventory, slot, action);
+    }
+
     private final KitService kitService;
     private EditKitGui editKitGui;
     private OriginalKitGui originalKitGui;
@@ -169,15 +203,25 @@ public final class EkitSelectGui extends AbstractGui {
 
     private ItemStack kitIcon(Player player, KitDefinition kit, boolean viewer) {
         Material material = Material.matchMaterial(kit.icon());
+        int presets = innerKits == null ? 0 : innerKits.list(kit.name()).size();
+        java.util.List<Component> lore = new java.util.ArrayList<>(java.util.List.of(
+                UiTheme.divider(),
+                kit.crystalFfa()
+                        ? UiTheme.status("Crystal FFA Kit", UiTheme.SUCCESS)
+                        : UiTheme.line(line(player, viewer ? "gui.kit-view-only" : "gui.kit-edit-hint"))));
+        if (presets > 0 && !viewer) {
+            // 中キットを持つキットだけ右クリックの案内を出す（デフォルト込みの数を表示）。
+            lore.add(UiTheme.blank());
+            lore.add(UiTheme.labelValue(line(player, "gui.innerkit-count-label"),
+                    String.valueOf(presets + 1)));
+            lore.add(UiTheme.hint(line(player, "gui.innerkit-right-hint")));
+        }
+        lore.add(UiTheme.blank());
+        lore.add(UiTheme.hint(line(player, "gui.kit-button-hint")));
         return ItemBuilder.of(material == null ? Material.DIAMOND_SWORD : material)
                 .name(MiniMessage.miniMessage().deserialize(kit.prettyDisplayName())
                         .decoration(TextDecoration.ITALIC, false))
-                .lore(UiTheme.divider(),
-                        kit.crystalFfa()
-                                ? UiTheme.status("Crystal FFA Kit", UiTheme.SUCCESS)
-                                : UiTheme.line(line(player, viewer ? "gui.kit-view-only" : "gui.kit-edit-hint")),
-                        UiTheme.blank(),
-                        UiTheme.hint(line(player, "gui.kit-button-hint")))
+                .lore(lore.toArray(new Component[0]))
                 // Keep the wooden-button delay for the normal picker; viewer actions are still
                 // delayed, but use a separate prefix so the editor can remain read-only.
                 .action(com.rumilance.practice.gui.DelayedButton.wrap(

@@ -256,7 +256,7 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
         matchService.startDuel(request.sender(), request.target(), request.kitName(),
                 request.ranked() ? MatchMode.RANKED : MatchMode.UNRANKED,
                 request.bestOf(), Map.of(), request.preferredArena().orElse(null), null, null,
-                request.firstTo());
+                request.firstTo(), request.innerKitName());
     }
 
     public void handleCancel(Player player) {

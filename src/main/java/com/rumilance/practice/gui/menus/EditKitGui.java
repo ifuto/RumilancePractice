@@ -65,6 +65,22 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
     private ShieldPatternGui shieldPatternGui;
     private com.rumilance.practice.hiddenrank.HiddenRankService hiddenRankService;
     private com.rumilance.practice.rank.RankService rankService;
+    /** 中キット (inner kits): preset loadouts stored inside a kit. Wired from bootstrap. */
+    private com.rumilance.practice.kit.InnerKitService innerKits;
+    private InnerKitSelectGui innerKitSelectGui;
+
+    public void setInnerKits(com.rumilance.practice.kit.InnerKitService innerKits) {
+        this.innerKits = innerKits;
+    }
+
+    public void setInnerKitSelectGui(InnerKitSelectGui innerKitSelectGui) {
+        this.innerKitSelectGui = innerKitSelectGui;
+    }
+
+    /** The 中キット being edited, or null for the kit's own (default) loadout. */
+    private static String innerKit(GuiSession session) {
+        return session == null ? null : session.get(InnerKitSelectGui.CHOICE_KEY, String.class);
+    }
 
     public void setRankService(com.rumilance.practice.rank.RankService rankService) {
         this.rankService = rankService;
@@ -285,10 +301,11 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
     }
 
     public void reopenWithLayout(Player player, String kitName, ItemStack[] layout) {
-        // Keep the crystal variant across reopens (anvil rename / trim apply relaunch the
-        // editor): without this a variant edit would land on the kit's base layout.
-        Integer crystal = crystalVariant(registry.get(player.getUniqueId()).orElse(null));
-        openKitEditor(player, kitName, null, crystal);
+        // Keep the crystal variant AND the 中キット across reopens (anvil rename / trim apply
+        // relaunch the editor): without this a preset edit would land on the kit's base layout.
+        GuiSession previous = registry.get(player.getUniqueId()).orElse(null);
+        Integer crystal = crystalVariant(previous);
+        openKitEditor(player, kitName, null, crystal, innerKit(previous));
         GuiSession session = registry.get(player.getUniqueId()).orElse(null);
         if (session != null && layout != null) {
             session.put("layout", layout);
@@ -312,6 +329,16 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
      * {@link CrystalFfaStore#variantKey}.
      */
     public void openKitEditor(Player player, String kitName, String preset, Integer crystalVariant) {
+        openKitEditor(player, kitName, preset, crystalVariant, null);
+    }
+
+    /**
+     * Opens the kit editor on one 中キット (inner kit): {@code innerKitId} edits that preset's
+     * loadout, which lives in kits.yml under the kit, instead of the player's own rearrangement
+     * of the kit. Null / blank / {@code default} edits the kit itself, as always.
+     */
+    public void openKitEditor(Player player, String kitName, String preset, Integer crystalVariant,
+                              String innerKitId) {
         GuiSession session = registry.open(player.getUniqueId(), type(), rows);
         session.setSelectedKit(kitName);
         session.put("mode", "edit");
@@ -320,6 +347,10 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         }
         if (crystalVariant != null) {
             session.put("crystal", crystalVariant);
+        }
+        if (!com.rumilance.practice.kit.InnerKitService.isDefault(innerKitId)) {
+            session.put(InnerKitSelectGui.CHOICE_KEY,
+                    com.rumilance.practice.kit.InnerKitService.normalizeId(innerKitId));
         }
         initPresetSession(session);
         PlayerState state = stateManager.getState(player.getUniqueId());
@@ -397,8 +428,13 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
                             + com.rumilance.practice.util.KitNames.pretty(kit), UiTheme.PRIMARY)
                     .decoration(TextDecoration.ITALIC, false);
         }
+        String inner = innerKit(session);
+        String innerName = inner == null ? null : innerKits == null ? null
+                : innerKits.get(kit, inner).map(com.rumilance.practice.kit.InnerKitService.InnerKit::displayName)
+                        .orElse(null);
         return Component.text(kit == null ? "Edit Kit"
                 : "Edit: " + com.rumilance.practice.util.KitNames.pretty(kit)
+                        + (innerName == null ? "" : " \u203a " + innerName)
                         + (crystal == null ? "" : " (KIT" + crystal + ")"), UiTheme.PRIMARY)
                 .decoration(TextDecoration.ITALIC, false);
     }
@@ -437,7 +473,7 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
                 ? session.targetPlayer() : player.getUniqueId();
         ItemStack[] layout = KitLayoutContents.retainOrLoad(
                 session.get("layout", ItemStack[].class),
-                loadLayout(layoutOwner, kit, crystalVariant(session)));
+                loadLayout(layoutOwner, kit, crystalVariant(session), innerKit(session)));
         // armor row visually: helmet/chest/legs/boots + offhand
         inventory.setItem(GuiSlots.slot(0, 1), tagged(player, layout.length > 36 ? layout[36] : null,
                 isViewOnly(session) ? "decorate" : "slot:36"));
@@ -617,12 +653,27 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
     }
 
     private ItemStack[] loadLayout(UUID uuid, KitDefinition kit) {
-        return loadLayout(uuid, kit, null);
+        return loadLayout(uuid, kit, null, null);
     }
 
     /** Variant-aware load: {@code crystal} 1..9 reads {@code <kit>#v<n>} (falls back to the
      * kit's official layout when that slot was never saved). */
     private ItemStack[] loadLayout(UUID uuid, KitDefinition kit, Integer crystal) {
+        return loadLayout(uuid, kit, crystal, null);
+    }
+
+    /**
+     * 中キット-aware load: a preset's loadout is shared by everybody and lives in kits.yml, so it
+     * wins over both the player's own rearrangement and the crystal variant slots. The array is
+     * cloned because the editor writes slots in place.
+     */
+    private ItemStack[] loadLayout(UUID uuid, KitDefinition kit, Integer crystal, String innerKit) {
+        if (innerKits != null && !com.rumilance.practice.kit.InnerKitService.isDefault(innerKit)) {
+            ItemStack[] preset = innerKits.layout(kit.name(), innerKit).orElse(null);
+            if (preset != null) {
+                return preset.clone();
+            }
+        }
         String key = crystal == null ? kit.name() : CrystalFfaStore.variantKey(kit.name(), crystal);
         try {
             var snap = layoutRepository.find(uuid, key);
@@ -698,6 +749,17 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
                             String action, org.bukkit.event.inventory.ClickType clickType) {
         if (isViewOnly(session) && !"back".equals(action) && !"close".equals(action)) {
             return;
+        }
+        // 中キット: キット一覧での右クリックはプリセット一覧へ（左クリックは今まで通り即編集）。
+        if (clickType == org.bukkit.event.inventory.ClickType.RIGHT
+                && action != null && action.startsWith("editkit:")
+                && innerKitSelectGui != null) {
+            String pickedKit = action.substring("editkit:".length());
+            if (innerKits != null && innerKits.has(pickedKit)) {
+                session.setNavigatingAway(true);
+                innerKitSelectGui.openForEdit(player, session, pickedKit);
+                return;
+            }
         }
         if (clickType == org.bukkit.event.inventory.ClickType.RIGHT
                 && action != null && action.startsWith("slot:")) {
@@ -803,6 +865,19 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             return;
         }
         ItemStack[] fresh = defaultLayout(kit);
+        String inner = innerKit(session);
+        if (innerKits != null && !com.rumilance.practice.kit.InnerKitService.isDefault(inner)) {
+            // プリセットの「初期状態」= 保存済みの中身（無ければキット本体の構成）。共有プリセットの
+            // 編集なので、個人のレイアウトDB行やキャッシュには触らない。
+            ItemStack[] stored = innerKits.layout(kitId, inner).orElse(null);
+            fresh = stored != null ? stored.clone() : fresh;
+            session.put("layout", fresh);
+            stashCurrentLayout(player, session);
+            render(player, session, inventory);
+            sounds.play(player, "gui-click");
+            player.sendMessage(t(player, "gui.kit-reset-done"));
+            return;
+        }
         session.put("layout", fresh);
         stashCurrentLayout(player, session);
         layoutCache.put(player.getUniqueId(), kitId, fresh);
@@ -896,8 +971,24 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         if (kitId == null) {
             return;
         }
-        persistLayout(player, kitId, resolveLayoutForSave(player, session), notify,
-                crystalVariant(session));
+        ItemStack[] layout = resolveLayoutForSave(player, session);
+        // 中キットの編集: 保存先はプレイヤー個人のレイアウト(DB)ではなく kits.yml のプリセット。
+        // 個人レイアウトに書くとその人だけの並び替えになり、他の人には反映されない。
+        String inner = innerKit(session);
+        if (innerKits != null && layout != null
+                && !com.rumilance.practice.kit.InnerKitService.isDefault(inner)) {
+            if (innerKits.saveLayout(kitId, inner, layout)) {
+                if (notify) {
+                    sounds.play(player, "select");
+                    player.sendMessage(t(player, "gui.innerkit-saved"));
+                }
+            } else if (notify) {
+                sounds.play(player, "error");
+                player.sendMessage(t(player, "gui.innerkit-save-failed"));
+            }
+            return;
+        }
+        persistLayout(player, kitId, layout, notify, crystalVariant(session));
     }
 
     public void persistLayout(Player player, String kitId, ItemStack[] layout, boolean notify) {
