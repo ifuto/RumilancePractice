@@ -8,8 +8,8 @@ import com.rumilance.practice.gui.ItemBuilder;
 import com.rumilance.practice.gui.MenuScaffold;
 import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.kit.KitService;
+import com.rumilance.practice.kit.KitLoadout;
 import com.rumilance.practice.model.KitDefinition;
-import com.rumilance.practice.model.KitItemEntry;
 import com.rumilance.practice.locale.MessageService;
 import com.rumilance.practice.sound.SoundService;
 import com.rumilance.practice.util.GuiSlots;
@@ -77,28 +77,23 @@ public final class KitPreviewGui extends AbstractGui {
             return;
         }
 
-        // Armor + off-hand across the top bar (slots 0..4 mapped to inventory slots).
-        placeArmor(inventory, kit);
-
-        // Storage items in rows 1-3 (inventory slots 9..35 => menu rows 1-3, same columns).
-        for (KitItemEntry entry : kit.items()) {
-            if (entry.slot() < 9 || entry.slot() > 35) {
-                continue;
-            }
-            ItemStack stack = previewStack(entry);
-            if (stack != null) {
-                inventory.setItem(entry.slot(), stack);
+        // Render the EXACT loadout the match gives: older kits store armor in the `armor` map,
+        // child kits created from the official editor store it in item slots 36..40. Both ways
+        // are resolved by KitLoadout.fromOfficial (including full-NBT potion/armor stacks).
+        ItemStack[] loadout = KitLoadout.fromOfficial(kit);
+        inventory.setItem(GuiSlots.slot(0, 3), loadout[KitLoadout.OFFHAND]);
+        inventory.setItem(GuiSlots.slot(0, 5), loadout[KitLoadout.HELMET]);
+        inventory.setItem(GuiSlots.slot(0, 6), loadout[KitLoadout.CHEST]);
+        inventory.setItem(GuiSlots.slot(0, 7), loadout[KitLoadout.LEGS]);
+        inventory.setItem(GuiSlots.slot(0, 8), loadout[KitLoadout.BOOTS]);
+        for (int slot = 9; slot < 36; slot++) {
+            if (loadout[slot] != null) {
+                inventory.setItem(slot, loadout[slot]);
             }
         }
-
-        // Hot-bar preview on row 4 columns 0..8 (slots 36..44).
-        for (KitItemEntry entry : kit.items()) {
-            if (entry.slot() < 0 || entry.slot() > 8) {
-                continue;
-            }
-            ItemStack stack = previewStack(entry);
-            if (stack != null) {
-                inventory.setItem(GuiSlots.slot(4, entry.slot()), stack);
+        for (int slot = 0; slot < 9; slot++) {
+            if (loadout[slot] != null) {
+                inventory.setItem(GuiSlots.slot(4, slot), loadout[slot]);
             }
         }
 
@@ -122,50 +117,6 @@ public final class KitPreviewGui extends AbstractGui {
                         .build());
 
         MenuScaffold.closeButton(inventory, t(player, "menu.close"));
-    }
-
-    private void placeArmor(Inventory inventory, KitDefinition kit) {
-        // Render a player-doll layout: helmet=5, chestplate=6, leggings=7, boots=8, offhand=4.
-        placeArmorPiece(inventory, GuiSlots.slot(0, 5), kit.armor().get("helmet"));
-        placeArmorPiece(inventory, GuiSlots.slot(0, 6), kit.armor().get("chestplate"));
-        placeArmorPiece(inventory, GuiSlots.slot(0, 7), kit.armor().get("leggings"));
-        placeArmorPiece(inventory, GuiSlots.slot(0, 8), kit.armor().get("boots"));
-    }
-
-    private void placeArmorPiece(Inventory inventory, int slot, String materialName) {
-        if (materialName == null || materialName.isBlank()) {
-            return;
-        }
-        // Full-NBT armor pieces are stored as "data:<base64>".
-        if (materialName.startsWith("data:")) {
-            ItemStack decoded = com.rumilance.practice.util.ItemSerializer
-                    .singleFromBase64(materialName.substring("data:".length()));
-            if (decoded != null) {
-                inventory.setItem(slot, decoded);
-                return;
-            }
-        }
-        Material material = Material.matchMaterial(materialName);
-        if (material == null || material.isAir()) {
-            return;
-        }
-        inventory.setItem(slot, new ItemStack(material));
-    }
-
-    /** Preview stack with full NBT when available (enchant glint, potion colours, ...). */
-    private static ItemStack previewStack(KitItemEntry entry) {
-        if (entry.hasSerializedItem()) {
-            ItemStack decoded = com.rumilance.practice.util.ItemSerializer
-                    .singleFromBase64(entry.itemDataBase64());
-            if (decoded != null) {
-                return decoded;
-            }
-        }
-        Material material = Material.matchMaterial(entry.material());
-        if (material == null || material.isAir()) {
-            return null;
-        }
-        return new ItemStack(material, Math.max(1, entry.amount()));
     }
 
     @Override

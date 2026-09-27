@@ -461,6 +461,10 @@ public final class ConfigService {
     }
 
     public void reload() {
+        // A GUI edit (including changing a folder's default child) is normally saved on a
+        // one-second debounce. Reload must not replace the in-memory YAML before that write,
+        // otherwise a quick /practiceadmin reload silently discards the new sub-menu settings.
+        flushPendingSaves();
         loadAll();
     }
 

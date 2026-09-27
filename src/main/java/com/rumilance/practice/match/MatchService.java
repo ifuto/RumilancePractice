@@ -325,7 +325,7 @@ public final class MatchService {
             }
             return null;
         }
-        return kitService.get(name).orElse(null);
+        return kitService.get(kitService.playableId(name)).orElse(null);
     }
 
     public KitDefinition resolveKitFor(MatchSession session, UUID playerId) {
@@ -333,7 +333,7 @@ public final class MatchService {
         if (name == null || name.startsWith("@original:")) {
             return resolveKit(session);
         }
-        KitDefinition resolved = kitService.get(name).orElse(null);
+        KitDefinition resolved = kitService.get(kitService.playableId(name)).orElse(null);
         return resolved != null ? resolved : resolveKit(session);
     }
 
@@ -641,14 +641,17 @@ public final class MatchService {
             sendBothToLobby(playerA, playerB);
             return;
         }
-        KitDefinition kit = kitService.get(kitId).orElse(null);
+        // フォルダ(中メニュー)が渡されたらデフォルトの子で戦う。セッションにも子の id を持つので、
+        // 以降のルール/レイアウト/戦績はすべて「実際に使ったキット」の名前で残る。
+        String fightKitId = kitService.playableId(kitId);
+        KitDefinition kit = kitService.get(fightKitId).orElse(null);
         if (kit == null || !kit.enabled()) {
             sendBothToLobby(playerA, playerB);
             return;
         }
 
         MatchSession session = new MatchSession(
-                UUID.randomUUID(), mode, kitId, List.of(playerA, playerB), null, bestOf);
+                UUID.randomUUID(), mode, fightKitId, List.of(playerA, playerB), null, bestOf);
         session.applySeries(carrySeriesWins);
         session.setFirstTo(firstTo);
         session.setInnerKit(innerKitId);
@@ -887,7 +890,8 @@ public final class MatchService {
         // used as the session kit, so every rule lookup reads the owner's settings. No shared
         // match kit is required (kitId may be null).
         boolean originalFight = originalKit != null && originalKitService != null;
-        String sessionKitName = kitId;
+        // フォルダ(中メニュー)ならデフォルトの子で戦う。
+        String sessionKitName = kitService.playableId(kitId);
         if (originalFight) {
             String synthetic = com.rumilance.practice.originalkit.OriginalKitService
                     .syntheticKitName(originalKit.owner(), originalKit.slot());
@@ -906,7 +910,7 @@ public final class MatchService {
                 return;
             }
         } else {
-            KitDefinition shared = kitService.get(kitId).orElse(null);
+            KitDefinition shared = kitService.get(sessionKitName).orElse(null);
             if (shared == null || !shared.enabled()) {
                 return;
             }

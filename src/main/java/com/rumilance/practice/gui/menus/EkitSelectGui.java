@@ -28,14 +28,8 @@ import java.util.UUID;
  */
 public final class EkitSelectGui extends AbstractGui {
 
-    /** 中キット (inner kits): right-click a kit to choose which preset to edit. */
-    private com.rumilance.practice.kit.InnerKitService innerKits;
     private InnerKitSelectGui innerKitSelectGui;
     private InnerKitAdminGui innerKitAdminGui;
-
-    public void setInnerKits(com.rumilance.practice.kit.InnerKitService innerKits) {
-        this.innerKits = innerKits;
-    }
 
     public void setInnerKitSelectGui(InnerKitSelectGui innerKitSelectGui) {
         this.innerKitSelectGui = innerKitSelectGui;
@@ -47,31 +41,42 @@ public final class EkitSelectGui extends AbstractGui {
     }
 
     /**
-     * 中キット: RIGHT click for an ADMIN opens the management screen of that kit — create, rename,
-     * icon, delete and edit contents, all without a command (it opens even for a kit with no preset
-     * yet, because that is where the first one gets made). RIGHT click for a player opens the
-     * preset picker so they can rearrange that preset's items for themselves. LEFT click keeps
-     * editing the kit itself exactly as before, and viewing somebody else's layout is read-only.
+     * A folder's RIGHT-click opens its ordinary child-kit list (for both players and admins).
+     * Players edit their own layout for that child, the same as any other kit. Admins can reach
+     * the management screen from the child list's Manage button; an empty parent opens the
+     * management screen directly so they can create the first child. LEFT uses the default child.
      */
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot,
                             String action, org.bukkit.event.inventory.ClickType clickType) {
         if (clickType == org.bukkit.event.inventory.ClickType.RIGHT
+                && action != null && action.startsWith("viewkit:")
+                && isViewer(session) && innerKitSelectGui != null) {
+            String kitId = action.substring("viewkit:".length());
+            if (kitService.isFolder(kitId)) {
+                session.setNavigatingAway(true);
+                innerKitSelectGui.openForViewer(player, session, kitId);
+                return;
+            }
+        }
+        if (clickType == org.bukkit.event.inventory.ClickType.RIGHT
                 && action != null && action.startsWith("kit:")
-                && innerKits != null && !isViewer(session)) {
+                && !isViewer(session)) {
             String kitId = action.substring("kit:".length());
-            // 中キットの作成・削除・中身の変更は Admin 専用。一般プレイヤーはここから
-            // 「その中キットの自分用の配置」を直す画面へ進む。
-            if (innerKitAdminGui != null && player.hasPermission("rumilance.admin")) {
+            // 中メニューを持つキット: 誰でも子キットの一覧へ(子は普通のキットなので、そこで
+            // 自分の配置を直す)。子を持たないキットを Admin が右クリックしたときだけ、子を作る
+            // ための管理画面へ進む。
+            if (kitService.isFolder(kitId)) {
+                if (innerKitSelectGui != null) {
+                    sounds.play(player, "gui-click");
+                    session.setNavigatingAway(true);
+                    innerKitSelectGui.openForEdit(player, session, kitId);
+                    return;
+                }
+            } else if (innerKitAdminGui != null && player.hasPermission("rumilance.admin")) {
                 sounds.play(player, "gui-click");
                 session.setNavigatingAway(true);
                 innerKitAdminGui.open(player, kitId, InnerKitAdminGui.ORIGIN_EKIT);
-                return;
-            }
-            if (innerKitSelectGui != null && innerKits.has(kitId)) {
-                sounds.play(player, "gui-click");
-                session.setNavigatingAway(true);
-                innerKitSelectGui.openForEdit(player, session, kitId);
                 return;
             }
         }
@@ -100,12 +105,27 @@ public final class EkitSelectGui extends AbstractGui {
         this.crystalKitSlotsGui = crystalKitSlotsGui;
     }
 
+    /** Reopen the same parent category/page after selecting or backing out of a child menu. */
+    public void openAt(Player player, String category, int page) {
+        openWithSession(player, session -> {
+            session.setKitCategory(category);
+            session.setPage(Math.max(0, page));
+        });
+    }
+
     /** Opens the official-kit picker in read-only mode for a tester inspecting another player. */
     public void openViewer(Player viewer, UUID targetId, String targetName) {
+        openViewerAt(viewer, targetId, targetName, null, 0);
+    }
+
+    public void openViewerAt(Player viewer, UUID targetId, String targetName,
+                             String category, int page) {
         openWithSession(viewer, session -> {
             session.put("mode", "viewer-picker");
             session.setTargetPlayer(targetId);
             session.put("viewer-target-name", targetName == null ? "?" : targetName);
+            session.setKitCategory(category);
+            session.setPage(Math.max(0, page));
         });
     }
 
@@ -218,20 +238,26 @@ public final class EkitSelectGui extends AbstractGui {
     }
 
     private ItemStack kitIcon(Player player, KitDefinition kit, boolean viewer) {
+        // フォルダは親の名前とアイコンのまま。左=既定の子を編集、右=子一覧。
+        KitDefinition shown = kitService.tile(kit);
+        java.util.List<KitDefinition> children = kitService.children(kit.name());
         Material material = Material.matchMaterial(kit.icon());
-        int presets = innerKits == null ? 0 : innerKits.list(kit.name()).size();
         java.util.List<Component> lore = new java.util.ArrayList<>(java.util.List.of(
                 UiTheme.divider(),
-                kit.crystalFfa()
+                (kit.crystalFfa() || shown.crystalFfa())
                         ? UiTheme.status("Crystal FFA Kit", UiTheme.SUCCESS)
                         : UiTheme.line(line(player, viewer ? "gui.kit-view-only" : "gui.kit-edit-hint"))));
         boolean canManage = innerKitAdminGui != null && player.hasPermission("rumilance.admin");
-        if (!viewer && (presets > 0 || canManage)) {
-            // Admin には右クリックの案内を常に出す（中キットが0件でも、そこで作るため）。
+        if (!children.isEmpty() || (!viewer && canManage)) {
+            // Admin には右クリックの案内を常に出す（子が0件でも、そこで中メニューを作るため）。
             lore.add(UiTheme.blank());
             lore.add(UiTheme.labelValue(line(player, "gui.innerkit-count-label"),
-                    String.valueOf(presets + 1)));
-            lore.add(UiTheme.hint(line(player, canManage
+                    String.valueOf(children.size())));
+            if (!children.isEmpty()) {
+                lore.add(UiTheme.labelValue(line(player, "gui.innerkit-default-label"),
+                        com.rumilance.practice.gui.KitDisplayNames.plain(shown)));
+            }
+            lore.add(UiTheme.hint(line(player, children.isEmpty() && canManage
                     ? "gui.innerkit-admin-right-hint" : "gui.innerkit-right-hint")));
         }
         lore.add(UiTheme.blank());
@@ -313,12 +339,14 @@ public final class EkitSelectGui extends AbstractGui {
             return;
         }
         if (action != null && action.startsWith("kit:")) {
-            String kitId = action.substring(4);
+            String pickedId = action.substring(4);
+            // Crystal FFA's KIT1..9 variants are keyed by its DECLARED original id; the special
+            // editor must stay on that id even if it is also used as a folder. Other folders
+            // open the current default child's ordinary personal kit layout.
+            boolean crystal = kitService.get(pickedId).map(KitDefinition::crystalFfa).orElse(false);
+            String kitId = crystal ? pickedId : kitService.playableId(pickedId);
             sounds.play(player, "select");
             session.setNavigatingAway(true);
-            // The declared crystal FFA kit edits through the KIT1..9 slot picker instead of
-            // the plain editor: each slot keeps its own layout of the same kit.
-            boolean crystal = kitService.get(kitId).map(KitDefinition::crystalFfa).orElse(false);
             if (crystal && crystalKitSlotsGui != null) {
                 crystalKitSlotsGui.openPicker(player, kitId);
             } else if (editKitGui != null) {

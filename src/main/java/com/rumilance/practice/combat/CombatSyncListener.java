@@ -391,7 +391,7 @@ public final class CombatSyncListener implements Listener {
         if (ffaService.isInFfa(player.getUniqueId())) {
             return ffaService.arenaOf(player.getUniqueId())
                     .flatMap(ffaService::get)
-                    .flatMap(arena -> kitService.get(arena.kitId()))
+                    .flatMap(arena -> ffaService.kitForArena(arena.kitId()))
                     .orElse(null);
         }
         return null;

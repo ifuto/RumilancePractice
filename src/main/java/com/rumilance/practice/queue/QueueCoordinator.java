@@ -158,7 +158,17 @@ public final class QueueCoordinator {
                 return;
             }
         }
-        if (!kitService.isQueueEnabled(kitId) || kitService.get(kitId).filter(k -> k.enabled()).isEmpty()) {
+        // Queue has exactly ONE option per top-level tile. Even a direct /queue <child> command
+        // resolves through its folder: a non-default child cannot bypass the no-submenu rule.
+        var requested = kitService.get(kitId).orElse(null);
+        var topLevel = requested != null && requested.isChild()
+                ? kitService.get(requested.parent()).orElse(null) : requested;
+        if (topLevel == null || !topLevel.enabled() || !kitService.isQueueEnabled(topLevel.name())) {
+            messageService.send(player, "queue.kit-disabled");
+            return;
+        }
+        final String fightKitId = kitService.playableId(topLevel.name());
+        if (!kitService.isQueueEnabled(fightKitId) || kitService.get(fightKitId).filter(k -> k.enabled()).isEmpty()) {
             messageService.send(player, "queue.kit-disabled");
             return;
         }
@@ -176,7 +186,7 @@ public final class QueueCoordinator {
         // clicking another kit/mode switches queues.
         if (queueService.isQueued(player.getUniqueId())) {
             boolean sameQueue = queueService.get(player.getUniqueId())
-                    .map(e -> e.mode() == mode && e.kitId().equalsIgnoreCase(kitId))
+                    .map(e -> e.mode() == mode && e.kitId().equalsIgnoreCase(fightKitId))
                     .orElse(false);
             if (sameQueue) {
                 leave(player);
@@ -196,7 +206,7 @@ public final class QueueCoordinator {
         AtomicReference<Integer> elo = new AtomicReference<>(1000);
         if (mode == MatchMode.RANKED) {
             try {
-                elo.set(rankedStatsRepository.find(player.getUniqueId(), kitId)
+                elo.set(rankedStatsRepository.find(player.getUniqueId(), fightKitId)
                         .map(RankedKitStats::elo)
                         .orElse(1000));
             } catch (Exception ignored) {
@@ -206,7 +216,7 @@ public final class QueueCoordinator {
 
         String ip = player.getAddress() == null ? null : player.getAddress().getAddress().getHostAddress();
         PlayerPlatform platform = PlayerPlatform.of(player);
-        if (!queueService.join(player.getUniqueId(), kitId, mode, elo.get(), ip, platform)) {
+        if (!queueService.join(player.getUniqueId(), fightKitId, mode, elo.get(), ip, platform)) {
             messageService.send(player, "queue.already-queued");
             return;
         }
@@ -223,7 +233,7 @@ public final class QueueCoordinator {
         giveLeaveItem(player);
         soundService.play(player, "queue-joined");
         messageService.send(player, "queue.joined",
-                MessageService.tags("mode", messageService.modeWord(player, mode == MatchMode.RANKED), "kit", kitId));
+                MessageService.tags("mode", messageService.modeWord(player, mode == MatchMode.RANKED), "kit", fightKitId));
     }
 
     public void leave(Player player) {

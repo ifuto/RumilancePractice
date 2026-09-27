@@ -25,8 +25,6 @@ public final class KitSelectGui extends AbstractGui {
 
     private final KitService kitService;
     private DuelRequestGui duelRequestGui;
-    /** 中キット (inner kits) — right-click a kit to pick the preset this duel fights with. */
-    private com.rumilance.practice.kit.InnerKitService innerKits;
     private InnerKitSelectGui innerKitSelectGui;
 
     public KitSelectGui(GuiSessionRegistry registry, SoundService sounds, KitService kitService) {
@@ -38,16 +36,19 @@ public final class KitSelectGui extends AbstractGui {
         this.duelRequestGui = duelRequestGui;
     }
 
-    public void setInnerKits(com.rumilance.practice.kit.InnerKitService innerKits) {
-        this.innerKits = innerKits;
-    }
-
     public void setInnerKitSelectGui(InnerKitSelectGui innerKitSelectGui) {
         this.innerKitSelectGui = innerKitSelectGui;
     }
 
     public void openFor(Player player, GuiSession parent) {
+        openFor(player, parent, null, 0);
+    }
+
+    /** Return from a child menu to the SAME parent category/page before first render. */
+    public void openFor(Player player, GuiSession parent, String category, int page) {
         GuiSession session = registry.open(player.getUniqueId(), type(), rows);
+        session.setKitCategory(category);
+        session.setPage(Math.max(0, page));
         session.setRanked(parent.ranked());
         session.setTargetPlayer(parent.targetPlayer());
         session.setSelectedKit(parent.selectedKit());
@@ -142,17 +143,21 @@ public final class KitSelectGui extends AbstractGui {
     }
 
     private ItemStack kitIcon(Player player, GuiSession session, KitDefinition kit, String current) {
+        // フォルダになっても親の名前とアイコンはそのまま。左=既定の子、右=子一覧。
+        List<KitDefinition> children = kitService.children(kit.name());
         Material mat = Material.matchMaterial(kit.icon());
-        boolean selected = kit.name().equalsIgnoreCase(current);
-        int presets = innerKits == null ? 0 : innerKits.list(kit.name()).size();
+        boolean selected = kit.name().equalsIgnoreCase(current)
+                || kitService.get(current).map(k -> kit.name().equalsIgnoreCase(k.parent())).orElse(false);
         List<Component> lore = new ArrayList<>(List.of(
                 UiTheme.divider(),
                 UiTheme.line(kit.prettyDisplayName())));
-        if (presets > 0) {
-            // 中キットがあるキットだけ右クリックの案内を出す（無いキットは今まで通り）。
+        if (!children.isEmpty()) {
             lore.add(UiTheme.blank());
             lore.add(UiTheme.labelValue(line(player, "gui.innerkit-count-label"),
-                    String.valueOf(presets + 1)));
+                    String.valueOf(children.size())));
+            lore.add(UiTheme.labelValue(line(player, "gui.innerkit-default-label"),
+                    kitService.defaultChild(kit.name())
+                            .map(com.rumilance.practice.gui.KitDisplayNames::plain).orElse("-")));
             lore.add(UiTheme.hint(line(player, "gui.innerkit-right-hint")));
         }
         lore.add(UiTheme.blank());
@@ -168,19 +173,15 @@ public final class KitSelectGui extends AbstractGui {
                 .build();
     }
 
-    /**
-     * 中キット: a RIGHT click on a kit that has presets opens the preset list instead of picking
-     * the default. A kit without presets behaves exactly as before, and left click always picks
-     * the kit's default loadout.
-     */
+    /** Folder RIGHT-click opens its child-kit list; LEFT picks its default child. */
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot,
                             String action, org.bukkit.event.inventory.ClickType clickType) {
         if (clickType == org.bukkit.event.inventory.ClickType.RIGHT
                 && action != null && action.startsWith("pick:")
-                && innerKitSelectGui != null && innerKits != null) {
+                && innerKitSelectGui != null) {
             String kitId = action.substring("pick:".length());
-            if (innerKits.has(kitId)) {
+            if (kitService.isFolder(kitId)) {
                 sounds.play(player, "gui-click");
                 session.setNavigatingAway(true);
                 innerKitSelectGui.openForDuel(player, session, kitId);
@@ -227,7 +228,8 @@ public final class KitSelectGui extends AbstractGui {
             return;
         }
         if (action != null && action.startsWith("pick:")) {
-            session.setSelectedKit(action.substring(5));
+            // フォルダを選んだらデフォルトの子で進む(中メニューから選んだ子はそのまま)。
+            session.setSelectedKit(kitService.playableId(action.substring(5)));
             sounds.play(player, "select");
             returnToDuel(player, session);
         }

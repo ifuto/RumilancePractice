@@ -328,13 +328,35 @@ public final class FeatureBootstrap {
         services.register(LobbyService.class, lobbyService);
 
         KitService kitService = new KitService(configService);
-        // 中キット (inner kits): named preset loadouts stored INSIDE a kit
-        // (kits.yml -> kits.<kit>.inner-kits). Duel Request / Party Fight / Kit Edit offer them on
-        // a right-click; Queue always fights the kit itself, which is the default and cannot be
-        // changed. Created next to KitService because it reads and writes the same kits.yml.
+        // A regular kit converted into a folder keeps its OLD inventory arrangements and ranked
+        // results on the new default child. The database copy is idempotent and keeps old rows as
+        // backup; make this available before the one-time old-preset conversion runs.
+        kitService.setMigrationCallbacks((from, to) -> {
+            try {
+                kitLayoutRepository.copyForKit(from, to);
+            } catch (java.sql.SQLException e) {
+                throw new IllegalStateException("Could not carry over kit layouts " + from + " -> " + to, e);
+            }
+        }, (from, to) -> {
+            try {
+                rankedStatsRepository.copyForKit(from, to);
+            } catch (java.sql.SQLException e) {
+                throw new IllegalStateException("Could not carry over ranked stats " + from + " -> " + to, e);
+            }
+        });
+        // Old inner-kits were loadout-only presets. Carry them over once as ordinary child kits;
+        // after that, only the parent/child kit model is used by the pickers and admin screens.
         com.rumilance.practice.kit.InnerKitService innerKits =
                 new com.rumilance.practice.kit.InnerKitService(configService, plugin.getLogger());
+        // 自動引き継ぎ: 旧「中キット(プリセット)」の設定が残っていたら、起動時に一度だけ
+        // 「親=フォルダ / 子=普通のキット」の形へ変換して kits.yml に書き直す(再設定は不要)。
+        int carriedOver = innerKits.migrateToChildKits(kitService);
+        if (carriedOver > 0) {
+            plugin.getLogger().info("[N Arena] 中キット(プリセット) " + carriedOver
+                    + " 件を子キットへ引き継ぎました (kits.yml を更新しました)");
+        }
         services.register(KitService.class, kitService);
+        services.register(com.rumilance.practice.kit.InnerKitService.class, innerKits);
 
         com.rumilance.practice.hiddenrank.HiddenRankService hiddenRankService =
                 new com.rumilance.practice.hiddenrank.HiddenRankService(plugin);
@@ -1055,23 +1077,19 @@ public final class FeatureBootstrap {
         crystalKitSlotsGui.setEkitSelectGui(ekitSelectGui);
         ekitSelectGui.setCrystalKitSlotsGui(crystalKitSlotsGui);
 
-        // ---- 中キット (inner kits) -------------------------------------------------------
-        // One preset picker shared by the three screens that offer a right-click: the duel kit
-        // picker, the party kit picker and the kit editor's picker. Queue is deliberately NOT
-        // wired here — clicking a kit in the queue keeps fighting the default loadout.
+        // ---- 中メニュー (ordinary child kits) --------------------------------------------
+        // One child-kit picker shared by duel, party and kit edit on a right-click. Queue is
+        // deliberately NOT wired: every queue path resolves a folder to its default child.
         com.rumilance.practice.gui.menus.InnerKitSelectGui innerKitSelectGui =
                 new com.rumilance.practice.gui.menus.InnerKitSelectGui(
-                        guiSessions, soundService, kitService, innerKits);
+                        guiSessions, soundService, kitService);
         innerKitSelectGui.setKitSelectGui(kitSelectGui);
         innerKitSelectGui.setDuelRequestGui(duelRequestGui);
         innerKitSelectGui.setTeamKitSelectGui(teamKitSelectGui);
         innerKitSelectGui.setEkitSelectGui(ekitSelectGui);
         innerKitSelectGui.setEditKitGui(editKitGui);
-        kitSelectGui.setInnerKits(innerKits);
         kitSelectGui.setInnerKitSelectGui(innerKitSelectGui);
-        teamKitSelectGui.setInnerKits(innerKits);
         teamKitSelectGui.setInnerKitSelectGui(innerKitSelectGui);
-        ekitSelectGui.setInnerKits(innerKits);
         ekitSelectGui.setInnerKitSelectGui(innerKitSelectGui);
         editKitGui.setInnerKits(innerKits);
         editKitGui.setInnerKitSelectGui(innerKitSelectGui);
@@ -1087,6 +1105,8 @@ public final class FeatureBootstrap {
         EkitAdminGui ekitAdminGui = new EkitAdminGui(guiSessions, soundService, ekitItems);
         PresetAdminGui presetAdminGui = new PresetAdminGui(guiSessions, soundService, presetItems, kitService);
         KitAdminGui kitAdminGui = new KitAdminGui(guiSessions, soundService, kitService, messageService);
+        editKitGui.setKitAdminGui(kitAdminGui);
+        kitAdminGui.setOpenOfficialEditor(editKitGui::openOfficialEditor);
         kitAdminGui.setArenaNames(() -> arenaStore.templates().stream().map(ArenaTemplate::name).toList());
         KitStartEffectsGui kitStartEffectsGui = new KitStartEffectsGui(guiSessions, soundService, kitService);
         kitAdminGui.setOpenStartEffects(kitStartEffectsGui::open);
@@ -1098,16 +1118,16 @@ public final class FeatureBootstrap {
         kitItemRulesGui.setReturnTo(kitAdminGui::openConfig);
         kitAdminGui.setOpenItemRules(kitItemRulesGui::open);
 
-        // 中キット management: one screen for create / rename / icon / delete / edit contents, so
-        // the whole feature is usable from the GUI. Reached from the kit config panel (button), by
-        // right-clicking a kit in /ekit, or by `/kit preset <kit>`.
+        // Folder management: create or move ordinary kits inside, pick the default, open each
+        // child's normal settings/editor, move it out or delete it. GUI-first, Admin-only.
         com.rumilance.practice.gui.menus.InnerKitAdminGui innerKitAdminGui =
                 new com.rumilance.practice.gui.menus.InnerKitAdminGui(
-                        guiSessions, soundService, kitService, innerKits);
+                        guiSessions, soundService, kitService);
         innerKitAdminGui.setEditKitGui(editKitGui);
         innerKitAdminGui.setConfirmGui(confirmGui);
         innerKitAdminGui.setEkitSelectGui(ekitSelectGui);
         innerKitAdminGui.setKitAdminGui(kitAdminGui);
+        innerKitSelectGui.setAdminGui(innerKitAdminGui);
         ekitSelectGui.setInnerKitAdminGui(innerKitAdminGui);
         // 編集GUIのキット一覧からも右クリックで管理画面へ（Admin のみ。中は権限で弾く）。
         editKitGui.setInnerKitAdminGui(innerKitAdminGui);
@@ -1474,7 +1494,7 @@ public final class FeatureBootstrap {
         totemGuard.addContext(new com.rumilance.practice.combat.TotemGuardListener.Context(
                 id -> ffaService.arenaOf(id)
                         .flatMap(ffaService::get)
-                        .flatMap(arena -> kitService.get(arena.kitId()))
+                        .flatMap(arena -> ffaService.kitForArena(arena.kitId()))
                         .orElse(null),
                 ffaService::isInFfa,
                 id -> {
@@ -1612,7 +1632,7 @@ public final class FeatureBootstrap {
                 ffaService::isInFfa,
                 id -> ffaService.arenaOf(id)
                         .flatMap(ffaService::get)
-                        .flatMap(arena -> kitService.get(arena.kitId()))
+                        .flatMap(arena -> ffaService.kitForArena(arena.kitId()))
                         .orElse(null)));
         bedExplosion.addContext(new com.rumilance.practice.combat.BedExplosionListener.Context(
                 id -> practiceService.session(id)
@@ -1771,7 +1791,6 @@ public final class FeatureBootstrap {
                 configService, arenaStore, arenaService, kitService, queueService, faweBridge,
                 new File(PluginIdentity.dataFolder(plugin), "schematics"), soundService, kitAdminGui);
         arenaKitAdmin.setPresetItems(presetItems);
-        arenaKitAdmin.setInnerKits(innerKits);
         arenaKitAdmin.setInnerKitAdminGui(innerKitAdminGui);
         arenaKitAdmin.setPresetAdminGui(presetAdminGui);
         arenaKitAdmin.setArenaAdminGui(arenaAdminGui);

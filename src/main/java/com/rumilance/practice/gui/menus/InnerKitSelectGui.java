@@ -8,7 +8,6 @@ import com.rumilance.practice.gui.ItemBuilder;
 import com.rumilance.practice.gui.MenuScaffold;
 import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.kit.InnerKitService;
-import com.rumilance.practice.kit.InnerKitService.InnerKit;
 import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.model.KitDefinition;
 import com.rumilance.practice.sound.SoundService;
@@ -19,48 +18,52 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
 /**
- * 中キット (inner kit) picker — the list a right-click on a kit opens in Duel Request, Party
- * Fight and Kit Edit.
+ * 中メニュー (sub-menu) picker — the list of CHILD KITS a right-click on a folder kit opens in
+ * Duel Request, Party Fight and Kit Edit.
  *
- * <p>The first entry is always the kit itself, badged {@code [Default]}: it is what Queue hands
- * out, it is not a stored preset, and it cannot be changed, renamed, removed or replaced by
- * another preset. Everything below it is a real preset from
- * {@code kits.<kit>.inner-kits} in kits.yml, created with {@code /kit preset add} and edited in
- * the kit editor.</p>
+ * <p>A child kit is a normal kit in every respect (its own name, icon, contents, rules, personal
+ * layout and stats); it only differs in that it is not listed on the top level — you reach it
+ * through its parent's tile. The child the admin marked as the folder's {@code default-child} is
+ * badged {@code [Default]} and is what the parent's own tile uses.</p>
  *
  * <p>Where the choice goes depends on the screen that opened this one ({@code session "origin"}):
- * a duel carries it into the duel request, a party battle carries it into the team match, and the
- * kit editor opens that preset's loadout for editing. Queue never comes here — clicking a kit in
- * the queue GUI keeps fighting the default, exactly as before.</p>
+ * a duel carries the child into the duel request, a party battle carries it into the team match,
+ * and the kit editor opens that child's layout for editing. Queue never comes here — clicking a
+ * folder in the queue GUI fights its default child, exactly as a plain kit would.</p>
  */
 public final class InnerKitSelectGui extends AbstractGui {
 
     /** Session key holding which screen opened this picker. */
     public static final String ORIGIN_KEY = "innerkit-origin";
-    /** Session key holding the chosen preset id on the caller's session (null/absent = default). */
+    /** Legacy key used by old requests. Child choices now travel as normal kit ids. */
     public static final String CHOICE_KEY = "innerkit";
 
     public static final String ORIGIN_DUEL = "duel";
     public static final String ORIGIN_TEAM = "team";
     public static final String ORIGIN_EDIT = "edit";
+    public static final String ORIGIN_VIEW = "view";
 
     private final KitService kitService;
-    private final InnerKitService innerKits;
     private KitSelectGui kitSelectGui;
     private DuelRequestGui duelRequestGui;
     private TeamKitSelectGui teamKitSelectGui;
     private EkitSelectGui ekitSelectGui;
     private EditKitGui editKitGui;
+    private InnerKitAdminGui adminGui;
+
+    public void setAdminGui(InnerKitAdminGui adminGui) {
+        this.adminGui = adminGui;
+    }
 
     public InnerKitSelectGui(GuiSessionRegistry registry, SoundService sounds,
-                             KitService kitService, InnerKitService innerKits) {
+                             KitService kitService) {
         super(registry, sounds, GuiType.INNER_KIT_SELECT, 6, false);
         this.kitService = kitService;
-        this.innerKits = innerKits;
     }
 
     public void setKitSelectGui(KitSelectGui kitSelectGui) {
@@ -83,7 +86,7 @@ public final class InnerKitSelectGui extends AbstractGui {
         this.editKitGui = editKitGui;
     }
 
-    /** Right-click in the duel kit picker: choose the 中キット this duel fights with. */
+    /** Right-click in the duel kit picker: choose the ordinary child kit. */
     public void openForDuel(Player player, GuiSession parent, String kitId) {
         GuiSession session = begin(player, parent, kitId, ORIGIN_DUEL);
         if (session == null) {
@@ -98,7 +101,7 @@ public final class InnerKitSelectGui extends AbstractGui {
         finish(player, session);
     }
 
-    /** Right-click in the party kit picker: choose the 中キット the team battle fights with. */
+    /** Right-click in the party kit picker: choose the ordinary child kit. */
     public void openForTeam(Player player, GuiSession parent, String kitId) {
         GuiSession session = begin(player, parent, kitId, ORIGIN_TEAM);
         if (session == null) {
@@ -107,13 +110,22 @@ public final class InnerKitSelectGui extends AbstractGui {
         finish(player, session);
     }
 
-    /** Right-click in the kit editor's picker: choose which 中キット to edit. */
+    /** Right-click in /ekit: each child opens the ordinary personal kit editor. */
     public void openForEdit(Player player, GuiSession parent, String kitId) {
         GuiSession session = begin(player, parent, kitId, ORIGIN_EDIT);
-        if (session == null) {
-            return;
+        if (session != null) {
+            finish(player, session);
         }
-        finish(player, session);
+    }
+
+    /** Hidden tester viewing another player's kit — children must stay read-only too. */
+    public void openForViewer(Player player, GuiSession parent, String kitId) {
+        GuiSession session = begin(player, parent, kitId, ORIGIN_VIEW);
+        if (session != null && parent != null) {
+            session.setTargetPlayer(parent.targetPlayer());
+            session.put("viewer-target-name", parent.get("viewer-target-name", String.class));
+            finish(player, session);
+        }
     }
 
     private GuiSession begin(Player player, GuiSession parent, String kitId, String origin) {
@@ -125,10 +137,16 @@ public final class InnerKitSelectGui extends AbstractGui {
         session.setSelectedKit(kitId);
         session.setPage(0);
         if (parent != null) {
-            // Remember where "back" returns to, and which category page the caller was on.
+            // Remember where "back" returns to, including the parent's kit-list page.
             session.setKitCategory(parent.kitCategory());
-            // Show the caller's current choice as selected (a reopen must not look reset).
-            session.put(CHOICE_KEY, parent.get(CHOICE_KEY, String.class));
+            session.put("origin-page", parent.page());
+            // Show the caller's current choice as selected (a reopen must not look reset): the
+            // caller's session kit is a child of this folder once one has been picked.
+            String chosen = parent.selectedKit();
+            if (chosen != null && kitService.get(chosen)
+                    .map(k -> kitId.equalsIgnoreCase(k.parent())).orElse(false)) {
+                session.put(CHOICE_KEY, chosen);
+            }
         }
         return session;
     }
@@ -169,75 +187,89 @@ public final class InnerKitSelectGui extends AbstractGui {
             MenuScaffold.returnButton(inventory, t(player, "menu.back"));
             return;
         }
-        List<InnerKit> presets = innerKits.list(kitId);
-        String current = session.get(CHOICE_KEY, String.class);
-        int index = 0;
-        // The default first, always: the kit itself, badged and locked.
-        inventory.setItem(MenuScaffold.gridSlot(index++),
-                defaultTile(player, kitId, kit, InnerKitService.isDefault(current)));
-        for (InnerKit preset : presets) {
-            if (index >= MenuScaffold.gridPageSize()) {
-                break;
-            }
-            inventory.setItem(MenuScaffold.gridSlot(index++),
-                    presetTile(player, session, kit, preset, preset.id().equals(
-                            InnerKitService.normalizeId(current))));
+        // Player-facing menu mirrors an ordinary kit list: disabled children are only shown
+        // in the admin manager, not offered as duel/party/edit choices.
+        List<KitDefinition> children = kitService.children(kitId).stream()
+                .filter(KitDefinition::enabled).toList();
+        if (children.isEmpty()) {
+            // フォルダではなくなった(子を全部消した)キット: 開く意味が無いので親へ戻す。
+            inventory.setItem(MenuScaffold.gridSlot(13), ItemBuilder.of(Material.BARRIER)
+                    .name(t(player, "gui.kit-none").color(UiTheme.DANGER))
+                    .action("decorate")
+                    .build());
+            MenuScaffold.returnButton(inventory, t(player, "menu.back"));
+            return;
         }
+        String defaultChild = kitService.defaultChild(kitId)
+                .map(KitDefinition::name).orElse(null);
+        String current = kitService.playableId(session.get(CHOICE_KEY, String.class) == null
+                ? kitId : session.get(CHOICE_KEY, String.class));
+        int perPage = MenuScaffold.gridPageSize();
+        int page = Math.min(session.page(), Math.max(0, (children.size() - 1) / perPage));
+        for (int index = 0; index < perPage && page * perPage + index < children.size(); index++) {
+            KitDefinition child = children.get(page * perPage + index);
+            inventory.setItem(MenuScaffold.gridSlot(index), childTile(player, session, child,
+                    child.name().equalsIgnoreCase(defaultChild),
+                    child.name().equalsIgnoreCase(current)));
+        }
+        if (ORIGIN_EDIT.equals(session.get(ORIGIN_KEY, String.class))
+                && player.hasPermission("rumilance.admin") && adminGui != null) {
+            inventory.setItem(com.rumilance.practice.util.GuiSlots.slot(5, 7),
+                    ItemBuilder.of(Material.SHULKER_BOX)
+                            .name(t(player, "gui.innerkit-admin-title").color(UiTheme.SECONDARY))
+                            .action("manage").build());
+        }
+        paintPaging(player, inventory, page, children.size());
         MenuScaffold.returnButton(inventory, t(player, "menu.back"));
     }
 
     /**
-     * {@code HQ Style Axe [Default]} — the kit's own loadout, not a stored preset. Its label is
-     * independent of the kit's name: {@code /kit preset default <kit> <name>} renames just this
-     * entry, and with no label set it falls back to the kit's display name.
+     * One child kit. The folder's {@code default-child} carries the {@code [Default]} badge: it is
+     * what the parent's own tile fights with, and what Queue always uses.
      */
-    private ItemStack defaultTile(Player player, String kitId, KitDefinition kit, boolean selected) {
-        return ItemBuilder.of(ItemBuilder.materialOr(kit.icon(), Material.DIAMOND_SWORD))
-                .nameMini(innerKits.displayOf(kitId, null, kit.prettyDisplayName()))
-                .lore(
-                        UiTheme.divider(),
-                        UiTheme.line(line(player, "gui.innerkit-default-lore")),
-                        UiTheme.blank(),
-                        selected
-                                ? UiTheme.status(line(player, "gui.kit-selected"), UiTheme.SUCCESS)
-                                : UiTheme.hint(line(player, "gui.innerkit-click-select"))
-                )
-                .glint(selected)
-                .action("pick:" + InnerKitService.DEFAULT_ID)
-                .build();
-    }
-
-    private ItemStack presetTile(Player player, GuiSession session, KitDefinition kit, InnerKit preset,
-                                 boolean selected) {
-        Material icon = Material.matchMaterial(preset.icon() == null ? kit.icon() : preset.icon());
+    private ItemStack childTile(Player player, GuiSession session, KitDefinition child,
+                                boolean isDefault, boolean selected) {
+        Material icon = Material.matchMaterial(child.icon());
+        String label = child.prettyDisplayName()
+                + (isDefault ? " " + InnerKitService.DEFAULT_BADGE : "");
+        List<Component> lore = new ArrayList<>(List.of(
+                UiTheme.divider(),
+                UiTheme.line(line(player, originLoreKey(session)))));
+        if (isDefault) {
+            lore.add(UiTheme.blank());
+            lore.add(UiTheme.status(line(player, "gui.innerkit-default-lore"), UiTheme.SUCCESS));
+        }
+        lore.add(UiTheme.blank());
+        lore.add(UiTheme.labelValue(line(player, "gui.innerkit-id-label"), child.name()));
+        lore.add(UiTheme.blank());
+        lore.add(selected
+                ? UiTheme.status(line(player, "gui.kit-selected"), UiTheme.SUCCESS)
+                : UiTheme.hint(line(player, "gui.innerkit-click-select")));
+        // 表示名は MiniMessage を通す(色や装飾を書いたキット名でもそのまま出る)。色を自分で
+        // 指定しているキット名はそれを優先し、無ければ選択状態の色を付ける。
+        Component name = net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
+                .deserialize(label)
+                .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false)
+                .colorIfAbsent(selected ? UiTheme.SUCCESS : UiTheme.VALUE);
         return ItemBuilder.of(icon == null ? Material.DIAMOND_SWORD : icon)
-                .name(Component.text(preset.displayName(),
-                        selected ? UiTheme.SUCCESS : UiTheme.VALUE))
-                .lore(
-                        UiTheme.divider(),
-                        UiTheme.line(line(player, originLoreKey(player, session))),
-                        UiTheme.blank(),
-                        UiTheme.labelValue(line(player, "gui.innerkit-id-label"), preset.id()),
-                        UiTheme.blank(),
-                        selected
-                                ? UiTheme.status(line(player, "gui.kit-selected"), UiTheme.SUCCESS)
-                                : UiTheme.hint(line(player, "gui.innerkit-click-select"))
-                )
+                .name(name)
+                .lore(lore.toArray(new Component[0]))
                 .glint(selected)
-                .action("pick:" + preset.id())
+                .action("pick:" + child.name())
                 .build();
     }
 
     /** One hint line per origin, so the list says what the click will do. */
-    private String originLoreKey(Player player, GuiSession session) {
+    private String originLoreKey(GuiSession session) {
         String origin = session.get(ORIGIN_KEY, String.class);
         if (ORIGIN_TEAM.equals(origin)) {
             return "gui.innerkit-team-lore";
         }
         if (ORIGIN_EDIT.equals(origin)) {
-            // 中キットの中身を書き換えられるのは Admin だけ。それ以外は「自分の並び」を直す。
-            return player != null && player.hasPermission("rumilance.admin")
-                    ? "gui.innerkit-edit-lore" : "gui.innerkit-order-lore";
+            return "gui.innerkit-edit-lore";
+        }
+        if (ORIGIN_VIEW.equals(origin)) {
+            return "gui.kit-view-only";
         }
         return "gui.innerkit-duel-lore";
     }
@@ -252,34 +284,60 @@ public final class InnerKitSelectGui extends AbstractGui {
             backToOrigin(player, session);
             return;
         }
+        if ("page:prev".equals(action) || "page:next".equals(action)) {
+            int pages = Math.max(1, (kitService.children(session.selectedKit()).size()
+                    + MenuScaffold.gridPageSize() - 1) / MenuScaffold.gridPageSize());
+            session.setPage(Math.min(pages - 1, Math.max(0,
+                    session.page() + ("page:next".equals(action) ? 1 : -1))));
+            refresh(player, session, inventory);
+            return;
+        }
+        if ("manage".equals(action) && player.hasPermission("rumilance.admin")
+                && adminGui != null) {
+            session.setNavigatingAway(true);
+            adminGui.open(player, session.selectedKit(), InnerKitAdminGui.ORIGIN_EKIT);
+            return;
+        }
         if (!action.startsWith("pick:")) {
             return;
         }
         String chosen = action.substring("pick:".length()).toLowerCase(Locale.ROOT);
-        String kitId = session.selectedKit();
+        if (kitService.get(chosen).filter(KitDefinition::enabled)
+                .filter(k -> session.selectedKit().equalsIgnoreCase(k.parent())).isEmpty()) {
+            sounds.play(player, "error");
+            return;
+        }
         String origin = session.get(ORIGIN_KEY, String.class);
-        String inner = InnerKitService.DEFAULT_ID.equals(chosen) ? null : chosen;
         sounds.play(player, "select");
         switch (origin == null ? ORIGIN_DUEL : origin) {
             case ORIGIN_TEAM -> {
                 player.closeInventory();
                 if (teamKitSelectGui != null) {
-                    teamKitSelectGui.proceedWithKit(player, kitId, inner);
+                    teamKitSelectGui.proceedWithKit(player, chosen, null);
                 }
             }
             case ORIGIN_EDIT -> {
                 if (editKitGui != null) {
                     session.setNavigatingAway(true);
-                    editKitGui.openKitEditor(player, kitId, null, null, inner);
+                    editKitGui.openKitEditor(player, chosen);
                 } else {
                     player.closeInventory();
                 }
             }
-            default -> returnToDuel(player, session, kitId, inner);
+            case ORIGIN_VIEW -> {
+                if (editKitGui != null && session.targetPlayer() != null) {
+                    session.setNavigatingAway(true);
+                    editKitGui.openKitViewer(player, session.targetPlayer(),
+                            session.get("viewer-target-name", String.class), chosen);
+                } else {
+                    player.closeInventory();
+                }
+            }
+            default -> returnToDuel(player, session, chosen, null);
         }
     }
 
-    /** Duel: reopen the request GUI with the kit AND the chosen 中キット on the fresh session. */
+    /** Duel: reopen the request GUI with the selected CHILD KIT on the fresh session. */
     private void returnToDuel(Player player, GuiSession session, String kitId, String inner) {
         Player target = session.targetPlayer() == null
                 ? null : org.bukkit.Bukkit.getPlayer(session.targetPlayer());
@@ -292,7 +350,7 @@ public final class InnerKitSelectGui extends AbstractGui {
         int bestOf = session.bestOf();
         boolean fromBattle = session.fromBattleMenu();
         player.closeInventory();
-        // The choice rides into openFor so the very first render already names the preset.
+        // The child id is on the session before the first render and starts that kit.
         duelRequestGui.openFor(player, target, ranked, kitId, map, bestOf, inner);
         registry.get(player.getUniqueId()).ifPresent(fresh -> fresh.setFromBattleMenu(fromBattle));
     }
@@ -301,28 +359,25 @@ public final class InnerKitSelectGui extends AbstractGui {
     private void backToOrigin(Player player, GuiSession session) {
         String origin = session.get(ORIGIN_KEY, String.class);
         String category = session.kitCategory();
-        if (ORIGIN_EDIT.equals(origin)) {
-            if (ekitSelectGui != null) {
-                session.setNavigatingAway(true);
-                ekitSelectGui.open(player);
-                return;
-            }
-        } else if (ORIGIN_TEAM.equals(origin)) {
-            if (teamKitSelectGui != null) {
-                session.setNavigatingAway(true);
-                teamKitSelectGui.open(player);
-                registry.get(player.getUniqueId()).ifPresent(fresh -> {
-                    fresh.setKitCategory(category);
-                    fresh.setPage(0);
-                });
-                return;
-            }
+        Integer previousPage = session.get("origin-page", Integer.class);
+        int page = previousPage == null ? 0 : previousPage;
+        if (ORIGIN_VIEW.equals(origin) && ekitSelectGui != null
+                && session.targetPlayer() != null) {
+            session.setNavigatingAway(true);
+            ekitSelectGui.openViewerAt(player, session.targetPlayer(),
+                    session.get("viewer-target-name", String.class), category, page);
+        } else if (ORIGIN_EDIT.equals(origin) && ekitSelectGui != null) {
+            session.setNavigatingAway(true);
+            ekitSelectGui.openAt(player, category, page);
+        } else if (ORIGIN_TEAM.equals(origin) && teamKitSelectGui != null) {
+            session.setNavigatingAway(true);
+            teamKitSelectGui.openAt(player, category, page);
         } else if (kitSelectGui != null) {
             session.setNavigatingAway(true);
-            kitSelectGui.openFor(player, session);
-            registry.get(player.getUniqueId()).ifPresent(fresh -> fresh.setKitCategory(category));
-            return;
+            kitSelectGui.openFor(player, session, category, page);
+        } else {
+            player.closeInventory();
         }
-        player.closeInventory();
     }
+
 }

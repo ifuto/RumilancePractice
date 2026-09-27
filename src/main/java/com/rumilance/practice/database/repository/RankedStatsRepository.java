@@ -57,6 +57,53 @@ public final class RankedStatsRepository {
         }
     }
 
+    /**
+     * On turning an existing kit into a folder, the original kit becomes its default child. Copy
+     * each player's ranked stats to that child so their existing ELO/W-L carry over. Old records
+     * stay as historical backups; a rerun never overwrites stats earned under the child id.
+     */
+    public int copyForKit(String fromKit, String toKit) throws SQLException {
+        if (fromKit == null || toKit == null || fromKit.equalsIgnoreCase(toKit)) {
+            return 0;
+        }
+        String table = databaseService.table("ranked_stats");
+        String select = "SELECT uuid, elo, wins, losses, win_streak, best_elo FROM " + table
+                + " WHERE kit = ?";
+        String insert = "INSERT INTO " + table
+                + " (id, uuid, kit, elo, wins, losses, win_streak, best_elo) "
+                + "SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM " + table
+                + " WHERE uuid = ? AND kit = ?)";
+        try (Connection connection = databaseService.getConnection()) {
+            connection.setAutoCommit(false);
+            try (PreparedStatement read = connection.prepareStatement(select);
+                 PreparedStatement write = connection.prepareStatement(insert)) {
+                read.setString(1, fromKit);
+                int copied = 0;
+                try (ResultSet rows = read.executeQuery()) {
+                    while (rows.next()) {
+                        String uuid = rows.getString("uuid");
+                        write.setString(1, UUID.randomUUID().toString());
+                        write.setString(2, uuid);
+                        write.setString(3, toKit);
+                        write.setInt(4, rows.getInt("elo"));
+                        write.setInt(5, rows.getInt("wins"));
+                        write.setInt(6, rows.getInt("losses"));
+                        write.setInt(7, rows.getInt("win_streak"));
+                        write.setInt(8, rows.getInt("best_elo"));
+                        write.setString(9, uuid);
+                        write.setString(10, toKit);
+                        copied += write.executeUpdate();
+                    }
+                }
+                connection.commit();
+                return copied;
+            } catch (SQLException e) {
+                connection.rollback();
+                throw e;
+            }
+        }
+    }
+
     public List<RankedKitStats> topByKit(String kit, int limit) throws SQLException {
         String sql = "SELECT id, uuid, kit, elo, wins, losses, win_streak, best_elo FROM "
                 + databaseService.table("ranked_stats") + " WHERE kit = ? ORDER BY elo DESC LIMIT ?";

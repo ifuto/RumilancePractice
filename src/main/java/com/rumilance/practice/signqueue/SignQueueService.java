@@ -166,8 +166,12 @@ public final class SignQueueService implements Listener {
                 Component.text(kitLabel, NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false),
                 Component.text(messageService.raw(viewer, "gui.sign-kit-item-hint"),
                         NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)));
+        // A sign is a queue tile: a child id (e.g. from /practiceadmin sign) must not expose
+        // non-default choices in Queue. Bind it to the visible parent instead.
+        String queueKitId = kitService.get(kitId)
+                .filter(KitDefinition::isChild).map(KitDefinition::parent).orElse(kitId);
         meta.getPersistentDataContainer().set(ItemKeys.queueSignKit(), PersistentDataType.STRING,
-                kitId.toLowerCase(Locale.ROOT));
+                queueKitId.toLowerCase(Locale.ROOT));
         item.setItemMeta(meta);
         return item;
     }
@@ -285,7 +289,11 @@ public final class SignQueueService implements Listener {
     }
 
     private void join(Player player, String kitId) {
-        String normalized = kitId.toLowerCase(Locale.ROOT);
+        KitDefinition requested = kitService.get(kitId).orElse(null);
+        KitDefinition parent = requested != null && requested.isChild()
+                ? kitService.get(requested.parent()).orElse(null) : requested;
+        String normalized = parent == null ? kitId.toLowerCase(Locale.ROOT)
+                : parent.name().toLowerCase(Locale.ROOT);
         if (teamService != null && teamService.teamOf(player.getUniqueId()).isPresent()) {
             messageService.send(player, "party.solo-only");
             return;
@@ -294,8 +302,10 @@ public final class SignQueueService implements Listener {
             messageService.send(player, "queue.maintenance");
             return;
         }
-        if (!kitService.isQueueEnabled(normalized)
-                || kitService.get(normalized).filter(KitDefinition::enabled).isEmpty()) {
+        KitDefinition defaultKit = kitService.tile(parent);
+        if (parent == null || !parent.enabled() || defaultKit == null || !defaultKit.enabled()
+                || !kitService.isQueueEnabled(normalized)
+                || !kitService.isQueueEnabled(defaultKit.name())) {
             messageService.send(player, "queue.kit-disabled");
             return;
         }

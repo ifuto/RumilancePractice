@@ -1854,7 +1854,7 @@ public final class AfkCrystalManager implements Listener, CommandExecutor,
         if (sel == null) {
             return false;
         }
-        KitDefinition kit = kitService.get(sel).orElse(null);
+        KitDefinition kit = kitService.playable(sel).orElse(null);
         if (kit == null) {
             return false;
         }

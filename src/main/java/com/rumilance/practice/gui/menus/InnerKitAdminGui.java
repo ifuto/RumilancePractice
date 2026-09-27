@@ -8,8 +8,8 @@ import com.rumilance.practice.gui.GuiType;
 import com.rumilance.practice.gui.ItemBuilder;
 import com.rumilance.practice.gui.MenuScaffold;
 import com.rumilance.practice.gui.UiTheme;
+import com.rumilance.practice.util.GuiSlots;
 import com.rumilance.practice.kit.InnerKitService;
-import com.rumilance.practice.kit.InnerKitService.InnerKit;
 import com.rumilance.practice.kit.KitLoadout;
 import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.locale.MessageService;
@@ -24,31 +24,30 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.List;
+import java.util.Locale;
 
 /**
- * 中キット (inner kit) management — everything about a kit's presets without a single command.
+ * 中メニュー (sub-menu) management — the child kits inside one folder, without a single command.
  *
- * <p>Opened from the kit admin screen (「中キット」button), by right-clicking a kit in the kit
- * editor's picker ({@code /ekit}), or by {@code /kit preset <kit>}. One screen does all of it:</p>
+ * <p>Opened from the kit admin screen (「中メニュー」button), by right-clicking a folder in the
+ * kit editor's picker ({@code /ekit}), or by {@code /kit inner <kit>}. One screen does all of it:</p>
  *
  * <ul>
- *   <li><b>create</b> — the three buttons at the bottom of the grid ask for a name in chat and
- *       then take the contents from the admin's inventory (the same snapshot {@code /kit create}
- *       takes), from a copy of the kit, or from nothing. So "preset 1 has 6 arrows, preset 2 has
+ *   <li><b>create</b> — the three buttons under the list ask for a name in chat and then take the
+ *       contents from the admin's inventory (the same snapshot {@code /kit create} takes), from a
+ *       copy of the folder's default child, or from nothing. So "child 1 has 6 arrows, child 2 has
  *       3" is built by holding the items and clicking.</li>
- *   <li><b>edit contents</b> — left-click an entry: the normal kit editor opens on that preset and
- *       saves into kits.yml, so everybody who picks it gets the same items.</li>
- *   <li><b>rename</b> — right-click: the label shown in the duel/party/edit pickers. On the
- *       default entry this renames only the label (its contents are the kit itself), which is how
- *       a kit {@code Axe} gets listed as {@code HQ Style Axe [Default]}.</li>
- *   <li><b>icon</b> — shift-click with an item in hand.</li>
- *   <li><b>delete</b> — press Q, then confirm.</li>
+ *   <li><b>configure</b> — left-click a child: its own kit admin screen opens, because a child is a
+ *       normal kit — contents, icon, name, HP, knockback, block rules, arenas, queue toggle.</li>
+ *   <li><b>default</b> — right-click a child: the folder's own tile (and Queue, which never opens a
+ *       sub-menu) uses that child from then on.</li>
+ *   <li><b>delete</b> — press Q, then confirm. Deleting the default child moves the folder's tile
+ *       to the next one; deleting the last child turns the folder back into a plain kit.</li>
  * </ul>
  *
- * <p>The default entry is always first and always locked: it is the kit's own loadout, the one
- * Queue and every left-click in the player pickers hand out. It can be renamed and its contents
- * can be edited (that is editing the kit), but it can never be removed or replaced by a
- * preset.</p>
+ * <p>A new child inherits the folder's rules — HP, knockback, block rules, arenas, start effects —
+ * so a sub-menu offers several loadouts of the same fight. Only the contents, icon and name are
+ * new, and the first child becomes the default automatically.</p>
  */
 public final class InnerKitAdminGui extends AbstractGui {
 
@@ -59,22 +58,21 @@ public final class InnerKitAdminGui extends AbstractGui {
     public static final String ORIGIN_KIT_ADMIN = "kitadmin";
     public static final String ORIGIN_COMMAND = "command";
 
-    /** Grid slots for the entry list; the three create buttons sit in the last three. */
+    /** Grid slots for the child list; the three create buttons sit in the last three. */
     private static final int ENTRY_SLOTS = 25;
     private static final int CREATE_SLOT = ENTRY_SLOTS;
+    private static final String VIEW_IMPORT = "import";
 
     private final KitService kitService;
-    private final InnerKitService innerKits;
     private EditKitGui editKitGui;
     private ConfirmGui confirmGui;
     private EkitSelectGui ekitSelectGui;
     private KitAdminGui kitAdminGui;
 
     public InnerKitAdminGui(GuiSessionRegistry registry, SoundService sounds,
-                            KitService kitService, InnerKitService innerKits) {
+                            KitService kitService) {
         super(registry, sounds, GuiType.INNER_KIT_ADMIN, 6, false);
         this.kitService = kitService;
-        this.innerKits = innerKits;
     }
 
     public void setEditKitGui(EditKitGui editKitGui) {
@@ -93,7 +91,7 @@ public final class InnerKitAdminGui extends AbstractGui {
         this.kitAdminGui = kitAdminGui;
     }
 
-    /** Opens one kit's 中キット management. */
+    /** Opens one folder's 中メニュー management. */
     public void open(Player player, String kitId) {
         open(player, kitId, ORIGIN_COMMAND);
     }
@@ -102,14 +100,21 @@ public final class InnerKitAdminGui extends AbstractGui {
         if (kitId == null || kitId.isBlank()) {
             return;
         }
-        // 中キットの作成・削除・中身の変更は Admin の仕事。/ekit は rumilance.user でも叩けるので、
+        // 子キットの追加・削除・既定の変更は Admin の仕事。/ekit は rumilance.user でも叩けるので、
         // ここでも一度確認しておく（右クリックの出し分けを何かの拍子に通り抜けても開かない）。
         if (!player.hasPermission("rumilance.admin")) {
             player.sendMessage(t(player, "general.no-permission"));
             return;
         }
+        KitDefinition parent = kitService.get(kitId).orElse(null);
+        if (parent == null || parent.isChild()) {
+            player.sendMessage(t(player, "gui.innerkit-create-no-kit",
+                    MessageService.tags("name", kitId)).color(UiTheme.DANGER));
+            return;
+        }
         GuiSession session = registry.open(player.getUniqueId(), type(), rows);
-        session.setSelectedKit(kitId);
+        session.setSelectedKit(parent.name());
+        session.setPage(0);
         session.put(ORIGIN_KEY, origin);
         PracticeGuiOpen.open(this, player, session);
         sounds.play(player, "gui-open");
@@ -144,66 +149,107 @@ public final class InnerKitAdminGui extends AbstractGui {
             MenuScaffold.returnButton(inventory, t(player, "menu.back"));
             return;
         }
-        // The locked default first, then every stored preset.
-        int index = 0;
-        inventory.setItem(MenuScaffold.gridSlot(index++), defaultTile(player, kitId, kit));
-        List<InnerKit> presets = innerKits.list(kitId);
-        for (InnerKit preset : presets) {
-            if (index >= ENTRY_SLOTS) {
-                inventory.setItem(MenuScaffold.gridSlot(index), ItemBuilder.of(Material.BARRIER)
-                        .name(t(player, "gui.innerkit-admin-more").color(UiTheme.WARNING))
-                        .lore(
-                                UiTheme.divider(),
-                                UiTheme.line(line(player, "gui.innerkit-admin-more-lore"))
-                        )
-                        .action("decorate")
-                        .build());
-                break;
-            }
-            inventory.setItem(MenuScaffold.gridSlot(index++), presetTile(player, preset));
+        if (VIEW_IMPORT.equals(session.get("view", String.class))) {
+            renderImport(player, session, inventory, kitId);
+            return;
         }
+        List<KitDefinition> children = kitService.children(kitId);
+        String defaultId = kitService.defaultChild(kitId).map(KitDefinition::name).orElse(null);
+        if (children.isEmpty()) {
+            inventory.setItem(MenuScaffold.gridSlot(13), ItemBuilder.of(Material.CHEST)
+                    .name(t(player, "gui.innerkit-admin-empty").color(UiTheme.MUTED))
+                    .lore(
+                            UiTheme.divider(),
+                            UiTheme.line(line(player, "gui.innerkit-admin-empty-lore"))
+                    )
+                    .action("decorate")
+                    .build());
+        }
+        int pages = Math.max(1, (children.size() + ENTRY_SLOTS - 1) / ENTRY_SLOTS);
+        int page = Math.min(session.page(), pages - 1);
+        for (int index = 0; index < ENTRY_SLOTS && page * ENTRY_SLOTS + index < children.size(); index++) {
+            KitDefinition child = children.get(page * ENTRY_SLOTS + index);
+            inventory.setItem(MenuScaffold.gridSlot(index),
+                    childTile(player, child, child.name().equalsIgnoreCase(defaultId)));
+        }
+        pageControls(player, inventory, page, pages);
         createButtons(player, inventory);
+        inventory.setItem(GuiSlots.slot(5, 1), ItemBuilder.of(Material.NETHER_STAR)
+                .name(t(player, "gui.innerkit-admin-convert").color(UiTheme.PRIMARY))
+                .lore(UiTheme.divider(), UiTheme.line(line(player, "gui.innerkit-admin-convert-lore")))
+                .action("convert").build());
+        inventory.setItem(GuiSlots.slot(5, 7), ItemBuilder.of(Material.HOPPER)
+                .name(t(player, "gui.innerkit-admin-import").color(UiTheme.SECONDARY))
+                .lore(UiTheme.divider(), UiTheme.line(line(player, "gui.innerkit-admin-import-lore")))
+                .action("import").build());
         MenuScaffold.returnButton(inventory, t(player, "menu.back"));
     }
 
-    /** {@code HQ Style Axe [Default]} — the kit itself: contents locked, label renameable. */
-    private ItemStack defaultTile(Player player, String kitId, KitDefinition kit) {
-        return ItemBuilder.of(ItemBuilder.materialOr(kit.icon(), Material.DIAMOND_SWORD))
-                .nameMini(innerKits.displayOf(kitId, null, kit.prettyDisplayName()))
-                .lore(
-                        UiTheme.divider(),
-                        UiTheme.line(line(player, "gui.innerkit-admin-default-lore")),
-                        UiTheme.labelValue(line(player, "gui.innerkit-admin-slots"),
-                                Integer.toString(KitLoadout.itemCount(KitLoadout.fromOfficial(kit)))),
-                        UiTheme.blank(),
-                        UiTheme.hint(line(player, "gui.innerkit-admin-default-edit-hint")),
-                        UiTheme.hint(line(player, "gui.innerkit-admin-rename-hint"))
-                )
-                .glint(true)
-                .action("entry:" + InnerKitService.DEFAULT_ID)
-                .build();
+    /** Select an already existing, independent kit to file under this folder — no data is lost. */
+    private void renderImport(Player player, GuiSession session, Inventory inventory, String folderId) {
+        List<KitDefinition> choices = kitService.topLevel().stream()
+                .filter(k -> !k.name().equalsIgnoreCase(folderId) && !kitService.isFolder(k.name()))
+                .toList();
+        if (choices.isEmpty()) {
+            inventory.setItem(MenuScaffold.gridSlot(13), ItemBuilder.of(Material.BARRIER)
+                    .name(t(player, "gui.innerkit-admin-import-empty").color(UiTheme.MUTED))
+                    .action("decorate").build());
+        }
+        int perPage = MenuScaffold.gridPageSize();
+        int pages = Math.max(1, (choices.size() + perPage - 1) / perPage);
+        int page = Math.min(session.page(), pages - 1);
+        for (int index = 0; index < perPage && page * perPage + index < choices.size(); index++) {
+            KitDefinition kit = choices.get(page * perPage + index);
+            inventory.setItem(MenuScaffold.gridSlot(index),
+                    ItemBuilder.of(ItemBuilder.materialOr(kit.icon(), Material.DIAMOND_SWORD))
+                            .nameMini(kit.prettyDisplayName())
+                            .lore(UiTheme.divider(),
+                                    UiTheme.labelValue(line(player, "gui.innerkit-id-label"), kit.name()),
+                                    UiTheme.hint(line(player, "gui.innerkit-admin-import-hint")))
+                            .action("move:" + kit.name()).build());
+        }
+        pageControls(player, inventory, page, pages);
+        MenuScaffold.returnButton(inventory, t(player, "menu.back"));
     }
 
-    private ItemStack presetTile(Player player, InnerKit preset) {
-        Material icon = Material.matchMaterial(preset.icon() == null ? "" : preset.icon());
-        return ItemBuilder.of(icon == null || icon.isAir() ? Material.DIAMOND_SWORD : icon)
-                .name(Component.text(preset.displayName(), UiTheme.VALUE))
+    private void pageControls(Player player, Inventory inventory, int page, int pages) {
+        if (page > 0) {
+            inventory.setItem(GuiSlots.slot(5, 0), ItemBuilder.of(Material.ARROW)
+                    .name(t(player, "menu.page-prev")).action("page:prev").build());
+        }
+        if (page + 1 < pages) {
+            inventory.setItem(GuiSlots.slot(5, 8), ItemBuilder.of(Material.ARROW)
+                    .name(t(player, "menu.page-next")).action("page:next").build());
+        }
+    }
+
+    /** One child kit. The folder's default carries the badge — it is what the tile and Queue use. */
+    private ItemStack childTile(Player player, KitDefinition child, boolean isDefault) {
+        String label = child.prettyDisplayName()
+                + (isDefault ? " " + InnerKitService.DEFAULT_BADGE : "");
+        return ItemBuilder.of(ItemBuilder.materialOr(child.icon(), Material.DIAMOND_SWORD))
+                .nameMini(label)
                 .lore(
                         UiTheme.divider(),
-                        UiTheme.labelValue(line(player, "gui.innerkit-id-label"), preset.id()),
+                        isDefault
+                                ? UiTheme.status(line(player, "gui.innerkit-admin-default-lore"),
+                                        UiTheme.SUCCESS)
+                                : UiTheme.line(line(player, "gui.innerkit-admin-child-lore")),
                         UiTheme.labelValue(line(player, "gui.innerkit-admin-slots"),
-                                Integer.toString(KitLoadout.itemCount(preset.layout()))),
+                                Integer.toString(KitLoadout.itemCount(KitLoadout.fromOfficial(child)))),
+                        UiTheme.labelValue(line(player, "gui.innerkit-id-label"), child.name()),
                         UiTheme.blank(),
                         UiTheme.hint(line(player, "gui.innerkit-admin-edit-hint")),
-                        UiTheme.hint(line(player, "gui.innerkit-admin-rename-hint")),
-                        UiTheme.hint(line(player, "gui.innerkit-admin-icon-hint")),
+                        UiTheme.hint(line(player, "gui.innerkit-admin-default-hint")),
+                        UiTheme.hint(line(player, "gui.innerkit-admin-official-hint")),
                         UiTheme.hint(line(player, "gui.innerkit-admin-delete-hint"))
                 )
-                .action("entry:" + preset.id())
+                .glint(isDefault)
+                .action("child:" + child.name())
                 .build();
     }
 
-    /** The three ways to create a preset — contents source first, name asked in chat after. */
+    /** The three ways to create a child kit — contents source first, name asked in chat after. */
     private void createButtons(Player player, Inventory inventory) {
         inventory.setItem(MenuScaffold.gridSlot(CREATE_SLOT), ItemBuilder.of(Material.PLAYER_HEAD)
                 .name(t(player, "gui.innerkit-create-inventory").color(UiTheme.SUCCESS))
@@ -241,7 +287,7 @@ public final class InnerKitAdminGui extends AbstractGui {
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot,
                             String action, ClickType click) {
-        if (action == null) {
+        if (action == null || !player.hasPermission("rumilance.admin")) {
             return;
         }
         if ("close".equals(action)) {
@@ -250,7 +296,13 @@ public final class InnerKitAdminGui extends AbstractGui {
         }
         if ("back".equals(action)) {
             sounds.play(player, "gui-back");
-            back(player, session);
+            if (VIEW_IMPORT.equals(session.get("view", String.class))) {
+                session.put("view", null);
+                session.setPage(0);
+                refresh(player, session, inventory);
+            } else {
+                back(player, session);
+            }
             return;
         }
         String kitId = session.selectedKit();
@@ -259,50 +311,99 @@ public final class InnerKitAdminGui extends AbstractGui {
             return;
         }
         String origin = originOf(session);
+        if ("page:prev".equals(action) || "page:next".equals(action)) {
+            session.setPage(Math.max(0, session.page() + ("page:next".equals(action) ? 1 : -1)));
+            refresh(player, session, inventory);
+            return;
+        }
+        if ("import".equals(action)) {
+            session.put("view", VIEW_IMPORT);
+            session.setPage(0);
+            sounds.play(player, "gui-click");
+            refresh(player, session, inventory);
+            return;
+        }
+        if (action.startsWith("move:") && VIEW_IMPORT.equals(session.get("view", String.class))) {
+            String childId = action.substring("move:".length());
+            try {
+                boolean moved = kitService.setParent(childId, kitId);
+                player.sendMessage(t(player, moved
+                        ? "gui.innerkit-admin-moved" : "gui.innerkit-save-failed",
+                        MessageService.tags("name", childId)));
+                sounds.play(player, moved ? "select" : "error");
+                if (moved) {
+                    session.put("view", null);
+                    session.setPage(0);
+                    refresh(player, session, inventory);
+                }
+            } catch (RuntimeException e) {
+                player.sendMessage(t(player, "gui.innerkit-save-failed"));
+                sounds.play(player, "error");
+            }
+            return;
+        }
+        if ("convert".equals(action)) {
+            try {
+                boolean ok = kitService.ensureFolder(kitId).isPresent();
+                player.sendMessage(t(player, ok
+                        ? "gui.innerkit-admin-converted" : "gui.innerkit-save-failed"));
+                sounds.play(player, ok ? "select" : "error");
+                refresh(player, session, inventory);
+            } catch (RuntimeException e) {
+                player.sendMessage(t(player, "gui.innerkit-save-failed"));
+                sounds.play(player, "error");
+            }
+            return;
+        }
         if (action.startsWith("create:")) {
             sounds.play(player, "gui-click");
             promptCreate(player, kitId, origin, action.substring("create:".length()));
             return;
         }
-        if (!action.startsWith("entry:")) {
+        if (!action.startsWith("child:")) {
             return;
         }
-        String id = action.substring("entry:".length());
-        boolean isDefault = InnerKitService.isDefault(id);
+        String childId = action.substring("child:".length());
+        KitDefinition child = kitService.get(childId).orElse(null);
+        if (child == null || !kitId.equalsIgnoreCase(child.parent())) {
+            sounds.play(player, "error");
+            return;
+        }
         if (click == ClickType.DROP || click == ClickType.CONTROL_DROP) {
-            if (isDefault) {
-                locked(player);
-                return;
-            }
             sounds.play(player, "gui-click");
-            askDelete(player, kitId, id, origin);
+            askDelete(player, kitId, child, origin);
             return;
         }
-        if (click.isShiftClick()) {
-            if (isDefault) {
-                locked(player);
-                return;
-            }
-            setIconFromHand(player, session, inventory, kitId, id);
+        if (click == ClickType.SHIFT_LEFT && editKitGui != null) {
+            // Admin edits the shared contents of THIS child, never their own personal layout.
+            session.setNavigatingAway(true);
+            editKitGui.openOfficialEditor(player, childId);
             return;
         }
         if (click == ClickType.RIGHT) {
-            sounds.play(player, "gui-click");
-            promptRename(player, kitId, id, isDefault, origin);
+            boolean ok = kitService.setDefaultChild(kitId, childId);
+            player.sendMessage(ok
+                    ? t(player, "gui.innerkit-admin-default-set",
+                            MessageService.tags("name", child.prettyDisplayName()))
+                    : t(player, "gui.innerkit-save-failed"));
+            sounds.play(player, ok ? "select" : "error");
+            if (ok) {
+                refresh(player, session, inventory);
+            }
             return;
         }
         if (click != ClickType.LEFT) {
             return;
         }
-        // Left click: the contents — the normal kit editor, on the preset (or on the kit itself
-        // for the default entry, whose contents ARE the kit).
-        if (editKitGui == null) {
-            player.closeInventory();
-            return;
-        }
         sounds.play(player, "select");
         session.setNavigatingAway(true);
-        editKitGui.openKitEditor(player, kitId, null, null, isDefault ? null : id);
+        if (kitAdminGui != null) {
+            kitAdminGui.openConfig(player, childId);
+        } else if (editKitGui != null) {
+            editKitGui.openOfficialEditor(player, childId);
+        } else {
+            player.closeInventory();
+        }
     }
 
     // ---------------------------------------------------------------- create
@@ -310,8 +411,7 @@ public final class InnerKitAdminGui extends AbstractGui {
     private void promptCreate(Player player, String kitId, String origin, String kind) {
         // Fail before the chat prompt when there is nothing to snapshot: asking for a name and
         // then refusing wastes the admin's typing.
-        if (!"copy".equals(kind) && !"empty".equals(kind)
-                && !KitLoadout.hasAnyItem(KitLoadout.fromPlayer(player))) {
+        if ("inventory".equals(kind) && !KitLoadout.hasAnyItem(KitLoadout.fromPlayer(player))) {
             player.sendMessage(t(player, "gui.innerkit-empty-inventory").color(UiTheme.DANGER));
             sounds.play(player, "error");
             return;
@@ -329,19 +429,27 @@ public final class InnerKitAdminGui extends AbstractGui {
     }
 
     private void create(Player player, String kitId, String origin, String kind, String name) {
-        KitDefinition kit = kitService.get(kitId).orElse(null);
-        if (kit == null) {
-            player.sendMessage(t(player, "gui.innerkit-create-no-kit",
-                    MessageService.tags("name", kitId)).color(UiTheme.DANGER));
+        // 名前から id を作る。日本語など ascii に落とせない名前は「親id-連番」を id にして、
+        // 入力された名前を表示名としてそのまま使う。
+        String id = idOf(name);
+        if (id.isEmpty()) {
+            id = uniqueChildId(kitId);
+        } else if (kitService.get(id).isPresent()) {
+            player.sendMessage(t(player, "gui.innerkit-exists",
+                    MessageService.tags("name", name)).color(UiTheme.DANGER));
             sounds.play(player, "error");
+            open(player, kitId, origin);
             return;
         }
         ItemStack[] seed;
         String icon;
         switch (kind) {
             case "copy" -> {
-                seed = KitLoadout.fromOfficial(kit);
-                icon = kit.icon();
+                // 既定の子(いなければフォルダ自身)の中身を複製してから差だけ直す、がやりやすい。
+                KitDefinition source = kitService.defaultChild(kitId)
+                        .orElseGet(() -> kitService.get(kitId).orElse(null));
+                seed = source == null ? new ItemStack[KitLoadout.SIZE] : KitLoadout.fromOfficial(source);
+                icon = source == null ? null : source.icon();
             }
             case "empty" -> {
                 seed = new ItemStack[KitLoadout.SIZE];
@@ -353,101 +461,80 @@ public final class InnerKitAdminGui extends AbstractGui {
                 icon = hand == null || hand.getType().isAir() ? null : hand.getType().name();
             }
         }
-        InnerKitService.CreateResult result = innerKits.create(kitId, name, seed, icon);
-        player.sendMessage(switch (result) {
-            case OK -> t(player, "gui.innerkit-created", MessageService.tags(
-                    "name", name,
-                    "slots", Integer.toString(KitLoadout.itemCount(seed))));
-            case NO_SUCH_KIT -> t(player, "gui.innerkit-create-no-kit",
-                    MessageService.tags("name", kitId));
-            case BLANK_NAME -> t(player, "gui.innerkit-name-invalid");
-            case RESERVED_NAME -> t(player, "gui.innerkit-reserved");
-            case ALREADY_EXISTS -> t(player, "gui.innerkit-exists",
-                    MessageService.tags("name", name));
-        });
-        sounds.play(player, result == InnerKitService.CreateResult.OK ? "select" : "error");
+        KitDefinition child;
+        try {
+            child = kitService.createChild(id, kitId, seed, icon, name);
+        } catch (RuntimeException e) {
+            // DB copy failure: the kit still exists unchanged. Show a useful message rather
+            // than dropping the admin's chat input in an uncaught inventory callback.
+            player.getServer().getLogger().warning("Could not carry over kit data for " + kitId
+                    + ": " + e.getMessage());
+            child = null;
+        }
+        if (child == null) {
+            player.sendMessage(t(player, "gui.innerkit-save-failed").color(UiTheme.DANGER));
+            sounds.play(player, "error");
+            open(player, kitId, origin);
+            return;
+        }
+        player.sendMessage(t(player, "gui.innerkit-created", MessageService.tags(
+                "name", name,
+                "slots", Integer.toString(KitLoadout.itemCount(seed)))));
+        sounds.play(player, "select");
         open(player, kitId, origin);
     }
 
-    // ---------------------------------------------------------------- rename
-
-    private void promptRename(Player player, String kitId, String id, boolean isDefault, String origin) {
-        KitDefinition kit = kitService.get(kitId).orElse(null);
-        String current = isDefault
-                ? innerKits.displayOf(kitId, null, kit == null ? kitId : kit.prettyDisplayName())
-                : innerKits.get(kitId, id).map(InnerKit::displayName).orElse(id);
-        player.closeInventory();
-        player.sendMessage(t(player,
-                isDefault ? "gui.innerkit-default-rename-prompt" : "gui.innerkit-rename-prompt",
-                MessageService.tags("name", current)));
-        PendingInput.await(player, text -> {
-            if (text == null || text.isBlank() || text.equalsIgnoreCase("cancel")) {
-                player.sendMessage(t(player, "gui.innerkit-name-cancel").color(UiTheme.MUTED));
-            } else {
-                boolean ok = isDefault
-                        ? innerKits.setDefaultName(kitId, text)
-                        : innerKits.setDisplayName(kitId, id, text);
-                player.sendMessage(ok
-                        ? t(player, "gui.innerkit-renamed", MessageService.tags("name", text.trim()))
-                        : t(player, "gui.innerkit-save-failed"));
-                sounds.play(player, ok ? "select" : "error");
+    /** A typed name as a kit id: lowercase, spaces to dashes, a-z 0-9 and dashes only. */
+    private static String idOf(String name) {
+        String raw = name.trim().toLowerCase(Locale.ROOT).replace(' ', '-').replace('_', '-');
+        StringBuilder out = new StringBuilder(raw.length());
+        for (char c : raw.toCharArray()) {
+            if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-') {
+                out.append(c);
             }
-            open(player, kitId, origin);
-        });
+        }
+        String id = out.toString().replaceAll("-{2,}", "-").replaceAll("^-|-$", "");
+        return id.length() > 48 ? id.substring(0, 48) : id;
     }
 
-    // ---------------------------------------------------------------- icon
-
-    private void setIconFromHand(Player player, GuiSession session, Inventory inventory,
-                                 String kitId, String id) {
-        ItemStack hand = player.getInventory().getItemInMainHand();
-        if (hand == null || hand.getType().isAir()) {
-            player.sendMessage(t(player, "gui.innerkit-icon-hold").color(UiTheme.DANGER));
-            sounds.play(player, "error");
-            return;
+    /** {@code <folder>-2}, {@code <folder>-3}, ... — the first free id for a non-ascii name. */
+    private String uniqueChildId(String parentId) {
+        String base = parentId.toLowerCase(Locale.ROOT) + "-";
+        for (int i = 2; i < 1000; i++) {
+            if (kitService.get(base + i).isEmpty()) {
+                return base + i;
+            }
         }
-        boolean ok = innerKits.setIcon(kitId, id, hand.getType().name());
-        player.sendMessage(ok
-                ? t(player, "gui.innerkit-icon-set")
-                : t(player, "gui.innerkit-save-failed"));
-        sounds.play(player, ok ? "select" : "error");
-        if (ok) {
-            refresh(player, session, inventory);
-        }
+        return base + System.currentTimeMillis();
     }
 
     // ---------------------------------------------------------------- delete
 
-    private void askDelete(Player player, String kitId, String id, String origin) {
-        InnerKit preset = innerKits.get(kitId, id).orElse(null);
-        if (preset == null) {
-            sounds.play(player, "error");
-            return;
-        }
+    private void askDelete(Player player, String kitId, KitDefinition child, String origin) {
         if (confirmGui == null) {
-            delete(player, kitId, id, preset.displayName(), origin);
+            delete(player, kitId, child, origin);
             return;
         }
         player.closeInventory();
         confirmGui.open(player,
-                t(player, "gui.innerkit-delete-title", MessageService.tags("name", preset.displayName())),
+                t(player, "gui.innerkit-delete-title",
+                        MessageService.tags("name", child.prettyDisplayName())),
                 List.of(t(player, "gui.innerkit-delete-lore")),
-                yes -> delete(yes, kitId, id, preset.displayName(), origin),
+                yes -> delete(yes, kitId, child, origin),
                 no -> open(no, kitId, origin));
     }
 
-    private void delete(Player player, String kitId, String id, String name, String origin) {
-        boolean removed = innerKits.remove(kitId, id);
+    private void delete(Player player, String kitId, KitDefinition child, String origin) {
+        // delete() は子キットの親参照と既定の子を整理してから消すので、フォルダは壊れない。
+        boolean removed = kitService.get(child.name())
+                .filter(k -> kitId.equalsIgnoreCase(k.parent()))
+                .map(k -> kitService.delete(k.name())).orElse(false);
         player.sendMessage(removed
-                ? t(player, "gui.innerkit-deleted", MessageService.tags("name", name))
+                ? t(player, "gui.innerkit-deleted",
+                        MessageService.tags("name", child.prettyDisplayName()))
                 : t(player, "gui.innerkit-save-failed"));
         sounds.play(player, removed ? "delete" : "error");
         open(player, kitId, origin);
-    }
-
-    private void locked(Player player) {
-        player.sendMessage(t(player, "gui.innerkit-default-locked").color(UiTheme.DANGER));
-        sounds.play(player, "error");
     }
 
     // ---------------------------------------------------------------- navigation

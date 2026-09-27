@@ -60,12 +60,6 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
         this.innerKitAdminGui = innerKitAdminGui;
     }
 
-    /** 中キット (inner kits): shared preset loadouts stored inside a kit. */
-    private com.rumilance.practice.kit.InnerKitService innerKits;
-
-    public void setInnerKits(com.rumilance.practice.kit.InnerKitService innerKits) {
-        this.innerKits = innerKits;
-    }
     private com.rumilance.practice.gui.menus.PresetAdminGui presetAdminGui;
     private com.rumilance.practice.gui.menus.ArenaAdminGui arenaAdminGui;
     private java.util.function.BiConsumer<Player, String> partyIconPrompt;
@@ -125,6 +119,19 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
         return handleArena(sender, args);
     }
 
+    /** /kit create on a folder updates its default CHILD and keeps the child's display label. */
+    private KitDefinition snapshotKit(Player source, String enteredId) {
+        boolean folder = kitService.isFolder(enteredId);
+        String realId = kitService.playableId(enteredId);
+        String oldLabel = folder ? kitService.get(realId).map(KitDefinition::displayName).orElse(null) : null;
+        KitDefinition kit = kitService.createFromPlayer(source, realId);
+        if (oldLabel != null) {
+            kit = kit.toBuilder().displayName(oldLabel).build();
+            kitService.save(kit);
+        }
+        return kit;
+    }
+
     private boolean handleToggle(CommandSender sender, String[] args) {
         if (args.length < 3) {
             sender.sendMessage(Component.text("/toggle <queue|map> <enable|disable> <id>", NamedTextColor.YELLOW));
@@ -159,7 +166,7 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                 sender.sendMessage(Component.text("Player not found: " + args[2], NamedTextColor.RED));
                 return true;
             }
-            KitDefinition saved = kitService.createFromPlayer(source, args[1]);
+            KitDefinition saved = snapshotKit(source, args[1]);
             sender.sendMessage(Component.text("Kit saved: " + saved.displayName()
                     + " (from " + source.getName() + ")", NamedTextColor.GREEN));
             return true;
@@ -189,8 +196,9 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                 player.sendMessage(Component.text("/kit rename <nowname> <newname> - 改名 (入力した大文字小文字がそのまま表示名に)", NamedTextColor.GRAY));
                 player.sendMessage(Component.text("/kit arena <kit> add|remove|list|clear [arena] - デュエル用アリーナプール", NamedTextColor.GRAY));
                 player.sendMessage(Component.text("/kit party-arena <kit> add|remove|list|clear [arena] - パーティ用アリーナプール", NamedTextColor.GRAY));
-                player.sendMessage(Component.text("/kit preset [kit] - 中キット(プリセット)の管理GUIを開く。作成・改名・アイコン・削除・中身編集はすべてGUIで可能", NamedTextColor.GRAY));
-                player.sendMessage(Component.text("  テキスト版: /kit preset add|remove|list|default <kit> [name] (add は --from <player> / --copy-kit / --empty)", NamedTextColor.DARK_GRAY));
+                player.sendMessage(Component.text("/kit submenu [kit] - 中メニュー (子キット) の管理GUIを開く", NamedTextColor.GRAY));
+                player.sendMessage(Component.text("  テキスト版: /kit submenu convert|add|move|remove|default|list <親> [子]", NamedTextColor.DARK_GRAY));
+                player.sendMessage(Component.text("  /kit preset は submenu の旧名エイリアスです。", NamedTextColor.DARK_GRAY));
                 yield true;
             }
             case "arena" -> {
@@ -199,8 +207,8 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
             case "party-arena" -> {
                 yield handleArenaPool(player, args, true);
             }
-            case "preset" -> {
-                yield handlePreset(player, args);
+            case "submenu", "inner", "preset" -> {
+                yield handleSubMenu(player, args);
             }
             case "rename" -> {
                 if (args.length < 3) {
@@ -213,6 +221,7 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                     case OK -> Component.text("Kit renamed: " + args[1] + " -> " + args[2], NamedTextColor.GREEN);
                     case NOT_FOUND -> Component.text("Unknown kit: " + args[1], NamedTextColor.RED);
                     case TARGET_EXISTS -> Component.text("A kit named '" + args[2] + "' already exists.", NamedTextColor.RED);
+                    case MIGRATION_FAILED -> Component.text("Kit data could not be carried over. The old kit is unchanged; check the server log.", NamedTextColor.RED);
                 });
                 yield true;
             }
@@ -263,7 +272,7 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                 }
                 // Pass the RAW name: KitService lowercases the storage key itself but keeps
                 // the typed casing as the display name (for gui.kit-name-case: KEEP).
-                KitDefinition kit = kitService.createFromPlayer(source, args[1]);
+                KitDefinition kit = snapshotKit(source, args[1]);
                 player.sendMessage(Component.text("Kit saved: " + kit.displayName()
                         + " (from " + source.getName() + ")", NamedTextColor.GREEN));
                 yield true;
@@ -688,28 +697,24 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                     "gui", "help", "create", "overwrite", "list", "info", "enable", "disable",
                     "delete", "timeout", "order", "rename", "arena", "adventure", "autoregen", "autofood",
                     "blockplace", "blockbreak", "breakplayerplaced", "canbreak", "pearl", "totem", "swordshieldbreak",
-                    "bedexplosion"), args[0]);
+                    "bedexplosion", "submenu", "inner", "preset"), args[0]);
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
-        if (sub.equals("preset")) {
+        if (List.of("submenu", "inner", "preset").contains(sub)) {
             if (args.length == 2) {
-                // GUI-first: a kit name opens its 中キット management, so offer both.
-                java.util.List<String> options =
-                        new java.util.ArrayList<>(List.of("add", "remove", "list", "default"));
-                kitService.all().forEach(k -> options.add(k.name()));
+                List<String> options = new ArrayList<>(List.of("convert", "add", "move",
+                        "remove", "default", "list", "help"));
+                kitService.topLevel().forEach(k -> options.add(k.name()));
                 return filter(options, args[1]);
             }
             if (args.length == 3) {
-                return filter(kitService.all().stream().map(KitDefinition::name).toList(), args[2]);
+                return filter(kitService.topLevel().stream().map(KitDefinition::name).toList(), args[2]);
             }
-            if (args.length >= 4 && args[1].equalsIgnoreCase("add")
-                    && args[args.length - 1].startsWith("-")) {
-                return filter(List.of("--from", "--copy-kit", "--empty"), args[args.length - 1]);
-            }
-            if (args.length == 4 && (args[1].equalsIgnoreCase("remove") || args[1].equalsIgnoreCase("delete"))) {
-                return filter(innerKits == null ? List.of()
-                        : innerKits.list(args[2]).stream()
-                                .map(com.rumilance.practice.kit.InnerKitService.InnerKit::id).toList(), args[3]);
+            if (args.length == 4 && List.of("move", "remove", "default").contains(args[1].toLowerCase(Locale.ROOT))) {
+                List<KitDefinition> candidates = args[1].equalsIgnoreCase("move")
+                        ? kitService.topLevel()
+                        : kitService.children(args[2]);
+                return filter(candidates.stream().map(KitDefinition::name).toList(), args[3]);
             }
             return List.of();
         }
@@ -801,257 +806,166 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
     }
 
     /**
-     * {@code /kit preset add|remove|list|default} — 中キット (inner kits).
-     *
-     * <p>A preset is a shared loadout living inside one kit, and its contents are <b>complete and
-     * its own</b>: what is snapshotted or edited is exactly what the fight hands out, with nothing
-     * filled back from the kit. Two presets of one kit can therefore differ in anything at all —
-     * preset 1 with 6 arrows, preset 2 with 3, other items, other enchantments, empty slots.</p>
-     *
-     * <p>{@code add} decides those contents the way {@code /kit create} decides a kit's: by
-     * snapshotting an inventory. With no flag it snapshots the sender (hold the items, run the
-     * command), {@code --from <player>} snapshots somebody else, {@code --copy-kit} starts from a
-     * copy of the kit's own items for a small variation, and {@code --empty} starts from a blank
-     * grid. Fine-tuning afterwards happens in the kit editor ({@code /ekit} → RIGHT-click the kit →
-     * the preset), which saves to kits.yml, so everybody who picks that preset gets the same
-     * contents.</p>
-     *
-     * <p>Duel Request, Party Fight and Kit Edit offer the list on a RIGHT click; a LEFT click and
-     * Queue always fight the kit's own loadout. That default is not a stored preset — it cannot be
-     * created over, edited as a preset, removed or replaced, so {@code add} with the name
-     * {@code default} is refused — but its LABEL is separate from the kit's name and
-     * {@code /kit preset default <kit> <name>} sets it ({@code reset} clears it again), so a kit
-     * {@code Axe} can be listed as {@code HQ Style Axe [Default]}.</p>
+     * Text fallback for the GUI-first 中メニュー. {@code preset} is kept only as an alias; it must
+     * NEVER write old {@code inner-kits} loadout-only entries (they would be invisible until the
+     * next restart). Children are ordinary kits with their own ids, contents and rules.
      */
-    /** Usage line of {@code /kit preset add}, shared by its two guard clauses. */
-    private static final String ADD_USAGE =
-            "/kit preset add <kit> [--from <player>] [--copy-kit|--empty] <name...>";
-
-    /** Text actions of {@code /kit preset}; any other word is read as a kit name -> GUI. */
-    private static final java.util.Set<String> PRESET_ACTIONS = java.util.Set.of(
-            "add", "remove", "delete", "list", "default", "label", "name", "help");
-
-    private boolean handlePreset(Player player, String[] args) {
-        if (innerKits == null) {
-            player.sendMessage(Component.text("Inner kits are unavailable (not wired).", NamedTextColor.RED));
-            return true;
-        }
-        // GUI-first: `/kit preset` opens the kit admin screen and `/kit preset <kit>` that kit's
-        // 中キット management, where creating, renaming, icon-setting, deleting and editing the
-        // contents all happen by clicking. The text actions below stay for quick/console use.
-        String typed = args.length > 1 ? args[1] : null;
-        if (typed == null || (!PRESET_ACTIONS.contains(typed.toLowerCase(Locale.ROOT))
-                && kitService.get(typed).isPresent())) {
+    private boolean handleSubMenu(Player player, String[] args) {
+        String label = args[0].equalsIgnoreCase("preset") ? "preset" : "submenu";
+        String typed = args.length > 1 ? args[1].toLowerCase(Locale.ROOT) : null;
+        if (typed == null || kitService.get(typed).isPresent()) {
             openInnerKitGui(player, typed);
             return true;
         }
-        String action = typed.toLowerCase(Locale.ROOT);
-        switch (action) {
-            case "list" -> {
-                String filterKit = args.length > 2 ? args[2] : null;
-                List<KitDefinition> kits;
-                if (filterKit == null) {
-                    kits = kitService.all();
-                } else {
-                    var only = kitService.get(filterKit).orElse(null);
-                    if (only == null) {
-                        player.sendMessage(Component.text("Unknown kit: " + filterKit, NamedTextColor.RED));
+        if (typed.equals("help")) {
+            player.sendMessage(Component.text("/kit submenu [parent] | convert <parent> | list [parent]", NamedTextColor.YELLOW));
+            player.sendMessage(Component.text("/kit submenu add <parent> <name...> [--copy|--empty|--from <player>]", NamedTextColor.YELLOW));
+            player.sendMessage(Component.text("/kit submenu move <parent> <existingKit> | remove <parent> <child>", NamedTextColor.YELLOW));
+            player.sendMessage(Component.text("/kit submenu default <parent> <child>", NamedTextColor.YELLOW));
+            return true;
+        }
+        if (typed.equals("list")) {
+            if (args.length < 3) {
+                for (KitDefinition kit : kitService.topLevel()) {
+                    if (kitService.isFolder(kit.name())) {
+                        player.sendMessage(Component.text(kit.name() + " (" + kitService.children(kit.name()).size()
+                                + " child kits)", NamedTextColor.AQUA));
+                    }
+                }
+                return true;
+            }
+            KitDefinition parent = kitService.get(args[2]).orElse(null);
+            if (parent == null) {
+                player.sendMessage(Component.text("Unknown kit: " + args[2], NamedTextColor.RED));
+                return true;
+            }
+            String defaultId = kitService.defaultChild(parent.name()).map(KitDefinition::name).orElse("");
+            player.sendMessage(Component.text(parent.name() + " / child kits:", NamedTextColor.AQUA));
+            kitService.children(parent.name()).forEach(k -> player.sendMessage(Component.text(
+                    "- " + k.name() + " (" + k.prettyDisplayName() + ")"
+                            + (k.name().equals(defaultId) ? " [Default]" : ""), NamedTextColor.GREEN)));
+            return true;
+        }
+        if (args.length < 3) {
+            player.sendMessage(Component.text("/kit " + label + " help", NamedTextColor.YELLOW));
+            return true;
+        }
+        KitDefinition parent = kitService.get(args[2]).orElse(null);
+        if (parent == null || parent.isChild()) {
+            player.sendMessage(Component.text("Unknown parent kit: " + args[2], NamedTextColor.RED));
+            return true;
+        }
+        try {
+            switch (typed) {
+                case "convert" -> {
+                    var result = kitService.ensureFolder(parent.name());
+                    player.sendMessage(Component.text(result.isPresent()
+                            ? "Sub-menu ready: " + parent.name() + " (default: " + result.get().name() + ")"
+                            : "Could not create a sub-menu for " + parent.name(),
+                            result.isPresent() ? NamedTextColor.GREEN : NamedTextColor.RED));
+                }
+                case "move" -> {
+                    if (args.length < 4) {
+                        player.sendMessage(Component.text("/kit submenu move <parent> <existingKit>", NamedTextColor.YELLOW));
                         return true;
                     }
-                    kits = List.of(only);
+                    boolean moved = kitService.setParent(args[3], parent.name());
+                    player.sendMessage(Component.text(moved
+                            ? "Moved " + args[3] + " into " + parent.name() + ". Its id, items, rules and layouts are unchanged."
+                            : "Could not move kit (missing, already a folder, or invalid parent).",
+                            moved ? NamedTextColor.GREEN : NamedTextColor.RED));
                 }
-                int shown = 0;
-                for (KitDefinition kit : kits) {
-                    var presets = innerKits.list(kit.name());
-                    if (presets.isEmpty()) {
-                        continue;
-                    }
-                    shown++;
-                    player.sendMessage(Component.text(kit.name() + " (" + (presets.size() + 1) + "):",
-                                    NamedTextColor.AQUA)
-                            .append(Component.text("  " + innerKits.displayOf(kit.name(), null,
-                                    kit.prettyDisplayName()) + "  (default = the kit itself)",
-                                    NamedTextColor.GRAY)));
-                    for (var preset : presets) {
-                        player.sendMessage(Component.text("  - " + preset.displayName(), NamedTextColor.GREEN)
-                                .append(Component.text("  [" + preset.id() + "] "
-                                        + com.rumilance.practice.kit.KitLoadout.itemCount(preset.layout())
-                                        + " slots", NamedTextColor.DARK_GRAY)));
-                    }
-                }
-                if (shown == 0) {
-                    player.sendMessage(Component.text(
-                            "No inner kits yet. Hold the items you want in it, then: "
-                                    + "/kit preset add <kit> <name>",
-                            NamedTextColor.GRAY));
-                }
-            }
-            case "add" -> {
-                if (args.length < 4) {
-                    player.sendMessage(Component.text(ADD_USAGE, NamedTextColor.YELLOW));
-                    player.sendMessage(Component.text(
-                            "中身は /kit create と同じく「今持っている物」の撮影が既定。"
-                                    + "--copy-kit = キット本体から複製して調整、--empty = 空から作成、"
-                                    + "--from <player> = 別プレイヤーのインベントリを撮影。",
-                            NamedTextColor.GRAY));
-                    return true;
-                }
-                KitDefinition kit = kitService.get(args[2]).orElse(null);
-                if (kit == null) {
-                    player.sendMessage(Component.text("Unknown kit: " + args[2], NamedTextColor.RED));
-                    return true;
-                }
-                // Flags may sit anywhere after <kit>; every other token is part of the
-                // (multi-word) preset name, so "Club Style Axe" needs no quoting.
-                String fromName = null;
-                boolean copyKit = false;
-                boolean empty = false;
-                java.util.List<String> nameParts = new java.util.ArrayList<>();
-                for (int i = 3; i < args.length; i++) {
-                    String token = args[i];
-                    String lower = token.toLowerCase(Locale.ROOT);
-                    if (lower.equals("--from") || lower.equals("--player")) {
-                        if (i + 1 < args.length) {
-                            fromName = args[++i];
-                        }
-                        continue;
-                    }
-                    if (lower.startsWith("--from=")) {
-                        fromName = token.substring("--from=".length());
-                        continue;
-                    }
-                    if (lower.equals("--copy-kit") || lower.equals("--copy")) {
-                        copyKit = true;
-                        continue;
-                    }
-                    if (lower.equals("--empty") || lower.equals("--blank")) {
-                        empty = true;
-                        continue;
-                    }
-                    nameParts.add(token);
-                }
-                String name = String.join(" ", nameParts);
-                if (name.isBlank()) {
-                    player.sendMessage(Component.text(ADD_USAGE, NamedTextColor.YELLOW));
-                    return true;
-                }
-                // The contents are the admin's decision, exactly like /kit create: snapshot what
-                // somebody is holding. Copying the kit or starting blank are opt-in.
-                org.bukkit.inventory.ItemStack[] seed;
-                String icon;
-                String source;
-                if (empty) {
-                    seed = new org.bukkit.inventory.ItemStack[
-                            com.rumilance.practice.kit.KitLoadout.SIZE];
-                    icon = null;
-                    source = "an empty grid";
-                } else if (copyKit) {
-                    seed = com.rumilance.practice.kit.KitLoadout.fromOfficial(kit);
-                    icon = kit.icon();
-                    source = "a copy of the kit's own items";
-                } else {
-                    Player snapshot = player;
-                    if (fromName != null && !fromName.isBlank()) {
-                        snapshot = org.bukkit.Bukkit.getPlayerExact(fromName);
-                        if (snapshot == null) {
-                            player.sendMessage(Component.text("Player not found: " + fromName,
-                                    NamedTextColor.RED));
-                            return true;
-                        }
-                    }
-                    seed = com.rumilance.practice.kit.KitLoadout.fromPlayer(snapshot);
-                    if (!com.rumilance.practice.kit.KitLoadout.hasAnyItem(seed)) {
-                        player.sendMessage(Component.text("Nothing to snapshot: "
-                                + snapshot.getName() + " is carrying no items. Hold the preset's"
-                                + " contents first, or use --copy-kit (start from the kit) /"
-                                + " --empty (start blank).", NamedTextColor.RED));
+                case "remove" -> {
+                    if (args.length < 4 || kitService.get(args[3])
+                            .map(k -> !parent.name().equalsIgnoreCase(k.parent())).orElse(true)) {
+                        player.sendMessage(Component.text("/kit submenu remove <parent> <child>", NamedTextColor.YELLOW));
                         return true;
                     }
-                    org.bukkit.inventory.ItemStack hand = snapshot.getInventory().getItemInMainHand();
-                    icon = hand.getType().isAir() ? null : hand.getType().name();
-                    source = snapshot.getName() + "'s inventory";
+                    boolean moved = kitService.setParent(args[3], null);
+                    player.sendMessage(Component.text(moved
+                            ? "Moved " + args[3] + " back to the top-level kit list (nothing deleted)."
+                            : "Could not move that child out.",
+                            moved ? NamedTextColor.GREEN : NamedTextColor.RED));
                 }
-                var result = innerKits.create(kit.name(), name, seed, icon);
-                int slots = com.rumilance.practice.kit.KitLoadout.itemCount(seed);
-                player.sendMessage(switch (result) {
-                    case OK -> Component.text("Inner kit added: " + name.trim() + " ["
-                            + com.rumilance.practice.kit.InnerKitService.slug(name) + "] on "
-                            + kit.name() + " - " + slots + " slot(s) from " + source
-                            + ". Fine-tune: /ekit -> right-click " + kit.name() + ".",
-                            NamedTextColor.GREEN);
-                    case NO_SUCH_KIT -> Component.text("Unknown kit: " + args[2], NamedTextColor.RED);
-                    case BLANK_NAME -> Component.text(
-                            "Give the inner kit a name with letters or numbers.", NamedTextColor.RED);
-                    case RESERVED_NAME -> Component.text(
-                            "'default' is the kit itself: the default cannot become a preset.",
-                            NamedTextColor.RED);
-                    case ALREADY_EXISTS -> Component.text(
-                            "That inner kit already exists on " + kit.name() + ".", NamedTextColor.RED);
-                });
+                case "default" -> {
+                    if (args.length < 4) {
+                        player.sendMessage(Component.text("/kit submenu default <parent> <child>", NamedTextColor.YELLOW));
+                        return true;
+                    }
+                    boolean ok = kitService.setDefaultChild(parent.name(), args[3]);
+                    player.sendMessage(Component.text(ok
+                            ? "Default child of " + parent.name() + " is now " + args[3]
+                            : "The default must be one of that folder's direct children.",
+                            ok ? NamedTextColor.GREEN : NamedTextColor.RED));
+                }
+                case "add" -> {
+                    if (args.length < 4) {
+                        player.sendMessage(Component.text("/kit submenu add <parent> <name...> [--copy|--empty|--from <player>]", NamedTextColor.YELLOW));
+                        return true;
+                    }
+                    String from = null;
+                    boolean copy = false;
+                    boolean empty = false;
+                    List<String> words = new ArrayList<>();
+                    for (int i = 3; i < args.length; i++) {
+                        String option = args[i].toLowerCase(Locale.ROOT);
+                        if (option.equals("--from") && i + 1 < args.length) {
+                            from = args[++i];
+                        } else if (option.equals("--copy") || option.equals("--copy-kit")) {
+                            copy = true;
+                        } else if (option.equals("--empty")) {
+                            empty = true;
+                        } else {
+                            words.add(args[i]);
+                        }
+                    }
+                    String displayName = String.join(" ", words).trim();
+                    if (displayName.isEmpty()) {
+                        player.sendMessage(Component.text("Give the child kit a name.", NamedTextColor.RED));
+                        return true;
+                    }
+                    String id = com.rumilance.practice.kit.InnerKitService.slug(displayName);
+                    if (id == null) {
+                        id = parent.name() + "-" + (kitService.children(parent.name()).size() + 2);
+                    }
+                    Player source = from == null ? player : org.bukkit.Bukkit.getPlayerExact(from);
+                    if (source == null && !copy && !empty) {
+                        player.sendMessage(Component.text("Player not found: " + from, NamedTextColor.RED));
+                        return true;
+                    }
+                    KitDefinition origin = kitService.defaultChild(parent.name()).orElse(parent);
+                    org.bukkit.inventory.ItemStack[] snapshot = empty
+                            ? new org.bukkit.inventory.ItemStack[com.rumilance.practice.kit.KitLoadout.SIZE]
+                            : copy ? com.rumilance.practice.kit.KitLoadout.fromOfficial(origin)
+                            : com.rumilance.practice.kit.KitLoadout.fromPlayer(source);
+                    if (!empty && !copy && !com.rumilance.practice.kit.KitLoadout.hasAnyItem(snapshot)) {
+                        player.sendMessage(Component.text("Nothing to snapshot. Hold the items or use --copy / --empty.", NamedTextColor.RED));
+                        return true;
+                    }
+                    String icon = copy ? origin.icon() : empty ? "DIAMOND_SWORD"
+                            : source.getInventory().getItemInMainHand().getType().name();
+                    KitDefinition child = kitService.createChild(id, parent.name(), snapshot, icon, displayName);
+                    player.sendMessage(Component.text(child == null
+                            ? "Could not create child: id already used or invalid (" + id + ")"
+                            : "Created child kit " + child.name() + " in " + parent.name(),
+                            child == null ? NamedTextColor.RED : NamedTextColor.GREEN));
+                }
+                default -> player.sendMessage(Component.text("/kit " + label + " help", NamedTextColor.YELLOW));
             }
-            case "remove", "delete" -> {
-                if (args.length < 4) {
-                    player.sendMessage(Component.text("/kit preset remove <kit> <name>", NamedTextColor.YELLOW));
-                    return true;
-                }
-                String name = String.join(" ", java.util.Arrays.copyOfRange(args, 3, args.length));
-                String id = com.rumilance.practice.kit.InnerKitService.slug(name);
-                boolean removed = innerKits.remove(args[2], id == null ? name : id);
-                player.sendMessage(removed
-                        ? Component.text("Inner kit removed: " + name.trim() + " (" + args[2] + ")",
-                                NamedTextColor.GREEN)
-                        : Component.text(com.rumilance.practice.kit.InnerKitService
-                                        .isDefault(id == null ? name : id)
-                                ? "The default is the kit itself and cannot be removed."
-                                : "No such inner kit: " + name.trim() + " on " + args[2],
-                                NamedTextColor.RED));
-            }
-            case "default", "label", "name" -> {
-                if (args.length < 4) {
-                    player.sendMessage(Component.text(
-                            "/kit preset default <kit> <name...>   (clear: /kit preset default <kit> reset)",
-                            NamedTextColor.YELLOW));
-                    return true;
-                }
-                KitDefinition kit = kitService.get(args[2]).orElse(null);
-                if (kit == null) {
-                    player.sendMessage(Component.text("Unknown kit: " + args[2], NamedTextColor.RED));
-                    return true;
-                }
-                String name = String.join(" ", java.util.Arrays.copyOfRange(args, 3, args.length));
-                boolean clearing = name.isBlank() || name.equals("-") || name.equalsIgnoreCase("reset");
-                if (!innerKits.setDefaultName(kit.name(), name)) {
-                    player.sendMessage(Component.text("Could not save the default label for "
-                            + kit.name() + " (is kits.yml writable?).", NamedTextColor.RED));
-                    return true;
-                }
-                player.sendMessage(clearing
-                        ? Component.text("Default entry of " + kit.name() + " shows the kit name again: "
-                                + innerKits.displayOf(kit.name(), null, kit.prettyDisplayName()),
-                                NamedTextColor.GREEN)
-                        : Component.text("Default entry of " + kit.name() + " is now listed as "
-                                + innerKits.displayOf(kit.name(), null, kit.prettyDisplayName())
-                                + " (contents stay the kit itself - Queue and left-click use them)",
-                                NamedTextColor.GREEN));
-            }
-            default -> player.sendMessage(Component.text(
-                    "/kit preset <add|remove|list|default> <kit> [name]", NamedTextColor.YELLOW));
+        } catch (RuntimeException e) {
+            player.sendMessage(Component.text("Could not update the sub-menu; old kits were kept. Check the server log: "
+                    + e.getMessage(), NamedTextColor.RED));
         }
         return true;
     }
 
-    /** Opens the 中キット management GUI, falling back to text when it is not wired. */
+    /** Opens the child-kit management GUI, falling back to text when it is not wired. */
     private void openInnerKitGui(Player player, String kitArg) {
         if (innerKitAdminGui == null) {
-            player.sendMessage(Component.text(
-                    "/kit preset <kit>  |  add|remove|list|default <kit> [name]",
-                    NamedTextColor.YELLOW));
+            player.sendMessage(Component.text("/kit submenu help", NamedTextColor.YELLOW));
             return;
         }
         if (kitArg == null) {
-            player.sendMessage(Component.text(
-                    "キットを選んで「中キット」ボタン: /kit の管理GUIを開きます。",
-                    NamedTextColor.GRAY));
             kitAdminGui.open(player);
             return;
         }
@@ -1060,7 +974,8 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
             player.sendMessage(Component.text("Unknown kit: " + kitArg, NamedTextColor.RED));
             return;
         }
-        innerKitAdminGui.open(player, kit.name(),
+        String parentId = kit.isChild() ? kit.parent() : kit.name();
+        innerKitAdminGui.open(player, parentId,
                 com.rumilance.practice.gui.menus.InnerKitAdminGui.ORIGIN_COMMAND);
     }
 

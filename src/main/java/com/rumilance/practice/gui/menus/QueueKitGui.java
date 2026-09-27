@@ -110,8 +110,9 @@ public final class QueueKitGui extends AbstractGui {
         // Info tile showing total queue depth.
         PlayerPlatform platform = PlayerPlatform.of(player);
         int totalWaiting = kits.stream()
-                .filter(k -> kitService.isQueueEnabled(k.name()))
-                .mapToInt(k -> queueService.waitingCount(mode(), k.name(), platform))
+                .filter(k -> kitService.isQueueEnabled(k.name())
+                        && kitService.isQueueEnabled(kitService.playableId(k.name())))
+                .mapToInt(k -> queueService.waitingCount(mode(), kitService.playableId(k.name()), platform))
                 .sum();
         inventory.setItem(GuiSlots.slot(5, 1),
                 ItemBuilder.of(Material.CLOCK)
@@ -171,18 +172,21 @@ public final class QueueKitGui extends AbstractGui {
         List<KitDefinition> kits = kitService.enabled(sub
                 ? com.rumilance.practice.model.KitCategory.SUB
                 : com.rumilance.practice.model.KitCategory.MAIN);
-        int index = 0;
-        for (KitDefinition kit : kits) {
-            if (index >= MenuScaffold.gridPageSize()) {
-                break;
-            }
-            inventory.setItem(MenuScaffold.gridSlot(index++), kitIcon(player, kit));
+        int perPage = MenuScaffold.gridPageSize();
+        int page = Math.min(session.page(), Math.max(0, (kits.size() - 1) / perPage));
+        for (int i = 0; i < perPage && page * perPage + i < kits.size(); i++) {
+            inventory.setItem(MenuScaffold.gridSlot(i), kitIcon(player, kits.get(page * perPage + i)));
         }
+        paintPaging(player, inventory, page, kits.size());
     }
 
     private ItemStack kitIcon(Player player, KitDefinition kit) {
-        boolean queueOn = kitService.isQueueEnabled(kit.name());
-        int waiting = queueService.waitingCount(mode(), kit.name(), PlayerPlatform.of(player));
+        // フォルダ(中メニューを持つキット)は Queue ではデフォルトの子そのものとして並ぶ:
+        // 右クリックでも中メニューは開かず、選べるのはデフォルトだけ、という仕様どおり。
+        KitDefinition shown = kitService.tile(kit);
+        boolean queueOn = shown.enabled() && kitService.isQueueEnabled(kit.name())
+                && kitService.isQueueEnabled(shown.name());
+        int waiting = queueService.waitingCount(mode(), shown.name(), PlayerPlatform.of(player));
 
         if (!queueOn) {
             return ItemBuilder.of(Material.BARRIER)
@@ -200,8 +204,11 @@ public final class QueueKitGui extends AbstractGui {
         // its hint flips to leave-queue (the coordinator's join toggles leave when queued).
         QueueService.QueueEntry mine = queueService.get(player.getUniqueId()).orElse(null);
         boolean queuedHere = mine != null && mine.mode() == mode()
-                && kit.name().equalsIgnoreCase(mine.kitId());
+                && (shown.name().equalsIgnoreCase(mine.kitId())
+                        || kit.name().equalsIgnoreCase(mine.kitId()));
 
+        // The top-level button keeps its original name/icon; the chosen default is shown in
+        // lore and supplies the queue's arena/rules/items. A folder is not renamed into its child.
         Material icon = ItemBuilder.materialOr(kit.icon(), Material.DIAMOND_SWORD);
         ItemBuilder builder = ItemBuilder.of(icon)
                 .nameMini(kit.prettyDisplayName())
@@ -211,10 +218,14 @@ public final class QueueKitGui extends AbstractGui {
                                 line(player, ranked ? "gui.ranked" : "gui.unranked")),
                         UiTheme.labelValue(line(player, "gui.queue-waiting-count"), String.valueOf(waiting))
                 );
+        if (kitService.isFolder(kit.name())) {
+            builder.lore(UiTheme.labelValue(line(player, "gui.innerkit-default-label"),
+                    com.rumilance.practice.gui.KitDisplayNames.plain(shown)));
+        }
         if (ranked) {
             builder.lore(
-                    UiTheme.labelValue(line(player, "gui.queue-arena"), kit.hasFixedArena()
-                            ? com.rumilance.practice.util.KitNames.pretty(kit.arenaName())
+                    UiTheme.labelValue(line(player, "gui.queue-arena"), shown.hasFixedArena()
+                            ? com.rumilance.practice.util.KitNames.pretty(shown.arenaName())
                             : line(player, "gui.queue-random"))
             );
         }
@@ -253,6 +264,13 @@ public final class QueueKitGui extends AbstractGui {
             refresh(player, session, inventory);
             return;
         }
+        if ("page:prev".equals(action) || "page:next".equals(action)) {
+            session.setPage(Math.max(0, session.page()
+                    + ("page:next".equals(action) ? 1 : -1)));
+            sounds.play(player, "gui-click");
+            refresh(player, session, inventory);
+            return;
+        }
         if ("back".equals(action)) {
             if (session.kitCategory() != null) {
                 session.setKitCategory(null);
@@ -267,9 +285,10 @@ public final class QueueKitGui extends AbstractGui {
             player.closeInventory();
             return;
         }
-        if (action.startsWith("kit:")) {
+        if (action != null && action.startsWith("kit:")) {
             String kitId = action.substring(4);
-            if (!kitService.isQueueEnabled(kitId)) {
+            if (!kitService.isQueueEnabled(kitId)
+                    || !kitService.isQueueEnabled(kitService.playableId(kitId))) {
                 sounds.play(player, "error");
                 return;
             }
@@ -277,7 +296,7 @@ public final class QueueKitGui extends AbstractGui {
             if (clickType == org.bukkit.event.inventory.ClickType.RIGHT) {
                 sounds.play(player, "gui-click");
                 player.closeInventory();
-                openPreview(player, kitId);
+                openPreview(player, kitService.playableId(kitId));
                 return;
             }
             player.closeInventory();

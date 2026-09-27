@@ -13,20 +13,32 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class KitEditStash {
 
-    public record Snapshot(String kitId, String preset, ItemStack[] layout, int slot) {
+    public record Snapshot(String kitId, String preset, ItemStack[] layout, int slot,
+                           boolean officialEdit) {
     }
 
     private final Map<UUID, Snapshot> byPlayer = new ConcurrentHashMap<>();
 
     public void put(UUID playerId, String kitId, String preset, ItemStack[] layout, int slot) {
+        put(playerId, kitId, preset, layout, slot, false);
+    }
+
+    public void put(UUID playerId, String kitId, String preset, ItemStack[] layout, int slot,
+                    boolean officialEdit) {
         ItemStack[] copy = copyLayout(layout);
-        byPlayer.put(playerId, new Snapshot(kitId, preset == null ? "" : preset, copy, slot));
+        byPlayer.put(playerId, new Snapshot(kitId, preset == null ? "" : preset, copy, slot,
+                officialEdit));
     }
 
     public void putLayout(UUID playerId, String kitId, String preset, ItemStack[] layout) {
+        putLayout(playerId, kitId, preset, layout, false);
+    }
+
+    public void putLayout(UUID playerId, String kitId, String preset, ItemStack[] layout,
+                          boolean officialEdit) {
         Snapshot previous = byPlayer.get(playerId);
         int slot = previous == null ? -1 : previous.slot();
-        put(playerId, kitId, preset, layout, slot);
+        put(playerId, kitId, preset, layout, slot, officialEdit);
     }
 
     public Snapshot get(UUID playerId) {

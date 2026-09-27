@@ -13,6 +13,7 @@ import com.rumilance.practice.gui.PracticeGuiHolder;
 import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.kit.CrystalFfaStore;
 import com.rumilance.practice.kit.KitLayoutEditor;
+import com.rumilance.practice.kit.KitLoadout;
 import com.rumilance.practice.kit.KitLayoutCache;
 import com.rumilance.practice.kit.KitLayoutContents;
 import com.rumilance.practice.kit.KitService;
@@ -69,6 +70,16 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
     private com.rumilance.practice.kit.InnerKitService innerKits;
     private InnerKitSelectGui innerKitSelectGui;
     private InnerKitAdminGui innerKitAdminGui;
+    private KitAdminGui kitAdminGui;
+
+    public void setKitAdminGui(KitAdminGui kitAdminGui) {
+        this.kitAdminGui = kitAdminGui;
+    }
+
+    /** Official edits live in kits.yml, not in the editor player's personal kit_layouts row. */
+    private static boolean isOfficialEdit(GuiSession session) {
+        return session != null && Boolean.TRUE.equals(session.get("official-edit", Boolean.class));
+    }
 
     public void setInnerKits(com.rumilance.practice.kit.InnerKitService innerKits) {
         this.innerKits = innerKits;
@@ -127,7 +138,7 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         }
         ItemStack[] layout = session.get("layout", ItemStack[].class);
         kitEditStash.putLayout(player.getUniqueId(), session.selectedKit(),
-                session.get("preset", String.class), layout);
+                session.get("preset", String.class), layout, isOfficialEdit(session));
     }
 
     public void restoreLobbyHands(Player player) {
@@ -311,7 +322,14 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         // relaunch the editor): without this a preset edit would land on the kit's base layout.
         GuiSession previous = registry.get(player.getUniqueId()).orElse(null);
         Integer crystal = crystalVariant(previous);
-        openKitEditor(player, kitName, null, crystal, innerKit(previous));
+        boolean official = isOfficialEdit(previous) || (kitEditStash != null
+                && kitEditStash.get(player.getUniqueId()) != null
+                && kitEditStash.get(player.getUniqueId()).officialEdit());
+        if (official) {
+            openOfficialEditor(player, kitName);
+        } else {
+            openKitEditor(player, kitName, null, crystal, innerKit(previous));
+        }
         GuiSession session = registry.get(player.getUniqueId()).orElse(null);
         if (session != null && layout != null) {
             session.put("layout", layout);
@@ -346,7 +364,8 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
     public void openKitEditor(Player player, String kitName, String preset, Integer crystalVariant,
                               String innerKitId) {
         GuiSession session = registry.open(player.getUniqueId(), type(), rows);
-        session.setSelectedKit(kitName);
+        // フォルダ(中メニュー)を渡されたらデフォルトの子を編集する。
+        session.setSelectedKit(kitService.playableId(kitName));
         session.put("mode", "edit");
         if (preset != null && !preset.isBlank()) {
             session.put("preset", preset);
@@ -371,10 +390,40 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         sounds.play(player, "gui-open");
     }
 
+    /**
+     * Admin editing the SHARED kit contents in kits.yml (including every child kit). Players
+     * continue to use openKitEditor to save only their personal layout. This uses the same 41-slot
+     * editor and the same snapshot/trim/rename tools, but its Save path writes the kit itself.
+     */
+    public void openOfficialEditor(Player player, String kitName) {
+        if (!player.hasPermission("rumilance.admin")) {
+            player.sendMessage(t(player, "general.no-permission"));
+            return;
+        }
+        KitDefinition kit = kitService.playable(kitName).orElse(null);
+        if (kit == null) {
+            return;
+        }
+        GuiSession session = registry.open(player.getUniqueId(), type(), rows);
+        session.setSelectedKit(kit.name());
+        session.put("mode", "edit");
+        session.put("official-edit", Boolean.TRUE);
+        initPresetSession(session);
+        try {
+            if (stateManager.getState(player.getUniqueId()) != PlayerState.EDITING_KIT) {
+                stateManager.transition(player.getUniqueId(), PlayerState.EDITING_KIT);
+            }
+        } catch (Exception ignored) {
+            // Do not eat a kit edit on a transition from another admin GUI.
+        }
+        PracticeGuiOpen.open(this, player, session);
+        sounds.play(player, "gui-open");
+    }
+
     /** Opens one of another player's saved official-kit layouts without entering edit mode. */
     public void openKitViewer(Player viewer, UUID targetId, String targetName, String kitName) {
         openWithSession(viewer, session -> {
-            session.setSelectedKit(kitName);
+            session.setSelectedKit(kitService.playableId(kitName));
             session.setTargetPlayer(targetId);
             session.put("mode", "view");
             session.put("viewer-target-name", targetName == null ? "?" : targetName);
@@ -439,7 +488,8 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
                 : innerKits.get(kit, inner).map(com.rumilance.practice.kit.InnerKitService.InnerKit::displayName)
                         .orElse(null);
         return Component.text(kit == null ? "Edit Kit"
-                : "Edit: " + com.rumilance.practice.util.KitNames.pretty(kit)
+                : (isOfficialEdit(session) ? "Shared Kit: " : "Edit: ")
+                        + com.rumilance.practice.util.KitNames.pretty(kit)
                         + (innerName == null ? "" : " \u203a " + innerName)
                         + (crystal == null ? "" : " (KIT" + crystal + ")"), UiTheme.PRIMARY)
                 .decoration(TextDecoration.ITALIC, false);
@@ -455,6 +505,7 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
                 if (i >= 21) {
                     break;
                 }
+                // フォルダでも親のタイルは元の顔。クリックはデフォルトの子を開く。
                 Material mat = Material.matchMaterial(kit.icon());
                 ItemStack icon = new ItemStack(mat == null ? Material.DIAMOND_SWORD : mat);
                 ItemMeta meta = icon.getItemMeta();
@@ -479,8 +530,9 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
                 ? session.targetPlayer() : player.getUniqueId();
         ItemStack[] layout = KitLayoutContents.retainOrLoad(
                 session.get("layout", ItemStack[].class),
-                loadLayout(layoutOwner, kit, crystalVariant(session), innerKit(session),
-                        personalPresetEdit(player)));
+                isOfficialEdit(session) ? KitLoadout.fromOfficial(kit)
+                        : loadLayout(layoutOwner, kit, crystalVariant(session), innerKit(session),
+                                personalPresetEdit(player)));
         // armor row visually: helmet/chest/legs/boots + offhand
         inventory.setItem(GuiSlots.slot(0, 1), tagged(player, layout.length > 36 ? layout[36] : null,
                 isViewOnly(session) ? "decorate" : "slot:36"));
@@ -791,14 +843,14 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
                 && action != null && action.startsWith("editkit:")
                 && innerKitSelectGui != null) {
             String pickedKit = action.substring("editkit:".length());
+            if (kitService.isFolder(pickedKit)) {
+                session.setNavigatingAway(true);
+                innerKitSelectGui.openForEdit(player, session, pickedKit);
+                return;
+            }
             if (innerKitAdminGui != null && player.hasPermission("rumilance.admin")) {
                 session.setNavigatingAway(true);
                 innerKitAdminGui.open(player, pickedKit, InnerKitAdminGui.ORIGIN_EKIT);
-                return;
-            }
-            if (innerKits != null && innerKits.has(pickedKit)) {
-                session.setNavigatingAway(true);
-                innerKitSelectGui.openForEdit(player, session, pickedKit);
                 return;
             }
         }
@@ -854,6 +906,12 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             if (kitEditStash != null) {
                 kitEditStash.clear(player.getUniqueId());
             }
+            if ("back".equals(action) && isOfficialEdit(session) && kitAdminGui != null) {
+                session.setNavigatingAway(true);
+                stateManager.resetToLobby(player.getUniqueId());
+                kitAdminGui.openConfig(player, session.selectedKit());
+                return;
+            }
             if ("back".equals(action) && ekitSelectGui != null) {
                 session.setNavigatingAway(true);
                 stateManager.resetToLobby(player.getUniqueId());
@@ -865,7 +923,7 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             return;
         }
         if (action.startsWith("editkit:")) {
-            session.setSelectedKit(action.substring(8));
+            session.setSelectedKit(kitService.playableId(action.substring(8)));
             session.put("mode", "edit");
             initPresetSession(session);
             render(player, session, inventory);
@@ -906,6 +964,15 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             return;
         }
         ItemStack[] fresh = defaultLayout(kit);
+        if (isOfficialEdit(session)) {
+            // Reset an admin draft to the *current official contents*. No personal DB row is
+            // touched, and the shared kit is changed only when Save is pressed.
+            session.put("layout", fresh);
+            stashCurrentLayout(player, session);
+            render(player, session, inventory);
+            sounds.play(player, "gui-click");
+            return;
+        }
         String inner = innerKit(session);
         if (innerKits != null && !com.rumilance.practice.kit.InnerKitService.isDefault(inner)) {
             // プリセットの「初期状態」= 保存済みの中身（無ければキット本体の構成）。
@@ -1032,6 +1099,10 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             return;
         }
         ItemStack[] layout = resolveLayoutForSave(player, session);
+        if (isOfficialEdit(session)) {
+            saveOfficial(player, kitId, layout, notify);
+            return;
+        }
         // 中キットの編集: 保存先はプレイヤー個人のレイアウト(DB)ではなく kits.yml のプリセット。
         // 個人レイアウトに書くとその人だけの並び替えになり、他の人には反映されない。
         String inner = innerKit(session);
@@ -1054,6 +1125,21 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             return;
         }
         persistLayout(player, kitId, layout, notify, crystalVariant(session));
+    }
+
+    private void saveOfficial(Player player, String kitId, ItemStack[] layout, boolean notify) {
+        if (!player.hasPermission("rumilance.admin") || layout == null) {
+            if (notify) {
+                player.sendMessage(t(player, "general.no-permission"));
+            }
+            return;
+        }
+        boolean saved = kitService.setOfficialLoadout(kitId, layout);
+        if (notify) {
+            sounds.play(player, saved ? "select" : "error");
+            player.sendMessage(t(player, saved
+                    ? "gui.innerkit-official-saved" : "gui.innerkit-save-failed"));
+        }
     }
 
     /**
@@ -1108,6 +1194,13 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
 
     public void persistLayout(Player player, String kitId, ItemStack[] layout, boolean notify,
                               Integer crystalVariant) {
+        GuiSession current = registry.get(player.getUniqueId()).orElse(null);
+        if (isOfficialEdit(current) || (kitEditStash != null
+                && kitEditStash.get(player.getUniqueId()) != null
+                && kitEditStash.get(player.getUniqueId()).officialEdit())) {
+            saveOfficial(player, kitId, layout, notify);
+            return;
+        }
         KitDefinition kit = kitService.get(kitId).orElse(null);
         if (kit == null || layout == null) {
             return;

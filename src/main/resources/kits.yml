@@ -6,4 +6,9 @@
 #   adventure: true           -> forces Adventure mode for this kit (default Survival).
 #   arena: <arena-name>  -> pin this kit to one specific arena (empty = any free arena).
 #   enabled / ranked / ffa-enabled / natural-health-regen / timeout-seconds / ...
+# Sub-menus (中メニュー) add only two optional references to these SAME ordinary kit entries:
+#   kits.<folder>.default-child: <child-kit-id>  -> left click / Queue use this child
+#   kits.<child>.parent: <folder-kit-id>         -> child appears only in the folder's right-click menu
+# The admin GUI creates both links, preserves the existing kit as the first child and copies
+# player layouts/ranked history on conversion. Child kits own their items/rules like any kit.
 kits: {}

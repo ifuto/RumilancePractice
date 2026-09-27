@@ -28,19 +28,54 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class KitService {
 
     private final ConfigService configService;
+    /** In-memory kits.yml supplied by pure JUnit tests (no server or scheduler required). */
+    private final FileConfiguration standaloneYaml;
     private final Map<String, KitDefinition> kits = new ConcurrentHashMap<>();
     private final Map<String, Boolean> queueEnabled = new ConcurrentHashMap<>();
     /** Admin-defined display order (lower index first); kits not listed sort alphabetically after. */
     private final List<String> sortOrder = new java.util.concurrent.CopyOnWriteArrayList<>();
+    /** Optional DB copy hooks: installed after the database is ready, before any migration. */
+    private java.util.function.BiConsumer<String, String> copyLayouts = (from, to) -> { };
+    private java.util.function.BiConsumer<String, String> copyRankedStats = (from, to) -> { };
+
+    /** Keep existing player layouts and ranked results when a kit becomes a folder. */
+    public void setMigrationCallbacks(java.util.function.BiConsumer<String, String> layouts,
+                                      java.util.function.BiConsumer<String, String> rankedStats) {
+        this.copyLayouts = Objects.requireNonNull(layouts);
+        this.copyRankedStats = Objects.requireNonNull(rankedStats);
+    }
+
+    /** For the one-time old inner-kit migration (those rows are full snapshots, not deltas). */
+    public void copyPersonalLayouts(String from, String to) {
+        copyLayouts.accept(from, to);
+    }
 
     public KitService(ConfigService configService) {
         this.configService = Objects.requireNonNull(configService);
+        this.standaloneYaml = null;
         reload();
+    }
+
+    /** Test seam: exercise real YAML round-trips without a running Paper server. */
+    KitService(FileConfiguration kitsYaml) {
+        this.configService = null;
+        this.standaloneYaml = Objects.requireNonNull(kitsYaml);
+        reload();
+    }
+
+    private FileConfiguration yaml() {
+        return standaloneYaml == null ? configService.kits() : standaloneYaml;
+    }
+
+    private void saveKits() {
+        if (configService != null) {
+            configService.save(ConfigService.KITS);
+        }
     }
 
     public void reload() {
         kits.clear();
-        FileConfiguration yaml = configService.kits();
+        FileConfiguration yaml = yaml();
         ConfigurationSection root = yaml.getConfigurationSection("kits");
         if (root == null) {
             return;
@@ -74,7 +109,11 @@ public final class KitService {
                     // "Bed Explosion" kit rule: beds detonate on right click like Nether/End beds.
                     .bedExplosion(section.getBoolean("bed-explosion", false))
                     // "Crystal FFA" declaration: THE crystal FFA kit gets the KIT1..9 variant editor.
-                    .crystalFfa(section.getBoolean("crystal-ffa", false));
+                    .crystalFfa(section.getBoolean("crystal-ffa", false))
+                    // 中メニュー: `parent` = このキットは別キットの子メニューの中に入っている、
+                    // `default-child` = フォルダ化した自分のタイルが使う子。どちらも普通のキット id。
+                    .parent(section.getString("parent", null))
+                    .defaultChild(section.getString("default-child", null));
 
             List<String> arenaList = section.getStringList("arenas");
             if (arenaList.isEmpty()) {
@@ -190,20 +229,211 @@ public final class KitService {
         return Optional.ofNullable(kits.get(id.toLowerCase(Locale.ROOT)));
     }
 
+    /** Every kit, children included — admin lookups and tab-completion, not the player lists. */
     public List<KitDefinition> all() {
         return sorted(kits.values());
     }
 
+    /**
+     * The kits a player list shows: enabled top-level kits. A child kit (中メニューの中身) never
+     * appears here — it is reached through its parent's tile, so every picker, the queue and the
+     * kit tab-completion stay exactly as wide as they were before sub-menus existed.
+     */
     public List<KitDefinition> enabled() {
-        return sorted(kits.values().stream().filter(KitDefinition::enabled).toList());
+        return sorted(kits.values().stream()
+                .filter(KitDefinition::enabled)
+                .filter(kit -> !hasValidParent(kit))
+                .toList());
     }
 
-    /** Enabled kits of one category, in the admin-defined display order. */
+    /** Enabled top-level kits of one category, in the admin-defined display order. */
     public List<KitDefinition> enabled(KitCategory category) {
         return sorted(kits.values().stream()
                 .filter(KitDefinition::enabled)
+                .filter(kit -> !hasValidParent(kit))
                 .filter(k -> k.category() == category)
                 .toList());
+    }
+
+    // ------------------------------------------------------------------ 中メニュー (sub-menus)
+
+    /**
+     * Top-level kits — the ones a kit list shows. A child kit lives inside its parent's sub-menu
+     * and is only reachable from there. An invalid/missing parent is treated as top-level, rather
+     * than making the kit disappear because somebody hand-edited kits.yml incorrectly.
+     */
+    public List<KitDefinition> topLevel() {
+        return sorted(kits.values().stream().filter(kit -> !hasValidParent(kit)).toList());
+    }
+
+    private boolean hasValidParent(KitDefinition kit) {
+        if (kit == null || !kit.isChild() || kit.name().equalsIgnoreCase(kit.parent())) {
+            return false;
+        }
+        KitDefinition parent = kits.get(kit.parent());
+        return parent != null && !parent.isChild();
+    }
+
+    /** The kits stored inside {@code parentId}'s sub-menu, in display order. */
+    public List<KitDefinition> children(String parentId) {
+        String key = parentId == null ? "" : parentId.trim().toLowerCase(Locale.ROOT);
+        if (key.isEmpty()) {
+            return List.of();
+        }
+        KitDefinition parent = kits.get(key);
+        if (parent == null || parent.isChild()) {
+            return List.of();
+        }
+        return sorted(kits.values().stream()
+                .filter(k -> key.equals(k.parent()) && hasValidParent(k)).toList());
+    }
+
+    /** True when {@code kitId} holds a sub-menu, i.e. its tile is a folder rather than a kit. */
+    public boolean isFolder(String kitId) {
+        return !children(kitId).isEmpty();
+    }
+
+    /**
+     * The child a folder's own tile uses: the admin's {@code default-child} while it still points at
+     * a real child, otherwise the first one. Empty for a kit without a sub-menu.
+     */
+    public Optional<KitDefinition> defaultChild(String kitId) {
+        List<KitDefinition> kids = children(kitId);
+        if (kids.isEmpty()) {
+            return Optional.empty();
+        }
+        String wanted = get(kitId).map(KitDefinition::defaultChild).orElse(null);
+        if (wanted != null) {
+            for (KitDefinition kid : kids) {
+                if (kid.name().equalsIgnoreCase(wanted)) {
+                    return Optional.of(kid);
+                }
+            }
+        }
+        return Optional.of(kids.getFirst());
+    }
+
+    /**
+     * The kit that is actually used when somebody picks {@code kitId}: a folder resolves to its
+     * default child, anything else is itself. Every "fight with this kit" path (queue, duel, party,
+     * hotbar, commands) goes through this so a folder is never handed to the match engine.
+     */
+    public Optional<KitDefinition> playable(String kitId) {
+        return get(kitId).map(kit -> defaultChild(kit.name()).orElse(kit));
+    }
+
+    /** The kit behind a parent tile (default child when it is a folder, otherwise the kit). */
+    public KitDefinition tile(KitDefinition kit) {
+        return kit == null ? null : defaultChild(kit.name()).orElse(kit);
+    }
+
+    /** {@link #playable(String)} as an id — the input id when it is not a folder. */
+    public String playableId(String kitId) {
+        return playable(kitId).map(KitDefinition::name).orElse(kitId);
+    }
+
+    /** Points a folder's own tile at one of its DIRECT children (Admin's「デフォルト」choice). */
+    public boolean setDefaultChild(String parentId, String childId) {
+        KitDefinition parent = get(parentId).orElse(null);
+        KitDefinition child = get(childId).orElse(null);
+        if (parent == null || parent.isChild() || child == null
+                || !parent.name().equalsIgnoreCase(child.parent())) {
+            return false;
+        }
+        save(parent.toBuilder().defaultChild(child.name()).build());
+        return true;
+    }
+
+    /**
+     * Turn an existing normal kit into a folder without destroying its kit settings or everyone's
+     * layouts/ranked stats. The kit's own contents and rules are copied to {@code <kit>-default}
+     * as the first child. Its old id stays as the menu button, and its old data stays as a backup
+     * so removing the last child can turn it back into an ordinary kit. Idempotent.
+     *
+     * <p>The DB copies happen BEFORE the YAML change. If they fail, the parent remains a playable
+     * ordinary kit and no player is sent into an empty folder. Repeating the operation copies only
+     * missing rows, so partial copies cannot overwrite new scores or layouts.</p>
+     */
+    public Optional<KitDefinition> ensureFolder(String parentId) {
+        KitDefinition parent = get(parentId).orElse(null);
+        if (parent == null || parent.isChild()) {
+            return Optional.empty();
+        }
+        Optional<KitDefinition> existing = defaultChild(parent.name());
+        if (existing.isPresent()) {
+            if (!existing.get().name().equalsIgnoreCase(parent.defaultChild())) {
+                save(parent.toBuilder().defaultChild(existing.get().name()).build());
+            }
+            return existing;
+        }
+        String base = parent.name().toLowerCase(Locale.ROOT) + "-default";
+        String id = base;
+        for (int index = 2; kits.containsKey(id); index++) {
+            id = base + "-" + index;
+        }
+        // An identical baseline is important: delta-encoded personal layouts copied from the
+        // parent can then decode against the child's kit definition without losing any item.
+        copyLayouts.accept(parent.name(), id);
+        copyRankedStats.accept(parent.name(), id);
+        KitDefinition child = parent.toBuilder().name(id)
+                .parent(parent.name()).defaultChild(null).crystalFfa(false).build();
+        save(child);
+        appendToOrder(id);
+        save(parent.toBuilder().defaultChild(id).build());
+        return Optional.of(child);
+    }
+
+    /**
+     * File any EXISTING kit under a folder, keeping its id, contents, config, layouts and stats.
+     * Null or blank parent lifts a child back out. Folders cannot themselves be children: one
+     * level only. On the first move into an ordinary kit, its original items are automatically
+     * saved as its default child. A move away repairs the old folder's default pointer.
+     */
+    public boolean setParent(String kitId, String parentId) {
+        KitDefinition child = get(kitId).orElse(null);
+        if (child == null) {
+            return false;
+        }
+        String oldParent = child.parent();
+        if (parentId == null || parentId.isBlank()) {
+            if (oldParent == null) {
+                return true;
+            }
+            save(child.toBuilder().parent(null).build());
+            repairDefault(oldParent);
+            return true;
+        }
+        KitDefinition newParent = get(parentId).orElse(null);
+        if (newParent == null || newParent.isChild()
+                || child.name().equalsIgnoreCase(newParent.name()) || isFolder(child.name())) {
+            return false;
+        }
+        if (newParent.name().equalsIgnoreCase(oldParent)) {
+            return true;
+        }
+        if (ensureFolder(newParent.name()).isEmpty()) {
+            return false;
+        }
+        save(child.toBuilder().parent(newParent.name()).defaultChild(null).build());
+        if (oldParent != null) {
+            repairDefault(oldParent);
+        }
+        return true;
+    }
+
+    /** Clears an invalid default or advances it to the next child after removal / moving out. */
+    private void repairDefault(String parentId) {
+        KitDefinition parent = get(parentId).orElse(null);
+        if (parent == null) {
+            return;
+        }
+        List<KitDefinition> kids = children(parent.name());
+        String next = kids.isEmpty() ? null
+                : kids.stream().anyMatch(k -> k.name().equalsIgnoreCase(parent.defaultChild()))
+                ? parent.defaultChild() : kids.getFirst().name();
+        if (!Objects.equals(parent.defaultChild(), next)) {
+            save(parent.toBuilder().defaultChild(next).build());
+        }
     }
 
     /** Applies the admin-defined kit order; unlisted kits follow alphabetically. */
@@ -259,9 +489,24 @@ public final class KitService {
         java.util.Collections.swap(order, index, target);
         sortOrder.clear();
         sortOrder.addAll(order);
-        configService.kits().set("kit-order", order);
-        configService.save(ConfigService.KITS);
+        yaml().set("kit-order", order);
+        saveKits();
         return true;
+    }
+
+    /**
+     * Puts {@code kitId} at the end of the persisted display order. Sub-menu children are not
+     * reordered by hand, so their order is simply the order they were created in — and listing them
+     * keeps that order stable across reloads instead of falling back to alphabetical.
+     */
+    public void appendToOrder(String kitId) {
+        String key = kitId == null ? "" : kitId.trim().toLowerCase(Locale.ROOT);
+        if (key.isEmpty() || sortOrder.contains(key) || !kits.containsKey(key)) {
+            return;
+        }
+        sortOrder.add(key);
+        yaml().set("kit-order", new ArrayList<>(sortOrder));
+        saveKits();
     }
 
     /** Moves a kit between the Main and Sub sections and persists it. */
@@ -307,18 +552,31 @@ public final class KitService {
     }
 
     public boolean delete(String id) {
-        KitDefinition removed = kits.remove(id.toLowerCase(Locale.ROOT));
+        KitDefinition removed = get(id).orElse(null);
         if (removed == null) {
             return false;
         }
-        configService.kits().set("kits." + id, null);
-        configService.save(ConfigService.KITS);
+        // Capture children BEFORE removing their parent; a missing parent is not a valid folder.
+        List<KitDefinition> kids = children(removed.name());
+        kits.remove(removed.name().toLowerCase(Locale.ROOT));
+        yaml().set("kits." + removed.name(), null);
+        sortOrder.remove(removed.name().toLowerCase(Locale.ROOT));
+        queueEnabled.remove(removed.name().toLowerCase(Locale.ROOT));
+        // Removing a folder promotes all of its children; never silently destroy them.
+        for (KitDefinition child : kids) {
+            save(child.toBuilder().parent(null).build());
+        }
+        if (removed.parent() != null) {
+            repairDefault(removed.parent());
+        }
+        yaml().set("kit-order", new ArrayList<>(sortOrder));
+        saveKits();
         return true;
     }
 
     /** Result of {@link #rename(String, String)}. */
     public enum RenameResult {
-        OK, NOT_FOUND, TARGET_EXISTS
+        OK, NOT_FOUND, TARGET_EXISTS, MIGRATION_FAILED
     }
 
     /**
@@ -336,6 +594,21 @@ public final class KitService {
         if (!oldKey.equals(newKey) && kits.containsKey(newKey)) {
             return RenameResult.TARGET_EXISTS;
         }
+        if (!oldKey.equals(newKey)) {
+            try {
+                // Rename must not strand saved personal arrangements or ranked history at the
+                // old id. Copy first, then change kits.yml; failure leaves the old kit playable.
+                copyLayouts.accept(oldKey, newKey);
+                copyRankedStats.accept(oldKey, newKey);
+                for (int variant = 1; variant <= CrystalFfaStore.SLOTS; variant++) {
+                    copyLayouts.accept(CrystalFfaStore.variantKey(oldKey, variant),
+                            CrystalFfaStore.variantKey(newKey, variant));
+                }
+            } catch (RuntimeException failure) {
+                return RenameResult.MIGRATION_FAILED;
+            }
+        }
+        List<KitDefinition> childRefs = children(oldKey);
         KitDefinition renamed = existing.toBuilder()
                 .name(newKey)
                 .displayName(newName)
@@ -350,20 +623,30 @@ public final class KitService {
         int orderIndex = sortOrder.indexOf(oldKey);
         if (orderIndex >= 0) {
             sortOrder.set(orderIndex, newKey);
-            configService.kits().set("kit-order", new ArrayList<>(sortOrder));
+            yaml().set("kit-order", new ArrayList<>(sortOrder));
         }
         // 中キット (inner kits) live INSIDE the kit's own section, so a rename has to carry them
         // across: dropping the old section without this would silently delete every preset.
-        ConfigurationSection inner = configService.kits()
+        ConfigurationSection inner = yaml()
                 .getConfigurationSection("kits." + oldKey + ".inner-kits");
         Map<String, Object> innerSnapshot = inner == null ? null : new LinkedHashMap<>(inner.getValues(true));
-        configService.kits().set("kits." + oldKey, null);
+        yaml().set("kits." + oldKey, null);
         persist(renamed);
         if (innerSnapshot != null && !innerSnapshot.isEmpty()) {
             for (Map.Entry<String, Object> entry : innerSnapshot.entrySet()) {
-                configService.kits().set("kits." + newKey + ".inner-kits." + entry.getKey(), entry.getValue());
+                yaml().set("kits." + newKey + ".inner-kits." + entry.getKey(), entry.getValue());
             }
-            configService.save(ConfigService.KITS);
+            saveKits();
+        }
+        // 中メニューの親子関係はキット id で持つので、改名したら「子の parent」と
+        // 「誰かのデフォルトの子」も新しい id へ置き換える。
+        for (KitDefinition child : childRefs) {
+            save(child.toBuilder().parent(newKey).build());
+        }
+        for (KitDefinition kit : List.copyOf(kits.values())) {
+            if (oldKey.equalsIgnoreCase(kit.defaultChild() == null ? "" : kit.defaultChild())) {
+                save(kit.toBuilder().defaultChild(newKey).build());
+            }
         }
         return RenameResult.OK;
     }
@@ -511,9 +794,93 @@ public final class KitService {
         return kit;
     }
 
+    /**
+     * Creates a child kit — one entry of a folder's 中メニュー — from a 41-slot layout
+     * ({@link KitLoadout#SIZE}; {@code null} / all-air creates an empty child).
+     *
+     * <p>A child is a normal kit, so it gets its own contents, icon, name, personal layouts and
+     * stats. What it takes from the folder is the rule set — HP, knockback, block rules, arenas,
+     * start effects, timeouts — because a sub-menu exists to offer several loadouts of the SAME
+     * fight, and because that is exactly what the preset carry-over produced. The first child of a
+     * folder becomes its {@code default-child} automatically.</p>
+     *
+     * @return the created kit, or {@code null} when the id is taken/blank or the parent is missing
+     */
+    public KitDefinition createChild(String childId, String parentId, ItemStack[] layout,
+                                     String icon, String displayName) {
+        String key = childId == null ? "" : childId.trim().toLowerCase(Locale.ROOT);
+        String parentKey = parentId == null ? "" : parentId.trim().toLowerCase(Locale.ROOT);
+        KitDefinition parent = kits.get(parentKey);
+        if (!key.matches("[a-z0-9_-]+") || parent == null || parent.isChild() || kits.containsKey(key)
+                || ensureFolder(parentKey).isEmpty() || kits.containsKey(key)) {
+            return null;
+        }
+        // Each child has independent rules. New children start with a copy of the default
+        // child's current rules, so settings changed since the folder was made are respected.
+        KitDefinition source = defaultChild(parentKey).orElse(parent);
+        ItemStack[] contents = layout == null ? new ItemStack[KitLoadout.SIZE] : layout;
+        String childIcon = icon == null || icon.isBlank() ? source.icon() : icon;
+        KitDefinition child = KitDefinition.builder(key)
+                .displayName(displayName == null || displayName.isBlank()
+                        ? com.rumilance.practice.util.KitNames.pretty(key) : displayName.trim())
+                .icon(childIcon)
+                .category(source.category())
+                .items(InnerKitService.entriesFromLayout(contents))
+                // 41スロットのレイアウトは防具もアイテム枠として持つので armor マップは使わない。
+                .armor(Map.of())
+                .ranked(source.ranked())
+                .ffaEnabled(source.ffaEnabled())
+                .maxHealth(source.maxHealth())
+                .naturalHealthRegen(source.naturalHealthRegen())
+                .knockbackMultiplier(source.knockbackMultiplier())
+                .enabled(source.enabled())
+                .autoFood(source.autoFood())
+                .swordShieldBreak(source.swordShieldBreak())
+                .blockPlace(source.blockPlace())
+                .blockBreak(source.blockBreak())
+                .breakPlayerPlacedOnly(source.breakPlayerPlacedOnly())
+                .canBreak(source.canBreak())
+                .pearl(source.pearl())
+                .totem(source.totem())
+                .forceAdventure(source.forceAdventure())
+                .timeoutSeconds(source.timeoutSeconds())
+                .arenas(source.arenas())
+                .partyArenas(source.partyArenas())
+                .startCommands(source.startCommands())
+                .startEffects(source.startEffects())
+                .presetEnabled(source.presetEnabled())
+                .bedExplosion(source.bedExplosion())
+                // Crystal FFA is exclusive; do not duplicate its flag on a new child.
+                .crystalFfa(false)
+                .parent(parentKey)
+                .build();
+        save(child);
+        appendToOrder(key);
+        // 最初の子は自動的に既定になる(既定未設定のフォルダもここで直る)。
+        if (get(parentKey).map(KitDefinition::defaultChild).orElse(null) == null) {
+            setDefaultChild(parentKey, key);
+        }
+        return child;
+    }
+
+    /**
+     * Admin-only caller saves the SHARED 41-slot contents of one normal child/kit, not the
+     * editor player's personal layout. Leave every rule and every other kit unchanged.
+     */
+    public boolean setOfficialLoadout(String kitId, ItemStack[] layout) {
+        KitDefinition kit = get(kitId).orElse(null);
+        if (kit == null || layout == null || isFolder(kit.name())) {
+            return false;
+        }
+        ItemStack[] sanitized = KitLoadout.sanitize(layout);
+        save(kit.toBuilder().items(InnerKitService.entriesFromLayout(sanitized))
+                .armor(Map.of()).build());
+        return true;
+    }
+
     private void persist(KitDefinition kit) {
         String path = "kits." + kit.name();
-        FileConfiguration yaml = configService.kits();
+        FileConfiguration yaml = yaml();
         yaml.set(path + ".display-name", kit.displayName());
         yaml.set(path + ".icon", kit.icon());
         yaml.set(path + ".category", kit.category().name());
@@ -537,6 +904,9 @@ public final class KitService {
         yaml.set(path + ".preset-enabled", kit.presetEnabled());
         yaml.set(path + ".bed-explosion", kit.bedExplosion());
         yaml.set(path + ".crystal-ffa", kit.crystalFfa());
+        // 中メニューの親子関係（未設定のときはキーごと消す）。
+        yaml.set(path + ".parent", kit.parent());
+        yaml.set(path + ".default-child", kit.defaultChild());
         yaml.set(path + ".can-break", kit.canBreak());
         yaml.set(path + ".start-commands", kit.startCommands());
         List<Map<String, Object>> startEffectMaps = new ArrayList<>();
@@ -559,13 +929,19 @@ public final class KitService {
             if (!entry.enchantments().isEmpty()) {
                 map.put("enchantments", new LinkedHashMap<>(entry.enchantments()));
             }
+            if (entry.unbreakable()) {
+                map.put("unbreakable", true);
+            }
             itemMaps.add(map);
         }
         yaml.set(path + ".items", itemMaps);
+        // A full 41-slot kit stores armor in `items`. When replacing an older `armor` map,
+        // clear stale pieces first — otherwise deleted armor would silently reappear on reload.
+        yaml.set(path + ".armor", null);
         for (Map.Entry<String, String> armor : kit.armor().entrySet()) {
             yaml.set(path + ".armor." + armor.getKey(), armor.getValue());
         }
-        configService.save(ConfigService.KITS);
+        saveKits();
     }
 
     /**

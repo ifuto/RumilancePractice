@@ -1,5 +1,6 @@
 package com.rumilance.practice.gui.menus;
 
+import com.rumilance.practice.chat.PendingInput;
 import com.rumilance.practice.gui.AbstractGui;
 import com.rumilance.practice.gui.GuiDecorator;
 import com.rumilance.practice.gui.GuiSession;
@@ -50,6 +51,12 @@ public final class KitAdminGui extends AbstractGui {
     private java.util.function.BiConsumer<Player, String> openBlockRules = (p, kit) -> { };
     private java.util.function.BiConsumer<Player, String> openItemRules = (p, kit) -> { };
     private java.util.function.BiConsumer<Player, String> openInnerKits = (p, kit) -> { };
+    private java.util.function.BiConsumer<Player, String> openOfficialEditor = (p, kit) -> { };
+
+    /** The same 41-slot editor, but its admin mode writes kits.yml instead of kit_layouts. */
+    public void setOpenOfficialEditor(java.util.function.BiConsumer<Player, String> editor) {
+        this.openOfficialEditor = editor == null ? (p, kit) -> { } : editor;
+    }
 
     public KitAdminGui(GuiSessionRegistry registry, SoundService sounds, KitService kitService, MessageService messageService) {
         super(registry, sounds, GuiType.KIT_ADMIN, 6, false);
@@ -88,6 +95,10 @@ public final class KitAdminGui extends AbstractGui {
 
     /** Reopens the config panel for a kit (used when returning from Start Effects GUI). */
     public void openConfig(Player player, String kitId) {
+        if (!player.hasPermission("rumilance.admin")) {
+            player.sendMessage(t(player, "general.no-permission"));
+            return;
+        }
         GuiSession session = registry.open(player.getUniqueId(), type(), rows);
         session.put("view", "config");
         session.setSelectedKit(kitId);
@@ -130,27 +141,22 @@ public final class KitAdminGui extends AbstractGui {
         }
         if ("config".equals(view) && session.selectedKit() != null
                 && kitService.get(session.selectedKit()).isPresent()) {
-            renderConfig(inventory, session, locale);
+            renderConfig(player, inventory, session, locale);
         } else {
-            renderList(inventory, locale);
+            renderList(player, inventory, session, locale);
         }
     }
 
-    private void renderList(Inventory inventory, String locale) {
-        int slot = 10;
-        for (KitDefinition kit : kitService.all()) {
-            if (slot == 17) {
-                slot = 19;
-            } else if (slot == 26) {
-                slot = 28;
-            } else if (slot == 35) {
-                slot = 37;
-            }
-            if (slot >= 44) {
-                break;
-            }
-            inventory.setItem(slot++, kitIcon(kit, locale));
+    private void renderList(Player player, Inventory inventory, GuiSession session, String locale) {
+        // List only the top level; child kits are managed from their folder. Page instead of
+        // silently truncating the list at 28 (the admin can turn ANY kit into a folder).
+        List<KitDefinition> kits = kitService.topLevel();
+        int perPage = MenuScaffold.gridPageSize();
+        int page = Math.min(session.page(), Math.max(0, (kits.size() - 1) / perPage));
+        for (int i = 0; i < perPage && page * perPage + i < kits.size(); i++) {
+            inventory.setItem(MenuScaffold.gridSlot(i), kitIcon(kits.get(page * perPage + i), locale));
         }
+        paintPaging(player, inventory, page, kits.size());
     }
 
     private ItemStack kitIcon(KitDefinition kit, String locale) {
@@ -188,10 +194,10 @@ public final class KitAdminGui extends AbstractGui {
         return stack;
     }
 
-    private void renderConfig(Inventory inventory, GuiSession session, String locale) {
+    private void renderConfig(Player player, Inventory inventory, GuiSession session, String locale) {
         KitDefinition kit = kitService.get(session.selectedKit()).orElse(null);
         if (kit == null) {
-            renderList(inventory, locale);
+            renderList(player, inventory, session, locale);
             return;
         }
         inventory.setItem(GuiSlots.slot(0, 4), header(kit, locale));
@@ -211,11 +217,23 @@ public final class KitAdminGui extends AbstractGui {
         // --- the KIT1..9 variant editor; FFA spawns the player with the selected slot.
         inventory.setItem(GuiSlots.slot(1, 4), toggle("Crystal FFA", kit.crystalFfa(),
                 "toggle:crystalffa", Material.END_CRYSTAL, locale));
-        // --- row 2: 中キット (inner kits) — the preset loadouts inside this kit ---
-        inventory.setItem(GuiSlots.slot(2, 4), entry(Material.SHULKER_BOX,
-                rawGui(locale, "gui.kit-admin-innerkits"),
-                rawGui(locale, "gui.kit-admin-innerkits-lore"), UiTheme.SECONDARY,
-                "open:inner-kits", locale));
+        // --- row 2: shared contents + sub-menu + icon (children are ordinary kits) ---
+        if (!kitService.isFolder(kit.name())) {
+            inventory.setItem(GuiSlots.slot(2, 2), entry(Material.CHEST,
+                    rawGui(locale, "gui.kit-admin-official"),
+                    rawGui(locale, "gui.kit-admin-official-lore"), UiTheme.SUCCESS,
+                    "open:official", locale));
+        }
+        if (!kit.isChild()) {
+            inventory.setItem(GuiSlots.slot(2, 4), entry(Material.SHULKER_BOX,
+                    rawGui(locale, "gui.kit-admin-innerkits"),
+                    rawGui(locale, "gui.kit-admin-innerkits-lore"), UiTheme.SECONDARY,
+                    "open:inner-kits", locale));
+        }
+        inventory.setItem(GuiSlots.slot(2, 6), entry(Material.ITEM_FRAME,
+                rawGui(locale, "gui.kit-admin-icon"),
+                rawGui(locale, "gui.kit-admin-icon-lore"), UiTheme.PRIMARY,
+                "icon:held", locale));
 
         // --- row 3: rule groups live in dedicated sub-GUIs so nothing is crowded ---
         inventory.setItem(GuiSlots.slot(3, 2), entry(Material.STONE_PICKAXE,
@@ -239,6 +257,12 @@ public final class KitAdminGui extends AbstractGui {
         inventory.setItem(GuiSlots.slot(4, 6), ItemBuilder.action(Material.NETHER_STAR,
                 Component.text(rawGui(locale, "gui.kit-admin-preset-open"), UiTheme.SECONDARY), "open:preset"));
 
+        if (kit.isChild()) {
+            inventory.setItem(GuiSlots.slot(5, 7), entry(Material.HOPPER,
+                    rawGui(locale, "gui.kit-admin-unfile"),
+                    rawGui(locale, "gui.kit-admin-unfile-lore"), UiTheme.WARNING,
+                    "unfile", locale));
+        }
         inventory.setItem(GuiSlots.slot(5, 4), ItemBuilder.action(UiTheme.BACK,
                 Component.text(t(locale, "back"), UiTheme.PRIMARY).decoration(TextDecoration.ITALIC, false), "back"));
     }
@@ -248,8 +272,9 @@ public final class KitAdminGui extends AbstractGui {
         ItemMeta meta = stack.getItemMeta();
         meta.displayName(Component.text(kit.prettyDisplayName(), UiTheme.SECONDARY)
                 .decoration(TextDecoration.ITALIC, false));
-        meta.lore(List.of(Component.text(t(locale, "click-hint"), UiTheme.MUTED)
+        meta.lore(List.of(Component.text(rawGui(locale, "gui.kit-admin-rename-lore"), UiTheme.MUTED)
                 .decoration(TextDecoration.ITALIC, false)));
+        meta.getPersistentDataContainer().set(ItemKeys.guiAction(), PersistentDataType.STRING, "rename:display");
         stack.setItemMeta(meta);
         return stack;
     }
@@ -322,10 +347,23 @@ public final class KitAdminGui extends AbstractGui {
 
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot, String action) {
-        if (action == null) {
+        if (action == null || !player.hasPermission("rumilance.admin")) {
+            return;
+        }
+        if ((action.equals("page:prev") || action.equals("page:next"))
+                && "list".equals(session.get("view", String.class))) {
+            session.setPage(Math.max(0, session.page()
+                    + (action.equals("page:next") ? 1 : -1)));
+            refresh(player, session, inventory);
             return;
         }
         if (action.equals("back")) {
+            KitDefinition selected = kitService.get(session.selectedKit()).orElse(null);
+            if (selected != null && selected.isChild()) {
+                session.setNavigatingAway(true);
+                openInnerKits.accept(player, selected.parent());
+                return;
+            }
             session.put("view", "list");
             session.setSelectedKit(null);
             sounds.play(player, "gui-click");
@@ -368,6 +406,55 @@ public final class KitAdminGui extends AbstractGui {
             if (session.selectedKit() != null) {
                 sounds.play(player, "gui-click");
                 openItemRules.accept(player, session.selectedKit());
+            }
+            return;
+        }
+        if (action.equals("open:official")) {
+            if (session.selectedKit() != null) {
+                session.setNavigatingAway(true);
+                openOfficialEditor.accept(player, session.selectedKit());
+            }
+            return;
+        }
+        if (action.equals("rename:display")) {
+            String kitId = session.selectedKit();
+            if (kitId == null) {
+                return;
+            }
+            player.closeInventory();
+            player.sendMessage(t(player, "gui.kit-admin-rename-prompt"));
+            PendingInput.await(player, value -> {
+                if (value != null && !value.isBlank() && !"cancel".equalsIgnoreCase(value.trim())) {
+                    kitService.get(kitId).ifPresent(kit ->
+                            kitService.save(kit.toBuilder().displayName(value.trim()).build()));
+                }
+                if (player.isOnline()) {
+                    openConfig(player, kitId);
+                }
+            });
+            return;
+        }
+        if (action.equals("icon:held")) {
+            KitDefinition kit = kitService.get(session.selectedKit()).orElse(null);
+            Material held = player.getInventory().getItemInMainHand().getType();
+            if (kit != null && !held.isAir()) {
+                kitService.save(kit.toBuilder().icon(held.name()).build());
+                sounds.play(player, "select");
+                refresh(player, session, inventory);
+            } else {
+                player.sendMessage(t(player, "gui.kit-admin-icon-hold"));
+                sounds.play(player, "error");
+            }
+            return;
+        }
+        if (action.equals("unfile")) {
+            KitDefinition child = kitService.get(session.selectedKit()).orElse(null);
+            if (child != null && child.isChild() && kitService.setParent(child.name(), null)) {
+                sounds.play(player, "select");
+                player.sendMessage(t(player, "gui.kit-admin-unfiled"));
+                session.put("view", "list");
+                session.setSelectedKit(null);
+                refresh(player, session, inventory);
             }
             return;
         }
@@ -468,6 +555,13 @@ public final class KitAdminGui extends AbstractGui {
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot,
                             String action, org.bukkit.event.inventory.ClickType click) {
+        if (action != null && action.startsWith("select:")
+                && click == org.bukkit.event.inventory.ClickType.RIGHT
+                && player.hasPermission("rumilance.admin")) {
+            session.setNavigatingAway(true);
+            openInnerKits.accept(player, action.substring("select:".length()));
+            return;
+        }
         if (action != null && action.startsWith("select:") && click.isShiftClick()) {
             String kitName = action.substring("select:".length());
             boolean moved = kitService.move(kitName,

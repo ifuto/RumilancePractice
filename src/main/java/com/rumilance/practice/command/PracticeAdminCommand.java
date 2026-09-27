@@ -215,8 +215,10 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
                 lobbyService.reload();
                 kitService.reload();
                 if (innerKits != null) {
-                    // 中キット live inside kits.yml, so they reload with the kits.
+                    // If an old kits.yml was dropped in while the server was running, carry its
+                    // loadout-only presets over as real child kits on reload as well as at boot.
                     innerKits.reload();
+                    innerKits.migrateToChildKits(kitService);
                 }
                 arenaStore.reload();
                 arenaService.setTemplates(arenaStore.templates());

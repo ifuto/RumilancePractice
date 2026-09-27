@@ -119,16 +119,19 @@ public final class DuelRequestGui extends AbstractGui {
         String chosenKit = (kit != null && !kit.isBlank()) ? kit
                 : session.selectedKit();
         if (chosenKit == null || chosenKit.isBlank()) {
-            kitService.enabled().stream().findFirst().ifPresent(k -> session.setSelectedKit(k.name()));
+            kitService.enabled().stream().findFirst()
+                    .ifPresent(k -> session.setSelectedKit(kitService.playableId(k.name())));
         } else {
             // Keep the caller's kit, but fall back if it has since been disabled/removed.
-            String finalChosen = chosenKit;
-            boolean stillEnabled = kitService.enabled().stream()
-                    .anyMatch(k -> k.name().equalsIgnoreCase(finalChosen));
-            if (stillEnabled) {
-                session.setSelectedKit(finalChosen);
+            // フォルダ(中メニュー)が渡されたらデフォルトの子に解決する。子キットは enabled() の
+            // 一覧には出ないので、妥当性の判定は get() 側で行う。
+            String resolved = kitService.playableId(chosenKit);
+            boolean usable = kitService.get(resolved).map(k -> k.enabled()).orElse(false);
+            if (usable) {
+                session.setSelectedKit(resolved);
             } else {
-                kitService.enabled().stream().findFirst().ifPresent(k -> session.setSelectedKit(k.name()));
+                kitService.enabled().stream().findFirst()
+                    .ifPresent(k -> session.setSelectedKit(kitService.playableId(k.name())));
             }
         }
         PracticeGuiOpen.open(this, sender, session);
@@ -370,10 +373,10 @@ public final class DuelRequestGui extends AbstractGui {
     private String kitLabel(GuiSession session) {
         String kit = session.selectedKit() == null ? "nodebuff" : session.selectedKit();
         String inner = session.get(InnerKitSelectGui.CHOICE_KEY, String.class);
-        if (innerKits == null || com.rumilance.practice.kit.InnerKitService.isDefault(inner)) {
-            return kit;
-        }
         String pretty = kitService.get(kit).map(k -> k.prettyDisplayName()).orElse(kit);
+        if (innerKits == null || com.rumilance.practice.kit.InnerKitService.isDefault(inner)) {
+            return pretty; // a child is a normal kit; show that kit's own display name
+        }
         return innerKits.displayOf(kit, inner, pretty);
     }
 }

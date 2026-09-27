@@ -226,7 +226,7 @@ public final class PracticeService {
         if (arenaKit == null || arenaKit.isBlank()) {
             arenaKit = boundKit;
         }
-        com.rumilance.practice.model.KitDefinition kit = kitService.get(arenaKit).orElse(null);
+        com.rumilance.practice.model.KitDefinition kit = kitService.playable(arenaKit).orElse(null);
         if (kit == null || kit.arenas() == null || kit.arenas().isEmpty()) {
             return null;
         }
@@ -2028,7 +2028,7 @@ public final class PracticeService {
         if (boundKit == null || boundKit.isBlank()) {
             return null;
         }
-        return kitService.get(boundKit).orElse(null);
+        return kitService.playable(boundKit).orElse(null);
     }
 
     /** Re-applies the session's fight loadout (after a rescued death, a kit change, ...). */
@@ -2052,7 +2052,7 @@ public final class PracticeService {
         if (who == null || kitName == null || kitName.isBlank() || kitService == null) {
             return false;
         }
-        var kit = kitService.get(kitName);
+        var kit = kitService.playable(kitName);
         if (kit.isEmpty()) {
             return false;
         }
@@ -2066,7 +2066,7 @@ public final class PracticeService {
     private void giveBotLoadout(Player player, PracticeSession session, PracticeType type) {
         String boundKit = botModeKits.get(type);
         if (boundKit != null && !boundKit.isBlank() && kitService != null) {
-            var kitOpt = kitService.get(boundKit);
+            var kitOpt = kitService.playable(boundKit);
             if (kitOpt.isPresent()) {
                 player.getInventory().clear();
                 player.getInventory().setArmorContents(null);
@@ -2546,7 +2546,7 @@ public final class PracticeService {
         }
         com.rumilance.practice.model.KitDefinition kit;
         try {
-            kit = kitService.get(bound).orElse(null);
+            kit = kitService.playable(bound).orElse(null);
         } catch (RuntimeException e) {
             kit = null;
         }

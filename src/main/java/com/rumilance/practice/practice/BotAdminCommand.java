@@ -124,7 +124,7 @@ public final class BotAdminCommand implements CommandExecutor, TabCompleter {
                     "アリーナキット '" + arenaKit + "' が見つかりません。", NamedTextColor.RED));
             return true;
         }
-        java.util.List<String> arenas = kitService.get(arenaKit)
+        java.util.List<String> arenas = kitService.playable(arenaKit)
                 .map(kit -> kit.arenas() == null ? java.util.List.<String>of() : kit.arenas())
                 .orElse(java.util.List.of());
         if (arenas.isEmpty()) {

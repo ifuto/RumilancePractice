@@ -9,7 +9,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
-public record KitDefinition(String name, String displayName, String icon, KitCategory category, boolean ranked, boolean ffaEnabled, double maxHealth, boolean naturalHealthRegen, double knockbackMultiplier, List<KitItemEntry> items, Map<String, String> armor, boolean enabled, boolean autoFood, boolean swordShieldBreak, boolean blockPlace, boolean blockBreak, boolean breakPlayerPlacedOnly, List<String> canBreak, boolean pearl, boolean totem, boolean forceAdventure, int timeoutSeconds, List<String> arenas, List<String> partyArenas, List<String> startCommands, List<KitStartEffect> startEffects, boolean presetEnabled, boolean bedExplosion, boolean crystalFfa) {
+public record KitDefinition(String name, String displayName, String icon, KitCategory category, boolean ranked, boolean ffaEnabled, double maxHealth, boolean naturalHealthRegen, double knockbackMultiplier, List<KitItemEntry> items, Map<String, String> armor, boolean enabled, boolean autoFood, boolean swordShieldBreak, boolean blockPlace, boolean blockBreak, boolean breakPlayerPlacedOnly, List<String> canBreak, boolean pearl, boolean totem, boolean forceAdventure, int timeoutSeconds, List<String> arenas, List<String> partyArenas, List<String> startCommands, List<KitStartEffect> startEffects, boolean presetEnabled, boolean bedExplosion, boolean crystalFfa, String parent, String defaultChild) {
     public KitDefinition {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(displayName, "displayName");
@@ -25,6 +25,29 @@ public record KitDefinition(String name, String displayName, String icon, KitCat
         partyArenas = KitDefinition.normalizeArenas(partyArenas);
         startCommands = List.copyOf(startCommands == null ? List.of() : startCommands);
         startEffects = List.copyOf(startEffects == null ? List.of() : startEffects);
+        parent = normalizeRef(parent);
+        defaultChild = normalizeRef(defaultChild);
+    }
+
+    /**
+     * Kit references ({@code parent} / {@code default-child}) are stored the way KitService keys
+     * its map — trimmed and lowercased — and blank means "none" so the record never carries "".
+     */
+    private static String normalizeRef(String ref) {
+        if (ref == null) {
+            return null;
+        }
+        String trimmed = ref.trim();
+        return trimmed.isEmpty() ? null : trimmed.toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * True when this kit lives inside another kit's sub-menu (中メニュー). A child is a normal kit
+     * in every other respect — its own contents, rules, layout and stats — it is just not listed on
+     * the top level; you reach it through its {@link #parent()}'s tile.
+     */
+    public boolean isChild() {
+        return this.parent != null;
     }
 
     private static List<String> normalizeArenas(List<String> raw) {
@@ -140,6 +163,10 @@ public record KitDefinition(String name, String displayName, String icon, KitCat
          * player with the variant they selected. At most one kit carries the flag.
          */
         private boolean crystalFfa;
+        /** Id of the kit whose sub-menu this kit lives in (null = a top-level kit). */
+        private String parent;
+        /** For a folder kit: which child its own tile uses (null = the first child). */
+        private String defaultChild;
 
         private Builder(String name) {
             this.name = Objects.requireNonNull(name, "name");
@@ -176,6 +203,8 @@ public record KitDefinition(String name, String displayName, String icon, KitCat
             this.presetEnabled = source.presetEnabled;
             this.bedExplosion = source.bedExplosion;
             this.crystalFfa = source.crystalFfa;
+            this.parent = source.parent;
+            this.defaultChild = source.defaultChild;
         }
 
         public Builder name(String value) {
@@ -385,8 +414,20 @@ public record KitDefinition(String name, String displayName, String icon, KitCat
             return this;
         }
 
+        /** Files this kit inside another kit's sub-menu (null lifts it back to the top level). */
+        public Builder parent(String value) {
+            this.parent = value;
+            return this;
+        }
+
+        /** For a folder kit: the child its own tile uses (null = the first child). */
+        public Builder defaultChild(String value) {
+            this.defaultChild = value;
+            return this;
+        }
+
         public KitDefinition build() {
-            return new KitDefinition(this.name, this.displayName, this.icon, this.category, this.ranked, this.ffaEnabled, this.maxHealth, this.naturalHealthRegen, this.knockbackMultiplier, this.items, this.armor, this.enabled, this.autoFood, this.swordShieldBreak, this.blockPlace, this.blockBreak, this.breakPlayerPlacedOnly, this.canBreak, this.pearl, this.totem, this.forceAdventure, this.timeoutSeconds, this.arenas, this.partyArenas, this.startCommands, this.startEffects, this.presetEnabled, this.bedExplosion, this.crystalFfa);
+            return new KitDefinition(this.name, this.displayName, this.icon, this.category, this.ranked, this.ffaEnabled, this.maxHealth, this.naturalHealthRegen, this.knockbackMultiplier, this.items, this.armor, this.enabled, this.autoFood, this.swordShieldBreak, this.blockPlace, this.blockBreak, this.breakPlayerPlacedOnly, this.canBreak, this.pearl, this.totem, this.forceAdventure, this.timeoutSeconds, this.arenas, this.partyArenas, this.startCommands, this.startEffects, this.presetEnabled, this.bedExplosion, this.crystalFfa, this.parent, this.defaultChild);
         }
     }
 }

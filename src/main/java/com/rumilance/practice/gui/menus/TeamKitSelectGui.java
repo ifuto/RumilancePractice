@@ -39,8 +39,6 @@ public final class TeamKitSelectGui extends AbstractGui {
     private PartyMapSelectGui partyMapSelectGui;
     /** Owner's original-kit store (null = original kits unavailable here). */
     private com.rumilance.practice.originalkit.OriginalKitService originalKitService;
-    /** 中キット (inner kits): shared presets stored inside a kit. */
-    private com.rumilance.practice.kit.InnerKitService innerKits;
     private InnerKitSelectGui innerKitSelectGui;
 
     public void setOriginalKitService(
@@ -71,10 +69,6 @@ public final class TeamKitSelectGui extends AbstractGui {
     }
 
     /** 中キット (inner kits) — right-click a kit to pick the preset the battle fights with. */
-    public void setInnerKits(com.rumilance.practice.kit.InnerKitService innerKits) {
-        this.innerKits = innerKits;
-    }
-
     public void setInnerKitSelectGui(InnerKitSelectGui innerKitSelectGui) {
         this.innerKitSelectGui = innerKitSelectGui;
     }
@@ -92,6 +86,14 @@ public final class TeamKitSelectGui extends AbstractGui {
     @Override
     protected Component title(Player player, GuiSession session) {
         return t(player, "gui.party-kit-title").color(UiTheme.PRIMARY);
+    }
+
+    /** Reopen the parent kit list at its original category/page after visiting a child menu. */
+    public void openAt(Player player, String category, int page) {
+        openWithSession(player, session -> {
+            session.setKitCategory(category);
+            session.setPage(Math.max(0, page));
+        });
     }
 
     @Override
@@ -178,55 +180,60 @@ public final class TeamKitSelectGui extends AbstractGui {
         // kits (Owner の Original Kit 星) stay selectable like on the old mixed screen.
         List<KitDefinition> kits = kitService.enabled(
                 "SUB".equalsIgnoreCase(category) ? KitCategory.SUB : KitCategory.MAIN);
-        int index = 0;
-        inventory.setItem(MenuScaffold.gridSlot(index++), com.rumilance.practice.gui.KitSections.header(
+        List<ItemStack> choices = new ArrayList<>();
+        choices.add(com.rumilance.practice.gui.KitSections.header(
                 "SUB".equalsIgnoreCase(category) ? KitCategory.SUB : KitCategory.MAIN,
                 kits.size(), line(player, "gui.party-start-click")));
         for (KitDefinition kit : kits) {
-            if (index >= MenuScaffold.gridPageSize()) {
-                break;
-            }
-            inventory.setItem(MenuScaffold.gridSlot(index++), partyKitTile(player, kit));
+            choices.add(partyKitTile(player, kit));
         }
 
-        // The owner's own original kits are also selectable for the party battle: everyone
-        // fights with that kit alone — its saved layout AND its settings supply every rule.
-        if (originalKitService != null && index < MenuScaffold.gridPageSize()) {
+        // The owner's own original kits stay selectable even with 28+ server kits.
+        if (originalKitService != null) {
             com.rumilance.practice.originalkit.OriginalKitService.Plan plan =
                     originalKitService.planOf(player);
-            for (int slot = 0; slot < 9 && index < MenuScaffold.gridPageSize(); slot++) {
+            for (int slot = 0; slot < 9; slot++) {
                 if (!originalKitService.isSlotUnlocked(plan, slot)
                         || !originalKitService.hasSaved(player.getUniqueId(), slot)) {
                     continue;
                 }
-                inventory.setItem(MenuScaffold.gridSlot(index++),
-                        ItemBuilder.of(Material.NETHER_STAR)
-                                .name(Component.text("Original Kit #" + (slot + 1), UiTheme.HEADER)
-                                        .decoration(TextDecoration.ITALIC, false))
-                                .lore(UiTheme.divider(),
-                                        UiTheme.line(line(player, "gui.party-original-kit-lore")),
-                                        UiTheme.blank(),
-                                        UiTheme.hint(line(player, "gui.party-start-click")))
-                                .glint(true)
-                                .action("origkit:" + slot)
-                                .build());
+                choices.add(ItemBuilder.of(Material.NETHER_STAR)
+                        .name(Component.text("Original Kit #" + (slot + 1), UiTheme.HEADER)
+                                .decoration(TextDecoration.ITALIC, false))
+                        .lore(UiTheme.divider(),
+                                UiTheme.line(line(player, "gui.party-original-kit-lore")),
+                                UiTheme.blank(),
+                                UiTheme.hint(line(player, "gui.party-start-click")))
+                        .glint(true)
+                        .action("origkit:" + slot)
+                        .build());
             }
         }
+        int perPage = MenuScaffold.gridPageSize();
+        int page = Math.min(session.page(), Math.max(0, (choices.size() - 1) / perPage));
+        for (int i = 0; i < perPage && page * perPage + i < choices.size(); i++) {
+            inventory.setItem(MenuScaffold.gridSlot(i), choices.get(page * perPage + i));
+        }
+        paintPaging(player, inventory, page, choices.size());
 
         MenuScaffold.returnButton(inventory, t(player, "menu.back"));
     }
 
     private ItemStack partyKitTile(Player player, KitDefinition kit) {
-        int presets = innerKits == null ? 0 : innerKits.list(kit.name()).size();
+        // フォルダの親タイルは元の名前とアイコンを保持。左=既定の子、右=子一覧。
+        KitDefinition shown = kitService.tile(kit);
+        List<KitDefinition> children = kitService.children(kit.name());
         List<Component> lore = new ArrayList<>(List.of(
                 UiTheme.divider(),
-                UiTheme.labelValue(line(player, "gui.party-arena"), kit.hasFixedArena()
-                        ? com.rumilance.practice.util.KitNames.pretty(kit.arenaName())
+                UiTheme.labelValue(line(player, "gui.party-arena"), shown.hasFixedArena()
+                        ? com.rumilance.practice.util.KitNames.pretty(shown.arenaName())
                         : line(player, "gui.queue-random"))));
-        if (presets > 0) {
+        if (!children.isEmpty()) {
             lore.add(UiTheme.blank());
             lore.add(UiTheme.labelValue(line(player, "gui.innerkit-count-label"),
-                    String.valueOf(presets + 1)));
+                    String.valueOf(children.size())));
+            lore.add(UiTheme.labelValue(line(player, "gui.innerkit-default-label"),
+                    com.rumilance.practice.gui.KitDisplayNames.plain(shown)));
             lore.add(UiTheme.hint(line(player, "gui.innerkit-right-hint")));
         }
         lore.add(UiTheme.blank());
@@ -238,18 +245,15 @@ public final class TeamKitSelectGui extends AbstractGui {
                 .build();
     }
 
-    /**
-     * 中キット: RIGHT click on a kit that has presets opens the preset list; the battle then
-     * fights with that loadout. Kits without presets, and every left click, behave as before.
-     */
+    /** Folder RIGHT-click opens its child-kit list; LEFT fights with the default child. */
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot,
                             String action, org.bukkit.event.inventory.ClickType clickType) {
         if (clickType == org.bukkit.event.inventory.ClickType.RIGHT
                 && action != null && action.startsWith("kit:")
-                && innerKitSelectGui != null && innerKits != null) {
+                && innerKitSelectGui != null) {
             String kitId = action.substring("kit:".length());
-            if (innerKits.has(kitId)) {
+            if (kitService.isFolder(kitId)) {
                 sounds.play(player, "gui-click");
                 session.setNavigatingAway(true);
                 innerKitSelectGui.openForTeam(player, session, kitId);
@@ -261,7 +265,17 @@ public final class TeamKitSelectGui extends AbstractGui {
 
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot, String action) {
-        if (action != null && action.startsWith("cat:")) {
+        if (action == null) {
+            return;
+        }
+        if (action.startsWith("page:")) {
+            session.setPage(Math.max(0, session.page()
+                    + ("page:next".equals(action) ? 1 : -1)));
+            sounds.play(player, "gui-click");
+            refresh(player, session, inventory);
+            return;
+        }
+        if (action.startsWith("cat:")) {
             session.setKitCategory(action.substring(4));
             session.setPage(0);
             sounds.play(player, "gui-click");
@@ -336,6 +350,8 @@ public final class TeamKitSelectGui extends AbstractGui {
      * (null / blank / {@code default} = the kit itself, exactly as before).
      */
     public void proceedWithKit(Player player, String kitId, String innerKitId) {
+        // フォルダ(中メニュー)を渡されたらデフォルトの子で戦う。中メニューから選んだ子はそのまま。
+        kitId = kitService.playableId(kitId);
         // Validate split readiness BEFORE entering map selection so the owner
         // gets the same errors as before.
         TeamService.Result precheck = teamService.preflightStart(player);

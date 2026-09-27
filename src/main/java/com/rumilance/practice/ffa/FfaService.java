@@ -402,7 +402,7 @@ public final class FfaService {
                 // block rules existed inherit the kit's block settings once, and the
                 // inherited values are persisted immediately below so a plugin update
                 // never silently changes behavior (later kit edits no longer bleed in).
-                KitDefinition legacyKit = kitService.get(kitId).orElse(null);
+                KitDefinition legacyKit = kitForArena(kitId).orElse(null);
                 if (legacyKit != null) {
                     blockPlace = legacyKit.allowsBlockPlace();
                     blockBreak = legacyKit.blockBreak();
@@ -523,6 +523,15 @@ public final class FfaService {
         return arenas.get(id.toLowerCase());
     }
 
+    /**
+     * An arena referencing a folder uses its current default child for normal FFA kit rules and
+     * items, just like clicking the folder. Crystal FFA remains pinned to its specially declared
+     * kit: KIT1..9 variants are keyed by that original kit id and must not be silently rekeyed.
+     */
+    public Optional<KitDefinition> kitForArena(String kitId) {
+        return kitService.get(kitId).map(kit -> kit.crystalFfa() ? kit : kitService.tile(kit));
+    }
+
     public boolean join(Player player, String arenaId) {
         if (runtimeFlags.maintenance() && !player.hasPermission("rumilance.admin")) {
             messageService.send(player, "ffa.maintenance");
@@ -555,7 +564,7 @@ public final class FfaService {
             messageService.send(player, "ffa.cannot-join");
             return false;
         }
-        KitDefinition kit = kitService.get(arena.kitId()).orElse(null);
+        KitDefinition kit = kitForArena(arena.kitId()).orElse(null);
         if (kit == null) {
             messageService.send(player, "ffa.kit-missing");
             return false;
@@ -811,7 +820,7 @@ public final class FfaService {
         }
         return arenaOf(player.getUniqueId())
                 .flatMap(this::get)
-                .map(arena -> kitService.get(arena.kitId()).orElse(null))
+                .map(arena -> kitForArena(arena.kitId()).orElse(null))
                 .filter(KitDefinition::crystalFfa)
                 .orElse(null);
     }
@@ -1000,7 +1009,7 @@ public final class FfaService {
     private KitDefinition kitOfPlayer(UUID playerId) {
         return arenaOf(playerId)
                 .flatMap(FfaService.this::get)
-                .flatMap(arena -> kitService.get(arena.kitId()))
+                .flatMap(arena -> kitForArena(arena.kitId()))
                 .orElse(null);
     }
 
@@ -1105,7 +1114,7 @@ public final class FfaService {
         if (arena == null) {
             return;
         }
-        KitDefinition kit = kitService.get(arena.kitId()).orElse(null);
+        KitDefinition kit = kitForArena(arena.kitId()).orElse(null);
         // Wipe the previous life's items BEFORE the teleport. The kit is handed out only AFTER
         // the teleport lands (see teleportIntoArena) so the player never briefly holds the new
         // kit at the old death spot, and arrives at spawn fully kitted — the same order the
@@ -1928,7 +1937,7 @@ public final class FfaService {
         if (arena == null) {
             return;
         }
-        kitService.get(arena.kitId()).ifPresent(kit -> {
+        kitForArena(arena.kitId()).ifPresent(kit -> {
             if (kit.crystalFfa()) {
                 // Crystal FFA: a kill is NOT a free re-kit. The winner keeps fighting with
                 // what they have (their own HP too) and tops consumables up with /regear

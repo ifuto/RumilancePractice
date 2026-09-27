@@ -173,12 +173,18 @@ public final class TeamCommand implements CommandExecutor, TabCompleter {
                     player.sendMessage(Component.text("Usage: /team queue <kit>", NamedTextColor.YELLOW));
                     return true;
                 }
-                String queueKit = args[1].toLowerCase(Locale.ROOT);
-                if (kitService.get(queueKit).filter(k -> k.enabled()).isEmpty()) {
+                // Team Fight Queue is Queue too: even /team queue <child> uses only the
+                // folder's default child, never an arbitrary child through a command bypass.
+                String queueArg = args[1].toLowerCase(Locale.ROOT);
+                var requested = kitService.get(queueArg).orElse(null);
+                var topLevel = requested != null && requested.isChild()
+                        ? kitService.get(requested.parent()).orElse(null) : requested;
+                var actual = topLevel == null ? null : kitService.tile(topLevel);
+                if (actual == null || !topLevel.enabled() || !actual.enabled()) {
                     player.sendMessage(err(TeamService.Result.KIT_NOT_FOUND));
                     return true;
                 }
-                TeamService.Result qr = teamService.queueFight(player, queueKit);
+                TeamService.Result qr = teamService.queueFight(player, actual.name());
                 if (qr != TeamService.Result.OK) player.sendMessage(err(qr));
             }
             case "unqueue" -> {

@@ -18,34 +18,14 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * 中キット (inner kits): named presets that live <b>inside</b> one official kit.
+ * Legacy inner-kit preset reader / one-time migration to real child kits. The old
+ * {@code kits.<kit>.inner-kits} loadout-only format is read at startup so installed servers
+ * can upgrade without losing their settings or personal rearrangements. The current player
+ * pickers and admin GUI use ordinary {@link com.rumilance.practice.model.KitDefinition}s with
+ * {@code parent} / {@code default-child}; they never create new legacy preset sections.
  *
- * <p>An {@code Axe} kit can carry {@code HQ Style Axe}, {@code Club Style Axe},
- * {@code Hatena Style Axe} … Each one is a full 41-slot loadout (main inventory, armour,
- * off-hand) that replaces the kit's own items — every other rule of the fight (max health,
- * pearls, block rules, arenas, start effects) still comes from the parent kit, because a
- * 中キット is a loadout, not a new kit.</p>
- *
- * <p><b>The default is not a stored preset and its contents cannot be changed.</b> What Queue
- * hands out — the kit's own items, {@link KitLoadout#fromOfficial} — is always the default, is
- * always listed first, cannot be created over, edited as a preset or removed, and no other
- * preset can be promoted to default. Its <b>label</b> is separate from the kit's name:
- * {@code /kit preset default axe HQ Style Axe} lists the kit {@code Axe} as
- * {@code HQ Style Axe [Default]}, stored as {@code inner-kits.default.display-name} — a label
- * only, and a {@code layout} written there is ignored. A 中キット can be chosen only where a
- * RIGHT click offers the list: Duel Request, Party Fight and Kit Edit. A LEFT click and every
- * queue path fight the default, exactly as before.</p>
- *
- * <p><b>A preset's contents are complete.</b> Applying one goes through
- * {@link KitService#applyExact}, never {@link KitLoadout#resolve}: slots the preset leaves empty
- * stay empty instead of being filled back from the kit, because a preset differs in the items
- * themselves, not only in their arrangement.</p>
- *
- * <p>Storage is {@code kits.<kit>.inner-kits.<id>} in kits.yml — {@code display-name},
- * {@code icon} and a {@code layout} map of {@code <slot>: <base64 item>} for the non-empty
- * slots, using the same {@link ItemSerializer} encoding the kit's own armour entries use.
- * Presets are created and removed with {@code /kit preset …} (admin) and their contents are
- * edited in the normal kit editor.</p>
+ * <p>The old lookup methods remain for compatibility with in-flight requests that may still
+ * reference an old preset name, and for mixed-version servers which reload configs mid-fight.</p>
  */
 public final class InnerKitService {
 
@@ -83,6 +63,7 @@ public final class InnerKitService {
     }
 
     private final ConfigService configService;
+    private final FileConfiguration standaloneYaml;
     private final Logger logger;
     /** kit id (lowercase) -> presets in declaration order. */
     private final Map<String, Map<String, InnerKit>> byKit = new ConcurrentHashMap<>();
@@ -91,8 +72,27 @@ public final class InnerKitService {
 
     public InnerKitService(ConfigService configService, Logger logger) {
         this.configService = Objects.requireNonNull(configService, "configService");
+        this.standaloneYaml = null;
         this.logger = logger;
         reload();
+    }
+
+    /** Test seam shared with KitService: in-memory kits.yml with no Paper scheduler. */
+    InnerKitService(FileConfiguration kitsYaml, Logger logger) {
+        this.configService = null;
+        this.standaloneYaml = Objects.requireNonNull(kitsYaml);
+        this.logger = logger;
+        reload();
+    }
+
+    private FileConfiguration yaml() {
+        return standaloneYaml == null ? configService.kits() : standaloneYaml;
+    }
+
+    private void saveKits() {
+        if (configService != null) {
+            configService.save(ConfigService.KITS);
+        }
     }
 
     // ---------------------------------------------------------------- read
@@ -101,7 +101,7 @@ public final class InnerKitService {
     public void reload() {
         byKit.clear();
         defaultNames.clear();
-        FileConfiguration yaml = configService.kits();
+        FileConfiguration yaml = yaml();
         ConfigurationSection kits = yaml.getConfigurationSection("kits");
         if (kits == null) {
             return;
@@ -262,7 +262,7 @@ public final class InnerKitService {
         if (label.isEmpty() || label.equals("-") || label.equalsIgnoreCase("reset")) {
             defaultNames.remove(key);
             parent.set(DEFAULT_ID, null);
-            configService.save(ConfigService.KITS);
+            saveKits();
             return true;
         }
         defaultNames.put(key, label);
@@ -271,7 +271,7 @@ public final class InnerKitService {
             section = parent.createSection(DEFAULT_ID);
         }
         section.set("display-name", label);
-        configService.save(ConfigService.KITS);
+        saveKits();
         return true;
     }
 
@@ -334,7 +334,7 @@ public final class InnerKitService {
         ConfigurationSection section = innerSection(kitId, false);
         if (section != null) {
             section.set(normalizeId(innerId), null);
-            configService.save(ConfigService.KITS);
+            saveKits();
         }
         return true;
     }
@@ -375,7 +375,7 @@ public final class InnerKitService {
         if (kitId == null || kitId.isBlank()) {
             return false;
         }
-        ConfigurationSection kits = configService.kits().getConfigurationSection("kits");
+        ConfigurationSection kits = yaml().getConfigurationSection("kits");
         if (kits == null) {
             return false;
         }
@@ -389,7 +389,7 @@ public final class InnerKitService {
 
     /** The {@code kits.<kit>.inner-kits} section, creating it when {@code create} is true. */
     private ConfigurationSection innerSection(String kitId, boolean create) {
-        FileConfiguration yaml = configService.kits();
+        FileConfiguration yaml = yaml();
         ConfigurationSection kits = yaml.getConfigurationSection("kits");
         if (kits == null) {
             return null;
@@ -431,7 +431,7 @@ public final class InnerKitService {
         for (Map.Entry<String, String> entry : encoded.entrySet()) {
             section.set("layout." + entry.getKey(), entry.getValue());
         }
-        configService.save(ConfigService.KITS);
+        saveKits();
     }
 
     /** {@code <slot> -> base64 item} for the non-empty slots of a 41-slot loadout. */
@@ -482,6 +482,139 @@ public final class InnerKitService {
             }
         }
         return layout;
+    }
+
+    // ---------------------------------------------------------------- 自動引き継ぎ (migration)
+
+    /**
+     * 旧「中キット(プリセット)」を **普通のキット** へ一度だけ引き継ぐ。
+     *
+     * <p>プリセットは「親キットの中に入っている41スロットの入れ替え」だったが、中メニュー方式では
+     * 子は**それ自体がキット**(自分の名前・アイコン・中身・ルールを持つ)で、親はフォルダになる。
+     * そこで起動時に {@code kits.<kit>.inner-kits} を見て、</p>
+     * <ol>
+     *   <li>既定エントリ(= 親キット本体) → 子キット {@code <kit>-default}。中身は親のまま、
+     *       表示名は {@code inner-kits.default.display-name}(無ければ親の表示名)。</li>
+     *   <li>各プリセット → 子キット {@code <kit>-<presetId>}。中身はプリセットの41スロット、
+     *       表示名/アイコンはプリセットのもの、その他のルールは親からコピー。</li>
+     *   <li>親は {@code default-child} に {@code <kit>-default} を持つフォルダになり、
+     *       {@code inner-kits} セクションは消える(自分の items は「子を全部消したときの戻り先」として残す)。</li>
+     * </ol>
+     * <p>冪等: {@code inner-kits} が無ければ何もしない。 id が既存キットと衝突するときは
+     * {@code -2}, {@code -3} … を付けて避ける。</p>
+     *
+     * @return 引き継いで作った子キットの数(0 = 引き継ぐものが無かった)
+     */
+    public int migrateToChildKits(KitService kitService) {
+        if (kitService == null || byKit.isEmpty()) {
+            return 0;
+        }
+        FileConfiguration yaml = yaml();
+        int created = 0;
+        // Look only at the OLD inner-kits sections. A regular kits.yml without these sections
+        // never creates a folder on upgrade; the admin decides which kit becomes a folder.
+        for (String parentKey : List.copyOf(byKit.keySet())) {
+            com.rumilance.practice.model.KitDefinition parent =
+                    kitService.get(parentKey).orElse(null);
+            Map<String, InnerKit> presets = byKit.get(parentKey);
+            if (parent == null || presets == null || presets.isEmpty()) {
+                // Leave orphaned/label-only sections untouched: never delete something we cannot
+                // migrate, and never turn a kit into a folder just because a label was saved.
+                continue;
+            }
+            try {
+                // The parent's original items, rules, player layouts and ranked history all
+                // survive in its new default child. If a restart interrupted an earlier attempt,
+                // ensureFolder returns the existing child and the DB copy is idempotent.
+                boolean wasFolder = kitService.isFolder(parentKey);
+                com.rumilance.practice.model.KitDefinition defaultKit =
+                        kitService.ensureFolder(parentKey).orElse(null);
+                if (defaultKit == null) {
+                    continue;
+                }
+                if (!wasFolder) {
+                    created++;
+                }
+                String label = defaultNames.get(parentKey);
+                if (label != null && !label.isBlank()
+                        && !defaultKit.displayName().equals(stripBadge(label))) {
+                    kitService.save(defaultKit.toBuilder().displayName(stripBadge(label)).build());
+                }
+                for (InnerKit preset : presets.values()) {
+                    if (preset == null || isDefault(preset.id())) {
+                        continue;
+                    }
+                    String id = migratedChildId(kitService, parentKey, preset.id());
+                    // Old personal preset arrangements were stored as *full* snapshots under
+                    // parent#preset#id. The new child is a normal kit, so it reads childId rows.
+                    // Keep the old rows for backup and never overwrite a new child layout.
+                    kitService.copyPersonalLayouts(layoutKey(parentKey, preset.id()), id);
+                    if (kitService.get(id).isPresent()) {
+                        continue; // earlier attempt already saved this child
+                    }
+                    com.rumilance.practice.model.KitDefinition child = kitService.createChild(
+                            id, parentKey, preset.layout(), preset.icon(), preset.displayName());
+                    if (child == null) {
+                        throw new IllegalStateException("Could not create child kit " + id);
+                    }
+                    created++;
+                }
+                // Only after every child and its personal layouts have been copied can the old
+                // section go. Running migration again will no-op; the parent and children are kits.
+                yaml.set("kits." + parent.name() + ".inner-kits", null);
+                saveKits();
+            } catch (RuntimeException e) {
+                if (logger != null) {
+                    logger.log(Level.SEVERE, "Could not migrate old inner-kits on " + parentKey
+                            + "; the original inner-kits section was kept for the next startup", e);
+                }
+            }
+        }
+        // Clear legacy runtime lookups after persisting the new kit definitions. The old preset
+        // system must never override a child kit's real contents at match start.
+        reload();
+        return created;
+    }
+
+    /** Reuses a child from an interrupted migration, or allocates a collision-free id. */
+    private static String migratedChildId(KitService kitService, String parentId, String suffix) {
+        String base = (parentId + "-" + normalizeId(suffix)).toLowerCase(Locale.ROOT);
+        String id = base;
+        for (int n = 2; ; n++) {
+            com.rumilance.practice.model.KitDefinition existing = kitService.get(id).orElse(null);
+            if (existing == null || parentId.equalsIgnoreCase(existing.parent())) {
+                return id;
+            }
+            id = base + "-" + n;
+        }
+    }
+
+    /** 末尾の {@code [Default]} 飾りを落とす(子メニュー側で badge は付け直すため)。 */
+    public static String stripBadge(String label) {
+        String text = label == null ? "" : label.trim();
+        String badge = DEFAULT_BADGE.trim();
+        while (text.toLowerCase(Locale.ROOT).endsWith(badge.toLowerCase(Locale.ROOT))) {
+            text = text.substring(0, text.length() - badge.length()).trim();
+        }
+        return text.isEmpty() ? DEFAULT_BADGE : text;
+    }
+
+    /** A 41-slot layout as kit item entries (full NBT, armor slots included). */
+    static List<com.rumilance.practice.model.KitItemEntry> entriesFromLayout(ItemStack[] layout) {
+        List<com.rumilance.practice.model.KitItemEntry> items = new ArrayList<>();
+        if (layout == null) {
+            return items;
+        }
+        for (int slot = 0; slot < layout.length && slot < KitLoadout.SIZE; slot++) {
+            ItemStack stack = layout[slot];
+            if (stack == null || stack.getType().isAir() || KitLayoutContents.isPlaceholder(stack)) {
+                continue;
+            }
+            items.add(new com.rumilance.practice.model.KitItemEntry(
+                    slot, stack.getType().name(), stack.getAmount(), null,
+                    ItemSerializer.singleToBase64(stack)));
+        }
+        return items;
     }
 
     // ---------------------------------------------------------------- pure helpers

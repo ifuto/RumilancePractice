@@ -64,6 +64,11 @@ public final class RumilanceReloadCommand implements CommandExecutor, TabComplet
         safe(done, failed, "sounds", () -> services.get(SoundService.class).reload());
         safe(done, failed, "lobby", () -> services.get(LobbyService.class).reload());
         safe(done, failed, "kits", () -> services.get(KitService.class).reload());
+        safe(done, failed, "old-inner-kits", () -> services.find(com.rumilance.practice.kit.InnerKitService.class)
+                .ifPresent(legacy -> {
+                    legacy.reload();
+                    legacy.migrateToChildKits(services.get(KitService.class));
+                }));
         safe(done, failed, "arenas", () -> {
             ArenaTemplateStore store = services.find(ArenaTemplateStore.class).orElse(null);
             if (store != null) {
