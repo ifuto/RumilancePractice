@@ -143,7 +143,7 @@ tools/release/attach-pack.sh v1.76.52
 新しいタグに上げる場合は URL も追随させます:
 
 ```bash
-tools/release/build-pack.sh --tag v1.76.59   # config.yml の resource-pack.url / sha1 を同期
+tools/release/build-pack.sh --tag v1.76.60   # config.yml の resource-pack.url / sha1 を同期
 # ResourcePackService.java の DEFAULT_URL も同じタグに更新 → 再ビルド
 ```
 
