@@ -68,6 +68,7 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
     /** 中キット (inner kits): preset loadouts stored inside a kit. Wired from bootstrap. */
     private com.rumilance.practice.kit.InnerKitService innerKits;
     private InnerKitSelectGui innerKitSelectGui;
+    private InnerKitAdminGui innerKitAdminGui;
 
     public void setInnerKits(com.rumilance.practice.kit.InnerKitService innerKits) {
         this.innerKits = innerKits;
@@ -75,6 +76,11 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
 
     public void setInnerKitSelectGui(InnerKitSelectGui innerKitSelectGui) {
         this.innerKitSelectGui = innerKitSelectGui;
+    }
+
+    /** 中キットの管理画面（Admin 専用）。ここからでも右クリックで開けるようにする。 */
+    public void setInnerKitAdminGui(InnerKitAdminGui innerKitAdminGui) {
+        this.innerKitAdminGui = innerKitAdminGui;
     }
 
     /** The 中キット being edited, or null for the kit's own (default) loadout. */
@@ -473,7 +479,8 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
                 ? session.targetPlayer() : player.getUniqueId();
         ItemStack[] layout = KitLayoutContents.retainOrLoad(
                 session.get("layout", ItemStack[].class),
-                loadLayout(layoutOwner, kit, crystalVariant(session), innerKit(session)));
+                loadLayout(layoutOwner, kit, crystalVariant(session), innerKit(session),
+                        personalPresetEdit(player)));
         // armor row visually: helmet/chest/legs/boots + offhand
         inventory.setItem(GuiSlots.slot(0, 1), tagged(player, layout.length > 36 ? layout[36] : null,
                 isViewOnly(session) ? "decorate" : "slot:36"));
@@ -653,25 +660,32 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
     }
 
     private ItemStack[] loadLayout(UUID uuid, KitDefinition kit) {
-        return loadLayout(uuid, kit, null, null);
+        return loadLayout(uuid, kit, null, null, false);
     }
 
     /** Variant-aware load: {@code crystal} 1..9 reads {@code <kit>#v<n>} (falls back to the
      * kit's official layout when that slot was never saved). */
     private ItemStack[] loadLayout(UUID uuid, KitDefinition kit, Integer crystal) {
-        return loadLayout(uuid, kit, crystal, null);
+        return loadLayout(uuid, kit, crystal, null, false);
     }
 
     /**
      * 中キット-aware load: a preset's loadout is shared by everybody and lives in kits.yml, so it
-     * wins over both the player's own rearrangement and the crystal variant slots. The array is
-     * cloned because the editor writes slots in place.
+     * wins over the crystal variant slots. An ADMIN edits that shared loadout itself; anybody else
+     * edits their own arrangement of it — positions only, the items stay the admin's — which is
+     * stored per player under a composite layout key. The array is cloned because the editor writes
+     * slots in place.
      */
-    private ItemStack[] loadLayout(UUID uuid, KitDefinition kit, Integer crystal, String innerKit) {
+    private ItemStack[] loadLayout(UUID uuid, KitDefinition kit, Integer crystal, String innerKit,
+                                   boolean personal) {
         if (innerKits != null && !com.rumilance.practice.kit.InnerKitService.isDefault(innerKit)) {
             ItemStack[] preset = innerKits.layout(kit.name(), innerKit).orElse(null);
             if (preset != null) {
-                return preset.clone();
+                if (!personal) {
+                    return preset.clone();
+                }
+                ItemStack[] mine = personalPresetLayout(uuid, kit.name(), innerKit, preset);
+                return mine != null ? mine : preset.clone();
             }
         }
         String key = crystal == null ? kit.name() : CrystalFfaStore.variantKey(kit.name(), crystal);
@@ -684,6 +698,27 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             // fall through
         }
         return defaultLayout(kit);
+    }
+
+    /**
+     * The player's saved arrangement of one 中キット, re-applied to the preset's CURRENT contents so
+     * a later admin edit of the preset still decides what is in the fight.
+     */
+    private ItemStack[] personalPresetLayout(UUID uuid, String kitId, String innerKit,
+                                             ItemStack[] preset) {
+        String key = com.rumilance.practice.kit.InnerKitService.layoutKey(kitId, innerKit);
+        layoutCache.loadSyncIfAbsent(uuid, key);
+        ItemStack[] saved = layoutCache.get(uuid, key).orElse(null);
+        return saved == null
+                ? null : com.rumilance.practice.kit.KitLoadout.reorder(preset, saved);
+    }
+
+    /**
+     * Creating, deleting and rewriting a 中キット stays an admin job. A player who opens one only
+     * moves its items around for themselves — the item kinds and amounts cannot change.
+     */
+    private boolean personalPresetEdit(Player player) {
+        return player == null || !player.hasPermission("rumilance.admin");
     }
 
     /** Full-NBT kit entry when available; plain material+amount otherwise. */
@@ -750,11 +785,17 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         if (isViewOnly(session) && !"back".equals(action) && !"close".equals(action)) {
             return;
         }
-        // 中キット: キット一覧での右クリックはプリセット一覧へ（左クリックは今まで通り即編集）。
+        // 中キット: キット一覧での右クリック。Admin は管理画面、プレイヤーは配置変更の一覧へ
+        //（左クリックは今まで通り即編集）。
         if (clickType == org.bukkit.event.inventory.ClickType.RIGHT
                 && action != null && action.startsWith("editkit:")
                 && innerKitSelectGui != null) {
             String pickedKit = action.substring("editkit:".length());
+            if (innerKitAdminGui != null && player.hasPermission("rumilance.admin")) {
+                session.setNavigatingAway(true);
+                innerKitAdminGui.open(player, pickedKit, InnerKitAdminGui.ORIGIN_EKIT);
+                return;
+            }
             if (innerKits != null && innerKits.has(pickedKit)) {
                 session.setNavigatingAway(true);
                 innerKitSelectGui.openForEdit(player, session, pickedKit);
@@ -844,7 +885,7 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             return;
         }
         if ("save".equals(action)) {
-            save(player, session);
+            save(player, session, inventory);
             return;
         }
         if ("reset".equals(action)) {
@@ -867,10 +908,22 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         ItemStack[] fresh = defaultLayout(kit);
         String inner = innerKit(session);
         if (innerKits != null && !com.rumilance.practice.kit.InnerKitService.isDefault(inner)) {
-            // プリセットの「初期状態」= 保存済みの中身（無ければキット本体の構成）。共有プリセットの
-            // 編集なので、個人のレイアウトDB行やキャッシュには触らない。
+            // プリセットの「初期状態」= 保存済みの中身（無ければキット本体の構成）。
             ItemStack[] stored = innerKits.layout(kitId, inner).orElse(null);
             fresh = stored != null ? stored.clone() : fresh;
+            if (personalPresetEdit(player)) {
+                // プレイヤーの場合は「自分の並び」だけ捨てて、プリセット本来の配置に戻す。
+                // kits.yml の共有プリセットには触らない。
+                String personalKey = com.rumilance.practice.kit.InnerKitService.layoutKey(kitId, inner);
+                layoutCache.invalidate(player.getUniqueId(), personalKey);
+                asyncExecutor.execute(() -> {
+                    try {
+                        layoutRepository.delete(player.getUniqueId(), personalKey);
+                    } catch (Exception ignored) {
+                        // 未保存なら消すものが無いだけ。
+                    }
+                });
+            }
             session.put("layout", fresh);
             stashCurrentLayout(player, session);
             render(player, session, inventory);
@@ -958,8 +1011,15 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         }
     }
 
-    private void save(Player player, GuiSession session) {
+    private void save(Player player, GuiSession session, Inventory inventory) {
         persistLayout(player, session, true);
+        // 中キットの並びを保存したときは、プリセットに無いアイテムが消えた「本当の結果」を
+        // その場で画面にも出す（保存した内容と表示が食い違ったままにならないように）。
+        String inner = innerKit(session);
+        if (inventory != null && innerKits != null && personalPresetEdit(player)
+                && !com.rumilance.practice.kit.InnerKitService.isDefault(inner)) {
+            render(player, session, inventory);
+        }
     }
 
     /**
@@ -977,6 +1037,11 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         String inner = innerKit(session);
         if (innerKits != null && layout != null
                 && !com.rumilance.practice.kit.InnerKitService.isDefault(inner)) {
+            if (personalPresetEdit(player)) {
+                // 一般プレイヤーは kits.yml を触れない：自分の並びだけを個人レイアウトに保存する。
+                persistPersonalPreset(player, session, kitId, inner, layout, notify);
+                return;
+            }
             if (innerKits.saveLayout(kitId, inner, layout)) {
                 if (notify) {
                     sounds.play(player, "select");
@@ -989,6 +1054,51 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             return;
         }
         persistLayout(player, kitId, layout, notify, crystalVariant(session));
+    }
+
+    /**
+     * Saves one player's own arrangement of a 中キット. The row holds the preset's items placed the
+     * way that player wants them, under a composite key ({@code kit#preset#id}) so it can never
+     * collide with the kit's own layout or a crystal variant slot. Items that are not part of the
+     * preset are dropped here already, so even a tampered editor cannot add anything to the fight.
+     */
+    private void persistPersonalPreset(Player player, GuiSession session, String kitId, String inner,
+                                       ItemStack[] layout, boolean notify) {
+        String key = com.rumilance.practice.kit.InnerKitService.layoutKey(kitId, inner);
+        ItemStack[] preset = innerKits.layout(kitId, inner).orElse(null);
+        ItemStack[] ordered = preset == null
+                ? layout.clone() : com.rumilance.practice.kit.KitLoadout.reorder(preset, layout);
+        if (session != null) {
+            // 保存するのは「プリセットの中身を自分の並びに置き直した結果」。エディタの元データも
+            // それに合わせる（足したアイテムは消え、減らしたアイテムは戻る）。
+            session.put("layout", ordered.clone());
+            stashCurrentLayout(player, session);
+        }
+        // kit=null は「フルbase64で保存」の意味。差分はキット本体との差になってしまうため使えない。
+        KitLayoutSnapshot snap = KitLayoutSnapshot.create(player.getUniqueId(), key,
+                KitLayoutDelta.encode(ordered, null));
+        layoutCache.put(player.getUniqueId(), key, ordered);
+        asyncExecutor.execute(() -> {
+            try {
+                layoutRepository.upsert(snap);
+                if (!notify) {
+                    return;
+                }
+                player.getServer().getScheduler().runTask(
+                        JavaPlugin.getProvidingPlugin(EditKitGui.class),
+                        () -> {
+                            sounds.play(player, "select");
+                            player.sendMessage(t(player, "gui.innerkit-order-saved"));
+                        });
+            } catch (Exception e) {
+                if (!notify) {
+                    return;
+                }
+                player.getServer().getScheduler().runTask(
+                        JavaPlugin.getProvidingPlugin(EditKitGui.class),
+                        () -> player.sendMessage(t(player, "gui.save-failed")));
+            }
+        });
     }
 
     public void persistLayout(Player player, String kitId, ItemStack[] layout, boolean notify) {

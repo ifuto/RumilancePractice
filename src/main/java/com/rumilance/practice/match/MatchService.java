@@ -1331,22 +1331,33 @@ public final class MatchService {
     }
 
     /**
-     * Kit + the match's 中キット. A preset's contents are authoritative and shared by everybody
-     * in the fight: they replace the kit's own items AND the player's personal rearrangement,
-     * with nothing filled back from the kit (an empty preset slot stays empty). Without a preset
-     * nothing changes and the player's own layout still applies.
+     * Kit + the match's 中キット. A preset's contents are authoritative and shared by everybody in
+     * the fight: they replace the kit's own items, with nothing filled back from the kit (an empty
+     * preset slot stays empty). What a player keeps is WHERE those items sit — their own arrangement
+     * of the preset is laid over it, positions only, so the item kinds and amounts stay exactly what
+     * the admin defined. Without a preset nothing changes and the player's own layout still applies.
      */
     private void applyKit(Player player, KitDefinition kit, MatchSession session) {
         String inner = session == null ? null : session.innerKit();
         if (inner != null && innerKits != null) {
             ItemStack[] preset = innerKits.layout(kit.name(), inner).orElse(null);
             if (preset != null) {
-                kitService.applyExact(player, kit, preset.clone());
+                ItemStack[] mine = personalPresetOrder(player.getUniqueId(), kit.name(), inner);
+                kitService.applyExact(player, kit, mine == null
+                        ? preset.clone()
+                        : com.rumilance.practice.kit.KitLoadout.reorder(preset, mine));
                 PlayerVitals.applyCombatStart(player, kit.maxHealth());
                 return;
             }
         }
         applyKit(player, kit);
+    }
+
+    /** The player's own arrangement of a 中キット, or null when they never changed it. */
+    private ItemStack[] personalPresetOrder(java.util.UUID uuid, String kitId, String inner) {
+        String key = com.rumilance.practice.kit.InnerKitService.layoutKey(kitId, inner);
+        layoutCache.loadSyncIfAbsent(uuid, key);
+        return layoutCache.get(uuid, key).orElse(null);
     }
 
     private void applyKit(Player player, KitDefinition kit) {

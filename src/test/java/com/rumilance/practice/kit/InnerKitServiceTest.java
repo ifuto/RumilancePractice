@@ -15,6 +15,26 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 final class InnerKitServiceTest {
 
     @Test
+    void layoutKeyIsCompositeLowerCaseAndStable() {
+        // 個人の「中キットの並び」は kit_layouts に置くので、キット本体やクリスタル変種と衝突しない
+        // キーであること。innerId は保存用の id（slug 形）で渡り、normalizeId は trim + 小文字化
+        // だけなので、大文字小文字や前後空白の違いで別の行ができないことも確認する。
+        assertEquals("axe#preset#club-style-axe",
+                InnerKitService.layoutKey("Axe", "club-style-axe"));
+        assertEquals(InnerKitService.layoutKey("axe", "club-style-axe"),
+                InnerKitService.layoutKey(" AXE ", " Club-Style-Axe "));
+        assertEquals("axe#preset#", InnerKitService.layoutKey("axe", null));
+    }
+
+    @Test
+    void layoutKeyCannotCollideWithCrystalVariantKeys() {
+        // crystal variant keys are "<kit>#v<n>" — even a preset literally named "v3" stays apart.
+        String variant = "axe#v3";
+        assertFalse(variant.equals(InnerKitService.layoutKey("axe", "v3")));
+        assertFalse(variant.equals(InnerKitService.layoutKey("axe", null)));
+    }
+
+    @Test
     void slugBuildsStableStorageIds() {
         assertEquals("hq-style-axe", InnerKitService.slug("HQ Style Axe"));
         assertEquals("club-style-axe", InnerKitService.slug("Club Style Axe"));

@@ -215,7 +215,7 @@ public final class InnerKitSelectGui extends AbstractGui {
                         selected ? UiTheme.SUCCESS : UiTheme.VALUE))
                 .lore(
                         UiTheme.divider(),
-                        UiTheme.line(line(player, originLoreKey(session))),
+                        UiTheme.line(line(player, originLoreKey(player, session))),
                         UiTheme.blank(),
                         UiTheme.labelValue(line(player, "gui.innerkit-id-label"), preset.id()),
                         UiTheme.blank(),
@@ -229,13 +229,15 @@ public final class InnerKitSelectGui extends AbstractGui {
     }
 
     /** One hint line per origin, so the list says what the click will do. */
-    private String originLoreKey(GuiSession session) {
+    private String originLoreKey(Player player, GuiSession session) {
         String origin = session.get(ORIGIN_KEY, String.class);
         if (ORIGIN_TEAM.equals(origin)) {
             return "gui.innerkit-team-lore";
         }
         if (ORIGIN_EDIT.equals(origin)) {
-            return "gui.innerkit-edit-lore";
+            // 中キットの中身を書き換えられるのは Admin だけ。それ以外は「自分の並び」を直す。
+            return player != null && player.hasPermission("rumilance.admin")
+                    ? "gui.innerkit-edit-lore" : "gui.innerkit-order-lore";
         }
         return "gui.innerkit-duel-lore";
     }

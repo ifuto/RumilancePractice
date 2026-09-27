@@ -201,7 +201,7 @@ commands:
     permission: rumilance.admin
   team:
     description: Owner-invite style teams with public/private visibility and red-blue team battles.
-    usage: /team <gui|create|invite|join|decline|leave|kick|public|list|info|side|autosplit|clearsides|start|disband>
+    usage: /team <gui|create|invite|join|decline|leave|kick|public|list|info|side|autosplit|clearsides|start|disband|spectate>
     aliases: [party, p]
     permission: rumilance.user
   tournament:

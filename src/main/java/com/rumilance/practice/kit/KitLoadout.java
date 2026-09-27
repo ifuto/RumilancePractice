@@ -137,6 +137,101 @@ public final class KitLoadout {
         return sanitize(out);
     }
 
+    /**
+     * Positions from {@code order}, items from {@code base} — how a player keeps their own
+     * arrangement of a 中キット whose contents the admin fixed. Only stacks the preset really
+     * contains can end up in the fight (matched by full NBT first, then material + amount, then
+     * material), so dropping, duplicating or smuggling an item in the editor changes nothing:
+     * whatever the arrangement does not mention keeps the preset's own slot, and anything it holds
+     * but the preset does not is dropped.
+     */
+    public static ItemStack[] reorder(ItemStack[] base, ItemStack[] order) {
+        ItemStack[] out = new ItemStack[SIZE];
+        if (base == null) {
+            return out;
+        }
+        ItemStack[] preset = copy41(base);
+        KitLayoutContents.stripPlaceholders(preset);
+        java.util.List<Integer> left = new java.util.ArrayList<>();
+        String[] keys = new String[SIZE];
+        for (int i = 0; i < SIZE; i++) {
+            if (isEmpty(preset[i])) {
+                continue;
+            }
+            left.add(i);
+            keys[i] = ItemSerializer.singleToBase64(preset[i]);
+        }
+        if (left.isEmpty()) {
+            return sanitize(preset);
+        }
+        if (order != null) {
+            ItemStack[] wanted = copy41(order);
+            KitLayoutContents.stripPlaceholders(wanted);
+            for (int slot = 0; slot < SIZE && !left.isEmpty(); slot++) {
+                if (isEmpty(wanted[slot])) {
+                    continue;
+                }
+                int pick = pickIndex(preset, keys, left, wanted[slot]);
+                if (pick < 0) {
+                    continue;
+                }
+                out[slot] = cloneOrNull(preset[pick]);
+                left.remove(Integer.valueOf(pick));
+            }
+        }
+        // Stacks the arrangement never mentioned go back to the preset's own slot ...
+        java.util.Iterator<Integer> rest = left.iterator();
+        while (rest.hasNext()) {
+            int i = rest.next();
+            if (out[i] == null) {
+                out[i] = cloneOrNull(preset[i]);
+                rest.remove();
+            }
+        }
+        // ... and whatever is left (its slot now holds something the player moved there) fills the
+        // first free slot, so an item can never go missing from the fight.
+        for (int i : left) {
+            int free = firstFree(out);
+            if (free < 0) {
+                break;
+            }
+            out[free] = cloneOrNull(preset[i]);
+        }
+        return sanitize(out);
+    }
+
+    /** Best still-unplaced preset stack for {@code want}: exact NBT, material + amount, material. */
+    private static int pickIndex(ItemStack[] preset, String[] keys, java.util.List<Integer> candidates,
+                                ItemStack want) {
+        String key = ItemSerializer.singleToBase64(want);
+        for (int pass = 0; pass < 3; pass++) {
+            for (int i : candidates) {
+                ItemStack have = preset[i];
+                if (pass == 0) {
+                    if (key != null && key.equals(keys[i])) {
+                        return i;
+                    }
+                } else if (pass == 1) {
+                    if (have.getType() == want.getType() && have.getAmount() == want.getAmount()) {
+                        return i;
+                    }
+                } else if (have.getType() == want.getType()) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
+    private static int firstFree(ItemStack[] layout) {
+        for (int i = 0; i < layout.length; i++) {
+            if (isEmpty(layout[i])) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     public static void give(PlayerInventory inventory, ItemStack[] loadout) {
         if (inventory == null || loadout == null) {
             return;

@@ -46,6 +46,7 @@ public final class TeamService {
     /** 解散演出: カン(block.anvil.use)を鳴らし始めてから break 音までの間隔。 */
     private static final long DISBAND_BREAK_DELAY_TICKS = 15L;
 
+    private volatile boolean maintenanceStarted;
     private final Map<UUID, Team> byId = new ConcurrentHashMap<>();
     private final Map<UUID, Team> byMember = new ConcurrentHashMap<>();
     private final Map<UUID, Invite> invites = new ConcurrentHashMap<>();
@@ -70,14 +71,23 @@ public final class TeamService {
         /** 自分のパーティーには申し込めない。 */
         DUEL_SELF,
         /** この操作はチーム / パーティのどちらか専用で、種別が合わない。 */
-        WRONG_KIND
+        WRONG_KIND,
+        /** 観戦できる進行中の試合がない。 */
+        NO_LIVE_MATCH
     }
 
     private volatile com.rumilance.practice.session.PlayerStateManager stateManager;
     private volatile com.rumilance.practice.rank.RankService rankService;
+    /** 試合中のパーティーに入った人に観戦を案内するために使う。 */
+    private volatile com.rumilance.practice.spectator.SpectatorService spectatorService;
 
     public void setRankService(com.rumilance.practice.rank.RankService rankService) {
         this.rankService = rankService;
+    }
+
+    public void setSpectatorService(
+            com.rumilance.practice.spectator.SpectatorService spectatorService) {
+        this.spectatorService = spectatorService;
     }
 
     /**
@@ -171,6 +181,7 @@ public final class TeamService {
                 case NO_PENDING_DUEL -> "party.err-no-pending-duel";
                 case DUEL_SELF -> "party.err-duel-self";
                 case WRONG_KIND -> "party.err-wrong-kind";
+                case NO_LIVE_MATCH -> "party.err-no-live-match";
                 case COOLDOWN, OK, MEMBER_BUSY, SELF_BUSY -> "";
             };
             if (key.isEmpty()) {
@@ -198,6 +209,7 @@ public final class TeamService {
             case NO_PENDING_DUEL -> "No pending team duel request.";
             case DUEL_SELF -> "You cannot challenge your own party.";
             case WRONG_KIND -> "This works only for the right group kind (team or party).";
+            case NO_LIVE_MATCH -> "There is no match to spectate right now.";
             case COOLDOWN -> {
                 int secs = remainingInviteCooldownSeconds(player.getUniqueId(), cooldownTarget);
                 yield "Wait " + Math.max(1, secs) + "s before inviting that player again.";
@@ -338,20 +350,82 @@ public final class TeamService {
         if (!team.isOwner(player.getUniqueId())) {
             return Result.NOT_OWNER;
         }
+        disbandTeam(team, true);
+        return Result.OK;
+    }
+
+    /**
+     * The one place a team stops existing: drops every member, wipes the team's queue / duel state
+     * (a disbanded party left in the draw would pair somebody with a ghost) and removes it from the
+     * registry. Every disband goes through here — the owner's {@code /team disband}, the owner
+     * leaving or quitting, the last member walking out, and the maintenance sweep.
+     */
+    private void disbandTeam(Team team, boolean announce) {
+        if (team == null) {
+            return;
+        }
         // 解散したパーティーが Queue / Duel に残ると、抽選で幽霊と組まされてしまう。
         clearPartyFightState(team.id());
-        broadcast(team, Component.text("Team '" + team.name() + "' disbanded.", NamedTextColor.RED));
-        for (UUID member : team.members()) {
+        if (announce) {
+            broadcast(team, Component.text("Team '" + team.name() + "' disbanded.", NamedTextColor.RED));
+        }
+        for (UUID member : java.util.List.copyOf(team.members())) {
             byMember.remove(member);
-            invites.entrySet().removeIf(e -> e.getValue().teamId().equals(team.id()));
             Player m = Bukkit.getPlayer(member);
             if (m != null) {
                 playDisbandCue(m);
                 restoreLobby(m);
             }
         }
+        invites.entrySet().removeIf(e -> e.getValue().teamId().equals(team.id()));
         byId.remove(team.id());
-        return Result.OK;
+    }
+
+    /** True when any member of {@code team} is still in a live team match. */
+    private boolean anyMemberInLiveMatch(Team team) {
+        for (UUID member : team.members()) {
+            if (isInActiveTeamMatch(member)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Safety net for the disband rules, started once at boot and run every few seconds on the
+     * server thread. A team is dropped when it has no members left, or when it lost its owner
+     * (left or quit mid-match, so the match was allowed to finish first, or the quit event was
+     * missed entirely) and no live match is holding it any more. Without this a team could sit in
+     * the registry with zero members, or ownerless and impossible to disband.
+     */
+    public void startMaintenance() {
+        if (plugin == null || maintenanceStarted) {
+            return;
+        }
+        maintenanceStarted = true;
+        Bukkit.getScheduler().runTaskTimer(plugin, this::sweepDeadTeams, 60L, 60L);
+    }
+
+    void sweepDeadTeams() {
+        if (Bukkit.getOnlinePlayers().isEmpty()) {
+            // 誰も居ない（= シャットダウン処理中）ときは何もしない。解散メッセージの spam 防止。
+            return;
+        }
+        for (Team team : java.util.List.copyOf(byId.values())) {
+            if (team.size() == 0) {
+                disbandTeam(team, false);
+                continue;
+            }
+            // オーナーが居なくなったパーティーは残さない：メンバーから外れた／解散待ちの印が付いた／
+            // そもそもオフライン（quit イベントを取りこぼした場合の保険）。
+            boolean ownerGone = !team.members().contains(team.owner())
+                    || team.isPendingDisband()
+                    || Bukkit.getPlayer(team.owner()) == null;
+            if (!ownerGone || anyMemberInLiveMatch(team)) {
+                continue;
+            }
+            disbandTeam(team, true);
+        }
     }
 
     // ---- membership ----
@@ -432,6 +506,7 @@ public final class TeamService {
         invites.remove(player.getUniqueId());
         applyHotbar(player, team);
         broadcast(team, Component.text(player.getName() + " joined the team.", NamedTextColor.AQUA));
+        offerSpectateButton(player, team);
         return Result.OK;
     }
 
@@ -459,6 +534,21 @@ public final class TeamService {
         Team team = byMember.get(player.getUniqueId());
         if (team == null) return Result.NOT_IN_TEAM;
         if (team.isOwner(player.getUniqueId())) {
+            if (isInActiveTeamMatch(player.getUniqueId())) {
+                // オーナーが試合中に抜ける：進行中の試合はそのまま終わらせて、終わったら解散する。
+                // 試合中にインベントリやロビー復帰を触ると戦闘が壊れるので、ここでは何もしない。
+                team.setPendingDisband(true);
+                team.remove(player.getUniqueId());
+                byMember.remove(player.getUniqueId());
+                recentLeaver.put(player.getUniqueId(), Instant.now());
+                invites.remove(player.getUniqueId());
+                broadcast(team, Component.text(
+                        "Team '" + team.name() + "' will disband when this match ends.",
+                        NamedTextColor.RED));
+                player.sendMessage(Component.text("You left '" + team.name()
+                        + "'. It will disband when this match ends.", NamedTextColor.YELLOW));
+                return Result.OK;
+            }
             return disband(player);
         }
         team.remove(player.getUniqueId());
@@ -466,6 +556,10 @@ public final class TeamService {
         recentLeaver.put(player.getUniqueId(), Instant.now());
         restoreLobby(player);
         broadcast(team, Component.text(player.getName() + " left the team.", NamedTextColor.YELLOW));
+        if (team.size() == 0) {
+            // 誰もいなくなったパーティーは残さない（0人なのに消えない、を防ぐ）。
+            disbandTeam(team, false);
+        }
         return Result.OK;
     }
 
@@ -922,31 +1016,36 @@ public final class TeamService {
             return;
         }
         if (team.isOwner(player) && isInActiveTeamMatch(player)) {
+            // オーナーが試合中に抜けた：進行中の試合は壊さず「解散待ち」の印を付けて、
+            // 試合が終わったら sweepDeadTeams が片付ける（放置されたチームを残さない）。
+            team.setPendingDisband(true);
             team.remove(player);
             byMember.remove(player);
+            broadcast(team, Component.text(
+                    "Team '" + team.name() + "' will disband when this match ends.",
+                    NamedTextColor.RED));
+            invites.remove(player);
             return;
         }
         if (team.isOwner(player)) {
-            for (UUID member : team.members()) {
-                byMember.remove(member);
-                Player p = Bukkit.getPlayer(member);
-                if (p != null) {
-                    restoreLobby(p);
-                    p.sendMessage(Component.text("Team disbanded (owner left).", NamedTextColor.RED));
-                }
-            }
-            byId.remove(team.id());
-        } else {
-            team.remove(player);
-            byMember.remove(player);
-            for (UUID member : team.members()) {
-                Player p = Bukkit.getPlayer(member);
-                if (p != null) {
-                    p.sendMessage(Component.text("A player left the team.", NamedTextColor.YELLOW));
-                }
+            // オーナーが抜けたら解散。Queue / Duel の状態もここでまとめて掃除する。
+            disbandTeam(team, true);
+            invites.remove(player);
+            return;
+        }
+        team.remove(player);
+        byMember.remove(player);
+        for (UUID member : team.members()) {
+            Player p = Bukkit.getPlayer(member);
+            if (p != null) {
+                p.sendMessage(Component.text("A player left the team.", NamedTextColor.YELLOW));
             }
         }
         invites.remove(player);
+        if (team.size() == 0) {
+            // 最後の一人がログアウトしたら、そのパーティーは消す。
+            disbandTeam(team, false);
+        }
     }
 
     // ---- Party vs Party: Team Fight Queue / Team Duel Request ----
@@ -1146,6 +1245,96 @@ public final class TeamService {
         Bukkit.getScheduler().runTask(plugin, () -> matchService.startTeamMatch(
                 sideA, sideB, battleKit, MatchMode.TEAM, 1, arenaName, false));
         return true;
+    }
+
+    /**
+     * The team match somebody of {@code team} is in right now. Only real team matches count, so a
+     * Private FFA — which is not a team match — never shows up here and never gets a spectate offer.
+     */
+    private java.util.Optional<com.rumilance.practice.session.MatchSession> liveTeamMatch(Team team) {
+        for (UUID member : team.members()) {
+            var live = matchService.registry().byPlayer(member)
+                    .filter(com.rumilance.practice.session.MatchSession::isTeamMatch)
+                    .filter(s -> {
+                        com.rumilance.practice.state.MatchState st = s.state();
+                        return st != com.rumilance.practice.state.MatchState.CLOSED
+                                && st != com.rumilance.practice.state.MatchState.FAILED;
+                    })
+                    .findFirst();
+            if (live.isPresent()) {
+                return live;
+            }
+        }
+        return java.util.Optional.empty();
+    }
+
+    /** Any online fighter of {@code session} to attach the spectator camera to. */
+    private Player firstOnlineParticipant(com.rumilance.practice.session.MatchSession session,
+                                         UUID skip) {
+        for (UUID id : session.participants()) {
+            if (id.equals(skip)) {
+                continue;
+            }
+            Player p = Bukkit.getPlayer(id);
+            if (p != null) {
+                return p;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 試合中のパーティーに入った人に「観戦する」ボタンをチャットで渡す。自分がその試合の出場側
+     * だったり、観戦できる試合がなければ何も出さない。
+     */
+    private void offerSpectateButton(Player player, Team team) {
+        if (spectatorService == null || matchService == null) {
+            return;
+        }
+        var session = liveTeamMatch(team).orElse(null);
+        if (session == null || session.participants().contains(player.getUniqueId())) {
+            return;
+        }
+        if (firstOnlineParticipant(session, player.getUniqueId()) == null) {
+            return;
+        }
+        Component intro = messageService == null
+                ? Component.text("This party is in a match. ", NamedTextColor.GRAY)
+                : messageService.render(player, "party.spectate-offer");
+        String label = messageService == null
+                ? "Spectate" : messageService.raw(player, "party.spectate-button");
+        String hover = messageService == null
+                ? "Watch the match in progress" : messageService.raw(player, "party.spectate-hover");
+        player.sendMessage(intro.decoration(TextDecoration.ITALIC, false)
+                .append(com.rumilance.practice.chat.ChatButtons.row(
+                        com.rumilance.practice.chat.ChatButtons.button(
+                                label, "/team spectate", hover))));
+    }
+
+    /**
+     * Puts the player into their team's ongoing match as a spectator — what the chat button runs.
+     */
+    public Result spectateOngoingMatch(Player player) {
+        Team team = byMember.get(player.getUniqueId());
+        if (team == null) {
+            return Result.NOT_IN_TEAM;
+        }
+        if (spectatorService == null || matchService == null) {
+            return Result.NO_LIVE_MATCH;
+        }
+        if (spectatorService.isSpectating(player.getUniqueId())) {
+            // もう観戦中なら何もしない（ボタンを連打されても画面が飛ばないように）。
+            return Result.OK;
+        }
+        var session = liveTeamMatch(team).orElse(null);
+        if (session == null || session.participants().contains(player.getUniqueId())) {
+            return Result.NO_LIVE_MATCH;
+        }
+        Player target = firstOnlineParticipant(session, player.getUniqueId());
+        if (target == null) {
+            return Result.NO_LIVE_MATCH;
+        }
+        return spectatorService.trySpectate(player, target) ? Result.OK : Result.NO_LIVE_MATCH;
     }
 
     private boolean isInActiveTeamMatch(UUID player) {

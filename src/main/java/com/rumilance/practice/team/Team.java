@@ -39,6 +39,8 @@ public final class Team {
     private final java.util.Map<TeamColor, TeamConfig> teamConfigs = new java.util.HashMap<>();
     /** Owner's original-kit slot to fight with (null = normal kit loadouts). */
     private volatile Integer originalKitSlot;
+    /** Owner quit while a match was live: disband as soon as the match is over (see TeamService). */
+    private volatile boolean pendingDisband;
 
     /** Original-kit slot the owner picked for the next battle, or null for regular kits. */
     public Integer originalKitSlot() {
@@ -47,6 +49,15 @@ public final class Team {
 
     public void setOriginalKitSlot(Integer slot) {
         this.originalKitSlot = slot;
+    }
+
+    /** True once the team is marked to dissolve as soon as its live match ends. */
+    public boolean isPendingDisband() {
+        return pendingDisband;
+    }
+
+    public void setPendingDisband(boolean pendingDisband) {
+        this.pendingDisband = pendingDisband;
     }
 
     /** Team vs Party. Set at creation and used only to route entry points + wording. */

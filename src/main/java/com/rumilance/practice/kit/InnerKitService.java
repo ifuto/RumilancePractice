@@ -508,6 +508,18 @@ public final class InnerKitService {
     }
 
     /**
+     * Storage key for one player's own arrangement of one 中キット, used against the same
+     * kit_layouts table / cache that holds plain kit layouts. Composite on purpose: the
+     * {@code #preset#} infix can never be produced by a crystal variant key ({@code axe#v3}) or by
+     * a kit name, and both halves are lowercased so the GUI (session kit id) and match start
+     * ({@code kit.name()}) always agree.
+     */
+    public static String layoutKey(String kitId, String innerId) {
+        return (kitId == null ? "" : kitId.trim().toLowerCase(Locale.ROOT))
+                + "#preset#" + normalizeId(innerId);
+    }
+
+    /**
      * Storage id for a preset name: lowercase, spaces and underscores become dashes, anything
      * that is not {@code a-z 0-9 -} is dropped, dashes collapse, max 48 chars. {@code null} when
      * nothing usable is left, so a name of only symbols cannot create a preset.

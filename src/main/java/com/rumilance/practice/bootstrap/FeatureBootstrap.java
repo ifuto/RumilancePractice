@@ -977,6 +977,10 @@ public final class FeatureBootstrap {
         teamKitSelectGui.setOriginalKitService(originalKitService);
         // Party start force-saves any member still editing a kit (never blocks the start).
         teamService.setOriginalKitService(originalKitService);
+        // パーティーの自動解散（0人／オーナー離脱／オーナーのログアウト）を取りこぼさないための定期掃除。
+        teamService.startMaintenance();
+        // 試合中のパーティーに入った人へ「観戦する」ボタンを出すため。
+        teamService.setSpectatorService(spectatorService);
 
         // Sign queue: Unranked 1v1 queue joined from placed queue signs (the kit is fixed
         // per sign; the match fights with the first waiter's custom/original kit).
@@ -1105,6 +1109,8 @@ public final class FeatureBootstrap {
         innerKitAdminGui.setEkitSelectGui(ekitSelectGui);
         innerKitAdminGui.setKitAdminGui(kitAdminGui);
         ekitSelectGui.setInnerKitAdminGui(innerKitAdminGui);
+        // 編集GUIのキット一覧からも右クリックで管理画面へ（Admin のみ。中は権限で弾く）。
+        editKitGui.setInnerKitAdminGui(innerKitAdminGui);
         kitAdminGui.setOpenInnerKits((p, kit) -> innerKitAdminGui.open(p, kit,
                 com.rumilance.practice.gui.menus.InnerKitAdminGui.ORIGIN_KIT_ADMIN));
 

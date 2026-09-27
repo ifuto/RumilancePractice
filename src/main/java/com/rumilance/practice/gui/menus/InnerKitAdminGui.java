@@ -102,6 +102,12 @@ public final class InnerKitAdminGui extends AbstractGui {
         if (kitId == null || kitId.isBlank()) {
             return;
         }
+        // 中キットの作成・削除・中身の変更は Admin の仕事。/ekit は rumilance.user でも叩けるので、
+        // ここでも一度確認しておく（右クリックの出し分けを何かの拍子に通り抜けても開かない）。
+        if (!player.hasPermission("rumilance.admin")) {
+            player.sendMessage(t(player, "general.no-permission"));
+            return;
+        }
         GuiSession session = registry.open(player.getUniqueId(), type(), rows);
         session.setSelectedKit(kitId);
         session.put(ORIGIN_KEY, origin);

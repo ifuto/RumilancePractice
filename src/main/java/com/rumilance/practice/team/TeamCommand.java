@@ -208,6 +208,15 @@ public final class TeamCommand implements CommandExecutor, TabCompleter {
                 if (dr != TeamService.Result.OK) player.sendMessage(err(dr));
             }
             case "disband" -> teamService.disband(player);
+            // 試合中のパーティーに入った人向け。チャットの「観戦する」ボタンもここを叩く。
+            case "spectate", "spec" -> {
+                TeamService.Result sr = teamService.spectateOngoingMatch(player);
+                if (sr != TeamService.Result.OK) {
+                    // 観戦まわりは新規の案内なので、他の /team より先にローカライズ版を出す。
+                    player.sendMessage(Component.text(teamService.errorMessage(player, sr, null),
+                            NamedTextColor.RED));
+                }
+            }
             case "list" -> {
                 player.sendMessage(Component.text("Public teams:", NamedTextColor.AQUA));
                 if (teamService.publicTeams().isEmpty()) {
@@ -276,6 +285,7 @@ public final class TeamCommand implements CommandExecutor, TabCompleter {
             case NO_PENDING_DUEL -> "No pending team duel request.";
             case DUEL_SELF -> "You cannot challenge your own party.";
             case WRONG_KIND -> "That only works for the right group kind (team or party).";
+            case NO_LIVE_MATCH -> "There is no match to spectate right now.";
             default -> r.name();
         };
         return Component.text(msg, NamedTextColor.RED);
@@ -292,7 +302,7 @@ public final class TeamCommand implements CommandExecutor, TabCompleter {
             if (teamOpt.isEmpty()) {
                 subs.addAll(List.of("create", "join", "decline"));
             } else {
-                subs.addAll(List.of("info", "leave"));
+                subs.addAll(List.of("info", "leave", "spectate"));
                 if (teamOpt.get().isOwner(player.getUniqueId())) {
                     subs.addAll(List.of("queue", "unqueue", "duel", "accept", "deny"));
                     subs.addAll(List.of("invite", "kick", "public", "side",
