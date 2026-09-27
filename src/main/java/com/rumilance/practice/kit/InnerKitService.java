@@ -203,11 +203,19 @@ public final class InnerKitService {
 
     // ---------------------------------------------------------------- write
 
-    /**
-     * Creates a preset. {@code seed} is the loadout it starts with — normally the kit's current
-     * items ({@link KitLoadout#fromOfficial}) so the admin edits a copy instead of an empty grid.
-     */
+    /** Creates a preset seeded with {@code seed}; the kit's own icon is shown in the picker. */
     public CreateResult create(String kitId, String name, ItemStack[] seed) {
+        return create(kitId, name, seed, null);
+    }
+
+    /**
+     * Creates a preset. {@code seed} is its complete contents — normally a snapshot of the
+     * admin's inventory ({@link KitLoadout#fromPlayer}, like {@code /kit create}), a copy of the
+     * kit's own items ({@link KitLoadout#fromOfficial}) when the preset starts as a variation, or
+     * an empty grid. Whatever it is, it is authoritative: the kit never fills slots back in.
+     * {@code icon} (nullable material name) is the picker tile; the kit's icon is used when null.
+     */
+    public CreateResult create(String kitId, String name, ItemStack[] seed, String icon) {
         if (!kitExists(kitId)) {
             return CreateResult.NO_SUCH_KIT;
         }
@@ -225,9 +233,11 @@ public final class InnerKitService {
         }
         String display = name.trim();
         ItemStack[] layout = seed != null ? copy(seed) : new ItemStack[KitLoadout.SIZE];
-        InnerKit inner = new InnerKit(id, display, null, layout);
+        String material = icon == null || icon.isBlank()
+                ? null : icon.trim().toUpperCase(Locale.ROOT);
+        InnerKit inner = new InnerKit(id, display, material, layout);
         map.put(id, inner);
-        write(inner, kitId, display, null, layout);
+        write(inner, kitId, display, material, layout);
         return CreateResult.OK;
     }
 

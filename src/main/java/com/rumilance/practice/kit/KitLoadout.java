@@ -61,6 +61,62 @@ public final class KitLoadout {
     }
 
     /**
+     * Snapshot of what a player is carrying and wearing right now, in loadout indices
+     * (0-35 storage, 36-39 helmet/chest/legs/boots, 40 off-hand).
+     *
+     * <p>This is how a 中キット is born: {@code /kit preset add} stores exactly this array, so an
+     * admin decides a preset's contents by holding them — the same idea as {@code /kit create}
+     * snapshotting a kit. Amounts, enchantments, potion contents and custom names all survive
+     * (whole stacks, cloned), which is what makes "preset 1 has 6 arrows, preset 2 has 3" a
+     * per-preset fact rather than something the kit decides. {@link #sanitize} runs on the way out
+     * so editor placeholder panes and unwearable armour cannot slip in.</p>
+     */
+    public static ItemStack[] fromPlayer(org.bukkit.entity.Player player) {
+        ItemStack[] layout = new ItemStack[SIZE];
+        if (player == null) {
+            return layout;
+        }
+        PlayerInventory inventory = player.getInventory();
+        ItemStack[] storage = inventory.getStorageContents();
+        for (int i = 0; i < storage.length && i < 36; i++) {
+            layout[i] = cloneOrNull(storage[i]);
+        }
+        layout[HELMET] = cloneOrNull(inventory.getHelmet());
+        layout[CHEST] = cloneOrNull(inventory.getChestplate());
+        layout[LEGS] = cloneOrNull(inventory.getLeggings());
+        layout[BOOTS] = cloneOrNull(inventory.getBoots());
+        layout[OFFHAND] = cloneOrNull(inventory.getItemInOffHand());
+        return sanitize(layout);
+    }
+
+    /** True when a loadout holds at least one real item (used to reject empty snapshots). */
+    public static boolean hasAnyItem(ItemStack[] layout) {
+        if (layout == null) {
+            return false;
+        }
+        for (ItemStack stack : layout) {
+            if (stack != null && !stack.getType().isAir()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** How many slots of a loadout actually hold an item — for "created (12 slots)" feedback. */
+    public static int itemCount(ItemStack[] layout) {
+        if (layout == null) {
+            return 0;
+        }
+        int count = 0;
+        for (ItemStack stack : layout) {
+            if (stack != null && !stack.getType().isAir()) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /**
      * Player layout overlay. Non-preset kits always keep every official stack (missing
      * potions / armor are filled back). Armor slots never receive potions or editor panes.
      */

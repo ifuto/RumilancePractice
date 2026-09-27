@@ -322,3 +322,5 @@ IDを作っていた（`npc:tick.mcfunction`）。そのため **タグ（#minec
 <!-- trigger: build + plugin-delivery for 中キット (inner kits) — /kit preset add|remove|list + right-click pickers in Duel Request / Party Fight / Kit Edit, preset loadout wins over kit base and personal layout, carries across rematches → v1.76.58 2026-09-27 (arena/01a0dc7c) -->
 
 <!-- trigger: rebuild + redeliver plugin-delivery jar for 中キット corrections — preset contents are authoritative (applyExact, no fill-back from the kit) + default entry label settable apart from the kit name (/kit preset default) 2026-09-27 (arena/01a0dc7c) -->
+
+<!-- trigger: rebuild + redeliver plugin-delivery jar — /kit preset add now snapshots the admin inventory like /kit create (--from/--copy-kit/--empty) 2026-09-27 (arena/01a0dc7c) -->

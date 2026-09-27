@@ -182,7 +182,7 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                 player.sendMessage(Component.text("/kit rename <nowname> <newname> - 改名 (入力した大文字小文字がそのまま表示名に)", NamedTextColor.GRAY));
                 player.sendMessage(Component.text("/kit arena <kit> add|remove|list|clear [arena] - デュエル用アリーナプール", NamedTextColor.GRAY));
                 player.sendMessage(Component.text("/kit party-arena <kit> add|remove|list|clear [arena] - パーティ用アリーナプール", NamedTextColor.GRAY));
-                player.sendMessage(Component.text("/kit preset add|remove|list|default <kit> [name] - 中キット(プリセット)。既定の中身は変更不可・表示名だけ /kit preset default で設定", NamedTextColor.GRAY));
+                player.sendMessage(Component.text("/kit preset add|remove|list|default <kit> [name] - 中キット(プリセット)。add は /kit create 同様にインベントリを撮影して中身にする(--from <player> / --copy-kit / --empty)。既定の中身は変更不可・表示名だけ /kit preset default", NamedTextColor.GRAY));
                 yield true;
             }
             case "arena" -> {
@@ -690,6 +690,10 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
             if (args.length == 3) {
                 return filter(kitService.all().stream().map(KitDefinition::name).toList(), args[2]);
             }
+            if (args.length >= 4 && args[1].equalsIgnoreCase("add")
+                    && args[args.length - 1].startsWith("-")) {
+                return filter(List.of("--from", "--copy-kit", "--empty"), args[args.length - 1]);
+            }
             if (args.length == 4 && (args[1].equalsIgnoreCase("remove") || args[1].equalsIgnoreCase("delete"))) {
                 return filter(innerKits == null ? List.of()
                         : innerKits.list(args[2]).stream()
@@ -787,17 +791,30 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
     /**
      * {@code /kit preset add|remove|list|default} — 中キット (inner kits).
      *
-     * <p>A preset is a shared loadout living inside one kit, and its contents are complete: what
-     * the editor saves is exactly what the fight hands out, with nothing filled back from the kit.
-     * Duel Request, Party Fight and Kit Edit offer the list on a RIGHT click; a LEFT click and
+     * <p>A preset is a shared loadout living inside one kit, and its contents are <b>complete and
+     * its own</b>: what is snapshotted or edited is exactly what the fight hands out, with nothing
+     * filled back from the kit. Two presets of one kit can therefore differ in anything at all —
+     * preset 1 with 6 arrows, preset 2 with 3, other items, other enchantments, empty slots.</p>
+     *
+     * <p>{@code add} decides those contents the way {@code /kit create} decides a kit's: by
+     * snapshotting an inventory. With no flag it snapshots the sender (hold the items, run the
+     * command), {@code --from <player>} snapshots somebody else, {@code --copy-kit} starts from a
+     * copy of the kit's own items for a small variation, and {@code --empty} starts from a blank
+     * grid. Fine-tuning afterwards happens in the kit editor ({@code /ekit} → RIGHT-click the kit →
+     * the preset), which saves to kits.yml, so everybody who picks that preset gets the same
+     * contents.</p>
+     *
+     * <p>Duel Request, Party Fight and Kit Edit offer the list on a RIGHT click; a LEFT click and
      * Queue always fight the kit's own loadout. That default is not a stored preset — it cannot be
      * created over, edited as a preset, removed or replaced, so {@code add} with the name
      * {@code default} is refused — but its LABEL is separate from the kit's name and
-     * {@code /kit preset default <kit> <name>} sets it ( {@code reset} clears it again), so a kit
-     * {@code Axe} can be listed as {@code HQ Style Axe [Default]}. Contents are edited in the kit
-     * editor; this command only creates, lists, removes and labels entries, seeding a new one with
-     * the kit's current items so the admin edits a copy instead of an empty grid.</p>
+     * {@code /kit preset default <kit> <name>} sets it ({@code reset} clears it again), so a kit
+     * {@code Axe} can be listed as {@code HQ Style Axe [Default]}.</p>
      */
+    /** Usage line of {@code /kit preset add}, shared by its two guard clauses. */
+    private static final String ADD_USAGE =
+            "/kit preset add <kit> [--from <player>] [--copy-kit|--empty] <name...>";
+
     private boolean handlePreset(Player player, String[] args) {
         if (innerKits == null) {
             player.sendMessage(Component.text("Inner kits are unavailable (not wired).", NamedTextColor.RED));
@@ -832,18 +849,26 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                                     NamedTextColor.GRAY)));
                     for (var preset : presets) {
                         player.sendMessage(Component.text("  - " + preset.displayName(), NamedTextColor.GREEN)
-                                .append(Component.text("  [" + preset.id() + "]", NamedTextColor.DARK_GRAY)));
+                                .append(Component.text("  [" + preset.id() + "] "
+                                        + com.rumilance.practice.kit.KitLoadout.itemCount(preset.layout())
+                                        + " slots", NamedTextColor.DARK_GRAY)));
                     }
                 }
                 if (shown == 0) {
                     player.sendMessage(Component.text(
-                            "No inner kits yet. Create one: /kit preset add <kit> <name>",
+                            "No inner kits yet. Hold the items you want in it, then: "
+                                    + "/kit preset add <kit> <name>",
                             NamedTextColor.GRAY));
                 }
             }
             case "add" -> {
                 if (args.length < 4) {
-                    player.sendMessage(Component.text("/kit preset add <kit> <name>", NamedTextColor.YELLOW));
+                    player.sendMessage(Component.text(ADD_USAGE, NamedTextColor.YELLOW));
+                    player.sendMessage(Component.text(
+                            "中身は /kit create と同じく「今持っている物」の撮影が既定。"
+                                    + "--copy-kit = キット本体から複製して調整、--empty = 空から作成、"
+                                    + "--from <player> = 別プレイヤーのインベントリを撮影。",
+                            NamedTextColor.GRAY));
                     return true;
                 }
                 KitDefinition kit = kitService.get(args[2]).orElse(null);
@@ -851,13 +876,83 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                     player.sendMessage(Component.text("Unknown kit: " + args[2], NamedTextColor.RED));
                     return true;
                 }
-                String name = String.join(" ", java.util.Arrays.copyOfRange(args, 3, args.length));
-                var result = innerKits.create(kit.name(), name,
-                        com.rumilance.practice.kit.KitLoadout.fromOfficial(kit));
+                // Flags may sit anywhere after <kit>; every other token is part of the
+                // (multi-word) preset name, so "Club Style Axe" needs no quoting.
+                String fromName = null;
+                boolean copyKit = false;
+                boolean empty = false;
+                java.util.List<String> nameParts = new java.util.ArrayList<>();
+                for (int i = 3; i < args.length; i++) {
+                    String token = args[i];
+                    String lower = token.toLowerCase(Locale.ROOT);
+                    if (lower.equals("--from") || lower.equals("--player")) {
+                        if (i + 1 < args.length) {
+                            fromName = args[++i];
+                        }
+                        continue;
+                    }
+                    if (lower.startsWith("--from=")) {
+                        fromName = token.substring("--from=".length());
+                        continue;
+                    }
+                    if (lower.equals("--copy-kit") || lower.equals("--copy")) {
+                        copyKit = true;
+                        continue;
+                    }
+                    if (lower.equals("--empty") || lower.equals("--blank")) {
+                        empty = true;
+                        continue;
+                    }
+                    nameParts.add(token);
+                }
+                String name = String.join(" ", nameParts);
+                if (name.isBlank()) {
+                    player.sendMessage(Component.text(ADD_USAGE, NamedTextColor.YELLOW));
+                    return true;
+                }
+                // The contents are the admin's decision, exactly like /kit create: snapshot what
+                // somebody is holding. Copying the kit or starting blank are opt-in.
+                org.bukkit.inventory.ItemStack[] seed;
+                String icon;
+                String source;
+                if (empty) {
+                    seed = new org.bukkit.inventory.ItemStack[
+                            com.rumilance.practice.kit.KitLoadout.SIZE];
+                    icon = null;
+                    source = "an empty grid";
+                } else if (copyKit) {
+                    seed = com.rumilance.practice.kit.KitLoadout.fromOfficial(kit);
+                    icon = kit.icon();
+                    source = "a copy of the kit's own items";
+                } else {
+                    Player snapshot = player;
+                    if (fromName != null && !fromName.isBlank()) {
+                        snapshot = org.bukkit.Bukkit.getPlayerExact(fromName);
+                        if (snapshot == null) {
+                            player.sendMessage(Component.text("Player not found: " + fromName,
+                                    NamedTextColor.RED));
+                            return true;
+                        }
+                    }
+                    seed = com.rumilance.practice.kit.KitLoadout.fromPlayer(snapshot);
+                    if (!com.rumilance.practice.kit.KitLoadout.hasAnyItem(seed)) {
+                        player.sendMessage(Component.text("Nothing to snapshot: "
+                                + snapshot.getName() + " is carrying no items. Hold the preset's"
+                                + " contents first, or use --copy-kit (start from the kit) /"
+                                + " --empty (start blank).", NamedTextColor.RED));
+                        return true;
+                    }
+                    org.bukkit.inventory.ItemStack hand = snapshot.getInventory().getItemInMainHand();
+                    icon = hand.getType().isAir() ? null : hand.getType().name();
+                    source = snapshot.getName() + "'s inventory";
+                }
+                var result = innerKits.create(kit.name(), name, seed, icon);
+                int slots = com.rumilance.practice.kit.KitLoadout.itemCount(seed);
                 player.sendMessage(switch (result) {
                     case OK -> Component.text("Inner kit added: " + name.trim() + " ["
                             + com.rumilance.practice.kit.InnerKitService.slug(name) + "] on "
-                            + kit.name() + ". Edit its contents: /ekit -> right-click the kit.",
+                            + kit.name() + " - " + slots + " slot(s) from " + source
+                            + ". Fine-tune: /ekit -> right-click " + kit.name() + ".",
                             NamedTextColor.GREEN);
                     case NO_SUCH_KIT -> Component.text("Unknown kit: " + args[2], NamedTextColor.RED);
                     case BLANK_NAME -> Component.text(

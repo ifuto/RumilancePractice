@@ -194,10 +194,16 @@ Paper 1.21.11 向け Practice PvP プラグイン **N Arena**(プラグイン名
     `/kit preset default <kit> <name>` でキット `Axe` を `HQ Style Axe [Default]` として一覧できる
     (kits.yml の `inner-kits.default.display-name` = 名前だけ。`reset` でキット名に戻る。
     ここに `layout` を書いても無視され、中身は常にキット本体)。
-  - **管理はコマンド**: `/kit preset add <kit> <name>`(キット現在の中身を初期値として複製)、
-    `/kit preset remove <kit> <name>`、`/kit preset list [kit]`、`/kit preset default <kit> <name>`。
-    保存先は kits.yml の `kits.<kit>.inner-kits.<id>`(`display-name` / `icon` / スロット別 base64 の
-    `layout`)。キット改名時はプリセットも一緒に移動し、`/practiceadmin reload` で読み直される。
+  - **作成は `/kit create` と同じ「インベントリ撮影」**: `/kit preset add <kit> <name...>` は
+    **実行した Admin が今持っている物**(ストレージ36+防具4+オフハンド、NBT・エンチャント・個数ごと)を
+    そのプリセットの**完全な中身**として保存する。`--from <player>` で別プレイヤーを撮影、
+    `--copy-kit` でキット本体の中身を複製してから調整、`--empty` で空から作成。
+    → 「プリセット1は矢6本、プリセット2は矢3本」のように**プリセットごとに中身が完全に別物**で、
+    何が有って何が無いかもプリセット単位。空スロットは空のまま支給される(キットから補完しない)。
+  - **その他のコマンド**: `/kit preset remove <kit> <name>`、`/kit preset list [kit]`、
+    `/kit preset default <kit> <name>`(既定の表示名だけ変更)。保存先は kits.yml の
+    `kits.<kit>.inner-kits.<id>`(`display-name` / `icon` / スロット別 base64 の `layout`)。
+    キット改名時はプリセットも一緒に移動し、`/practiceadmin reload` で読み直される。
   - **中身の編集は Kit Edit**: `/ekit` でキットを右クリック → プリセット選択 → 通常のキットエディタが
     そのプリセットのロードアウトを開く。保存先はプレイヤー個人のレイアウトDBではなく kits.yml の
     プリセットなので**選んだ全員に同じ中身**が適用される(「初期状態にリセット」もプリセット単位)。
