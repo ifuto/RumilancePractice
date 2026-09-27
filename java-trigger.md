@@ -324,3 +324,5 @@ IDを作っていた（`npc:tick.mcfunction`）。そのため **タグ（#minec
 <!-- trigger: rebuild + redeliver plugin-delivery jar for 中キット corrections — preset contents are authoritative (applyExact, no fill-back from the kit) + default entry label settable apart from the kit name (/kit preset default) 2026-09-27 (arena/01a0dc7c) -->
 
 <!-- trigger: rebuild + redeliver plugin-delivery jar — /kit preset add now snapshots the admin inventory like /kit create (--from/--copy-kit/--empty) 2026-09-27 (arena/01a0dc7c) -->
+
+<!-- trigger: rebuild + redeliver plugin-delivery jar — 中キット management GUI (create/rename/icon/delete/edit without commands) 2026-09-27 (arena/01a0dc7c) -->

@@ -1094,6 +1094,20 @@ public final class FeatureBootstrap {
         kitItemRulesGui.setReturnTo(kitAdminGui::openConfig);
         kitAdminGui.setOpenItemRules(kitItemRulesGui::open);
 
+        // 中キット management: one screen for create / rename / icon / delete / edit contents, so
+        // the whole feature is usable from the GUI. Reached from the kit config panel (button), by
+        // right-clicking a kit in /ekit, or by `/kit preset <kit>`.
+        com.rumilance.practice.gui.menus.InnerKitAdminGui innerKitAdminGui =
+                new com.rumilance.practice.gui.menus.InnerKitAdminGui(
+                        guiSessions, soundService, kitService, innerKits);
+        innerKitAdminGui.setEditKitGui(editKitGui);
+        innerKitAdminGui.setConfirmGui(confirmGui);
+        innerKitAdminGui.setEkitSelectGui(ekitSelectGui);
+        innerKitAdminGui.setKitAdminGui(kitAdminGui);
+        ekitSelectGui.setInnerKitAdminGui(innerKitAdminGui);
+        kitAdminGui.setOpenInnerKits((p, kit) -> innerKitAdminGui.open(p, kit,
+                com.rumilance.practice.gui.menus.InnerKitAdminGui.ORIGIN_KIT_ADMIN));
+
         AdminMenuGui adminMenuGui = new AdminMenuGui(guiSessions, soundService);
         adminMenuGui.setOpenKitAdmin(kitAdminGui::open);
         com.rumilance.practice.gui.menus.FfaSettingsGui ffaSettingsGui =
@@ -1212,6 +1226,7 @@ public final class FeatureBootstrap {
         guiListener.register(unrankedGui);
         guiListener.register(kitSelectGui);
         guiListener.register(innerKitSelectGui);
+        guiListener.register(innerKitAdminGui);
         guiListener.register(duelRequestGui);
         guiListener.register(duelMapSelectGui);
         guiListener.register(settingsGui);
@@ -1751,6 +1766,7 @@ public final class FeatureBootstrap {
                 new File(PluginIdentity.dataFolder(plugin), "schematics"), soundService, kitAdminGui);
         arenaKitAdmin.setPresetItems(presetItems);
         arenaKitAdmin.setInnerKits(innerKits);
+        arenaKitAdmin.setInnerKitAdminGui(innerKitAdminGui);
         arenaKitAdmin.setPresetAdminGui(presetAdminGui);
         arenaKitAdmin.setArenaAdminGui(arenaAdminGui);
         arenaKitAdmin.setPartyIconPrompt(partyIconListener::await);

@@ -74,5 +74,7 @@ public enum GuiType {
     TOURNAMENT,
     REQUEST_INBOX,
     /** 中キット (inner kit) preset picker: right-click a kit in Duel / Party / Kit Edit. */
-    INNER_KIT_SELECT
+    INNER_KIT_SELECT,
+    /** 中キット management (admin): create / rename / icon / delete / edit contents. */
+    INNER_KIT_ADMIN
 }

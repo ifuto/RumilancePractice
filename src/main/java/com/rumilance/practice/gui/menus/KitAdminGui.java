@@ -49,6 +49,7 @@ public final class KitAdminGui extends AbstractGui {
     private java.util.function.BiConsumer<Player, String> openArenaSelect = (p, kit) -> { };
     private java.util.function.BiConsumer<Player, String> openBlockRules = (p, kit) -> { };
     private java.util.function.BiConsumer<Player, String> openItemRules = (p, kit) -> { };
+    private java.util.function.BiConsumer<Player, String> openInnerKits = (p, kit) -> { };
 
     public KitAdminGui(GuiSessionRegistry registry, SoundService sounds, KitService kitService, MessageService messageService) {
         super(registry, sounds, GuiType.KIT_ADMIN, 6, false);
@@ -78,6 +79,11 @@ public final class KitAdminGui extends AbstractGui {
 
     public void setOpenItemRules(java.util.function.BiConsumer<Player, String> openItemRules) {
         this.openItemRules = openItemRules == null ? (p, kit) -> { } : openItemRules;
+    }
+
+    /** 中キット (inner kit) management screen of one kit. */
+    public void setOpenInnerKits(java.util.function.BiConsumer<Player, String> openInnerKits) {
+        this.openInnerKits = openInnerKits == null ? (p, kit) -> { } : openInnerKits;
     }
 
     /** Reopens the config panel for a kit (used when returning from Start Effects GUI). */
@@ -205,6 +211,12 @@ public final class KitAdminGui extends AbstractGui {
         // --- the KIT1..9 variant editor; FFA spawns the player with the selected slot.
         inventory.setItem(GuiSlots.slot(1, 4), toggle("Crystal FFA", kit.crystalFfa(),
                 "toggle:crystalffa", Material.END_CRYSTAL, locale));
+        // --- row 2: 中キット (inner kits) — the preset loadouts inside this kit ---
+        inventory.setItem(GuiSlots.slot(2, 4), entry(Material.SHULKER_BOX,
+                rawGui(locale, "gui.kit-admin-innerkits"),
+                rawGui(locale, "gui.kit-admin-innerkits-lore"), UiTheme.SECONDARY,
+                "open:inner-kits", locale));
+
         // --- row 3: rule groups live in dedicated sub-GUIs so nothing is crowded ---
         inventory.setItem(GuiSlots.slot(3, 2), entry(Material.STONE_PICKAXE,
                 rawGui(locale, "gui.kit-admin-block-rules"),
@@ -356,6 +368,13 @@ public final class KitAdminGui extends AbstractGui {
             if (session.selectedKit() != null) {
                 sounds.play(player, "gui-click");
                 openItemRules.accept(player, session.selectedKit());
+            }
+            return;
+        }
+        if (action.equals("open:inner-kits")) {
+            if (session.selectedKit() != null) {
+                sounds.play(player, "gui-click");
+                openInnerKits.accept(player, session.selectedKit());
             }
             return;
         }

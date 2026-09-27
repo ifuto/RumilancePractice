@@ -53,6 +53,13 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
     private final KitAdminGui kitAdminGui;
     private final Map<String, ArenaTemplate> drafts = new ConcurrentHashMap<>();
     private com.rumilance.practice.kit.PresetItems presetItems;
+    /** 中キット management GUI — the primary way in; the text actions below are the fallback. */
+    private com.rumilance.practice.gui.menus.InnerKitAdminGui innerKitAdminGui;
+
+    public void setInnerKitAdminGui(com.rumilance.practice.gui.menus.InnerKitAdminGui innerKitAdminGui) {
+        this.innerKitAdminGui = innerKitAdminGui;
+    }
+
     /** 中キット (inner kits): shared preset loadouts stored inside a kit. */
     private com.rumilance.practice.kit.InnerKitService innerKits;
 
@@ -182,7 +189,8 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                 player.sendMessage(Component.text("/kit rename <nowname> <newname> - 改名 (入力した大文字小文字がそのまま表示名に)", NamedTextColor.GRAY));
                 player.sendMessage(Component.text("/kit arena <kit> add|remove|list|clear [arena] - デュエル用アリーナプール", NamedTextColor.GRAY));
                 player.sendMessage(Component.text("/kit party-arena <kit> add|remove|list|clear [arena] - パーティ用アリーナプール", NamedTextColor.GRAY));
-                player.sendMessage(Component.text("/kit preset add|remove|list|default <kit> [name] - 中キット(プリセット)。add は /kit create 同様にインベントリを撮影して中身にする(--from <player> / --copy-kit / --empty)。既定の中身は変更不可・表示名だけ /kit preset default", NamedTextColor.GRAY));
+                player.sendMessage(Component.text("/kit preset [kit] - 中キット(プリセット)の管理GUIを開く。作成・改名・アイコン・削除・中身編集はすべてGUIで可能", NamedTextColor.GRAY));
+                player.sendMessage(Component.text("  テキスト版: /kit preset add|remove|list|default <kit> [name] (add は --from <player> / --copy-kit / --empty)", NamedTextColor.DARK_GRAY));
                 yield true;
             }
             case "arena" -> {
@@ -685,7 +693,11 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
         String sub = args[0].toLowerCase(Locale.ROOT);
         if (sub.equals("preset")) {
             if (args.length == 2) {
-                return filter(List.of("add", "remove", "list", "default"), args[1]);
+                // GUI-first: a kit name opens its 中キット management, so offer both.
+                java.util.List<String> options =
+                        new java.util.ArrayList<>(List.of("add", "remove", "list", "default"));
+                kitService.all().forEach(k -> options.add(k.name()));
+                return filter(options, args[1]);
             }
             if (args.length == 3) {
                 return filter(kitService.all().stream().map(KitDefinition::name).toList(), args[2]);
@@ -815,12 +827,25 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
     private static final String ADD_USAGE =
             "/kit preset add <kit> [--from <player>] [--copy-kit|--empty] <name...>";
 
+    /** Text actions of {@code /kit preset}; any other word is read as a kit name -> GUI. */
+    private static final java.util.Set<String> PRESET_ACTIONS = java.util.Set.of(
+            "add", "remove", "delete", "list", "default", "label", "name", "help");
+
     private boolean handlePreset(Player player, String[] args) {
         if (innerKits == null) {
             player.sendMessage(Component.text("Inner kits are unavailable (not wired).", NamedTextColor.RED));
             return true;
         }
-        String action = args.length > 1 ? args[1].toLowerCase(Locale.ROOT) : "list";
+        // GUI-first: `/kit preset` opens the kit admin screen and `/kit preset <kit>` that kit's
+        // 中キット management, where creating, renaming, icon-setting, deleting and editing the
+        // contents all happen by clicking. The text actions below stay for quick/console use.
+        String typed = args.length > 1 ? args[1] : null;
+        if (typed == null || (!PRESET_ACTIONS.contains(typed.toLowerCase(Locale.ROOT))
+                && kitService.get(typed).isPresent())) {
+            openInnerKitGui(player, typed);
+            return true;
+        }
+        String action = typed.toLowerCase(Locale.ROOT);
         switch (action) {
             case "list" -> {
                 String filterKit = args.length > 2 ? args[2] : null;
@@ -1013,6 +1038,30 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                     "/kit preset <add|remove|list|default> <kit> [name]", NamedTextColor.YELLOW));
         }
         return true;
+    }
+
+    /** Opens the 中キット management GUI, falling back to text when it is not wired. */
+    private void openInnerKitGui(Player player, String kitArg) {
+        if (innerKitAdminGui == null) {
+            player.sendMessage(Component.text(
+                    "/kit preset <kit>  |  add|remove|list|default <kit> [name]",
+                    NamedTextColor.YELLOW));
+            return;
+        }
+        if (kitArg == null) {
+            player.sendMessage(Component.text(
+                    "キットを選んで「中キット」ボタン: /kit の管理GUIを開きます。",
+                    NamedTextColor.GRAY));
+            kitAdminGui.open(player);
+            return;
+        }
+        KitDefinition kit = kitService.get(kitArg).orElse(null);
+        if (kit == null) {
+            player.sendMessage(Component.text("Unknown kit: " + kitArg, NamedTextColor.RED));
+            return;
+        }
+        innerKitAdminGui.open(player, kit.name(),
+                com.rumilance.practice.gui.menus.InnerKitAdminGui.ORIGIN_COMMAND);
     }
 
     private boolean handleArenaPool(Player player, String[] args, boolean party) {

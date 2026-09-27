@@ -31,6 +31,7 @@ public final class EkitSelectGui extends AbstractGui {
     /** 中キット (inner kits): right-click a kit to choose which preset to edit. */
     private com.rumilance.practice.kit.InnerKitService innerKits;
     private InnerKitSelectGui innerKitSelectGui;
+    private InnerKitAdminGui innerKitAdminGui;
 
     public void setInnerKits(com.rumilance.practice.kit.InnerKitService innerKits) {
         this.innerKits = innerKits;
@@ -40,18 +41,31 @@ public final class EkitSelectGui extends AbstractGui {
         this.innerKitSelectGui = innerKitSelectGui;
     }
 
+    /** 中キット management screen opened by a right-click here (create/rename/delete/edit). */
+    public void setInnerKitAdminGui(InnerKitAdminGui innerKitAdminGui) {
+        this.innerKitAdminGui = innerKitAdminGui;
+    }
+
     /**
-     * 中キット: RIGHT click on a kit that has presets opens the preset list; LEFT click keeps
-     * editing the kit itself exactly as before. Viewing somebody else's layout is read-only and
-     * never offers presets.
+     * 中キット: RIGHT click opens the management screen of that kit — create, rename, icon,
+     * delete and edit contents, all without a command. It opens even for a kit that has no
+     * preset yet, because that is where the first one gets made. LEFT click keeps editing the kit
+     * itself exactly as before, and viewing somebody else's layout is read-only (no management).
      */
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot,
                             String action, org.bukkit.event.inventory.ClickType clickType) {
         if (clickType == org.bukkit.event.inventory.ClickType.RIGHT
                 && action != null && action.startsWith("kit:")
-                && innerKitSelectGui != null && innerKits != null && !isViewer(session)) {
+                && innerKits != null && !isViewer(session)
+                && (innerKitAdminGui != null || innerKitSelectGui != null)) {
             String kitId = action.substring("kit:".length());
+            if (innerKitAdminGui != null) {
+                sounds.play(player, "gui-click");
+                session.setNavigatingAway(true);
+                innerKitAdminGui.open(player, kitId, InnerKitAdminGui.ORIGIN_EKIT);
+                return;
+            }
             if (innerKits.has(kitId)) {
                 sounds.play(player, "gui-click");
                 session.setNavigatingAway(true);
@@ -209,12 +223,13 @@ public final class EkitSelectGui extends AbstractGui {
                 kit.crystalFfa()
                         ? UiTheme.status("Crystal FFA Kit", UiTheme.SUCCESS)
                         : UiTheme.line(line(player, viewer ? "gui.kit-view-only" : "gui.kit-edit-hint"))));
-        if (presets > 0 && !viewer) {
-            // 中キットを持つキットだけ右クリックの案内を出す（デフォルト込みの数を表示）。
+        if (!viewer && (presets > 0 || innerKitAdminGui != null)) {
+            // 編集できる人には右クリックの案内を常に出す（中キットが0件でも、そこで作るため）。
             lore.add(UiTheme.blank());
             lore.add(UiTheme.labelValue(line(player, "gui.innerkit-count-label"),
                     String.valueOf(presets + 1)));
-            lore.add(UiTheme.hint(line(player, "gui.innerkit-right-hint")));
+            lore.add(UiTheme.hint(line(player, innerKitAdminGui == null
+                    ? "gui.innerkit-right-hint" : "gui.innerkit-admin-right-hint")));
         }
         lore.add(UiTheme.blank());
         lore.add(UiTheme.hint(line(player, "gui.kit-button-hint")));

@@ -275,6 +275,49 @@ public final class InnerKitService {
         return true;
     }
 
+    /**
+     * Renames a preset — the label the pickers show. The storage id (and therefore the saved
+     * layout) stays put, so renaming never loses contents. The default is not a preset: its label
+     * is {@link #setDefaultName}.
+     */
+    public boolean setDisplayName(String kitId, String innerId, String name) {
+        if (kitId == null || isDefault(innerId) || name == null || name.isBlank()) {
+            return false;
+        }
+        String id = normalizeId(innerId);
+        Map<String, InnerKit> map = byKit.get(kitId.toLowerCase(Locale.ROOT));
+        InnerKit existing = map == null ? null : map.get(id);
+        if (existing == null) {
+            return false;
+        }
+        InnerKit renamed = new InnerKit(id, name.trim(), existing.icon(), existing.layout());
+        map.put(id, renamed);
+        write(renamed, kitId, renamed.displayName(), renamed.icon(), renamed.layout());
+        return true;
+    }
+
+    /**
+     * Sets the picker icon of a preset (a material name, e.g. what the admin holds in hand).
+     * Null or blank clears it and the kit's own icon is used again.
+     */
+    public boolean setIcon(String kitId, String innerId, String materialName) {
+        if (kitId == null || isDefault(innerId)) {
+            return false;
+        }
+        String id = normalizeId(innerId);
+        Map<String, InnerKit> map = byKit.get(kitId.toLowerCase(Locale.ROOT));
+        InnerKit existing = map == null ? null : map.get(id);
+        if (existing == null) {
+            return false;
+        }
+        String icon = materialName == null || materialName.isBlank()
+                ? null : materialName.trim().toUpperCase(Locale.ROOT);
+        InnerKit updated = new InnerKit(id, existing.displayName(), icon, existing.layout());
+        map.put(id, updated);
+        write(updated, kitId, updated.displayName(), icon, updated.layout());
+        return true;
+    }
+
     /** Removes a preset. The default cannot be removed (it is the kit itself). */
     public boolean remove(String kitId, String innerId) {
         if (kitId == null || isDefault(innerId)) {
