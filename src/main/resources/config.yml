@@ -96,6 +96,16 @@ shield-web:
   # server log). Set false to make the whole tab read-only state with no command exec.
   console-enabled: true
 
+# Knockback coefficients — 計算は一切変更せず、Paper が「最終適用するノックバックベクトル」
+# (EntityKnockbackEvent の finalKnockback) にだけ掛かる倍率です。1.0 = 完全にバニラ通り。
+# スプリント/Knockbackエンチャントの強さ、耐衝撃属性（KNOCKBACK_RESISTANCE: ネザライト装備）、
+# 爆発耐衝撃（explosion_knockback_resistance）などのゲーム内軽減は、係数の手前で完全に働きます。
+# 運用中は /kbf h <値> / /kbf v <値> で即時変更でき、変更値は plugins/n-arena/knockback.json
+# に永続化されてこの config 値より優先されます（/kbf reset で config に戻る）。範囲 0.0〜4.0。
+knockback:
+  horizontal: 1.0
+  vertical: 1.0
+
 executor:
   # Size of the async worker pool used for I/O and heavier computations
   # (database queries, schematic pastes, statistics recalculation, etc.).

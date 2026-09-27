@@ -44,10 +44,21 @@ public final class PaperCombatCompatListener implements Listener {
 
     private final Plugin plugin;
     private final Predicate<UUID> combatantTest;
+    /**
+     * Operator-tuned knockback coefficients ({@link KnockbackTuning}); the vanilla reproduction
+     * below is kept exact, then the finished vector is scaled with the same factor the
+     * {@link KnockbackTuningListener} applies to Paper's {@code EntityKnockbackEvent}, so both
+     * paths behave identically. Null / neutral → byte-identical vanilla behaviour.
+     */
+    private com.rumilance.practice.combat.KnockbackTuning knockbackTuning;
 
     public PaperCombatCompatListener(Plugin plugin, Predicate<UUID> combatantTest) {
         this.plugin = plugin;
         this.combatantTest = combatantTest;
+    }
+
+    public void setKnockbackTuning(com.rumilance.practice.combat.KnockbackTuning tuning) {
+        this.knockbackTuning = tuning;
     }
 
     private boolean combatant(Player player) {
@@ -206,6 +217,14 @@ public final class PaperCombatCompatListener implements Listener {
         // LivingEntity#knockbackStrength: grounded targets get the fixed vertical hop.
         if (victim.isOnGround()) {
             newY = 0.4d;
+        }
+        // バニラ再現の完成ベクトルに、運用者係数だけを乗せる（計算式には触れない）。
+        var tuning = knockbackTuning;
+        if (tuning != null && !tuning.isNeutral()) {
+            double[] scaled = tuning.scale(newX, newY, newZ);
+            newX = scaled[0];
+            newY = scaled[1];
+            newZ = scaled[2];
         }
         victim.setVelocity(new Vector(newX, newY, newZ));
     }

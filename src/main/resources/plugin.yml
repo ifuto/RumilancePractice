@@ -390,6 +390,10 @@ commands:
     description: Switch the resource-pack policy (required kicks on decline, recommended does not).
     usage: /packpolicy [required|recommended|status]
     permission: rumilance.admin
+  kbf:
+    description: Tune knockback coefficients (multipliers on Paper's final knockback — vanilla calc untouched).
+    usage: /kbf [h <0.0-4.0>|v <0.0-4.0>|reset|status]
+    permission: rumilance.admin
   tell:
     description: Send a private message to a player.
     usage: /tell <player> <message>

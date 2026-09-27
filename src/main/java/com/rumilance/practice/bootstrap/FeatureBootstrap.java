@@ -260,6 +260,7 @@ public final class FeatureBootstrap {
     private PracticeService practiceService;
     private com.rumilance.practice.practice.afk.AfkCrystalManager afkCrystalManager;
     private com.rumilance.practice.shieldweb.ShieldWebService shieldWebService;
+    private com.rumilance.practice.combat.KnockbackTuning knockbackTuning;
     /** {@code /bot} inside FFA: the unkillable mannequin training dummy. */
     private com.rumilance.practice.ffa.FfaMannequinService ffaMannequins;
     private TeamGlowLosService teamGlowLosService;
@@ -1689,7 +1690,21 @@ public final class FeatureBootstrap {
         pm.registerEvents(locatorBarService, plugin);
         locatorBarService.start();
         services.register(com.rumilance.practice.util.LocatorBarService.class, locatorBarService);
-        pm.registerEvents(new com.rumilance.practice.combat.PaperCombatCompatListener(plugin, combatant), plugin);
+        com.rumilance.practice.combat.PaperCombatCompatListener paperCombatCompat =
+                new com.rumilance.practice.combat.PaperCombatCompatListener(plugin, combatant);
+        pm.registerEvents(paperCombatCompat, plugin);
+        // ---- Knockback coefficients (/kbf) --------------------------------------------
+        // Multipliers on Paper's FINAL knockback only (EntityKnockbackEvent#getFinalKnockback →
+        // setFinalKnockback): the vanilla/Paper calculation — sprint & enchant strength,
+        // KNOCKBACK_RESISTANCE (netherite), explosion knockback resistance, grounded hop —
+        // runs untouched underneath. The compat path (shield-blocked/post-stun synth) is scaled
+        // with the same factors, and 1.0/1.0 defaults make the whole thing a zero-cost pass-through.
+        this.knockbackTuning = new com.rumilance.practice.combat.KnockbackTuning(
+                PluginIdentity.dataFolder(plugin).toPath().resolve("knockback.json"),
+                configService.config().getDouble("knockback.horizontal", 1.0d),
+                configService.config().getDouble("knockback.vertical", 1.0d));
+        pm.registerEvents(new com.rumilance.practice.combat.KnockbackTuningListener(knockbackTuning), plugin);
+        paperCombatCompat.setKnockbackTuning(knockbackTuning);
         // Paper #11012/#9504: resync the hotbar when our kit/arena rules cancel a place/break.
         pm.registerEvents(new com.rumilance.practice.guard.BlockInteractionResyncListener(plugin, combatant), plugin);
         pm.registerEvents(new GoldenHeadListener(plugin, matchRegistry), plugin);
@@ -1894,6 +1909,7 @@ public final class FeatureBootstrap {
         bind("chatunban", chatBanCommand);
         bind("packpolicy", new com.rumilance.practice.command.PackPolicyCommand(
                 resourcePackService, messageService));
+        bind("kbf", new com.rumilance.practice.command.KnockbackFactorCommand(knockbackTuning));
         com.rumilance.practice.command.TellCommand tellCommand =
                 new com.rumilance.practice.command.TellCommand(messageService, chatBanService,
                         settingsService);
