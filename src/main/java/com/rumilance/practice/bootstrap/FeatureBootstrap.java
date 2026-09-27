@@ -1725,7 +1725,7 @@ public final class FeatureBootstrap {
                 configService.config().getDouble("knockback.vertical", 1.0d),
                 kbConfigCauses, kbConfigKits);
         // Victim → current kit id (duel kit first, then the FFA arena's kit), for kit profiles.
-        final java.util.function.Function<UUID, String> kbKitResolver = id -> {
+        final java.util.function.Function<java.util.UUID, String> kbKitResolver = id -> {
             java.util.Optional<com.rumilance.practice.session.MatchSession> session =
                     matchService.registry().byPlayer(id);
             if (session.isPresent()) {
