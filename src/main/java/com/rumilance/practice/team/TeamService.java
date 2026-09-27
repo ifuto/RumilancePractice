@@ -1253,14 +1253,15 @@ public final class TeamService {
      */
     private java.util.Optional<com.rumilance.practice.session.MatchSession> liveTeamMatch(Team team) {
         for (UUID member : team.members()) {
-            var live = matchService.registry().byPlayer(member)
-                    .filter(com.rumilance.practice.session.MatchSession::isTeamMatch)
-                    .filter(s -> {
-                        com.rumilance.practice.state.MatchState st = s.state();
-                        return st != com.rumilance.practice.state.MatchState.CLOSED
-                                && st != com.rumilance.practice.state.MatchState.FAILED;
-                    })
-                    .findFirst();
+            // MatchRegistry.byPlayer は Optional を返す（Stream ではない）ので filter だけ重ねる。
+            java.util.Optional<com.rumilance.practice.session.MatchSession> live =
+                    matchService.registry().byPlayer(member)
+                            .filter(com.rumilance.practice.session.MatchSession::isTeamMatch)
+                            .filter(s -> {
+                                com.rumilance.practice.state.MatchState st = s.state();
+                                return st != com.rumilance.practice.state.MatchState.CLOSED
+                                        && st != com.rumilance.practice.state.MatchState.FAILED;
+                            });
             if (live.isPresent()) {
                 return live;
             }
