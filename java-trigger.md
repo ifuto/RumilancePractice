@@ -326,3 +326,5 @@ IDを作っていた（`npc:tick.mcfunction`）。そのため **タグ（#minec
 <!-- trigger: rebuild + redeliver plugin-delivery jar — /kit preset add now snapshots the admin inventory like /kit create (--from/--copy-kit/--empty) 2026-09-27 (arena/01a0dc7c) -->
 
 <!-- trigger: rebuild + redeliver plugin-delivery jar — 中キット management GUI (create/rename/icon/delete/edit without commands) 2026-09-27 (arena/01a0dc7c) -->
+
+<!-- trigger: build + plugin-delivery → v1.76.59 — party auto-disband invariants (owner leave / owner quit / 0 members + 3s sweep), spectate button on joining a party mid-match (/team spectate), 中キット management gated to rumilance.admin, players keep a personal arrangement of a preset (kit_layouts "<kit>#preset#<id>", KitLoadout.reorder) 2026-09-27 (arena/01a0dc7c) -->
