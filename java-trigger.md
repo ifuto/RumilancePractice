@@ -318,3 +318,5 @@ IDを作っていた（`npc:tick.mcfunction`）。そのため **タグ（#minec
 <!-- trigger: build + plugin-delivery + resource-pack release v1.76.57 (FFA mannequin /bot, token from checkout credentials) 2026-09-26 (arena/01a0dc7c) -->
 
 <!-- trigger: build + plugin-delivery for FFA Bot per-arena opt-in toggle (default OFF) + full damage pass-through 2026-09-26 (arena/01a0dc7c) -->
+
+<!-- trigger: build + plugin-delivery for 中キット (inner kits) — /kit preset add|remove|list + right-click pickers in Duel Request / Party Fight / Kit Edit, preset loadout wins over kit base and personal layout, carries across rematches → v1.76.58 2026-09-27 (arena/01a0dc7c) -->
