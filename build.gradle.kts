@@ -99,6 +99,12 @@ tasks.processResources {
     filesMatching("plugin.yml") {
         expand(props)
     }
+    // Ship the repo resourcepack/ inside the jar as pack-base/ so the Shield Web UI has a
+    // working copy to unpack at runtime (plugins/n-arena/shield-web/pack-src/) before it
+    // injects uploaded shield artwork and rebuilds the zip the clients are re-pushed.
+    from(layout.projectDirectory.dir("resourcepack")) {
+        into("pack-base")
+    }
 }
 
 tasks.test {

@@ -225,3 +225,10 @@ python3 tools/add_custom_shield.py <cmd> <image.png> [--pack-root resourcepack]
 
 その後 `tools/release/build-pack.sh` → `tools/release/attach-pack.sh <tag>` で
 パックを再ビルド・再アップロードすれば完了です（手順は上の「パックの中身を変えたとき」）。
+
+> **v1.77.0〜**: サーバー上で盾を追加したいだけならスクリプト不要の **Shield Web** が使えます。
+> `shield-web.enabled: true` でプラグイン内蔵HTTPが起動し、ブラウザから
+> 「PNGアップロード → プレイヤー紐づけ → 全員へ即時再適用」まで完結します（同じ注入処理の
+> Java版が `plugins/n-arena/shield-web/pack-src/` の作業コピーに対して走ります）。
+> 手順は [shield-web.md](shield-web.md)。リポジトリの `resourcepack/` 配布版を盾入りにする
+> 場合は、このページの従来手順をそのまま使ってください。

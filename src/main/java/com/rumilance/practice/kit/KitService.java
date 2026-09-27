@@ -719,6 +719,34 @@ public final class KitService {
     }
 
     /**
+     * Re-runs the hidden-rank shield pass on a live inventory. The Shield Web UI calls this
+     * right after linking an artwork to an online player so the assignment shows immediately,
+     * without waiting for the next kit application.
+     */
+    public void refreshCustomShield(Player player) {
+        applyCustomShield(player);
+        player.updateInventory();
+    }
+
+    /**
+     * Strips the Custom Model Data off every shield the player is currently carrying — used
+     * when a holder is unassigned (or their artwork is deleted) from the Shield Web UI. The
+     * VIP+ loom patterns are untouched; only the exclusive-artwork override comes off.
+     */
+    public void clearCustomShield(Player player) {
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (item != null && item.getType() == org.bukkit.Material.SHIELD) {
+                org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
+                if (meta != null && meta.hasCustomModelData()) {
+                    meta.setCustomModelData(null);
+                    item.setItemMeta(meta);
+                }
+            }
+        }
+        player.updateInventory();
+    }
+
+    /**
      * Gives the hidden-rank custom shield: every shield the kit handed out receives the
      * operator-assigned Custom Model Data, which the resource pack renders as the holder's
      * high-resolution artwork. No-op for players without the hidden rank / model data.

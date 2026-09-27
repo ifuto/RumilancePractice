@@ -299,7 +299,7 @@ commands:
     permission: rumilance.admin
   urank:
     description: Manage hidden ranks that never display (OP), including custom_shield and tester.
-    usage: /urank <custom_shield|tester|remove|shield|gui|list>
+    usage: /urank <custom_shield|tester|remove|shield|gui|web|list>
     permission: rumilance.admin
   forceend:
     description: Force-end the match a player is in (or spectating) as a draw (OP).

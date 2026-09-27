@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>N Arena — 盾管理</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Hiragino Kaku Gothic ProN", "Noto Sans JP", system-ui, sans-serif;
+         background: #14161d; color: #e7e9ef; }
+  header { background: #1d2130; padding: 14px 20px; display: flex; gap: 14px; align-items: center;
+           border-bottom: 2px solid #6c5ce7; }
+  header h1 { font-size: 18px; margin: 0; }
+  header .badge { background: #6c5ce7; border-radius: 6px; padding: 2px 10px; font-size: 12px; }
+  main { max-width: 1040px; margin: 0 auto; padding: 20px; }
+  section { background: #1d2130; border: 1px solid #2c3150; border-radius: 12px;
+            padding: 16px 18px; margin-bottom: 18px; }
+  h2 { font-size: 15px; margin: 0 0 12px; color: #a3a9ff; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  button { background: #6c5ce7; color: #fff; border: 0; border-radius: 8px;
+           padding: 8px 14px; font-size: 13px; cursor: pointer; }
+  button:hover { background: #7d6cf0; }
+  button.danger { background: #d84356; }
+  button.ghost { background: #333a55; }
+  input, select { background: #14161d; color: #e7e9ef; border: 1px solid #3a4066;
+                  border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+  #drop { border: 2px dashed #4a5180; border-radius: 12px; padding: 26px; text-align: center;
+          color: #9aa0c3; cursor: pointer; transition: border-color .15s; }
+  #drop.over { border-color: #8f83ff; background: #23273c; }
+  #drop img { max-height: 64px; image-rendering: pixelated; margin-top: 10px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+  .card { background: #14161d; border: 1px solid #2c3150; border-radius: 10px; padding: 12px; }
+  .card .preview { width: 100%; height: 120px; display: flex; align-items: center;
+                   justify-content: center; background: #0e1016; border-radius: 8px; margin-bottom: 10px; }
+  .card img { max-width: 110px; max-height: 110px; image-rendering: pixelated; }
+  .card .cmd { font-size: 12px; color: #8890b8; }
+  .holders { font-size: 12px; color: #8890b8; margin-top: 4px; }
+  #toast { position: fixed; right: 18px; bottom: 18px; max-width: 380px; background: #2b324f;
+           border: 1px solid #4a5180; border-radius: 10px; padding: 12px 16px; font-size: 13px;
+           display: none; white-space: pre-wrap; }
+  #toast.err { border-color: #d84356; background: #3a1e26; }
+  .muted { color: #8890b8; font-size: 12px; }
+  code { background: #0e1016; padding: 2px 6px; border-radius: 5px; font-size: 12px; }
+  a { color: #8f83ff; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🛡️ N Arena — 盾管理</h1>
+  <span class="badge">custom_shield (裏ランク)</span>
+  <span class="muted" id="statusline"></span>
+</header>
+<main>
+  <section>
+    <h2>① 盾画像をアップロード（PNG・512×512推奨・自動リサイズ）</h2>
+    <div id="drop">
+      ここにPNGをドラッグ&amp;ドロップ / クリックで選択
+      <div id="pick"><img id="preview" alt="" hidden></div>
+    </div>
+    <input type="file" id="file" accept="image/png" hidden>
+    <div class="row" style="margin-top:12px">
+      <label>表示名 <input id="name" placeholder="例: 水色の盾" size="16"></label>
+      <label>CMD <input id="cmd" placeholder="空=自動割当(100〜)" size="8" inputmode="numeric"></label>
+      <button id="upload" disabled>アップロードして全員に即適用</button>
+      <span class="muted">既存CMDを指定すると画像だけ差し替わります</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>② 盾とプレイヤーの紐づけ</h2>
+    <div class="muted">オンラインなら即座に手持ちの盾へ反映、オフラインなら次のキット適用から。</div>
+    <div id="cards" class="grid" style="margin-top:12px"></div>
+  </section>
+
+  <section>
+    <h2>③ 状態 / 操作</h2>
+    <div class="row">
+      <button class="ghost" id="repush">最新パックを全員に再送</button>
+      <button class="ghost" id="reload">再読込</button>
+    </div>
+    <p class="muted" id="meta"></p>
+    <p class="muted">パックURL（resource-pack.json の url）: <code id="packurl"></code><br>
+       プレイヤー外部公開の例: <code>tailscale funnel --bg &lt;port&gt;</code> → 出てきた https URL + <code>/pack.zip</code> を url に設定。</p>
+  </section>
+</main>
+<div id="toast"></div>
+<script>
+const TOKEN = "__TOKEN__";
+const H = { "Authorization": "Bearer " + TOKEN };
+let state = null;
+
+const $ = (id) => document.getElementById(id);
+function toast(msg, isErr) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.className = isErr ? "err" : "";
+  t.style.display = "block";
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.style.display = "none", 6000);
+}
+async function api(path, options) {
+  const res = await fetch(path, options);
+  let data = {};
+  try { data = await res.json(); } catch (e) { /* empty body */ }
+  if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+  return data;
+}
+let onlinePlayers = [];
+async function refresh() {
+  const results = await Promise.all([
+    api("/admin/api/state", { headers: H }),
+    api("/admin/api/players", { headers: H }).catch(() => ({ online: [] })),
+  ]);
+  state = results[0];
+  onlinePlayers = results[1].online || [];
+  render();
+}
+function holderNames(cmd) {
+  if (!state) return "";
+  const names = state.holders.filter(h => h.cmd === cmd).map(h => h.name);
+  return names.length ? names.join(", ") : "";
+}
+function render() {
+  $("statusline").textContent = "port " + state.port + (state.manageHash ? "" : " (hash外部管理)");
+  $("packurl").textContent = state.pack.url || "(未設定)";
+  $("meta").textContent =
+    "pack.zip: " + (state.pack.present ? (state.pack.bytes/1024).toFixed(1) + " KB, sha1=" + state.pack.sha1.slice(0,12) + "…" : "未生成")
+    + "  / 盾 " + state.shields.length + " 件・紐づけ " + state.holders.length + " 人";
+
+  const cards = $("cards");
+  cards.innerHTML = "";
+  if (state.shields.length === 0) {
+    cards.innerHTML = "<span class='muted'>まだ盾がありません。①からアップロードしてください。</span>";
+  }
+  for (const s of state.shields) {
+    const div = document.createElement("div");
+    div.className = "card";
+    const holders = holderNames(s.cmd);
+    div.innerHTML =
+      "<div class='preview'><img src='/shield-texture?cmd=" + s.cmd + "&token=" + encodeURIComponent(TOKEN) + "' alt=''></div>" +
+      "<div><b>" + escapeHtml(s.name) + "</b> <span class='cmd'>cmd=" + s.cmd + "</span></div>" +
+      "<div class='holders'>" + (holders ? "使用中: " + escapeHtml(holders) : "未使用") + "</div>";
+    const row = document.createElement("div");
+    row.className = "row";
+    row.style.marginTop = "8px";
+    const input = document.createElement("input");
+    input.placeholder = "プレイヤー名 or UUID";
+    input.size = 16;
+    const online = document.createElement("select");
+    online.innerHTML = "<option value=''>— オンラインから選ぶ —</option>";
+    for (const p of onlinePlayers) {
+      const o = document.createElement("option");
+      o.value = p.name; o.textContent = p.name + " (online)";
+      online.appendChild(o);
+    }
+    online.onchange = () => { if (online.value) input.value = online.value; };
+    const assignBtn = document.createElement("button");
+    assignBtn.textContent = "紐づけ";
+    assignBtn.onclick = async () => {
+      if (!input.value.trim()) { toast("プレイヤー名を入力してください", true); return; }
+      try {
+        const r = await api("/admin/api/assign?cmd=" + s.cmd + "&player=" + encodeURIComponent(input.value.trim()), { method: "POST", headers: H });
+        toast(r.message || "適用しました");
+        refresh();
+      } catch (e) { toast(e.message, true); }
+    };
+    const delBtn = document.createElement("button");
+    delBtn.textContent = "削除";
+    delBtn.className = "danger";
+    delBtn.onclick = async () => {
+      if (!confirm("cmd=" + s.cmd + " の盾を削除します（紐づけ中のプレイヤーも解除）。よろしいですか？")) return;
+      try {
+        const r = await api("/admin/api/delete?cmd=" + s.cmd, { method: "POST", headers: H });
+        toast(r.message || "削除しました");
+        refresh();
+      } catch (e) { toast(e.message, true); }
+    };
+    row.append(online, input, assignBtn, delBtn);
+    div.appendChild(row);
+    cards.appendChild(div);
+  }
+  // 解除行
+  const un = document.createElement("div");
+  un.className = "row";
+  un.style.marginTop = "14px";
+  un.innerHTML = "<span class='muted'>解除:</span>";
+  const uinput = document.createElement("input");
+  uinput.placeholder = "プレイヤー名 or UUID";
+  const ubtn = document.createElement("button");
+  ubtn.className = "danger";
+  ubtn.textContent = "盾を解除";
+  ubtn.onclick = async () => {
+    if (!uinput.value.trim()) { toast("プレイヤー名を入力してください", true); return; }
+    try {
+      const r = await api("/admin/api/unassign?player=" + encodeURIComponent(uinput.value.trim()), { method: "POST", headers: H });
+      toast(r.message || "解除しました");
+      refresh();
+    } catch (e) { toast(e.message, true); }
+  };
+  un.append(uinput, ubtn);
+  cards.appendChild(un);
+}
+function escapeHtml(s) {
+  return (s || "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// --- upload handling ---
+let pickedFile = null;
+const drop = $("drop"), file = $("file");
+drop.onclick = () => file.click();
+["dragover", "dragenter"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => { if (e.dataTransfer.files[0]) pick(e.dataTransfer.files[0]); });
+file.onchange = () => { if (file.files[0]) pick(file.files[0]); };
+function pick(f) {
+  if (!f.type.includes("png") && !f.name.toLowerCase().endsWith(".png")) { toast("PNGファイルを選んでください", true); return; }
+  if (f.size > 8 * 1024 * 1024) { toast("8MBまでです", true); return; }
+  pickedFile = f;
+  const img = $("preview");
+  img.src = URL.createObjectURL(f);
+  img.hidden = false;
+  if (!$("name").value) $("name").value = f.name.replace(/\.png$/i, "").slice(0, 32);
+  $("upload").disabled = false;
+}
+$("upload").onclick = async () => {
+  if (!pickedFile) return;
+  const params = new URLSearchParams();
+  if ($("cmd").value.trim()) params.set("cmd", $("cmd").value.trim());
+  if ($("name").value.trim()) params.set("name", $("name").value.trim());
+  try {
+    toast("アップロード中…パックを再構築して全員に再送します");
+    const r = await api("/admin/api/upload?" + params.toString(),
+      { method: "POST", headers: Object.assign({ "Content-Type": "application/octet-stream" }, H), body: pickedFile });
+    toast((r.message || "登録しました") + "\nsha1=" + (r.sha1 || "").slice(0, 12) + "…");
+    pickedFile = null; $("preview").hidden = true; $("upload").disabled = true; $("cmd").value = "";
+    refresh();
+  } catch (e) { toast(e.message, true); }
+};
+$("repush").onclick = async () => {
+  try { const r = await api("/admin/api/repush", { method: "POST", headers: H }); toast(r.message || "再送しました"); }
+  catch (e) { toast(e.message, true); }
+};
+$("reload").onclick = () => refresh().catch(e => toast(e.message, true));
+refresh().catch(e => toast(e.message, true));
+</script>
+</body>
+</html>

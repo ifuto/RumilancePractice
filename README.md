@@ -61,6 +61,7 @@ Paper 1.21.11 向け Practice PvP プラグイン **N Arena** です。ランク
 - サーバー停止時は切断 ChatBan を発行しません（`MatchSession.shuttingDown`）
 - タイムアウト・放置・Fly による自動キックは行いません（`KickGuardListener` が Paper の `TIMEOUT` / `IDLING` / `FLYING_PLAYER` / `FLYING_VEHICLE` キックをキャンセルし、参加時に netty の read-timeout も除去。コマンド・BAN・プラグインによるキックは従来通り有効）
 - 練習ボットの戦闘関数と Quantum マップ関数の対応表は [docs/bot-combat-parity.md](docs/bot-combat-parity.md)
+- **カスタム盾（裏ランク `custom_shield`）はブラウザ管理できる** — `shield-web.enabled: true` でプラグイン内蔵HTTPが起動し、PNGアップ→プレイヤー紐づけ→全員へ即時再適用までWebで完結（`/urank web` が管理URLを表示。Tailscale Funnel でも配布可）。手順: [docs/shield-web.md](docs/shield-web.md)
 
 ## 権限
 

@@ -37,10 +37,16 @@ public final class HiddenRankCommand implements CommandExecutor, TabCompleter {
 
     private final HiddenRankService hiddenRanks;
     private final CustomShieldAdminGui adminGui;
+    private com.rumilance.practice.shieldweb.ShieldWebService shieldWeb;
 
     public HiddenRankCommand(HiddenRankService hiddenRanks, CustomShieldAdminGui adminGui) {
         this.hiddenRanks = hiddenRanks;
         this.adminGui = adminGui;
+    }
+
+    /** Wiring for {@code /urank web} — optional because Shield Web can be config-off. */
+    public void setShieldWeb(com.rumilance.practice.shieldweb.ShieldWebService shieldWeb) {
+        this.shieldWeb = shieldWeb;
     }
 
     @Override
@@ -62,6 +68,27 @@ public final class HiddenRankCommand implements CommandExecutor, TabCompleter {
                 } else {
                     sender.sendMessage(Component.text("Console cannot open GUIs.", NamedTextColor.RED));
                 }
+            }
+            case "web" -> {
+                if (shieldWeb == null || !shieldWeb.enabled()) {
+                    sender.sendMessage(Component.text(
+                            "Shield Web は無効です。config.yml → shield-web.enabled: true で起動します。",
+                            NamedTextColor.RED));
+                    return true;
+                }
+                int port = shieldWeb.port();
+                sender.sendMessage(Component.text("=== Shield Web (盾管理) ===", NamedTextColor.LIGHT_PURPLE));
+                sender.sendMessage(Component.text(
+                        "管理画面: http://localhost:" + port + "/admin?token=" + shieldWeb.token(),
+                        NamedTextColor.GREEN));
+                sender.sendMessage(Component.text(
+                        "  ↑ サーバーPCのブラウザで開く。LAN内なら http://<サーバーPCのIP>:"
+                                + port + "/admin?token=<同じトークン>", NamedTextColor.GRAY));
+                sender.sendMessage(Component.text(
+                        "登録盾: " + shieldWeb.shieldCount()
+                                + " 件。外部公開は tailscale funnel --bg " + port
+                                + " → resource-pack.json の url を Funnel URL + /pack.zip に。",
+                        NamedTextColor.DARK_GRAY));
             }
             case "list" -> {
                 var shieldHolders = hiddenRanks.customShieldHolders();
@@ -179,7 +206,7 @@ public final class HiddenRankCommand implements CommandExecutor, TabCompleter {
     private void usage(CommandSender sender) {
         sender.sendMessage(Component.text(
                 "/urank custom_shield <player> | tester <player> | tester remove <player> | "
-                        + "remove [tester] <player> | shield <player> <cmd> | gui | list",
+                        + "remove [tester] <player> | shield <player> <cmd> | gui | web | list",
                 NamedTextColor.YELLOW));
     }
 
@@ -190,7 +217,7 @@ public final class HiddenRankCommand implements CommandExecutor, TabCompleter {
             return List.of();
         }
         if (args.length == 1) {
-            return filter(List.of("custom_shield", "tester", "remove", "shield", "gui", "list"), args[0]);
+            return filter(List.of("custom_shield", "tester", "remove", "shield", "gui", "web", "list"), args[0]);
         }
         List<String> onlineNames = Bukkit.getOnlinePlayers().stream().map(Player::getName).toList();
         if (args.length == 2 && args[0].equalsIgnoreCase("tester")) {

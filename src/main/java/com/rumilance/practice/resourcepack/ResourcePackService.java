@@ -171,6 +171,25 @@ public final class ResourcePackService implements Listener {
     }
 
     /**
+     * Announces the hash of a pack the plugin itself just (re)built — the Shield Web
+     * self-hosted flow ({@code shield-web.*}). Instead of re-downloading the configured URL
+     * to discover the hash, the builder hands its SHA-1 over directly: it is persisted into
+     * {@code resource-pack.json} and the pack is re-pushed to every online player, exactly as
+     * {@link #reload()} would. The startup {@link #resolveHashFromUrl()} pass fetches the URL
+     * anyway afterwards and simply confirms the same value, so nothing can drift.
+     */
+    public void updateLocalHash(String sha1Hex) {
+        String normalized = normalizeSha1(sha1Hex);
+        if (normalized == null) {
+            logger.warning("[ShieldWeb] ignoring malformed pack hash: " + sha1Hex);
+            return;
+        }
+        this.liveSha1 = normalized;
+        saveJson(configuredUrl(), normalized);
+        reload();
+    }
+
+    /**
      * Whether players refusing/failing the pack must be kicked. The admin-GUI override
      * ({@code pack-policy.yml}) wins over {@code resource-pack.required} in config.yml, which
      * is force-synced with the bundled pack on every startup. Default: recommended (no kick).

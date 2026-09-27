@@ -259,6 +259,7 @@ public final class FeatureBootstrap {
     private ReplayService replayService;
     private PracticeService practiceService;
     private com.rumilance.practice.practice.afk.AfkCrystalManager afkCrystalManager;
+    private com.rumilance.practice.shieldweb.ShieldWebService shieldWebService;
     /** {@code /bot} inside FFA: the unkillable mannequin training dummy. */
     private com.rumilance.practice.ffa.FfaMannequinService ffaMannequins;
     private TeamGlowLosService teamGlowLosService;
@@ -741,6 +742,18 @@ public final class FeatureBootstrap {
         services.register(com.rumilance.practice.resourcepack.ResourcePackService.class,
                 resourcePackService);
         plugin.getServer().getPluginManager().registerEvents(resourcePackService, plugin);
+
+        // ---- Shield Web (裏ランク custom_shield のブラウザ管理) --------------------------------
+        // Embedded zero-dependency HTTP server on the server PC (Tailscale Funnel friendly):
+        // PNG upload → pack rebuild + new SHA-1 → re-push to everyone → hidden rank + live
+        // shield equip. Config-off by default (shield-web.enabled in config.yml); start() is a
+        // no-op then, so construction is unconditional.
+        this.shieldWebService = new com.rumilance.practice.shieldweb.ShieldWebService(
+                plugin, configService, hiddenRankService, kitService, resourcePackService);
+        services.register(com.rumilance.practice.shieldweb.ShieldWebService.class,
+                this.shieldWebService);
+        this.shieldWebService.start();
+
         final RankService rankServiceRef = rankService;
         com.rumilance.practice.match.MatchTeamVisuals.setPrefixResolver((viewer, player, session) -> {
             net.kyori.adventure.text.Component prefix = net.kyori.adventure.text.Component.empty();
@@ -1940,7 +1953,12 @@ public final class FeatureBootstrap {
                 new com.rumilance.practice.craft.CraftRestrictionListener(stateManager), plugin);
         bind("practice", new PracticeCommand(practiceService));
         bind("setrank", new SetRankCommand(rankService, playerRepository));
-        bind("urank", new com.rumilance.practice.command.HiddenRankCommand(hiddenRankService, customShieldAdminGui));
+        com.rumilance.practice.command.HiddenRankCommand hiddenRankCommand =
+                new com.rumilance.practice.command.HiddenRankCommand(hiddenRankService, customShieldAdminGui);
+        if (this.shieldWebService != null) {
+            hiddenRankCommand.setShieldWeb(this.shieldWebService);
+        }
+        bind("urank", hiddenRankCommand);
         com.rumilance.practice.command.AdminMatchCommand adminMatchCommand =
                 new com.rumilance.practice.command.AdminMatchCommand(matchService, kitService, arenaService);
         bind("forceend", adminMatchCommand);
@@ -2048,6 +2066,10 @@ public final class FeatureBootstrap {
         if (this.quantum != null) {
             this.quantum.disable();
             this.quantum = null;
+        }
+        if (this.shieldWebService != null) {
+            this.shieldWebService.stop();
+            this.shieldWebService = null;
         }
         if (afkCrystalManager != null) {
             afkCrystalManager.shutdown();

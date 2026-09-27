@@ -71,6 +71,27 @@ resource-pack:
   # Kick message shown to players who declined / failed the pack.
   kick-message: "N Arena をプレイするにはリソースパックの適用が必要です。\n適用を拒否、またはダウンロードに失敗したため切断されました。"
 
+# Shield Web — the browser admin for the hidden custom_shield rank (裏ランクの盾).
+# An embedded zero-dependency HTTP server on the server machine: upload shield PNGs from a
+# browser, link them to players, and everyone online immediately receives the rebuilt pack.
+# Full guide: docs/shield-web.md (Tailscale Funnel works — no router port-forward needed).
+shield-web:
+  # Master switch. Starts the embedded HTTP server on enable. False = feature fully off.
+  enabled: false
+  # Listen address/port. "0.0.0.0" = LAN + localhost + Tailscale proxy all reach it;
+  # "127.0.0.1" restricts to the server PC itself (Tailscale `serve`/`funnel` still works,
+  # because the proxy connects from localhost).
+  bind: "0.0.0.0"
+  port: 8765
+  # true = the plugin announces the SHA-1 of the pack it rebuilt and re-pushes it to everyone
+  # (use when resource-pack.json "url" points at THIS server — e.g. the Funnel URL).
+  # false = the pack bytes are hosted elsewhere; nothing about the hash is touched.
+  manage-pack-hash: true
+  # false = the admin UI only accepts browsers on private/LAN/Tailscale addresses.
+  # true  = any source IP may reach /admin (still requires the token) — needed only when you
+  #         administer through a public proxy that is NOT Tailscale/localhost.
+  admin-allow-external: false
+
 executor:
   # Size of the async worker pool used for I/O and heavier computations
   # (database queries, schematic pastes, statistics recalculation, etc.).
