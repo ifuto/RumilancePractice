@@ -127,12 +127,34 @@ public final class MatchHistoryStore {
         return out;
     }
 
+    /**
+     * Server-wide battle log (web admin, moderation views): the latest finished matches
+     * across every player, deduplicated by match id — each shared immutable {@link Entry}
+     * lives in all of its participants' deques, so one pass over all buckets recovers the
+     * global timeline without touching the database. Newest first, capped at {@code limit}.
+     */
+    public synchronized List<Entry> recentAll(int limit) {
+        if (limit <= 0) {
+            return List.of();
+        }
+        long now = System.currentTimeMillis();
+        java.util.Map<UUID, Entry> byId = new java.util.LinkedHashMap<>();
+        for (ArrayDeque<Entry> deque : byPlayer.values()) {
+            deque.removeIf(e -> now - e.endedAtEpochMs() > TTL_MS);
+            for (Entry e : deque) {
+                byId.putIfAbsent(e.matchId(), e);
+            }
+        }
+        List<Entry> out = new ArrayList<>(byId.values());
+        out.sort((a, b) -> Long.compare(b.endedAtEpochMs(), a.endedAtEpochMs()));
+        return out.size() > limit ? new ArrayList<>(out.subList(0, limit)) : out;
+    }
+
     /** @return one entry by match id, if the viewer took part and it is still retained. */
     public Entry get(UUID viewer, UUID matchId) {
         for (Entry e : recent(viewer)) {
             if (e.matchId().equals(matchId)) {
-                return e;
-            }
+                return e;            }
         }
         return null;
     }

@@ -62,6 +62,26 @@ public final class ShieldWebServer implements AutoCloseable {
         String deleteShield(int cmd) throws ShieldWebException;
 
         String repush() throws ShieldWebException;
+
+        // ---- server management (the "upgrade to admin site" set) ----
+
+        /** Pack integrity probes + per-player applied state ("動作テスト"). */
+        String selftestJson();
+
+        /** Executes a console command on the main thread; rate-limited service-side. */
+        String runCommand(String command) throws ShieldWebException;
+
+        /** Native tab-completion candidates for a partially typed command line. */
+        String completionsJson(String input);
+
+        /** The tail of logs/latest.log, hard-bounded on both axes. */
+        String logsJson(int lines);
+
+        /** Finished matches across every player (battle log), newest first. */
+        String battlesJson();
+
+        /** Currently running matches with live per-player state (lightweight spectate). */
+        String matchesJson();
     }
 
     /** Uniform error for anything the admin UI should surface as a message. */
@@ -223,6 +243,22 @@ public final class ShieldWebServer implements AutoCloseable {
                     requirePost(method);
                     jsonOk(exchange, api.repush());
                 }
+                case "/admin/api/selftest" -> jsonOk(exchange, api.selftestJson());
+                case "/admin/api/complete" ->
+                    jsonOk(exchange, api.completionsJson(query.getOrDefault("input", "")));
+                case "/admin/api/logs" ->
+                    jsonOk(exchange, api.logsJson(intParamOrDefault(query, "lines", 200)));
+                case "/admin/api/battles" -> jsonOk(exchange, api.battlesJson());
+                case "/admin/api/matches" -> jsonOk(exchange, api.matchesJson());
+                case "/admin/api/command" -> {
+                    requirePost(method);
+                    byte[] body = readBody(exchange, 4096);
+                    String command = new String(body, StandardCharsets.UTF_8).trim();
+                    if (command.isEmpty()) {
+                        command = required(query, "cmd");
+                    }
+                    jsonOk(exchange, api.runCommand(command));
+                }
                 default -> respond(exchange, 404, json(), error("unknown endpoint"));
             }
         } catch (ShieldWebException e) {
@@ -340,12 +376,17 @@ public final class ShieldWebServer implements AutoCloseable {
         }
     }
 
-    private static int intParamOrDefault(Map<String, String> query, String key, int fallback)
-            throws ShieldWebException {
-        if (!query.containsKey(key) || query.get(key).isBlank()) {
+    private static int intParamOrDefault(Map<String, String> query, String key, int fallback) {
+        String raw = query.get(key);
+        if (raw == null || raw.isBlank()) {
             return fallback;
         }
-        return intParam(query, key);
+        try {
+            int value = Integer.parseInt(raw.trim());
+            return value > 0 ? value : fallback;
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
     }
 
     private static String required(Map<String, String> query, String key) throws ShieldWebException {

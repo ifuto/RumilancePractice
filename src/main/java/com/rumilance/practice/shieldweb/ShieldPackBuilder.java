@@ -115,14 +115,17 @@ public final class ShieldPackBuilder {
     /**
      * Writes the texture + models for {@code cmd} into {@code packSrc} and regenerates
      * {@code shield.json} from {@code allCmds} (the authoritative registry view, includes
-     * {@code cmd}). Idempotent: re-injecting an existing cmd overwrites its artwork.
+     * {@code cmd}). The artwork goes through {@link ShieldComposite}: it is automatically
+     * cropped to the shield's tall face and composited onto the wooden body, so any photo
+     * comes out as a proper shield. Idempotent: re-injecting an existing cmd overwrites it.
      */
     public static void inject(Path packSrc, int cmd, byte[] pngBytes, List<Integer> allCmds)
             throws IOException {
         if (cmd <= 0) {
             throw new IOException("cmd は 1 以上の整数にしてください");
         }
-        BufferedImage image = normalize(validatePng(pngBytes));
+        // Upload → 縦長に自動トリミング → 盾の木部へ合成（ShieldComposite）。
+        BufferedImage image = ShieldComposite.compose(packSrc, pngBytes);
         Files.createDirectories(packSrc.resolve(TEXTURE_DIR));
         Files.createDirectories(packSrc.resolve(MODEL_DIR));
         Files.createDirectories(packSrc.resolve(VANILLA_MODEL_DIR));

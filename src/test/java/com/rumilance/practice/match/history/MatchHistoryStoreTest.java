@@ -93,4 +93,48 @@ class MatchHistoryStoreTest {
         assertNotNull(store.get(viewer, e.matchId()));
         assertNull(store.get(UUID.randomUUID(), e.matchId()));
     }
+
+    // ------------------------------------------------------------------ recentAll (web battle log)
+
+    @Test
+    void recentAllDedupesMatchesSharedBySeveralPlayers(@TempDir Path tmp) {
+        MatchHistoryStore store = new MatchHistoryStore(null, tmp.resolve("h.bin"));
+        UUID a = UUID.randomUUID();
+        UUID b = UUID.randomUUID();
+        MatchHistoryStore.Entry shared = new MatchHistoryStore.Entry(
+                matchId("shared"), "TEAM", "gapple", System.currentTimeMillis(), 90_000L, false,
+                List.of(new MatchHistoryStore.Participant(a, "A", "RED", 5, true),
+                        new MatchHistoryStore.Participant(b, "B", "BLUE", 2, false)));
+        store.record(shared);
+
+        List<MatchHistoryStore.Entry> all = store.recentAll(50);
+        assertEquals(1, all.size(), "one match recorded via 2 players → one battle entry");
+        assertEquals(matchId("shared"), all.get(0).matchId());
+    }
+
+    @Test
+    void recentAllIsNewestFirstAndHonoursTheLimit(@TempDir Path tmp) {
+        MatchHistoryStore store = new MatchHistoryStore(null, tmp.resolve("h.bin"));
+        UUID viewer = UUID.randomUUID();
+        long now = System.currentTimeMillis();
+        for (int i = 0; i < 5; i++) {
+            // separate opponents so every match lands in its own player deque
+            store.record(new MatchHistoryStore.Entry(
+                    matchId("m" + i), "RANKED", "nodebuff", now - (5 - i) * 1000L, 30_000L, false,
+                    List.of(new MatchHistoryStore.Participant(viewer, "V", "RED", 1, true),
+                            new MatchHistoryStore.Participant(matchId("opp" + i), "O" + i,
+                                    "BLUE", 0, false))));
+        }
+
+        List<MatchHistoryStore.Entry> all = store.recentAll(50);
+        assertEquals(5, all.size());
+        assertEquals(matchId("m4"), all.get(0).matchId(), "newest first");
+        assertEquals(matchId("m0"), all.get(4).matchId(), "oldest last");
+
+        List<MatchHistoryStore.Entry> limited = store.recentAll(3);
+        assertEquals(3, limited.size(), "limit caps the web battle log");
+        assertEquals(matchId("m4"), limited.get(0).matchId());
+
+        assertTrue(store.recentAll(0).isEmpty(), "non-positive limit → empty");
+    }
 }

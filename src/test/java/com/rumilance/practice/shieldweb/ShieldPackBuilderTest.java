@@ -71,12 +71,33 @@ class ShieldPackBuilderTest {
     }
 
     @Test
-    void oversizedArtworkIsScaledDownTo512() throws IOException {
-        ShieldPackBuilder.inject(packSrc, 101, png(2048, 1024), List.of(101));
+    void oversizedArtworkIsAutoCroppedAndCompositedTo512() throws IOException {
+        // ランドスケープ入力は縦長（盾フェイスのアスペクト）へトリミングされ、
+        // 木製ボディへ合成された 512×512 の完成品テクスチャが書き込まれる。
+        byte[] flat = flatPng(2048, 1024, 0xFF3366CC);
+        ShieldPackBuilder.inject(packSrc, 101, flat, List.of(101));
         BufferedImage written = ImageIO.read(packSrc.resolve(
                 "assets/rumilance/textures/shield/shield_101.png").toFile());
         assertEquals(512, written.getWidth());
-        assertEquals(256, written.getHeight());
+        assertEquals(512, written.getHeight());
+        // フェイス中央にはアップ画像の色、フェイス外は木目ベース（=合成済み）
+        int face = written.getRGB(256, 256);
+        int outside = written.getRGB(4, 4);
+        assertEquals(0xFF3366CC, face, "upload must reach the shield face");
+        assertNotEquals(0xFF3366CC, outside, "the wooden body stays intact around the face");
+    }
+
+    /** Fully opaque single-colour artwork (unlike {@link #png}, which is one dot). */
+    private static byte[] flatPng(int w, int h, int argb) throws IOException {
+        BufferedImage image = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                image.setRGB(x, y, argb);
+            }
+        }
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        assertTrue(ImageIO.write(image, "PNG", out));
+        return out.toByteArray();
     }
 
     @Test

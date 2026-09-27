@@ -91,6 +91,10 @@ shield-web:
   # true  = any source IP may reach /admin (still requires the token) — needed only when you
   #         administer through a public proxy that is NOT Tailscale/localhost.
   admin-allow-external: false
+  # Browser console tab: lets the web UI run server console commands with tab-complete.
+  # Hard limits are always on (1 command/second, 300 chars, every command mirrored to the
+  # server log). Set false to make the whole tab read-only state with no command exec.
+  console-enabled: true
 
 executor:
   # Size of the async worker pool used for I/O and heavier computations

@@ -188,6 +188,7 @@
   .tag-blue { background: var(--pale-blue); color: var(--pale-blue-ink); }
   .tag-green { background: var(--pale-green); color: var(--pale-green-ink); }
   .tag-yellow { background: var(--pale-yellow); color: var(--pale-yellow-ink); }
+  .tag-red { background: var(--pale-red); color: var(--pale-red-ink); }
   .tag-gray { background: var(--surface-alt); color: var(--muted);
               border: 1px solid var(--rule); }
   kbd.cmd {
@@ -270,6 +271,96 @@
   .foot { margin-top: 56px; color: var(--muted); font-size: 12px;
           display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   .foot .mono { font-family: var(--font-mono); font-size: 11px; }
+
+  /* ---------------- tabs (management panes) -------------------------------------- */
+  .tabs {
+    display: flex; gap: 2px; flex-wrap: wrap;
+    border-bottom: 1px solid var(--rule);
+    margin-top: -6px;
+  }
+  .tab {
+    appearance: none; background: none; border: none; cursor: pointer;
+    font-family: var(--font-sans); font-size: 13px; font-weight: 600;
+    color: var(--muted);
+    padding: 10px 14px;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color 150ms ease, border-color 150ms ease;
+  }
+  .tab:hover { color: var(--ink-body); }
+  .tab.is-on { color: var(--ink); border-bottom-color: var(--ink); }
+  .pane { margin-top: 28px; }
+  .pane[hidden] { display: none; }
+
+  /* ---------------- console ------------------------------------------------------- */
+  .cmdline-row { display: flex; gap: 8px; }
+  .cmdline-row .field { flex: 1; font-family: var(--font-mono); font-size: 13px; }
+  .cands { display: flex; flex-wrap: wrap; gap: 6px; min-height: 0; margin-top: 10px; }
+  .cands:empty { display: none; }
+  .cands .cand {
+    appearance: none; cursor: pointer;
+    background: var(--surface-alt); border: 1px solid var(--rule);
+    border-radius: 9999px; padding: 3px 11px;
+    font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-body);
+    transition: background 150ms ease, border-color 150ms ease;
+  }
+  .cands .cand:hover { background: var(--surface); border-color: var(--rule-strong); }
+  .cmdout {
+    margin-top: 14px; max-height: 260px; overflow: auto;
+    background: var(--surface-alt); border: 1px solid var(--rule); border-radius: 8px;
+    padding: 12px 14px; white-space: pre-wrap; word-break: break-word;
+    font-family: var(--font-mono); font-size: 12px; line-height: 1.7; color: var(--ink-body);
+  }
+  .cmdout:empty::before { content: "（まだ出力がありません）"; color: var(--muted); }
+
+  /* ---------------- log view ------------------------------------------------------ */
+  .logview {
+    height: 420px; overflow: auto;
+    background: var(--surface-alt); border: 1px solid var(--rule); border-radius: 8px;
+    padding: 12px 14px;
+    font-family: var(--font-mono); font-size: 11.5px; line-height: 1.65;
+    color: var(--ink-body); white-space: pre-wrap; word-break: break-all;
+  }
+  .log-line { display: block; }
+  .log-line.warn { color: var(--pale-yellow-ink, #8A6A00); }
+  .log-line.err { color: var(--pale-red-ink); }
+  .log-line.info-mc { color: var(--pale-blue-ink); }
+  .toolbar-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+                 margin-bottom: 12px; }
+  .toolbar-row .spacer { flex: 1; }
+  .switch { display: inline-flex; align-items: center; gap: 6px;
+            font-size: 12px; color: var(--muted); cursor: pointer; user-select: none; }
+  .switch input { accent-color: var(--ink); }
+
+  /* ---------------- battles / spectate lists -------------------------------------- */
+  .rows { display: flex; flex-direction: column; gap: 10px; }
+  .row-card {
+    background: var(--surface); border: 1px solid var(--rule);
+    border-radius: var(--radius-card); padding: 16px 20px;
+    display: flex; flex-direction: column; gap: 8px;
+    transition: box-shadow 200ms ease;
+  }
+  .row-card:hover { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); }
+  .row-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .row-head .who { font-weight: 650; color: var(--ink); }
+  .row-head .when { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+  .row-head .grow { flex: 1; }
+  .p-row { display: flex; align-items: center; gap: 10px; font-size: 12.5px; }
+  .p-row .pname { font-weight: 600; color: var(--ink-body); min-width: 96px; }
+  .p-row .pmeta { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+  .hpbar {
+    flex: 1; max-width: 220px; height: 6px;
+    background: var(--rule); border-radius: 9999px; overflow: hidden;
+  }
+  .hpbar > span {
+    display: block; height: 100%;
+    background: var(--pale-green-ink); border-radius: 9999px;
+    transition: width 400ms var(--ease-out);
+  }
+  .hpbar > span.low { background: var(--pale-red-ink); }
+  .hpbar > span.out { background: var(--rule); }
+  .team-dot { display: inline-block; width: 8px; height: 8px; border-radius: 9999px;
+              background: var(--rule-strong, #D6D3CC); }
 </style>
 </head>
 <body>
@@ -296,11 +387,22 @@
 <main class="wrap">
 
   <section class="hero reveal" style="--i:0">
-    <p class="eyebrow">Shield Management · Hidden Rank</p>
-    <h1>盾管理</h1>
+    <p class="eyebrow">Server Management · Shield Web</p>
+    <h1>サーバー管理</h1>
     <p class="lede" id="meta">読み込み中…</p>
     <div class="hero-meta" id="hero-meta"></div>
   </section>
+
+  <nav class="tabs" id="tabs" role="tablist" aria-label="管理タブ">
+    <button class="tab is-on" data-pane="pane-shield" data-num="01" role="tab" aria-selected="true">盾</button>
+    <button class="tab" data-pane="pane-console" data-num="02" role="tab">コンソール</button>
+    <button class="tab" data-pane="pane-log" data-num="03" role="tab">サーバーログ</button>
+    <button class="tab" data-pane="pane-battles" data-num="04" role="tab">バトルログ</button>
+    <button class="tab" data-pane="pane-watch" data-num="05" role="tab">観戦</button>
+    <button class="tab" data-pane="pane-selftest" data-num="06" role="tab">セルフテスト</button>
+  </nav>
+
+  <div class="pane" id="pane-shield">
 
   <section class="reveal" style="--i:1">
     <div class="sec-head"><span class="sec-num">01</span><h2>盾画像をアップロード</h2></div>
@@ -354,6 +456,77 @@
       </div>
     </div>
   </section>
+
+  </div><!-- /pane-shield -->
+
+  <div class="pane" id="pane-console" hidden>
+    <div class="sec-head"><span class="sec-num">02</span><h2>コンソール</h2></div>
+    <div class="card">
+      <div class="cmdline-row">
+        <input class="field" id="cmdline" placeholder="slash なしで入力 — 例: give Foo diamond 64"
+               autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <button class="btn solid" id="cmdrun">実行</button>
+      </div>
+      <div class="cands" id="cands"></div>
+      <span class="note" id="console-note">サーバー本体のタブ補完と同じ候補を表示します。安全のため 1 秒に 1 回実行まで・実行履歴はすべてサーバーログに記録されます。config.yml の shield-web.console-enabled: false でこのタブを無効化できます。</span>
+      <pre class="cmdout" id="cmdout" aria-live="polite"></pre>
+    </div>
+  </div>
+
+  <div class="pane" id="pane-log" hidden>
+    <div class="sec-head"><span class="sec-num">03</span><h2>サーバーログ</h2></div>
+    <div class="card">
+      <div class="toolbar-row">
+        <select class="field" id="log-lines" style="max-width: 130px">
+          <option value="100">100 行</option>
+          <option value="200" selected>200 行</option>
+          <option value="400">400 行</option>
+        </select>
+        <button class="btn ghost sm" id="log-refresh">更新</button>
+        <span class="spacer"></span>
+        <label class="switch"><input type="checkbox" id="log-auto"> 5 秒ごとに自動更新</label>
+      </div>
+      <div class="logview" id="logview" role="log" aria-live="off"></div>
+      <span class="note">latest.log の末尾だけを読み出します（最大 192 KB）。この画面を見ていない間はサーバーへリクエストしません。</span>
+    </div>
+  </div>
+
+  <div class="pane" id="pane-battles" hidden>
+    <div class="sec-head"><span class="sec-num">04</span><h2>バトルログ</h2></div>
+    <div class="card">
+      <div class="toolbar-row">
+        <span class="note">直近 50 試合の結果（勝敗・キル・所要時間）。7 日間保持されます。</span>
+        <span class="spacer"></span>
+        <button class="btn ghost sm" id="battles-refresh">更新</button>
+      </div>
+      <div class="rows" id="batlist"></div>
+    </div>
+  </div>
+
+  <div class="pane" id="pane-watch" hidden>
+    <div class="sec-head"><span class="sec-num">05</span><h2>観戦</h2></div>
+    <div class="card">
+      <div class="toolbar-row">
+        <span class="note">動画ではなく「状態データ」のみを 3 秒おきに取得する軽量な観戦です。サーバーへの負荷はほぼゼロで、配信・カメラ移動は伴いません。</span>
+        <span class="spacer"></span>
+        <button class="btn ghost sm" id="watch-refresh">今すぐ更新</button>
+      </div>
+      <div class="rows" id="watchlist"></div>
+    </div>
+  </div>
+
+  <div class="pane" id="pane-selftest" hidden>
+    <div class="sec-head"><span class="sec-num">06</span><h2>セルフテスト</h2></div>
+    <div class="card">
+      <div class="toolbar-row">
+        <span class="note">リソースパックが正しく配布できる状態か、ファイル→ZIP→配線まで一括検査します。</span>
+        <span class="spacer"></span>
+        <button class="btn solid" id="selftest-run">動作テストを実行</button>
+      </div>
+      <div class="rows" id="selftest-rows"></div>
+      <div id="selftest-players" style="margin-top: 14px"></div>
+    </div>
+  </div>
 
   <div class="foot">
     <span>N Arena Shield Management — 管理画面は LAN / Tailscale 経路のみで有効です。</span>
@@ -589,6 +762,276 @@ $("unassign-btn").onclick = async () => {
     refresh();
   } catch (e) { toast(e.message, true); }
 };
+
+// ---------------- tabs --------------------------------------------------------------
+const tabButtons = document.querySelectorAll("#tabs .tab");
+const openedOnce = {};
+let activePane = "pane-shield";
+let logTimer = null;
+let watchTimer = null;
+
+function stopPaneTimers() {
+  if (logTimer) { clearInterval(logTimer); logTimer = null; }
+  if (watchTimer) { clearInterval(watchTimer); watchTimer = null; }
+}
+
+function activatePane(id) {
+  stopPaneTimers(); // サーバー負荷を出さないため、開いていないタブのポーリングは常に停止
+  activePane = id;
+  document.querySelectorAll(".pane").forEach(p => { p.hidden = (p.id !== id); });
+  tabButtons.forEach(t => {
+    const on = t.dataset.pane === id;
+    t.classList.toggle("is-on", on);
+    t.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  if (id === "pane-log") { if (!openedOnce.log) { openedOnce.log = true; loadLogs(); } armLogTimer(); }
+  if (id === "pane-battles" && !openedOnce.battles) { openedOnce.battles = true; loadBattles(); }
+  if (id === "pane-watch") { loadWatch(); armWatchTimer(); }
+  if (id === "pane-console" && !openedOnce.console) {
+    openedOnce.console = true;
+    loadCandidates();
+    $("cmdline").focus();
+  }
+}
+tabButtons.forEach(t => { t.onclick = () => activatePane(t.dataset.pane); });
+
+// ---------------- console (command exec + completion) --------------------------------
+let candTimer = null;
+
+async function loadCandidates() {
+  try {
+    const r = await api("/admin/api/complete?input=" + encodeURIComponent($("cmdline").value),
+        { headers: H });
+    const wrap = $("cands");
+    wrap.innerHTML = "";
+    (r.candidates || []).slice(0, 12).forEach(c => {
+      const b = document.createElement("button");
+      b.className = "cand";
+      b.type = "button";
+      b.textContent = c;
+      b.onclick = () => {
+        const v = $("cmdline").value;
+        const sp = v.lastIndexOf(" ");
+        $("cmdline").value = (sp >= 0 ? v.slice(0, sp + 1) : "") + c + " ";
+        $("cmdline").focus();
+        loadCandidates();
+      };
+      wrap.appendChild(b);
+    });
+  } catch (e) { /* 補完失敗はサイレント — 入力はそのまま使える */ }
+}
+
+$("cmdline").addEventListener("input", () => {
+  clearTimeout(candTimer);
+  candTimer = setTimeout(loadCandidates, 250);
+});
+
+async function runCommand() {
+  const line = $("cmdline").value.trim();
+  if (!line) return;
+  $("cmdrun").disabled = true;
+  try {
+    const r = await api("/admin/api/command", {
+      method: "POST",
+      headers: Object.assign({ "Content-Type": "text/plain; charset=utf-8" }, H),
+      body: line,
+    });
+    const out = $("cmdout");
+    out.textContent = "> " + (r.executed || line) + "\n" + (r.output || "") + "\n\n" + out.textContent;
+    $("cmdline").value = "";
+    $("cands").innerHTML = "";
+  } catch (e) { toast(e.message, true); }
+  $("cmdrun").disabled = false;
+  $("cmdline").focus();
+}
+$("cmdrun").onclick = runCommand;
+$("cmdline").addEventListener("keydown", e => {
+  if (e.key === "Enter") { e.preventDefault(); runCommand(); }
+});
+
+// ---------------- server log ----------------------------------------------------------
+async function loadLogs() {
+  try {
+    const r = await api("/admin/api/logs?lines=" + $("log-lines").value, { headers: H });
+    const view = $("logview");
+    view.innerHTML = "";
+    if (!r.ok) { view.textContent = r.note || r.error || "ログを読み取れません"; return; }
+    (r.lines || []).forEach(line => {
+      const el = document.createElement("span");
+      let cls = "log-line";
+      if (/\b(ERROR|SEVERE)\b|Exception|Caused by:/.test(line)) cls += " err";
+      else if (/\bWARN/.test(line)) cls += " warn";
+      else if (/\[Server:/.test(line)) cls += " info-mc";
+      el.className = cls;
+      el.textContent = line;
+      view.appendChild(el);
+    });
+    view.scrollTop = view.scrollHeight;
+  } catch (e) { toast(e.message, true); }
+}
+function armLogTimer() {
+  if (!$("log-auto").checked || logTimer) return;
+  logTimer = setInterval(() => { if (!document.hidden) loadLogs(); }, 5000);
+}
+$("log-refresh").onclick = () => loadLogs();
+$("log-lines").onchange = () => loadLogs();
+$("log-auto").onchange = () => {
+  if (logTimer) { clearInterval(logTimer); logTimer = null; }
+  armLogTimer();
+};
+
+// ---------------- battle log -----------------------------------------------------------
+const TEAM_COLORS = { RED: "#9F2F2D", BLUE: "#1F6C9F", GREEN: "#346538", YELLOW: "#956400" };
+function teamColorOf(raw) { return TEAM_COLORS[(raw || "").toUpperCase()] || "#8A8580"; }
+function fmtWhen(ms) {
+  return new Date(ms).toLocaleString("ja-JP", { month: "numeric", day: "numeric",
+    hour: "2-digit", minute: "2-digit" });
+}
+function fmtDur(ms) {
+  const s = Math.round(ms / 1000);
+  return Math.floor(s / 60) + "分" + ("0" + (s % 60)).slice(-2) + "秒";
+}
+
+async function loadBattles() {
+  try {
+    const r = await api("/admin/api/battles", { headers: H });
+    const list = $("batlist");
+    list.innerHTML = "";
+    if (!r.ok) { list.textContent = r.note || r.error || "バトルログを読み取れません"; return; }
+    if (!r.battles || r.battles.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = "まだ対戦記録がありません。";
+      list.appendChild(empty);
+      return;
+    }
+    r.battles.forEach(b => {
+      const winners = b.participants.filter(p => p.winner).map(p => escapeHtml(p.name)).join(" + ");
+      const losers = b.participants.filter(p => !p.winner).map(p => escapeHtml(p.name)).join(" + ");
+      const totalKills = b.participants.reduce((acc, p) => acc + p.kills, 0);
+      const card = document.createElement("div");
+      card.className = "row-card";
+      card.innerHTML =
+        "<div class='row-head'>" +
+          "<span class='who'>" + (winners || "引き分け") + "</span>" +
+          (winners ? "<span class='tag tag-green'>勝利</span>" : "") +
+          "<span class='who'>vs</span>" +
+          "<span class='who' style='font-weight:500;color:var(--muted)'>" + (losers || "—") + "</span>" +
+          "<span class='grow'></span>" +
+          "<span class='when'>" + fmtWhen(b.endedAt) + "</span>" +
+        "</div>" +
+        "<div class='row-head'>" +
+          "<span class='tag tag-gray'>" + escapeHtml(b.mode) + "</span>" +
+          (b.kit ? "<span class='tag tag-blue'>" + escapeHtml(b.kit) + "</span>" : "") +
+          "<span class='pmeta'>合計キル " + totalKills + " · " + fmtDur(b.durationMs) +
+            " · #" + escapeHtml(b.id) + "</span>" +
+        "</div>" +
+        "<div>" + b.participants.map(p =>
+          "<div class='p-row'>" +
+            "<span class='team-dot' style='background:" + teamColorOf(p.teamColor) + "'></span>" +
+            "<span class='pname'>" + escapeHtml(p.name) + "</span>" +
+            "<span class='pmeta'>キル " + p.kills + "</span>" +
+            (p.winner ? "<span class='tag tag-green'>WIN</span>" : "") +
+          "</div>").join("") + "</div>";
+      list.appendChild(card);
+    });
+  } catch (e) { toast(e.message, true); }
+}
+$("battles-refresh").onclick = () => loadBattles();
+
+// ---------------- spectate (lightweight state feed) -------------------------------------
+async function loadWatch() {
+  try {
+    const r = await api("/admin/api/matches", { headers: H });
+    const list = $("watchlist");
+    list.innerHTML = "";
+    if (!r.ok) { list.textContent = r.note || r.error || "試合情報を読み取れません"; return; }
+    if (!r.matches || r.matches.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = "現在進行中の試合はありません。";
+      list.appendChild(empty);
+      return;
+    }
+    r.matches.forEach(m => {
+      const card = document.createElement("div");
+      card.className = "row-card";
+      card.innerHTML =
+        "<div class='row-head'>" +
+          "<span class='who'>#" + escapeHtml(m.id) + "</span>" +
+          "<span class='tag tag-blue'>" + escapeHtml(m.mode) + "</span>" +
+          (m.kit ? "<span class='tag tag-gray'>" + escapeHtml(m.kit) + "</span>" : "") +
+          "<span class='tag tag-yellow'>" + escapeHtml(m.state || "") + "</span>" +
+          "<span class='grow'></span>" +
+          (m.team ? "<span class='pmeta'>チーム戦</span>" : "") +
+        "</div>" +
+        "<div>" + (m.players || []).map(p => {
+          const pct = Math.round((p.hpFrac || 0) * 100);
+          const bar = p.eliminated ? "out" : (p.hpFrac <= 0.35 ? "low" : "");
+          return "<div class='p-row'>" +
+            "<span class='team-dot' style='background:" + teamColorOf(p.team) + "'></span>" +
+            "<span class='pname'" + (p.eliminated ? " style='text-decoration:line-through;opacity:.6'" : "") +
+              ">" + escapeHtml(p.name) + "</span>" +
+            "<span class='hpbar'><span class='" + bar + "' style='width:" +
+              (p.eliminated ? 0 : pct) + "%'></span></span>" +
+            "<span class='pmeta'>" + escapeHtml(p.hp) + "</span>" +
+            (p.eliminated ? "<span class='tag tag-red'>脱落</span>" : "") +
+            (p.seriesWins > 0 ? "<span class='tag tag-yellow'>x" + p.seriesWins + "</span>" : "") +
+          "</div>";
+        }).join("") + "</div>" +
+        "<span class='note'>3 秒ごとの状態スナップショット（HP・位置情報を除く軽量データのみ）</span>";
+      list.appendChild(card);
+    });
+  } catch (e) { toast(e.message, true); }
+}
+function armWatchTimer() {
+  if (watchTimer) return;
+  watchTimer = setInterval(() => { if (!document.hidden) loadWatch(); }, 3000);
+}
+$("watch-refresh").onclick = () => loadWatch();
+
+// ---------------- self test -------------------------------------------------------------
+async function runSelfTest() {
+  $("selftest-run").disabled = true;
+  $("selftest-rows").innerHTML = "";
+  $("selftest-players").innerHTML = "";
+  try {
+    const r = await api("/admin/api/selftest", { headers: H });
+    const rows = $("selftest-rows");
+    let allOk = true;
+    (r.checks || []).forEach(c => {
+      if (!c.ok) allOk = false;
+      const row = document.createElement("div");
+      row.className = "row-card";
+      row.innerHTML =
+        "<div class='row-head'>" +
+          "<span class='tag " + (c.ok ? "tag-green" : "tag-red") + "'>" +
+            (c.ok ? "OK" : "NG") + "</span>" +
+          "<span class='who'>" + escapeHtml(c.name) + "</span>" +
+        "</div>" +
+        "<span class='note'>" + escapeHtml(c.detail || "") + "</span>";
+      rows.appendChild(row);
+    });
+    const pw = $("selftest-players");
+    const applied = (r.players || []).filter(p => p.applied).length;
+    pw.innerHTML =
+      "<div class='row-head'>" +
+        "<span class='tag " + (allOk ? "tag-green" : "tag-red") + "'>" +
+          (allOk ? "全項目クリア" : "要対処") + "</span>" +
+        "<span class='note'>オンラインのうちパック適用済み: " + applied + " / " +
+          (r.players || []).length + " 人</span>" +
+      "</div>" +
+      ((r.players || []).length > 0
+        ? "<div class='cands' style='margin-top:10px'>" +
+          r.players.map(p =>
+            "<span class='tag " + (p.applied ? "tag-green" : "tag-yellow") + "'>" +
+            escapeHtml(p.name) + (p.applied ? "" : " (未適用)") + "</span>").join(" ") +
+          "</div>" : "");
+    toast(allOk ? "セルフテスト全項目 OK" : "失敗した項目があります", !allOk);
+  } catch (e) { toast(e.message, true); }
+  $("selftest-run").disabled = false;
+}
+$("selftest-run").onclick = runSelfTest;
 
 // ---------------- reveal on view ----------------
 const io = new IntersectionObserver(entries => {

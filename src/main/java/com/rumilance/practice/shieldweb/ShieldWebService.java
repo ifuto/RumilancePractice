@@ -293,6 +293,8 @@ public final class ShieldWebService implements ShieldWebServer.Api {
                 first = false;
                 sb.append("{\"name\":").append(quote(player.getName()))
                         .append(",\"uuid\":").append(quote(player.getUniqueId().toString()))
+                        .append(",\"ping\":").append(Math.max(0, player.getPing()))
+                        .append(",\"world\":").append(quote(player.getWorld().getName()))
                         .append('}');
             }
             out.set(sb.append(']').toString());
@@ -421,6 +423,343 @@ public final class ShieldWebService implements ShieldWebServer.Api {
         if (!enabled()) {
             throw new ShieldWebException("shield-web が停止中です（config.yml → shield-web.enabled）");
         }
+    }
+
+    // ------------------------------------------------------------------ server management API
+
+    private com.rumilance.practice.match.MatchService matchService;
+    private com.rumilance.practice.match.history.MatchHistoryStore historyStore;
+    private long lastCommandAt;
+
+    /** Wires the battle-log / live-spectate sources; both endpoints degrade if unset. */
+    public void setMatchTools(com.rumilance.practice.match.MatchService matchService,
+                              com.rumilance.practice.match.history.MatchHistoryStore historyStore) {
+        this.matchService = matchService;
+        this.historyStore = historyStore;
+    }
+
+    private boolean consoleEnabled() {
+        return configService.config().getBoolean("shield-web.console-enabled", true);
+    }
+
+    /**
+     * The "動作テスト" panel: every automated pack-integrity probe ({@link PackSelfTest})
+     * plus, for each online player, whether their client actually applied the current pack —
+     * the only half of the pipeline the server cannot prove from files alone.
+     */
+    @Override
+    public String selftestJson() {
+        List<com.rumilance.practice.shieldweb.PackSelfTest.Check> checks =
+                com.rumilance.practice.shieldweb.PackSelfTest.run(packSrc, packZip, registry.cmdList());
+        StringBuilder sb = new StringBuilder(768);
+        sb.append("{\"ok\":true,\"checks\":[");
+        boolean first = true;
+        for (var check : checks) {
+            if (!first) {
+                sb.append(',');
+            }
+            first = false;
+            sb.append("{\"name\":").append(quote(check.name()))
+                    .append(",\"ok\":").append(check.ok())
+                    .append(",\"detail\":").append(quote(check.detail()))
+                    .append('}');
+        }
+        sb.append("],\"players\":[");
+        AtomicReference<String> playersPart = new AtomicReference<>("");
+        sync(() -> {
+            StringBuilder inner = new StringBuilder();
+            boolean innerFirst = true;
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                if (!innerFirst) {
+                    inner.append(',');
+                }
+                innerFirst = false;
+                inner.append("{\"name\":").append(quote(player.getName()))
+                        .append(",\"applied\":").append(resourcePackService.hasPack(player))
+                        .append('}');
+            }
+            playersPart.set(inner.toString());
+        });
+        return sb.append(playersPart.get()).append("]}").toString();
+    }
+
+    /**
+     * Console command execution from the browser. Hard safety rails:
+     * token + LAN (enforced upstream), explicit {@code shield-web.console-enabled} switch,
+     * 1 command/second rate limit, 300 char cap, every line mirrored to the server log.
+     */
+    @Override
+    public String runCommand(String command) throws ShieldWebException {
+        requireEnabled();
+        if (!consoleEnabled()) {
+            throw new ShieldWebException(
+                    "Webコンソールは無効です（config.yml → shield-web.console-enabled）");
+        }
+        String line = command == null ? "" : command.trim();
+        if (line.startsWith("/")) {
+            line = line.substring(1).trim();
+        }
+        if (line.isEmpty()) {
+            throw new ShieldWebException("コマンドが空です");
+        }
+        if (line.length() > 300) {
+            throw new ShieldWebException("コマンドは300文字までです");
+        }
+        synchronized (this) {
+            long now = System.currentTimeMillis();
+            if (now - lastCommandAt < 1000L) {
+                throw new ShieldWebException("連続実行は1秒に1回までです");
+            }
+            lastCommandAt = now;
+        }
+        final String finalLine = line;
+        logger.info("[ShieldWeb] web console dispatch: " + finalLine);
+        StringBuilder output = new StringBuilder();
+        AtomicReference<Boolean> dispatched = new AtomicReference<>(false);
+        sync(() -> {
+            dispatched.set(Bukkit.dispatchCommand(capturingSender(output), finalLine));
+        });
+        String out = output.toString();
+        if (out.length() > 24 * 1024) {
+            out = out.substring(0, 24 * 1024) + "\n…（以降は省略 — ログタブで確認）";
+        }
+        if (!Boolean.TRUE.equals(dispatched.get())) {
+            throw new ShieldWebException("コマンドが見つかりません: /" + finalLine);
+        }
+        return "{\"ok\":true,\"executed\":" + quote("/" + finalLine)
+                + ",\"output\":" + quote(out) + "}";
+    }
+
+    /**
+     * A sender that mirrors everything said back to it into {@code out} (≤24 KB).
+     * Uses Paper's {@code Bukkit.createCommandSender(Consumer<Component>)} via reflection —
+     * missing on plain Spigot, where we simply fall back to the console sender and output
+     * is only visible in the real log.
+     */
+    @SuppressWarnings("unchecked")
+    private static org.bukkit.command.CommandSender capturingSender(StringBuilder out) {
+        try {
+            java.util.function.Consumer<net.kyori.adventure.text.Component> sink = component -> {
+                if (out.length() > 24 * 1024) {
+                    return;
+                }
+                if (out.length() > 0) {
+                    out.append('\n');
+                }
+                out.append(net.kyori.adventure.text.serializer.plain
+                        .PlainTextComponentSerializer.plainText().serialize(component));
+            };
+            java.lang.reflect.Method method = Bukkit.class
+                    .getMethod("createCommandSender", java.util.function.Consumer.class);
+            return (org.bukkit.command.CommandSender) method.invoke(null, sink);
+        } catch (Throwable ignored) {
+            return Bukkit.getConsoleSender();
+        }
+    }
+
+    /** Native tab completion of the server's command map — the same list an in-game player sees. */
+    @Override
+    public String completionsJson(String input) {
+        String typed = input == null ? "" : input;
+        if (typed.length() > 200) {
+            typed = typed.substring(0, 200);
+        }
+        final String buffer = typed;
+        List<String> found = new ArrayList<>();
+        sync(() -> {
+            try {
+                List<String> completions = Bukkit.getCommandMap()
+                        .tabComplete(Bukkit.getConsoleSender(), buffer);
+                if (completions != null) {
+                    found.addAll(completions);
+                }
+            } catch (Throwable ignored) {
+                // completion is best-effort; an empty list is a perfectly good answer
+            }
+        });
+        java.util.Collections.sort(found, String.CASE_INSENSITIVE_ORDER);
+        StringBuilder sb = new StringBuilder("{\"candidates\":[");
+        int count = 0;
+        for (String candidate : found) {
+            if (count++ >= 50) {
+                break;
+            }
+            if (count > 1) {
+                sb.append(',');
+            }
+            sb.append(quote(candidate));
+        }
+        return sb.append("]}").toString();
+    }
+
+    /**
+     * Tail of {@code logs/latest.log}. Bounded on both axes (≤400 lines / last ≤192 KB) so
+     * the viewer can never make the site read a huge log into memory.
+     */
+    @Override
+    public String logsJson(int lines) {
+        int wanted = Math.max(10, Math.min(400, lines));
+        Path logFile = serverRoot().resolve("logs/latest.log");
+        try {
+            if (!Files.isRegularFile(logFile)) {
+                return "{\"ok\":false,\"lines\":[],\"path\":"
+                        + quote(logFile.toString()) + ",\"note\":\"latest.log が見つかりません\"}";
+            }
+            byte[] tail = tailBytes(logFile, 192 * 1024);
+            String text = new String(tail, StandardCharsets.UTF_8);
+            String[] split = text.split("\r?\n");
+            int from = Math.max(0, split.length - wanted);
+            StringBuilder sb = new StringBuilder("{\"ok\":true,\"path\":")
+                    .append(quote(logFile.getFileName().toString()))
+                    .append(",\"lines\":[");
+            for (int i = from; i < split.length; i++) {
+                if (i > from) {
+                    sb.append(',');
+                }
+                sb.append(quote(split[i]));
+            }
+            return sb.append("]}").toString();
+        } catch (IOException e) {
+            return "{\"ok\":false,\"lines\":[],\"note\":" + quote(e.getMessage()) + "}";
+        }
+    }
+
+    /** plugins/n-arena → server root (two levels up). */
+    private Path serverRoot() {
+        Path data = PluginIdentity.dataFolder(plugin).toPath();
+        Path plugins = data.getParent();
+        Path root = plugins == null ? null : plugins.getParent();
+        return root == null ? data : root;
+    }
+
+    private static byte[] tailBytes(Path file, int maxBytes) throws IOException {
+        try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(file.toFile(), "r")) {
+            long length = raf.length();
+            long skip = Math.max(0, length - maxBytes);
+            raf.seek(skip);
+            byte[] buffer = new byte[(int) (length - skip)];
+            raf.readFully(buffer);
+            // skip likely-cut first line when we started mid-file
+            if (skip > 0) {
+                for (int i = 0; i < buffer.length; i++) {
+                    if (buffer[i] == '\n') {
+                        int rest = buffer.length - (i + 1);
+                        if (rest <= 0) {
+                            return new byte[0];
+                        }
+                        byte[] trimmed = new byte[rest];
+                        System.arraycopy(buffer, i + 1, trimmed, 0, rest);
+                        return trimmed;
+                    }
+                }
+                return new byte[0];
+            }
+            return buffer;
+        }
+    }
+
+    /** Finished-match battle log from {@link com.rumilance.practice.match.history.MatchHistoryStore}. */
+    @Override
+    public String battlesJson() {
+        if (historyStore == null) {
+            return "{\"ok\":false,\"battles\":[],\"note\":\"history store 未接続\"}";
+        }
+        List<com.rumilance.practice.match.history.MatchHistoryStore.Entry> battles =
+                historyStore.recentAll(50);
+        StringBuilder sb = new StringBuilder("{\"ok\":true,\"battles\":[");
+        boolean first = true;
+        for (var battle : battles) {
+            if (!first) {
+                sb.append(',');
+            }
+            first = false;
+            sb.append("{\"id\":").append(quote(battle.matchId().toString().substring(0, 8)))
+                    .append(",\"mode\":").append(quote(battle.mode()))
+                    .append(",\"kit\":").append(quote(battle.kit()))
+                    .append(",\"endedAt\":").append(battle.endedAtEpochMs())
+                    .append(",\"durationMs\":").append(battle.durationMs())
+                    .append(",\"participants\":[");
+            boolean pf = true;
+            for (var p : battle.participants()) {
+                if (!pf) {
+                    sb.append(',');
+                }
+                pf = false;
+                sb.append("{\"name\":").append(quote(p.name()))
+                        .append(",\"team\":").append(quote(p.teamColor()))
+                        .append(",\"kills\":").append(p.kills())
+                        .append(",\"winner\":").append(p.winner())
+                        .append('}');
+            }
+            sb.append("]}");
+        }
+        return sb.append("]}").toString();
+    }
+
+    /**
+     * Lightweight spectate: running matches with per-player live HP / team / elimination —
+     * server-state text feed instead of video, exactly because a real stream would lag.
+     */
+    @Override
+    public String matchesJson() {
+        AtomicReference<String> out = new AtomicReference<>(
+                "{\"ok\":false,\"matches\":[],\"note\":\"match service 未接続\"}");
+        if (matchService == null) {
+            return out.get();
+        }
+        sync(() -> {
+            StringBuilder sb = new StringBuilder("{\"ok\":true,\"matches\":[");
+            boolean first = true;
+            int shown = 0;
+            for (var session : matchService.registry().all()) {
+                if (shown++ >= 20) {
+                    break;
+                }
+                if (!first) {
+                    sb.append(',');
+                }
+                first = false;
+                sb.append("{\"id\":").append(quote(session.id().toString().substring(0, 8)))
+                        .append(",\"mode\":").append(quote(String.valueOf(session.mode())))
+                        .append(",\"kit\":").append(quote(session.kitName()))
+                        .append(",\"state\":").append(quote(String.valueOf(session.state())))
+                        .append(",\"team\":").append(session.isTeamMatch())
+                        .append(",\"players\":[");
+                boolean pf = true;
+                for (java.util.UUID pid : session.participants()) {
+                    if (!pf) {
+                        sb.append(',');
+                    }
+                    pf = false;
+                    Player online = Bukkit.getPlayer(pid);
+                    String hpText;
+                    double hpValue = -1;
+                    if (online != null) {
+                        double max = online.getAttribute(
+                                org.bukkit.attribute.Attribute.MAX_HEALTH) != null
+                                ? online.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH).getValue()
+                                : 20.0;
+                        hpValue = Math.max(0, online.getHealth());
+                        hpText = String.format(java.util.Locale.US, "%.1f", hpValue)
+                                + " / " + String.format(java.util.Locale.US, "%.0f", max);
+                    } else {
+                        hpText = "—";
+                    }
+                    sb.append("{\"name\":").append(quote(online != null
+                                    ? online.getName() : String.valueOf(pid).substring(0, 8)))
+                            .append(",\"hp\":").append(quote(hpText))
+                            .append(",\"hpFrac\":").append(online != null
+                                    ? Math.min(1.0, hpValue / 20.0) : 0)
+                            .append(",\"team\":").append(quote(String.valueOf(session.teamColor(pid))))
+                            .append(",\"eliminated\":").append(session.isEliminated(pid))
+                            .append(",\"seriesWins\":").append(session.seriesWinsOf(pid))
+                            .append('}');
+                }
+                sb.append("]}");
+            }
+            out.set(sb.append("]}").toString());
+        });
+        return out.get();
     }
 
     // ------------------------------------------------------------------ player resolution (main thread)
