@@ -3,102 +3,383 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>N Arena — 盾管理</title>
+<title>盾管理 — N Arena</title>
+<!--
+  Design language: leonxlnx/taste-skill — skills/minimalist-skill (Premium Utilitarian
+  Minimalism & Editorial UI), adapted to a single-purpose admin tool.
+    - warm monochrome palette (bone canvas #F7F6F3, white surfaces, 1px #EAEAEA rules)
+    - off-black ink, muted secondaries, monospace metadata, pastel tags only
+    - no gradients on surfaces, no emoji, no pill cards/buttons, no heavy shadows
+    - motion is invisible: fade-up reveals (IntersectionObserver), shadow-shift hovers
+-->
 <style>
-  :root { color-scheme: dark; }
+  :root {
+    --canvas: #F7F6F3;
+    --surface: #FFFFFF;
+    --surface-alt: #F9F9F8;
+    --rule: #EAEAEA;
+    --rule-strong: #D8D6D1;
+    --ink: #111111;
+    --ink-body: #2F3437;
+    --muted: #787774;
+    --pale-red: #FDEBEC;     --pale-red-ink: #9F2F2D;
+    --pale-blue: #E1F3FE;    --pale-blue-ink: #1F6C9F;
+    --pale-green: #EDF3EC;   --pale-green-ink: #346538;
+    --pale-yellow: #FBF3DB;  --pale-yellow-ink: #956400;
+    --radius-card: 10px;
+    --radius-btn: 6px;
+    --font-sans: "SF Pro Display", "Geist Sans", "Helvetica Neue", -apple-system,
+                 "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+    --font-serif: "Newsreader", "Instrument Serif", Georgia,
+                  "Hiragino Mincho ProN", "Yu Mincho", serif;
+    --font-mono: "SF Mono", "Geist Mono", "JetBrains Mono", ui-monospace, Menlo,
+                 Consolas, monospace;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: "Hiragino Kaku Gothic ProN", "Noto Sans JP", system-ui, sans-serif;
-         background: #14161d; color: #e7e9ef; }
-  header { background: #1d2130; padding: 14px 20px; display: flex; gap: 14px; align-items: center;
-           border-bottom: 2px solid #6c5ce7; }
-  header h1 { font-size: 18px; margin: 0; }
-  header .badge { background: #6c5ce7; border-radius: 6px; padding: 2px 10px; font-size: 12px; }
-  main { max-width: 1040px; margin: 0 auto; padding: 20px; }
-  section { background: #1d2130; border: 1px solid #2c3150; border-radius: 12px;
-            padding: 16px 18px; margin-bottom: 18px; }
-  h2 { font-size: 15px; margin: 0 0 12px; color: #a3a9ff; }
-  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-  button { background: #6c5ce7; color: #fff; border: 0; border-radius: 8px;
-           padding: 8px 14px; font-size: 13px; cursor: pointer; }
-  button:hover { background: #7d6cf0; }
-  button.danger { background: #d84356; }
-  button.ghost { background: #333a55; }
-  input, select { background: #14161d; color: #e7e9ef; border: 1px solid #3a4066;
-                  border-radius: 8px; padding: 8px 10px; font-size: 13px; }
-  #drop { border: 2px dashed #4a5180; border-radius: 12px; padding: 26px; text-align: center;
-          color: #9aa0c3; cursor: pointer; transition: border-color .15s; }
-  #drop.over { border-color: #8f83ff; background: #23273c; }
-  #drop img { max-height: 64px; image-rendering: pixelated; margin-top: 10px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
-  .card { background: #14161d; border: 1px solid #2c3150; border-radius: 10px; padding: 12px; }
-  .card .preview { width: 100%; height: 120px; display: flex; align-items: center;
-                   justify-content: center; background: #0e1016; border-radius: 8px; margin-bottom: 10px; }
-  .card img { max-width: 110px; max-height: 110px; image-rendering: pixelated; }
-  .card .cmd { font-size: 12px; color: #8890b8; }
-  .holders { font-size: 12px; color: #8890b8; margin-top: 4px; }
-  #toast { position: fixed; right: 18px; bottom: 18px; max-width: 380px; background: #2b324f;
-           border: 1px solid #4a5180; border-radius: 10px; padding: 12px 16px; font-size: 13px;
-           display: none; white-space: pre-wrap; }
-  #toast.err { border-color: #d84356; background: #3a1e26; }
-  .muted { color: #8890b8; font-size: 12px; }
-  code { background: #0e1016; padding: 2px 6px; border-radius: 5px; font-size: 12px; }
-  a { color: #8f83ff; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    background: var(--canvas);
+    color: var(--ink-body);
+    line-height: 1.6;
+    font-size: 14px;
+  }
+
+  /* One warm ambient light spot, per the skill's "soft radial light at 0.03" clause.
+     Fixed + pointer-events: none, never on a scrolling container. */
+  .ambient {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background: radial-gradient(720px 460px at 82% -8%, rgba(154, 120, 60, 0.06), transparent 62%);
+  }
+
+  .wrap { max-width: 1024px; margin: 0 auto; padding: 0 24px; }
+
+  /* ---------------- top bar (no pill chrome; a single hairline rule) -------------- */
+  .topbar {
+    position: sticky; top: 0; z-index: 20;
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--rule);
+  }
+  .bar { display: flex; align-items: center; justify-content: space-between;
+         height: 58px; gap: 16px; }
+  .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); }
+  .brand svg { display: block; }
+  .brand-name { font-weight: 650; letter-spacing: -0.01em; }
+  .brand-sub { color: var(--muted); font-size: 12px; }
+  .bar-actions { display: flex; align-items: center; gap: 8px; }
+
+  /* ---------------- hero --------------------------------------------------------- */
+  main { position: relative; z-index: 1; padding-bottom: 96px; }
+  .hero { padding: 64px 0 40px; }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 14px;
+  }
+  h1 {
+    margin: 0; color: var(--ink);
+    font-family: var(--font-serif);
+    font-weight: 520; font-size: clamp(30px, 4.4vw, 44px);
+    letter-spacing: -0.02em; line-height: 1.1;
+  }
+  .lede { max-width: 640px; margin: 14px 0 0; color: var(--muted); }
+  .hero-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+
+  /* ---------------- sections ----------------------------------------------------- */
+  section { margin-top: 40px; }
+  .sec-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 16px; }
+  .sec-num {
+    font-family: var(--font-mono); font-size: 12px; color: var(--muted);
+    border: 1px solid var(--rule); border-radius: 4px; background: var(--surface);
+    padding: 1px 6px;
+  }
+  h2 {
+    margin: 0; color: var(--ink);
+    font-family: var(--font-serif); font-weight: 560;
+    font-size: 22px; letter-spacing: -0.02em; line-height: 1.1;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-card);
+    padding: 28px;
+    transition: box-shadow 200ms ease;
+  }
+  .card:hover { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); }
+
+  /* ---------------- upload ------------------------------------------------------- */
+  .upload-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 24px; }
+  @media (max-width: 760px) { .upload-grid { grid-template-columns: 1fr; } }
+
+  #drop {
+    border: 1.5px dashed var(--rule-strong);
+    border-radius: 8px;
+    background: var(--surface-alt);
+    min-height: 180px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 8px; text-align: center; cursor: pointer;
+    color: var(--muted);
+    transition: border-color 150ms ease, background 150ms ease;
+  }
+  #drop.over { border-color: var(--ink); background: #FFFFFF; }
+  #drop strong { color: var(--ink-body); font-weight: 600; }
+  #drop .hint { font-size: 12px; }
+  #preview { max-height: 96px; max-width: 96px; image-rendering: pixelated;
+             border: 1px solid var(--rule); border-radius: 6px;
+             background:
+               conic-gradient(#EFEDE8 0 25%, #FFFFFF 0 50%, #EFEDE8 0 75%, #FFFFFF 0) 0 0 / 12px 12px; }
+  #drop .picked { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+
+  .form-stack { display: flex; flex-direction: column; gap: 14px; }
+  .field-row { display: flex; flex-direction: column; gap: 6px; }
+  .lbl {
+    font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .mono { font-family: var(--font-mono); }
+  .field {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-btn);
+    color: var(--ink-body);
+    padding: 9px 12px; font-size: 13.5px; font-family: var(--font-sans);
+    outline: none;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+  }
+  .field:focus { border-color: var(--ink); box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.06); }
+  .field::placeholder { color: #A9A59E; }
+  select.field { appearance: none; }
+  .note { font-size: 12px; color: var(--muted); }
+
+  /* ---------------- buttons ------------------------------------------------------ */
+  .btn {
+    font-family: var(--font-sans);
+    font-size: 13px; font-weight: 600;
+    border-radius: var(--radius-btn);
+    padding: 9px 16px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background 150ms ease, border-color 150ms ease, transform 80ms ease;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn.solid { background: var(--ink); color: #FFFFFF; }
+  .btn.solid:hover:not(:disabled) { background: #333333; }
+  .btn.ghost { background: transparent; color: var(--ink-body); border-color: var(--rule); }
+  .btn.ghost:hover { border-color: var(--rule-strong); background: var(--surface); }
+  .btn.danger { background: var(--pale-red); color: var(--pale-red-ink); }
+  .btn.danger:hover { filter: saturate(1.4); }
+  .btn.sm { padding: 6px 12px; font-size: 12.5px; }
+
+  /* ---------------- tags & metadata ---------------------------------------------- */
+  .tag {
+    display: inline-flex; align-items: center; gap: 5px;
+    border-radius: 9999px; padding: 2px 10px;
+    font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .tag-blue { background: var(--pale-blue); color: var(--pale-blue-ink); }
+  .tag-green { background: var(--pale-green); color: var(--pale-green-ink); }
+  .tag-yellow { background: var(--pale-yellow); color: var(--pale-yellow-ink); }
+  .tag-gray { background: var(--surface-alt); color: var(--muted);
+              border: 1px solid var(--rule); }
+  kbd.cmd {
+    font-family: var(--font-mono); font-size: 11px;
+    border: 1px solid var(--rule); border-radius: 4px;
+    background: var(--surface-alt); padding: 1px 6px; color: var(--ink-body);
+  }
+
+  /* ---------------- shield grid --------------------------------------------------- */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+  .shield {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-card);
+    overflow: hidden;
+    transition: box-shadow 200ms ease, transform 600ms var(--ease-out), opacity 600ms var(--ease-out);
+  }
+  .shield:hover { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); }
+  .shield .preview {
+    height: 132px; display: flex; align-items: center; justify-content: center;
+    background: var(--surface-alt); border-bottom: 1px solid var(--rule);
+  }
+  .shield .preview img { max-height: 108px; max-width: 108px; image-rendering: pixelated; }
+  .shield .body { padding: 14px 16px 16px; }
+  .shield .title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .shield .name { font-weight: 650; color: var(--ink); letter-spacing: -0.01em; }
+  .shield .assign-row { display: flex; gap: 8px; margin-top: 12px; }
+  .shield .assign-row .field { flex: 1; min-width: 0; }
+  .shield .actions-row { display: flex; justify-content: space-between; align-items: center;
+                         margin-top: 12px; }
+  .usage { margin-top: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .usage-label { font-size: 11px; color: var(--muted); }
+
+  .empty {
+    border: 1px dashed var(--rule-strong); border-radius: var(--radius-card);
+    padding: 40px; text-align: center; color: var(--muted); background: var(--surface-alt);
+  }
+
+  /* ---------------- status section ------------------------------------------------ */
+  .dl { display: grid; grid-template-columns: max-content 1fr; row-gap: 10px;
+        column-gap: 20px; font-size: 13px; }
+  .dt { color: var(--muted); }
+  .dd { font-family: var(--font-mono); font-size: 12px; word-break: break-all;
+        color: var(--ink-body); }
+  .unassign-row { display: flex; gap: 8px; margin-top: 20px; padding-top: 18px;
+                  border-top: 1px solid var(--rule); }
+  .unassign-row .field { max-width: 260px; }
+
+  /* ---------------- toast --------------------------------------------------------- */
+  #toast {
+    position: fixed; right: 24px; bottom: 24px; z-index: 30;
+    max-width: 400px;
+    background: var(--surface);
+    border: 1px solid var(--rule); border-left: 2px solid var(--ink);
+    border-radius: var(--radius-card);
+    padding: 14px 18px;
+    font-size: 13px; color: var(--ink-body);
+    white-space: pre-wrap;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    opacity: 0; transform: translateY(12px);
+    transition: opacity 300ms var(--ease-out), transform 300ms var(--ease-out);
+    pointer-events: none;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+  #toast.err { border-left-color: var(--pale-red-ink); }
+
+  /* ---------------- reveal motion (IntersectionObserver driven) ------------------ */
+  .reveal { opacity: 0; transform: translateY(12px); }
+  .reveal.in {
+    opacity: 1; transform: translateY(0);
+    transition: opacity 600ms var(--ease-out), transform 600ms var(--ease-out);
+    transition-delay: calc(var(--i, 0) * 80ms);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { opacity: 1; transform: none; }
+    .reveal.in { transition: none; }
+    * { scroll-behavior: auto; }
+  }
+
+  .foot { margin-top: 56px; color: var(--muted); font-size: 12px;
+          display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .foot .mono { font-family: var(--font-mono); font-size: 11px; }
 </style>
 </head>
 <body>
-<header>
-  <h1>🛡️ N Arena — 盾管理</h1>
-  <span class="badge">custom_shield (裏ランク)</span>
-  <span class="muted" id="statusline"></span>
+<div class="ambient" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="wrap bar">
+    <div class="brand">
+      <svg width="18" height="18" viewBox="0 0 256 256" fill="none" aria-hidden="true">
+        <path d="M128 16L32 48v64c0 61.1 40.8 118.2 96 132 55.2-13.8 96-70.9 96-132V48L128 16z"
+              stroke="#111111" stroke-width="18" fill="none" stroke-linejoin="round"/>
+      </svg>
+      <span class="brand-name">N Arena</span>
+      <span class="brand-sub mono">shield-web / custom_shield</span>
+    </div>
+    <div class="bar-actions">
+      <span class="tag tag-blue" id="statusline">port —</span>
+      <button class="btn ghost sm" id="reload">再読込</button>
+      <button class="btn ghost sm" id="repush">全員に再送</button>
+    </div>
+  </div>
 </header>
-<main>
-  <section>
-    <h2>① 盾画像をアップロード（PNG・512×512推奨・自動リサイズ）</h2>
-    <div id="drop">
-      ここにPNGをドラッグ&amp;ドロップ / クリックで選択
-      <div id="pick"><img id="preview" alt="" hidden></div>
-    </div>
-    <input type="file" id="file" accept="image/png" hidden>
-    <div class="row" style="margin-top:12px">
-      <label>表示名 <input id="name" placeholder="例: 水色の盾" size="16"></label>
-      <label>CMD <input id="cmd" placeholder="空=自動割当(100〜)" size="8" inputmode="numeric"></label>
-      <button id="upload" disabled>アップロードして全員に即適用</button>
-      <span class="muted">既存CMDを指定すると画像だけ差し替わります</span>
+
+<main class="wrap">
+
+  <section class="hero reveal" style="--i:0">
+    <p class="eyebrow">Shield Management · Hidden Rank</p>
+    <h1>盾管理</h1>
+    <p class="lede" id="meta">読み込み中…</p>
+    <div class="hero-meta" id="hero-meta"></div>
+  </section>
+
+  <section class="reveal" style="--i:1">
+    <div class="sec-head"><span class="sec-num">01</span><h2>盾画像をアップロード</h2></div>
+    <div class="card">
+      <div class="upload-grid">
+        <div id="drop" tabindex="0" role="button" aria-label="PNGを選択">
+          <strong>PNGをドロップ</strong>
+          <span class="hint">またはクリックして選択 · 512 × 512 推奨 · 8 MB まで</span>
+          <img id="preview" alt="選択中の盾画像" hidden>
+          <span class="picked" id="picked" hidden></span>
+        </div>
+        <input type="file" id="file" accept="image/png" hidden>
+        <div class="form-stack">
+          <div class="field-row">
+            <label class="lbl" for="name">表示名</label>
+            <input class="field" id="name" placeholder="例: 水色の盾">
+          </div>
+          <div class="field-row">
+            <label class="lbl" for="cmd">カスタムモデルデータ (CMD)</label>
+            <input class="field" id="cmd" placeholder="空欄 = 100 から自動割当" inputmode="numeric">
+            <span class="note">既存の CMD を指定すると、画像だけが差し替わります（再送まで自動）。</span>
+          </div>
+          <div>
+            <button class="btn solid" id="upload" disabled>アップロードして全員に反映</button>
+          </div>
+          <span class="note">アップロード直後、リソースパックが再構築され、新しい SHA-1 でオンライン全員に再送されます（数秒の読み込み画面が一度入ります）。</span>
+        </div>
+      </div>
     </div>
   </section>
 
-  <section>
-    <h2>② 盾とプレイヤーの紐づけ</h2>
-    <div class="muted">オンラインなら即座に手持ちの盾へ反映、オフラインなら次のキット適用から。</div>
-    <div id="cards" class="grid" style="margin-top:12px"></div>
+  <section class="reveal" style="--i:2">
+    <div class="sec-head"><span class="sec-num">02</span><h2>盾とプレイヤーの紐づけ</h2></div>
+    <div id="cards" class="grid"></div>
   </section>
 
-  <section>
-    <h2>③ 状態 / 操作</h2>
-    <div class="row">
-      <button class="ghost" id="repush">最新パックを全員に再送</button>
-      <button class="ghost" id="reload">再読込</button>
+  <section class="reveal" style="--i:3">
+    <div class="sec-head"><span class="sec-num">03</span><h2>配布状態</h2></div>
+    <div class="card">
+      <dl class="dl">
+        <dt class="dt">パック URL</dt>
+        <dd class="dd" id="packurl">—</dd>
+        <dt class="dt">最新 SHA-1</dt>
+        <dd class="dd" id="packsha">—</dd>
+        <dt class="dt">外部公開の例</dt>
+        <dd class="dd">tailscale funnel --bg <span id="funnel-port">8765</span> → 出てきた https URL + /pack.zip を resource-pack.json の url に設定</dd>
+      </dl>
+      <div class="unassign-row">
+        <input class="field" id="unassign-name" placeholder="解除するプレイヤー名 or UUID">
+        <button class="btn danger" id="unassign-btn">盾を解除</button>
+      </div>
     </div>
-    <p class="muted" id="meta"></p>
-    <p class="muted">パックURL（resource-pack.json の url）: <code id="packurl"></code><br>
-       プレイヤー外部公開の例: <code>tailscale funnel --bg &lt;port&gt;</code> → 出てきた https URL + <code>/pack.zip</code> を url に設定。</p>
   </section>
+
+  <div class="foot">
+    <span>N Arena Shield Management — 管理画面は LAN / Tailscale 経路のみで有効です。</span>
+    <span class="mono" id="foot-token">token は /urank web で確認</span>
+  </div>
 </main>
-<div id="toast"></div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
 <script>
 const TOKEN = "__TOKEN__";
 const H = { "Authorization": "Bearer " + TOKEN };
 let state = null;
+let onlinePlayers = [];
 
 const $ = (id) => document.getElementById(id);
+
 function toast(msg, isErr) {
   const t = $("toast");
   t.textContent = msg;
-  t.className = isErr ? "err" : "";
-  t.style.display = "block";
+  t.classList.toggle("err", !!isErr);
+  t.classList.add("show");
   clearTimeout(t._h);
-  t._h = setTimeout(() => t.style.display = "none", 6000);
+  t._h = setTimeout(() => t.classList.remove("show"), 6000);
 }
+
 async function api(path, options) {
   const res = await fetch(path, options);
   let data = {};
@@ -106,7 +387,7 @@ async function api(path, options) {
   if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
   return data;
 }
-let onlinePlayers = [];
+
 async function refresh() {
   const results = await Promise.all([
     api("/admin/api/state", { headers: H }),
@@ -116,113 +397,157 @@ async function refresh() {
   onlinePlayers = results[1].online || [];
   render();
 }
+
 function holderNames(cmd) {
-  if (!state) return "";
-  const names = state.holders.filter(h => h.cmd === cmd).map(h => h.name);
-  return names.length ? names.join(", ") : "";
+  if (!state) return [];
+  return state.holders.filter(h => h.cmd === cmd).map(h => h.name);
 }
+
+function escapeHtml(s) {
+  return (s || "").replace(/[&<>"']/g, c =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
 function render() {
-  $("statusline").textContent = "port " + state.port + (state.manageHash ? "" : " (hash外部管理)");
-  $("packurl").textContent = state.pack.url || "(未設定)";
+  $("statusline").textContent = "port " + state.port;
+  $("packurl").textContent = state.pack.url || "(resource-pack.json 未設定)";
+  $("packsha").textContent = state.pack.present ? state.pack.sha1 : "(未生成)";
+  $("funnel-port").textContent = state.port;
+
+  const packKb = state.pack.present ? (state.pack.bytes / 1024).toFixed(1) + " KB" : "未生成";
   $("meta").textContent =
-    "pack.zip: " + (state.pack.present ? (state.pack.bytes/1024).toFixed(1) + " KB, sha1=" + state.pack.sha1.slice(0,12) + "…" : "未生成")
-    + "  / 盾 " + state.shields.length + " 件・紐づけ " + state.holders.length + " 人";
+    "shield-web がこのサーバー内で動いています。パック " + packKb +
+    " · 盾 " + state.shields.length + " 件 · 紐づけ " + state.holders.length + " 人。";
+
+  const metaTags = $("hero-meta");
+  metaTags.innerHTML = "";
+  const mkTag = (cls, text) => {
+    const el = document.createElement("span");
+    el.className = "tag " + cls;
+    el.textContent = text;
+    metaTags.appendChild(el);
+  };
+  mkTag("tag-green", "盾 " + state.shields.length + " 件");
+  mkTag("tag-yellow", "紐づけ " + state.holders.length + " 人");
+  mkTag("tag-gray", state.manageHash ? "hash = 自動管理" : "hash = 外部管理");
 
   const cards = $("cards");
   cards.innerHTML = "";
   if (state.shields.length === 0) {
-    cards.innerHTML = "<span class='muted'>まだ盾がありません。①からアップロードしてください。</span>";
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.style.gridColumn = "1 / -1";
+    empty.textContent = "まだ盾がありません。上の 01 からPNGをアップロードしてください。";
+    cards.appendChild(empty);
+    return;
   }
-  for (const s of state.shields) {
+
+  state.shields.forEach((s, i) => {
     const div = document.createElement("div");
-    div.className = "card";
+    div.className = "shield reveal in";
+    div.style.setProperty("--i", String(i));
     const holders = holderNames(s.cmd);
     div.innerHTML =
-      "<div class='preview'><img src='/shield-texture?cmd=" + s.cmd + "&token=" + encodeURIComponent(TOKEN) + "' alt=''></div>" +
-      "<div><b>" + escapeHtml(s.name) + "</b> <span class='cmd'>cmd=" + s.cmd + "</span></div>" +
-      "<div class='holders'>" + (holders ? "使用中: " + escapeHtml(holders) : "未使用") + "</div>";
+      "<div class='preview'><img src='/shield-texture?cmd=" + s.cmd +
+          "&token=" + encodeURIComponent(TOKEN) + "' alt='" + escapeHtml(s.name) + "'></div>" +
+      "<div class='body'>" +
+        "<div class='title-row'>" +
+          "<span class='name'>" + escapeHtml(s.name) + "</span>" +
+          "<kbd class='cmd'>cmd " + s.cmd + "</kbd>" +
+        "</div>" +
+        "<div class='usage'><span class='usage-label'>使用中</span>" +
+          (holders.length
+            ? holders.map(n => "<span class='tag tag-green'>" + escapeHtml(n) + "</span>").join("")
+            : "<span class='tag tag-gray'>未使用</span>") +
+        "</div>" +
+      "</div>";
+
+    const body = div.querySelector(".body");
     const row = document.createElement("div");
-    row.className = "row";
-    row.style.marginTop = "8px";
+    row.className = "assign-row";
     const input = document.createElement("input");
+    input.className = "field";
     input.placeholder = "プレイヤー名 or UUID";
-    input.size = 16;
-    const online = document.createElement("select");
-    online.innerHTML = "<option value=''>— オンラインから選ぶ —</option>";
-    for (const p of onlinePlayers) {
-      const o = document.createElement("option");
-      o.value = p.name; o.textContent = p.name + " (online)";
-      online.appendChild(o);
-    }
-    online.onchange = () => { if (online.value) input.value = online.value; };
+    input.setAttribute("aria-label", "紐づけるプレイヤー");
     const assignBtn = document.createElement("button");
+    assignBtn.className = "btn solid sm";
     assignBtn.textContent = "紐づけ";
+    row.append(input, assignBtn);
+
+    // オンライン候補は kbd 風のクイック選択チップとして出す(ダサいselectを避ける)
+    const actions = document.createElement("div");
+    actions.className = "actions-row";
+    const onlineWrap = document.createElement("div");
+    onlineWrap.style.display = "flex";
+    onlineWrap.style.gap = "6px";
+    onlineWrap.style.flexWrap = "wrap";
+    onlinePlayers.slice(0, 3).forEach(p => {
+      const chip = document.createElement("button");
+      chip.className = "btn ghost sm";
+      chip.type = "button";
+      chip.textContent = p.name;
+      chip.onclick = () => { input.value = p.name; };
+      onlineWrap.appendChild(chip);
+    });
+    const delBtn = document.createElement("button");
+    delBtn.className = "btn danger sm";
+    delBtn.textContent = "削除";
+    actions.append(onlineWrap, delBtn);
+    body.append(row, actions);
+
     assignBtn.onclick = async () => {
       if (!input.value.trim()) { toast("プレイヤー名を入力してください", true); return; }
       try {
-        const r = await api("/admin/api/assign?cmd=" + s.cmd + "&player=" + encodeURIComponent(input.value.trim()), { method: "POST", headers: H });
+        const r = await api("/admin/api/assign?cmd=" + s.cmd + "&player=" +
+            encodeURIComponent(input.value.trim()), { method: "POST", headers: H });
         toast(r.message || "適用しました");
         refresh();
       } catch (e) { toast(e.message, true); }
     };
-    const delBtn = document.createElement("button");
-    delBtn.textContent = "削除";
-    delBtn.className = "danger";
     delBtn.onclick = async () => {
-      if (!confirm("cmd=" + s.cmd + " の盾を削除します（紐づけ中のプレイヤーも解除）。よろしいですか？")) return;
+      if (!confirm("cmd " + s.cmd + " の盾を削除します（紐づけ中のプレイヤーも解除）。よろしいですか？")) return;
       try {
         const r = await api("/admin/api/delete?cmd=" + s.cmd, { method: "POST", headers: H });
         toast(r.message || "削除しました");
         refresh();
       } catch (e) { toast(e.message, true); }
     };
-    row.append(online, input, assignBtn, delBtn);
-    div.appendChild(row);
+
     cards.appendChild(div);
-  }
-  // 解除行
-  const un = document.createElement("div");
-  un.className = "row";
-  un.style.marginTop = "14px";
-  un.innerHTML = "<span class='muted'>解除:</span>";
-  const uinput = document.createElement("input");
-  uinput.placeholder = "プレイヤー名 or UUID";
-  const ubtn = document.createElement("button");
-  ubtn.className = "danger";
-  ubtn.textContent = "盾を解除";
-  ubtn.onclick = async () => {
-    if (!uinput.value.trim()) { toast("プレイヤー名を入力してください", true); return; }
-    try {
-      const r = await api("/admin/api/unassign?player=" + encodeURIComponent(uinput.value.trim()), { method: "POST", headers: H });
-      toast(r.message || "解除しました");
-      refresh();
-    } catch (e) { toast(e.message, true); }
-  };
-  un.append(uinput, ubtn);
-  cards.appendChild(un);
-}
-function escapeHtml(s) {
-  return (s || "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  });
 }
 
-// --- upload handling ---
+// ---------------- upload handling ----------------
 let pickedFile = null;
 const drop = $("drop"), file = $("file");
 drop.onclick = () => file.click();
-["dragover", "dragenter"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
-["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); file.click(); } };
+["dragover", "dragenter"].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault(); drop.classList.add("over");
+}));
+["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault(); drop.classList.remove("over");
+}));
 drop.addEventListener("drop", e => { if (e.dataTransfer.files[0]) pick(e.dataTransfer.files[0]); });
 file.onchange = () => { if (file.files[0]) pick(file.files[0]); };
+
 function pick(f) {
-  if (!f.type.includes("png") && !f.name.toLowerCase().endsWith(".png")) { toast("PNGファイルを選んでください", true); return; }
+  if (!f.type.includes("png") && !f.name.toLowerCase().endsWith(".png")) {
+    toast("PNGファイルを選んでください", true);
+    return;
+  }
   if (f.size > 8 * 1024 * 1024) { toast("8MBまでです", true); return; }
   pickedFile = f;
   const img = $("preview");
   img.src = URL.createObjectURL(f);
   img.hidden = false;
+  const picked = $("picked");
+  picked.textContent = f.name + " · " + (f.size / 1024).toFixed(0) + " KB";
+  picked.hidden = false;
   if (!$("name").value) $("name").value = f.name.replace(/\.png$/i, "").slice(0, 32);
   $("upload").disabled = false;
 }
+
 $("upload").onclick = async () => {
   if (!pickedFile) return;
   const params = new URLSearchParams();
@@ -230,18 +555,47 @@ $("upload").onclick = async () => {
   if ($("name").value.trim()) params.set("name", $("name").value.trim());
   try {
     toast("アップロード中…パックを再構築して全員に再送します");
-    const r = await api("/admin/api/upload?" + params.toString(),
-      { method: "POST", headers: Object.assign({ "Content-Type": "application/octet-stream" }, H), body: pickedFile });
-    toast((r.message || "登録しました") + "\nsha1=" + (r.sha1 || "").slice(0, 12) + "…");
-    pickedFile = null; $("preview").hidden = true; $("upload").disabled = true; $("cmd").value = "";
+    const r = await api("/admin/api/upload?" + params.toString(), {
+      method: "POST",
+      headers: Object.assign({ "Content-Type": "application/octet-stream" }, H),
+      body: pickedFile,
+    });
+    toast((r.message || "登録しました") + "\nsha1 = " + (r.sha1 || "").slice(0, 12) + "…");
+    pickedFile = null;
+    $("preview").hidden = true;
+    $("picked").hidden = true;
+    $("upload").disabled = true;
+    $("cmd").value = "";
+    file.value = "";
     refresh();
   } catch (e) { toast(e.message, true); }
 };
+
 $("repush").onclick = async () => {
-  try { const r = await api("/admin/api/repush", { method: "POST", headers: H }); toast(r.message || "再送しました"); }
-  catch (e) { toast(e.message, true); }
+  try {
+    const r = await api("/admin/api/repush", { method: "POST", headers: H });
+    toast(r.message || "再送しました");
+  } catch (e) { toast(e.message, true); }
 };
 $("reload").onclick = () => refresh().catch(e => toast(e.message, true));
+$("unassign-btn").onclick = async () => {
+  const name = $("unassign-name").value.trim();
+  if (!name) { toast("プレイヤー名を入力してください", true); return; }
+  try {
+    const r = await api("/admin/api/unassign?player=" + encodeURIComponent(name),
+        { method: "POST", headers: H });
+    toast(r.message || "解除しました");
+    $("unassign-name").value = "";
+    refresh();
+  } catch (e) { toast(e.message, true); }
+};
+
+// ---------------- reveal on view ----------------
+const io = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } });
+}, { threshold: 0.08 });
+document.querySelectorAll(".reveal").forEach(el => io.observe(el));
+
 refresh().catch(e => toast(e.message, true));
 </script>
 </body>
