@@ -155,11 +155,18 @@ public final class ShieldWebService implements ShieldWebServer.Api {
         if (Files.isRegularFile(packSrc.resolve("pack.mcmeta"))) {
             return; // operator's working copy (with their shields) already exists
         }
-        // The Plugin interface has no getFile(); only JavaPlugin knows the jar it came from.
-        java.io.File pluginJar = plugin instanceof org.bukkit.plugin.java.JavaPlugin javaPlugin
-                ? javaPlugin.getFile() : null;
-        if (pluginJar == null || !pluginJar.isFile() || !pluginJar.getName().endsWith(".jar")) {
-            throw new IOException("プラグインJARを特定できないため pack-base を展開できません");
+        // JavaPlugin#getFile() is protected, so locate the jar through the code source of the
+        // plugin's own main class instead — on a real server that IS the jar in plugins/.
+        java.io.File pluginJar;
+        try {
+            java.net.URL location = plugin.getClass().getProtectionDomain()
+                    .getCodeSource().getLocation();
+            pluginJar = Path.of(location.toURI()).toFile();
+        } catch (Exception e) {
+            throw new IOException("プラグインJARを特定できないため pack-base を展開できません", e);
+        }
+        if (!pluginJar.isFile() || !pluginJar.getName().endsWith(".jar")) {
+            throw new IOException("プラグインJARを特定できないため pack-base を展開できません: " + pluginJar);
         }
         try (JarFile jar = new JarFile(pluginJar)) {
             var entries = jar.entries();
