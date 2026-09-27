@@ -181,14 +181,23 @@ Paper 1.21.11 向け Practice PvP プラグイン **N Arena**(プラグイン名
 - **中キット(プリセット)**: 1つのキットの中に**名前付きの代替ロードアウト**を持てる。
   例: `Axe` → `HQ Style Axe[Default]` / `Club Style Axe` / `Hatena Style Axe`。
   - **右クリックで一覧**: **Duel Request**・**Party Fight**・**Kit Edit**(`/ekit`)のキット選択で、
-    中キットを持つキットを右クリックするとプリセット一覧が開く(左クリックは従来どおり)。
-  - **Queue は常にデフォルト**: キューのクリックは今まで通りキット本体を使い、一覧は出ない。
-  - **デフォルトは変更不可**: 一覧の先頭 `[Default]` はキット本体そのもので、保存されるプリセット
-    ではない。削除・改名・別プリセットへの差し替えはできず、`/kit preset add <kit> default` も拒否。
+    中キットを持つキットを右クリックするとプリセット一覧が開く。
+  - **左クリックは常にデフォルト**: プリセットが有るキットでも、左クリックは今まで通りキット本体で
+    進む(一覧は出ない)。**Queue**(`QueueKitGui`)と `/team queue`・`/team fight <party>` も
+    常にデフォルトで、中キットは選ばれない。
+  - **プリセットの中身は完全指定**: プリセットは**アイテムの中身そのもの**が別物。適用は
+    `KitService.applyExact` で行い、`KitLoadout.resolve` を通さない = **空スロットは空のまま**で
+    キット本体から補完されず、個人の並び替えも乗らない(エディタで保存した41スロットがそのまま出る)。
+  - **デフォルトの中身は変更不可・表示名は別設定**: 一覧の先頭 `[Default]` はキット本体そのもので、
+    保存されるプリセットではない。削除・プリセット化・別プリセットへの差し替えはできず、
+    `/kit preset add <kit> default` も拒否される。ただし**表示名はキット名とは別に設定できる**:
+    `/kit preset default <kit> <name>` でキット `Axe` を `HQ Style Axe [Default]` として一覧できる
+    (kits.yml の `inner-kits.default.display-name` = 名前だけ。`reset` でキット名に戻る。
+    ここに `layout` を書いても無視され、中身は常にキット本体)。
   - **管理はコマンド**: `/kit preset add <kit> <name>`(キット現在の中身を初期値として複製)、
-    `/kit preset remove <kit> <name>`、`/kit preset list [kit]`。保存先は kits.yml の
-    `kits.<kit>.inner-kits.<id>`(`display-name` / `icon` / スロット別 base64 の `layout`)。
-    キット改名時はプリセットも一緒に移動し、`/practiceadmin reload` で読み直される。
+    `/kit preset remove <kit> <name>`、`/kit preset list [kit]`、`/kit preset default <kit> <name>`。
+    保存先は kits.yml の `kits.<kit>.inner-kits.<id>`(`display-name` / `icon` / スロット別 base64 の
+    `layout`)。キット改名時はプリセットも一緒に移動し、`/practiceadmin reload` で読み直される。
   - **中身の編集は Kit Edit**: `/ekit` でキットを右クリック → プリセット選択 → 通常のキットエディタが
     そのプリセットのロードアウトを開く。保存先はプレイヤー個人のレイアウトDBではなく kits.yml の
     プリセットなので**選んだ全員に同じ中身**が適用される(「初期状態にリセット」もプリセット単位)。

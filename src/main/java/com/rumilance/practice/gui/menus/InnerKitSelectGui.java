@@ -174,7 +174,7 @@ public final class InnerKitSelectGui extends AbstractGui {
         int index = 0;
         // The default first, always: the kit itself, badged and locked.
         inventory.setItem(MenuScaffold.gridSlot(index++),
-                defaultTile(player, kit, InnerKitService.isDefault(current)));
+                defaultTile(player, kitId, kit, InnerKitService.isDefault(current)));
         for (InnerKit preset : presets) {
             if (index >= MenuScaffold.gridPageSize()) {
                 break;
@@ -186,10 +186,14 @@ public final class InnerKitSelectGui extends AbstractGui {
         MenuScaffold.returnButton(inventory, t(player, "menu.back"));
     }
 
-    /** {@code HQ Style Axe [Default]} — the kit's own loadout, not a stored preset. */
-    private ItemStack defaultTile(Player player, KitDefinition kit, boolean selected) {
+    /**
+     * {@code HQ Style Axe [Default]} — the kit's own loadout, not a stored preset. Its label is
+     * independent of the kit's name: {@code /kit preset default <kit> <name>} renames just this
+     * entry, and with no label set it falls back to the kit's display name.
+     */
+    private ItemStack defaultTile(Player player, String kitId, KitDefinition kit, boolean selected) {
         return ItemBuilder.of(ItemBuilder.materialOr(kit.icon(), Material.DIAMOND_SWORD))
-                .nameMini(kit.prettyDisplayName() + " " + InnerKitService.DEFAULT_BADGE)
+                .nameMini(innerKits.displayOf(kitId, null, kit.prettyDisplayName()))
                 .lore(
                         UiTheme.divider(),
                         UiTheme.line(line(player, "gui.innerkit-default-lore")),

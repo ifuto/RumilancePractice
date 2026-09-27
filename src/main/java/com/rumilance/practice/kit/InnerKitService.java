@@ -26,12 +26,20 @@ import java.util.logging.Logger;
  * pearls, block rules, arenas, start effects) still comes from the parent kit, because a
  * 中キット is a loadout, not a new kit.</p>
  *
- * <p><b>The default is not a stored preset and cannot be changed.</b> What Queue hands out —
- * the kit's own items, {@link KitLoadout#fromOfficial} — is always the default, is always
- * listed first as {@code <kit> [Default]}, cannot be created over, renamed, edited as a
- * preset or removed, and no other preset can be promoted to default. Choosing a 中キット is
- * only possible where it is offered: Duel Request, Party Fight and Kit Edit. Queue ignores
- * the choice entirely and always fights the default.</p>
+ * <p><b>The default is not a stored preset and its contents cannot be changed.</b> What Queue
+ * hands out — the kit's own items, {@link KitLoadout#fromOfficial} — is always the default, is
+ * always listed first, cannot be created over, edited as a preset or removed, and no other
+ * preset can be promoted to default. Its <b>label</b> is separate from the kit's name:
+ * {@code /kit preset default axe HQ Style Axe} lists the kit {@code Axe} as
+ * {@code HQ Style Axe [Default]}, stored as {@code inner-kits.default.display-name} — a label
+ * only, and a {@code layout} written there is ignored. A 中キット can be chosen only where a
+ * RIGHT click offers the list: Duel Request, Party Fight and Kit Edit. A LEFT click and every
+ * queue path fight the default, exactly as before.</p>
+ *
+ * <p><b>A preset's contents are complete.</b> Applying one goes through
+ * {@link KitService#applyExact}, never {@link KitLoadout#resolve}: slots the preset leaves empty
+ * stay empty instead of being filled back from the kit, because a preset differs in the items
+ * themselves, not only in their arrangement.</p>
  *
  * <p>Storage is {@code kits.<kit>.inner-kits.<id>} in kits.yml — {@code display-name},
  * {@code icon} and a {@code layout} map of {@code <slot>: <base64 item>} for the non-empty
@@ -78,6 +86,8 @@ public final class InnerKitService {
     private final Logger logger;
     /** kit id (lowercase) -> presets in declaration order. */
     private final Map<String, Map<String, InnerKit>> byKit = new ConcurrentHashMap<>();
+    /** kit id (lowercase) -> label of the default entry (absent = show the kit's own name). */
+    private final Map<String, String> defaultNames = new ConcurrentHashMap<>();
 
     public InnerKitService(ConfigService configService, Logger logger) {
         this.configService = Objects.requireNonNull(configService, "configService");
@@ -90,6 +100,7 @@ public final class InnerKitService {
     /** Re-reads every {@code inner-kits} section (plugin reload, /kit reload, after edits). */
     public void reload() {
         byKit.clear();
+        defaultNames.clear();
         FileConfiguration yaml = configService.kits();
         ConfigurationSection kits = yaml.getConfigurationSection("kits");
         if (kits == null) {
@@ -107,11 +118,22 @@ public final class InnerKitService {
                     continue;
                 }
                 String id = normalizeId(innerKey);
-                if (id.isEmpty() || isDefault(id)) {
-                    // A hand-written "default" section would shadow the kit itself: ignore it
-                    // rather than pretending the default can be redefined.
-                    logger.warning("[N Arena][InnerKit] ignoring reserved preset id '"
-                            + innerKey + "' on kit " + kitKey);
+                if (id.isEmpty()) {
+                    continue;
+                }
+                if (isDefault(id)) {
+                    // "default" is the kit itself: only its LABEL is configurable here, never a
+                    // loadout. A hand-written layout is ignored so the default can never drift
+                    // away from what Queue and every left-click hand out.
+                    String label = section.getString("display-name", null);
+                    if (label != null && !label.isBlank()) {
+                        defaultNames.put(kitKey.toLowerCase(Locale.ROOT), label.trim());
+                    }
+                    if (section.getConfigurationSection("layout") != null) {
+                        warn("[N Arena][InnerKit] ignoring 'layout' under inner-kits."
+                                + DEFAULT_ID + " on kit " + kitKey
+                                + " - the default's contents are the kit itself");
+                    }
                     continue;
                 }
                 String display = section.getString("display-name", id);
@@ -154,11 +176,26 @@ public final class InnerKitService {
         return get(kitId, innerId).map(InnerKit::layout);
     }
 
-    /** Display name of a choice, for lore and the match start message. */
+    /**
+     * The label the pickers show for the default entry: the one set with
+     * {@code /kit preset default <kit> <name>}, or the kit's own display name when none is set —
+     * always badged {@code [Default]} so the locked entry stays recognisable.
+     */
+    public Optional<String> defaultName(String kitId) {
+        if (kitId == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(defaultNames.get(kitId.toLowerCase(Locale.ROOT)));
+    }
+
+    /** Display name of a choice, for lore, tiles and the match start message. */
     public String displayOf(String kitId, String innerId, String kitDisplayName) {
         if (isDefault(innerId)) {
-            return (kitDisplayName == null || kitDisplayName.isBlank() ? kitId : kitDisplayName)
-                    + " " + DEFAULT_BADGE;
+            String label = defaultName(kitId).orElse(null);
+            if (label == null || label.isBlank()) {
+                label = kitDisplayName == null || kitDisplayName.isBlank() ? kitId : kitDisplayName;
+            }
+            return withBadge(label);
         }
         return get(kitId, innerId).map(InnerKit::displayName)
                 .orElse(kitDisplayName == null ? kitId : kitDisplayName);
@@ -192,6 +229,40 @@ public final class InnerKitService {
         map.put(id, inner);
         write(inner, kitId, display, null, layout);
         return CreateResult.OK;
+    }
+
+    /**
+     * Sets the label of the default entry — the one name in the list that is not the kit's name,
+     * so a kit {@code Axe} can be listed as {@code HQ Style Axe [Default]}. A blank name,
+     * {@code -} or {@code reset} clears it and the kit's own display name shows again.
+     *
+     * <p>Contents are never touched: the default stays the kit's own loadout, which is what Queue
+     * and every left-click hands out.</p>
+     */
+    public boolean setDefaultName(String kitId, String name) {
+        if (!kitExists(kitId)) {
+            return false;
+        }
+        ConfigurationSection parent = innerSection(kitId, true);
+        if (parent == null) {
+            return false;
+        }
+        String key = kitId.toLowerCase(Locale.ROOT);
+        String label = name == null ? "" : name.trim();
+        if (label.isEmpty() || label.equals("-") || label.equalsIgnoreCase("reset")) {
+            defaultNames.remove(key);
+            parent.set(DEFAULT_ID, null);
+            configService.save(ConfigService.KITS);
+            return true;
+        }
+        defaultNames.put(key, label);
+        ConfigurationSection section = parent.getConfigurationSection(DEFAULT_ID);
+        if (section == null) {
+            section = parent.createSection(DEFAULT_ID);
+        }
+        section.set("display-name", label);
+        configService.save(ConfigService.KITS);
+        return true;
     }
 
     /** Removes a preset. The default cannot be removed (it is the kit itself). */
@@ -233,6 +304,19 @@ public final class InnerKitService {
     }
 
     // ---------------------------------------------------------------- storage
+
+    /** {@code logger} is optional, so the service stays usable from tools and tests. */
+    private void warn(String message) {
+        if (logger != null) {
+            logger.warning(message);
+        }
+    }
+
+    private void warn(String message, Throwable cause) {
+        if (logger != null) {
+            logger.log(Level.WARNING, message, cause);
+        }
+    }
 
     private boolean kitExists(String kitId) {
         if (kitId == null || kitId.isBlank()) {
@@ -277,7 +361,7 @@ public final class InnerKitService {
     private void write(InnerKit inner, String kitId, String display, String icon, ItemStack[] layout) {
         ConfigurationSection parent = innerSection(kitId, true);
         if (parent == null) {
-            logger.warning("[N Arena][InnerKit] cannot persist preset " + inner.id()
+            warn("[N Arena][InnerKit] cannot persist preset " + inner.id()
                     + ": kit section " + kitId + " is gone");
             return;
         }
@@ -340,7 +424,7 @@ public final class InnerKitService {
             try {
                 layout[slot] = ItemSerializer.singleFromBase64(encoded);
             } catch (RuntimeException badItem) {
-                logger.log(Level.WARNING, "[N Arena][InnerKit] bad item in preset "
+                warn("[N Arena][InnerKit] bad item in preset "
                         + section.getName() + " slot " + slot, badItem);
             }
         }
@@ -353,6 +437,16 @@ public final class InnerKitService {
     public static boolean isDefault(String innerId) {
         return innerId == null || innerId.isBlank()
                 || DEFAULT_ID.equalsIgnoreCase(innerId.trim());
+    }
+
+    /** Appends {@link #DEFAULT_BADGE} unless the label already ends with it (any casing). */
+    public static String withBadge(String label) {
+        String text = label == null ? "" : label.trim();
+        if (text.isEmpty()) {
+            return DEFAULT_BADGE;
+        }
+        String badge = DEFAULT_BADGE.toLowerCase(Locale.ROOT);
+        return text.toLowerCase(Locale.ROOT).endsWith(badge) ? text : text + " " + DEFAULT_BADGE;
     }
 
     /** Lowercases and trims an id ("" for null); the map key form used everywhere. */

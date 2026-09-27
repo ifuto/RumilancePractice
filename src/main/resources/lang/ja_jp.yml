@@ -593,7 +593,7 @@ gui:
   innerkit-id-label: "ID"
   innerkit-right-hint: "右クリックで中キット（プリセット）一覧"
   innerkit-click-select: "クリックで選択"
-  innerkit-default-lore: "Queue と既定で使われるキット本体。変更不可。"
+  innerkit-default-lore: "中身はキット本体そのもの（Queue と左クリックはこれ）。表示名だけ /kit preset default で別途設定できます。"
   innerkit-duel-lore: "この中キットでデュエルを申し込む。"
   innerkit-team-lore: "この中キットでパーティ戦を開始する。"
   innerkit-edit-lore: "この中キットの中身を編集する。"

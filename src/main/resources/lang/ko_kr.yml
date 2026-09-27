@@ -592,7 +592,7 @@ gui:
   innerkit-id-label: "ID"
   innerkit-right-hint: "우클릭으로 내부 킷(프리셋) 목록"
   innerkit-click-select: "클릭하여 선택"
-  innerkit-default-lore: "Queue가 사용하는 킷 자체(기본값). 변경할 수 없습니다."
+  innerkit-default-lore: "킷 본체의 구성(Queue와 왼쪽 클릭이 사용). 표시 이름은 /kit preset default로 따로 설정할 수 있습니다."
   innerkit-duel-lore: "이 내부 킷으로 결투를 신청합니다."
   innerkit-team-lore: "이 내부 킷으로 파티 전투를 시작합니다."
   innerkit-edit-lore: "이 내부 킷의 내용을 편집합니다."

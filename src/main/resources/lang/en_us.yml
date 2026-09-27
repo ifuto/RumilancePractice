@@ -594,7 +594,7 @@ gui:
   innerkit-id-label: "ID"
   innerkit-right-hint: "Right-click for the inner kit list"
   innerkit-click-select: "Click to select"
-  innerkit-default-lore: "The kit itself - what Queue uses. Cannot be changed."
+  innerkit-default-lore: "The kit's own contents - what Queue and a left click use. Its label can be set separately (/kit preset default)."
   innerkit-duel-lore: "Send this duel request with this inner kit."
   innerkit-team-lore: "Start the party battle with this inner kit."
   innerkit-edit-lore: "Edit the contents of this inner kit."

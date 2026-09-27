@@ -1331,16 +1331,18 @@ public final class MatchService {
     }
 
     /**
-     * Kit + the match's 中キット. A preset loadout replaces both the kit's own items and the
-     * player's personal rearrangement, because a preset is shared by everybody in the fight;
-     * without one nothing changes and the player's own layout still applies.
+     * Kit + the match's 中キット. A preset's contents are authoritative and shared by everybody
+     * in the fight: they replace the kit's own items AND the player's personal rearrangement,
+     * with nothing filled back from the kit (an empty preset slot stays empty). Without a preset
+     * nothing changes and the player's own layout still applies.
      */
     private void applyKit(Player player, KitDefinition kit, MatchSession session) {
         String inner = session == null ? null : session.innerKit();
         if (inner != null && innerKits != null) {
             ItemStack[] preset = innerKits.layout(kit.name(), inner).orElse(null);
             if (preset != null) {
-                applyKit(player, kit, preset.clone());
+                kitService.applyExact(player, kit, preset.clone());
+                PlayerVitals.applyCombatStart(player, kit.maxHealth());
                 return;
             }
         }

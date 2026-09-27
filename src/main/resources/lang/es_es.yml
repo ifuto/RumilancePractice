@@ -592,7 +592,7 @@ gui:
   innerkit-id-label: "ID"
   innerkit-right-hint: "Clic derecho para ver la lista de kits internos"
   innerkit-click-select: "Clic para seleccionar"
-  innerkit-default-lore: "El kit en si, el que usa la cola. No se puede cambiar."
+  innerkit-default-lore: "El contenido del propio kit: lo que usan la cola y el clic izquierdo. Su nombre se configura aparte (/kit preset default)."
   innerkit-duel-lore: "Envia el duelo con este kit interno."
   innerkit-team-lore: "Inicia la batalla de grupo con este kit interno."
   innerkit-edit-lore: "Edita el contenido de este kit interno."

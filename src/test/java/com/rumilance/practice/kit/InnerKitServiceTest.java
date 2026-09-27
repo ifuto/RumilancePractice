@@ -68,6 +68,20 @@ final class InnerKitServiceTest {
     }
 
     @Test
+    void badgeIsAppendedToACustomDefaultLabelOnlyOnce() {
+        // The default entry's label is set apart from the kit name (/kit preset default), and it
+        // still has to read as the locked entry — so the badge is appended when missing...
+        assertEquals("HQ Style Axe [Default]", InnerKitService.withBadge("HQ Style Axe"));
+        assertEquals("Axe [Default]", InnerKitService.withBadge("  Axe "));
+        // ...but an admin who typed the badge keeps their exact text (no double badge).
+        assertEquals("HQ Style Axe[Default]", InnerKitService.withBadge("HQ Style Axe[Default]"));
+        assertEquals("HQ Style Axe [DEFAULT]", InnerKitService.withBadge("HQ Style Axe [DEFAULT]"));
+        // nothing to label -> just the badge
+        assertEquals("[Default]", InnerKitService.withBadge(null));
+        assertEquals("[Default]", InnerKitService.withBadge("   "));
+    }
+
+    @Test
     void badgeIsWhatEveryPickerShows() {
         // the duel/team/edit pickers and the GUI lore all build their labels from this one constant
         assertEquals("[Default]", InnerKitService.DEFAULT_BADGE);

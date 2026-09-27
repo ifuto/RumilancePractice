@@ -592,7 +592,7 @@ gui:
   innerkit-id-label: "ID"
   innerkit-right-hint: "Clic droit pour la liste des kits internes"
   innerkit-click-select: "Clic pour selectionner"
-  innerkit-default-lore: "Le kit lui-meme, celui de la file. Non modifiable."
+  innerkit-default-lore: "Le contenu du kit lui-meme : celui de la file et du clic gauche. Son nom se regle a part (/kit preset default)."
   innerkit-duel-lore: "Envoyer ce duel avec ce kit interne."
   innerkit-team-lore: "Lancer le combat de groupe avec ce kit interne."
   innerkit-edit-lore: "Modifier le contenu de ce kit interne."

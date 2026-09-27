@@ -373,6 +373,7 @@ public final class DuelRequestGui extends AbstractGui {
         if (innerKits == null || com.rumilance.practice.kit.InnerKitService.isDefault(inner)) {
             return kit;
         }
-        return innerKits.displayOf(kit, inner, kit);
+        String pretty = kitService.get(kit).map(k -> k.prettyDisplayName()).orElse(kit);
+        return innerKits.displayOf(kit, inner, pretty);
     }
 }

@@ -386,7 +386,26 @@ public final class KitService {
      * via setHelmet/setChestplate/... — never Bukkit raw {@code setItem(36-39)} (boots/legs/chest/helmet).
      */
     public void apply(Player player, KitDefinition kit, ItemStack[] layout) {
-        KitLoadout.give(player.getInventory(), KitLoadout.resolve(kit, layout));
+        applyResolved(player, kit, KitLoadout.resolve(kit, layout));
+    }
+
+    /**
+     * Applies an <b>authoritative</b> loadout — a 中キット (inner kit) preset.
+     *
+     * <p>A preset specifies its contents completely, so this never goes through
+     * {@link KitLoadout#resolve}: nothing is filled back from the kit and the player's personal
+     * rearrangement is irrelevant. A slot the preset leaves empty stays empty in the fight —
+     * that is the point of a preset, whose items differ from the kit's, not just their order.
+     * Only {@link KitLoadout#sanitize} runs, to strip editor placeholders and move armour that
+     * cannot be worn in the slot it sits in.</p>
+     */
+    public void applyExact(Player player, KitDefinition kit, ItemStack[] loadout) {
+        applyResolved(player, kit, KitLoadout.sanitize(loadout));
+    }
+
+    /** Shared tail of both apply paths: hand out {@code resolved}, then set the kit's rules. */
+    private void applyResolved(Player player, KitDefinition kit, ItemStack[] resolved) {
+        KitLoadout.give(player.getInventory(), resolved);
         applyCustomShield(player);
         // Reflect the kit's max-health on the player's MAX_HEALTH attribute; without this the
         // attribute stays at the vanilla 20 so a >20 HP kit is clamped to 20 and a kit's custom

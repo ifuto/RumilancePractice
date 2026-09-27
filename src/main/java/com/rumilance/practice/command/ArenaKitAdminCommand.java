@@ -182,7 +182,7 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                 player.sendMessage(Component.text("/kit rename <nowname> <newname> - 改名 (入力した大文字小文字がそのまま表示名に)", NamedTextColor.GRAY));
                 player.sendMessage(Component.text("/kit arena <kit> add|remove|list|clear [arena] - デュエル用アリーナプール", NamedTextColor.GRAY));
                 player.sendMessage(Component.text("/kit party-arena <kit> add|remove|list|clear [arena] - パーティ用アリーナプール", NamedTextColor.GRAY));
-                player.sendMessage(Component.text("/kit preset add|remove|list <kit> [name] - 中キット(プリセット)。既定は変更不可", NamedTextColor.GRAY));
+                player.sendMessage(Component.text("/kit preset add|remove|list|default <kit> [name] - 中キット(プリセット)。既定の中身は変更不可・表示名だけ /kit preset default で設定", NamedTextColor.GRAY));
                 yield true;
             }
             case "arena" -> {
@@ -685,7 +685,7 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
         String sub = args[0].toLowerCase(Locale.ROOT);
         if (sub.equals("preset")) {
             if (args.length == 2) {
-                return filter(List.of("add", "remove", "list"), args[1]);
+                return filter(List.of("add", "remove", "list", "default"), args[1]);
             }
             if (args.length == 3) {
                 return filter(kitService.all().stream().map(KitDefinition::name).toList(), args[2]);
@@ -785,14 +785,18 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
     }
 
     /**
-     * {@code /kit preset add|remove|list} — 中キット (inner kits).
+     * {@code /kit preset add|remove|list|default} — 中キット (inner kits).
      *
-     * <p>A preset is a shared loadout living inside one kit. Duel Request, Party Fight and Kit Edit
-     * offer the list on a RIGHT click; Queue always fights the kit's own loadout. That default is
-     * not a stored preset and cannot be changed, renamed, removed or replaced, so {@code add} with
-     * the name {@code default} is refused. Contents are edited in the kit editor — this command
-     * only creates, lists and removes the entries, seeding a new one with the kit's current items
-     * so the admin edits a copy instead of an empty grid.</p>
+     * <p>A preset is a shared loadout living inside one kit, and its contents are complete: what
+     * the editor saves is exactly what the fight hands out, with nothing filled back from the kit.
+     * Duel Request, Party Fight and Kit Edit offer the list on a RIGHT click; a LEFT click and
+     * Queue always fight the kit's own loadout. That default is not a stored preset — it cannot be
+     * created over, edited as a preset, removed or replaced, so {@code add} with the name
+     * {@code default} is refused — but its LABEL is separate from the kit's name and
+     * {@code /kit preset default <kit> <name>} sets it ( {@code reset} clears it again), so a kit
+     * {@code Axe} can be listed as {@code HQ Style Axe [Default]}. Contents are edited in the kit
+     * editor; this command only creates, lists, removes and labels entries, seeding a new one with
+     * the kit's current items so the admin edits a copy instead of an empty grid.</p>
      */
     private boolean handlePreset(Player player, String[] args) {
         if (innerKits == null) {
@@ -823,9 +827,9 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                     shown++;
                     player.sendMessage(Component.text(kit.name() + " (" + (presets.size() + 1) + "):",
                                     NamedTextColor.AQUA)
-                            .append(Component.text("  " + kit.prettyDisplayName() + " "
-                                    + com.rumilance.practice.kit.InnerKitService.DEFAULT_BADGE
-                                    + "  (default, fixed)", NamedTextColor.GRAY)));
+                            .append(Component.text("  " + innerKits.displayOf(kit.name(), null,
+                                    kit.prettyDisplayName()) + "  (default = the kit itself)",
+                                    NamedTextColor.GRAY)));
                     for (var preset : presets) {
                         player.sendMessage(Component.text("  - " + preset.displayName(), NamedTextColor.GREEN)
                                 .append(Component.text("  [" + preset.id() + "]", NamedTextColor.DARK_GRAY)));
@@ -882,8 +886,36 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
                                 : "No such inner kit: " + name.trim() + " on " + args[2],
                                 NamedTextColor.RED));
             }
+            case "default", "label", "name" -> {
+                if (args.length < 4) {
+                    player.sendMessage(Component.text(
+                            "/kit preset default <kit> <name...>   (clear: /kit preset default <kit> reset)",
+                            NamedTextColor.YELLOW));
+                    return true;
+                }
+                KitDefinition kit = kitService.get(args[2]).orElse(null);
+                if (kit == null) {
+                    player.sendMessage(Component.text("Unknown kit: " + args[2], NamedTextColor.RED));
+                    return true;
+                }
+                String name = String.join(" ", java.util.Arrays.copyOfRange(args, 3, args.length));
+                boolean clearing = name.isBlank() || name.equals("-") || name.equalsIgnoreCase("reset");
+                if (!innerKits.setDefaultName(kit.name(), name)) {
+                    player.sendMessage(Component.text("Could not save the default label for "
+                            + kit.name() + " (is kits.yml writable?).", NamedTextColor.RED));
+                    return true;
+                }
+                player.sendMessage(clearing
+                        ? Component.text("Default entry of " + kit.name() + " shows the kit name again: "
+                                + innerKits.displayOf(kit.name(), null, kit.prettyDisplayName()),
+                                NamedTextColor.GREEN)
+                        : Component.text("Default entry of " + kit.name() + " is now listed as "
+                                + innerKits.displayOf(kit.name(), null, kit.prettyDisplayName())
+                                + " (contents stay the kit itself - Queue and left-click use them)",
+                                NamedTextColor.GREEN));
+            }
             default -> player.sendMessage(Component.text(
-                    "/kit preset <add|remove|list> <kit> [name]", NamedTextColor.YELLOW));
+                    "/kit preset <add|remove|list|default> <kit> [name]", NamedTextColor.YELLOW));
         }
         return true;
     }

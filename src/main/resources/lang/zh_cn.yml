@@ -592,7 +592,7 @@ gui:
   innerkit-id-label: "ID"
   innerkit-right-hint: "右键查看中套件（预设）列表"
   innerkit-click-select: "点击选择"
-  innerkit-default-lore: "Queue 使用的套件本体（默认），不可更改。"
+  innerkit-default-lore: "即套件本身的内容（队列与左键点击使用）。显示名称可用 /kit preset default 单独设置。"
   innerkit-duel-lore: "用此中套件发送决斗请求。"
   innerkit-team-lore: "用此中套件开始派对战。"
   innerkit-edit-lore: "编辑此中套件的内容。"
