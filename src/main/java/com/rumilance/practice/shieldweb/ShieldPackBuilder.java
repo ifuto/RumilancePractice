@@ -143,8 +143,28 @@ public final class ShieldPackBuilder {
     }
 
     /** Removes every trace of {@code cmd} and regenerates {@code shield.json} without it. */
-    public static void remove(Path packSrc, int cmd, List<Integer> remainingCmds) throws IOException {
-        Files.deleteIfExists(packSrc.resolve(TEXTURE_DIR + "/shield_" + cmd + ".png"));
+    /**
+     * Rewrites the model definitions for {@code cmd} and regenerates {@code shield.json}
+     * WITHOUT touching the texture — used by the self-test's repair action when the artwork
+     * exists but the JSON wiring was lost or hand-edited. (Re-running {@link #inject} would
+     * compose the already-composited texture a second time and distort it.)
+     */
+    public static void ensureModels(Path packSrc, int cmd, List<Integer> allCmds) throws IOException {
+        if (cmd <= 0) {
+            throw new IOException("cmd は 1 以上の整数にしてください");
+        }
+        Files.createDirectories(packSrc.resolve(MODEL_DIR));
+        Files.createDirectories(packSrc.resolve(VANILLA_MODEL_DIR));
+        String textureRef = "rumilance:shield/shield_" + cmd;
+        String blockingRef = "rumilance:item/shield_" + cmd + "_blocking";
+        writeJson(packSrc.resolve(MODEL_DIR + "/shield_" + cmd + ".json"),
+                modelFor(textureRef, blockingRef));
+        writeJson(packSrc.resolve(MODEL_DIR + "/shield_" + cmd + "_blocking.json"),
+                modelBlocking(textureRef));
+        regenerateShieldJson(packSrc, allCmds);
+    }
+
+    public static void remove(Path packSrc, int cmd, List<Integer> remainingCmds) throws IOException {        Files.deleteIfExists(packSrc.resolve(TEXTURE_DIR + "/shield_" + cmd + ".png"));
         Files.deleteIfExists(packSrc.resolve(MODEL_DIR + "/shield_" + cmd + ".json"));
         Files.deleteIfExists(packSrc.resolve(MODEL_DIR + "/shield_" + cmd + "_blocking.json"));
         regenerateShieldJson(packSrc, remainingCmds);

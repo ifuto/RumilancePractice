@@ -750,8 +750,9 @@ public final class FeatureBootstrap {
         // no-op then, so construction is unconditional.
         this.shieldWebService = new com.rumilance.practice.shieldweb.ShieldWebService(
                 plugin, configService, hiddenRankService, kitService, resourcePackService);
-        // Battle log (MatchHistoryStore) + live spectate feed (MatchService) for the admin tabs.
-        shieldWebService.setMatchTools(matchService, matchHistoryStore);
+        // Battle log (MatchHistoryStore) + "who must not be pack-pushed right now"
+        // (MatchService / FfaService / QueueService) for the management site.
+        shieldWebService.setMatchTools(matchService, matchHistoryStore, ffaService, queueService);
         services.register(com.rumilance.practice.shieldweb.ShieldWebService.class,
                 this.shieldWebService);
         this.shieldWebService.start();

@@ -190,6 +190,30 @@ public final class ResourcePackService implements Listener {
     }
 
     /**
+     * Announce-only variant of {@link #updateLocalHash}: persists the freshly built hash and
+     * rebuilds the cached request, but pushes to NOBODY. Every push updates the client when
+     * a hash changes, which means a download screen — fine for joiners, but unacceptable for
+     * someone mid-match or mid-FFA. The caller (Shield Web) decides per player who is idle
+     * enough to receive it right away ({@link #applyTo(Player)}); the rest get the new pack
+     * automatically from the join hook, which always announces the latest request.
+     */
+    public void announceLocalHash(String sha1Hex) {
+        String normalized = normalizeSha1(sha1Hex);
+        if (normalized == null) {
+            logger.warning("[ShieldWeb] ignoring malformed pack hash: " + sha1Hex);
+            return;
+        }
+        this.liveSha1 = normalized;
+        saveJson(configuredUrl(), normalized);
+        loadJson();
+        this.request = buildRequest();
+        if (this.request == null) {
+            this.packId = null;
+        }
+        resolveHashFromUrl();
+    }
+
+    /**
      * Whether players refusing/failing the pack must be kicked. The admin-GUI override
      * ({@code pack-policy.yml}) wins over {@code resource-pack.required} in config.yml, which
      * is force-synced with the bundled pack on every startup. Default: recommended (no kick).

@@ -313,9 +313,13 @@ public final class ShieldWebService implements ShieldWebServer.Api {
             registry.save();
             ShieldPackBuilder.inject(packSrc, finalCmd, png, registry.cmdList());
             String sha1 = rebuildZip();
-            repushPack();
+            List<String> skipped = repushPack();
             int assignedCmd = finalCmd;
-            String toast = "盾 cmd=" + assignedCmd + " を登録しました（新しいパックを全員に再送済み）";
+            String toast = "盾 cmd=" + assignedCmd + " を登録しました"
+                    + (skipped.isEmpty()
+                        ? "（ロビーにいる人へは即時反映済み）"
+                        : "（ロビーにいる人へは即時反映。試合/FFA/キュー中の " + String.join(", ", skipped)
+                        + " は今は送らず、次回参加時に自動適用されます）");
             return "{\"ok\":true,\"cmd\":" + assignedCmd + ",\"name\":" + quote(entry.name())
                     + ",\"sha1\":" + quote(sha1) + ",\"message\":" + quote(toast) + "}";
         } catch (IOException e) {
@@ -384,10 +388,11 @@ public final class ShieldWebService implements ShieldWebServer.Api {
             registry.save();
             ShieldPackBuilder.remove(packSrc, cmd, registry.cmdList());
             String sha1 = rebuildZip();
-            repushPack();
+            List<String> skipped = repushPack();
             String toast = "盾 cmd=" + cmd + " を削除しました"
                     + (unassigned.isEmpty() ? "" : "（" + String.join(", ", unassigned)
-                    + " の紐づけも解除）");
+                    + " の紐づけも解除）")
+                    + (skipped.isEmpty() ? "" : busyNote(skipped).substring(1));
             return "{\"ok\":true,\"cmd\":" + cmd + ",\"sha1\":" + quote(sha1)
                     + ",\"unassigned\":" + unassigned.size()
                     + ",\"message\":" + quote(toast) + "}";
@@ -401,22 +406,53 @@ public final class ShieldWebService implements ShieldWebServer.Api {
         requireEnabled();
         try {
             String sha1 = rebuildZip();
-            repushPack();
+            List<String> skipped = repushPack();
+            String message = "最新のパックをロビーのプレイヤーへ再送しました"
+                    + (skipped.isEmpty() ? "" : busyNote(skipped));
             return "{\"ok\":true,\"sha1\":" + quote(sha1)
-                    + ",\"message\":\"最新のパックを全員に再送しました\"}";
+                    + ",\"message\":" + quote(message) + "}";
         } catch (IOException e) {
             throw new ShieldWebException("パック再構築に失敗: " + e.getMessage(), e);
         }
     }
 
-    /** Announces the freshly built hash and re-pushes the pack to everyone, on the main thread. */
-    private void repushPack() {
+    /**
+     * Announces the freshly built hash and pushes the new pack ONLY to players idle enough
+     * to afford a download screen (lobby). Players in a match / FFA / matchmaking queue are
+     * skipped on purpose — mid-fight pack reloads are exactly what we must never cause — and
+     * they receive the new pack automatically when they next join (the join hook always
+     * announces the latest request).
+     *
+     * @return names of skipped (busy) players, for user-facing messages
+     */
+    private List<String> repushPack() {
         final String sha1 = lastBuiltSha1;
+        List<String> skipped = new ArrayList<>();
         if (managePackHash() && sha1 != null) {
-            sync(() -> resourcePackService.updateLocalHash(sha1));
+            sync(() -> {
+                resourcePackService.announceLocalHash(sha1);
+                for (Player online : Bukkit.getOnlinePlayers()) {
+                    if (isBusy(online)) {
+                        skipped.add(online.getName());
+                        continue;
+                    }
+                    resourcePackService.applyTo(online);
+                }
+            });
         } else {
+            // 外部ホスティング運用: ローカルzipは配布物ではないので従来通りのリロードだけ。
             sync(resourcePackService::reload);
         }
+        return skipped;
+    }
+
+    /** Human-readable appendage: who did NOT get the live push and when they will get it. */
+    private static String busyNote(List<String> skipped) {
+        if (skipped == null || skipped.isEmpty()) {
+            return "";
+        }
+        return "。試合/FFA/キュー中の " + String.join(", ", skipped)
+                + " には今は送らず、次回の参加時に自動適用されます";
     }
 
     private void requireEnabled() throws ShieldWebException {
@@ -429,13 +465,38 @@ public final class ShieldWebService implements ShieldWebServer.Api {
 
     private com.rumilance.practice.match.MatchService matchService;
     private com.rumilance.practice.match.history.MatchHistoryStore historyStore;
+    private com.rumilance.practice.ffa.FfaService ffaService;
+    private com.rumilance.practice.queue.QueueService queueService;
     private long lastCommandAt;
 
-    /** Wires the battle-log / live-spectate sources; both endpoints degrade if unset. */
+    /**
+     * Wires the sources that know who is "busy" (in a match / FFA / matchmaking queue) and
+     * the finished-match history used by the battle log. All endpoints degrade if unset.
+     */
     public void setMatchTools(com.rumilance.practice.match.MatchService matchService,
-                              com.rumilance.practice.match.history.MatchHistoryStore historyStore) {
+                              com.rumilance.practice.match.history.MatchHistoryStore historyStore,
+                              com.rumilance.practice.ffa.FfaService ffaService,
+                              com.rumilance.practice.queue.QueueService queueService) {
         this.matchService = matchService;
         this.historyStore = historyStore;
+        this.ffaService = ffaService;
+        this.queueService = queueService;
+    }
+
+    /**
+     * A player we must NOT push the resource pack to right now: in a match, in FFA, or in
+     * the matchmaking queue — a mid-fight loading screen is the exact thing this feature
+     * must never cause. They receive the new pack automatically when they next join.
+     */
+    private boolean isBusy(Player player) {
+        java.util.UUID id = player.getUniqueId();
+        if (matchService != null && matchService.registry().byPlayer(id).isPresent()) {
+            return true;
+        }
+        if (ffaService != null && ffaService.isInFfa(id)) {
+            return true;
+        }
+        return queueService != null && queueService.isQueued(id);
     }
 
     private boolean consoleEnabled() {
@@ -697,69 +758,80 @@ public final class ShieldWebService implements ShieldWebServer.Api {
     }
 
     /**
-     * Lightweight spectate: running matches with per-player live HP / team / elimination —
-     * server-state text feed instead of video, exactly because a real stream would lag.
+     * One-click 自己修復 for the failures the self-test can detect:
+     * <ul>
+     *   <li>missing {@code pack.mcmeta} / pack working copy → re-extract {@code pack-base}
+     *       from the plugin jar;</li>
+     *   <li>shield.json wiring drift or missing model files for a registered cmd → models
+     *       are rewritten and shield.json regenerated from the registry;</li>
+     *   <li>missing / stale / inconsistent {@code pack.zip} → rebuilt deterministically and
+     *       announced (to non-busy players, per the no-mid-fight-push rule).</li>
+     * </ul>
+     * Cannot auto-fix: a registered shield whose texture is gone or corrupt — the original
+     * upload is the only copy. Those are reported unresolved for manual re-upload.
      */
     @Override
-    public String matchesJson() {
-        AtomicReference<String> out = new AtomicReference<>(
-                "{\"ok\":false,\"matches\":[],\"note\":\"match service 未接続\"}");
-        if (matchService == null) {
-            return out.get();
-        }
-        sync(() -> {
-            StringBuilder sb = new StringBuilder("{\"ok\":true,\"matches\":[");
-            boolean first = true;
-            int shown = 0;
-            for (var session : matchService.registry().all()) {
-                if (shown++ >= 20) {
-                    break;
-                }
-                if (!first) {
-                    sb.append(',');
-                }
-                first = false;
-                sb.append("{\"id\":").append(quote(session.id().toString().substring(0, 8)))
-                        .append(",\"mode\":").append(quote(String.valueOf(session.mode())))
-                        .append(",\"kit\":").append(quote(session.kitName()))
-                        .append(",\"state\":").append(quote(String.valueOf(session.state())))
-                        .append(",\"team\":").append(session.isTeamMatch())
-                        .append(",\"players\":[");
-                boolean pf = true;
-                for (java.util.UUID pid : session.participants()) {
-                    if (!pf) {
-                        sb.append(',');
-                    }
-                    pf = false;
-                    Player online = Bukkit.getPlayer(pid);
-                    String hpText;
-                    double hpValue = -1;
-                    if (online != null) {
-                        double max = online.getAttribute(
-                                org.bukkit.attribute.Attribute.MAX_HEALTH) != null
-                                ? online.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH).getValue()
-                                : 20.0;
-                        hpValue = Math.max(0, online.getHealth());
-                        hpText = String.format(java.util.Locale.US, "%.1f", hpValue)
-                                + " / " + String.format(java.util.Locale.US, "%.0f", max);
-                    } else {
-                        hpText = "—";
-                    }
-                    sb.append("{\"name\":").append(quote(online != null
-                                    ? online.getName() : String.valueOf(pid).substring(0, 8)))
-                            .append(",\"hp\":").append(quote(hpText))
-                            .append(",\"hpFrac\":").append(online != null
-                                    ? Math.min(1.0, hpValue / 20.0) : 0)
-                            .append(",\"team\":").append(quote(String.valueOf(session.teamColor(pid))))
-                            .append(",\"eliminated\":").append(session.isEliminated(pid))
-                            .append(",\"seriesWins\":").append(session.seriesWinsOf(pid))
-                            .append('}');
-                }
-                sb.append("]}");
+    public String repairJson() throws ShieldWebException {
+        requireEnabled();
+        List<String> fixed = new ArrayList<>();
+        List<String> unresolved = new ArrayList<>();
+        try {
+            if (!Files.isRegularFile(packSrc.resolve("pack.mcmeta"))) {
+                unpackBaseIfNeeded();
+                fixed.add("pack-src を pack-base から再展開しました");
             }
-            out.set(sb.append("]}").toString());
-        });
-        return out.get();
+            // Rebuild model jsons + the vanilla shield.json override table from the registry.
+            List<Integer> cmds = registry.cmdList();
+            boolean wiringTouched = false;
+            for (Integer cmd : cmds) {
+                Path texture = ShieldPackBuilder.textureFile(packSrc, cmd);
+                boolean textOk = Files.isRegularFile(texture);
+                if (textOk) {
+                    try {
+                        if (javax.imageio.ImageIO.read(texture.toFile()) == null) {
+                            textOk = false;
+                        }
+                    } catch (IOException unreadable) {
+                        textOk = false;
+                    }
+                }
+                if (!textOk) {
+                    unresolved.add("cmd=" + cmd + " の画像が pack-src から失われているか壊れています"
+                            + " — 元の画像で手動アップロードし直してください");
+                    continue;
+                }
+                Path model = packSrc.resolve(
+                        "assets/rumilance/models/item/shield_" + cmd + ".json");
+                if (!Files.isRegularFile(model)) {
+                    // models-only regeneration: NO re-inject (that would distort the texture)
+                    ShieldPackBuilder.ensureModels(packSrc, cmd, cmds);
+                    wiringTouched = true;
+                    fixed.add("cmd=" + cmd + " のモデル定義を再生成しました");
+                }
+            }
+            if (!wiringTouched) {
+                // Textures and models all present; the override table may still drift
+                // (e.g. hand-edited shields.json) → regenerate unconditionally, it is cheap.
+                ShieldPackBuilder.regenerateShieldJson(packSrc, cmds);
+            }
+            String sha1 = rebuildZip();
+            List<String> skipped = repushPack();
+            fixed.add("pack.zip を再構築して告知しました（sha1="
+                    + sha1.substring(0, Math.min(12, sha1.length())) + "…"
+                    + (skipped.isEmpty() ? "" : "、" + String.join(", ", skipped)
+                        + " は試合/FFA中のため見送り") + "）");
+            StringBuilder sb = new StringBuilder("{\"ok\":true,\"fixed\":[");
+            for (int i = 0; i < fixed.size(); i++) {
+                sb.append(i == 0 ? "" : ",").append(quote(fixed.get(i)));
+            }
+            sb.append("],\"unresolved\":[");
+            for (int i = 0; i < unresolved.size(); i++) {
+                sb.append(i == 0 ? "" : ",").append(quote(unresolved.get(i)));
+            }
+            return sb.append("]}").toString();
+        } catch (IOException e) {
+            throw new ShieldWebException("自動修復に失敗: " + e.getMessage(), e);
+        }
     }
 
     // ------------------------------------------------------------------ player resolution (main thread)

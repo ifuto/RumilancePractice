@@ -80,8 +80,11 @@ public final class ShieldWebServer implements AutoCloseable {
         /** Finished matches across every player (battle log), newest first. */
         String battlesJson();
 
-        /** Currently running matches with live per-player state (lightweight spectate). */
-        String matchesJson();
+        /**
+         * Self-repair pass behind the self-test's 「自動修復」button: restores pack-src,
+         * regenerates models/shield.json from the registry, rebuilds + announces the zip.
+         */
+        String repairJson() throws ShieldWebException;
     }
 
     /** Uniform error for anything the admin UI should surface as a message. */
@@ -249,7 +252,10 @@ public final class ShieldWebServer implements AutoCloseable {
                 case "/admin/api/logs" ->
                     jsonOk(exchange, api.logsJson(intParamOrDefault(query, "lines", 200)));
                 case "/admin/api/battles" -> jsonOk(exchange, api.battlesJson());
-                case "/admin/api/matches" -> jsonOk(exchange, api.matchesJson());
+                case "/admin/api/repair" -> {
+                    requirePost(method);
+                    jsonOk(exchange, api.repairJson());
+                }
                 case "/admin/api/command" -> {
                     requirePost(method);
                     byte[] body = readBody(exchange, 4096);

@@ -332,7 +332,7 @@
             font-size: 12px; color: var(--muted); cursor: pointer; user-select: none; }
   .switch input { accent-color: var(--ink); }
 
-  /* ---------------- battles / spectate lists -------------------------------------- */
+  /* ---------------- battle-log rows ---------------------------------------------- */
   .rows { display: flex; flex-direction: column; gap: 10px; }
   .row-card {
     background: var(--surface); border: 1px solid var(--rule);
@@ -348,17 +348,6 @@
   .p-row { display: flex; align-items: center; gap: 10px; font-size: 12.5px; }
   .p-row .pname { font-weight: 600; color: var(--ink-body); min-width: 96px; }
   .p-row .pmeta { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
-  .hpbar {
-    flex: 1; max-width: 220px; height: 6px;
-    background: var(--rule); border-radius: 9999px; overflow: hidden;
-  }
-  .hpbar > span {
-    display: block; height: 100%;
-    background: var(--pale-green-ink); border-radius: 9999px;
-    transition: width 400ms var(--ease-out);
-  }
-  .hpbar > span.low { background: var(--pale-red-ink); }
-  .hpbar > span.out { background: var(--rule); }
   .team-dot { display: inline-block; width: 8px; height: 8px; border-radius: 9999px;
               background: var(--rule-strong, #D6D3CC); }
 </style>
@@ -379,7 +368,7 @@
     <div class="bar-actions">
       <span class="tag tag-blue" id="statusline">port —</span>
       <button class="btn ghost sm" id="reload">再読込</button>
-      <button class="btn ghost sm" id="repush">全員に再送</button>
+      <button class="btn ghost sm" id="repush" title="ロビーにいる人へだけ即時反映。試合/FFA中には送りません">パック再送</button>
     </div>
   </div>
 </header>
@@ -398,8 +387,7 @@
     <button class="tab" data-pane="pane-console" data-num="02" role="tab">コンソール</button>
     <button class="tab" data-pane="pane-log" data-num="03" role="tab">サーバーログ</button>
     <button class="tab" data-pane="pane-battles" data-num="04" role="tab">バトルログ</button>
-    <button class="tab" data-pane="pane-watch" data-num="05" role="tab">観戦</button>
-    <button class="tab" data-pane="pane-selftest" data-num="06" role="tab">セルフテスト</button>
+    <button class="tab" data-pane="pane-selftest" data-num="05" role="tab">セルフテスト</button>
   </nav>
 
   <div class="pane" id="pane-shield">
@@ -428,7 +416,7 @@
           <div>
             <button class="btn solid" id="upload" disabled>アップロードして全員に反映</button>
           </div>
-          <span class="note">アップロード直後、リソースパックが再構築され、新しい SHA-1 でオンライン全員に再送されます（数秒の読み込み画面が一度入ります）。</span>
+          <span class="note">アップロード直後にパックを再構築し、<strong>ロビーにいる人へだけ</strong>新しい SHA-1 で即時反映します。試合・FFA・キュー中の人には読み込み画面を入れさせないため今は送らず、次回参加時に自動で新しいパックが適用されます。</span>
         </div>
       </div>
     </div>
@@ -503,27 +491,17 @@
     </div>
   </div>
 
-  <div class="pane" id="pane-watch" hidden>
-    <div class="sec-head"><span class="sec-num">05</span><h2>観戦</h2></div>
-    <div class="card">
-      <div class="toolbar-row">
-        <span class="note">動画ではなく「状態データ」のみを 3 秒おきに取得する軽量な観戦です。サーバーへの負荷はほぼゼロで、配信・カメラ移動は伴いません。</span>
-        <span class="spacer"></span>
-        <button class="btn ghost sm" id="watch-refresh">今すぐ更新</button>
-      </div>
-      <div class="rows" id="watchlist"></div>
-    </div>
-  </div>
-
   <div class="pane" id="pane-selftest" hidden>
-    <div class="sec-head"><span class="sec-num">06</span><h2>セルフテスト</h2></div>
+    <div class="sec-head"><span class="sec-num">05</span><h2>セルフテスト</h2></div>
     <div class="card">
       <div class="toolbar-row">
-        <span class="note">リソースパックが正しく配布できる状態か、ファイル→ZIP→配線まで一括検査します。</span>
+        <span class="note">リソースパックが正しく配布できる状態か、ファイル→ZIP→配線まで一括検査します。失敗項目は「自動修復」でその場で直せます。</span>
         <span class="spacer"></span>
+        <button class="btn ghost sm" id="repair-run" hidden>自動修復を実行</button>
         <button class="btn solid" id="selftest-run">動作テストを実行</button>
       </div>
       <div class="rows" id="selftest-rows"></div>
+      <div id="selftest-repair" style="margin-top: 14px"></div>
       <div id="selftest-players" style="margin-top: 14px"></div>
     </div>
   </div>
@@ -768,11 +746,9 @@ const tabButtons = document.querySelectorAll("#tabs .tab");
 const openedOnce = {};
 let activePane = "pane-shield";
 let logTimer = null;
-let watchTimer = null;
 
 function stopPaneTimers() {
   if (logTimer) { clearInterval(logTimer); logTimer = null; }
-  if (watchTimer) { clearInterval(watchTimer); watchTimer = null; }
 }
 
 function activatePane(id) {
@@ -786,7 +762,6 @@ function activatePane(id) {
   });
   if (id === "pane-log") { if (!openedOnce.log) { openedOnce.log = true; loadLogs(); } armLogTimer(); }
   if (id === "pane-battles" && !openedOnce.battles) { openedOnce.battles = true; loadBattles(); }
-  if (id === "pane-watch") { loadWatch(); armWatchTimer(); }
   if (id === "pane-console" && !openedOnce.console) {
     openedOnce.console = true;
     loadCandidates();
@@ -939,62 +914,12 @@ async function loadBattles() {
 }
 $("battles-refresh").onclick = () => loadBattles();
 
-// ---------------- spectate (lightweight state feed) -------------------------------------
-async function loadWatch() {
-  try {
-    const r = await api("/admin/api/matches", { headers: H });
-    const list = $("watchlist");
-    list.innerHTML = "";
-    if (!r.ok) { list.textContent = r.note || r.error || "試合情報を読み取れません"; return; }
-    if (!r.matches || r.matches.length === 0) {
-      const empty = document.createElement("div");
-      empty.className = "empty";
-      empty.textContent = "現在進行中の試合はありません。";
-      list.appendChild(empty);
-      return;
-    }
-    r.matches.forEach(m => {
-      const card = document.createElement("div");
-      card.className = "row-card";
-      card.innerHTML =
-        "<div class='row-head'>" +
-          "<span class='who'>#" + escapeHtml(m.id) + "</span>" +
-          "<span class='tag tag-blue'>" + escapeHtml(m.mode) + "</span>" +
-          (m.kit ? "<span class='tag tag-gray'>" + escapeHtml(m.kit) + "</span>" : "") +
-          "<span class='tag tag-yellow'>" + escapeHtml(m.state || "") + "</span>" +
-          "<span class='grow'></span>" +
-          (m.team ? "<span class='pmeta'>チーム戦</span>" : "") +
-        "</div>" +
-        "<div>" + (m.players || []).map(p => {
-          const pct = Math.round((p.hpFrac || 0) * 100);
-          const bar = p.eliminated ? "out" : (p.hpFrac <= 0.35 ? "low" : "");
-          return "<div class='p-row'>" +
-            "<span class='team-dot' style='background:" + teamColorOf(p.team) + "'></span>" +
-            "<span class='pname'" + (p.eliminated ? " style='text-decoration:line-through;opacity:.6'" : "") +
-              ">" + escapeHtml(p.name) + "</span>" +
-            "<span class='hpbar'><span class='" + bar + "' style='width:" +
-              (p.eliminated ? 0 : pct) + "%'></span></span>" +
-            "<span class='pmeta'>" + escapeHtml(p.hp) + "</span>" +
-            (p.eliminated ? "<span class='tag tag-red'>脱落</span>" : "") +
-            (p.seriesWins > 0 ? "<span class='tag tag-yellow'>x" + p.seriesWins + "</span>" : "") +
-          "</div>";
-        }).join("") + "</div>" +
-        "<span class='note'>3 秒ごとの状態スナップショット（HP・位置情報を除く軽量データのみ）</span>";
-      list.appendChild(card);
-    });
-  } catch (e) { toast(e.message, true); }
-}
-function armWatchTimer() {
-  if (watchTimer) return;
-  watchTimer = setInterval(() => { if (!document.hidden) loadWatch(); }, 3000);
-}
-$("watch-refresh").onclick = () => loadWatch();
-
-// ---------------- self test -------------------------------------------------------------
+// ---------------- self test (+ self-repair) ----------------------------------------------
 async function runSelfTest() {
   $("selftest-run").disabled = true;
   $("selftest-rows").innerHTML = "";
   $("selftest-players").innerHTML = "";
+  $("repair-run").hidden = true;
   try {
     const r = await api("/admin/api/selftest", { headers: H });
     const rows = $("selftest-rows");
@@ -1027,11 +952,39 @@ async function runSelfTest() {
             "<span class='tag " + (p.applied ? "tag-green" : "tag-yellow") + "'>" +
             escapeHtml(p.name) + (p.applied ? "" : " (未適用)") + "</span>").join(" ") +
           "</div>" : "");
+    if (!allOk) {
+      $("repair-run").hidden = false;
+      $("selftest-rows").insertAdjacentHTML("beforeend",
+        "<span class='note'>「自動修復を実行」で 再展開／配線再生成／ZIP再構築 を自動で試せます。" +
+        "修復できない項目（消えた画像など）は、修復結果で明示されます。</span>");
+    }
     toast(allOk ? "セルフテスト全項目 OK" : "失敗した項目があります", !allOk);
   } catch (e) { toast(e.message, true); }
   $("selftest-run").disabled = false;
 }
-$("selftest-run").onclick = runSelfTest;
+$("selftest-run").onclick = () => { $("selftest-repair").innerHTML = ""; runSelfTest(); };
+
+async function runRepair() {
+  $("repair-run").disabled = true;
+  $("selftest-repair").innerHTML = "";
+  try {
+    const r = await api("/admin/api/repair", { method: "POST", headers: H });
+    const area = $("selftest-repair");
+    const mkRow = (cls, label, text) =>
+      "<div class='row-head'><span class='tag " + cls + "'>" + label + "</span>" +
+      "<span class='note'>" + escapeHtml(text) + "</span></div>";
+    let html = "";
+    (r.fixed || []).forEach(f => { html += mkRow("tag-green", "修復", f); });
+    (r.unresolved || []).forEach(u => { html += mkRow("tag-red", "対処必要", u); });
+    area.innerHTML = "<div class='row-card'>" + html + "</div>";
+    toast((r.unresolved && r.unresolved.length > 0)
+      ? "一部を修復しました（要対処あり）" : "自動修復を実行しました");
+    // 修復直後に再検査して結果を確かめる
+    await runSelfTest();
+  } catch (e) { toast(e.message, true); }
+  $("repair-run").disabled = false;
+}
+$("repair-run").onclick = runRepair;
 
 // ---------------- reveal on view ----------------
 const io = new IntersectionObserver(entries => {
