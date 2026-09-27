@@ -48,17 +48,21 @@ public final class PaperCombatCompatListener implements Listener {
      * Operator-tuned knockback coefficients ({@link KnockbackTuning}); the vanilla reproduction
      * below is kept exact, then the finished vector is scaled with the same factor the
      * {@link KnockbackTuningListener} applies to Paper's {@code EntityKnockbackEvent}, so both
-     * paths behave identically. Null / neutral → byte-identical vanilla behaviour.
+     * paths behave identically. Null / fully-neutral → byte-identical vanilla behaviour.
      */
     private com.rumilance.practice.combat.KnockbackTuning knockbackTuning;
+    /** Victim kit resolver shared with {@link KnockbackTuningListener} (duel kit / FFA kit). */
+    private java.util.function.Function<java.util.UUID, String> kitResolverFn;
 
     public PaperCombatCompatListener(Plugin plugin, Predicate<UUID> combatantTest) {
         this.plugin = plugin;
         this.combatantTest = combatantTest;
     }
 
-    public void setKnockbackTuning(com.rumilance.practice.combat.KnockbackTuning tuning) {
+    public void setKnockbackTuning(com.rumilance.practice.combat.KnockbackTuning tuning,
+                                   java.util.function.Function<java.util.UUID, String> kitResolver) {
         this.knockbackTuning = tuning;
+        this.kitResolverFn = kitResolver;
     }
 
     private boolean combatant(Player player) {
@@ -219,12 +223,16 @@ public final class PaperCombatCompatListener implements Listener {
             newY = 0.4d;
         }
         // バニラ再現の完成ベクトルに、運用者係数だけを乗せる（計算式には触れない）。
+        // compatのノックバックは近接攻撃由来なので Cause は ENTITY_ATTACK として解釈する。
         var tuning = knockbackTuning;
         if (tuning != null && !tuning.isNeutral()) {
-            double[] scaled = tuning.scale(newX, newY, newZ);
-            newX = scaled[0];
-            newY = scaled[1];
-            newZ = scaled[2];
+            String kit = kitResolverFn != null ? kitResolverFn.apply(victim.getUniqueId()) : null;
+            if (!tuning.isNeutralFor("ENTITY_ATTACK", kit)) {
+                double[] scaled = tuning.scale("ENTITY_ATTACK", kit, newX, newY, newZ);
+                newX = scaled[0];
+                newY = scaled[1];
+                newZ = scaled[2];
+            }
         }
         victim.setVelocity(new Vector(newX, newY, newZ));
     }

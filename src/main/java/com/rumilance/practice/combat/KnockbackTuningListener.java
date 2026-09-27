@@ -15,30 +15,42 @@ import org.bukkit.util.Vector;
  * victim's {@code KNOCKBACK_RESISTANCE} attribute (netherite), explosion knockback resistance,
  * current velocity and the grounded hop — this listener only multiplies that FINAL vector via
  * {@code EntityKnockbackEvent#getFinalKnockback()} → {@code setFinalKnockback(...)}. All
- * knockback-reducing effects therefore stay perfectly in play, exactly as if the server were
- * running an alternative "kb multiplier" profile.</p>
+ * knockback-reducing effects therefore stay perfectly in play.</p>
  *
- * <p>Runs at {@link EventPriority#HIGH} so cancellers (LOW/NORMAL, cancelled events skipped)
- * and other shaping plugins run first; with neutral factors (the default) it is a pure no-op.</p>
+ * <p>Profiles (KBM-style): the effective factor comes from the victim's kit when a kit profile
+ * is configured, then the knockback {@code Cause}, then the global value — being knocked back
+ * by an explosion bed can be tuned differently from a melee swing, and a boxing duel from a
+ * nodebuff one, without any math being replaced. Priority HIGH so cancellers and other
+ * shaping plugins run first; fully-neutral configs short-circuit at zero cost.</p>
  */
 public final class KnockbackTuningListener implements Listener {
 
     private final KnockbackTuning tuning;
+    /** Resolves the victim's current kit id (duel kit, FFA arena kit), or {@code null}. */
+    private final java.util.function.Function<java.util.UUID, String> kitResolver;
 
-    public KnockbackTuningListener(KnockbackTuning tuning) {
+    public KnockbackTuningListener(KnockbackTuning tuning,
+                                   java.util.function.Function<java.util.UUID, String> kitResolver) {
         this.tuning = tuning;
+        this.kitResolver = kitResolver;
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onKnockback(EntityKnockbackEvent event) {
         if (tuning.isNeutral()) {
-            return; // 1.0 / 1.0 — vanilla pass-through, zero cost
+            return; // no profile configured anywhere → vanilla pass-through, zero cost
         }
-        if (!(event.getEntity() instanceof Player)) {
-            return; // 練習用ボットなど非プレイヤーの扱いは既存挙動のまま
+        if (!(event.getEntity() instanceof Player player)) {
+            return; // 練習用ボットなど非プレイヤーは既存挙動のまま
+        }
+        String cause = event.getCause() != null ? event.getCause().name() : "UNKNOWN";
+        String kit = kitResolver != null ? kitResolver.apply(player.getUniqueId()) : null;
+        if (tuning.isNeutralFor(cause, kit)) {
+            return;
         }
         Vector finalKnockback = event.getFinalKnockback();
-        double[] scaled = tuning.scale(finalKnockback.getX(), finalKnockback.getY(), finalKnockback.getZ());
+        double[] scaled = tuning.scale(cause, kit,
+                finalKnockback.getX(), finalKnockback.getY(), finalKnockback.getZ());
         event.setFinalKnockback(new Vector(scaled[0], scaled[1], scaled[2]));
     }
 }

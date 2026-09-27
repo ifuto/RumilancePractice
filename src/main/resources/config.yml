@@ -100,11 +100,24 @@ shield-web:
 # (EntityKnockbackEvent の finalKnockback) にだけ掛かる倍率です。1.0 = 完全にバニラ通り。
 # スプリント/Knockbackエンチャントの強さ、耐衝撃属性（KNOCKBACK_RESISTANCE: ネザライト装備）、
 # 爆発耐衝撃（explosion_knockback_resistance）などのゲーム内軽減は、係数の手前で完全に働きます。
-# 運用中は /kbf h <値> / /kbf v <値> で即時変更でき、変更値は plugins/n-arena/knockback.json
-# に永続化されてこの config 値より優先されます（/kbf reset で config に戻る）。範囲 0.0〜4.0。
+#
+# プロファイルの優先順位は kit > cause > global。運用中は /kbf コマンド（/kbf h <値>、
+# /kbf cause EXPLOSION h <値> v <値>、/kbf kit nodebuff h <値> v <値> など）で即時変更でき、
+# 変更値は plugins/n-arena/knockback.json に永続化されて config より優先されます。範囲 0.0〜4.0。
 knockback:
+  # グローバル係数（すべてのノックバックに掛かる既定）
   horizontal: 1.0
   vertical: 1.0
+  # 原因別オーバーライド（任意）。Cause = EntityKnockbackEvent.KnockbackCause の名前。
+  # causes:
+  #   ENTITY_ATTACK: { horizontal: 1.0, vertical: 1.0 }   # 近接攻撃
+  #   SWEEP_ATTACK:  { horizontal: 1.0, vertical: 1.0 }   # 薙ぎ払い
+  #   EXPLOSION:     { horizontal: 1.0, vertical: 1.0 }   # 爆発（クリスタル/ベッド）
+  #   SHIELD_BLOCK:  { horizontal: 1.0, vertical: 1.0 }   # 盾ブロック
+  # キット別プロファイル（任意）— 試合中の victim のキットで解決されます。
+  # kits:
+  #   nodebuff: { horizontal: 1.0, vertical: 1.0 }
+  #   boxing:   { horizontal: 0.85, vertical: 0.9 }
 
 executor:
   # Size of the async worker pool used for I/O and heavier computations

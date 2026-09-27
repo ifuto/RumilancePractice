@@ -1697,14 +1697,57 @@ public final class FeatureBootstrap {
         // Multipliers on Paper's FINAL knockback only (EntityKnockbackEvent#getFinalKnockback →
         // setFinalKnockback): the vanilla/Paper calculation — sprint & enchant strength,
         // KNOCKBACK_RESISTANCE (netherite), explosion knockback resistance, grounded hop —
-        // runs untouched underneath. The compat path (shield-blocked/post-stun synth) is scaled
-        // with the same factors, and 1.0/1.0 defaults make the whole thing a zero-cost pass-through.
+        // runs untouched underneath. Profiles: kit > cause > global (config + /kbf overrides),
+        // and a fully-neutral config makes the whole thing a zero-cost pass-through.
+        final java.util.Map<String, double[]> kbConfigCauses = new java.util.LinkedHashMap<>();
+        final java.util.Map<String, double[]> kbConfigKits = new java.util.LinkedHashMap<>();
+        org.bukkit.configuration.ConfigurationSection kbCauses =
+                configService.config().getConfigurationSection("knockback.causes");
+        if (kbCauses != null) {
+            for (String cause : kbCauses.getKeys(false)) {
+                kbConfigCauses.put(cause.toUpperCase(java.util.Locale.ROOT), new double[]{
+                        kbCauses.getDouble(cause + ".horizontal", 1.0d),
+                        kbCauses.getDouble(cause + ".vertical", 1.0d)});
+            }
+        }
+        org.bukkit.configuration.ConfigurationSection kbKits =
+                configService.config().getConfigurationSection("knockback.kits");
+        if (kbKits != null) {
+            for (String kit : kbKits.getKeys(false)) {
+                kbConfigKits.put(kit, new double[]{
+                        kbKits.getDouble(kit + ".horizontal", 1.0d),
+                        kbKits.getDouble(kit + ".vertical", 1.0d)});
+            }
+        }
         this.knockbackTuning = new com.rumilance.practice.combat.KnockbackTuning(
                 PluginIdentity.dataFolder(plugin).toPath().resolve("knockback.json"),
                 configService.config().getDouble("knockback.horizontal", 1.0d),
-                configService.config().getDouble("knockback.vertical", 1.0d));
-        pm.registerEvents(new com.rumilance.practice.combat.KnockbackTuningListener(knockbackTuning), plugin);
-        paperCombatCompat.setKnockbackTuning(knockbackTuning);
+                configService.config().getDouble("knockback.vertical", 1.0d),
+                kbConfigCauses, kbConfigKits);
+        // Victim → current kit id (duel kit first, then the FFA arena's kit), for kit profiles.
+        final java.util.function.Function<UUID, String> kbKitResolver = id -> {
+            java.util.Optional<com.rumilance.practice.session.MatchSession> session =
+                    matchService.registry().byPlayer(id);
+            if (session.isPresent()) {
+                return session.get().kitName();
+            }
+            Player p = Bukkit.getPlayer(id);
+            if (p != null) {
+                java.util.Optional<String> arenaId = ffaService.arenaOf(id);
+                if (arenaId.isPresent()) {
+                    for (com.rumilance.practice.ffa.FfaService.FfaArena arena : ffaService.arenasView()) {
+                        if (arenaId.get().equalsIgnoreCase(arena.id()) && arena.kitId() != null) {
+                            return arena.kitId();
+                        }
+                    }
+                }
+            }
+            return null;
+        };
+        pm.registerEvents(
+                new com.rumilance.practice.combat.KnockbackTuningListener(knockbackTuning, kbKitResolver),
+                plugin);
+        paperCombatCompat.setKnockbackTuning(knockbackTuning, kbKitResolver);
         // Paper #11012/#9504: resync the hotbar when our kit/arena rules cancel a place/break.
         pm.registerEvents(new com.rumilance.practice.guard.BlockInteractionResyncListener(plugin, combatant), plugin);
         pm.registerEvents(new GoldenHeadListener(plugin, matchRegistry), plugin);
