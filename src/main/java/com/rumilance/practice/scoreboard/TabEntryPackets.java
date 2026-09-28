@@ -86,13 +86,33 @@ final class TabEntryPackets {
         String value = fillerSkinValue;
         if (!value.isEmpty()) {
             try {
-                profile.getProperties().put("textures",
-                        new com.mojang.authlib.properties.Property("textures", value));
+                attachTexture(profile, value);
             } catch (Throwable ignored) {
                 // A malformed value must never break the whole layout — just send without skin.
             }
         }
         return profile;
+    }
+
+    /**
+     * Puts the texture property on the profile. Authlib's {@code Property} constructor moved
+     * between server generations (2-arg on ≤1.21.1-era authlib, 3-arg required on current
+     * paperweight dev bundles), so it is invoked reflectively — whichever exists wins.
+     */
+    private static void attachTexture(GameProfile profile, String value) throws Exception {
+        Class<?> propertyClass = Class.forName("com.mojang.authlib.properties.Property");
+        Object property;
+        try {
+            property = propertyClass
+                    .getConstructor(String.class, String.class, String.class)
+                    .newInstance("textures", value, null);
+        } catch (NoSuchMethodException threeArg) {
+            property = propertyClass
+                    .getConstructor(String.class, String.class)
+                    .newInstance("textures", value);
+        }
+        profile.getProperties().put("textures",
+                (com.mojang.authlib.properties.Property) property);
     }
 
     /** Adds one filler row to {@code viewer}'s player list at {@code order}. */
