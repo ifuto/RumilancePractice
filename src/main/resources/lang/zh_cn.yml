@@ -1317,8 +1317,8 @@ gui:
   bot-map-default: "第一个空闲房间"
 
   testarena-anvil-hint: "输入以方块为单位的边长，然后取走纸。"
-  testarena-anvil-limit: "有效尺寸: 21-256"
-  testarena-anvil-invalid: "<red>'<value>' 不是有效的边长，请使用 21-256。"
+  testarena-anvil-limit: "有效尺寸: 正整数"
+  testarena-anvil-invalid: "<red>'<value>' 不是有效的边长，请使用 正整数。"
   testarena-anvil-fail: "无法打开尺寸输入界面。"
   request-inbox: "申请列表"
   request-inbox-lore: "决斗、队伍邀请和队伍对决都集中在这里。"

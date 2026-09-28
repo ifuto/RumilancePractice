@@ -27,7 +27,7 @@ import java.util.function.BiConsumer;
 
 /**
  * Anvil-naming prompt for the TestArena side length: the player renames a piece of PAPER to a
- * number (21-256) and takes the result. Mirrors {@code KitAnvilRenameService} so the flow feels
+ * number (no size limit) and takes the result. Mirrors {@code KitAnvilRenameService} so the flow feels
  * native, but this one needs no rank gate — the map is disposable admin tooling. The callbacks
  * (apply/invalid/cancel) are recorded per player so a single listener serves any host.</p>
  */
@@ -88,13 +88,11 @@ public final class SideLengthAnvilService implements Listener {
             anvil.setItem(0, paper);
             anvil.setRepairCost(0);
             player.sendMessage(messages == null
-                    ? Component.text("Type a side length in blocks, then take the paper. Valid sizes: "
-                            + SmoothTerrainGenerator.MIN_WIDTH + "-" + SmoothTerrainGenerator.MAX_WIDTH
-                            + ".", NamedTextColor.YELLOW)
+                    ? Component.text("Type a side length in blocks, then take the paper. "
+                            + "Any positive size works — no size limit.", NamedTextColor.YELLOW)
                     : messages.render(player, "gui.testarena-anvil-hint"));
             player.sendMessage(messages == null
-                    ? Component.text("Valid sizes: " + SmoothTerrainGenerator.MIN_WIDTH + "-"
-                            + SmoothTerrainGenerator.MAX_WIDTH, NamedTextColor.GRAY)
+                    ? Component.text("Valid sizes: any positive number (no limit).", NamedTextColor.GRAY)
                     : messages.render(player, "gui.testarena-anvil-limit"));
         });
         return OpenResult.OPENED;
@@ -138,9 +136,8 @@ public final class SideLengthAnvilService implements Listener {
                                     .parsed("value", name == null ? "" : name)));
                 } else {
                     player.sendMessage(Component.text(
-                            "'" + name + "' is not a valid side length. Use "
-                                    + SmoothTerrainGenerator.MIN_WIDTH + "-"
-                                    + SmoothTerrainGenerator.MAX_WIDTH + ".",
+                            "'" + name + "' is not a valid side length. "
+                                    + "Use a positive number of blocks.",
                             NamedTextColor.RED));
                 }
                 invalid.accept(player, name);
@@ -211,10 +208,9 @@ public final class SideLengthAnvilService implements Listener {
         String cleaned = raw.trim();
         try {
             int value = Integer.parseInt(cleaned);
-            if (value < SmoothTerrainGenerator.MIN_WIDTH || value > SmoothTerrainGenerator.MAX_WIDTH) {
-                return null;
-            }
-            return value;
+            // No size limit: any positive length is accepted; the generator itself rejects
+            // sizes its arithmetic cannot represent.
+            return value >= 1 ? value : null;
         } catch (NumberFormatException ignored) {
             return null;
         }

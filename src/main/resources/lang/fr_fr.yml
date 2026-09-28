@@ -1317,8 +1317,8 @@ gui:
   bot-map-default: "première salle libre"
 
   testarena-anvil-hint: "Saisissez une longueur de cote en blocs, puis prenez le papier."
-  testarena-anvil-limit: "Tailles valides : 21-256"
-  testarena-anvil-invalid: "<red>'<value>' n'est pas une taille valide. Utilisez 21-256."
+  testarena-anvil-limit: "Tailles valides : tout nombre positif (sans limite)"
+  testarena-anvil-invalid: "<red>'<value>' n'est pas une taille valide. Utilisez un nombre positif."
   testarena-anvil-fail: "Impossible d'ouvrir la saisie de taille."
   request-inbox: "Demandes"
   request-inbox-lore: "Duels, invitations de groupe et duels de groupe au meme endroit."

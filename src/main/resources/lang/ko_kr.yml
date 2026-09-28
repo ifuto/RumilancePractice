@@ -1317,8 +1317,8 @@ gui:
   bot-map-default: "첫 번째 빈 방"
 
   testarena-anvil-hint: "블록 단위 한 변 길이를 입력한 뒤 종이를 가져가세요."
-  testarena-anvil-limit: "유효한 크기: 21-256"
-  testarena-anvil-invalid: "<red>'<value>'은(는) 유효한 길이가 아닙니다. 21-256을 사용하세요."
+  testarena-anvil-limit: "유효한 크기: 양의 정수"
+  testarena-anvil-invalid: "<red>'<value>'은(는) 유효한 길이가 아닙니다. 양의 정수을 사용하세요."
   testarena-anvil-fail: "크기 입력 화면을 열 수 없습니다."
   request-inbox: "신청 목록"
   request-inbox-lore: "듀얼 · 파티 초대 · 팀 초대 · 파티 대전을 한곳에서."

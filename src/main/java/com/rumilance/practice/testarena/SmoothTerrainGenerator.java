@@ -31,10 +31,11 @@ import java.util.function.Consumer;
 public final class SmoothTerrainGenerator {
 
     public static final int WIDTH = 100;
-    /** Smallest one-side length whose control grid keeps at least two cells. */
-    public static final int MIN_WIDTH = 21;
-    /** Largest one-side length accepted for a single temporary test map. */
-    public static final int MAX_WIDTH = 256;
+    /**
+     * Side length is intentionally unbounded (requested 2026-09-28: "testarenaのサイズ制限消して").
+     * Guards elsewhere only reject zero/negative lengths; generation memory scales with
+     * side^2, and coordinates must stay within the vanilla world border to be placeable.
+     */
     public static final int MAX_HEIGHT_DELTA = 4;
     public static final int UNDERGROUND_DEPTH = 200;
     public static final int SURFACE_ONLY_FOUNDATION_LAYERS = 2;
@@ -153,9 +154,14 @@ public final class SmoothTerrainGenerator {
                 shape = TerrainShape.RANDOM;
             }
             int length = sideLength == 0 ? WIDTH : sideLength;
-            if (length < MIN_WIDTH || length > MAX_WIDTH) {
-                throw new IllegalArgumentException("sideLength must be within ["
-                        + MIN_WIDTH + ", " + MAX_WIDTH + "]");
+            if (length <= 0) {
+                throw new IllegalArgumentException("sideLength must be positive");
+            }
+            if (length > 46340) {
+                // width^2 overflows a 32-bit int above 46340 (2^31-1 ~ 46340.9^2). The
+                // generator's per-map column counting is int-based, so clamp there instead
+                // of silently wrapping — this is an arithmetic floor, not a gameplay limit.
+                throw new IllegalArgumentException("sideLength is limited to 46340 by internal arithmetic");
             }
             sideLength = length;
             maxHeightDelta = Math.max(0, Math.min(MAX_HEIGHT_DELTA, maxHeightDelta));
@@ -375,7 +381,7 @@ public final class SmoothTerrainGenerator {
             scheduleFaweClear(player, area, mapId, complete, failure, operationId);
             return;
         }
-        List<ColumnData> columns = new ArrayList<>(area.width() * area.width());
+        List<ColumnData> columns = newColumnsList(area.width());
         for (int x = 0; x < area.width(); x++) {
             for (int z = 0; z < area.width(); z++) {
                 columns.add(new ColumnData(area.centerX() - area.width() / 2 + x,
@@ -432,7 +438,7 @@ public final class SmoothTerrainGenerator {
             fail(failure, "Wait for the current test map operation to finish.");
             return;
         }
-        int totalColumns = all.stream().mapToInt(a -> a.width() * a.width()).sum();
+        int totalColumns = (int) all.stream().mapToLong(a -> (long) a.width() * a.width()).sum();
         if (terrainEditBridge != null && terrainEditBridge.isAvailable()) {
             scheduleFaweClearAll(player, all, totalColumns, complete, failure, operationId);
             return;
@@ -651,9 +657,15 @@ public final class SmoothTerrainGenerator {
         running.put(player.getUniqueId(), holder[0]);
     }
 
+    /** Column lists grow only as generated; no eager width^2 allocation for huge maps. */
+    private static List<ColumnData> newColumnsList(int width) {
+        long total = (long) width * width;
+        return total <= 1_000_000L ? new ArrayList<>((int) total) : new ArrayList<>();
+    }
+
     private static List<ColumnData> plan(Area area, long seed) {
         HeightMap map = HeightMap.create(area.width(), seed, area.settings().shape(), area.settings().maxHeightDelta());
-        List<ColumnData> columns = new ArrayList<>(area.width() * area.width());
+        List<ColumnData> columns = newColumnsList(area.width());
         for (int x = 0; x < area.width(); x++) {
             for (int z = 0; z < area.width(); z++) {
                 int worldX = area.centerX() - area.width() / 2 + x;
@@ -866,6 +878,9 @@ public final class SmoothTerrainGenerator {
         }
 
         static HeightMap create(int width, long seed, TerrainShape shape, int maxHeightDelta) {
+            if (width < 1) {
+                throw new IllegalArgumentException("width must be positive");
+            }
             maxHeightDelta = Math.max(0, Math.min(MAX_HEIGHT_DELTA, maxHeightDelta));
             int gridSize = (int) Math.ceil((width - 1) / (double) CONTROL_SPACING) + 1;
             int[] positions = new int[gridSize];
@@ -883,8 +898,11 @@ public final class SmoothTerrainGenerator {
                         // Use a broad smooth-step depression rather than a pointed dish with a
                         // visible circular rim. A tiny low-frequency perturbation keeps the
                         // terrain natural while the centre remains clearly lower than the edge.
-                        double nx = positions[x] / (double) (width - 1) * 2.0d - 1.0d;
-                        double nz = positions[z] / (double) (width - 1) * 2.0d - 1.0d;
+                        // width==1: denominator would be 0; the single control point is centred.
+                        double nx = width < 2 ? 0.0d
+                                : positions[x] / (double) (width - 1) * 2.0d - 1.0d;
+                        double nz = width < 2 ? 0.0d
+                                : positions[z] / (double) (width - 1) * 2.0d - 1.0d;
                         double distance = Math.min(1.0d, Math.sqrt(nx * nx + nz * nz) / Math.sqrt(2.0d));
                         double smoothDistance = distance * distance * (3.0d - 2.0d * distance);
                         double variation = maxHeightDelta < 2 ? 0.0d

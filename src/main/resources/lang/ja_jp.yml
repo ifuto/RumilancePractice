@@ -1318,8 +1318,8 @@ gui:
   bot-map-default: "最初の空き部屋"
 
   testarena-anvil-hint: "ブロック数で一辺の長さを入力し、紙を取り出してください。"
-  testarena-anvil-limit: "有効なサイズ: 21-256"
-  testarena-anvil-invalid: "<red>'<value>' は有効な一辺の長さではありません。21-256 で入力してください。"
+  testarena-anvil-limit: "有効なサイズ: 正の整数なら任意（制限なし）"
+  testarena-anvil-invalid: "<red>'<value>' は有効な一辺の長さではありません。正の整数で入力してください。"
   testarena-anvil-fail: "サイズ入力画面を開けませんでした。"
   request-inbox: "申請一覧"
   request-inbox-lore: "デュエル申請・パーティ招待・チーム招待・パーティ対戦をまとめて確認。"

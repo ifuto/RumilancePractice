@@ -118,10 +118,8 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
         } catch (NumberFormatException ignored) {
             return null;
         }
-        if (size < SmoothTerrainGenerator.MIN_WIDTH || size > SmoothTerrainGenerator.MAX_WIDTH) {
-            return null;
-        }
-        return size;
+        // No size limit: any positive side length is accepted (0/negative means "invalid").
+        return size >= 1 ? size : null;
     }
 
     private void spawn(Player player, String[] args) {
@@ -140,9 +138,8 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
                 continue;
             }
             player.sendMessage(Component.text(
-                    "Unknown argument '" + raw + "'. Use a size (" +
-                            SmoothTerrainGenerator.MIN_WIDTH + "-" + SmoothTerrainGenerator.MAX_WIDTH +
-                            ") and/or a map (grass-stone, sand-sandstone, red-sand-red-sandstone).",
+                    "Unknown argument '" + raw + "'. Use a positive side length" +
+                            " and/or a map (grass-stone, sand-sandstone, red-sand-red-sandstone).",
                     NamedTextColor.RED));
             return;
         }
@@ -212,8 +209,7 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
 
     private void openSettingsMenu(Player player, int size) {
         MapMenuHolder holder = new MapMenuHolder();
-        holder.size = Math.max(SmoothTerrainGenerator.MIN_WIDTH,
-                Math.min(SmoothTerrainGenerator.MAX_WIDTH, size));
+        holder.size = Math.max(1, size);
         openSettingsMenu(player, holder);
     }
 
@@ -222,8 +218,7 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
         if (player == null || !player.isOnline()) {
             return;
         }
-        holder.size = Math.max(SmoothTerrainGenerator.MIN_WIDTH,
-                Math.min(SmoothTerrainGenerator.MAX_WIDTH, holder.size));
+        holder.size = Math.max(1, holder.size);
         Inventory inventory = Bukkit.createInventory(holder, 54,
                 Component.text("TestArena: map settings", NamedTextColor.DARK_AQUA));
         holder.bind(inventory);
@@ -239,64 +234,74 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
                 "Choose material, shape, underground, height and size."));
 
         inventory.setItem(GRASS_SLOT, item(Material.GRASS_BLOCK,
-                selected(holder.map == SmoothTerrainGenerator.TerrainMap.GRASS_STONE, "Grass / Stone"),
+                holder.map == SmoothTerrainGenerator.TerrainMap.GRASS_STONE, "Grass / Stone",
                 "Surface: grass block", "Layers 2-3: dirt", "Deeper foundation: stone"));
         inventory.setItem(SAND_SLOT, item(Material.SAND,
-                selected(holder.map == SmoothTerrainGenerator.TerrainMap.SAND_SANDSTONE, "Sand / Sandstone"),
+                holder.map == SmoothTerrainGenerator.TerrainMap.SAND_SANDSTONE, "Sand / Sandstone",
                 "Surface: sand", "Layers 1-4: sand", "Deeper foundation: sandstone"));
         inventory.setItem(RED_SAND_SLOT, item(Material.RED_SAND,
-                selected(holder.map == SmoothTerrainGenerator.TerrainMap.RED_SAND_RED_SANDSTONE,
-                        "Red Sand / Red Sandstone"),
+                holder.map == SmoothTerrainGenerator.TerrainMap.RED_SAND_RED_SANDSTONE,
+                        "Red Sand / Red Sandstone",
                 "Layers 1-3: red sand", "Deeper surface: red sandstone"));
 
         inventory.setItem(RANDOM_SLOT, item(Material.WHEAT_SEEDS,
-                selected(holder.shape == SmoothTerrainGenerator.TerrainShape.RANDOM, "Smooth random shape"),
+                holder.shape == SmoothTerrainGenerator.TerrainShape.RANDOM, "Smooth random shape",
                 "Shape: smooth random height map"));
         inventory.setItem(BOWL_SLOT, item(Material.BOWL,
-                selected(holder.shape == SmoothTerrainGenerator.TerrainShape.CENTER_LOW, "Centre-low bowl"),
+                holder.shape == SmoothTerrainGenerator.TerrainShape.CENTER_LOW, "Centre-low bowl",
                 "Shape: centre gently slopes down", "Independent from the material choice"));
 
         inventory.setItem(UNDERGROUND_SLOT, item(Material.STONE,
-                selected(!holder.surfaceOnly, "Underground: 200 blocks"),
+                !holder.surfaceOnly, "Underground: 200 blocks",
                 "Surface to bedrock: up to 200 blocks", "Bedrock is kept above world minimum Y"));
         inventory.setItem(SURFACE_ONLY_SLOT, item(Material.GLASS,
-                selected(holder.surfaceOnly, "Surface only"),
+                holder.surfaceOnly, "Surface only",
                 "Still creates at least 2 underground layers", "Then one safe bedrock layer"));
 
         inventory.setItem(HEIGHT_ZERO_SLOT, item(Material.SNOWBALL,
-                selected(holder.maxHeightDelta == 0, "Max height difference: 0"),
+                holder.maxHeightDelta == 0, "Max height difference: 0",
                 "Flat surface"));
         inventory.setItem(HEIGHT_TWO_SLOT, item(Material.SNOW_BLOCK,
-                selected(holder.maxHeightDelta == 2, "Max height difference: 2"),
+                holder.maxHeightDelta == 2, "Max height difference: 2",
                 "Gentle terrain"));
         inventory.setItem(HEIGHT_FOUR_SLOT, item(Material.COBBLESTONE,
-                selected(holder.maxHeightDelta == 4, "Max height difference: 4"),
+                holder.maxHeightDelta == 4, "Max height difference: 4",
                 "Maximum smooth variation"));
 
         inventory.setItem(SIZE_32_SLOT, item(Material.BRICKS,
-                selected(holder.size == 32, "Side length: 32"),
+                holder.size == 32, "Side length: 32",
                 "32 x 32 blocks"));
         inventory.setItem(SIZE_64_SLOT, item(Material.STONE_BRICKS,
-                selected(holder.size == 64, "Side length: 64"),
+                holder.size == 64, "Side length: 64",
                 "64 x 64 blocks"));
         inventory.setItem(SIZE_100_SLOT, item(Material.DEEPSLATE_BRICKS,
-                selected(holder.size == 100, "Side length: 100"),
+                holder.size == 100, "Side length: 100",
                 "100 x 100 blocks (default)"));
 
-        // Custom side length: the anvil prompt. Pressing the fixed Quick sizes first is fine,
-        // but any custom length goes through the anvil naming dialog (21-256).
+        // Custom side length: the anvil prompt. No size limit anymore — any positive number
+        // of blocks goes (large maps simply take longer / more memory to generate).
         inventory.setItem(SIZE_CUSTOM_SLOT, item(Material.NAME_TAG,
-                selected(holder.size != 32 && holder.size != 64 && holder.size != 100,
-                        "Side length: " + holder.size),
-                "Enter a custom side length (21-256)", "Opens the anvil naming dialog"));
+                holder.size != 32 && holder.size != 64 && holder.size != 100,
+                "Side length: " + holder.size,
+                "Enter any custom side length (no limit)", "Opens the anvil naming dialog"));
 
         inventory.setItem(START_SLOT, item(Material.EMERALD_BLOCK, "Generate test map",
                 "Click to create the selected " + holder.size + " x " + holder.size + " map"));
         inventory.setItem(53, item(Material.BARRIER, "Close", "No map will be created."));
     }
 
-    private static String selected(boolean selected, String name) {
-        return selected ? "Selected: " + name : name;
+    /** Menu button; {@code selected} buttons glow (enchantment glint) on top of the name marker. */
+    private static ItemStack item(Material material, boolean selected, String name, String... lore) {
+        ItemStack stack = new ItemStack(material);
+        ItemMeta meta = stack.getItemMeta();
+        meta.displayName(Component.text(selected ? "Selected: " + name : name, NamedTextColor.AQUA));
+        meta.lore(java.util.Arrays.stream(lore)
+                .map(line -> Component.text(line, NamedTextColor.GRAY)).toList());
+        if (selected) {
+            meta.setEnchantmentGlintOverride(true);
+        }
+        stack.setItemMeta(meta);
+        return stack;
     }
 
     private static ItemStack item(Material material, String name, String... lore) {
@@ -374,8 +379,7 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
     }
 
     private void reapplySettings(Player player, MapMenuHolder holder, int parsed) {
-        holder.size = Math.max(SmoothTerrainGenerator.MIN_WIDTH,
-                Math.min(SmoothTerrainGenerator.MAX_WIDTH, parsed));
+        holder.size = Math.max(1, parsed);
         openSettingsAndReopen(player, holder);
     }
 

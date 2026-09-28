@@ -114,16 +114,6 @@ public final class TeamColoredArmorService {
         }
     }
 
-    /** True while the player participates in an ongoing team (party) match. */
-    public boolean isInTeamMatch(Player player) {
-        if (player == null) {
-            return false;
-        }
-        return matchRegistry.byPlayer(player.getUniqueId())
-                .map(com.rumilance.practice.session.MatchSession::isTeamMatch)
-                .orElse(false);
-    }
-
     /** Leaving a match: restore real armor packets and clear glow. */
     public void clearForPlayer(Player player) {
         if (player == null) {
@@ -163,7 +153,12 @@ public final class TeamColoredArmorService {
             return;
         }
         Bukkit.getScheduler().runTask(plugin, () -> refreshTarget(changed));
-        Bukkit.getScheduler().runTaskLater(plugin, () -> refreshTarget(changed), 2L);
+        // 被ダメ時のA級装備チラつき対策: 装備本体は壊れるのが仕様（ユーザ指示）なので耐久消費
+        // は止めない。代わりに、バニラが耐久更新の実物装備パケットを撒くタイミング
+        // (イベント同一tick〜数tick後) を小刻みな偽装再送信で上書きし直す。
+        for (long tick : new long[] {1L, 2L, 3L, 5L, 8L}) {
+            Bukkit.getScheduler().runTaskLater(plugin, () -> refreshTarget(changed), tick);
+        }
     }
 
     private volatile TeamGlowLosService teamGlowLos;

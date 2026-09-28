@@ -1319,8 +1319,8 @@ gui:
   bot-map-default: "first free room"
 
   testarena-anvil-hint: "Type a side length in blocks, then take the paper."
-  testarena-anvil-limit: "Valid sizes: 21-256"
-  testarena-anvil-invalid: "<red>'<value>' is not a valid side length. Use 21-256."
+  testarena-anvil-limit: "Valid sizes: any positive number (no limit)"
+  testarena-anvil-invalid: "<red>'<value>' is not a valid side length. Use a positive number."
   testarena-anvil-fail: "Could not open the side length prompt."
   request-inbox: "Requests"
   request-inbox-lore: "Duel requests, party & team invites and party duels in one place."

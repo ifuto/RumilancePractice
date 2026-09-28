@@ -1317,8 +1317,8 @@ gui:
   bot-map-default: "primera sala libre"
 
   testarena-anvil-hint: "Escribe un lado en bloques y coge el papel."
-  testarena-anvil-limit: "Tamanos validos: 21-256"
-  testarena-anvil-invalid: "<red>'<value>' no es un lado valido. Usa 21-256."
+  testarena-anvil-limit: "Tamanos validos: cualquier numero positivo (sin limite)"
+  testarena-anvil-invalid: "<red>'<value>' no es un lado valido. Usa un numero positivo."
   testarena-anvil-fail: "No se pudo abrir el aviso de tamano."
   request-inbox: "Solicitudes"
   request-inbox-lore: "Duelos, invitaciones de grupo y duelos de grupo en un solo sitio."
