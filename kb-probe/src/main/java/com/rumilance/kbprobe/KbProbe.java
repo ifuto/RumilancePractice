@@ -4,17 +4,24 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.network.ServerInfo;
 import net.minecraft.client.world.ClientWorld;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.component.type.AttributeModifiersComponent;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.Entity;
-import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.EquipmentSlot;
+import net.minecraft.entity.attribute.EntityAttributeModifier;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.text.Text;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 /**
  * KB Probe — 他サーバーのノックバック係数をクライアント側で実測する中核ロジック。
@@ -64,22 +71,34 @@ public final class KbProbe {
         final long hitTick;
         long confirmTick = -1L;
         boolean sampled;
+        final UUID victimUuid;
         final double dirX, dirZ;
         final boolean targetOnGround, sprint;
         final int enchant;
         final double resistance;
+        /** 読み取れた対象の装備概要（エンチャント込み）。空文字 = 装備なし/非表示。 */
+        final String gearSummary;
 
-        PendingHit(long hitTick, double dirX, double dirZ, boolean targetOnGround,
-                   boolean sprint, int enchant, double resistance) {
+        PendingHit(long hitTick, UUID victimUuid, double dirX, double dirZ, boolean targetOnGround,
+                   boolean sprint, int enchant, double resistance, String gearSummary) {
             this.hitTick = hitTick;
+            this.victimUuid = victimUuid;
             this.dirX = dirX;
             this.dirZ = dirZ;
             this.targetOnGround = targetOnGround;
             this.sprint = sprint;
             this.enchant = enchant;
             this.resistance = resistance;
+            this.gearSummary = gearSummary;
         }
     }
+
+    /** 装備解析の結果: 実装備の属性コンポーネントから算出した耐衝撃 + 表示用サマリ。 */
+    private record GearInfo(double resistance, String summary) {
+    }
+
+    /** 属性のレジストリID（汎用耐衝撃）。 */
+    private static final String KNOCKBACK_RESISTANCE_ID = "minecraft:generic.knockback_resistance";
 
     /** entityId → 保留中の自前ヒット。 */
     private static final Map<Integer, PendingHit> PENDING = new HashMap<>();
@@ -87,6 +106,8 @@ public final class KbProbe {
     private static final Map<Integer, double[]> LAST_VELOCITY = new HashMap<>();
     /** entityId → 最後にサンプルを採った tick。 */
     private static final Map<Integer, Long> LAST_SAMPLED = new HashMap<>();
+    /** 装備概要を表示済みの対象（ワールド内で1回だけ出すスパム防止）。 */
+    private static final Set<UUID> GEAR_ANNOUNCED = new HashSet<>();
     /** 通知クールダウン（サーバー単位・種別単位）。 */
     private static long lastNoKbNotice = Long.MIN_VALUE;
     private static long lastNoDamageNotice = Long.MIN_VALUE;
@@ -121,8 +142,9 @@ public final class KbProbe {
         double dirX = Math.sin(yawRad);
         double dirZ = -Math.cos(yawRad);
         int enchant = EnchantmentHelper.getKnockbackBonus(me);
-        PendingHit hit = new PendingHit(clientTick, dirX, dirZ, victim.isOnGround(),
-                me.isSprinting(), enchant, estimateResistance(victim));
+        GearInfo gear = analyzeGear(victim);
+        PendingHit hit = new PendingHit(clientTick, victim.getUuid(), dirX, dirZ, victim.isOnGround(),
+                me.isSprinting(), enchant, gear.resistance(), gear.summary());
         PENDING.put(victim.getId(), hit);
     }
 
@@ -160,6 +182,7 @@ public final class KbProbe {
             PENDING.clear();
             LAST_VELOCITY.clear();
             LAST_SAMPLED.clear();
+            GEAR_ANNOUNCED.clear();
             lastWorld = mc.world;
             StatsStore.save();
         }
@@ -213,6 +236,14 @@ public final class KbProbe {
         // 耐衝撃ガード: 相手の推定耐衝撃が 1.0 以上なら水平は常に 0 → 計算不能
         if (hit.resistance >= 1.0d) {
             return;
+        }
+
+        // 初回ヒット時に、対象の装備＋エンチャント（クライアントに同期されている表示用装備）と
+        // そこから算出した推定耐衝撃を一度だけ提示する。係数が掛かった「土台」を読み手が確認できる。
+        if (GEAR_ANNOUNCED.add(hit.victimUuid)) {
+            chat("§7[KBProbe] 対象の装備: "
+                    + (hit.gearSummary.isEmpty() ? "(装備なし/非表示)" : hit.gearSummary)
+                    + String.format(" → 推定耐衝撃 %.0f%%", hit.resistance * 100.0d));
         }
 
         ServerStats stats = StatsStore.statsFor(serverKey());
@@ -287,16 +318,94 @@ public final class KbProbe {
     // 補助
     // ----------------------------------------------------------------------------------
 
-    /** 見えている装備からの耐衝撃推定（ネザライト1部位=0.1）。属性MOD等は不明なので近似。 */
-    private static double estimateResistance(PlayerEntity victim) {
-        double r = 0.0d;
-        for (ItemStack stack : victim.getArmorItems()) {
-            if (stack.isOf(Items.NETHERITE_HELMET) || stack.isOf(Items.NETHERITE_CHESTPLATE)
-                    || stack.isOf(Items.NETHERITE_LEGGINGS) || stack.isOf(Items.NETHERITE_BOOTS)) {
-                r += 0.1d;
+    /**
+     * 対象の装備を「属性コンポーネント込み」で解析する。他プレイヤーの装備は描画のため
+     * サーバーから同期されており、アイテム本体・エンチャント・属性モディファイアをすべて
+     * クライアントで読める。实体の解決済み attribute map（クラス/キット由来の直接付与など）
+     * だけは同期されないので、その分だけ推定が甘くなる点に注意。
+     */
+    private static GearInfo analyzeGear(PlayerEntity victim) {
+        double resistance = 0.0d;
+        StringBuilder summary = new StringBuilder();
+        for (EquipmentSlot slot : EquipmentSlot.values()) {
+            if (slot.getType() != EquipmentSlot.Type.HUMANOID_ARMOR
+                    && slot != EquipmentSlot.MAINHAND && slot != EquipmentSlot.OFFHAND) {
+                continue;
+            }
+            ItemStack stack = victim.getEquippedStack(slot);
+            if (stack.isEmpty()) {
+                continue;
+            }
+            resistance += knockbackResistanceOf(stack, slot);
+            if (summary.length() > 0) {
+                summary.append(' ');
+            }
+            summary.append(Registries.ITEM.getId(stack.getItem()).getPath());
+            String ench = enchantSummary(stack);
+            if (!ench.isEmpty()) {
+                summary.append('(').append(ench).append(')');
             }
         }
-        return Math.min(r, 1.0d);
+        return new GearInfo(Math.min(resistance, 1.0d), summary.toString());
+    }
+
+    /** 装備1点の耐衝撃（generic.knockback_resistance の ADD_VALUE 合算。装着スロット一致分のみ）。 */
+    private static double knockbackResistanceOf(ItemStack stack, EquipmentSlot wornSlot) {
+        var mods = stack.get(DataComponentTypes.ATTRIBUTE_MODIFIERS);
+        if (mods == null) {
+            return 0.0d;
+        }
+        double r = 0.0d;
+        for (AttributeModifiersComponent.Entry entry : mods.modifiers()) {
+            if (!isKnockbackResistance(entry.attribute())
+                    || entry.modifier().operation() != EntityAttributeModifier.Operation.ADD_VALUE
+                    || !slotApplies(entry.slot(), wornSlot)) {
+                continue;
+            }
+            r += entry.modifier().value();
+        }
+        return r;
+    }
+
+    private static boolean isKnockbackResistance(
+            RegistryEntry<net.minecraft.entity.attribute.EntityAttribute> attribute) {
+        return attribute.getKey()
+                .map(key -> key.getValue().toString().equals(KNOCKBACK_RESISTANCE_ID))
+                .orElse(false);
+    }
+
+    /** AttributeModifierSlot ↔ 実装備スロットの照合（yarn の matches() 更新に左右されない自前判定）。 */
+    private static boolean slotApplies(net.minecraft.component.type.AttributeModifierSlot modifierSlot,
+                                       EquipmentSlot wornSlot) {
+        return switch (modifierSlot) {
+            case HEAD -> wornSlot == EquipmentSlot.HEAD;
+            case CHEST -> wornSlot == EquipmentSlot.CHEST;
+            case LEGS -> wornSlot == EquipmentSlot.LEGS;
+            case FEET -> wornSlot == EquipmentSlot.FEET;
+            case ARMOR -> wornSlot.getType() == EquipmentSlot.Type.HUMANOID_ARMOR;
+            case MAINHAND -> wornSlot == EquipmentSlot.MAINHAND;
+            case OFFHAND -> wornSlot == EquipmentSlot.OFFHAND;
+            case HAND -> wornSlot == EquipmentSlot.MAINHAND || wornSlot == EquipmentSlot.OFFHAND;
+            case ANY -> true;
+            default -> true; // BODY 等: 現状の武器/防具には無いので受け流す
+        };
+    }
+
+    /** エンチャントのコンパクト表示（例 "protection:4,unbreaking:3"）。補正自体はKB計算に使わない情報欄。 */
+    private static String enchantSummary(ItemStack stack) {
+        var enchants = stack.getEnchantments();
+        if (enchants == null || enchants.getEnchantments().isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (RegistryEntry<net.minecraft.enchantment.Enchantment> entry : enchants.getEnchantments()) {
+            if (sb.length() > 0) {
+                sb.append(',');
+            }
+            sb.append(entry.getKey().map(k -> k.getValue().getPath()).orElse("?"));
+            sb.append(':').append(enchants.getLevel(entry));
+        }
+        return sb.length() <= 64 ? sb.toString() : sb.substring(0, 64);
     }
 
     private static String serverKey() {

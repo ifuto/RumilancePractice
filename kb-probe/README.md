@@ -17,13 +17,17 @@ Mod です。自分がプレイヤーを殴った結果として観測される�
 | 相手が無敵時間中 | 殴る時点で `hurtTime > 0` | その殴りは最初から保留しない |
 | 他起因の速度ノイズ | 押し出し方向が攻撃方向と逆/横向き | サンプル却下 |
 | 爆発・KB棒などの特大速度 | 生速度 > 2.5 | 外れ値として集計から除外 |
-| 相手の耐衝撃が高い | 見えているネザライト装備から推定 100% | 水平は計算不能として却下（垂直のみ有効） |
+| 相手の耐衝撃が高い | **実装備の属性コンポーネントを合算**して推定 100% | 水平は計算不能として却下（垂直のみ有効） |
 | 空中の相手 | 殴った瞬間に非接地 | 垂直係数は評価しない（バニラは空中で Y を変えないため） |
 
 ## 測定の仕組み
 
 1. `ClientPlayerInteractionManager#attackEntity` — 自分の殴りを捕捉。攻撃方向（yaw
-   由来）、スプリント状態、持ち物の Knockback エンチャント、相手の接地・装備を記録。
+   由来）、スプリント状態、自分の Knockback エンチャント、相手の接地状態、そして
+   **相手の装備一式（エンチャント・属性コンポーネント込み）** を記録。他プレイヤーの
+   装備は描画のためにサーバーからクライアントへ同期されているので、防具4部位＋両手の
+   アイテム、`generic.knockback_resistance` の属性値、各エンチャントとレベルをすべて
+   読み取れます（初ヒット時にチャットへ一覧表示します）。
 2. `ClientPlayNetworkHandler#onDamage`（EntityDamageS2CPacket）— ヒット成立を確認。
 3. `ClientPlayNetworkHandler#onEntityVelocityUpdate`（EntityVelocityUpdateS2CPacket）—
    ヒット直後に相手へ送られたサーバー決定速度を捕捉。前回パケット値との差分＝
@@ -42,7 +46,7 @@ JDK 21 とネットワーク（Fabric/Mojang の maven へのアクセス）が�
 ```bash
 cd kb-probe
 ../gradlew build        # リポジトリルートの Gradle ラッパーを流用
-# → build/libs/kb-probe-0.1.0.jar
+# → build/libs/kb-probe-0.2.0.jar
 ```
 
 リポジトリルート（プラグイン）のビルドや CI とは完全に分離されています
@@ -51,7 +55,7 @@ cd kb-probe
 ## 導入
 
 1. Fabric Loader 0.16+ の 1.21.1 クライアントを用意
-2. `kb-probe-0.1.0.jar` を `.minecraft/mods/` へ（fabric-api 不要）
+2. `kb-probe-0.2.0.jar` を `.minecraft/mods/` へ（fabric-api 不要）
 3. 計測したいサーバーに入り、アリーナ/デュエル等の **PvP が有効な場所** で
    普通にプレイヤーを殴るだけ。測定は完全受動です。
 
@@ -69,8 +73,11 @@ cd kb-probe
   ように「最終ベクトルにだけ掛ける」実装では垂直も正しく推定できます）。
 - **走り攻撃の加算は近似値**（0.5 固定）として計算に使っています。気になる場合は
   立ち撃ちで測ってください。
-- 相手の耐衝撃は「見えているネザライト装備」からの推定です（属性を持つ防具や
-  スキル系プラグインには対応しません）。
+- 相手の耐衝撃は「同期された装備の属性コンポーネント」から実計算します（ネザライトは
+  もちろん、独自属性アイテムにも対応）。一方で**装備とは別にエンティティへ直接付与される
+  属性**（キット/クラス適用・スキル系プラグイン・コマンド付与など）と、**装備を非表示にする
+  プラグイン**（vanish系など）には対応できません。読み取れた装備は初ヒット時に表示される
+  ので、推定の根拠はその都度確認できます。
 - この Mod は測定結果を自動では送信しません。データはローカルの
   `config/kbprobe.json` にのみ保存されます。
 
@@ -85,3 +92,6 @@ cd kb-probe
   / `packet.getId()/getVelocityX/Y/Z()`
 - `ClientPlayerInteractionManager#attackEntity(PlayerEntity, Entity)`
 - `EnchantmentHelper.getKnockbackBonus(LivingEntity)`
+- 装備系: `LivingEntity#getEquippedStack(EquipmentSlot)`、
+  `DataComponentTypes.ATTRIBUTE_MODIFIERS` / `AttributeModifiersComponent.Entry`、
+  `AttributeModifierSlot` 列挙、`ItemStack#getEnchantments()`
