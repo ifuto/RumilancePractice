@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "package": "com.rumilance.kbprobe.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "AttackHookMixin",
+    "ClientTickMixin",
+    "DamageConfirmMixin",
+    "VelocityCaptureMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

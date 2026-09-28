@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "kbprobe",
+  "version": "0.1.0",
+  "name": "KB Probe",
+  "description": "他サーバーのノックバック係数を実測するクライアントMod。殴った相手へサーバーが送る速度パケットを解析し、KB無効領域（ロビー保護など）では絶対に計測しない。",
+  "authors": ["Rumilance"],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {},
+  "mixins": ["kbprobe.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft": "~1.21.1",
+    "java": ">=21"
+  }
+}

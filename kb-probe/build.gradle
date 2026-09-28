@@ -1,0 +1,35 @@
+plugins {
+    id "java"
+    id "fabric-loom" version "1.7-SNAPSHOT"
+}
+
+group = "com.rumilance"
+version = "0.1.0"
+
+base {
+    archivesName = "kb-probe"
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+    // Fabric 公式テンプレート準拠: Minecraft は UTF-8 のソースを期待する
+    withSourcesJar()
+}
+
+loom {
+    // クライアント専用 Mod。runClient 構成は loom の既定で十分。
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    // fabric-api には依存しない（Mixin + loader のみの最小構成で導入摩擦を下げる）
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = "UTF-8"
+    options.release = 21
+}

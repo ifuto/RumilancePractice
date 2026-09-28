@@ -1,0 +1,12 @@
+// KB Probe — standalone client-mod project.
+// Intentionally NOT included from the repo-root settings.gradle.kts: the plugin CI build
+// never sees this project. Build it on its own:  cd kb-probe && ../gradlew build
+pluginManagement {
+    repositories {
+        maven { url = "https://maven.fabricmc.net/" }
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+rootProject.name = "kb-probe"
