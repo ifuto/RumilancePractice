@@ -95,9 +95,11 @@ final class TabEntryPackets {
     }
 
     /**
-     * Puts the texture property on the profile. Authlib's {@code Property} constructor moved
-     * between server generations (2-arg on ≤1.21.1-era authlib, 3-arg required on current
-     * paperweight dev bundles), so it is invoked reflectively — whichever exists wins.
+     * Puts the texture property on the profile. Fully reflective: the current paperweight dev
+     * bundle no longer exposes the authlib {@code properties.*} classes on the plugin compile
+     * classpath (and older generations shipped constructor shapes 2-arg and 3-arg), so nothing
+     * below compile-Bukkit/Paper-NMS must reference them directly. Any mismatch simply leaves
+     * the filler head-less (default skin).
      */
     private static void attachTexture(GameProfile profile, String value) throws Exception {
         Class<?> propertyClass = Class.forName("com.mojang.authlib.properties.Property");
@@ -111,8 +113,9 @@ final class TabEntryPackets {
                     .getConstructor(String.class, String.class)
                     .newInstance("textures", value);
         }
-        profile.getProperties().put("textures",
-                (com.mojang.authlib.properties.Property) property);
+        Object multimap = GameProfile.class.getMethod("getProperties").invoke(profile);
+        multimap.getClass().getMethod("put", Object.class, Object.class)
+                .invoke(multimap, "textures", property);
     }
 
     /** Adds one filler row to {@code viewer}'s player list at {@code order}. */
