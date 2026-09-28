@@ -184,6 +184,20 @@ public final class LobbyService {
         } else if (hook != null) {
             hook.accept(player);
         }
+        // Fight-grid TAB残留の解消: ロビー帰還のたびに TAB を確実に初期状態へ戻す
+        // (アリーナの列並び・hidden 指定・リスト名がそのまま残るのを防ぐ — 即時 + 2tick後の
+        // 追従で、テレポート/準備系パケットに後塗りされても最終状態がロビー側になる)。
+        java.util.function.Consumer<Player> tabReset = tabResetHook;
+        if (tabReset != null) {
+            tabReset.accept(player);
+            org.bukkit.Bukkit.getScheduler().runTaskLater(
+                    org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(LobbyService.class),
+                    () -> {
+                        if (player.isOnline()) {
+                            tabReset.accept(player);
+                        }
+                    }, 2L);
+        }
     }
 
     private void applySightAfterTeleport(Player player, java.util.function.Consumer<Player> hook) {
@@ -198,6 +212,17 @@ public final class LobbyService {
      */
     public void setSightHook(java.util.function.Consumer<Player> sightHook) {
         this.sightHook = sightHook;
+    }
+
+    private volatile java.util.function.Consumer<Player> tabResetHook;
+
+    /**
+     * Wires the fight-grid TAB reset (called from bootstrap): invoked on every lobby return —
+     * clears arena grid leftovers (hidden entries, list order, list name) and re-applies the
+     * lobby TAB for that viewer. In-match players keep showing in the lobby TAB as before.
+     */
+    public void setTabResetHook(java.util.function.Consumer<Player> tabResetHook) {
+        this.tabResetHook = tabResetHook;
     }
 
     public void setHubInventoryCustomizer(java.util.function.Function<Player, Boolean> customizer) {

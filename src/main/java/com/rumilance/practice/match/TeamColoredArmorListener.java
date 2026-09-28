@@ -8,6 +8,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.player.PlayerItemDamageEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
 /**
@@ -54,6 +55,28 @@ public final class TeamColoredArmorListener implements Listener {
                 continue;
             }
             service.refreshViewer(viewer);
+        }
+    }
+
+    /**
+     * Party-fight leather flicker fix ("ダメージ受けた瞬間革装備じゃなくなるバグ"): the team
+     * leather look is packet-only, but every armor-durability change re-broadcasts the REAL
+     * (undamaged→damaged meta) equipment to viewers, overwriting the fake leather for ~2 ticks
+     * until the refresh pulses re-send it. Freezing armor durability in team matches removes the
+     * overwrite at its source: real items keep their display, packets never fire, and the
+     * packet-only team look stays stable. Side effect is intended: armor does not break in
+     * practice party fights.
+     */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onItemDamage(PlayerItemDamageEvent event) {
+        org.bukkit.inventory.ItemStack item = event.getItem();
+        if (item == null || !service.isInTeamMatch(event.getPlayer())) {
+            return;
+        }
+        String name = item.getType().name();
+        if (name.endsWith("_HELMET") || name.endsWith("_CHESTPLATE") || name.endsWith("_LEGGINGS")
+                || name.endsWith("_BOOTS") || item.getType() == org.bukkit.Material.ELYTRA) {
+            event.setCancelled(true);
         }
     }
 

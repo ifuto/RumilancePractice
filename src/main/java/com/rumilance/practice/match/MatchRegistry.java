@@ -73,6 +73,18 @@ public final class MatchRegistry {
         }
     }
 
+    /**
+     * Detach ONE participant from the player→match index without touching the session itself —
+     * used when an already-eliminated team-match spectator leaves to the lobby mid-fight: the
+     * match keeps running for everyone else (win/re-check ledgers only ever treat them as
+     * eliminated, so removing the index entry does not change the outcome logic).
+     *
+     * @return true when an index entry existed for this player.
+     */
+    public synchronized boolean removePlayer(UUID playerId) {
+        return playerToMatch.remove(playerId) != null;
+    }
+
     public Collection<MatchSession> all() {
         return matches.values();
     }

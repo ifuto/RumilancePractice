@@ -114,6 +114,16 @@ public final class TeamColoredArmorService {
         }
     }
 
+    /** True while the player participates in an ongoing team (party) match. */
+    public boolean isInTeamMatch(Player player) {
+        if (player == null) {
+            return false;
+        }
+        return matchRegistry.byPlayer(player.getUniqueId())
+                .map(com.rumilance.practice.session.MatchSession::isTeamMatch)
+                .orElse(false);
+    }
+
     /** Leaving a match: restore real armor packets and clear glow. */
     public void clearForPlayer(Player player) {
         if (player == null) {

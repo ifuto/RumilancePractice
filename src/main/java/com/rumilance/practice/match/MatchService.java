@@ -479,6 +479,38 @@ public final class MatchService {
     }
 
     /**
+     * Voluntary early exit for an already-eliminated team-match spectator ({@code /hub} while
+     * dead-watching a party fight — the reported "PartyFightで死んだ観戦中に/hubで戻れない").
+     * Only the player→match index entry is detached: the fight itself keeps running untouched —
+     * the death was already processed when they were eliminated (drops spawned, inventory frozen,
+     * win ledgers updated), so leaving now must NOT re-drop, re-run lethal checks, or issue a
+     * disconnect penalty. Spectator-mode teardown on the leaving player is the lobby's normal
+     * job (sendHome resets gamemode/vitals/hotbar).
+     *
+     * @return true when the player WAS an eliminated team spectator and has been released.
+     */
+    public boolean leaveEliminatedTeamSpectator(Player player) {
+        if (player == null || !player.isOnline()) {
+            return false;
+        }
+        MatchSession session = registry.byPlayer(player.getUniqueId()).orElse(null);
+        if (session == null || !session.isTeamMatch() || session.state() != MatchState.ACTIVE) {
+            return false;
+        }
+        if (!session.isEliminated(player.getUniqueId())
+                || player.getGameMode() != org.bukkit.GameMode.SPECTATOR) {
+            return false; // still fighting — the normal "cannot leave during a match" applies
+        }
+        registry.removePlayer(player.getUniqueId());
+        if (spectatorService != null) {
+            spectatorService.revealInWorld(player); // undo the match-time hide for lobby viewers
+        }
+        sendHome(player);
+        stateManager.resetToLobby(player.getUniqueId());
+        return true;
+    }
+
+    /**
      * Hard block on entering a solo duel: currently committed to an active match
      * (FIGHTING/COUNTDOWN/PREPARING) or eliminated from a team match (watching the rest of it).
      */

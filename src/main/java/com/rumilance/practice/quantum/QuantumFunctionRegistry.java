@@ -350,6 +350,20 @@ public final class QuantumFunctionRegistry {
             if (!this.ensuredObjectiveCommands.add(command)) {
                 continue;
             }
+            // Skip dispatching when the objective already exists on the main board (they persist
+            // in the world's scoreboard.dat across restarts): every /reload otherwise printed one
+            // vanilla "An objective already exists by that name" per add-line — the 148-line
+            // console flood reported at startup.
+            String objectiveName = objectiveNameOf(command);
+            try {
+                org.bukkit.scoreboard.Scoreboard board =
+                        org.bukkit.Bukkit.getScoreboardManager().getMainScoreboard();
+                if (objectiveName != null && board.getObjective(objectiveName) != null) {
+                    continue;
+                }
+            } catch (RuntimeException ignored) {
+                // scoreboard unavailable (early boot): fall through and let dispatch report it
+            }
             try {
                 org.bukkit.Bukkit.dispatchCommand(org.bukkit.Bukkit.getConsoleSender(), command);
             } catch (RuntimeException ignored) {
@@ -357,6 +371,12 @@ public final class QuantumFunctionRegistry {
                 // reported by the function compiler/command log; do not abort other instances.
             }
         }
+    }
+
+    /** "scoreboard objectives add <name> <criteria> …" → <name> (null when unparsable). */
+    private static String objectiveNameOf(String command) {
+        String[] parts = command.trim().split("\\s+");
+        return parts.length >= 4 ? parts[3] : null;
     }
 
     private static List<String> instanceInit(QuantumPack pack, QuantumInstance instance) {

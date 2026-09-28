@@ -187,6 +187,9 @@ public final class ItemFlowGuardListener implements Listener {
     }
 
     private boolean ownInventoryLocked(Player player) {
+        if (lobbyOpExempt(player)) {
+            return false;
+        }
         if (inAfkRoom(player.getUniqueId())) {
             return false;
         }
@@ -194,6 +197,16 @@ public final class ItemFlowGuardListener implements Listener {
             return false;
         }
         return PracticeGuards.ownInventoryMoveBlocked(state(player));
+    }
+
+    /**
+     * OP players may freely edit their inventory while in the protected lobby states (reorder
+     * the function hotbar, move/drop/pick up items) — the lounge is theirs anyway. The
+     * exemption is scoped to lobby-ish states only: countdown/spectate/match-adjacent locks
+     * stay in force so an OP account cannot smuggle items into a fight by accident.
+     */
+    private boolean lobbyOpExempt(Player player) {
+        return player.isOp() && PracticeGuards.lobbyProtectedStates(state(player));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -204,6 +217,9 @@ public final class ItemFlowGuardListener implements Listener {
         }
         if (inAfkRoom(player.getUniqueId())) {
             return; // AFK rooms: free item flow, see setAfkExempt
+        }
+        if (lobbyOpExempt(player)) {
+            return;
         }
         if (PracticeGuards.looseItemMoveBlocked(state(player))) {
             event.setCancelled(true);
@@ -221,6 +237,9 @@ public final class ItemFlowGuardListener implements Listener {
         }
         if (inAfkRoom(player.getUniqueId())) {
             return; // AFK rooms: broken blocks must be collectable
+        }
+        if (lobbyOpExempt(player)) {
+            return;
         }
         if (PracticeGuards.looseItemMoveBlocked(state(player))) {
             event.setCancelled(true);

@@ -109,6 +109,13 @@ public final class LobbyCommand implements CommandExecutor {
             return true;
         }
         PlayerState state = stateManager.getState(player.getUniqueId());
+        // Party-fight death bubble: eliminated team spectators (SPECTATOR mode inside an ACTIVE
+        // team match) may /hub out — the fight keeps running for the survivors.
+        if (state == PlayerState.FIGHTING && matchService != null
+                && matchService.leaveEliminatedTeamSpectator(player)) {
+            messageService.send(player, "lobby.teleported");
+            return true;
+        }
         if (state == PlayerState.FIGHTING || state == PlayerState.COUNTDOWN || state == PlayerState.PREPARING_MATCH) {
             player.sendMessage(Component.text("You cannot return to lobby during a match.", NamedTextColor.RED));
             return true;

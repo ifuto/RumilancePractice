@@ -1461,6 +1461,18 @@ public final class FeatureBootstrap {
         tabFightListService.setRankService(rankService);
         tabFightListService.setConfigService(configService);
         tabFightListService.setNameColorService(nameColorService);
+        // TABを毎回リセット: ロビー帰還のたびにアリーナ由来の一覧状態（hidden/列order/名前）を
+        // 解除し、ロビーTABを即時再適用する（試合中の人は従来通りロビーTABにも表示される）。
+        lobbyService.setTabResetHook(player -> {
+            try {
+                tabFightListService.clear(player);
+            } catch (Throwable ignored) {
+            }
+            try {
+                scoreboardService.refreshNow(player);
+            } catch (Throwable ignored) {
+            }
+        });
         scoreboardService.setTabFightListService(tabFightListService);
         // 1v1 polish: i-frame hits still sound like real hits (no mechanic changes).
         com.rumilance.practice.combat.DuelHitSoundService.register(plugin, matchRegistry);
