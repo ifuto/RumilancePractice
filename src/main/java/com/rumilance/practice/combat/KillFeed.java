@@ -186,12 +186,13 @@ public final class KillFeed {
                 .hoverEvent(HoverEvent.showText(hover));
     }
 
-    private static NamedTextColor color(TeamColor team, boolean killer) {
+    private static net.kyori.adventure.text.format.TextColor color(TeamColor team, boolean killer) {
+        // 汎用 UI で標準青 #5555FF は使わない (2026-09-28 ユーザー指示): 明るめの TEAM_BLUE。
         if (team == TeamColor.RED) {
-            return killer ? NamedTextColor.RED : NamedTextColor.BLUE;
+            return killer ? NamedTextColor.RED : com.rumilance.practice.ui.UiColors.TEAM_BLUE;
         }
         if (team == TeamColor.BLUE) {
-            return killer ? NamedTextColor.BLUE : NamedTextColor.RED;
+            return killer ? com.rumilance.practice.ui.UiColors.TEAM_BLUE : NamedTextColor.RED;
         }
         return killer ? NamedTextColor.AQUA : NamedTextColor.RED;
     }

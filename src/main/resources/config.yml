@@ -82,7 +82,7 @@ shield-web:
   # "127.0.0.1" restricts to the server PC itself (Tailscale `serve`/`funnel` still works,
   # because the proxy connects from localhost).
   bind: "0.0.0.0"
-  port: 8765
+  port: 1010
   # true = the plugin announces the SHA-1 of the pack it rebuilt and re-pushes it to everyone
   # (use when resource-pack.json "url" points at THIS server — e.g. the Funnel URL).
   # false = the pack bytes are hosted elsewhere; nothing about the hash is touched.
@@ -159,6 +159,13 @@ match:
   # ordering to avoid kicks; set this to true/false to force it either way. When off, the TAB
   # keeps vanilla order and the players' styled list names during matches.
   tab-columns-enabled: true
+  # Texture of the fake header/blank filler rows in the match TAB grid. Paste any unsigned
+  # base64 "textures" value (the "Value" string of a custom head from minecraft-heads.com —
+  # pick one of their blank / dark / single-dot heads and the little head square at the left
+  # of every filler row blends into the TAB background, the closest to "no head at all" the
+  # vanilla protocol allows; a fully transparent skin always renders as a BLACK head). Leave
+  # empty for the default Steve/Alex head. Live via /rumireload.
+  filler-skin-value: ""
   # In-match action bar content.
   #   score = the pinned scoreline (names + kills / alive counts)  [default]
   #   time  = the elapsed match time in min:sec (e.g. 04:09)

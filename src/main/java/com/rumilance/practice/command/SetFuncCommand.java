@@ -42,7 +42,7 @@ public final class SetFuncCommand implements CommandExecutor, TabCompleter {
             case "ranked" -> FunctionalItemListener.rankedName();
             case "unranked" -> FunctionalItemListener.unrankedName();
             case "ffa" -> Component.text(FunctionalItemListener.stripVariationSelectors("FFA"), NamedTextColor.GREEN);
-            case "ekit" -> Component.text("Edit Kit", NamedTextColor.BLUE);
+            case "ekit" -> Component.text("Edit Kit", com.rumilance.practice.ui.UiColors.TEAM_BLUE);
             case "settings" -> Component.text("Settings", NamedTextColor.YELLOW);
             case "spectate" -> Component.text("Spectate", NamedTextColor.LIGHT_PURPLE);
             case "titles" -> Component.text("Kill Titles", NamedTextColor.AQUA);

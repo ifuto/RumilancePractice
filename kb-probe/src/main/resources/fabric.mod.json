@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "kbprobe",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "name": "KB Probe",
   "description": "他サーバーのノックバック係数を実測するクライアントMod。殴った相手へサーバーが送る速度パケットを解析し、KB無効領域（ロビー保護など）では絶対に計測しない。",
   "authors": ["Rumilance"],

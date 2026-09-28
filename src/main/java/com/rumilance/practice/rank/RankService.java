@@ -21,7 +21,7 @@ import java.util.logging.Level;
 public final class RankService {
 
     private static final TextColor AQUA = NamedTextColor.AQUA;
-    private static final TextColor BLUE = NamedTextColor.BLUE;
+    private static final TextColor BLUE = com.rumilance.practice.ui.UiColors.TEAM_BLUE;
 
     private final Plugin plugin;
     private final RankRepository repository;

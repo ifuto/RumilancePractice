@@ -58,13 +58,7 @@ public final class KbProbe {
     /** 「攻撃無効」「KB無効」通知の再表示間隔（30 秒）。 */
     private static final long NOTICE_COOLDOWN = 600;
 
-    // ---- 測定基準 ---------------------------------------------------------------------
-    /** バニラ基礎ノックバック（強さ）/ 接地時 Y。 */
-    private static final double BASE = 0.4d;
-    /** 押し出しベクトルと攻撃方向の内積の下限（これ未満はノイズ）。 */
-    private static final double DIR_MIN_DOT = 0.2d;
-    /** これ以上の生速度は外れ値（爆発・KB棒・特殊衝撃）として集計から除外。 */
-    private static final double OUTLIER = 2.5d;
+    // ---- 測定基準: 定数と期待値式は KbProbeMath に集約（ゲーム外シミュレーションと同一実装） ----
 
     private static long clientTick;
 
@@ -75,7 +69,7 @@ public final class KbProbe {
         final UUID victimUuid;
         final double dirX, dirZ;
         final boolean targetOnGround;
-        /** 疾走かつ攻撃チャージ済みの一撃（vanilla: +1.0 ノックバックレベル）。 */
+        /** 疾走ヒット（vanilla 1.21.1: チャージ率のゲートは無く、疾走中なら +1.0 ノックバックレベル）。 */
         final boolean sprintHit;
         /** 攻撃者側の attack_knockback 属性値（Knockbackエンチャ等 = 武器属性なので含まれる）。 */
         final double attackKnockback;
@@ -153,8 +147,9 @@ public final class KbProbe {
             return; // 完全に重なっている場合は方向定義不能（vanilla はランダム退避）
         }
         double attackKb = me.getAttributeValue(EntityAttributes.GENERIC_ATTACK_KNOCKBACK);
-        // vanilla: k = knockbackAgainst + (疾走かつチャージ率>0.9 ? 1.0 : 0.0) が 0 超のときだけ誘発が乗る
-        boolean sprintHit = me.isSprinting() && me.getAttackCooldownProgress(0.5f) > 0.9f;
+        // vanilla 1.21.1 実装（ソース検証済）: 疾走ブーにはチャージ率>0.9 のゲートは無い。
+        // 生粋の疾走ヒット = 疾走中に attack → ノックバックレベルに +1.0 で合成される。
+        boolean sprintHit = me.isSprinting();
         GearInfo gear = analyzeGear(victim);
         PendingHit hit = new PendingHit(clientTick, victim.getUuid(), dx / len, dz / len,
                 victim.isOnGround(), sprintHit, attackKb, gear.resistance(), gear.summary());
@@ -249,17 +244,17 @@ public final class KbProbe {
         // 静止ベースラインガード: vanilla 式は「現在速度/2 + 強さ」の混合なので、動いている
         // 相手だと外部係数が掛かる範囲（衝撃分だけか全体か）が一意に定まらない。クリーンな
         // 静止サンプルのみ採用する。水平 0.06（歩行速度の約半分）/ 垂直 0.1 未満で静止とみなす。
-        if (Math.hypot(current.x, current.z) > 0.06d || Math.abs(current.y) > 0.1d) {
+        if (!KbProbeMath.isIdle(current.x, current.y, current.z)) {
             return;
         }
 
         double hRaw = Math.hypot(dx, dz);
         // 方向ガード: KB は攻撃者→被害者へ押し出すはず。逆向き/横向きの速度は他起因のノイズ
-        if (hRaw > 1.0e-4 && (dx * hit.dirX + dz * hit.dirZ) / hRaw < DIR_MIN_DOT) {
+        if (!KbProbeMath.directionOk(dx, dz, hit.dirX, hit.dirZ, hRaw)) {
             return;
         }
         // 外れ値ガード: 想定外の巨大速度は係数推定の母集団に入れない
-        if (hRaw > OUTLIER || Math.abs(dy) > OUTLIER) {
+        if (KbProbeMath.outlier(hRaw, dy)) {
             return;
         }
         // 耐衝撃ガード: 相手の推定耐衝撃が 1.0 以上なら水平は常に 0 → 計算不能
@@ -282,13 +277,12 @@ public final class KbProbe {
         //          Δh += (0.2 + 0.5k)(1−r) − 0.4(1−r)… 正確には最終 Δh = (0.2+0.5k)(1−r)）
         //   垂直（接地・静止）: Δy = min(0.4, Δh)（各段で min(0.4, vy/2+s) が合成される結果と一致）
         double k = hit.knockbackLevel();
-        double mult = 1.0d - hit.resistance;
-        double expectH = (k > 0.0d ? 0.2d + 0.5d * k : BASE) * mult;
+        double expectH = KbProbeMath.expectHorizontal(k, hit.resistance);
         double fH = hRaw / expectH;
         stats.addHorizontal(hRaw, fH);
         Double fV = null;
         if (hit.targetOnGround) {
-            double expectV = Math.min(0.4d, expectH);
+            double expectV = KbProbeMath.expectVertical(k, hit.resistance);
             if (expectV > 1.0e-4) {
                 fV = dy / expectV;
                 stats.addVertical(dy, fV);

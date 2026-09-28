@@ -85,6 +85,9 @@ public final class MatchTeamVisuals {
             // Classic two-side fights keep their exact red/blue shades; extra team colors
             // use their own team colour.
             NamedTextColor named = color == TeamColor.RED ? NamedTextColor.RED
+                    // NOTE: scoreboard-team colours are the legacy 16 by protocol (the
+                    // SetPlayerTeam colour field), so the above-head/glow name keeps the
+                    // named blue here — the richer UI spots use UiColors.TEAM_BLUE instead.
                     : color == TeamColor.BLUE ? NamedTextColor.BLUE
                     : color.textColor();
             Team fight = team(board, fightName(color, onlinePlayer.getName()), named, ff);

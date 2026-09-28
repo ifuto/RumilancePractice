@@ -108,3 +108,13 @@ cd kb-probe
 - 装備系: `LivingEntity#getEquippedStack(EquipmentSlot)`、
   `DataComponentTypes.ATTRIBUTE_MODIFIERS` / `AttributeModifiersComponent.Entry`、
   `AttributeModifierSlot` 列挙、`ItemStack#getEnchantments()`
+
+## 変更履歴
+
+- **0.3.1** — 徹底監査（vanilla 1.21.1 正確モデルとの照合 + 実測シミュレーション `sim/KbProbeSim.java`）で2件修正:
+  1. **速度パケットの単位（致命的）**: `getVelocityX/Y/Z()` は `速度×8000` の生 int。
+     そのまま比較すると全サンプルが外れ値ガード (>2.5) に捌かれ、mod が一切計測できなかった。
+     `/8000`（`KbProbeMath.unscaleVelocity`）を挟んで正規化（実証: 捨てられる vs 記録される）。
+  2. **疾走ヒット判定**: 旧コードはチャージ率>0.9 も要求していたが vanilla 1.21.1 の
+     疾走ノックバックには当該ゲートは無い（検証済）。素の疾走中 attack で +1.0 に変更。
+  また式・閾値を `KbProbeMath`（MC非依存）に集約し、本番コードとシミュレータで同一実装を共有。

@@ -35,7 +35,7 @@ public final class CheckIdCommand implements CommandExecutor {
                                 .append(Component.text("  ", NamedTextColor.DARK_GRAY))
                                 .append(Component.text(entry.player1(), NamedTextColor.RED))
                                 .append(Component.text(" vs ", NamedTextColor.GRAY))
-                                .append(Component.text(entry.player2(), NamedTextColor.BLUE))),
+                                .append(Component.text(entry.player2(), com.rumilance.practice.ui.UiColors.TEAM_BLUE))),
                 () -> sender.sendMessage(Component.text("No duel with that ID.", NamedTextColor.RED)));
         return true;
     }

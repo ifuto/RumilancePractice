@@ -36,14 +36,29 @@ import java.util.UUID;
  */
 final class TabEntryPackets {
 
-    /** Ping drawn on filler rows: one bar. A negative value would draw the "no connection" icon. */
-    private static final int FILLER_LATENCY = 1000;
+    /** Ping drawn on filler rows: 0 ms — 埋め行を実プレイヤーと同じ緑バー扱いにする（user request 2026-09-28）。 */
+    private static final int FILLER_LATENCY = 0;
     /**
      * Profile name of a filler entry. The client renders the display name and the list order
      * decides the position, so the name is never used — TAB sends an empty one for the same
      * reason (it must not leak into chat completion as a fake player).
      */
     private static final String FILLER_NAME = "";
+
+    /**
+     * Optional texture property for the filler head (base64 of the standard unsigned
+     * {@code {"textures":{"SKIN":{"url":"http://textures.minecraft.net/texture/…"}}}} JSON).
+     * Set it to a blank/solid-dark skin and the head square in the TAB list blends into the
+     * list background — that is the closest to "headless" the vanilla protocol allows
+     * (a fully-transparent skin renders BLACK first-layer pixels, never invisible).
+     * Empty constant = fall back to the default Steve/Alex head.
+     */
+    private static volatile String fillerSkinValue = "";
+
+    /** Setter from config ({@code tab-fight.filler-skin-value}): any unsigned texture value. */
+    public static void setFillerSkinValue(String value) {
+        fillerSkinValue = value == null ? "" : value.trim();
+    }
 
     private static volatile Boolean available;
 
@@ -65,11 +80,26 @@ final class TabEntryPackets {
         return Boolean.TRUE.equals(available);
     }
 
+    /** The filler profile: blank name; carries the configured (usually blank) skin, if any. */
+    private static GameProfile fillerProfile(UUID id) {
+        GameProfile profile = new GameProfile(id, FILLER_NAME);
+        String value = fillerSkinValue;
+        if (!value.isEmpty()) {
+            try {
+                profile.getProperties().put("textures",
+                        new com.mojang.authlib.properties.Property("textures", value));
+            } catch (Throwable ignored) {
+                // A malformed value must never break the whole layout — just send without skin.
+            }
+        }
+        return profile;
+    }
+
     /** Adds one filler row to {@code viewer}'s player list at {@code order}. */
     static void add(Player viewer, UUID id, Component display, int order) {
         ClientboundPlayerInfoUpdatePacket.Entry entry = new ClientboundPlayerInfoUpdatePacket.Entry(
                 id,
-                new GameProfile(id, FILLER_NAME),
+                fillerProfile(id),
                 true,
                 FILLER_LATENCY,
                 GameType.SURVIVAL,

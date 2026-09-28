@@ -94,7 +94,7 @@ public final class ShieldWebService implements ShieldWebServer.Api {
             return;
         }
         String bind = configService.config().getString("shield-web.bind", "0.0.0.0");
-        int port = configService.config().getInt("shield-web.port", 8765);
+        int port = configService.config().getInt("shield-web.port", 1010);
         boolean allowExternal = configService.config()
                 .getBoolean("shield-web.admin-allow-external", false);
         try {

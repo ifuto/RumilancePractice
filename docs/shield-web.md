@@ -9,7 +9,7 @@
 [ブラウザ] ドロップで盾PNGをアップ → プレイヤー名を入れて「紐づけ」
      │
      ▼
-[プラグイン内蔵HTTP :8765]  PNG検証/リサイズ → pack-srcへ注入 → zip再構築(決定的) → SHA-1更新
+[プラグイン内蔵HTTP :1010]  PNG検証/リサイズ → pack-srcへ注入 → zip再構築(決定的) → SHA-1更新
      │                                          │
      ├─ /pack.zip  …… プレイヤーへ再送(即時) ◄───┤
      └─ /admin     …… 管理UI(トークン+LAN限定)
@@ -22,17 +22,17 @@
    shield-web:
      enabled: true
      bind: "0.0.0.0"      # LANやTailscaleからも管理したい。同一PCのみなら "127.0.0.1"
-     port: 8765
+     port: 1010
      manage-pack-hash: true
      admin-allow-external: false
    ```
 2. サーバー再起動（`/rumireload` はHTTPサーバーを再開させない点に注意）。
 3. コンソール or ゲーム内OPで `/urank web` → **管理URL+トークン** が出る:
    ```
-   管理画面: http://localhost:8765/admin?token=<64hex>
+   管理画面: http://localhost:1010/admin?token=<64hex>
    ```
    そのURLをサーバーPCのブラウザで開くだけ。LAN内の別PCからは
-   `http://<サーバーPCのIP>:8765/admin?token=<同じトークン>`。
+   `http://<サーバーPCのIP>:1010/admin?token=<同じトークン>`。
 
 ## プレイヤーへのパック配布（外部公開したい場合）
 
@@ -43,7 +43,7 @@
 
 ```bash
 # サーバーPCで（Tailscale導入済みなら1行）
-tailscale funnel --bg 8765
+tailscale funnel --bg 1010
 tailscale funnel status   # → https://<マシン名>.<テールネット>.ts.net が払い出される
 ```
 
@@ -59,7 +59,7 @@ tailscale funnel status   # → https://<マシン名>.<テールネット>.ts.n
 
 ### LAN運営の場合
 
-`url`: `http://<サーバーPCのIP>:8765/pack.zip`（例: `http://192.168.1.20:8765/pack.zip`）。
+`url`: `http://<サーバーPCのIP>:1010/pack.zip`（例: `http://192.168.1.20:1010/pack.zip`）。
 LANのプレイヤーはこれで受け取れます。従来のGitHub Release配布に戻したいときは元のURLに戻すだけです。
 
 ## Web画面の操作
@@ -120,11 +120,11 @@ LANのプレイヤーはこれで受け取れます。従来のGitHub Release配
 
 | 症状 | 対処 |
 |---|---|
-| `起動できませんでした（port 8765 が使用中?）` | 他アプリがポートを占有。`shield-web.port` を変えるか相手を止める |
+| `起動できませんでした（port 1010 が使用中?）` | 他アプリがポートを占有。`shield-web.port` を変えるか相手を止める |
 | 管理画面は開けるがプレイヤーに届かない | `resource-pack.json` の `url` がこのサーバー（or Funnel）を向いているか、`manage-pack-hash: true` かを確認 |
 | 画像は入ったが盾がバニラのまま | 紐づけされていない（stateのholdersを確認）。**パックの再DL中は旧バッジのまま** — 数秒待って切り替わる |
 | 外部から `403` | `admin-allow-external: true` は最終手段。Tailscale (100.x) 経由なら既定のまま通ります |
-| 配布しているzipを人がダウンロードして中身を見たい | `http://<host>:8765/pack.zip` をブラウザで直接開けば取れる（誰でもOK＝設計どおり） |
+| 配布しているzipを人がダウンロードして中身を見たい | `http://<host>:1010/pack.zip` をブラウザで直接開けば取れる（誰でもOK＝設計どおり） |
 
 データはすべて `plugins/n-arena/shield-web/` 配下(`pack-src/`・`pack.zip`・`shields.json`・`token.txt`)。
 紐づけは従来どおり `hidden_ranks.yml`（`/urank` 系と同じ保存先）。

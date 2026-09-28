@@ -1,6 +1,7 @@
 package com.rumilance.kbprobe.mixin;
 
 import com.rumilance.kbprobe.KbProbe;
+import com.rumilance.kbprobe.KbProbeMath;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.network.packet.s2c.play.EntityVelocityUpdateS2CPacket;
 import org.spongepowered.asm.mixin.Mixin;
@@ -18,7 +19,11 @@ public abstract class VelocityCaptureMixin {
 
     @Inject(method = "onEntityVelocityUpdate", at = @At("HEAD"))
     private void kbprobe$onVelocity(EntityVelocityUpdateS2CPacket packet, CallbackInfo ci) {
+        // 重要: 速度パケットの3成分は int (vel*8000)。そのまま渡すと ×8000 の値が
+        // 外れ値ガード(>2.5)に全て捌かれ、modが一切計測不能になる (修正: 0.3.1)。
         KbProbe.onVelocityPacket(packet.getId(),
-                packet.getVelocityX(), packet.getVelocityY(), packet.getVelocityZ());
+                KbProbeMath.unscaleVelocity(packet.getVelocityX()),
+                KbProbeMath.unscaleVelocity(packet.getVelocityY()),
+                KbProbeMath.unscaleVelocity(packet.getVelocityZ()));
     }
 }

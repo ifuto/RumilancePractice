@@ -235,6 +235,6 @@ public final class FunctionalItemListener implements Listener {
     }
 
     public static Component unrankedName() {
-        return Component.text("⚔ Unranked Queue ⚔", NamedTextColor.BLUE);
+        return Component.text("⚔ Unranked Queue ⚔", com.rumilance.practice.ui.UiColors.TEAM_BLUE);
     }
 }

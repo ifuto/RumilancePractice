@@ -158,6 +158,11 @@ public final class TabFightListService {
         if (padsBroken || !columnsEnabled()) {
             return false;
         }
+        com.rumilance.practice.config.ConfigService service = configService;
+        if (service != null) {
+            // Live-synced so /rumireload applies it without a restart.
+            TabEntryPackets.setFillerSkinValue(service.config().getString("match.filler-skin-value", ""));
+        }
         boolean usable;
         try {
             usable = TabEntryPackets.available();
@@ -550,23 +555,14 @@ public final class TabFightListService {
     }
 
     private static TextColor teamColor(TeamColor color) {
-        return color == null ? NamedTextColor.WHITE : TextColor.color(color.leatherColor().asRGB());
+        // 2026-09-28: TAB では革装備より濃いチーム色を避け、明るい統一パレットを使う
+        // (旧 leatherColor = 0xC62828/0x1565C0 は「色濃い」との指摘)。
+        return com.rumilance.practice.ui.UiColors.textOf(color);
     }
 
     /** Faded team colour of the death row's dot (the sample greys the whole row). */
     private static TextColor fadedTeamColor(TeamColor color) {
-        if (color == null) {
-            return DEATH_COLOR;
-        }
-        int rgb = color.leatherColor().asRGB();
-        int red = fade((rgb >> 16) & 0xFF);
-        int green = fade((rgb >> 8) & 0xFF);
-        int blue = fade(rgb & 0xFF);
-        return TextColor.color((red << 16) | (green << 8) | blue);
-    }
-
-    private static int fade(int channel) {
-        return channel + (255 - channel) * 55 / 100;
+        return color == null ? DEATH_COLOR : com.rumilance.practice.ui.UiColors.fadedOf(color);
     }
 
     private static void appendTeams(List<Member> target, List<Member> source) {
