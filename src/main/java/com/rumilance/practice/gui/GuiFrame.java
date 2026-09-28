@@ -55,71 +55,36 @@ public final class GuiFrame {
         return inventory.getSize() / GuiSlots.ROW_SIZE;
     }
 
-    /** Clears the whole inventory, then draws the full-perimeter theme frame. */
+    /**
+     * PERIMETER FRAMES WERE ABOLISHED on 2026-09-28 (user decision: "板ガラスの枠廃止" — they
+     * both ate usable slots and didn't look especially good, and some screens suffered pane/
+     * content collisions). The methods below keep their names and their "clear before render"
+     * contract so callers do not change; they simply no longer paint any glass.
+     */
+    /** Clears the whole inventory (was: full-perimeter theme frame). */
     public static Inventory frame(Inventory inventory, Theme theme) {
         inventory.clear();
-        ItemStack pane = ItemBuilder.hiddenFill(theme.pane);
-        int rows = rows(inventory);
-        for (int col = 0; col < GuiSlots.ROW_SIZE; col++) {
-            inventory.setItem(GuiSlots.slot(0, col), pane);
-            if (rows >= 2) {
-                inventory.setItem(GuiSlots.slot(rows - 1, col), pane);
-            }
-        }
-        for (int row = 1; row < rows - 1; row++) {
-            inventory.setItem(GuiSlots.slot(row, 0), pane);
-            inventory.setItem(GuiSlots.slot(row, GuiSlots.ROW_SIZE - 1), pane);
-        }
         return inventory;
     }
 
-    /**
-     * Frame for editors whose LAST row belongs to the player content (e.g. the kit editor's
-     * player-inventory strip): border on top + sides only.
-     */
+    /** Clears the whole inventory (was: top+sides frame for editors). */
     public static Inventory frameOpenBottom(Inventory inventory, Theme theme) {
         inventory.clear();
-        ItemStack pane = ItemBuilder.hiddenFill(theme.pane);
-        int rows = rows(inventory);
-        for (int col = 0; col < GuiSlots.ROW_SIZE; col++) {
-            inventory.setItem(GuiSlots.slot(0, col), pane);
-        }
-        for (int row = 1; row < rows; row++) {
-            inventory.setItem(GuiSlots.slot(row, 0), pane);
-            inventory.setItem(GuiSlots.slot(row, GuiSlots.ROW_SIZE - 1), pane);
-        }
         return inventory;
     }
 
-    /**
-     * Frame for screens whose TOP row carries content (e.g. the kit preview's armor bar):
-     * border on the bottom + sides only.
-     */
+    /** Clears the whole inventory (was: bottom+sides frame for top-content screens). */
     public static Inventory frameOpenTop(Inventory inventory, Theme theme) {
         inventory.clear();
-        ItemStack pane = ItemBuilder.hiddenFill(theme.pane);
-        int rows = rows(inventory);
-        int lastRow = rows - 1;
-        for (int col = 0; col < GuiSlots.ROW_SIZE; col++) {
-            inventory.setItem(GuiSlots.slot(lastRow, col), pane);
-        }
-        for (int row = 0; row < lastRow; row++) {
-            inventory.setItem(GuiSlots.slot(row, 0), pane);
-            inventory.setItem(GuiSlots.slot(row, GuiSlots.ROW_SIZE - 1), pane);
-        }
         return inventory;
     }
 
-    /**
-     * Free-edit screens (rows of player-editable slots): only the bottom bar is framed; the
-     * rest stays fully editable. Controls are placed on the bar afterwards.
-     */
+    /** Clears the last row so controls land on a clean strip (was: pane bar + controls). */
     public static Inventory bottomBar(Inventory inventory, Theme theme) {
-        ItemStack pane = ItemBuilder.hiddenFill(theme.pane);
         int lastRow = rows(inventory) - 1;
         if (lastRow >= 0) {
             for (int col = 0; col < GuiSlots.ROW_SIZE; col++) {
-                inventory.setItem(GuiSlots.slot(lastRow, col), pane);
+                inventory.clear(GuiSlots.slot(lastRow, col));
             }
         }
         return inventory;

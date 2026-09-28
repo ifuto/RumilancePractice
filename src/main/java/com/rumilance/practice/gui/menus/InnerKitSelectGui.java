@@ -228,21 +228,21 @@ public final class InnerKitSelectGui extends AbstractGui {
      * One child kit. The folder's {@code default-child} carries the {@code [Default]} badge: it is
      * what the parent's own tile fights with, and what Queue always uses.
      */
+    /**
+     * One child kit (2026-09-28 slimmed: the earlier divider/badge/ID/origin lore stack made
+     * the list unreadable for players). Now: name (with the [Default] badge when applicable)
+     * + a single status line; selection glint marks the current choice, as on every other
+     * kit list.
+     */
     private ItemStack childTile(Player player, GuiSession session, KitDefinition child,
                                 boolean isDefault, boolean selected) {
         Material icon = Material.matchMaterial(child.icon());
         String label = child.prettyDisplayName()
                 + (isDefault ? " " + InnerKitService.DEFAULT_BADGE : "");
-        List<Component> lore = new ArrayList<>(List.of(
-                UiTheme.divider(),
-                UiTheme.line(line(player, originLoreKey(session)))));
+        List<Component> lore = new ArrayList<>();
         if (isDefault) {
-            lore.add(UiTheme.blank());
             lore.add(UiTheme.status(line(player, "gui.innerkit-default-lore"), UiTheme.SUCCESS));
         }
-        lore.add(UiTheme.blank());
-        lore.add(UiTheme.labelValue(line(player, "gui.innerkit-id-label"), child.name()));
-        lore.add(UiTheme.blank());
         lore.add(selected
                 ? UiTheme.status(line(player, "gui.kit-selected"), UiTheme.SUCCESS)
                 : UiTheme.hint(line(player, "gui.innerkit-click-select")));
@@ -258,21 +258,6 @@ public final class InnerKitSelectGui extends AbstractGui {
                 .glint(selected)
                 .action("pick:" + child.name())
                 .build();
-    }
-
-    /** One hint line per origin, so the list says what the click will do. */
-    private String originLoreKey(GuiSession session) {
-        String origin = session.get(ORIGIN_KEY, String.class);
-        if (ORIGIN_TEAM.equals(origin)) {
-            return "gui.innerkit-team-lore";
-        }
-        if (ORIGIN_EDIT.equals(origin)) {
-            return "gui.innerkit-edit-lore";
-        }
-        if (ORIGIN_VIEW.equals(origin)) {
-            return "gui.kit-view-only";
-        }
-        return "gui.innerkit-duel-lore";
     }
 
     @Override
