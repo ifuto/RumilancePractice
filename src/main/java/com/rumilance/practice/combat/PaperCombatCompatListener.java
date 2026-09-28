@@ -176,12 +176,13 @@ public final class PaperCombatCompatListener implements Listener {
     }
 
     private void applyVanillaMeleeKnockback(Player victim, Player attacker) {
-        // Reproduce LivingEntity#knockback exactly:
-        //   dir = normalised position from attacker to victim (pushes the victim AWAY),
-        //   base melee knockback strength 0.4, plus a Player#attack extra when sprinting and
-        //   per Knockback-enchant level; horizontal impulse scales with knockback resistance
-        //   (so netherite with no resistance attribute = full, resistance potion/attribute =
-        //   reduced), grounded targets get the vanilla 0.4 upward hop.
+        // Reproduce vanilla 1.21.1 knockback exactly (verified against LivingEntity#takeKnockback
+        //   / #damage + PlayerEntity#attack decompiled sources):
+        //   dir = normalised attacker→victim (pushes the victim AWAY), base impulse 0.4 from
+        //   LivingEntity#damage, plus a Player#attack impulse k·0.5 where k = attack_knockback
+        //   attribute (Knockback enchant = 1/level) + 1 for a charged sprint hit; every impulse
+        //   is scaled by (1 − knockback_resistance) and grounded vertical is the vanilla
+        //   min(0.4, vy/2 + strength), never a fixed 0.4.
         double dx = victim.getLocation().getX() - attacker.getLocation().getX();
         double dz = victim.getLocation().getZ() - attacker.getLocation().getZ();
         double horizontal = Math.sqrt(dx * dx + dz * dz);
@@ -211,16 +212,19 @@ public final class PaperCombatCompatListener implements Listener {
         }
     }
 
-    /** One LivingEntity#knockback step: halve current horizontal speed, add directional impulse, hop if grounded. */
+    /**
+     * One LivingEntity#takeKnockback step (verified against vanilla 1.21.1 sources):
+     * horizontal: newV = currentV/2 ± strength·dir (impulse magnitude == strength, CALLERS
+     * already folded the (1 − knockback_resistance) scale into `strength`);
+     * vertical: grounded → min(0.4, currentVy/2 + strength), airborne → untouched.
+     */
     private void applyKnockbackBody(Player victim, double unitX, double unitZ, double strength) {
         Vector vel = victim.getVelocity();
-        double impulse = strength * 0.5d;
-        double newX = vel.getX() * 0.5d + unitX * impulse;
-        double newZ = vel.getZ() * 0.5d + unitZ * impulse;
+        double newX = vel.getX() * 0.5d + unitX * strength;
+        double newZ = vel.getZ() * 0.5d + unitZ * strength;
         double newY = vel.getY();
-        // LivingEntity#knockbackStrength: grounded targets get the fixed vertical hop.
         if (victim.isOnGround()) {
-            newY = 0.4d;
+            newY = Math.min(0.4d, vel.getY() * 0.5d + strength);
         }
         // バニラ再現の完成ベクトルに、運用者係数だけを乗せる（計算式には触れない）。
         // compatのノックバックは近接攻撃由来なので Cause は ENTITY_ATTACK として解釈する。

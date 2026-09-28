@@ -6,15 +6,16 @@ import net.minecraft.client.network.ServerInfo;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.AttributeModifiersComponent;
-import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.attribute.EntityAttributeModifier;
+import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.text.Text;
+import net.minecraft.util.math.Vec3d;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -73,23 +74,31 @@ public final class KbProbe {
         boolean sampled;
         final UUID victimUuid;
         final double dirX, dirZ;
-        final boolean targetOnGround, sprint;
-        final int enchant;
+        final boolean targetOnGround;
+        /** 疾走かつ攻撃チャージ済みの一撃（vanilla: +1.0 ノックバックレベル）。 */
+        final boolean sprintHit;
+        /** 攻撃者側の attack_knockback 属性値（Knockbackエンチャ等 = 武器属性なので含まれる）。 */
+        final double attackKnockback;
         final double resistance;
         /** 読み取れた対象の装備概要（エンチャント込み）。空文字 = 装備なし/非表示。 */
         final String gearSummary;
 
         PendingHit(long hitTick, UUID victimUuid, double dirX, double dirZ, boolean targetOnGround,
-                   boolean sprint, int enchant, double resistance, String gearSummary) {
+                   boolean sprintHit, double attackKnockback, double resistance, String gearSummary) {
             this.hitTick = hitTick;
             this.victimUuid = victimUuid;
             this.dirX = dirX;
             this.dirZ = dirZ;
             this.targetOnGround = targetOnGround;
-            this.sprint = sprint;
-            this.enchant = enchant;
+            this.sprintHit = sprintHit;
+            this.attackKnockback = attackKnockback;
             this.resistance = resistance;
             this.gearSummary = gearSummary;
+        }
+
+        /** vanilla の攻撃ノックバックレベル k = 属性 + (疾走ヒット 1.0)。 */
+        double knockbackLevel() {
+            return attackKnockback + (sprintHit ? 1.0d : 0.0d);
         }
     }
 
@@ -102,8 +111,6 @@ public final class KbProbe {
 
     /** entityId → 保留中の自前ヒット。 */
     private static final Map<Integer, PendingHit> PENDING = new HashMap<>();
-    /** entityId → 直近に受信した速度パケットの値（サーバー目線の前回速度）。 */
-    private static final Map<Integer, double[]> LAST_VELOCITY = new HashMap<>();
     /** entityId → 最後にサンプルを採った tick。 */
     private static final Map<Integer, Long> LAST_SAMPLED = new HashMap<>();
     /** 装備概要を表示済みの対象（ワールド内で1回だけ出すスパム防止）。 */
@@ -137,14 +144,20 @@ public final class KbProbe {
         if (victim.hurtTime > 0) {
             return;
         }
-        // ノックバックの押し出し方向は「攻撃者の yaw」由来（vanilla: sin(yaw), -cos(yaw)）
-        float yawRad = (float) Math.toRadians(me.getYaw());
-        double dirX = Math.sin(yawRad);
-        double dirZ = -Math.cos(yawRad);
-        int enchant = EnchantmentHelper.getKnockbackBonus(me);
+        // 押し出し方向は「攻撃者 → 被害者」（vanilla 1.21.1 の damage(): d=src.getX()-this.getX()
+        // を takeKnockback し内部で減算 → 被害者は攻撃者から遠ざかる方向へ飛ぶ）
+        double dx = victim.getX() - me.getX();
+        double dz = victim.getZ() - me.getZ();
+        double len = Math.hypot(dx, dz);
+        if (len < 1.0e-4) {
+            return; // 完全に重なっている場合は方向定義不能（vanilla はランダム退避）
+        }
+        double attackKb = me.getAttributeValue(EntityAttributes.GENERIC_ATTACK_KNOCKBACK);
+        // vanilla: k = knockbackAgainst + (疾走かつチャージ率>0.9 ? 1.0 : 0.0) が 0 超のときだけ誘発が乗る
+        boolean sprintHit = me.isSprinting() && me.getAttackCooldownProgress(0.5f) > 0.9f;
         GearInfo gear = analyzeGear(victim);
-        PendingHit hit = new PendingHit(clientTick, victim.getUuid(), dirX, dirZ, victim.isOnGround(),
-                me.isSprinting(), enchant, gear.resistance(), gear.summary());
+        PendingHit hit = new PendingHit(clientTick, victim.getUuid(), dx / len, dz / len,
+                victim.isOnGround(), sprintHit, attackKb, gear.resistance(), gear.summary());
         PENDING.put(victim.getId(), hit);
     }
 
@@ -158,7 +171,6 @@ public final class KbProbe {
 
     /** ClientPlayNetworkHandler#onEntityVelocityUpdate の HEAD から呼ばれる: 生速度の捕捉。 */
     public static void onVelocityPacket(int entityId, double vx, double vy, double vz) {
-        double[] prev = LAST_VELOCITY.put(entityId, new double[]{vx, vy, vz});
         PendingHit hit = PENDING.get(entityId);
         if (hit == null || hit.sampled || hit.confirmTick < 0L) {
             return;
@@ -166,11 +178,22 @@ public final class KbProbe {
         if (clientTick - hit.confirmTick > MOTION_WINDOW) {
             return;
         }
+        // ベースラインは「過去の速度パケット」では読めない（速度パケットは衝撃時のみ → 古い）。
+        // クライアントは対象エンティティの動きを tick ごとに再シミュレーションしているので、
+        // HEAD 時点（= vanilla が新速度を適用する直前）のローカル速度が最も正確な現在速度。
+        Vec3d current = null;
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc.world != null) {
+            Entity entity = mc.world.getEntityById(entityId);
+            if (entity != null) {
+                current = entity.getVelocity();
+            }
+        }
+        if (current == null) {
+            return;
+        }
         hit.sampled = true;
-        double baseX = prev != null ? prev[0] : 0.0d;
-        double baseY = prev != null ? prev[1] : 0.0d;
-        double baseZ = prev != null ? prev[2] : 0.0d;
-        recordSample(hit, entityId, vx - baseX, vy - baseY, vz - baseZ);
+        recordSample(hit, entityId, current, vx - current.x, vy - current.y, vz - current.z);
     }
 
     /** MinecraftClient#tick の TAIL から呼ばれる: タイムアウト処理と状態の清掃。 */
@@ -180,7 +203,6 @@ public final class KbProbe {
         if (mc.world != lastWorld) {
             // ワールド/サーバー移動: 保留・速度キャッシュを全破棄し、統計を永続化
             PENDING.clear();
-            LAST_VELOCITY.clear();
             LAST_SAMPLED.clear();
             GEAR_ANNOUNCED.clear();
             lastWorld = mc.world;
@@ -220,12 +242,19 @@ public final class KbProbe {
     // 測定処理
     // ----------------------------------------------------------------------------------
 
-    private static void recordSample(PendingHit hit, int entityId,
+    private static void recordSample(PendingHit hit, int entityId, Vec3d current,
                                      double dx, double dy, double dz) {
         LAST_SAMPLED.put(entityId, clientTick);
-        double hRaw = Math.hypot(dx, dz);
 
-        // 方向ガード: KB は攻撃方向へ押し出すはず。逆向き/横向きの速度は他起因のノイズ
+        // 静止ベースラインガード: vanilla 式は「現在速度/2 + 強さ」の混合なので、動いている
+        // 相手だと外部係数が掛かる範囲（衝撃分だけか全体か）が一意に定まらない。クリーンな
+        // 静止サンプルのみ採用する。水平 0.06（歩行速度の約半分）/ 垂直 0.1 未満で静止とみなす。
+        if (Math.hypot(current.x, current.z) > 0.06d || Math.abs(current.y) > 0.1d) {
+            return;
+        }
+
+        double hRaw = Math.hypot(dx, dz);
+        // 方向ガード: KB は攻撃者→被害者へ押し出すはず。逆向き/横向きの速度は他起因のノイズ
         if (hRaw > 1.0e-4 && (dx * hit.dirX + dz * hit.dirZ) / hRaw < DIR_MIN_DOT) {
             return;
         }
@@ -247,18 +276,26 @@ public final class KbProbe {
         }
 
         ServerStats stats = StatsStore.statsFor(serverKey());
-        // 期待強さ = 基礎0.4 + KBエンチャント(0.5/lv) + 走り攻撃加算(近似 0.5)
-        double strength = BASE + 0.5d * hit.enchant + (hit.sprint ? 0.5d : 0.0d);
-        double fH = hRaw / (strength * (1.0d - hit.resistance));
+        // vanilla 1.21.1 正確モデル（ソース検証済み）:
+        //   1段目: damage() → takeKnockback(0.4)（静止標的: Δh = 0.4(1−r)）
+        //   2段目: attack() → k>0 のとき takeKnockback(k*0.5)（1段目の速度を更に半減合成:
+        //          Δh += (0.2 + 0.5k)(1−r) − 0.4(1−r)… 正確には最終 Δh = (0.2+0.5k)(1−r)）
+        //   垂直（接地・静止）: Δy = min(0.4, Δh)（各段で min(0.4, vy/2+s) が合成される結果と一致）
+        double k = hit.knockbackLevel();
+        double mult = 1.0d - hit.resistance;
+        double expectH = (k > 0.0d ? 0.2d + 0.5d * k : BASE) * mult;
+        double fH = hRaw / expectH;
         stats.addHorizontal(hRaw, fH);
-        // 垂直は「接地していた相手」のみ有効（空中ではバニラは Y を変えない）
         Double fV = null;
         if (hit.targetOnGround) {
-            fV = dy / BASE;
-            stats.addVertical(dy, fV);
+            double expectV = Math.min(0.4d, expectH);
+            if (expectV > 1.0e-4) {
+                fV = dy / expectV;
+                stats.addVertical(dy, fV);
+            }
         }
         StatsStore.save();
-        announceSample(hRaw, fH, hit.targetOnGround ? dy : null, fV, stats);
+        announceSample(hRaw, fH, hit.targetOnGround ? dy : null, fV, k, stats);
     }
 
     // ----------------------------------------------------------------------------------
@@ -266,16 +303,17 @@ public final class KbProbe {
     // ----------------------------------------------------------------------------------
 
     private static void announceSample(double hRaw, double fH, Double vRaw, Double fV,
-                                       ServerStats stats) {
+                                       double knockbackLevel, ServerStats stats) {
         ClientPlayerEntity player = MinecraftClient.getInstance().player;
         if (player == null) {
             return;
         }
         String vPart = (vRaw != null && fV != null)
                 ? String.format(" V=%.3f(×%.2f)", vRaw, fV) : " V=—(空中)";
-        // アクションバー: 直近サンプル
+        // アクションバー: 直近サンプル（k=攻撃ノックバックレベル: 属性+疾走ボーナス）
         player.sendMessage(Text.literal(
-                String.format("KB計測 H=%.3f(×%.2f)%s @%s", hRaw, fH, vPart, serverKey())), true);
+                String.format("KB計測 H=%.3f(×%.2f)%s k=%.1f @%s",
+                        hRaw, fH, vPart, knockbackLevel, serverKey())), true);
         // チャット: 鯖別の集計（5件ごと + 最初の1件）
         if (stats.hSamples() == 1 || stats.hSamples() % 5 == 0) {
             player.sendMessage(Text.literal(String.format(
