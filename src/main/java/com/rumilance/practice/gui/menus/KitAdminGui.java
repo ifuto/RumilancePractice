@@ -201,21 +201,21 @@ public final class KitAdminGui extends AbstractGui {
             return;
         }
         inventory.setItem(GuiSlots.slot(0, 4), header(kit, locale));
-        inventory.setItem(GuiSlots.slot(1, 1), toggle(t(locale, "enabled"), kit.enabled(), "toggle:enabled",
+        inventory.setItem(GuiSlots.slot(1, 2), toggle(t(locale, "enabled"), kit.enabled(), "toggle:enabled",
                 kit.enabled() ? Material.LIME_DYE : Material.GRAY_DYE, locale));
-        inventory.setItem(GuiSlots.slot(1, 3), toggle(t(locale, "adventure"), kit.forceAdventure(), "toggle:adventure",
+        inventory.setItem(GuiSlots.slot(1, 4), toggle(t(locale, "adventure"), kit.forceAdventure(), "toggle:adventure",
                 kit.forceAdventure() ? Material.LIME_DYE : Material.GRAY_DYE, locale));
-        inventory.setItem(GuiSlots.slot(1, 5), toggle(t(locale, "ranked"), kit.ranked(), "toggle:ranked",
+        inventory.setItem(GuiSlots.slot(1, 6), toggle(t(locale, "ranked"), kit.ranked(), "toggle:ranked",
                 kit.ranked() ? Material.LIME_DYE : Material.GRAY_DYE, locale));
         // --- Main / Sub category tiles: which section of the pickers this kit appears in ---
         boolean isSub = kit.category() == com.rumilance.practice.model.KitCategory.SUB;
-        inventory.setItem(GuiSlots.slot(1, 2), toggle("Main Kits", !isSub, "toggle:mainkit",
+        inventory.setItem(GuiSlots.slot(1, 3), toggle("Main Kits", !isSub, "toggle:mainkit",
                 Material.WILD_ARMOR_TRIM_SMITHING_TEMPLATE, locale));
-        inventory.setItem(GuiSlots.slot(1, 6), toggle("Sub Kits", isSub, "toggle:subkit",
+        inventory.setItem(GuiSlots.slot(1, 7), toggle("Sub Kits", isSub, "toggle:subkit",
                 Material.BOLT_ARMOR_TRIM_SMITHING_TEMPLATE, locale));
         // --- Crystal FFA declaration: THE crystal FFA kit (exclusive across all kits) gets
         // --- the KIT1..9 variant editor; FFA spawns the player with the selected slot.
-        inventory.setItem(GuiSlots.slot(1, 4), toggle("Crystal FFA", kit.crystalFfa(),
+        inventory.setItem(GuiSlots.slot(1, 5), toggle("Crystal FFA", kit.crystalFfa(),
                 "toggle:crystalffa", Material.END_CRYSTAL, locale));
         // --- row 2: shared contents + sub-menu + icon (children are ordinary kits) ---
         if (!kitService.isFolder(kit.name())) {

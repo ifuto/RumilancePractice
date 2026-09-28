@@ -89,7 +89,7 @@ public final class KitItemRulesGui extends AbstractGui {
                 Component.text(line(player, "admin-gui.timeout") + ": " + kit.timeoutSeconds() + "s",
                         UiTheme.WARNING)
                         .decoration(TextDecoration.ITALIC, false), "noop"));
-        inventory.setItem(GuiSlots.slot(4, 2), bedExplosionToggle(player, kit));
+        inventory.setItem(GuiSlots.slot(4, 4), bedExplosionToggle(player, kit));
         inventory.setItem(GuiSlots.slot(5, 4), ItemBuilder.action(UiTheme.BACK,
                 t(player, "menu.back"), "back"));
     }

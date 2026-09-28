@@ -142,7 +142,7 @@ public final class ShieldPatternGui extends AbstractGui implements GuiCloseHandl
                 .lore(UiTheme.hint("Click: remove ALL layers"))
                 .action("reset")
                 .build());
-        inventory.setItem(GuiSlots.slot(0, 8), ItemBuilder.of(Material.PAPER)
+        inventory.setItem(GuiSlots.slot(0, 7), ItemBuilder.of(Material.PAPER)
                 .name(Component.text("Layers: " + layers.size() + "/" + MAX_LAYERS,
                         layers.size() >= MAX_LAYERS ? NamedTextColor.RED : NamedTextColor.GREEN))
                 .action("layers")
@@ -156,18 +156,18 @@ public final class ShieldPatternGui extends AbstractGui implements GuiCloseHandl
         for (int i = start; i < Math.min(start + PATTERNS_PER_PAGE, PATTERNS.size()); i++) {
             inventory.setItem(GuiSlots.slot(row, col), patternTile(PATTERNS.get(i), dye));
             col++;
-            if (col > 9) {
+            if (col > 7) {
                 col = 1;
                 row++;
             }
         }
         // Page arrows (only when there are 2+ pages).
         if (PATTERNS.size() > PATTERNS_PER_PAGE) {
-            inventory.setItem(GuiSlots.slot(0, 7), ItemBuilder.of(Material.SPECTRAL_ARROW)
+            inventory.setItem(GuiSlots.slot(0, 5), ItemBuilder.of(Material.SPECTRAL_ARROW)
                     .name(Component.text("Previous page", NamedTextColor.GRAY))
                     .action("page:" + Math.max(0, page - 1))
                     .build());
-            inventory.setItem(GuiSlots.slot(0, 9), ItemBuilder.of(Material.SPECTRAL_ARROW)
+            inventory.setItem(GuiSlots.slot(0, 6), ItemBuilder.of(Material.SPECTRAL_ARROW)
                     .name(Component.text("Next page", NamedTextColor.GRAY))
                     .action("page:" + Math.min(1, page + 1))
                     .build());

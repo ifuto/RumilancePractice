@@ -156,24 +156,24 @@ public final class TeamHubGui extends AbstractGui {
         }
         paintPaging(player, inventory, page, members.size());
 
-        // --- bottom bar (owner): the daily flow, left to right: invite members,
-        // auto-split them onto sides, then start the battle. Everything else
-        // (public/private, maps, friendly fire, per-team setup, disband) lives one
+        // --- bottom bar (owner), mirror-symmetric around the hero START (5,4):
+        // invite (5,1) <-> tournament (5,7), auto-split (5,2) <-> settings (5,6).
+        // Everything else (public/private, maps, friendly fire, disband) lives one
         // click away in the settings screen ---
         if (owner) {
-            inventory.setItem(GuiSlots.slot(5, 0),
+            inventory.setItem(GuiSlots.slot(5, 1),
                     ItemBuilder.of(Material.NETHER_STAR)
                             .name(t(player, "gui.party-quick-invite").color(UiTheme.PRIMARY))
                             .lore(UiTheme.divider(),
                                     UiTheme.line(line(player, "gui.party-quick-invite-lore")))
                             .action("quick_invite").build());
-            inventory.setItem(GuiSlots.slot(5, 1),
+            inventory.setItem(GuiSlots.slot(5, 2),
                     ItemBuilder.of(Material.ENDER_PEARL)
                             .name(t(player, "gui.party-auto-split").color(UiTheme.PRIMARY))
                             .lore(UiTheme.divider(),
                                     UiTheme.line(line(player, "gui.party-auto-split-lore")))
                             .action("auto_split").build());
-            inventory.setItem(GuiSlots.slot(5, 2),
+            inventory.setItem(GuiSlots.slot(5, 6),
                     ItemBuilder.of(Material.COMPARATOR)
                             .name(t(player, "gui.team-settings-entry").color(UiTheme.PRIMARY))
                             .lore(UiTheme.divider(),
@@ -207,7 +207,7 @@ public final class TeamHubGui extends AbstractGui {
                     ? UiTheme.line(line(player, "gui.party-assign-first"))
                     : UiTheme.line(line(player, "party.start-wait-lobby"));
             if (team.kind() == com.rumilance.practice.team.GroupKind.PARTY) {
-                inventory.setItem(GuiSlots.slot(5, 3),
+                inventory.setItem(GuiSlots.slot(5, 7),
                         ItemBuilder.of(Material.GOLDEN_SWORD)
                                 .name(t(player, "tournament.hub-button").color(UiTheme.SECONDARY))
                                 .lore(UiTheme.divider(),

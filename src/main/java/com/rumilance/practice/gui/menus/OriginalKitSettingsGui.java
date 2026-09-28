@@ -77,35 +77,35 @@ public final class OriginalKitSettingsGui extends AbstractGui {
         OriginalKitSettings settings = draftOf(player, session, kitSlot);
 
         // Movement / defence
-        inventory.setItem(GuiSlots.slot(1, 2), toggle(player, settings.fallDamage(),
+        inventory.setItem(GuiSlots.slot(1, 1), toggle(player, settings.fallDamage(),
                 "fallDamage", "toggle:fallDamage"));
-        inventory.setItem(GuiSlots.slot(2, 2), toggle(player, settings.pearl(),
+        inventory.setItem(GuiSlots.slot(2, 1), toggle(player, settings.pearl(),
                 "pearl", "toggle:pearl"));
-        inventory.setItem(GuiSlots.slot(3, 2), toggle(player, settings.totem(),
+        inventory.setItem(GuiSlots.slot(3, 1), toggle(player, settings.totem(),
                 "totem", "toggle:totem"));
 
         // Recovery
-        inventory.setItem(GuiSlots.slot(1, 4), toggle(player, settings.naturalRegen(),
+        inventory.setItem(GuiSlots.slot(1, 3), toggle(player, settings.naturalRegen(),
                 "naturalRegen", "toggle:naturalRegen"));
-        inventory.setItem(GuiSlots.slot(2, 4), toggle(player, settings.autoFood(),
+        inventory.setItem(GuiSlots.slot(2, 3), toggle(player, settings.autoFood(),
                 "autoFood", "toggle:autoFood"));
-        inventory.setItem(GuiSlots.slot(3, 4), toggle(player, settings.swordShieldBreak(),
+        inventory.setItem(GuiSlots.slot(3, 3), toggle(player, settings.swordShieldBreak(),
                 "swordShieldBreak", "toggle:swordShieldBreak"));
 
         // Building / environment
-        inventory.setItem(GuiSlots.slot(1, 6), toggle(player, settings.blockPlace(),
+        inventory.setItem(GuiSlots.slot(1, 5), toggle(player, settings.blockPlace(),
                 "blockPlace", "toggle:blockPlace"));
-        inventory.setItem(GuiSlots.slot(2, 6), toggle(player, settings.blockBreak(),
+        inventory.setItem(GuiSlots.slot(2, 5), toggle(player, settings.blockBreak(),
                 "blockBreak", "toggle:blockBreak"));
-        inventory.setItem(GuiSlots.slot(3, 6), toggle(player, settings.bedExplosion(),
+        inventory.setItem(GuiSlots.slot(3, 5), toggle(player, settings.bedExplosion(),
                 "bedExplosion", "toggle:bedExplosion"));
 
         // Numbers / mode / looks
-        inventory.setItem(GuiSlots.slot(1, 8), healthToggle(player, settings));
-        inventory.setItem(GuiSlots.slot(2, 8), timeoutToggle(player, settings));
-        inventory.setItem(GuiSlots.slot(3, 8), toggle(player, settings.forceAdventure(),
+        inventory.setItem(GuiSlots.slot(1, 7), healthToggle(player, settings));
+        inventory.setItem(GuiSlots.slot(2, 7), timeoutToggle(player, settings));
+        inventory.setItem(GuiSlots.slot(3, 7), toggle(player, settings.forceAdventure(),
                 "forceAdventure", "toggle:forceAdventure"));
-        inventory.setItem(GuiSlots.slot(4, 8), bodyScaleToggle(player, settings));
+        inventory.setItem(GuiSlots.slot(4, 4), bodyScaleToggle(player, settings));
 
         // Reset to vanilla defaults
         inventory.setItem(GuiSlots.slot(5, 2),
@@ -119,14 +119,15 @@ public final class OriginalKitSettingsGui extends AbstractGui {
                         .action("reset")
                         .build());
         // Save + back
-        inventory.setItem(GuiSlots.slot(5, 5),
+        inventory.setItem(GuiSlots.slot(5, 4),
                 ItemBuilder.of(UiTheme.CONFIRM)
                         .name(t(player, "gui.save").color(UiTheme.SUCCESS)
                                 .decoration(TextDecoration.ITALIC, false))
                         .lore(UiTheme.hint(line(player, "gui.toggle-hint")))
                         .action("save")
                         .build());
-        MenuScaffold.returnButton(inventory, t(player, "menu.back"));
+        inventory.setItem(GuiSlots.slot(5, 6),
+                ItemBuilder.action(UiTheme.BACK, t(player, "menu.back"), "back"));
     }
 
     private ItemStack toggle(Player player, boolean on, String settingKey, String action) {

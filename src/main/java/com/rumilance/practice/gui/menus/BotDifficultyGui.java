@@ -101,7 +101,7 @@ public final class BotDifficultyGui extends AbstractGui {
                             .glintIf(active)
                             .action("preset:" + preset.name()).build());
         }
-        inventory.setItem(GuiSlots.slot(2, 8),
+        inventory.setItem(GuiSlots.slot(2, 4),
                 ItemBuilder.of(Material.NETHER_STAR)
                         .name(t(player, "gui.difficulty-custom")
                                 .color(d.preset() == BotDifficulty.Preset.CUSTOM
@@ -129,7 +129,7 @@ public final class BotDifficultyGui extends AbstractGui {
         inventory.setItem(GuiSlots.slot(4, 7), paramTile(player, Material.BOW,
                 "gui.param-aim", String.format(Locale.ROOT, "%.0f°", d.aimSpreadDegrees()),
                 "param:aim"));
-        inventory.setItem(GuiSlots.slot(5, 1),
+        inventory.setItem(GuiSlots.slot(5, 2),
                 ItemBuilder.of(d.shieldStun() ? UiTheme.TOGGLE_ON : UiTheme.TOGGLE_OFF)
                         .name(t(player, "gui.param-stun")
                                 .color(d.shieldStun() ? UiTheme.SUCCESS : UiTheme.MUTED))
@@ -137,9 +137,9 @@ public final class BotDifficultyGui extends AbstractGui {
                                 UiTheme.blank(),
                                 UiTheme.hint(line(player, "gui.toggle-hint")))
                         .action("param:stun").build());
-        inventory.setItem(GuiSlots.slot(5, 3), paramTile(player, Material.CHAINMAIL_CHESTPLATE,
+        inventory.setItem(GuiSlots.slot(5, 4), paramTile(player, Material.CHAINMAIL_CHESTPLATE,
                 "gui.param-block", (int) Math.round(d.shieldReduction() * 100) + "%", "param:block"));
-        inventory.setItem(GuiSlots.slot(5, 5), paramTile(player, Material.TOTEM_OF_UNDYING,
+        inventory.setItem(GuiSlots.slot(5, 6), paramTile(player, Material.TOTEM_OF_UNDYING,
                 "gui.param-goal", String.valueOf(d.totemGoal()), "param:goal"));
 
         paintNav(player, session, inventory);

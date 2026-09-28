@@ -182,8 +182,8 @@ public final class SmithingTrimGui extends AbstractGui implements GuiCloseHandle
             }
             // 10 ores don't fit a single 9-wide chest row. Lay them out as one tight band:
             // the first 9 fill row 4, and the 10th sits at the start of row 5 — keeping all
-            // materials together (no 5/5 split) and clear of the apply/back controls which
-            // occupy the right of row 5.
+            // materials together (no 5/5 split) and clear of the row-5 controls, which are
+            // centred: remove at (5,2), the hero APPLY at (5,4), back at (5,6).
             int slot = matIndex < 9
                     ? GuiSlots.slot(4, matIndex)
                     : GuiSlots.slot(5, 0);
@@ -191,7 +191,7 @@ public final class SmithingTrimGui extends AbstractGui implements GuiCloseHandle
             matIndex++;
         }
 
-        inventory.setItem(GuiSlots.slot(5, 6),
+        inventory.setItem(GuiSlots.slot(5, 2),
                 ItemBuilder.of(Material.SHEARS)
                         .name(t(player, "gui.trim-remove").color(UiTheme.DANGER))
                         .lore(
@@ -200,7 +200,7 @@ public final class SmithingTrimGui extends AbstractGui implements GuiCloseHandle
                         )
                         .action("remove")
                         .build());
-        inventory.setItem(GuiSlots.slot(5, 7),
+        inventory.setItem(GuiSlots.slot(5, 4),
                 ItemBuilder.of(Material.SMITHING_TABLE)
                         .name(t(player, "gui.trim-apply").color(UiTheme.SUCCESS))
                         .lore(
@@ -210,7 +210,7 @@ public final class SmithingTrimGui extends AbstractGui implements GuiCloseHandle
                         )
                         .action("apply")
                         .build());
-        inventory.setItem(GuiSlots.slot(5, 8),
+        inventory.setItem(GuiSlots.slot(5, 6),
                 ItemBuilder.action(UiTheme.BACK, t(player, "menu.back"), "back"));
     }
 

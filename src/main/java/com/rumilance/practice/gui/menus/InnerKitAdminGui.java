@@ -58,9 +58,8 @@ public final class InnerKitAdminGui extends AbstractGui {
     public static final String ORIGIN_KIT_ADMIN = "kitadmin";
     public static final String ORIGIN_COMMAND = "command";
 
-    /** Grid slots for the child list; the three create buttons sit in the last three. */
-    private static final int ENTRY_SLOTS = 25;
-    private static final int CREATE_SLOT = ENTRY_SLOTS;
+    /** Child-kit rows of the grid; the three create buttons are mirrored at row4 cols 2/4/6. */
+    private static final int ENTRY_SLOTS = 22;
     private static final String VIEW_IMPORT = "import";
 
     private final KitService kitService;
@@ -251,7 +250,7 @@ public final class InnerKitAdminGui extends AbstractGui {
 
     /** The three ways to create a child kit — contents source first, name asked in chat after. */
     private void createButtons(Player player, Inventory inventory) {
-        inventory.setItem(MenuScaffold.gridSlot(CREATE_SLOT), ItemBuilder.of(Material.PLAYER_HEAD)
+        inventory.setItem(com.rumilance.practice.util.GuiSlots.slot(4, 2), ItemBuilder.of(Material.PLAYER_HEAD)
                 .name(t(player, "gui.innerkit-create-inventory").color(UiTheme.SUCCESS))
                 .lore(
                         UiTheme.divider(),
@@ -262,7 +261,7 @@ public final class InnerKitAdminGui extends AbstractGui {
                 .glint(true)
                 .action("create:inventory")
                 .build());
-        inventory.setItem(MenuScaffold.gridSlot(CREATE_SLOT + 1), ItemBuilder.of(Material.CHEST)
+        inventory.setItem(com.rumilance.practice.util.GuiSlots.slot(4, 4), ItemBuilder.of(Material.CHEST)
                 .name(t(player, "gui.innerkit-create-copy").color(UiTheme.SECONDARY))
                 .lore(
                         UiTheme.divider(),
@@ -272,7 +271,7 @@ public final class InnerKitAdminGui extends AbstractGui {
                 )
                 .action("create:copy")
                 .build());
-        inventory.setItem(MenuScaffold.gridSlot(CREATE_SLOT + 2), ItemBuilder.of(Material.PAPER)
+        inventory.setItem(com.rumilance.practice.util.GuiSlots.slot(4, 6), ItemBuilder.of(Material.PAPER)
                 .name(t(player, "gui.innerkit-create-empty").color(UiTheme.MUTED))
                 .lore(
                         UiTheme.divider(),

@@ -142,7 +142,7 @@ public final class NameColorGui extends AbstractGui {
             boolean selected = hex.equalsIgnoreCase(selection.primaryHex()) && !editingSecondary
                     || hex.equalsIgnoreCase(selection.secondaryHex()) && editingSecondary;
             TextColor swatch = TextColor.fromHexString(hex);
-            inventory.setItem(GuiSlots.slot(2 + i / 8, 1 + i % 8),
+            inventory.setItem(GuiSlots.slot(2 + i / 7, 1 + i % 7),
                     ItemBuilder.of(wool == null ? Material.WHITE_WOOL : wool)
                             .name(Component.text(hex, swatch == null ? UiTheme.VALUE : swatch)
                                     .decoration(TextDecoration.ITALIC, false))
@@ -157,7 +157,7 @@ public final class NameColorGui extends AbstractGui {
     }
 
     private void backToSettings(Inventory inventory, Player player) {
-        inventory.setItem(GuiSlots.slot(5, 8),
+        inventory.setItem(GuiSlots.slot(5, 4),
                 ItemBuilder.of(UiTheme.BACK)
                         .name(t(player, "menu.back").color(UiTheme.WARNING))
                         .action("back_settings").build());

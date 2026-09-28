@@ -216,6 +216,15 @@ public final class MenuScaffold {
         return Math.max(0, rowCount(inventory) - 1);
     }
 
+    /** @return the stack at a slot, or null when empty/air — used to avoid overwriting title chrome. */
+    private static ItemStack itemAt(Inventory inventory, int slot) {
+        if (slot < 0 || slot >= inventory.getSize()) {
+            return null;
+        }
+        ItemStack stack = inventory.getItem(slot);
+        return (stack == null || stack.getType().isAir()) ? null : stack;
+    }
+
     /** Number of items one page of the standard content grid can hold. */
     public static int gridPageSize() {
         return 28;
@@ -232,6 +241,11 @@ public final class MenuScaffold {
                 Component.text("Go to page " + (page + 2), UiTheme.MUTED));
     }
 
+    /**
+     * Symmetric paged nav: prev at (last,2), the return/close hero stays centred at
+     * (last,4) via {@link #returnButton}, next at (last,6). The page counter rides along in
+     * the buttons' names instead of its own off-centre tile.
+     */
     public static void pagingButtons(Inventory inventory, int page, int totalItems,
                                      Component prevLabel, Component nextLabel, Component pageLabel,
                                      Component prevLore, Component nextLore) {
@@ -240,30 +254,26 @@ public final class MenuScaffold {
             return;
         }
         int pageSize = gridPageSize();
+        int pageCount = Math.max(1, (totalItems + pageSize - 1) / pageSize);
+        Component suffix = Component.text("  " + (page + 1) + "/" + pageCount, UiTheme.MUTED);
         if (page > 0) {
-            inventory.setItem(GuiSlots.slot(lastRow, 0),
+            inventory.setItem(GuiSlots.slot(lastRow, 2),
                     ItemBuilder.of(Material.ARROW)
-                            .name(prevLabel)
+                            .name(prevLabel.append(suffix))
                             .lore(prevLore)
                             .action("page:prev")
                             .build());
         }
-        int pageCount = Math.max(1, (totalItems + pageSize - 1) / pageSize);
-        if (pageCount > 1) {
-            inventory.setItem(GuiSlots.slot(lastRow, 6),
-                    ItemBuilder.of(Material.PAPER)
-                            .name(pageLabel)
-                            .action("decorate")
-                            .build());
-        }
         if ((long) (page + 1) * pageSize < totalItems) {
-            inventory.setItem(GuiSlots.slot(lastRow, GuiSlots.ROW_SIZE - 1),
+            inventory.setItem(GuiSlots.slot(lastRow, 6),
                     ItemBuilder.of(Material.ARROW)
-                            .name(nextLabel)
+                            .name(nextLabel.append(suffix))
                             .lore(nextLore)
                             .action("page:next")
                             .build());
         }
+        // No separate page-counter tile: the (page+1)/pageCount suffix rides in the button names,
+        // keeping the bottom row a strict prev[2] — return[4] — next[6] symmetry.
     }
 
 }

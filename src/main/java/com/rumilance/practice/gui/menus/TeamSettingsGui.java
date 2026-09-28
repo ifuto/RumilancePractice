@@ -164,8 +164,8 @@ public final class TeamSettingsGui extends AbstractGui {
                         .lore(UiTheme.hint(line(player, "party.clear-sides-hint")))
                         .action("clearsides").build());
 
-        // Row 3 — destructive action, alone on the right, behind a confirmation.
-        inventory.setItem(GuiSlots.slot(3, 6),
+        // Row 3 — destructive action tucked into the far corner, behind a confirmation.
+        inventory.setItem(GuiSlots.slot(3, 8),
                 ItemBuilder.of(Material.BARRIER)
                         .name(t(player, "party.disband").color(UiTheme.DANGER))
                         .lore(UiTheme.divider(),

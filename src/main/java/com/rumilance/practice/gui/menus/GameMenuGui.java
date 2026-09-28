@@ -25,7 +25,7 @@ import org.bukkit.inventory.Inventory;
  * <pre>
  *   [you]  N Arena                    [N online]
  *   ─────────────────────────────────────────────
- *        BATTLE          KITS          PARTY
+ *        KITS        [BATTLE]         PARTY
  *
  *       SPECTATE      PROFILE       SETTINGS
  *
@@ -34,8 +34,10 @@ import org.bukkit.inventory.Inventory;
  *                      [close]
  * </pre>
  *
- * <p>Combat entries live under {@link BattleMenuGui}; this screen keeps kit editor, spectate,
- * settings, titles and teams — each tile in the standard {@link MenuTile} anatomy.</p>
+ * <p>The hero action (BATTLE) anchors the primary row on the centre column; its rowmates
+ * mirror around it. Combat entries live under {@link BattleMenuGui}; this screen keeps kit
+ * editor, spectate, settings, titles and teams — each tile in the standard {@link MenuTile}
+ * anatomy.</p>
  */
 public final class GameMenuGui extends AbstractGui {
 
@@ -112,14 +114,14 @@ public final class GameMenuGui extends AbstractGui {
         // Row 1 — the three things players reach for first.
         boolean inParty = teamService != null && teamService.teamOf(player.getUniqueId()).isPresent();
         boolean kitLocked = kitEditBusy.test(player);
-        inventory.setItem(GuiSlots.slot(1, 2),
+        inventory.setItem(GuiSlots.slot(1, 4),
                 MenuTile.of(player, this, Material.NETHERITE_SWORD,
                         "menu.battle", UiTheme.SUCCESS, "menu.battle-lore", "battle")
                         .glint(true)
                         .live(UiTheme.labelValue(line(player, "menu.server-online"),
                                 String.valueOf(Math.max(0, RealPlayers.count() - 1))))
                         .build(false, null));
-        inventory.setItem(GuiSlots.slot(1, 4),
+        inventory.setItem(GuiSlots.slot(1, 2),
                 MenuTile.of(player, this, Material.CRAFTING_TABLE,
                         "menu.kits", UiTheme.PRIMARY, "menu.kits-lore", "ekit")
                         .build(kitLocked, "menu.kits-busy-reason"));
