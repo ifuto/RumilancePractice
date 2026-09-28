@@ -122,8 +122,8 @@ public final class KillFeed {
                 // Cosmetics must never interfere with the kill flow.
             }
         }
-        NamedTextColor killerColor = color(killerTeam, true);
-        NamedTextColor victimColor = color(killerTeam, false);
+        net.kyori.adventure.text.format.TextColor killerColor = color(killerTeam, true);
+        net.kyori.adventure.text.format.TextColor victimColor = color(killerTeam, false);
         MessageService ms = messageService;
         if (ms == null) {
             Bukkit.broadcast(line(killer, victim, killerColor, victimColor,
@@ -138,18 +138,18 @@ public final class KillFeed {
     }
 
     public static Component line(Player killer, Player victim,
-                                 NamedTextColor killerColor, NamedTextColor victimColor) {
+                                 net.kyori.adventure.text.format.TextColor killerColor, net.kyori.adventure.text.format.TextColor victimColor) {
         return line(killer, victim, killerColor, victimColor, killer.getHealth(), maxHealth(killer), null, null);
     }
 
     public static Component line(Player killer, Player victim,
-                                 NamedTextColor killerColor, NamedTextColor victimColor,
+                                 net.kyori.adventure.text.format.TextColor killerColor, net.kyori.adventure.text.format.TextColor victimColor,
                                  double killerHealth, double killerMax, UUID matchId) {
         return line(killer, victim, killerColor, victimColor, killerHealth, killerMax, matchId, null);
     }
 
     public static Component line(Player killer, Player victim,
-                                 NamedTextColor killerColor, NamedTextColor victimColor,
+                                 net.kyori.adventure.text.format.TextColor killerColor, net.kyori.adventure.text.format.TextColor victimColor,
                                  double killerHealth, double killerMax, UUID matchId,
                                  Component inventoryHover) {
         Component killerName = clickableName(killer.getName(), killerColor, true, matchId,
@@ -169,7 +169,7 @@ public final class KillFeed {
                 .append(Component.text(")", NamedTextColor.DARK_GRAY));
     }
 
-    private static Component clickableName(String name, NamedTextColor color, boolean bold,
+    private static Component clickableName(String name, net.kyori.adventure.text.format.TextColor color, boolean bold,
                                            UUID matchId, UUID playerId, Component inventoryHover) {
         Component base = Component.text(name, color);
         if (bold) {
