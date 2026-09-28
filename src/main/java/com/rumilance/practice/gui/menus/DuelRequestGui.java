@@ -204,13 +204,9 @@ public final class DuelRequestGui extends AbstractGui {
         inventory.setItem(GuiSlots.slot(2, 5), GuiDecorator.button(Material.GRASS_BLOCK,
                 messageService.render(locale, "duel-gui.map-select",
                         MessageService.tags("map", mapLabel)), "map"));
-        ItemStack modeButton = GuiDecorator.button(
-                session.ranked() ? Material.PURPLE_DYE : Material.BLUE_DYE,
-                messageService.render(locale, session.ranked() ? "duel-gui.mode-ranked" : "duel-gui.mode-unranked"), "mode");
-        modeButton.editMeta(meta -> meta.setEnchantmentGlintOverride(session.ranked()));
-        inventory.setItem(GuiSlots.slot(3, 4), modeButton);
-        // FT (先取点数): click +1, shift-click +5, 40 → ∞ → 1. ∞ means no score limit.
-        inventory.setItem(GuiSlots.slot(3, 6),
+        // Symmetric config row: FT (先取点数) on the left, queue mode on the right.
+        // FT: click +1, shift-click +5, 40 → ∞ → 1. ∞ means no score limit.
+        inventory.setItem(GuiSlots.slot(3, 3),
                 com.rumilance.practice.gui.ItemBuilder.of(Material.NETHERITE_SCRAP)
                         .name(messageService.render(locale, "duel-gui.ft", MessageService.tags(
                                 "n", com.rumilance.practice.match.FirstTo.label(session.firstTo()))))
@@ -223,12 +219,16 @@ public final class DuelRequestGui extends AbstractGui {
                         .glint(session.firstTo() > 0)
                         .action("ft")
                         .build());
-        inventory.setItem(GuiSlots.slot(4, 2), GuiDecorator.button(Material.BARRIER,
+        ItemStack modeButton = GuiDecorator.button(
+                session.ranked() ? Material.PURPLE_DYE : Material.BLUE_DYE,
+                messageService.render(locale, session.ranked() ? "duel-gui.mode-ranked" : "duel-gui.mode-unranked"), "mode");
+        modeButton.editMeta(meta -> meta.setEnchantmentGlintOverride(session.ranked()));
+        inventory.setItem(GuiSlots.slot(3, 5), modeButton);
+        // Footer: dismiss at the far left corner, the hero action (SEND) centred on the bottom row.
+        inventory.setItem(GuiSlots.slot(4, 0), GuiDecorator.button(Material.BARRIER,
                 messageService.render(locale, "duel-gui.cancel"), "cancel"));
-        inventory.setItem(GuiSlots.slot(4, 4), GuiDecorator.button(Material.CLOCK,
-                messageService.render(locale, "duel-gui.best-of", MessageService.tags("n", String.valueOf(session.bestOf()))), "bestof"));
         boolean pending = Boolean.TRUE.equals(session.get("pending", Boolean.class));
-        inventory.setItem(GuiSlots.slot(4, 6), GuiDecorator.button(
+        inventory.setItem(GuiSlots.slot(4, 4), GuiDecorator.button(
                 pending ? Material.YELLOW_GLAZED_TERRACOTTA : Material.EMERALD,
                 messageService.render(locale, pending ? "duel-gui.pending" : "duel-gui.send"), "send"));
     }
@@ -271,11 +271,6 @@ public final class DuelRequestGui extends AbstractGui {
             }
             case "mode" -> {
                 session.setRanked(!session.ranked());
-                sounds.play(player, "gui-click");
-                render(player, session, inventory);
-            }
-            case "bestof" -> {
-                session.setBestOf(session.bestOf() == 1 ? 3 : session.bestOf() == 3 ? 5 : 1);
                 sounds.play(player, "gui-click");
                 render(player, session, inventory);
             }

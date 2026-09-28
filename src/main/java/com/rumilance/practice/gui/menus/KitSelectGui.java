@@ -10,6 +10,7 @@ import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.model.KitDefinition;
 import com.rumilance.practice.sound.SoundService;
+import com.rumilance.practice.util.GuiSlots;
 import com.rumilance.practice.util.KitNames;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -76,71 +77,82 @@ public final class KitSelectGui extends AbstractGui {
     }
 
     /**
-     * One-screen picker (2026-09-28 redesign, replacing the two-step "wooden button"
-     * category chooser that felt too complex): both families on one screen — the top band
-     * lists MAIN kits, the bottom band SUB kits, each with its own header and its own page
-     * arrows when it overflows one row. Folder kits still work as before: LEFT-click picks
-     * the folder's default child, RIGHT-click opens the child list.
+     * Two-step picker, rebuilt for the 2026-09-28 GUI refresh with generous whitespace and
+     * left-right symmetry: step 1 is the 木時差式 (delayed wooden-button) MAIN KITS/SUB KITS
+     * branch on the centre row; step 2 is one centred row of that category's kits (folders:
+     * LEFT = default child, RIGHT = child list) with mirrored page arrows at the row ends
+     * and the kit currently selected glowing.
      */
-    private static final int MAIN_LABEL_SLOT = 4 + 1 * 9;             // (1,4)
-    private static final int MAIN_FIRST_SLOT = 1 + 2 * 9;             // (2,1) → 7 slots
-    private static final int SUB_LABEL_SLOT = 4 + 3 * 9;              // (3,4)
-    private static final int SUB_FIRST_SLOT = 1 + 4 * 9;              // (4,1) → 7 slots
-    private static final int BAND_CAPACITY = 7;
-
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
         paintFrame(player, session, inventory);
-        renderBand(player, session, inventory, com.rumilance.practice.model.KitCategory.MAIN,
-                MAIN_LABEL_SLOT, MAIN_FIRST_SLOT, "gui.kit-main-button", UiTheme.SUCCESS);
-        renderBand(player, session, inventory, com.rumilance.practice.model.KitCategory.SUB,
-                SUB_LABEL_SLOT, SUB_FIRST_SLOT, "gui.kit-sub-button", UiTheme.SECONDARY);
+        if (session.kitCategory() == null) {
+            renderChooser(player, inventory);
+        } else {
+            renderCategory(player, session, inventory);
+        }
         MenuScaffold.returnButton(inventory, t(player, "menu.back"));
     }
 
-    /** Header + one row of kits for one category, with per-band arrows when it overflows. */
-    private void renderBand(Player player, GuiSession session, Inventory inventory,
-                            com.rumilance.practice.model.KitCategory category, int labelSlot,
-                            int firstSlot, String labelKey, net.kyori.adventure.text.format.TextColor color) {
+    private static int CHOOSER_ROW = 2;
+
+    /** The branch screen: two big centred category buttons (delated-press 木時差式). */
+    private void renderChooser(Player player, Inventory inventory) {
+        inventory.setItem(GuiSlots.slot(CHOOSER_ROW, 3),
+                categoryTile(player, com.rumilance.practice.model.KitCategory.MAIN,
+                        "gui.kit-main-button", UiTheme.SUCCESS));
+        inventory.setItem(GuiSlots.slot(CHOOSER_ROW, 5),
+                categoryTile(player, com.rumilance.practice.model.KitCategory.SUB,
+                        "gui.kit-sub-button", UiTheme.SECONDARY));
+    }
+
+    private ItemStack categoryTile(Player player, com.rumilance.practice.model.KitCategory category,
+                                   String nameKey, net.kyori.adventure.text.format.TextColor color) {
+        int count = kitService.enabled(category).size();
+        return com.rumilance.practice.gui.KitSections.categoryButton(category,
+                t(player, nameKey).color(color),
+                java.util.List.of(
+                        UiTheme.labelValue(line(player, "gui.kit-count-label"), String.valueOf(count)),
+                        UiTheme.hint(line(player, "gui.kit-click-select"))));
+    }
+
+    private static final int CATEGORY_LABEL_SLOT = 4 + 1 * 9;   // (1,4) header
+    private static final int CATEGORY_FIRST_SLOT = 1 + 2 * 9;   // (2,1) → 7 slots row
+    private static final int CATEGORY_CAPACITY = 7;
+
+    /** One category: header centred at (1,4); kits centered on row 2; arrows at the row ends. */
+    private void renderCategory(Player player, GuiSession session, Inventory inventory) {
+        boolean main = !("SUB".equalsIgnoreCase(session.kitCategory()));
+        com.rumilance.practice.model.KitCategory category = main
+                ? com.rumilance.practice.model.KitCategory.MAIN
+                : com.rumilance.practice.model.KitCategory.SUB;
         List<KitDefinition> kits = kitService.enabled(category);
-        inventory.setItem(labelSlot, ItemBuilder.of(com.rumilance.practice.gui.KitSections
-                        .icon(category))
-                .name(t(player, labelKey).color(color))
+        inventory.setItem(CATEGORY_LABEL_SLOT, ItemBuilder.of(
+                        com.rumilance.practice.gui.KitSections.icon(category))
+                .name(t(player, main ? "gui.kit-main-button" : "gui.kit-sub-button")
+                        .color(main ? UiTheme.SUCCESS : UiTheme.SECONDARY))
                 .lore(UiTheme.labelValue(line(player, "gui.kit-count-label"),
                         String.valueOf(kits.size())))
                 .action("decorate")
                 .build());
-        boolean main = category == com.rumilance.practice.model.KitCategory.MAIN;
-        int bandPage = Math.min(bandPage(session, main),
-                Math.max(0, (kits.size() - 1) / BAND_CAPACITY));
-        if (main) {
-            session.put("page-main", bandPage);
-        } else {
-            session.put("page-sub", bandPage);
+        int page = Math.min(Math.max(0, session.page()), Math.max(0, (kits.size() - 1) / CATEGORY_CAPACITY));
+        if (page != session.page()) {
+            session.setPage(page);
         }
         String current = session.selectedKit();
-        int from = bandPage * BAND_CAPACITY;
-        for (int i = 0; i < BAND_CAPACITY && from + i < kits.size(); i++) {
-            inventory.setItem(firstSlot + i, kitIcon(player, session, kits.get(from + i), current));
+        int from = page * CATEGORY_CAPACITY;
+        for (int i = 0; i < CATEGORY_CAPACITY && from + i < kits.size(); i++) {
+            inventory.setItem(CATEGORY_FIRST_SLOT + i,
+                    kitIcon(player, session, kits.get(from + i), current));
         }
-        // Prev/next live at the row ends of the header line (free since the glass frame is gone).
-        boolean prev = bandPage > 0;
-        boolean next = from + BAND_CAPACITY < kits.size();
-        if (prev) {
-            inventory.setItem(labelSlot - 2,
-                    ItemBuilder.action(UiTheme.PREV_PAGE, t(player, "menu.page-prev"),
-                            "page:" + (main ? "main" : "sub") + ":prev"));
+        if (page > 0) {
+            inventory.setItem(2 * 9,
+                    ItemBuilder.action(UiTheme.PREV_PAGE, t(player, "menu.page-prev"), "page:prev"));
         }
-        if (next) {
-            inventory.setItem(labelSlot + 2,
-                    ItemBuilder.action(UiTheme.NEXT_PAGE, t(player, "menu.page-next"),
-                            "page:" + (main ? "main" : "sub") + ":next"));
+        if (from + CATEGORY_CAPACITY < kits.size()) {
+            inventory.setItem((2 + 1) * 9 - 1,
+                    ItemBuilder.action(UiTheme.NEXT_PAGE, t(player, "menu.page-next"), "page:next"));
         }
-    }
-
-    private static int bandPage(GuiSession session, boolean main) {
-        Integer page = session.get(main ? "page-main" : "page-sub", Integer.class);
-        return page == null ? 0 : Math.max(0, page);
     }
 
     private ItemStack kitIcon(Player player, GuiSession session, KitDefinition kit, String current) {
@@ -186,25 +198,35 @@ public final class KitSelectGui extends AbstractGui {
 
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot, String action) {
+        if (action != null && action.startsWith("cat:")) {
+            session.setKitCategory(action.substring(4));
+            session.setPage(0);
+            sounds.play(player, "gui-click");
+            refresh(player, session, inventory);
+            return;
+        }
         if (action != null && action.startsWith("page:")) {
-            // Per-band paging: page:main:prev / page:sub:next etc.
-            String[] parts = action.split(":");
-            if (parts.length == 3) {
-                boolean main = "main".equals(parts[1]);
-                boolean next = "next".equals(parts[2]);
-                com.rumilance.practice.model.KitCategory category = main
-                        ? com.rumilance.practice.model.KitCategory.MAIN
-                        : com.rumilance.practice.model.KitCategory.SUB;
-                int pages = Math.max(1, (kitService.enabled(category).size() + BAND_CAPACITY - 1)
-                        / BAND_CAPACITY);
-                int page = Math.min(Math.max(0, bandPage(session, main) + (next ? 1 : -1)), pages - 1);
-                session.put(main ? "page-main" : "page-sub", page);
-                sounds.play(player, "gui-click");
-                refresh(player, session, inventory);
-            }
+            // Per-category paging on the kit row: page:prev / page:next.
+            boolean next = "next".equals(action.substring(5));
+            boolean main = !("SUB".equalsIgnoreCase(session.kitCategory()));
+            com.rumilance.practice.model.KitCategory category = main
+                    ? com.rumilance.practice.model.KitCategory.MAIN
+                    : com.rumilance.practice.model.KitCategory.SUB;
+            int pages = Math.max(1, (kitService.enabled(category).size() + CATEGORY_CAPACITY - 1)
+                    / CATEGORY_CAPACITY);
+            session.setPage(Math.min(Math.max(0, session.page() + (next ? 1 : -1)), pages - 1));
+            sounds.play(player, "gui-click");
+            refresh(player, session, inventory);
             return;
         }
         if ("back".equals(action) || "close".equals(action)) {
+            if (session.kitCategory() != null && "back".equals(action)) {
+                // Back from a category returns to the MAIN/SUB branch, not all the way out.
+                session.setKitCategory(null);
+                sounds.play(player, "gui-back");
+                refresh(player, session, inventory);
+                return;
+            }
             sounds.play(player, "gui-back");
             returnToDuel(player, session);
             return;

@@ -87,8 +87,13 @@ public final class GuiSession {
         this.page = Math.max(0, page);
     }
 
+    /**
+     * BO (best-of) was removed from all user-facing surfaces in the 2026-09-28 GUI refresh —
+     * every duel is a single game now (FT covers length). The accessor is pinned to 1 so
+     * legacy session state can never revive it while the field exists.
+     */
     public int bestOf() {
-        return bestOf;
+        return 1;
     }
 
     public int firstTo() {
@@ -99,8 +104,9 @@ public final class GuiSession {
         this.firstTo = com.rumilance.practice.match.FirstTo.normalise(firstTo);
     }
 
+    /** No-op: best-of is fixed at 1 (see {@link #bestOf()}); kept so old call sites compile. */
     public void setBestOf(int bestOf) {
-        this.bestOf = bestOf;
+        this.bestOf = 1;
     }
 
     public boolean ranked() {
