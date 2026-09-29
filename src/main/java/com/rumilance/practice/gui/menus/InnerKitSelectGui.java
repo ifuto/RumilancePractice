@@ -299,7 +299,8 @@ public final class InnerKitSelectGui extends AbstractGui {
             case ORIGIN_TEAM -> {
                 player.closeInventory();
                 if (teamKitSelectGui != null) {
-                    teamKitSelectGui.proceedWithKit(player, chosen, null);
+                    // 中キット選択も「選択」のみに — 開始はキット一覧の START ヒーローから。
+                    teamKitSelectGui.openResume(player, chosen, null);
                 }
             }
             case ORIGIN_EDIT -> {

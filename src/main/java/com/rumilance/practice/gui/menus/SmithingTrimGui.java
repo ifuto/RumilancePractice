@@ -223,8 +223,7 @@ public final class SmithingTrimGui extends AbstractGui implements GuiCloseHandle
             if (bound == null) {
                 applyLore.add(UiTheme.hint(line(player, "gui.trim-free-note-unset")));
             } else {
-                applyLore.add(UiTheme.hint(t(player, "gui.trim-free-note-bound",
-                        com.rumilance.practice.locale.MessageService.tags("kit", bound))));
+                applyLore.add(UiTheme.hint(line(player, "gui.trim-free-note-bound").replace("<kit>", bound)));
             }
         }
         inventory.setItem(GuiSlots.slot(5, 4),

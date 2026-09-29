@@ -157,9 +157,36 @@ public final class FfaSpawnIndex implements Listener {
         int[] trimmedZ = new int[occN];
         System.arraycopy(occX, 0, trimmedX, 0, occN);
         System.arraycopy(occZ, 0, trimmedZ, 0, occN);
-        int pick = FfaSpawnMath.pickIndex(
-                n, xs, zs, trimmedX, trimmedZ, FfaSpawnLocator.MIN_DISTANCE * FfaSpawnLocator.MIN_DISTANCE,
-                ThreadLocalRandom.current());
+        // Natural-first: 芝生・土層だけのプールを先に回す(ユーザー要望「石の上スポーンはキモい」)。
+        int[] naturalIdx = new int[n];
+        int nNat = 0;
+        for (int i = 0; i < n; i++) {
+            Spot spot = loaded.get(i);
+            if (FfaSpawnMath.isNaturalSpawnGround(
+                    world.getBlockAt(spot.x(), spot.y() - 1, spot.z()).getType().name())) {
+                naturalIdx[nNat++] = i;
+            }
+        }
+        int pick = -1;
+        if (nNat > 0) {
+            int[] ncx = new int[nNat];
+            int[] ncz = new int[nNat];
+            for (int i = 0; i < nNat; i++) {
+                ncx[i] = xs[naturalIdx[i]];
+                ncz[i] = zs[naturalIdx[i]];
+            }
+            int nPick = FfaSpawnMath.pickIndex(nNat, ncx, ncz, trimmedX, trimmedZ,
+                    FfaSpawnLocator.MIN_DISTANCE * FfaSpawnLocator.MIN_DISTANCE,
+                    ThreadLocalRandom.current());
+            if (nPick >= 0) {
+                pick = naturalIdx[nPick];
+            }
+        }
+        if (pick < 0) {
+            pick = FfaSpawnMath.pickIndex(
+                    n, xs, zs, trimmedX, trimmedZ, FfaSpawnLocator.MIN_DISTANCE * FfaSpawnLocator.MIN_DISTANCE,
+                    ThreadLocalRandom.current());
+        }
         if (pick < 0) {
             return null;
         }

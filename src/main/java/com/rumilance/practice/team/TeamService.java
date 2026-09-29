@@ -458,6 +458,31 @@ public final class TeamService {
         return Result.OK;
     }
 
+    /** GUI helper: does this viewer's team have a live pending invite for target? */
+    public boolean isInvitePending(Player viewer, UUID targetId) {
+        if (viewer == null || targetId == null) {
+            return false;
+        }
+        Team team = byMember.get(viewer.getUniqueId());
+        if (team == null) {
+            return false;
+        }
+        Invite invite = invites.get(targetId);
+        return invite != null && invite.teamId().equals(team.id());
+    }
+
+    /** Owner-side invite withdrawal (GUI second-click). */
+    public Result revokeInvite(Player owner, UUID targetId) {
+        Team team = byMember.get(owner.getUniqueId());
+        if (team == null) return Result.NOT_IN_TEAM;
+        if (!team.isOwner(owner.getUniqueId())) return Result.NOT_OWNER;
+        Invite invite = invites.get(targetId);
+        if (invite == null || !invite.teamId().equals(team.id())) return Result.TARGET_OFFLINE;
+        invites.remove(targetId);
+        team.revokeInvite(targetId);
+        return Result.OK;
+    }
+
     private int remainingInviteCooldownSeconds(UUID owner, UUID target) {
         if (owner == null || target == null) {
             return 0;

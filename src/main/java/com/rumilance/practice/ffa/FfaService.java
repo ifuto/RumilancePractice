@@ -1253,12 +1253,18 @@ public final class FfaService {
         }
         int minDistSq = FfaSpawnLocator.MIN_DISTANCE * FfaSpawnLocator.MIN_DISTANCE;
         java.util.concurrent.ThreadLocalRandom rng = java.util.concurrent.ThreadLocalRandom.current();
+        // Natural-first: 先の2/3は芝生・土系の列のみ採用(ユーザー要望:石の上スポーンはキモい)。
         for (int attempt = 0; attempt < 24; attempt++) {
+            boolean naturalOnly = attempt < 16;
             int x = rng.nextInt(arena.region().minX(), arena.region().maxX() + 1);
             int z = rng.nextInt(arena.region().minZ(), arena.region().maxZ() + 1);
             int top = Math.min(world.getHighestBlockYAt(x, z), maxY);
             Location spot = scanColumnSpawnable(world, x, z, minY, top);
             if (spot == null) {
+                continue;
+            }
+            if (naturalOnly && !FfaSpawnMath.isNaturalSpawnGround(
+                    world.getBlockAt(x, spot.getBlockY() - 1, z).getType().name())) {
                 continue;
             }
             if (occX.length == 0

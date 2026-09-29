@@ -114,6 +114,23 @@ public final class FfaSpawnMath {
         return Integer.MIN_VALUE;
     }
 
+    /**
+     * 自然味のある足場だけを通すフィルタ — ユーザー要望「石の上にスポーンするのはキモい」。
+     * FFA のスポーン選定(ジョイン・リスポーン双方)はまずこちらの層で探し、見つからなければ
+     * {@link #isSpawnGround} の一般層(石・レンガ含む)に降りる。
+     */
+    public static boolean isNaturalSpawnGround(String materialName) {
+        if (materialName == null) {
+            return false;
+        }
+        return switch (materialName) {
+            case "GRASS_BLOCK", "DIRT", "COARSE_DIRT", "ROOTED_DIRT", "PODZOL", "MYCELIUM",
+                    "MUD", "PACKED_MUD", "FARMLAND", "MOSS_BLOCK", "SAND", "RED_SAND",
+                    "GRAVEL", "CLAY", "SNOW_BLOCK", "NETHERRACK" -> true;
+            default -> false;
+        };
+    }
+
     /** True when {@code materialName} is a solid, safe surface a player can stand on at spawn. */
     public static boolean isSpawnGround(String materialName) {
         if (materialName == null) {

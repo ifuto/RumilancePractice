@@ -36,6 +36,12 @@ public final class TeamSettingsGui extends AbstractGui {
     private TeamKitSelectGui kitSelect;
     private TeamConfigGui teamConfigGui;
     private ConfirmGui confirmGui;
+    /** select_map タイルの直 link(キット選択を経ずにマップだけ開いて帰る経路 [Party/GUI 刷新])。 */
+    private PartyMapSelectGui directMapSelect;
+
+    public void setDirectMapSelect(PartyMapSelectGui directMapSelect) {
+        this.directMapSelect = directMapSelect;
+    }
     private TeamHubGui.ArenaTemplateStoreSupplier arenaStoreSupplier;
 
     public TeamSettingsGui(GuiSessionRegistry registry, SoundService sounds,
@@ -249,13 +255,16 @@ public final class TeamSettingsGui extends AbstractGui {
                 }
             }
             case "select_map" -> {
-                // Map selection goes through kit selection first: picking a kit opens that
-                // kit's party-map list, and choosing a map starts the battle.
+                // マップだけを選ぶ(開始なし)。PartyMapSelect から即戻る経路 [Party/GUI 刷新]。
                 if (!owner) {
                     return;
                 }
                 sounds.play(player, "gui-click");
-                openLater(player, kitSelect);
+                if (directMapSelect != null) {
+                    openLater(player, directMapSelect);
+                } else {
+                    openLater(player, kitSelect);
+                }
             }
             case "open_team_config" -> {
                 if (!owner) {

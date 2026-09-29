@@ -110,11 +110,21 @@ public final class PartyInviteGui extends AbstractGui {
                             .action("decorate")
                             .build());
         }
+        inventory.setItem(GuiSlots.slot(0, 4),
+                ItemBuilder.of(Material.BOOK)
+                        .name(t(player, "party.invite-title").color(UiTheme.SECONDARY))
+                        .lore(UiTheme.divider(),
+                                UiTheme.labelValue(line(player, "party.invite-online-label"),
+                                        String.valueOf(candidates.size())),
+                                UiTheme.blank(),
+                                UiTheme.hint(line(player, "party.invite-hint")))
+                        .action("decorate").build());
         paintPaging(player, inventory, page, candidates.size());
         MenuScaffold.returnButton(inventory, t(player, "menu.back"));
     }
 
     private ItemStack skull(Player viewer, Player target) {
+        boolean pending = teamService.isInvitePending(viewer, target.getUniqueId());
         // Busy targets (match/queue/FFA/spectate) are flagged — they cannot join a party
         // until they are back in the lobby, so the owner sees it before inviting.
         String busyKey = null;
@@ -132,7 +142,9 @@ public final class PartyInviteGui extends AbstractGui {
             };
         }
         ItemBuilder builder = ItemBuilder.of(Material.PLAYER_HEAD)
-                .name(Component.text(target.getName(), busyKey == null ? UiTheme.VALUE : UiTheme.MUTED)
+                .name(Component.text(target.getName(),
+                                pending ? UiTheme.SUCCESS
+                                        : busyKey == null ? UiTheme.VALUE : UiTheme.MUTED)
                         .decoration(TextDecoration.ITALIC, false))
                 .skullOwner(target)
                 .lore(UiTheme.divider());
@@ -140,9 +152,14 @@ public final class PartyInviteGui extends AbstractGui {
             builder.lore(UiTheme.status(line(viewer, busyKey), UiTheme.WARNING));
         }
         return builder
-                .lore(busyKey == null
+                .lore(pending
+                        ? UiTheme.line(line(viewer, "party.invite-sent"))
+                        : busyKey == null
                         ? UiTheme.hint(line(viewer, "party.invite-click"))
                         : UiTheme.line(line(viewer, "party.invite-busy-note")))
+                .lore(pending ? UiTheme.hint(line(viewer, "party.invite-revoke-hint"))
+                        : UiTheme.blank())
+                .glint(pending)
                 .action("invite:" + target.getUniqueId())
                 .build();
     }
@@ -183,6 +200,13 @@ public final class PartyInviteGui extends AbstractGui {
             Player target = Bukkit.getPlayer(targetId);
             if (target == null) {
                 sounds.play(player, "error");
+                return;
+            }
+            // 2回目クリック = 招待取り消し(連打/誤タップの自然な回収路)。
+            if (teamService.isInvitePending(player, targetId)) {
+                teamService.revokeInvite(player, targetId);
+                sounds.play(player, "cancel");
+                refresh(player, session, inventory);
                 return;
             }
             TeamService.Result r = teamService.invite(player, target.getName());

@@ -100,6 +100,47 @@ public final class TeamKitSelectGui extends AbstractGui {
     protected void configureSession(GuiSession session, Player player) {
         session.setKitCategory(null);
         session.setPage(0);
+        session.setSelectedKit(null);
+        session.put("orig_sel", Boolean.FALSE);
+        session.put(InnerKitSelectGui.CHOICE_KEY, null);
+    }
+
+    /** バトル開始: START ヒーローボタン直行(選択されたマップはチーム設定のまま利用)。 */
+    private void startBattleDirect(Player player, String kitId, String innerKitId) {
+        kitId = kitService.playableId(kitId);
+        TeamService.Result precheck = teamService.preflightStart(player);
+        if (precheck != TeamService.Result.OK) {
+            sounds.play(player, "error");
+            player.sendMessage(Component.text(teamService.errorMessage(player, precheck), UiTheme.DANGER)
+                    .decoration(TextDecoration.ITALIC, false));
+            return;
+        }
+        sounds.play(player, "gui-click");
+        player.closeInventory();
+        TeamService.Result r = teamService.start(player, kitId, innerKitId);
+        sounds.play(player, r == TeamService.Result.OK ? "match-found" : "error");
+        if (r != TeamService.Result.OK) {
+            player.sendMessage(Component.text(teamService.errorMessage(player, r), UiTheme.DANGER)
+                    .decoration(TextDecoration.ITALIC, false));
+        }
+    }
+
+    /**
+     * マップ確定・中キット確定からの復帰: 選んでいたキットを保持したまま一覧を開き直す。
+     */
+    public void openResume(Player player, String kitId, String innerKitId) {
+        openWithSession(player, session -> {
+            if (kitId != null) {
+                session.setSelectedKit(kitService.playableId(kitId));
+                kitService.get(kitId).ifPresent(k ->
+                        session.setKitCategory(k.category().name()));
+            }
+            if (innerKitId != null
+                    && !com.rumilance.practice.kit.InnerKitService.isDefault(innerKitId)) {
+                session.put(InnerKitSelectGui.CHOICE_KEY,
+                        com.rumilance.practice.kit.InnerKitService.normalizeId(innerKitId));
+            }
+        });
     }
 
     @Override
@@ -145,6 +186,16 @@ public final class TeamKitSelectGui extends AbstractGui {
 
         String category = session.kitCategory();
         if (category == null) {
+            // 使いやすさ: メイン/サブどちらか空なら 2 択画面は飛ばして直接一覧へ。
+            boolean mainEmpty = kitService.enabled(KitCategory.MAIN).isEmpty();
+            boolean subEmpty = kitService.enabled(KitCategory.SUB).isEmpty();
+            if (mainEmpty != subEmpty) {
+                category = mainEmpty ? "SUB" : "MAIN";
+                session.setKitCategory(category);
+                session.setPage(0);
+            }
+        }
+        if (category == null) {
             // Step 1: the two wooden category buttons (Queue と同じ2択画面)。
             List<KitDefinition> main = kitService.enabled(KitCategory.MAIN);
             List<KitDefinition> sub = kitService.enabled(KitCategory.SUB);
@@ -185,7 +236,7 @@ public final class TeamKitSelectGui extends AbstractGui {
                 "SUB".equalsIgnoreCase(category) ? KitCategory.SUB : KitCategory.MAIN,
                 kits.size(), line(player, "gui.party-start-click")));
         for (KitDefinition kit : kits) {
-            choices.add(partyKitTile(player, kit));
+            choices.add(partyKitTile(player, session, kit));
         }
 
         // The owner's own original kits stay selectable even with 28+ server kits.
@@ -204,7 +255,9 @@ public final class TeamKitSelectGui extends AbstractGui {
                                 UiTheme.line(line(player, "gui.party-original-kit-lore")),
                                 UiTheme.blank(),
                                 UiTheme.hint(line(player, "gui.party-start-click")))
-                        .glint(true)
+                        .glint(Boolean.TRUE.equals(session.get("orig_sel", Boolean.class))
+                                && team.originalKitSlot() != null
+                                && team.originalKitSlot() == slot)
                         .action("origkit:" + slot)
                         .build());
             }
@@ -216,10 +269,57 @@ public final class TeamKitSelectGui extends AbstractGui {
         }
         paintPaging(player, inventory, page, choices.size());
 
-        MenuScaffold.returnButton(inventory, t(player, "menu.back"));
+        // [選択 → START 確定] 的新フロー: タップ=選択(光るだけ)、START=合図のクリック。
+        // マップを変えたい時だけ 右の MAP チップから選ぶ。バトル開始は START のみ。
+        String selectedKit = session.selectedKit();
+        boolean origSelected = Boolean.TRUE.equals(session.get("orig_sel", Boolean.class));
+        boolean hasSelection = selectedKit != null || origSelected;
+        String innerChoice = session.get(InnerKitSelectGui.CHOICE_KEY, String.class);
+
+        inventory.setItem(GuiSlots.slot(5, 2),
+                ItemBuilder.action(UiTheme.BACK, t(player, "menu.back"), "back"));
+        inventory.setItem(GuiSlots.slot(5, 6),
+                ItemBuilder.of(Material.MAP)
+                        .name(t(player, "gui.party-map-chip").color(UiTheme.PRIMARY))
+                        .lore(UiTheme.divider(),
+                                UiTheme.labelValue(line(player, "party.map-label"),
+                                        team != null && team.selectedArena() != null
+                                                ? com.rumilance.practice.util.NameDisplay
+                                                        .pretty(team.selectedArena())
+                                                : line(player, "party.random")),
+                                UiTheme.blank(),
+                                UiTheme.hint(line(player, "gui.party-map-chip-hint")))
+                        .action("open_map").build());
+        Component startName;
+        java.util.List<Component> startLore;
+        if (origSelected) {
+            startName = t(player, "gui.party-start-orig").color(ready ? UiTheme.SUCCESS : UiTheme.MUTED);
+            startLore = java.util.List.of(UiTheme.divider(),
+                    UiTheme.line(line(player, "gui.party-selected-orig")));
+        } else if (selectedKit != null) {
+            startName = t(player, "gui.party-start-kit", MessageService.tags(
+                    "kit", com.rumilance.practice.util.KitNames.pretty(selectedKit)))
+                    .color(ready ? UiTheme.SUCCESS : UiTheme.MUTED);
+            startLore = new ArrayList<>(java.util.List.of(UiTheme.divider()));
+            if (innerChoice != null
+                    && !com.rumilance.practice.kit.InnerKitService.isDefault(innerChoice)) {
+                ((ArrayList<Component>) startLore).add(UiTheme.line(
+                        line(player, "gui.party-selected-inner").replace("<inner>", innerChoice)));
+            }
+        } else {
+            startName = t(player, "gui.party-start").color(UiTheme.MUTED);
+            startLore = java.util.List.of(UiTheme.divider(),
+                    UiTheme.hint(line(player, "gui.party-pick-first")));
+        }
+        inventory.setItem(GuiSlots.slot(5, 4),
+                ItemBuilder.of(ready && hasSelection ? Material.DIAMOND_SWORD : Material.IRON_SWORD)
+                        .name(startName)
+                        .lore(startLore.toArray(new Component[0]))
+                        .glint(ready && hasSelection)
+                        .action("start_battle").build());
     }
 
-    private ItemStack partyKitTile(Player player, KitDefinition kit) {
+    private ItemStack partyKitTile(Player player, GuiSession session, KitDefinition kit) {
         // フォルダの親タイルは元の名前とアイコンを保持。左=既定の子、右=子一覧。
         KitDefinition shown = kitService.tile(kit);
         List<KitDefinition> children = kitService.children(kit.name());
@@ -237,10 +337,11 @@ public final class TeamKitSelectGui extends AbstractGui {
             lore.add(UiTheme.hint(line(player, "gui.innerkit-right-hint")));
         }
         lore.add(UiTheme.blank());
-        lore.add(UiTheme.hint(line(player, "gui.party-start-click")));
+        lore.add(UiTheme.hint(line(player, "gui.party-select-click")));
         return ItemBuilder.of(ItemBuilder.materialOr(kit.icon(), Material.DIAMOND_SWORD))
                 .nameMini(kit.prettyDisplayName())
                 .lore(lore.toArray(new Component[0]))
+                .glint(kit.name().equals(session.selectedKit()))
                 .action("kit:" + kit.name())
                 .build();
     }
@@ -296,11 +397,59 @@ public final class TeamKitSelectGui extends AbstractGui {
                 player.closeInventory();
                 player.performCommand("team");
             }
+            case "open_map" -> {
+                // マップだけ事前に選ぶ(開始はしない)。PartyMapSelect 側で map: クリック = 選択確定。
+                sounds.play(player, "gui-click");
+                if (partyMapSelectGui == null) {
+                    return;
+                }
+                String selKit = session.selectedKit();
+                String inner = session.get(InnerKitSelectGui.CHOICE_KEY, String.class);
+                session.setNavigatingAway(true);
+                if (selKit == null) {
+                    org.bukkit.Bukkit.getScheduler().runTask(
+                            org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
+                            () -> { if (player.isOnline()) { partyMapSelectGui.open(player); } });
+                } else {
+                    final String k = selKit;
+                    String in = inner;
+                    org.bukkit.Bukkit.getScheduler().runTask(
+                            org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
+                            () -> { if (player.isOnline()) { partyMapSelectGui.openForKit(player, k, in); } });
+                }
+            }
+            case "start_battle" -> {
+                boolean origSelected = Boolean.TRUE.equals(session.get("orig_sel", Boolean.class));
+                Integer origSlot = teamService.teamOf(player.getUniqueId())
+                        .map(com.rumilance.practice.team.Team::originalKitSlot).orElse(null);
+                if (origSelected && origSlot != null) {
+                    proceedWithOriginalKit(player, origSlot);
+                } else {
+                    String sel = session.selectedKit();
+                    if (sel == null) {
+                        player.sendMessage(Component.text(
+                                line(player, "gui.party-pick-first"), UiTheme.WARNING)
+                                .decoration(TextDecoration.ITALIC, false));
+                        sounds.play(player, "error");
+                        return;
+                    }
+                    String inner = session.get(InnerKitSelectGui.CHOICE_KEY, String.class);
+                    startBattleDirect(player, sel, inner);
+                }
+            }
             default -> {
                 if (action.startsWith("kit:")) {
+                    // Selection only — 開始は START ヒーローボタンから(1回の誤タップで始まらない)。
+                    String chosen = action.substring("kit:".length());
+                    if (!kitService.isFolder(chosen)) {
+                        chosen = kitService.playableId(chosen);
+                    }
+                    session.setSelectedKit(chosen);
+                    session.put("orig_sel", Boolean.FALSE);
                     teamService.teamOf(player.getUniqueId())
                             .ifPresent(team -> team.setOriginalKitSlot(null));
-                    proceedWithKit(player, action.substring("kit:".length()));
+                    sounds.play(player, "select");
+                    refresh(player, session, inventory);
                 } else if (action.startsWith("origkit:")) {
                     // Original kit selected: remember the owner's slot. The match then fights
                     // on that kit alone — loadout AND rules — with no shared match kit at all.
@@ -310,9 +459,12 @@ public final class TeamKitSelectGui extends AbstractGui {
                     } catch (NumberFormatException e) {
                         return;
                     }
+                    session.setSelectedKit(null);
+                    session.put("orig_sel", Boolean.TRUE);
                     teamService.teamOf(player.getUniqueId())
                             .ifPresent(team -> team.setOriginalKitSlot(origSlot));
-                    proceedWithOriginalKit(player, origSlot);
+                    sounds.play(player, "select");
+                    refresh(player, session, inventory);
                 }
             }
         }
@@ -340,46 +492,11 @@ public final class TeamKitSelectGui extends AbstractGui {
         }
     }
 
-    /** Validates readiness, then enters the map-select flow (or starts directly without it). */
-    private void proceedWithKit(Player player, String kitId) {
-        proceedWithKit(player, kitId, null);
-    }
-
     /**
-     * Party battle with a chosen 中キット: {@code innerKitId} is the preset everyone fights with
-     * (null / blank / {@code default} = the kit itself, exactly as before).
+     * Legacy entry (中キット確定等): 新フローでは「開始」は行わず、選択済み状態で一覧に戻る。
+     * START ヒーローボタンからのみバトルが始まる(誤タップ防止 2026-09-29)。
      */
     public void proceedWithKit(Player player, String kitId, String innerKitId) {
-        // フォルダ(中メニュー)を渡されたらデフォルトの子で戦う。中メニューから選んだ子はそのまま。
-        kitId = kitService.playableId(kitId);
-        // Validate split readiness BEFORE entering map selection so the owner
-        // gets the same errors as before.
-        TeamService.Result precheck = teamService.preflightStart(player);
-        if (precheck != TeamService.Result.OK) {
-            sounds.play(player, "error");
-            player.sendMessage(Component.text(teamService.errorMessage(player, precheck), UiTheme.DANGER)
-                    .decoration(TextDecoration.ITALIC, false));
-            return;
-        }
-        sounds.play(player, "gui-click");
-        if (partyMapSelectGui != null) {
-            final String chosenKit = kitId;
-            final String chosenInner = innerKitId;
-            org.bukkit.Bukkit.getScheduler().runTask(
-                    org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
-                    () -> {
-                        if (player.isOnline()) {
-                            partyMapSelectGui.openForKit(player, chosenKit, chosenInner);
-                        }
-                    });
-        } else {
-            player.closeInventory();
-            TeamService.Result r = teamService.start(player, kitId, innerKitId);
-            sounds.play(player, r == TeamService.Result.OK ? "match-found" : "error");
-            if (r != TeamService.Result.OK) {
-                player.sendMessage(Component.text(teamService.errorMessage(player, r), UiTheme.DANGER)
-                        .decoration(TextDecoration.ITALIC, false));
-            }
-        }
+        openResume(player, kitId, innerKitId);
     }
 }

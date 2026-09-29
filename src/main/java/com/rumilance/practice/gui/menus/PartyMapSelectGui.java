@@ -110,7 +110,7 @@ public final class PartyMapSelectGui extends AbstractGui {
 
         inventory.setItem(MenuScaffold.gridSlot(0), ItemBuilder.of(Material.ENDER_EYE)
                 .name(t(player, "party.random").color(UiTheme.PRIMARY))
-                .lore(UiTheme.hint(line(player, "party.click-start")))
+                .lore(UiTheme.hint(line(player, "gui.party-map-click")))
                 .action("map:random")
                 .build());
 
@@ -133,7 +133,7 @@ public final class PartyMapSelectGui extends AbstractGui {
                             UiTheme.labelValue(line(player, "gui.arena-id"), t.name()),
                             selected
                                     ? UiTheme.status(line(player, "party.selected"), UiTheme.SUCCESS)
-                                    : UiTheme.hint(line(player, "party.click-start"))
+                                    : UiTheme.hint(line(player, "gui.party-map-click"))
                     )
                     .glint(selected)
                     .action("map:" + t.name())
@@ -150,9 +150,13 @@ public final class PartyMapSelectGui extends AbstractGui {
         }
         if ("back".equals(action)) {
             sounds.play(player, "gui-back");
-            // Back goes to kit selection (the previous step), not the team hub.
-            if (teamKitSelectGui != null) {
-                teamKitSelectGui.open(player);
+            String kitId = session.get("kit_id", String.class);
+            if (kitId != null && teamKitSelectGui != null) {
+                // Back with selection preserved (map chip から来た場合)。
+                String innerKitId = session.get(InnerKitSelectGui.CHOICE_KEY, String.class);
+                teamKitSelectGui.openResume(player, kitId, innerKitId);
+            } else if (teamSettingsGui != null) {
+                teamSettingsGui.open(player);
             } else if (teamHubGui != null) {
                 teamHubGui.open(player);
             } else {
@@ -161,32 +165,45 @@ public final class PartyMapSelectGui extends AbstractGui {
             return;
         }
         if (action != null && action.startsWith("map:")) {
+            // [Party GUI 刷新 2026-09-29] マップの確定のみする — バトルはキット選択画面の
+            // START ヒーローボタンから始める。誤タップで試合が始まる事故は消滅する。
             String map = action.substring("map:".length());
             String kitId = session.get("kit_id", String.class);
-            if (kitId == null) {
-                player.closeInventory();
-                return;
-            }
             String arena = "random".equalsIgnoreCase(map) ? null : map;
             TeamService.Result r = teamService.setSelectedArena(player, arena);
             if (r != TeamService.Result.OK) {
                 sounds.play(player, "error");
                 return;
             }
-            player.closeInventory();
+            sounds.play(player, "select");
             String innerKitId = session.get(InnerKitSelectGui.CHOICE_KEY, String.class);
-            session.put("kit_id", null);
-            session.put(InnerKitSelectGui.CHOICE_KEY, null);
             this.pendingKitId = null;
             this.pendingInnerKitId = null;
-            TeamService.Result start = teamService.start(player, kitId, innerKitId);
-            sounds.play(player, start == TeamService.Result.OK ? "match-found" : "error");
-            if (start != TeamService.Result.OK) {
-                player.sendMessage(net.kyori.adventure.text.Component.text(
-                        teamService.errorMessage(player, start), UiTheme.DANGER)
-                        .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+            if (kitId != null && teamKitSelectGui != null) {
+                // キット選択画面へ選定済みキット付きで帰る(1 tick 遅延で close 競合を防ぐ)
+                player.closeInventory();
+                final String k = kitId;
+                final String in = innerKitId;
+                org.bukkit.Bukkit.getScheduler().runTask(
+                        org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
+                        () -> { if (player.isOnline()) { teamKitSelectGui.openResume(player, k, in); } });
+            } else if (teamSettingsGui != null) {
+                // 設定画面(マップだけ選びに来た)へ戻る
+                player.closeInventory();
+                org.bukkit.Bukkit.getScheduler().runTask(
+                        org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
+                        () -> { if (player.isOnline()) { teamSettingsGui.open(player); } });
+            } else {
+                player.closeInventory();
             }
         }
+    }
+
+    /** 設定画面からマップ選択したときの帰り場所。 */
+    private TeamSettingsGui teamSettingsGui;
+
+    public void setTeamSettingsGui(TeamSettingsGui teamSettingsGui) {
+        this.teamSettingsGui = teamSettingsGui;
     }
 
     private List<ArenaTemplate> partyPool(String kitId) {

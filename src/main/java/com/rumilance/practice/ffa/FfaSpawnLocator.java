@@ -23,7 +23,8 @@ public final class FfaSpawnLocator {
 
     private static final int SAMPLE_ATTEMPTS = 12;
     private static final int MAX_LOADED_SCANS = 8;
-    static final int MIN_DISTANCE = 8;
+    /** 他プレイヤーとのスポーン間最小距離【ユーザー要望:絶対にめっちゃ離す】8→32。 */
+    static final int MIN_DISTANCE = 32;
 
     private FfaSpawnLocator() {
     }
@@ -115,9 +116,36 @@ public final class FfaSpawnLocator {
             cx[i] = grass.get(i).getBlockX();
             cz[i] = grass.get(i).getBlockZ();
         }
-        int pick = FfaSpawnMath.pickIndex(
-                grass.size(), cx, cz, trimmedX, trimmedZ, MIN_DISTANCE * MIN_DISTANCE, rng);
-        Location chosen = pick < 0 ? null : grass.get(pick).clone();
+        // Natural-first: 芝生・土系の上だけのプールから選ぶ(石の上スポーン回避)。
+        int[] naturalIdx = new int[grass.size()];
+        int nNat = 0;
+        for (int i = 0; i < grass.size(); i++) {
+            Location g = grass.get(i);
+            String ground = world.getBlockAt(g.getBlockX(), g.getBlockY() - 1, g.getBlockZ())
+                    .getType().name();
+            if (FfaSpawnMath.isNaturalSpawnGround(ground)) {
+                naturalIdx[nNat++] = i;
+            }
+        }
+        Location chosen = null;
+        if (nNat > 0) {
+            int[] ncx = new int[nNat];
+            int[] ncz = new int[nNat];
+            for (int i = 0; i < nNat; i++) {
+                ncx[i] = cx[naturalIdx[i]];
+                ncz[i] = cz[naturalIdx[i]];
+            }
+            int nPick = FfaSpawnMath.pickIndex(nNat, ncx, ncz, trimmedX, trimmedZ,
+                    MIN_DISTANCE * MIN_DISTANCE, rng);
+            if (nPick >= 0) {
+                chosen = grass.get(naturalIdx[nPick]).clone();
+            }
+        }
+        if (chosen == null) {
+            int pick = FfaSpawnMath.pickIndex(
+                    grass.size(), cx, cz, trimmedX, trimmedZ, MIN_DISTANCE * MIN_DISTANCE, rng);
+            chosen = pick < 0 ? null : grass.get(pick).clone();
+        }
         if (chosen == null) {
             chosen = com.rumilance.practice.util.SpawnFooting.standClear(fallback);
             if (chosen == null) {

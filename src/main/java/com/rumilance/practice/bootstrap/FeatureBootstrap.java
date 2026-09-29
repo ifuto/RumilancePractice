@@ -986,6 +986,8 @@ public final class FeatureBootstrap {
         teamSettingsGui.setTeamConfigGui(teamConfigGui);
         teamSettingsGui.setBrowser(teamsBrowserGui);
         teamSettingsGui.setArenaStoreSupplier(arenaStore::partyArenas);
+        teamSettingsGui.setDirectMapSelect(partyMapSelectGui);
+        partyMapSelectGui.setTeamSettingsGui(teamSettingsGui);
         teamConfigGui.setTeamSettingsGui(teamSettingsGui);
         teamHubGui.setTeamSettingsGui(teamSettingsGui);
         ArenaAdminGui arenaAdminGui = new ArenaAdminGui(
