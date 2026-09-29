@@ -18,15 +18,16 @@ import org.bukkit.event.inventory.ClickType;
 import org.bukkit.inventory.Inventory;
 
 /**
- * Owner-only team settings & operations — the single second-level screen of the party GUI.
- * Everything that is not daily wanted lives here (old Settings/Manage screens merged into
- * one, so navigation is always Hub → Settings → optional battle config):
+ * パーティ設定 (完全リビルド 2026-09-29)。設計思想:
+ * <p>「人の画面 = Hub に残す」「ルールの画面 = ここに集約」の一本化。</p>
  * <ul>
- *   <li>Row 1 — battle rules: public/private, map selection, friendly fire</li>
- *   <li>Row 2 — team operations: per-team battle settings, autosplit, clear sides</li>
- *   <li>Row 3 — disband (destructive, confirmation dialog)</li>
+ *   <li>row1 — ルール:       公開/非公開 (1,2)・マップ (1,4)・友好ファイア (1,6)</li>
+ *   <li>row2 — チーム操作:   サイド白紙 (2,2)・自動分割 (2,4)・上位設定 (2,6)</li>
+ *   <li>row3 — 危険:         解散は赤い最遠隅 (3,7) だけ</li>
+ *   <li>row4 — 共通:         ハブへ戻る (4,4)。Owner 以外は空画面+バリアのみ</li>
  * </ul>
- * Invite lives on the hub because it is a daily action; back always returns to the hub.
+ * <p>旧画面が抱えていた「やりたい操作が hub と settings に分散」問題は
+ * Settings への一本化で解消する(Hub は誰がどちら側かの「人」の可視化に専念)。</p>
  */
 public final class TeamSettingsGui extends AbstractGui {
 
@@ -36,12 +37,13 @@ public final class TeamSettingsGui extends AbstractGui {
     private TeamKitSelectGui kitSelect;
     private TeamConfigGui teamConfigGui;
     private ConfirmGui confirmGui;
-    /** select_map タイルの直 link(キット選択を経ずにマップだけ開いて帰る経路 [Party/GUI 刷新])。 */
+    /** select_map タイルの直 link(キット選択を経ずにマップだけ開いて帰る経路)。 */
     private PartyMapSelectGui directMapSelect;
 
     public void setDirectMapSelect(PartyMapSelectGui directMapSelect) {
         this.directMapSelect = directMapSelect;
     }
+
     private TeamHubGui.ArenaTemplateStoreSupplier arenaStoreSupplier;
 
     public TeamSettingsGui(GuiSessionRegistry registry, SoundService sounds,
@@ -76,7 +78,7 @@ public final class TeamSettingsGui extends AbstractGui {
 
     @Override
     protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
-        return com.rumilance.practice.gui.GuiFrame.Theme.WHITE;
+        return com.rumilance.practice.gui.GuiFrame.Theme.CYAN;
     }
 
     @Override
@@ -86,13 +88,12 @@ public final class TeamSettingsGui extends AbstractGui {
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return t(player, "gui.team-settings-title").color(UiTheme.PRIMARY);
+        return t(player, "party-settings-title").color(UiTheme.PRIMARY);
     }
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
         paintFrame(player, session, inventory);
-
         Team team = teamService.teamOf(player.getUniqueId()).orElse(null);
         if (team == null || !team.isOwner(player.getUniqueId())) {
             inventory.setItem(GuiSlots.slot(2, 4),
@@ -105,7 +106,7 @@ public final class TeamSettingsGui extends AbstractGui {
             return;
         }
 
-        // Row 1 — battle rules.
+        // === row1: ルール（バトルの基本設定、視線の流れは [公開-マップ-FF] ) ===
         inventory.setItem(GuiSlots.slot(1, 2),
                 ItemBuilder.of(team.isPublic() ? UiTheme.TOGGLE_ON : UiTheme.TOGGLE_OFF)
                         .name(t(player, team.isPublic() ? "party.public-team" : "party.private-team")
@@ -117,20 +118,18 @@ public final class TeamSettingsGui extends AbstractGui {
                                 UiTheme.blank(),
                                 UiTheme.hint(line(player, "party.toggle-hint")))
                         .action("toggle_public").build());
-        if (arenaStoreSupplier != null && !arenaStoreSupplier.partyArenas().isEmpty()) {
-            inventory.setItem(GuiSlots.slot(1, 4),
-                    ItemBuilder.of(Material.MAP)
-                            .name(t(player, "party.select-map").color(UiTheme.PRIMARY))
-                            .lore(UiTheme.divider(),
-                                    UiTheme.labelValue(line(player, "party.map-label"),
-                                            team.selectedArena() == null
-                                                    ? line(player, "party.random")
-                                                    : com.rumilance.practice.util.NameDisplay
-                                                            .pretty(team.selectedArena())),
-                                    UiTheme.blank(),
-                                    UiTheme.hint(line(player, "party.select-map-hint")))
-                            .action("select_map").build());
-        }
+        inventory.setItem(GuiSlots.slot(1, 4),
+                ItemBuilder.of(Material.MAP)
+                        .name(t(player, "party.select-map").color(UiTheme.PRIMARY))
+                        .lore(UiTheme.divider(),
+                                UiTheme.labelValue(line(player, "party.map-label"),
+                                        team.selectedArena() == null
+                                                ? line(player, "party.random")
+                                                : com.rumilance.practice.util.NameDisplay
+                                                        .pretty(team.selectedArena())),
+                                UiTheme.blank(),
+                                UiTheme.hint(line(player, "party.select-map-hint")))
+                        .action("select_map").build());
         inventory.setItem(GuiSlots.slot(1, 6),
                 ItemBuilder.of(team.friendlyFire() ? Material.TNT : Material.SHIELD)
                         .name(t(player, team.friendlyFire() ? "party.ff-on-label" : "party.ff-off-label")
@@ -143,17 +142,13 @@ public final class TeamSettingsGui extends AbstractGui {
                                 UiTheme.hint(line(player, "gui.toggle-hint")))
                         .action("toggle_ff").build());
 
-        // Row 2 — team operations.
-        if (teamConfigGui != null) {
-            inventory.setItem(GuiSlots.slot(2, 2),
-                    ItemBuilder.of(Material.COMMAND_BLOCK)
-                            .name(t(player, "gui.team-config-open").color(UiTheme.PRIMARY))
-                            .lore(UiTheme.divider(),
-                                    UiTheme.line(line(player, "gui.team-config-open-lore")),
-                                    UiTheme.blank(),
-                                    UiTheme.hint(line(player, "gui.toggle-hint")))
-                            .action("open_team_config").build());
-        }
+        // === row2: チーム操作(人の編成を整える方) ===
+        inventory.setItem(GuiSlots.slot(2, 2),
+                ItemBuilder.of(Material.WATER_BUCKET)
+                        .name(t(player, "party.clear-sides").color(UiTheme.WARNING))
+                        .lore(UiTheme.divider(),
+                                UiTheme.hint(line(player, "party.clear-sides-hint")))
+                        .action("clearsides").build());
         inventory.setItem(GuiSlots.slot(2, 4),
                 ItemBuilder.of(Material.ENDER_PEARL)
                         .name(t(player, "party.autosplit").color(UiTheme.PRIMARY))
@@ -164,14 +159,19 @@ public final class TeamSettingsGui extends AbstractGui {
                                 UiTheme.blank(),
                                 UiTheme.hint(line(player, "party.autosplit-hint")))
                         .action("autosplit").build());
-        inventory.setItem(GuiSlots.slot(2, 6),
-                ItemBuilder.of(Material.WATER_BUCKET)
-                        .name(t(player, "party.clear-sides").color(UiTheme.WARNING))
-                        .lore(UiTheme.hint(line(player, "party.clear-sides-hint")))
-                        .action("clearsides").build());
+        if (teamConfigGui != null) {
+            inventory.setItem(GuiSlots.slot(2, 6),
+                    ItemBuilder.of(Material.COMMAND_BLOCK)
+                            .name(t(player, "gui.team-config-open").color(UiTheme.PRIMARY))
+                            .lore(UiTheme.divider(),
+                                    UiTheme.line(line(player, "gui.team-config-open-lore")),
+                                    UiTheme.blank(),
+                                    UiTheme.hint(line(player, "gui.toggle-hint")))
+                            .action("open_team_config").build());
+        }
 
-        // Row 3 — destructive action tucked into the far corner, behind a confirmation.
-        inventory.setItem(GuiSlots.slot(3, 8),
+        // === row3: 危険系は最遠隅(3,7)だけに置く ===
+        inventory.setItem(GuiSlots.slot(3, 7),
                 ItemBuilder.of(Material.BARRIER)
                         .name(t(player, "party.disband").color(UiTheme.DANGER))
                         .lore(UiTheme.divider(),
@@ -255,7 +255,6 @@ public final class TeamSettingsGui extends AbstractGui {
                 }
             }
             case "select_map" -> {
-                // マップだけを選ぶ(開始なし)。PartyMapSelect から即戻る経路 [Party/GUI 刷新]。
                 if (!owner) {
                     return;
                 }
@@ -300,9 +299,6 @@ public final class TeamSettingsGui extends AbstractGui {
                                 sounds.play(who, "select");
                                 teamService.disband(who);
                                 who.closeInventory();
-                                // The disband cue is anvil -> 15-tick-later break. Reopen the
-                                // browser a beat after the break so its gui-open sound never
-                                // lands on top of the break.
                                 openBrowserAfterBreak(who);
                             },
                             who -> {
@@ -315,7 +311,7 @@ public final class TeamSettingsGui extends AbstractGui {
                     player.closeInventory();
                     openBrowserAfterBreak(player);
                 } else {
-                    sounds.play(player, "error");
+                    player.sendMessage(Component.text(line(player, "party.disband-hint"), UiTheme.DANGER));
                 }
             }
             default -> {

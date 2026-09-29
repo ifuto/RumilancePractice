@@ -13,7 +13,6 @@ import com.rumilance.practice.team.Team;
 import com.rumilance.practice.team.TeamService;
 import com.rumilance.practice.util.GuiSlots;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
@@ -29,20 +28,28 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * The main party control panel, deliberately kept to the daily flow. Five buttons along
- * the bottom — invite players, auto-split sides, settings (every other control: public /
- * private, map, friendly fire, per-team battle setup, disband), start the battle, close.
- * Every member is listed in the standard 28-slot content grid with a side-coloured icon:
+ * パーティ中継 GUI【完全リビルド 2026-09-29. 「0 から」志向版】。
+ *
+ * <p>旧来は「メンバーが大きな7列グリッドに混在する自己説明の下手な画面」だった。
+ * 新設計は「どの画面でも一目で読める 1 枚紙」に揃えている:</p>
  * <ul>
- *   <li>Left-click a member — cycle their side (RED → BLUE → unassigned)</li>
- *   <li>Right-click (or shift-click) a member — kick (owner only)</li>
+ *   <li>row0 — チーム名のヘッド(中央) + RED/BLUE の人数チップ(左右対称)</li>
+ *   <li>rows1-3 — RED ゾーン(列1-3) ↔ BLUE ゾーン(列5-7)。頭の色はサイドと一致し、
+ *       どこに誰が居るかが配一覧で読める</li>
+ *   <li>row4 — 未割当メンバー専用ベルト(両サイドの境界線上)</li>
+ *   <li>row5 — 下段: リーダーは [招待(2)|自動分割(3)|START(4)|設定(6)|閉(8)]、
+ *       メンバーは [退場(4)|閉(8)]。必ず左右対称、破壊系は最遠隅</li>
  * </ul>
- * Sides may be arbitrarily uneven (max 20 per side); paging kicks in past 28 members.
- * Party members that are not the owner get a leave button instead of the owner bar.
+ * <p>メンバー頭のクリック=サイドを RED→BLUE→未割当 で回す(OWNER のみ)、
+ * 右クリック=キック(OWNER のみ、paging は SIDE 別 9 cap で省略)。</p>
  */
 public final class TeamHubGui extends AbstractGui {
 
     private static final TextColor BLUE = TextColor.color(0x55AAFF);
+    /** One side column's slot count (rows1-3 × cols1-3 または 5-7). */
+    private static final int SIDE_SLOTS = 9;
+    /** Unassigned strip slots on row4 (cols1-7). */
+    private static final int UNASSIGNED_SLOTS = 7;
 
     private final TeamService teamService;
     private final TeamsBrowserGui browser;
@@ -64,7 +71,6 @@ public final class TeamHubGui extends AbstractGui {
         this.teamSettingsGui = teamSettingsGui;
     }
 
-    /** Opens the tournament setup screen; owner-gated inside the target GUI itself. */
     public void setTournamentGui(com.rumilance.practice.gui.menus.TournamentGui tournamentGui) {
         this.tournamentGui = tournamentGui;
     }
@@ -73,9 +79,8 @@ public final class TeamHubGui extends AbstractGui {
         this.stateManager = stateManager;
     }
 
-    @FunctionalInterface
     public interface ArenaTemplateStoreSupplier {
-        java.util.List<com.rumilance.practice.model.ArenaTemplate> partyArenas();
+        List<com.rumilance.practice.model.ArenaTemplate> partyArenas();
     }
 
     public TeamHubGui(GuiSessionRegistry registry, SoundService sounds,
@@ -123,12 +128,13 @@ public final class TeamHubGui extends AbstractGui {
                 .color(UiTheme.PRIMARY);
     }
 
+    // ================================================================== render
+
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
         paintFrame(player, session, inventory);
         Team team = teamService.teamOf(player.getUniqueId()).orElse(null);
         if (team == null) {
-            // Player left / was kicked while the menu was open: show a friendly redirect tile.
             inventory.setItem(GuiSlots.slot(2, 4),
                     ItemBuilder.of(Material.COMPASS)
                             .name(t(player, "party.not-in-team").color(UiTheme.WARNING))
@@ -138,104 +144,31 @@ public final class TeamHubGui extends AbstractGui {
             return;
         }
         boolean owner = team.isOwner(player.getUniqueId());
+        List<TeamColor> activeColors = team.activeColors();
+        TeamColor red = !activeColors.isEmpty() ? activeColors.getFirst() : TeamColor.RED;
+        TeamColor blue = activeColors.size() >= 2 ? activeColors.get(1) : TeamColor.BLUE;
 
-        // --- top bar: team info flanked by the side counters (management controls live
-        // in the team settings sub-GUI so this screen stays focused on members + start) ---
+        // row0: チーム名ヘッド(4) ∥ RED/BLUE チップ(1,2/6,7)
         inventory.setItem(GuiSlots.slot(0, 4), headerItem(player, team));
-        paintCounters(player, team, inventory);
+        inventory.setItem(GuiSlots.slot(0, 2), sideChip(player, team, red));
+        inventory.setItem(GuiSlots.slot(0, 6), sideChip(player, team, blue));
 
-                // --- member grid (rows 1-4, cols 1-7 = 28 slots, paged past 28 members).
-        // 使いやすさの肝: メンバーは必ず【RED → BLUE → 未割当】の順に固まって並ぶ。
-        // クリックでサイドを回しても「どこに誰がいるか」が一目で追える。 ---
-        List<UUID> members = new ArrayList<>(team.members());
-        List<TeamColor> sortColors = team.activeColors();
-        members.sort((a, b) -> {
-            int ia = sideSortIndex(team, sortColors, a);
-            int ib = sideSortIndex(team, sortColors, b);
-            return Integer.compare(ia, ib);
-        });
-        int page = session.page();
-        int pageSize = MenuScaffold.gridPageSize();
-        int from = Math.min(page * pageSize, members.size());
-        int to = Math.min(from + pageSize, members.size());
-        int index = 0;
-        for (int i = from; i < to; i++) {
-            inventory.setItem(MenuScaffold.gridSlot(index++), memberItem(player, team, members.get(i), owner));
-        }
-        paintPaging(player, inventory, page, members.size());
+        // rows1-3: RED 列 1-3 / BLUE 列 5-7 / row4 未割当ベルト列 1-7
+        List<UUID> reds = sideMembers(team, red);
+        List<UUID> blues = sideMembers(team, blue);
+        List<UUID> free = unassignedMembers(team);
+        slotSideGrid(player, inventory, reds, 1, team, owner);
+        slotSideGrid(player, inventory, blues, 5, team, owner);
+        slotUnassignedStrip(player, inventory, free, team, owner);
 
-        // --- bottom bar (owner), mirror-symmetric around the hero START (5,4):
-        // invite (5,1) <-> tournament (5,7), auto-split (5,2) <-> settings (5,6).
-        // Everything else (public/private, maps, friendly fire, disband) lives one
-        // click away in the settings screen ---
+        // 側っ端に余る時の「+N」のタグ
+        overflowBadge(inventory, GuiSlots.slot(3, 3), reds.size(), SIDE_SLOTS);
+        overflowBadge(inventory, GuiSlots.slot(3, 7), blues.size(), SIDE_SLOTS);
+        overflowBadge(inventory, GuiSlots.slot(4, 7), free.size(), UNASSIGNED_SLOTS);
+
+        // row5: フッター(Owner: [招待 2 | 自動分割 3 | START 4 | 設定 6 | 閉 8]、他: [退場 4 | 閉 8])
         if (owner) {
-            inventory.setItem(GuiSlots.slot(5, 1),
-                    ItemBuilder.of(Material.NETHER_STAR)
-                            .name(t(player, "gui.party-quick-invite").color(UiTheme.PRIMARY))
-                            .lore(UiTheme.divider(),
-                                    UiTheme.line(line(player, "gui.party-quick-invite-lore")))
-                            .action("quick_invite").build());
-            inventory.setItem(GuiSlots.slot(5, 6),
-                    ItemBuilder.of(Material.COMPARATOR)
-                            .name(t(player, "gui.team-settings-entry").color(UiTheme.PRIMARY))
-                            .lore(UiTheme.divider(),
-                                    UiTheme.line(line(player, "gui.team-settings-lore")),
-                                    UiTheme.blank(),
-                                    UiTheme.hint(line(player, "gui.team-settings-hint")))
-                            .action("team_settings").build());
-            // Start button shows the FULL readiness picture: sides assigned AND every member
-            // free in the lobby (not queued / in FFA / spectating / fighting). Whatever is
-            // missing is named in the lore so the owner knows exactly what to fix.
-            List<TeamColor> activeColors = team.activeColors();
-            int assigned = 0;
-            for (TeamColor color : activeColors) {
-                assigned += team.side(color).size();
-            }
-            int unassigned = team.size() - assigned;
-            TeamService.Result precheck = teamService.preflightStart(player);
-            boolean ready = precheck == TeamService.Result.OK;
-            Component blockedReason;
-            if (ready) {
-                blockedReason = null;
-            } else if (!team.isSplitReady()) {
-                blockedReason = UiTheme.line(unassigned > 0
-                        ? line(player, "gui.party-unassigned-n")
-                                .replace("<n>", String.valueOf(unassigned))
-                        : line(player, "gui.party-need-both"));
-            } else {
-                blockedReason = UiTheme.line(teamService.errorMessage(player, precheck));
-            }
-            Component blockedHint = !team.isSplitReady()
-                    ? UiTheme.line(line(player, "gui.party-assign-first"))
-                    : UiTheme.line(line(player, "party.start-wait-lobby"));
-            if (team.kind() == com.rumilance.practice.team.GroupKind.PARTY) {
-                inventory.setItem(GuiSlots.slot(5, 7),
-                        ItemBuilder.of(Material.GOLDEN_SWORD)
-                                .name(t(player, "tournament.hub-button").color(UiTheme.SECONDARY))
-                                .lore(UiTheme.divider(),
-                                        UiTheme.line(line(player, "tournament.hub-button-lore")),
-                                        UiTheme.blank(),
-                                        UiTheme.hint(line(player, "tournament.hub-button-hint")))
-                                .action("open_tournament").build());
-            }
-            inventory.setItem(GuiSlots.slot(5, 4),
-                    ItemBuilder.of(Material.DIAMOND_SWORD)
-                            .name(t(player, "gui.party-start").color(ready ? UiTheme.SUCCESS : UiTheme.MUTED))
-                            .lore(UiTheme.divider(),
-                                    ready
-                                            ? UiTheme.line(line(player, "party.start-ready")
-                                                    .replace("<red>", String.valueOf(
-                                                            team.side(activeColors.get(0)).size()))
-                                                    .replace("<blue>", String.valueOf(
-                                                            team.side(activeColors.get(1)).size())))
-                                            : blockedReason,
-                                    UiTheme.blank(),
-                                    ready ? UiTheme.hint(line(player, "gui.party-start-hint"))
-                                            : blockedHint)
-                            .glintIf(ready)
-                            .action("choose_kit").build());
-            inventory.setItem(GuiSlots.slot(5, 8),
-                    ItemBuilder.action(UiTheme.CLOSE, t(player, "menu.close"), "close"));
+            ownerBar(player, team, red, blue, inventory);
         } else {
             inventory.setItem(GuiSlots.slot(5, 4),
                     ItemBuilder.of(Material.OAK_DOOR)
@@ -247,56 +180,118 @@ public final class TeamHubGui extends AbstractGui {
         }
     }
 
-    /** Sort bucket for the member grid: side order index, unassigned members come last. */
-    private static int sideSortIndex(Team team, List<TeamColor> colors, UUID member) {
-        for (int i = 0; i < colors.size(); i++) {
-            if (team.side(colors.get(i)).contains(member)) {
-                return i;
+    /** サイド別要素のグリッド配置(rows1-3、cols=3)。 */
+    private void slotSideGrid(Player viewer, Inventory inventory, List<UUID> members, int baseCol,
+                              Team team, boolean viewerIsOwner) {
+        for (int i = 0; i < Math.min(members.size(), SIDE_SLOTS); i++) {
+            int row = 1 + i / 3;
+            int col = baseCol + i % 3;
+            inventory.setItem(GuiSlots.slot(row, col),
+                    memberItem(viewer, team, members.get(i), viewerIsOwner));
+        }
+    }
+
+    /** 未割当ベルト(row4、cols1-7)。 */
+    private void slotUnassignedStrip(Player viewer, Inventory inventory, List<UUID> members,
+                                     Team team, boolean viewerIsOwner) {
+        for (int i = 0; i < Math.min(members.size(), UNASSIGNED_SLOTS); i++) {
+            inventory.setItem(GuiSlots.slot(4, 1 + i),
+                    memberItem(viewer, team, members.get(i), viewerIsOwner));
+        }
+    }
+
+    /** 余った人数の +N バッジ(グリッド末尾の角に置く)。 */
+    private void overflowBadge(Inventory inventory, int slot, int size, int cap) {
+        if (size <= cap) {
+            return;
+        }
+        inventory.setItem(slot, ItemBuilder.of(Material.NAME_TAG)
+                .name(Component.text("+" + (size - cap), UiTheme.MUTED)
+                        .decoration(TextDecoration.ITALIC, false))
+                .action("decorate").build());
+    }
+
+    /** RED ▸ [[0,2] chip] の人数チップ(装飾のみ)。 */
+    private ItemStack sideChip(Player viewer, Team team, TeamColor color) {
+        int count = team.side(color).size();
+        return ItemBuilder.of(color.wool(), Math.max(1, count))
+                .name(Component.text(line(viewer, "party.team-count-chip")
+                        .replace("<team>", color.label())
+                        .replace("<n>", String.valueOf(count)), color.textColor()))
+                .action("decorate").build());
+    }
+
+    private List<UUID> sideMembers(Team team, TeamColor color) {
+        List<UUID> out = new ArrayList<>();
+        for (UUID member : team.members()) {
+            if (color == team.sideOf(member)) {
+                out.add(member);
             }
         }
-        return colors.size();
+        return out;
     }
 
-    /** Side counters flank the header chip; decorative only (sides are assigned by clicking members). */
-    private void paintCounters(Player player, Team team, Inventory inventory) {
-        int[][] counterSlots = {{0, 2}, {0, 6}, {0, 1}, {0, 7}, {0, 0}, {0, 8}};
-        List<TeamColor> activeColors = team.activeColors();
-        for (int i = 0; i < activeColors.size() && i < counterSlots.length; i++) {
-            TeamColor color = activeColors.get(i);
-            int count = team.side(color).size();
-            inventory.setItem(GuiSlots.slot(counterSlots[i][0], counterSlots[i][1]),
-                    ItemBuilder.of(color.wool(), Math.max(1, count))
-                            .name(Component.text(line(player, "party.team-count-chip")
-                                    .replace("<team>", color.label())
-                                    .replace("<n>", String.valueOf(count)), color.textColor()))
-                            .action("decorate").build());
+    private List<UUID> unassignedMembers(Team team) {
+        List<UUID> out = new ArrayList<>();
+        for (UUID member : team.members()) {
+            if (team.sideOf(member) == null) {
+                out.add(member);
+            }
         }
+        return out;
     }
 
-    /**
-     * @return the lang key of the member's blocking activity state, or {@code null} when the
-     *         member is free in the lobby (or the state manager is not wired).
-     */
-    private String busyStateKey(UUID member) {
-        if (stateManager == null) {
-            return null;
+    /** Owner 用のフッター一式。START にはレディネス(実行理由)を lore で。 */
+    private void ownerBar(Player player, Team team, TeamColor red, TeamColor blue, Inventory inventory) {
+        inventory.setItem(GuiSlots.slot(5, 2),
+                ItemBuilder.of(Material.NETHER_STAR)
+                        .name(t(player, "gui.party-quick-invite").color(UiTheme.PRIMARY))
+                        .lore(UiTheme.divider(),
+                                UiTheme.line(line(player, "gui.party-quick-invite-lore")))
+                        .action("quick_invite").build());
+        inventory.setItem(GuiSlots.slot(5, 6),
+                ItemBuilder.of(Material.COMPARATOR)
+                        .name(t(player, "gui.team-settings-entry").color(UiTheme.PRIMARY))
+                        .lore(UiTheme.divider(),
+                                UiTheme.line(line(player, "gui.team-settings-lore")),
+                                UiTheme.blank(),
+                                UiTheme.hint(line(player, "gui.team-settings-hint")))
+                        .action("team_settings").build());
+        if (team.kind() == com.rumilance.practice.team.GroupKind.PARTY) {
+            inventory.setItem(GuiSlots.slot(5, 1),
+                    ItemBuilder.of(Material.GOLDEN_SWORD)
+                            .name(t(player, "tournament.hub-button").color(UiTheme.SECONDARY))
+                            .lore(UiTheme.divider(),
+                                    UiTheme.line(line(player, "tournament.hub-button-lore")),
+                                    UiTheme.blank(),
+                                    UiTheme.hint(line(player, "tournament.hub-button-hint")))
+                            .action("open_tournament").build());
         }
-        Player online = Bukkit.getPlayer(member);
-        if (online == null) {
-            return null;
-        }
-        com.rumilance.practice.state.PlayerState state = stateManager.getState(member);
-        return switch (state) {
-            case QUEUED_RANKED -> "menu.state-ranked-queue";
-            case QUEUED_UNRANKED -> "menu.state-unranked-queue";
-            case FIGHTING, PREPARING_MATCH, COUNTDOWN, ENDING -> "menu.state-fighting";
-            case SPECTATING -> "menu.state-spectating";
-            case FFA -> "menu.state-ffa";
-            case EDITING_KIT -> "menu.state-editing";
-            case REQUESTING_DUEL -> "menu.state-dueling";
-            case PRACTICE_WAIT, PRACTICE_ACTIVE -> "menu.state-fighting";
-            default -> null;
-        };
+        // START ヒーロー: レディネスを lore に明記(未割当/繁忙/準備 Ready)
+        int r = team.side(red).size();
+        int b = team.side(blue).size();
+        int unassigned = team.size() - r - b;
+        TeamService.Result precheck = teamService.preflightStart(player);
+        boolean ready = precheck == TeamService.Result.OK;
+        Component blockedReason = ready ? null
+                : UiTheme.line(!team.isSplitReady()
+                        ? line(player, "gui.party-need-both")
+                        : teamService.errorMessage(player, precheck));
+        inventory.setItem(GuiSlots.slot(5, 4),
+                ItemBuilder.of(Material.DIAMOND_SWORD)
+                        .name(t(player, "gui.party-start").color(ready ? UiTheme.SUCCESS : UiTheme.MUTED))
+                        .lore(UiTheme.divider(),
+                                ready
+                                        ? UiTheme.line(line(player, "party.start-ready")
+                                                .replace("<red>", String.valueOf(r))
+                                                .replace("<blue>", String.valueOf(b)))
+                                        : blockedReason,
+                                UiTheme.blank(),
+                                UiTheme.hint(line(player, "gui.party-start-hint")))
+                        .glintIf(ready)
+                        .action("choose_kit").build());
+        inventory.setItem(GuiSlots.slot(5, 8),
+                ItemBuilder.action(UiTheme.CLOSE, t(player, "menu.close"), "close"));
     }
 
     private ItemStack headerItem(Player viewer, Team team) {
@@ -328,8 +323,6 @@ public final class TeamHubGui extends AbstractGui {
                 .lore(UiTheme.divider(),
                         UiTheme.labelValue(line(viewer, "gui.party-side"),
                                 side == null ? line(viewer, "gui.party-unassigned") : side.name()));
-        // Busy members (queue / FFA / match / spectate) are flagged so the owner sees at a
-        // glance why a battle cannot start.
         String busyState = busyStateKey(member);
         if (busyState != null) {
             b.lore(UiTheme.status(line(viewer, busyState), UiTheme.WARNING));
@@ -338,14 +331,38 @@ public final class TeamHubGui extends AbstractGui {
             b.lore(UiTheme.status(line(viewer, "gui.party-owner"), UiTheme.SECONDARY));
         }
         if (viewerIsOwner) {
-            b.lore(UiTheme.blank(),
-                    UiTheme.hint(line(viewer, "gui.party-click-cycle")));
+            b.lore(UiTheme.blank(), UiTheme.hint(line(viewer, "gui.party-click-cycle")));
             if (!team.isOwner(member)) {
                 b.lore(UiTheme.hint(line(viewer, "party.right-kick")));
             }
         }
         return b.skullOwner(p).action("member:" + member).build();
     }
+
+    /** 忙しさのキー(queue / FFA / match / spectate)、SOON の予定通知用。 */
+    private String busyStateKey(UUID member) {
+        if (stateManager == null) {
+            return null;
+        }
+        Player online = Bukkit.getPlayer(member);
+        if (online == null) {
+            return null;
+        }
+        com.rumilance.practice.state.PlayerState state = stateManager.getState(member);
+        return switch (state) {
+            case QUEUED_RANKED -> "menu.state-ranked-queue";
+            case QUEUED_UNRANKED -> "menu.state-unranked-queue";
+            case FIGHTING, PREPARING_MATCH, COUNTDOWN, ENDING -> "menu.state-fighting";
+            case SPECTATING -> "menu.state-spectating";
+            case FFA -> "menu.state-ffa";
+            case EDITING_KIT -> "menu.state-editing";
+            case REQUESTING_DUEL -> "menu.state-dueling";
+            case PRACTICE_WAIT, PRACTICE_ACTIVE -> "menu.state-fighting";
+            default -> null;
+        };
+    }
+
+    // ================================================================== clicks
 
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot,
@@ -373,7 +390,7 @@ public final class TeamHubGui extends AbstractGui {
                     return;
                 }
                 sounds.play(player, "gui-open");
-                org.bukkit.Bukkit.getScheduler().runTask(
+                Bukkit.getScheduler().runTask(
                         org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
                         () -> {
                             if (player.isOnline()) {
@@ -399,7 +416,7 @@ public final class TeamHubGui extends AbstractGui {
                     return;
                 }
                 sounds.play(player, "gui-open");
-                org.bukkit.Bukkit.getScheduler().runTask(
+                Bukkit.getScheduler().runTask(
                         org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
                         () -> {
                             if (player.isOnline()) {
@@ -414,7 +431,7 @@ public final class TeamHubGui extends AbstractGui {
                     return;
                 }
                 sounds.play(player, "gui-open");
-                org.bukkit.Bukkit.getScheduler().runTask(
+                Bukkit.getScheduler().runTask(
                         org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
                         () -> {
                             if (player.isOnline() && tournamentGui != null) {
@@ -438,9 +455,7 @@ public final class TeamHubGui extends AbstractGui {
                     return;
                 }
                 sounds.play(player, "gui-click");
-                // Open on the next tick: switching inventories from inside an
-                // InventoryClickEvent handler is unreliable on some clients.
-                org.bukkit.Bukkit.getScheduler().runTask(
+                Bukkit.getScheduler().runTask(
                         org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
                         () -> {
                             if (player.isOnline()) {
@@ -475,11 +490,8 @@ public final class TeamHubGui extends AbstractGui {
                     TeamService.Result r;
                     if (click == ClickType.RIGHT || click == ClickType.SHIFT_LEFT
                             || click == ClickType.SHIFT_RIGHT) {
-                        // Right-click (and the legacy shift-click convention) kicks.
                         r = teamService.kick(player, name);
                     } else {
-                        // One-button cycling: first click RED, next toggles to BLUE, then
-                        // back to unassigned.
                         r = teamService.cycleSide(player, name);
                     }
                     sounds.play(player, r == TeamService.Result.OK ? "gui-click" : "error");
