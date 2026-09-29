@@ -19,6 +19,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
+import com.rumilance.practice.util.GuiSlots;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
