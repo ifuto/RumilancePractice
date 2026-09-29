@@ -74,6 +74,11 @@ public final class MatchService {
 
     private final Plugin plugin;
     private final ArenaService arenaService;
+
+    /** Accessor for arena-aware listeners (e.g. generated-block break scoping). */
+    public ArenaService arenaService() {
+        return arenaService;
+    }
     private final KitService kitService;
     private final KitLayoutCache layoutCache;
     private final LobbyService lobbyService;

@@ -175,16 +175,15 @@ public final class FfaSpawnIndex implements Listener {
                 ncx[i] = xs[naturalIdx[i]];
                 ncz[i] = zs[naturalIdx[i]];
             }
-            int nPick = FfaSpawnMath.pickIndex(nNat, ncx, ncz, trimmedX, trimmedZ,
-                    FfaSpawnLocator.MIN_DISTANCE * FfaSpawnLocator.MIN_DISTANCE,
+            int nPick = FfaSpawnMath.pickMaxIndex(nNat, ncx, ncz, trimmedX, trimmedZ,
                     ThreadLocalRandom.current());
             if (nPick >= 0) {
                 pick = naturalIdx[nPick];
             }
         }
         if (pick < 0) {
-            pick = FfaSpawnMath.pickIndex(
-                    n, xs, zs, trimmedX, trimmedZ, FfaSpawnLocator.MIN_DISTANCE * FfaSpawnLocator.MIN_DISTANCE,
+            pick = FfaSpawnMath.pickMaxIndex(
+                    n, xs, zs, trimmedX, trimmedZ,
                     ThreadLocalRandom.current());
         }
         if (pick < 0) {

@@ -680,15 +680,20 @@ public final class FfaService {
 
     /** True when {@code location} lies inside any enabled FFA arena region. */
     public boolean isInFfaRegion(Location location) {
+        return arenaIdContaining(location) != null;
+    }
+
+    /** The id of the enabled FFA arena containing {@code location}, or {@code null}. */
+    public String arenaIdContaining(Location location) {
         if (location == null) {
-            return false;
+            return null;
         }
         for (FfaArena arena : arenas.values()) {
             if (arena.enabled() && arena.region() != null && arena.region().contains(location)) {
-                return true;
+                return arena.id();
             }
         }
-        return false;
+        return null;
     }
 
     public FfaStats stats(UUID player) {
@@ -1211,13 +1216,10 @@ public final class FfaService {
     }
 
     /**
-     * Random join spawn: pick random columns inside the arena, top-down scan each for a
-     * valid ground block ({@link FfaSpawnMath#isSpawnGround}), and prefer columns FAR from
-     * the players already fighting. Returns the first candidate at least
-     * {@link FfaSpawnLocator#MIN_DISTANCE} blocks from every occupant; when 24 attempts
-     * find none, the FARTHEST valid candidate still wins (instead of the caller falling
-     * back to the stale fixed spawn point next to everyone). {@code null} only when no
-     * standable column was sampled at all.
+     * Random join spawn: 24 ランダム列の中から【ユーザー要望:可能な限り最も遠い
+     * 場所へ】全試行の最遠スコアで列を採用する。近すぎは絶対に選択されない(単に
+     * 一番遠い場所)。地面 tier は『自然地面(芝/土 etc)の最遠 → 全候補の最遠』。
+     * 見つからなければインデックス/locator の maximum 選択にフォールスルーする。
      */
     private Location randomGrassSpawn(FfaArena arena, List<Location> occupied) {
         if (arena == null || arena.region() == null || arena.region().world() == null) {
@@ -1251,11 +1253,13 @@ public final class FfaService {
             System.arraycopy(tmpX, 0, occX, 0, n);
             System.arraycopy(tmpZ, 0, occZ, 0, n);
         }
-        int minDistSq = FfaSpawnLocator.MIN_DISTANCE * FfaSpawnLocator.MIN_DISTANCE;
         java.util.concurrent.ThreadLocalRandom rng = java.util.concurrent.ThreadLocalRandom.current();
-        // Natural-first: 先の2/3は芝生・土系の列のみ採用(ユーザー要望:石の上スポーンはキモい)。
+        Location bestNatural = null;
+        int bestNaturalScore = -1;
+        Location bestAny = null;
+        int bestScore = -1;
+        // 全試行でスコア最大(=最も遠い)候補を取り合わせる。自然地面を別枠で重視。
         for (int attempt = 0; attempt < 24; attempt++) {
-            boolean naturalOnly = attempt < 16;
             int x = rng.nextInt(arena.region().minX(), arena.region().maxX() + 1);
             int z = rng.nextInt(arena.region().minZ(), arena.region().maxZ() + 1);
             int top = Math.min(world.getHighestBlockYAt(x, z), maxY);
@@ -1263,18 +1267,22 @@ public final class FfaService {
             if (spot == null) {
                 continue;
             }
-            if (naturalOnly && !FfaSpawnMath.isNaturalSpawnGround(
-                    world.getBlockAt(x, spot.getBlockY() - 1, z).getType().name())) {
-                continue;
+            boolean natural = FfaSpawnMath.isNaturalSpawnGround(
+                    world.getBlockAt(x, spot.getBlockY() - 1, z).getType().name());
+            // 距離条件は締めず、スコア最大の列を採用(ユーザー要望:可能な限り最も遠く)。
+            int score = occX.length == 0 ? Integer.MAX_VALUE
+                    : FfaSpawnMath.minDistSqToOccupied(x, z, occX, occZ);
+            if (natural && score > bestNaturalScore) {
+                bestNaturalScore = score;
+                bestNatural = spot;
             }
-            if (occX.length == 0
-                    || FfaSpawnMath.minDistSqToOccupied(x, z, occX, occZ) >= minDistSq) {
-                return spot;
+            if (score > bestScore) {
+                bestScore = score;
+                bestAny = spot;
             }
         }
-        // Nothing far enough in 24 tries — let the caller fall back to the spawn index /
-        // live locator, which enumerate EVERY standable column and pick the farthest.
-        return null;
+        // 自然地面の最遠を最優先、なければ全候補の最遠。絶対に「誰かの真横」には出ない。
+        return bestNatural != null ? bestNatural : bestAny;
     }
 
     /** Top-down scan of one column for a standable surface (ground + clear feet + head). */

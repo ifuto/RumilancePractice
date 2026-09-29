@@ -55,6 +55,59 @@ public final class FfaSpawnMath {
         return best;
     }
 
+    /**
+     * FFA スポーン選定【ユーザー要望 2026-09-29:「他プレイヤーから可能な限り最も遠い
+     * ところへ行く」】 — 全候補の中から「一番遠い相手までの距離」が最大の候補群
+     * (最高スコアの 90% 以上)だけに絞ってランダムに選ぶ。db はスルーしないので、
+     * どんなに混んだアリーナでも絶対に最近点ポイントには出ない。誰も居なければ自由。
+     */
+    public static int pickMaxIndex(
+            int count,
+            int[] cx,
+            int[] cz,
+            int[] occupantX,
+            int[] occupantZ,
+            java.util.random.RandomGenerator rng
+    ) {
+        if (count <= 0) {
+            return -1;
+        }
+        if (occupantX == null || occupantX.length == 0) {
+            return rng.nextInt(count);
+        }
+        int[] scores = new int[count];
+        int best = -1;
+        for (int i = 0; i < count; i++) {
+            scores[i] = minDistSqToOccupied(cx[i], cz[i], occupantX, occupantZ);
+            if (scores[i] > best) {
+                best = scores[i];
+            }
+        }
+        int threshold = Math.max(1, best * 9 / 10);
+        int avg = 0;
+        for (int score : scores) {
+            if (score >= threshold) {
+                avg++;
+            }
+        }
+        int pick = rng.nextInt(Math.max(1, avg));
+        int seen = 0;
+        for (int i = 0; i < count; i++) {
+            if (scores[i] >= threshold && seen++ == pick) {
+                return i;
+            }
+        }
+        // fallback: the absolute farthest (tie-break among exact max)
+        int winner = -1;
+        for (int i = 0; i < count; i++) {
+            if (scores[i] == best) {
+                winner = i;
+                break;
+            }
+        }
+        return winner;
+    }
+
     public static boolean farFromAll(int x, int z, int[] occupantX, int[] occupantZ, int minDistSq) {
         if (occupantX == null || occupantX.length == 0) {
             return true;

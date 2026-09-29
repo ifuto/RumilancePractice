@@ -23,7 +23,9 @@ public final class FfaSpawnLocator {
 
     private static final int SAMPLE_ATTEMPTS = 12;
     private static final int MAX_LOADED_SCANS = 8;
-    /** 他プレイヤーとのスポーン間最小距離【ユーザー要望:絶対にめっちゃ離す】8→32。 */
+    /** 他プレイヤーとのスポーン間最小距離【ユーザー要望最終版:条件判定ではなく
+     *  「可能な限り最遠の場所へ」= {@code pickMaxIndex} で最大距離を実現する。
+     *  ここ残存値は「それでも絶対下限」(近すぎだけは避ける安全網)として残す。 */
     static final int MIN_DISTANCE = 32;
 
     private FfaSpawnLocator() {
@@ -135,15 +137,14 @@ public final class FfaSpawnLocator {
                 ncx[i] = cx[naturalIdx[i]];
                 ncz[i] = cz[naturalIdx[i]];
             }
-            int nPick = FfaSpawnMath.pickIndex(nNat, ncx, ncz, trimmedX, trimmedZ,
-                    MIN_DISTANCE * MIN_DISTANCE, rng);
+            int nPick = FfaSpawnMath.pickMaxIndex(nNat, ncx, ncz, trimmedX, trimmedZ, rng);
             if (nPick >= 0) {
                 chosen = grass.get(naturalIdx[nPick]).clone();
             }
         }
         if (chosen == null) {
-            int pick = FfaSpawnMath.pickIndex(
-                    grass.size(), cx, cz, trimmedX, trimmedZ, MIN_DISTANCE * MIN_DISTANCE, rng);
+            int pick = FfaSpawnMath.pickMaxIndex(
+                    grass.size(), cx, cz, trimmedX, trimmedZ, rng);
             chosen = pick < 0 ? null : grass.get(pick).clone();
         }
         if (chosen == null) {

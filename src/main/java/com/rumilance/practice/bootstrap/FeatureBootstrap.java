@@ -488,6 +488,10 @@ public final class FeatureBootstrap {
 
         com.rumilance.practice.util.PlayerPlacedBlockTracker playerPlacedBlockTracker =
                 new com.rumilance.practice.util.PlayerPlacedBlockTracker();
+        // 溶岩×水生成の丸石・黒曜石も破壊可能に(マッチ＋FFA双方の playerPlaced スコープへ登録)。
+        plugin.getServer().getPluginManager().registerEvents(
+                new com.rumilance.practice.arena.GeneratedBlockBreakListener(
+                        ffaService, matchService, playerPlacedBlockTracker), plugin);
         services.register(com.rumilance.practice.util.PlayerPlacedBlockTracker.class, playerPlacedBlockTracker);
         matchService.setPlayerPlacedBlockTracker(playerPlacedBlockTracker);
 
