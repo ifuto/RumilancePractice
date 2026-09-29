@@ -152,9 +152,10 @@ public final class CrystalKitQuickGui extends AbstractGui {
                 return;
             }
             if (ffaService.applyCrystalVariant(player, variant)) {
-                sounds.play(player, "select");
                 player.sendMessage(Component.text("Equipped KIT" + variant, NamedTextColor.AQUA));
-                refresh(player, session, inventory);
+                // Reload ends the picker on purpose: level-up jingle (inside the service)
+                // + the screen closes, so the player is straight back on their feet.
+                player.closeInventory();
             } else {
                 sounds.play(player, "error");
             }

@@ -1748,7 +1748,9 @@ public final class MatchService {
             if (type == null) {
                 continue;
             }
-            int duration = SplashPotionDurations.ticks(type, start.amplifier());
+            int duration = start.durationTicks() >= 0
+                    ? start.durationTicks()
+                    : SplashPotionDurations.ticks(type, start.amplifier());
             player.addPotionEffect(new PotionEffect(type, duration, start.amplifier(), false, true, true));
             any = true;
         }

@@ -797,6 +797,10 @@ public final class FeatureBootstrap {
         com.rumilance.practice.combat.KillFeed.setKillEffectPlayer(killEffectService::playOnKill);
         com.rumilance.practice.combat.KillFeed.setMessageService(services.get(MessageService.class));
 
+        // 無料版の鍛冶型特別枠: 好きな1キットだけ VIP 範囲の素材・パターンを許可。
+        // (ランク変更リスナーがこれを参照するため、リスナー登録より先に組み立てる)
+        com.rumilance.practice.cosmetic.TrimAllowanceService trimAllowanceService =
+                new com.rumilance.practice.cosmetic.TrimAllowanceService(plugin, asyncExecutor);
         // When a player drops below VIP+, reset smithing trims to default: strip premium
         // materials/patterns from everything worn/held, and scrub saved kit layouts.
         final KitLayoutRepository kitLayoutRepositoryRef = kitLayoutRepository;
@@ -821,9 +825,17 @@ public final class FeatureBootstrap {
             }
             final java.util.UUID pid = player.getUniqueId();
             final KitService kitServiceRef = kitService;
+            // ③ 鍛冶型リセット: 無料版の「好きな1キット」枠(後述 trimAllowanceService)は
+            // ランクに関係なく有効なので、そのキットのレイアウトからはVIP範囲の鍛冶型を
+            // 消さない。キャッシュも必ず同期させ、消した物が復活(リザレクト)しないようにする。
+            final var trimAllowanceRef = trimAllowanceService;
             asyncExecutorRef.runAsync(() -> {
                 try {
+                    String freeSlotKit = trimAllowanceRef == null ? null : trimAllowanceRef.boundKit(pid);
                     for (var snap : kitLayoutRepositoryRef.findAllForPlayer(pid)) {
+                        if (freeSlotKit != null && freeSlotKit.equalsIgnoreCase(snap.kit())) {
+                            continue; // the chosen free slot keeps its full trim range
+                        }
                         com.rumilance.practice.model.KitDefinition kitDef =
                                 kitServiceRef.get(snap.kit()).orElse(null);
                         org.bukkit.inventory.ItemStack[] items =
@@ -836,6 +848,8 @@ public final class FeatureBootstrap {
                             kitLayoutRepositoryRef.upsert(com.rumilance.practice.model.KitLayoutSnapshot.create(
                                     snap.uuid(), snap.kit(),
                                     com.rumilance.practice.util.KitLayoutDelta.encode(items, kitDef)));
+                            // The next read must not resurrect the OLD (unscrubbed) cache entry.
+                            layoutCache.invalidate(pid, snap.kit());
                         }
                     }
                 } catch (RuntimeException | java.sql.SQLException e) {
@@ -1230,6 +1244,7 @@ public final class FeatureBootstrap {
         SmithingTrimGui smithingTrimGui = new SmithingTrimGui(guiSessions, soundService, rankService);
         smithingTrimGui.setEditKitGui(editKitGui);
         editKitGui.setSmithingTrimGui(smithingTrimGui);
+        smithingTrimGui.setTrimAllowanceService(trimAllowanceService);
         com.rumilance.practice.gui.menus.ShieldPatternGui shieldPatternGui =
                 new com.rumilance.practice.gui.menus.ShieldPatternGui(guiSessions, soundService);
         shieldPatternGui.setEditKitGui(editKitGui);
@@ -1617,6 +1632,8 @@ public final class FeatureBootstrap {
         pm.registerEvents(new MatchCommandGuardListener(stateManager, messageService), plugin);
         pm.registerEvents(new MatchCountdownLockListener(stateManager), plugin);
         pm.registerEvents(new com.rumilance.practice.match.MatchChatListener(matchRegistry, spectatorService), plugin);
+        // /matchchat — duel chat scope toggle (local [Duel] channel vs global public chat).
+
         pm.registerEvents(new TeamColoredArmorListener(teamColoredArmor, settingsService), plugin);
         pm.registerEvents(new ArenaBoundsListener(matchService, arenaService), plugin);
         pm.registerEvents(new SpectatorBoundsListener(
@@ -1968,8 +1985,10 @@ public final class FeatureBootstrap {
         com.rumilance.practice.command.TellCommand tellCommand =
                 new com.rumilance.practice.command.TellCommand(messageService, chatBanService,
                         settingsService);
+        tellCommand.setSoundService(soundService);
         plugin.getServer().getPluginManager().registerEvents(tellCommand, plugin);
         bind("tell", tellCommand);
+        bind("matchchat", new com.rumilance.practice.command.MatchChatCommand(matchRegistry));
         bind("reply", tellCommand);
         bind("ekitadmin", new EkitAdminCommand(ekitAdminGui,
                 services.get(com.rumilance.practice.originalkit.OriginalKitRoomService.class)));

@@ -1078,30 +1078,55 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         }
     }
 
+    /**
+     * Save, debounced for 1 second per open editor: the async upsert used to be queued once
+     * per spam-click, so a player machine-gunning Save could overrun the store with stale
+     * envelopes. A successful save plays the level-up jingle and closes the screen (the
+     * lobby inventory comes back, the overlay stash and the session are released) — the
+     * same flow {@link #forceSaveForMatch} already relied on.
+     */
     private void save(Player player, GuiSession session, Inventory inventory) {
-        persistLayout(player, session, true);
-        // 中キットの並びを保存したときは、プリセットに無いアイテムが消えた「本当の結果」を
-        // その場で画面にも出す（保存した内容と表示が食い違ったままにならないように）。
-        String inner = innerKit(session);
-        if (inventory != null && innerKits != null && personalPresetEdit(player)
-                && !com.rumilance.practice.kit.InnerKitService.isDefault(inner)) {
-            render(player, session, inventory);
+        long now = System.currentTimeMillis();
+        Long lastSave = session == null ? null : session.get("save_at", Long.class);
+        if (lastSave != null && now - lastSave < 1000L) {
+            return;
         }
+        if (session != null) {
+            session.put("save_at", now);
+        }
+        boolean ok = persistLayout(player, session, false);
+        if (!ok) {
+            sounds.play(player, "error");
+            player.sendMessage(t(player, "gui.save-failed"));
+            return;
+        }
+        sounds.play(player, "save-done");
+        player.sendMessage(t(player, "gui.kit-saved"));
+        restoreLobbyHands(player);
+        if (kitEditStash != null) {
+            kitEditStash.clear(player.getUniqueId());
+        }
+        registry.close(player.getUniqueId());
+        player.closeInventory();
     }
 
     /**
      * Writes the current kit layout to DB. Always succeeds when kit/layout exist — no
      * rearrange-only gate. Used by Save and trim apply.
      */
-    public void persistLayout(Player player, GuiSession session, boolean notify) {
+    /**
+     * Writes the current editor layout out. @return true when the write was accepted
+     * (the async store enqueue counts) — used by the debounced Save to decide between the
+     * close-and-jingle path and the stay-open-with-error path.
+     */
+    public boolean persistLayout(Player player, GuiSession session, boolean notify) {
         String kitId = session == null ? null : session.selectedKit();
         if (kitId == null) {
-            return;
+            return false;
         }
         ItemStack[] layout = resolveLayoutForSave(player, session);
         if (isOfficialEdit(session)) {
-            saveOfficial(player, kitId, layout, notify);
-            return;
+            return saveOfficial(player, kitId, layout, notify);
         }
         // 中キットの編集: 保存先はプレイヤー個人のレイアウト(DB)ではなく kits.yml のプリセット。
         // 個人レイアウトに書くとその人だけの並び替えになり、他の人には反映されない。
@@ -1111,28 +1136,29 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             if (personalPresetEdit(player)) {
                 // 一般プレイヤーは kits.yml を触れない：自分の並びだけを個人レイアウトに保存する。
                 persistPersonalPreset(player, session, kitId, inner, layout, notify);
-                return;
+                return true;
             }
-            if (innerKits.saveLayout(kitId, inner, layout)) {
-                if (notify) {
+            boolean saved = innerKits.saveLayout(kitId, inner, layout);
+            if (notify) {
+                if (saved) {
                     sounds.play(player, "select");
                     player.sendMessage(t(player, "gui.innerkit-saved"));
+                } else {
+                    sounds.play(player, "error");
+                    player.sendMessage(t(player, "gui.innerkit-save-failed"));
                 }
-            } else if (notify) {
-                sounds.play(player, "error");
-                player.sendMessage(t(player, "gui.innerkit-save-failed"));
             }
-            return;
+            return saved;
         }
-        persistLayout(player, kitId, layout, notify, crystalVariant(session));
+        return persistLayout(player, kitId, layout, notify, crystalVariant(session));
     }
 
-    private void saveOfficial(Player player, String kitId, ItemStack[] layout, boolean notify) {
+    private boolean saveOfficial(Player player, String kitId, ItemStack[] layout, boolean notify) {
         if (!player.hasPermission("rumilance.admin") || layout == null) {
             if (notify) {
                 player.sendMessage(t(player, "general.no-permission"));
             }
-            return;
+            return false;
         }
         boolean saved = kitService.setOfficialLoadout(kitId, layout);
         if (notify) {
@@ -1140,6 +1166,7 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             player.sendMessage(t(player, saved
                     ? "gui.innerkit-official-saved" : "gui.innerkit-save-failed"));
         }
+        return saved;
     }
 
     /**
@@ -1187,23 +1214,22 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         });
     }
 
-    public void persistLayout(Player player, String kitId, ItemStack[] layout, boolean notify) {
-        persistLayout(player, kitId, layout, notify,
+    public boolean persistLayout(Player player, String kitId, ItemStack[] layout, boolean notify) {
+        return persistLayout(player, kitId, layout, notify,
                 crystalVariant(registry.get(player.getUniqueId()).orElse(null)));
     }
 
-    public void persistLayout(Player player, String kitId, ItemStack[] layout, boolean notify,
+    public boolean persistLayout(Player player, String kitId, ItemStack[] layout, boolean notify,
                               Integer crystalVariant) {
         GuiSession current = registry.get(player.getUniqueId()).orElse(null);
         if (isOfficialEdit(current) || (kitEditStash != null
                 && kitEditStash.get(player.getUniqueId()) != null
                 && kitEditStash.get(player.getUniqueId()).officialEdit())) {
-            saveOfficial(player, kitId, layout, notify);
-            return;
+            return saveOfficial(player, kitId, layout, notify);
         }
         KitDefinition kit = kitService.get(kitId).orElse(null);
         if (kit == null || layout == null) {
-            return;
+            return false;
         }
         String storeKey = crystalVariant == null
                 ? kitId : CrystalFfaStore.variantKey(kitId, crystalVariant);
@@ -1233,15 +1259,19 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
                         () -> player.sendMessage(t(player, "gui.save-failed")));
             }
         });
+        return true;
     }
 
     private ItemStack[] resolveLayoutForSave(Player player, GuiSession session) {
+        // The session layout is the live arrangement the player is looking at; the overlay
+        // stash (anvil/smithing carry-bag) is only a fallback — preferring the stash used
+        // to resurrect an older layout and silently discard post-overlay rearrangements.
         ItemStack[] layout = null;
-        if (kitEditStash != null) {
-            layout = kitEditStash.layoutCopy(player.getUniqueId());
-        }
-        if (layout == null && session != null) {
+        if (session != null) {
             layout = session.get("layout", ItemStack[].class);
+        }
+        if (layout == null && kitEditStash != null) {
+            layout = kitEditStash.layoutCopy(player.getUniqueId());
         }
         if (layout == null) {
             return null;

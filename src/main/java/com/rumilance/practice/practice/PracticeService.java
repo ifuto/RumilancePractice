@@ -1193,6 +1193,31 @@ public final class PracticeService {
             abortJoin(player, session, "practice.spawn-invalid");
             return;
         }
+        // ② BOT 戦の "奈落落ち + チャット/コマンド凍結": アリーナクローンが未ロードのまま
+        // spawn が「虚空の中」に点いていた時、SafeTeleport は通るのに足場が無く、プレイヤーは
+        // 落ち続けて PRACTICE_* 状態のガード(コマンド/DM 制限)だけが有効なまま宙吊りになる。
+        // テレポート前に足元が本当に存在するか検証し、足場が見つかれば微修正、なければ中止する。
+        spawn = ensureStandable(spawn);
+        if (spawn == null) {
+            plugin.getLogger().warning("[N Arena][Practice] join-abort: spawn in the void / clone not loaded"
+                    + " arena=" + session.arenaInstanceId());
+            abortJoin(player, session, "practice.spawn-invalid");
+            return;
+        }
+        // ウォッチドッグ: 30 秒経っても COUNTDOWN/WAIT から ACTIVE に進めなければロビーへ戻す
+        // (ボットスポーン失敗・データパック側の開始信号ロスト等、どんな詰まりでも
+        // チャット・コマンド・テレポートの凍結状態で置き去りにしない)。
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            PracticeSession live = sessions.get(player.getUniqueId());
+            if (live == session
+                    && (live.phase() == PracticeSession.Phase.WAIT
+                            || live.phase() == PracticeSession.Phase.COUNTDOWN)
+                    && player.isOnline()) {
+                plugin.getLogger().warning("[N Arena][Practice] watchdog: still "
+                        + live.phase() + " after 30s, forcing leave player=" + player.getName());
+                leave(player, true);
+            }
+        }, 30L * 20L);
         SafeTeleport.teleport(player, spawn).whenComplete((ok, err) ->
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     if (!player.isOnline()) {
@@ -1228,6 +1253,42 @@ public final class PracticeService {
                                         ? joinedRoom.displayName() : session.practiceId())));
                     }
                 }));
+    }
+
+    /**
+     * Scans downward (then slightly upward) for a real floor at {@code spawn}. Returns the
+     * adjusted location, or {@code null} when nothing solid exists within reach — i.e. the
+     * arena clone has not materialised there yet, and teleporting would drop the player
+     * into the void.
+     */
+    private Location ensureStandable(Location spawn) {
+        org.bukkit.World world = spawn.getWorld();
+        if (world == null) {
+            return null;
+        }
+        int x = spawn.getBlockX(), z = spawn.getBlockZ();
+        int startY = spawn.getBlockY();
+        int minY = world.getMinHeight() + 1;
+        int maxY = Math.min(world.getMaxHeight() - 2, startY + 4);
+        // downward: the expected case (floor right under, or a few blocks lower in a big arena)
+        for (int y = startY; y >= Math.max(minY, startY - 24); y--) {
+            org.bukkit.block.Block block = world.getBlockAt(x, y, z);
+            if (!block.getType().isAir() && !block.isPassable()) {
+                Location fixed = spawn.clone();
+                fixed.setY(y + 1.0);
+                return fixed;
+            }
+        }
+        // upward: floating spawn pads a couple of blocks above the marker
+        for (int y = startY + 1; y <= maxY; y++) {
+            org.bukkit.block.Block block = world.getBlockAt(x, y, z);
+            if (!block.getType().isAir() && !block.isPassable()) {
+                Location fixed = spawn.clone();
+                fixed.setY(y + 1.0);
+                return fixed;
+            }
+        }
+        return null;
     }
 
     private void abortJoin(Player player, PracticeSession session, String langKey) {

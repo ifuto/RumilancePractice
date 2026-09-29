@@ -38,6 +38,13 @@ public final class TellCommand implements CommandExecutor, TabCompleter, Listene
     private final SettingsService settingsService;
     /** Last whisper partner per player, for /reply (updated in both directions). */
     private final Map<UUID, UUID> lastPartner = new ConcurrentHashMap<>();
+    /** Soft chime when a whisper lands (settings-aware volume via SoundService). */
+    private com.rumilance.practice.sound.SoundService soundService;
+
+    /** Wired from bootstrap; null keeps tells silent. */
+    public void setSoundService(com.rumilance.practice.sound.SoundService soundService) {
+        this.soundService = soundService;
+    }
 
     public TellCommand(MessageService messageService, ChatBanService chatBanService) {
         this(messageService, chatBanService, null);
@@ -137,6 +144,9 @@ public final class TellCommand implements CommandExecutor, TabCompleter, Listene
         to.sendMessage(messageService.render(to, "tell.from",
                 MessageService.tags("target", from == null ? "Console" : from.getName(),
                         "message", message)));
+        if (soundService != null) {
+            soundService.play(to, "tell-received");
+        }
         if (from != null) {
             lastPartner.put(to.getUniqueId(), from.getUniqueId());
         }

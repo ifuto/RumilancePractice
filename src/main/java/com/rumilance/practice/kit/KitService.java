@@ -942,6 +942,9 @@ public final class KitService {
             Map<String, Object> map = new LinkedHashMap<>();
             map.put("type", effect.potionEffectKey().toUpperCase(Locale.ROOT));
             map.put("amplifier", effect.amplifier());
+            if (effect.durationTicks() != KitStartEffect.DURATION_FROM_POTION_TABLE) {
+                map.put("duration-ticks", effect.durationTicks());
+            }
             startEffectMaps.add(map);
         }
         yaml.set(path + ".start-effects", startEffectMaps);
@@ -1001,8 +1004,13 @@ public final class KitService {
             } else if (levelObj instanceof Number number) {
                 amplifier = Math.max(0, number.intValue() - 1);
             }
+            int durationTicks = KitStartEffect.DURATION_FROM_POTION_TABLE;
+            Object durObj = map.get("duration-ticks");
+            if (durObj instanceof Number number) {
+                durationTicks = Math.max(0, number.intValue());
+            }
             try {
-                out.add(new KitStartEffect(key, amplifier));
+                out.add(new KitStartEffect(key, amplifier, durationTicks));
             } catch (IllegalArgumentException ignored) {
                 // skip blank / invalid
             }

@@ -394,6 +394,11 @@ commands:
     description: Tune knockback coefficients (multipliers on Paper's final knockback — vanilla calc untouched).
     usage: /kbf [h <0.0-4.0>|v <0.0-4.0>|reset|status]
     permission: rumilance.admin
+  matchchat:
+    description: Pick match-local or global chat while duelling (duelo / パーティ戦の自分の発言の届け先).
+    usage: /matchchat [local|global]
+    aliases: [mc]
+    permission: rumilance.user
   tell:
     description: Send a private message to a player.
     usage: /tell <player> <message>

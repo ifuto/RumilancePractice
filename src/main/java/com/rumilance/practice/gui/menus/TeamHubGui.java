@@ -144,8 +144,16 @@ public final class TeamHubGui extends AbstractGui {
         inventory.setItem(GuiSlots.slot(0, 4), headerItem(player, team));
         paintCounters(player, team, inventory);
 
-                // --- member grid (rows 1-4, cols 1-7 = 28 slots, paged past 28 members) ---
+                // --- member grid (rows 1-4, cols 1-7 = 28 slots, paged past 28 members).
+        // 使いやすさの肝: メンバーは必ず【RED → BLUE → 未割当】の順に固まって並ぶ。
+        // クリックでサイドを回しても「どこに誰がいるか」が一目で追える。 ---
         List<UUID> members = new ArrayList<>(team.members());
+        List<TeamColor> sortColors = team.activeColors();
+        members.sort((a, b) -> {
+            int ia = sideSortIndex(team, sortColors, a);
+            int ib = sideSortIndex(team, sortColors, b);
+            return Integer.compare(ia, ib);
+        });
         int page = session.page();
         int pageSize = MenuScaffold.gridPageSize();
         int from = Math.min(page * pageSize, members.size());
@@ -167,12 +175,6 @@ public final class TeamHubGui extends AbstractGui {
                             .lore(UiTheme.divider(),
                                     UiTheme.line(line(player, "gui.party-quick-invite-lore")))
                             .action("quick_invite").build());
-            inventory.setItem(GuiSlots.slot(5, 2),
-                    ItemBuilder.of(Material.ENDER_PEARL)
-                            .name(t(player, "gui.party-auto-split").color(UiTheme.PRIMARY))
-                            .lore(UiTheme.divider(),
-                                    UiTheme.line(line(player, "gui.party-auto-split-lore")))
-                            .action("auto_split").build());
             inventory.setItem(GuiSlots.slot(5, 6),
                     ItemBuilder.of(Material.COMPARATOR)
                             .name(t(player, "gui.team-settings-entry").color(UiTheme.PRIMARY))
@@ -243,6 +245,16 @@ public final class TeamHubGui extends AbstractGui {
             inventory.setItem(GuiSlots.slot(5, 8),
                     ItemBuilder.action(UiTheme.CLOSE, t(player, "menu.close"), "close"));
         }
+    }
+
+    /** Sort bucket for the member grid: side order index, unassigned members come last. */
+    private static int sideSortIndex(Team team, List<TeamColor> colors, UUID member) {
+        for (int i = 0; i < colors.size(); i++) {
+            if (team.side(colors.get(i)).contains(member)) {
+                return i;
+            }
+        }
+        return colors.size();
     }
 
     /** Side counters flank the header chip; decorative only (sides are assigned by clicking members). */

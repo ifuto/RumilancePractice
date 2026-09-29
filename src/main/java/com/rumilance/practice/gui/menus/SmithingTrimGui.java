@@ -53,6 +53,13 @@ public final class SmithingTrimGui extends AbstractGui implements GuiCloseHandle
     );
 
     private final RankService rankService;
+    /** 無料版プレイヤーの「好きな1キット」VIP鍛冶型枠(bootstrap で配線)。 */
+    private com.rumilance.practice.cosmetic.TrimAllowanceService trimAllowanceService;
+
+    public void setTrimAllowanceService(
+            com.rumilance.practice.cosmetic.TrimAllowanceService trimAllowanceService) {
+        this.trimAllowanceService = trimAllowanceService;
+    }
     private EditKitGui editKitGui;
 
     public SmithingTrimGui(GuiSessionRegistry registry, SoundService sounds, RankService rankService) {
@@ -105,7 +112,12 @@ public final class SmithingTrimGui extends AbstractGui implements GuiCloseHandle
      * Falls back to the rank-based defaults only when the piece has no trim.
      */
     private void initSelectionFromExistingTrim(Player player, GuiSession session, ItemStack armor) {
-        String material = rankService.isVipPlusOrAbove(player) ? "gold" : "copper";
+        boolean vipLike = rankService.isVipPlusOrAbove(player)
+                || (trimAllowanceService != null
+                        && session != null
+                        && trimAllowanceService.allows(
+                                player.getUniqueId(), session.get("kit_id", String.class)));
+        String material = vipLike ? "gold" : "copper";
         String pattern = "sentry";
         if (armor != null && armor.getItemMeta() instanceof ArmorMeta armorMeta && armorMeta.hasTrim()) {
             ArmorTrim existing = armorMeta.getTrim();
@@ -113,10 +125,10 @@ public final class SmithingTrimGui extends AbstractGui implements GuiCloseHandle
             String existingPat = trimKey(existing.getPattern());
             // Only preselect a premium material/pattern the player is still allowed to keep;
             // otherwise fall back to the defaults so a downgraded player can't re-apply premium.
-            if (canUseMaterial(player, existingMat)) {
+            if (canUseMaterial(player, session, existingMat)) {
                 material = existingMat;
             }
-            if (canUsePattern(player, existingPat)) {
+            if (canUsePattern(player, session, existingPat)) {
                 pattern = existingPat;
             }
         }
@@ -156,7 +168,7 @@ public final class SmithingTrimGui extends AbstractGui implements GuiCloseHandle
             int col = patIndex % 9;
             String key = trimKey(pattern);
             boolean selected = key.equalsIgnoreCase(session.get("trim_pattern", String.class));
-            boolean allowed = canUsePattern(player, key);
+            boolean allowed = canUsePattern(player, session, key);
             inventory.setItem(GuiSlots.slot(row, col), patternIcon(player, pattern, selected, allowed));
             patIndex++;
         }
@@ -167,7 +179,7 @@ public final class SmithingTrimGui extends AbstractGui implements GuiCloseHandle
         for (TrimMaterial mat : MATERIALS) {
             String key = trimKey(mat);
             boolean selected = key.equalsIgnoreCase(session.get("trim_material", String.class));
-            boolean allowed = canUseMaterial(player, key);
+            boolean allowed = canUseMaterial(player, session, key);
             ItemBuilder matBuilder = ItemBuilder.of(allowed ? materialIcon(mat) : Material.GRAY_DYE)
                     .name(Component.text(pretty(key), selected ? UiTheme.SUCCESS
                             : allowed ? UiTheme.VALUE : UiTheme.MUTED)
@@ -200,14 +212,25 @@ public final class SmithingTrimGui extends AbstractGui implements GuiCloseHandle
                         )
                         .action("remove")
                         .build());
+        java.util.ArrayList<Component> applyLore = new java.util.ArrayList<>(java.util.List.of(
+                UiTheme.divider(),
+                UiTheme.line(line(player, "gui.trim-apply-lore")),
+                UiTheme.hint(line(player, "gui.trim-apply-hint"))));
+        if (!rankService.isVipPlusOrAbove(player)
+                && trimAllowanceService != null
+                && session.get("kit_id", String.class) != null) {
+            String bound = trimAllowanceService.boundKit(player.getUniqueId());
+            if (bound == null) {
+                applyLore.add(UiTheme.hint(line(player, "gui.trim-free-note-unset")));
+            } else {
+                applyLore.add(UiTheme.hint(t(player, "gui.trim-free-note-bound",
+                        com.rumilance.practice.locale.MessageService.tags("kit", bound))));
+            }
+        }
         inventory.setItem(GuiSlots.slot(5, 4),
                 ItemBuilder.of(Material.SMITHING_TABLE)
                         .name(t(player, "gui.trim-apply").color(UiTheme.SUCCESS))
-                        .lore(
-                                UiTheme.divider(),
-                                UiTheme.line(line(player, "gui.trim-apply-lore")),
-                                UiTheme.hint(line(player, "gui.trim-apply-hint"))
-                        )
+                        .lore(applyLore.toArray(Component[]::new))
                         .action("apply")
                         .build());
         inventory.setItem(GuiSlots.slot(5, 6),
@@ -271,7 +294,7 @@ public final class SmithingTrimGui extends AbstractGui implements GuiCloseHandle
         }
         if (action.startsWith("mat:")) {
             String key = action.substring(4);
-            if (!canUseMaterial(player, key)) {
+            if (!canUseMaterial(player, session, key)) {
                 sounds.play(player, "error");
                 player.sendMessage(t(player, "gui.trim-locked-material"));
                 return;
@@ -283,7 +306,7 @@ public final class SmithingTrimGui extends AbstractGui implements GuiCloseHandle
         }
         if (action.startsWith("pat:")) {
             String key = action.substring(4);
-            if (!canUsePattern(player, key)) {
+            if (!canUsePattern(player, session, key)) {
                 sounds.play(player, "error");
                 player.sendMessage(t(player, "gui.trim-locked-pattern"));
                 return;
@@ -327,7 +350,7 @@ public final class SmithingTrimGui extends AbstractGui implements GuiCloseHandle
             String materialKey = session.get("trim_material", String.class);
             String patternKey = session.get("trim_pattern", String.class);
             if (!PracticeGuards.trimSelectionAllowed(
-                    rankService.isVipPlusOrAbove(player), materialKey, patternKey)) {
+                    effectiveVipPlus(player, session), materialKey, patternKey)) {
                 sounds.play(player, "error");
                 player.sendMessage(t(player, "gui.trim-locked-selection"));
                 return;
@@ -345,6 +368,20 @@ public final class SmithingTrimGui extends AbstractGui implements GuiCloseHandle
             } else {
                 writeBack(player, result, invSlot == null ? -1 : invSlot);
                 player.closeInventory();
+            }
+            // First successful VIP-range apply on an unbound free player pins that kit as
+            // their free slot — tell them exactly which kit it is so it never surprises them.
+            if (trimAllowanceService != null && !rankService.isVipPlusOrAbove(player)) {
+                String kitId = session.get("kit_id", String.class);
+                if (kitId != null
+                        && trimAllowanceService.boundKit(player.getUniqueId()) == null
+                        && !PracticeGuards.trimSelectionAllowed(false, materialKey, patternKey)) {
+                    String bound = trimAllowanceService.bindIfUnset(player.getUniqueId(), kitId);
+                    if (bound != null) {
+                        player.sendMessage(t(player, "gui.trim-free-kit-bound",
+                                com.rumilance.practice.locale.MessageService.tags("kit", bound)));
+                    }
+                }
             }
             sounds.play(player, "select");
             player.sendMessage(t(player, "gui.trim-applied"));
@@ -435,12 +472,27 @@ public final class SmithingTrimGui extends AbstractGui implements GuiCloseHandle
         stack.setItemMeta(meta);
     }
 
-    private boolean canUseMaterial(Player player, String key) {
-        return PracticeGuards.trimMaterialAllowed(rankService.isVipPlusOrAbove(player), key);
+    /**
+     * 無料版の「好きな1キット」特別枠: キット編集から開き、対象キットがこのプレイヤーの
+     * 無料VIP枠({@link com.rumilance.practice.cosmetic.TrimAllowanceService})に一致すれば
+     * VIP+ と同じ範囲を許可する。サービス未配線のときは素直にランク判定。
+     */
+    private boolean effectiveVipPlus(Player player, GuiSession session) {
+        if (rankService.isVipPlusOrAbove(player)) {
+            return true;
+        }
+        if (trimAllowanceService == null || session == null) {
+            return false;
+        }
+        return trimAllowanceService.allows(player.getUniqueId(), session.get("kit_id", String.class));
     }
 
-    private boolean canUsePattern(Player player, String key) {
-        return PracticeGuards.trimPatternAllowed(rankService.isVipPlusOrAbove(player), key);
+    private boolean canUseMaterial(Player player, GuiSession session, String key) {
+        return PracticeGuards.trimMaterialAllowed(effectiveVipPlus(player, session), key);
+    }
+
+    private boolean canUsePattern(Player player, GuiSession session, String key) {
+        return PracticeGuards.trimPatternAllowed(effectiveVipPlus(player, session), key);
     }
 
     private static TrimMaterial resolveMaterial(String key) {

@@ -899,7 +899,28 @@ public final class FfaService {
         ItemStack[] layout = variantLayout(player.getUniqueId(), kit, v);
         kitService.apply(player, kit, layout);
         crystalFfaStore.selectVariant(player.getUniqueId(), v);
-        soundService.play(player, "select");
+        soundService.play(player, "kit-reload");
+        // 「**NARENA** <player> reloaded a kit」— the reload log goes to every other member
+        // of the same FFA arena (the reloader got the level-up jingle + the screen closed).
+        String arenaId = playerArena.get(player.getUniqueId());
+        if (arenaId != null) {
+            net.kyori.adventure.text.Component log = net.kyori.adventure.text.Component
+                    .text("NARENA ", net.kyori.adventure.text.format.NamedTextColor.GOLD,
+                            net.kyori.adventure.text.format.TextDecoration.BOLD)
+                    .append(net.kyori.adventure.text.Component.text(player.getName(),
+                            net.kyori.adventure.text.format.NamedTextColor.AQUA))
+                    .append(net.kyori.adventure.text.Component.text(" reloaded a kit",
+                            net.kyori.adventure.text.format.NamedTextColor.GRAY));
+            for (java.util.Map.Entry<java.util.UUID, String> entry : playerArena.entrySet()) {
+                if (!arenaId.equals(entry.getValue()) || entry.getKey().equals(player.getUniqueId())) {
+                    continue;
+                }
+                org.bukkit.entity.Player other = org.bukkit.Bukkit.getPlayer(entry.getKey());
+                if (other != null && other.isOnline()) {
+                    other.sendMessage(log);
+                }
+            }
+        }
         return true;
     }
 

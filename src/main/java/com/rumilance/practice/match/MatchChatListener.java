@@ -43,6 +43,25 @@ public final class MatchChatListener implements Listener {
     private final MatchRegistry registry;
     private final SpectatorService spectatorService;
 
+    /**
+     * Per-player voice routing during matches (server-session scope): {@code true} keeps the
+     * fighter's lines on the public chat instead of the match-scoped channel. Toggled with
+     * {@code /matchchat}; a match never forces the other player's preference.
+     */
+    private static final java.util.Map<UUID, Boolean> GLOBAL_MODE = new java.util.concurrent.ConcurrentHashMap<>();
+
+    public static boolean isGlobal(UUID playerId) {
+        return Boolean.TRUE.equals(GLOBAL_MODE.get(playerId));
+    }
+
+    public static void setGlobal(UUID playerId, boolean global) {
+        if (global) {
+            GLOBAL_MODE.put(playerId, Boolean.TRUE);
+        } else {
+            GLOBAL_MODE.remove(playerId);
+        }
+    }
+
     public MatchChatListener(MatchRegistry registry, SpectatorService spectatorService) {
         this.registry = registry;
         this.spectatorService = spectatorService;
@@ -51,6 +70,10 @@ public final class MatchChatListener implements Listener {
     @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
     public void onChat(AsyncChatEvent event) {
         Player speaker = event.getPlayer();
+        if (isGlobal(speaker.getUniqueId())) {
+            // Opted to keep talking on the public channel even inside a duel.
+            return;
+        }
         MatchSession session = registry.byPlayer(speaker.getUniqueId()).orElse(null);
         if (session == null) {
             return;
