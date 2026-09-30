@@ -87,6 +87,16 @@ menu:
   delete: "削除"
 
 party:
+  err-not-member: "そのプレイヤーはパーティメンバーではありません"
+  invite-pending-label: "招待保留"
+  transfer-title: "リーダー権限を移譲"
+  transfer-lore: "パーティのリーダー権を別メンバーに渡します(自分は通常メンバーへ)"
+  transfer-hint: "クリック: メンバー選択へ"
+  transfer-pick-lore: "渡したい相手の頭をクリック。やめる時は「戻る」"
+  transfer-nobody: "他のメンバーがいません"
+  transfer-nobody-lore: "1人でいる限り権限は渡せない"
+  transfer-done: "リーダー権限を <player> に移しました"
+  create-private-hint: "とりあえずこれで OK — 友達だけで始める専用パーティ"
   solo-only: "<red>パーティーを抜けてからソロキュー・デュエルを使ってください。"
   hub-title: "パーティ"
   browser-title: "パーティ一覧"
@@ -569,6 +579,7 @@ admin-gui:
   bed-explosion-lore2: "爆発は自分にも当たります（バニラのベッド爆破と同じ）。"
 
 gui:
+  party-settings-title: "パーティ管理"
   admin-ffa-settings: "FFAアリーナ設定"
   admin-ffa-settings-lore-1: "アリーナごとの機能切り替え(TPA / RTPQueue)"
   admin-ffa-settings-lore-2: "アリーナの大きさ(上空から見たブロック数)"
@@ -695,7 +706,6 @@ gui:
   trim-locked-pattern: "<red>このパターンは VIP+ 以上で利用できます。"
   trim-locked-selection: "<red>選択中の装飾は VIP+ 以上で利用できます。"
   no-enchants: "エンチャントなし"
-  settings-title: "設定"
   settings-cooldown: "設定変更のクールダウン中… (<secs>s)"
   deny-duels: "デュエル拒否"
   deny-duels-lore: "他プレイヤーからのデュエル申請をブロックする。"
@@ -1252,7 +1262,7 @@ gui:
   practice-layout-order-anchor: "リスポーンアンカー → グロウストーン"
   practice-layout-order-glow: "グロウストーン → リスポーンアンカー"
   team-settings-title: "チーム設定"
-  team-settings-entry: "チーム設定"
+  team-settings-entry: "パーティ管理"
   team-settings-lore: "招待・公開設定・マップ・フレンドリーファイア+チーム管理"
   team-settings-hint: "クリック: チーム設定を開く"
   back-to-hub: "チームハブに戻る"

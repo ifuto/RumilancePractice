@@ -67,8 +67,9 @@ public final class TeamsBrowserGui extends AbstractGui {
     protected void render(Player player, GuiSession session, Inventory inventory) {
         paintFrame(player, session, inventory);
 
-        // Create buttons (top of content area): party (public / private) or an internal team.
-        inventory.setItem(GuiSlots.slot(1, 3),
+        // Create buttons (top of content area) — ヒエラルキービュ: 中央=私有パーティ(とりあえずこれ!
+        // でいい人向けヒーロー)、左右=公用/内部チームのオプション [Party GUI 完全リビルド 2026-09-29]。
+        inventory.setItem(GuiSlots.slot(1, 2),
                 ItemBuilder.of(Material.WHITE_BANNER)
                         .name(t(player, "party.create-public").color(UiTheme.SUCCESS))
                         .lore(UiTheme.divider(),
@@ -77,6 +78,15 @@ public final class TeamsBrowserGui extends AbstractGui {
                                 UiTheme.hint(line(player, "menu.click")))
                         .action("create_public").build());
         inventory.setItem(GuiSlots.slot(1, 4),
+                ItemBuilder.of(Material.NETHER_STAR)
+                        .name(t(player, "party.create-private").color(UiTheme.SECONDARY))
+                        .lore(UiTheme.divider(),
+                                UiTheme.line(line(player, "party.create-private-lore")),
+                                UiTheme.blank(),
+                                UiTheme.hint(line(player, "party.create-private-hint")))
+                        .glint(true)
+                        .action("create_private").build());
+        inventory.setItem(GuiSlots.slot(1, 6),
                 ItemBuilder.of(Material.IRON_SWORD)
                         .name(t(player, "party.create-team").color(UiTheme.SECONDARY))
                         .lore(UiTheme.divider(),
@@ -84,14 +94,6 @@ public final class TeamsBrowserGui extends AbstractGui {
                                 UiTheme.blank(),
                                 UiTheme.hint(line(player, "party.create-team-hint")))
                         .action("create_team").build());
-        inventory.setItem(GuiSlots.slot(1, 5),
-                ItemBuilder.of(Material.LIGHT_GRAY_BANNER)
-                        .name(t(player, "party.create-private").color(UiTheme.MUTED))
-                        .lore(UiTheme.divider(),
-                                UiTheme.line(line(player, "party.create-private-lore")),
-                                UiTheme.blank(),
-                                UiTheme.hint(line(player, "menu.click")))
-                        .action("create_private").build());
         inventory.setItem(GuiSlots.slot(0, 8),
                 ItemBuilder.of(Material.WRITABLE_BOOK)
                         .name(t(player, "party.how-title").color(UiTheme.SECONDARY))

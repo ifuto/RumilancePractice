@@ -8,28 +8,45 @@ import com.rumilance.practice.gui.ItemBuilder;
 import com.rumilance.practice.gui.MenuScaffold;
 import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.sound.SoundService;
+import com.rumilance.practice.state.TeamColor;
 import com.rumilance.practice.team.Team;
 import com.rumilance.practice.team.TeamService;
 import com.rumilance.practice.util.GuiSlots;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.TextDecoration;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemStack;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 
 /**
- * パーティ設定 (完全リビルド 2026-09-29)。設計思想:
- * <p>「人の画面 = Hub に残す」「ルールの画面 = ここに集約」の一本化。</p>
+ * パーティ管理 GUI【完全リビルド 2026-09-29。「0 から」再設計版 — 旧 TeamSettingsGui】。
+ *
+ * <p>旧設定画面は「ルール・破壊系・管理系・マップ…何でもごちゃまぜ」だった。
+ * 新設計は 3 つの ri FUNCTION 帯で構成される(機能配置から考え直し):</p>
  * <ul>
- *   <li>row1 — ルール:       公開/非公開 (1,2)・マップ (1,4)・友好ファイア (1,6)</li>
- *   <li>row2 — チーム操作:   サイド白紙 (2,2)・自動分割 (2,4)・上位設定 (2,6)</li>
- *   <li>row3 — 危険:         解散は赤い最遠隅 (3,7) だけ</li>
- *   <li>row4 — 共通:         ハブへ戻る (4,4)。Owner 以外は空画面+バリアのみ</li>
+ *   <li><b>row1 ルール(バトル設定)</b> — [公開/非公開 (1,2) | マップ (1,4) | 友好ファイア (1,6)]:
+ *       毎回試合の互みを変えるものだけを置く</li>
+ *   <li><b>row2 運営(メンバー)動作</b> — [サイド白紙 (2,4) | <b>権限移譲 (2,3)</b> 新機能 |
+ *       チーム設定パネル (2,5)]: メンバーコントロールをここに集約
+ *       (自動分割はハブの日常磴へ一本化 — ⑨ 重複監査により撤去)</li>
+ *   <li><b>row3 危険ゾーン</b> — 解散ボタンのみ最遠隅 (3,7) (確認ダイアログ)</li>
  * </ul>
- * <p>旧画面が抱えていた「やりたい操作が hub と settings に分散」問題は
- * Settings への一本化で解消する(Hub は誰がどちら側かの「人」の可視化に専念)。</p>
+ * <p><b>権限移譲</b> 押下で画面がモード切替(下部が「メンバー選択」一覧になり、
+ * クリックした相手にリーダーを渡す)。視線の流れは「上=今日の試合の設定 → 下=危険」。
+ * 非 OWNER には鉄壁:CLOSE ボタンのみ(従来どおり)。</p>
  */
 public final class TeamSettingsGui extends AbstractGui {
+
+    /** Transfer mode flag (session key). */
+    private static final String K_TRANSFER = "transfer_mode";
 
     private final TeamService teamService;
     private TeamHubGui teamHubGui;
@@ -88,8 +105,10 @@ public final class TeamSettingsGui extends AbstractGui {
 
     @Override
     protected Component title(Player player, GuiSession session) {
-        return t(player, "party-settings-title").color(UiTheme.PRIMARY);
+        return t(player, "gui.party-settings-title").color(UiTheme.PRIMARY);
     }
+
+    // ================================================================== render
 
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
@@ -106,7 +125,16 @@ public final class TeamSettingsGui extends AbstractGui {
             return;
         }
 
-        // === row1: ルール（バトルの基本設定、視線の流れは [公開-マップ-FF] ) ===
+        if (Boolean.TRUE.equals(session.get(K_TRANSFER, Boolean.class))) {
+            renderTransferPicker(player, session, inventory, team);
+            return;
+        }
+        renderMain(player, inventory, team);
+    }
+
+    /** メイン画面(ルール/運営/危険の3帯 + フッターの戻る)。 */
+    private void renderMain(Player player, Inventory inventory, Team team) {
+        // === row1: ルール（バトル設定） ===
         inventory.setItem(GuiSlots.slot(1, 2),
                 ItemBuilder.of(team.isPublic() ? UiTheme.TOGGLE_ON : UiTheme.TOGGLE_OFF)
                         .name(t(player, team.isPublic() ? "party.public-team" : "party.private-team")
@@ -142,23 +170,21 @@ public final class TeamSettingsGui extends AbstractGui {
                                 UiTheme.hint(line(player, "gui.toggle-hint")))
                         .action("toggle_ff").build());
 
-        // === row2: チーム操作(人の編成を整える方) ===
+        // === row2: 運営(メンバー動作) ===
         inventory.setItem(GuiSlots.slot(2, 2),
+                ItemBuilder.of(Material.NETHERITE_HELMET)
+                        .name(t(player, "party.transfer-title").color(UiTheme.SECONDARY))
+                        .lore(UiTheme.divider(),
+                                UiTheme.line(line(player, "party.transfer-lore")),
+                                UiTheme.blank(),
+                                UiTheme.hint(line(player, "party.transfer-hint")))
+                        .action("transfer_mode").build());
+        inventory.setItem(GuiSlots.slot(2, 4),
                 ItemBuilder.of(Material.WATER_BUCKET)
                         .name(t(player, "party.clear-sides").color(UiTheme.WARNING))
                         .lore(UiTheme.divider(),
                                 UiTheme.hint(line(player, "party.clear-sides-hint")))
                         .action("clearsides").build());
-        inventory.setItem(GuiSlots.slot(2, 4),
-                ItemBuilder.of(Material.ENDER_PEARL)
-                        .name(t(player, "party.autosplit").color(UiTheme.PRIMARY))
-                        .lore(UiTheme.divider(),
-                                UiTheme.line(line(player, "party.autosplit-lore-1")),
-                                UiTheme.line(line(player, "party.autosplit-lore-2")),
-                                UiTheme.line(line(player, "party.autosplit-lore-3")),
-                                UiTheme.blank(),
-                                UiTheme.hint(line(player, "party.autosplit-hint")))
-                        .action("autosplit").build());
         if (teamConfigGui != null) {
             inventory.setItem(GuiSlots.slot(2, 6),
                     ItemBuilder.of(Material.COMMAND_BLOCK)
@@ -170,7 +196,7 @@ public final class TeamSettingsGui extends AbstractGui {
                             .action("open_team_config").build());
         }
 
-        // === row3: 危険系は最遠隅(3,7)だけに置く ===
+        // === row3: 危険ゾーンは最遠隅のみ ===
         inventory.setItem(GuiSlots.slot(3, 7),
                 ItemBuilder.of(Material.BARRIER)
                         .name(t(player, "party.disband").color(UiTheme.DANGER))
@@ -183,9 +209,57 @@ public final class TeamSettingsGui extends AbstractGui {
         MenuScaffold.returnButton(inventory, t(player, "gui.back-to-hub"));
     }
 
+    /** 権限移譲モードの描画: メンバー(自分以外)の選択グリッド + 戻るでメイン画面。 */
+    private void renderTransferPicker(Player player, GuiSession session, Inventory inventory, Team team) {
+        inventory.setItem(GuiSlots.slot(0, 4),
+                ItemBuilder.of(Material.NETHER_STAR)
+                        .name(t(player, "party.transfer-title").color(UiTheme.SECONDARY))
+                        .lore(UiTheme.divider(),
+                                UiTheme.line(line(player, "party.transfer-pick-lore")))
+                        .action("decorate").build());
+        List<UUID> others = new ArrayList<>();
+        for (UUID member : team.members()) {
+            if (!member.equals(team.owner())) {
+                others.add(member);
+            }
+        }
+        if (others.isEmpty()) {
+            inventory.setItem(GuiSlots.slot(2, 4),
+                    ItemBuilder.of(Material.BARRIER)
+                            .name(t(player, "party.transfer-nobody").color(UiTheme.MUTED))
+                            .lore(UiTheme.hint(line(player, "party.transfer-nobody-lore")))
+                            .action("decorate").build());
+        }
+        int page = session.page();
+        int perPage = MenuScaffold.gridPageSize();
+        int from = Math.min(page * perPage, others.size());
+        int to = Math.min(from + perPage, others.size());
+        int index = 0;
+        for (int i = from; i < to; i++) {
+            inventory.setItem(MenuScaffold.gridSlot(index++), head(player, others.get(i)));
+        }
+        // 戻る=メイン画面へ(逃す板場)
+        inventory.setItem(GuiSlots.slot(4, 4),
+                ItemBuilder.action(UiTheme.BACK, t(player, "menu.back"), "transfer_exit"));
+    }
+
+    private ItemStack head(Player viewer, UUID member) {
+        OfflinePlayer p = Bukkit.getOfflinePlayer(member);
+        String name = p.getName() == null ? "?" : p.getName();
+        return ItemBuilder.of(Material.PLAYER_HEAD)
+                .name(Component.text(name, UiTheme.VALUE).decoration(TextDecoration.ITALIC, false))
+                .lore(UiTheme.divider(),
+                        UiTheme.hint(line(viewer, "party.transfer-pick-lore")))
+                .skullOwner(p)
+                .action("transfer:" + member)
+                .build();
+    }
+
+    // ================================================================== helpers
+
     private void backToHub(Player player) {
         org.bukkit.Bukkit.getScheduler().runTask(
-                org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
+                org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(TeamSettingsGui.class),
                 () -> {
                     if (player.isOnline() && teamHubGui != null) {
                         teamHubGui.open(player);
@@ -198,7 +272,7 @@ public final class TeamSettingsGui extends AbstractGui {
             return;
         }
         org.bukkit.Bukkit.getScheduler().runTask(
-                org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
+                org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(TeamSettingsGui.class),
                 () -> {
                     if (player.isOnline()) {
                         gui.open(player);
@@ -217,7 +291,7 @@ public final class TeamSettingsGui extends AbstractGui {
             return;
         }
         org.bukkit.Bukkit.getScheduler().runTaskLater(
-                org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
+                org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(TeamSettingsGui.class),
                 () -> {
                     if (player.isOnline()) {
                         browser.open(player);
@@ -225,6 +299,8 @@ public final class TeamSettingsGui extends AbstractGui {
                 },
                 16L);
     }
+
+    // ================================================================== clicks
 
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot,
@@ -236,9 +312,60 @@ public final class TeamSettingsGui extends AbstractGui {
         }
         boolean owner = team.isOwner(player.getUniqueId());
         switch (action) {
-            case "close", "back" -> {
+            case "back", "close" -> {
+                session.put(K_TRANSFER, Boolean.FALSE);
                 sounds.play(player, "gui-back");
                 backToHub(player);
+            }
+            case "transfer_exit" -> {
+                session.put(K_TRANSFER, Boolean.FALSE);
+                session.setPage(0);
+                sounds.play(player, "gui-back");
+                refresh(player, session, inventory);
+            }
+            case "transfer_mode" -> {
+                if (!owner) {
+                    return;
+                }
+                session.put(K_TRANSFER, Boolean.TRUE);
+                session.setPage(0);
+                sounds.play(player, "gui-open");
+                refresh(player, session, inventory);
+            }
+            default -> {
+                if (action.startsWith("transfer:")) {
+                    if (!owner) {
+                        return;
+                    }
+                    UUID target;
+                    try {
+                        target = UUID.fromString(action.substring("transfer:".length()));
+                    } catch (IllegalArgumentException e) {
+                        return;
+                    }
+                    OfflinePlayer op = Bukkit.getOfflinePlayer(target);
+                    String name = op.getName();
+                    if (name == null) {
+                        sounds.play(player, "error");
+                        return;
+                    }
+                    TeamService.Result r = teamService.transferOwnership(player, name);
+                    sounds.play(player, r == TeamService.Result.OK ? "match-found" : "error");
+                    if (r != TeamService.Result.OK) {
+                        player.sendMessage(Component.text(
+                                teamService.errorMessage(player, r), UiTheme.DANGER)
+                                .decoration(TextDecoration.ITALIC, false));
+                    }
+                    session.put(K_TRANSFER, Boolean.FALSE);
+                    // 旧オーナーは呼び出し元に戻る(管理画面の権限は移譲先へ)
+                    player.closeInventory();
+                    if (r == TeamService.Result.OK) {
+                        player.sendMessage(Component.text(
+                                line(player, "party.transfer-done").replace("<player>", name),
+                                UiTheme.SUCCESS).decoration(TextDecoration.ITALIC, false));
+                    }
+                    return;
+                }
             }
             case "toggle_public" -> {
                 if (owner) {
@@ -271,13 +398,6 @@ public final class TeamSettingsGui extends AbstractGui {
                 }
                 sounds.play(player, "gui-open");
                 openLater(player, teamConfigGui);
-            }
-            case "autosplit" -> {
-                if (owner) {
-                    TeamService.Result r = teamService.autoAssign(player);
-                    sounds.play(player, r == TeamService.Result.OK ? "select" : "error");
-                    refresh(player, session, inventory);
-                }
             }
             case "clearsides" -> {
                 if (owner) {
@@ -313,8 +433,6 @@ public final class TeamSettingsGui extends AbstractGui {
                 } else {
                     player.sendMessage(Component.text(line(player, "party.disband-hint"), UiTheme.DANGER));
                 }
-            }
-            default -> {
             }
         }
     }

@@ -86,6 +86,16 @@ menu:
   delete: "删除"
 
 party:
+  err-not-member: "That player is not a party member"
+  invite-pending-label: "Pending invites"
+  transfer-title: "Transfer leadership"
+  transfer-lore: "Give this party’s leadership to another member (you stay a member)"
+  transfer-hint: "Click: choose a member"
+  transfer-pick-lore: "Click a head to pass leadership. “Back” cancels"
+  transfer-nobody: "No other members"
+  transfer-nobody-lore: "Leadership cannot be transferred while alone"
+  transfer-done: "Leadership transferred to <player>"
+  create-private-hint: "Ok for everyone — a private party just for your friends"
   solo-only: "<red>使用单人队列或约战前请先离开队伍。"
   hub-title: "队伍"
   browser-title: "队伍列表"
@@ -568,6 +578,7 @@ admin-gui:
   bed-explosion-lore2: "爆炸也会伤害点击者本身。"
 
 gui:
+  party-settings-title: "Party manage"
   admin-ffa-settings: "FFA 斗场设置"
   admin-ffa-settings-lore-1: "按斗场切换功能(TPA / RTPQueue)。"
   admin-ffa-settings-lore-2: "俯视显示的斗场尺寸(格数)。"
@@ -694,7 +705,6 @@ gui:
   trim-locked-pattern: "<red>该花纹需 VIP+ 及以上。"
   trim-locked-selection: "<red>所选纹饰需 VIP+ 及以上。"
   no-enchants: "无附魔"
-  settings-title: "设置"
   settings-cooldown: "设置冷却中…… (<secs>秒)"
   deny-duels: "拒绝约战"
   deny-duels-lore: "屏蔽其他玩家的约战请求。"

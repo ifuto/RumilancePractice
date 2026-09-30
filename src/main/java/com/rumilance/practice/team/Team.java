@@ -18,7 +18,8 @@ import java.util.UUID;
 public final class Team {
 
     private final UUID id;
-    private final UUID owner;
+    // 権限移譲機能のため volatile (読み取りはどのスレッドでも同時)。変更は TeamService 経由のみ。
+    private volatile UUID owner;
     private String name;
     private boolean isPublic;
     private final Set<UUID> members = new LinkedHashSet<>();
@@ -152,6 +153,11 @@ public final class Team {
 
     public UUID owner() {
         return owner;
+    }
+
+    /** 権限移譲は {@link TeamService#transferOwnership} 経由でのみ許可する。 */
+    public void setOwner(UUID newOwner) {
+        this.owner = java.util.Objects.requireNonNull(newOwner, "newOwner");
     }
 
     public String name() {

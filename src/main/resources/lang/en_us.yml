@@ -88,6 +88,16 @@ menu:
   delete: "Delete"
 
 party:
+  err-not-member: "That player is not a party member"
+  invite-pending-label: "Pending invites"
+  transfer-title: "Transfer leadership"
+  transfer-lore: "Give this party’s leadership to another member (you stay a member)"
+  transfer-hint: "Click: choose a member"
+  transfer-pick-lore: "Click a head to pass leadership. “Back” cancels"
+  transfer-nobody: "No other members"
+  transfer-nobody-lore: "Leadership cannot be transferred while alone"
+  transfer-done: "Leadership transferred to <player>"
+  create-private-hint: "Ok for everyone — a private party just for your friends"
   solo-only: "<red>Leave your party before using solo queue or duels."
   hub-title: "Party"
   browser-title: "Party List"
@@ -570,6 +580,7 @@ admin-gui:
   bed-explosion-lore2: "The blast also hits the clicker, like vanilla bed bombing."
 
 gui:
+  party-settings-title: "Party manage"
   admin-ffa-settings: "FFA Arena Settings"
   admin-ffa-settings-lore-1: "Per-arena feature toggles (TPA / RTPQueue)."
   admin-ffa-settings-lore-2: "Arena size shown as measured from above."
@@ -696,7 +707,6 @@ gui:
   trim-locked-pattern: "<red>This pattern is available for VIP+ and above."
   trim-locked-selection: "<red>The selected trim is available for VIP+ and above."
   no-enchants: "No enchantments"
-  settings-title: "Settings"
   settings-cooldown: "Settings cooldown… (<secs>s)"
   deny-duels: "Deny duels"
   deny-duels-lore: "Block duel requests from other players."
@@ -1253,7 +1263,7 @@ gui:
   practice-layout-order-anchor: "RESPAWN_ANCHOR then GLOWSTONE"
   practice-layout-order-glow: "GLOWSTONE then RESPAWN_ANCHOR"
   team-settings-title: "Team Settings"
-  team-settings-entry: "Team Settings"
+  team-settings-entry: "Party manage"
   team-settings-lore: "Invites, visibility, map, friendly fire + team management"
   team-settings-hint: "Click: open team settings"
   back-to-hub: "Back to team hub"

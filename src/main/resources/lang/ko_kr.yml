@@ -86,6 +86,16 @@ menu:
   delete: "삭제"
 
 party:
+  err-not-member: "That player is not a party member"
+  invite-pending-label: "Pending invites"
+  transfer-title: "Transfer leadership"
+  transfer-lore: "Give this party’s leadership to another member (you stay a member)"
+  transfer-hint: "Click: choose a member"
+  transfer-pick-lore: "Click a head to pass leadership. “Back” cancels"
+  transfer-nobody: "No other members"
+  transfer-nobody-lore: "Leadership cannot be transferred while alone"
+  transfer-done: "Leadership transferred to <player>"
+  create-private-hint: "Ok for everyone — a private party just for your friends"
   solo-only: "<red>솔로 대기열이나 결투를 이용하려면 먼저 파티에서 나가세요."
   hub-title: "파티"
   browser-title: "파티 목록"
@@ -568,6 +578,7 @@ admin-gui:
   bed-explosion-lore2: "폭발은 클릭한 플레이어에게도 적용됩니다."
 
 gui:
+  party-settings-title: "Party manage"
   admin-ffa-settings: "FFA 아레나 설정"
   admin-ffa-settings-lore-1: "아레나별 기능 설정(TPA / RTPQueue)."
   admin-ffa-settings-lore-2: "위에서 본 아레나 크기(블록 수)."
@@ -694,7 +705,6 @@ gui:
   trim-locked-pattern: "<red>This pattern is available for VIP+ and above."
   trim-locked-selection: "<red>The selected trim is available for VIP+ and above."
   no-enchants: "No enchantments"
-  settings-title: "Settings"
   settings-cooldown: "Settings cooldown… (<secs>s)"
   deny-duels: "Deny duels"
   deny-duels-lore: "Block duel requests from other players."

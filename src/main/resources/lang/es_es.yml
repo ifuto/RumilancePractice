@@ -86,6 +86,16 @@ menu:
   delete: "Eliminar"
 
 party:
+  err-not-member: "That player is not a party member"
+  invite-pending-label: "Pending invites"
+  transfer-title: "Transfer leadership"
+  transfer-lore: "Give this party’s leadership to another member (you stay a member)"
+  transfer-hint: "Click: choose a member"
+  transfer-pick-lore: "Click a head to pass leadership. “Back” cancels"
+  transfer-nobody: "No other members"
+  transfer-nobody-lore: "Leadership cannot be transferred while alone"
+  transfer-done: "Leadership transferred to <player>"
+  create-private-hint: "Ok for everyone — a private party just for your friends"
   solo-only: "<red>Sal de tu equipo antes de usar la cola en solitario o duelos."
   hub-title: "Equipo"
   browser-title: "Lista de equipos"
@@ -568,6 +578,7 @@ admin-gui:
   bed-explosion-lore2: "La explosión también afecta a quien la detona."
 
 gui:
+  party-settings-title: "Party manage"
   admin-ffa-settings: "Ajustes de arenas FFA"
   admin-ffa-settings-lore-1: "Activadores por arena (TPA / RTPQueue)."
   admin-ffa-settings-lore-2: "Tamaño de la arena medido desde arriba."
@@ -694,7 +705,6 @@ gui:
   trim-locked-pattern: "<red>Este patrón requiere VIP+ o superior."
   trim-locked-selection: "<red>El ornamento elegido requiere VIP+ o superior."
   no-enchants: "Sin encantamientos"
-  settings-title: "Ajustes"
   settings-cooldown: "Enfriamiento de ajustes… (<secs>s)"
   deny-duels: "Rechazar duelos"
   deny-duels-lore: "Bloquea solicitudes de duelo de otros."

@@ -73,7 +73,9 @@ public final class TeamService {
         /** この操作はチーム / パーティのどちらか専用で、種別が合わない。 */
         WRONG_KIND,
         /** 観戦できる進行中の試合がない。 */
-        NO_LIVE_MATCH
+        NO_LIVE_MATCH,
+        /** 権限移譲等で、対象がチームのメンバーでない。 */
+        NOT_MEMBER
     }
 
     private volatile com.rumilance.practice.session.PlayerStateManager stateManager;
@@ -175,6 +177,7 @@ public final class TeamService {
                 case UNBALANCED -> "party.err-unbalanced";
                 case OWNER_CANNOT_LEAVE -> "party.err-owner-kick";
                 case INVALID_SIDE -> "party.err-invalid-side";
+                case NOT_MEMBER -> "party.err-not-member";
                 case KIT_NOT_FOUND -> "party.err-kit";
                 case NO_ARENA -> "party.err-arena";
                 case ALREADY_QUEUED -> "party.err-already-queued";
@@ -210,6 +213,7 @@ public final class TeamService {
             case DUEL_SELF -> "You cannot challenge your own party.";
             case WRONG_KIND -> "This works only for the right group kind (team or party).";
             case NO_LIVE_MATCH -> "There is no match to spectate right now.";
+            case NOT_MEMBER -> "That player is not a member.";
             case COOLDOWN -> {
                 int secs = remainingInviteCooldownSeconds(player.getUniqueId(), cooldownTarget);
                 yield "Wait " + Math.max(1, secs) + "s before inviting that player again.";
@@ -455,6 +459,45 @@ public final class TeamService {
                                 "/team join " + team.name(), "Join " + team.name()),
                         com.rumilance.practice.chat.ChatButtons.decline("Decline",
                                 "/team decline", "Decline this invite"))));
+        return Result.OK;
+    }
+
+    /** GUI helper: pending invites count of the viewer's team (header badge). */
+    public int pendingInviteCount(java.util.UUID viewerId) {
+        Team team = byMember.get(viewerId);
+        if (team == null) {
+            return 0;
+        }
+        int n = 0;
+        for (Invite invite : invites.values()) {
+            if (invite != null && invite.teamId().equals(team.id())) {
+                n++;
+            }
+        }
+        return n;
+    }
+
+    /**
+     * 権限移譲: OWNER がチーム内の別メンバーへリーダー権を渡す (パーティ管理 GUI の新機能)。
+     * 現在オーナーはメンバーのまま残る。
+     */
+    public Result transferOwnership(Player owner, String targetName) {
+        Team team = byMember.get(owner.getUniqueId());
+        if (team == null) return Result.NOT_IN_TEAM;
+        if (!team.isOwner(owner.getUniqueId())) return Result.NOT_OWNER;
+        Player target = Bukkit.getPlayerExact(targetName);
+        if (target == null) return Result.TARGET_OFFLINE;
+        if (!team.members().contains(target.getUniqueId())) return Result.NOT_MEMBER;
+        team.setOwner(target.getUniqueId());
+        team.members().forEach(id -> {
+            Player m = Bukkit.getPlayer(id);
+            if (m != null) {
+                m.sendMessage(Component.text("★ " + target.getName()
+                                + " is now the party leader.",
+                        net.kyori.adventure.text.format.NamedTextColor.GOLD)
+                        .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+            }
+        });
         return Result.OK;
     }
 

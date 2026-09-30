@@ -218,7 +218,7 @@ public final class TeamHubGui extends AbstractGui {
                 .name(Component.text(line(viewer, "party.team-count-chip")
                         .replace("<team>", color.label())
                         .replace("<n>", String.valueOf(count)), color.textColor()))
-                .action("decorate").build());
+                .action("decorate").build();
     }
 
     private List<UUID> sideMembers(Team team, TeamColor color) {
@@ -249,6 +249,12 @@ public final class TeamHubGui extends AbstractGui {
                         .lore(UiTheme.divider(),
                                 UiTheme.line(line(player, "gui.party-quick-invite-lore")))
                         .action("quick_invite").build());
+        inventory.setItem(GuiSlots.slot(5, 3),
+                ItemBuilder.of(Material.ENDER_PEARL)
+                        .name(t(player, "gui.party-auto-split").color(UiTheme.PRIMARY))
+                        .lore(UiTheme.divider(),
+                                UiTheme.line(line(player, "gui.party-auto-split-lore")))
+                        .action("auto_split").build());
         inventory.setItem(GuiSlots.slot(5, 6),
                 ItemBuilder.of(Material.COMPARATOR)
                         .name(t(player, "gui.team-settings-entry").color(UiTheme.PRIMARY))
@@ -296,18 +302,23 @@ public final class TeamHubGui extends AbstractGui {
 
     private ItemStack headerItem(Player viewer, Team team) {
         OfflinePlayer ownerPlayer = Bukkit.getOfflinePlayer(team.owner());
+        java.util.List<Component> lore = new ArrayList<>(java.util.List.of(
+                UiTheme.divider(),
+                UiTheme.labelValue(line(viewer, "gui.party-owner"),
+                        ownerPlayer.getName() == null ? "?" : ownerPlayer.getName()),
+                UiTheme.labelValue(line(viewer, "gui.party-members"), team.size() + "/30")));
+        int pending = teamService.pendingInviteCount(viewer.getUniqueId());
+        if (pending > 0) {
+            lore.add(UiTheme.labelValue(line(viewer, "party.invite-pending-label"),
+                    String.valueOf(pending)));
+        }
+        lore.add(UiTheme.status(team.isPublic()
+                        ? line(viewer, "gui.party-public")
+                        : line(viewer, "gui.party-private"),
+                team.isPublic() ? UiTheme.SUCCESS : UiTheme.MUTED));
         return ItemBuilder.of(Material.PLAYER_HEAD)
                 .name(Component.text(team.name(), UiTheme.HEADER))
-                .lore(
-                        UiTheme.divider(),
-                        UiTheme.labelValue(line(viewer, "gui.party-owner"),
-                                ownerPlayer.getName() == null ? "?" : ownerPlayer.getName()),
-                        UiTheme.labelValue(line(viewer, "gui.party-members"), team.size() + "/30"),
-                        UiTheme.status(team.isPublic()
-                                        ? line(viewer, "gui.party-public")
-                                        : line(viewer, "gui.party-private"),
-                                team.isPublic() ? UiTheme.SUCCESS : UiTheme.MUTED)
-                )
+                .lore(lore.toArray(Component[]::new))
                 .skullOwner(ownerPlayer)
                 .action("decorate")
                 .build();
@@ -391,7 +402,7 @@ public final class TeamHubGui extends AbstractGui {
                 }
                 sounds.play(player, "gui-open");
                 Bukkit.getScheduler().runTask(
-                        org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
+                        org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(TeamHubGui.class),
                         () -> {
                             if (player.isOnline()) {
                                 partyInviteGui.openFor(player);
@@ -417,7 +428,7 @@ public final class TeamHubGui extends AbstractGui {
                 }
                 sounds.play(player, "gui-open");
                 Bukkit.getScheduler().runTask(
-                        org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
+                        org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(TeamHubGui.class),
                         () -> {
                             if (player.isOnline()) {
                                 teamSettingsGui.open(player);
@@ -432,7 +443,7 @@ public final class TeamHubGui extends AbstractGui {
                 }
                 sounds.play(player, "gui-open");
                 Bukkit.getScheduler().runTask(
-                        org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
+                        org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(TeamHubGui.class),
                         () -> {
                             if (player.isOnline() && tournamentGui != null) {
                                 tournamentGui.open(player);
@@ -456,7 +467,7 @@ public final class TeamHubGui extends AbstractGui {
                 }
                 sounds.play(player, "gui-click");
                 Bukkit.getScheduler().runTask(
-                        org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(getClass()),
+                        org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(TeamHubGui.class),
                         () -> {
                             if (player.isOnline()) {
                                 kitSelect.open(player);
