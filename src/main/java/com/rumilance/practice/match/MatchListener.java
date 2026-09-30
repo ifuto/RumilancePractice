@@ -241,7 +241,8 @@ public final class MatchListener implements Listener {
         }
         if (session.state() == MatchState.ACTIVE) {
             KitDefinition kit = matchService.resolveKit(session);
-            if (!KitBlockRules.mayPlace(kit)) {
+            // シュルカー例外: 設置可否・アドベンチャー指定に関係なく設置可 (KitBlockRules)。
+            if (!KitBlockRules.mayPlace(kit, event.getBlock().getType())) {
                 event.setCancelled(true);
                 return;
             }

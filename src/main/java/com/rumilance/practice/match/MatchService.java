@@ -1996,6 +1996,23 @@ public final class MatchService {
             downed.sendActionBar(title(downed, "match.eliminated",
                     Component.text("You were eliminated!", NamedTextColor.RED))
                     .decorate(TextDecoration.BOLD));
+            // 観戦脱出導線: Party Fight で倒れた人のチャットに「観戦をやめてロビーに戻る」
+            // ボタンを出す。実体は /hub（LobbyCommand → leaveEliminatedTeamSpectator）で、
+            // 敗北処理（ドロップ・勝敗帳）は既に完了済みなので再実行も罰も発生しない。
+            downed.sendMessage(Component.text()
+                    .append(title(downed, "match.eliminated-return-hint",
+                            Component.text("You are watching the rest of the fight.",
+                                    NamedTextColor.GRAY)))
+                    .append(Component.text(" "))
+                    .append(com.rumilance.practice.chat.ChatButtons.decline(
+                            messageService == null
+                                    ? "Stop spectating and return to lobby"
+                                    : messageService.raw(downed, "match.eliminated-return-button"),
+                            "/hub",
+                            messageService == null
+                                    ? "Return to the lobby"
+                                    : messageService.raw(downed, "match.eliminated-return-hover")))
+                    .build().decoration(TextDecoration.ITALIC, false));
             if (spectatorService != null) {
                 spectatorService.hideInWorld(downed);
             }

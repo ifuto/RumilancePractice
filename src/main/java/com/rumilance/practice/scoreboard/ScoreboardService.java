@@ -252,6 +252,18 @@ public final class ScoreboardService {
                 if (player.getScoreboard() != Bukkit.getScoreboardManager().getMainScoreboard()) {
                     player.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
                 }
+                // ← Party Fight の ● 残留バグの根本修正: スコアボード表示 OFF の人は update()
+                //   を通らないため、試合 TAB 取り込み (playerListName 上書き / list order /
+                //   filler行 / listed=false) が一生クリアされず、ロビー復帰後も ● が残って
+                //   いた。TAB プレイヤーリストはサイドバー用スコアボード設定とは無関係なので、
+                //   表示 OFF の人にも毎 tick クリアを走らせる（試合中の人は後段の fight-grid
+                //   apply が同 tick に再適用するので表示は維持される）。
+                if (tabFightListService != null
+                        && matchRegistry.byPlayer(player.getUniqueId()).isEmpty()
+                        && (spectatorService == null
+                            || spectatorService.matchOf(player.getUniqueId()).isEmpty())) {
+                    tabFightListService.clear(player);
+                }
                 continue;
             }
             update(player, onlineCount, cfg);
@@ -600,18 +612,45 @@ public final class ScoreboardService {
             if (tabFightListService != null) {
                 tabFightListService.clear(player);
             }
-            // Lobby / FFA / queue: rank badge (admin / VIP+ / VIP) in front of each name.
-            if (handle != null && iconFontService != null && rankService != null
-                    && iconFontService.enabled()) {
+            // Lobby / FFA / queue: rank badge (admin / VIP+ / VIP) in front of each name,
+            // 状態マーカーを名前の右に: 試合中 = ⚔️ / 観戦中 = 👁️ (ロビー視点の他人名)。
+            // マーカーはリソースパック非依存の Unicode なので icons.enabled() に関係なく出す。
+            if (handle != null && rankService != null) {
                 com.rumilance.practice.font.RankIconNameTags.apply(
                         handle.board, iconFontService, rankService,
                         Bukkit.getOnlinePlayers(),
                         tabCustomizationConfig == null ? null
-                                : other -> tabCustomizationConfig.prefix(other, rankService));
+                                : other -> tabCustomizationConfig.prefix(other, rankService),
+                        this::tabStatusMarker);
             } else if (handle != null) {
                 com.rumilance.practice.font.RankIconNameTags.clear(handle.board);
             }
         }
+    }
+
+    /** TAB name に付ける status マーカー（ユーザー指定の表記: 名前の右に半角スペース3つ+絵文字）。 */
+    private static final Component TAB_MARKER_FIGHTING = Component.text("   ⚔️");
+    private static final Component TAB_MARKER_SPECTATING = Component.text("   👁️");
+
+    /**
+     * ロビー（/FFA/キュー）視点の TAB 名右側マーカーを解決する。観戦中（デュエル観戦 or FFA 観戦）
+     * は 👁️、マッチ参加者（パーティファイトで倒れて同試合を観戦中の人を含む）は ⚔️。
+     * それ以外のロビー勢にはマーカーなし。
+     */
+    private Component tabStatusMarker(Player target) {
+        if (target == null || matchRegistry == null) {
+            return Component.empty();
+        }
+        java.util.UUID id = target.getUniqueId();
+        if (spectatorService != null
+                && (spectatorService.matchOf(id).isPresent()
+                    || spectatorService.ffaArenaOf(id).isPresent())) {
+            return TAB_MARKER_SPECTATING;
+        }
+        if (matchRegistry.byPlayer(id).isPresent()) {
+            return TAB_MARKER_FIGHTING;
+        }
+        return Component.empty();
     }
 
     private void fillLobby(ScoreboardContext ctx, Player player, ScoreboardConfig cfg) {

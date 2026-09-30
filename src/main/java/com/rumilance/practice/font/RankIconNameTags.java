@@ -37,21 +37,46 @@ public final class RankIconNameTags {
     public static void apply(Scoreboard board, IconFontService icons, RankService ranks,
                              Collection<? extends Player> online,
                              Function<Player, Component> customPrefix) {
-        if (board == null || icons == null || ranks == null || !icons.enabled()) {
+        apply(board, icons, ranks, online, customPrefix, null);
+    }
+
+    /**
+     * Full form: rank-icon prefix + optional status-marker suffix (TAB name 右側の状態マーカー:
+     * ロビー視点で 試合中 = ⚔️ / 観戦中 = 👁️)。Markers ride in the SAME team as the badge —
+     * an entry may only render one team's prefix+suffix, so a second marker team would fight
+     * the badge team over the entry, and {@link #clear(Scoreboard)} (match entry) removes both.
+     * Glyph-less (no resource pack) viewers still get the markers: they are plain unicode.
+     */
+    public static void apply(Scoreboard board, IconFontService icons, RankService ranks,
+                             Collection<? extends Player> online,
+                             Function<Player, Component> customPrefix,
+                             Function<Player, Component> markerSuffix) {
+        if (board == null || ranks == null) {
             return;
         }
+        boolean glyphs = icons != null && icons.enabled();
         for (Player other : online) {
-            PlayerRank effective = effectiveRank(ranks, other);
-            Component icon = icons.rankIcon(effective);
-            if (customPrefix != null) {
-                Component suffix = customPrefix.apply(other);
-                if (suffix != null && !suffix.equals(Component.empty())) {
-                    icon = icon.append(suffix);
+            Component icon = Component.empty();
+            if (glyphs) {
+                PlayerRank effective = effectiveRank(ranks, other);
+                icon = icons.rankIcon(effective);
+                if (customPrefix != null) {
+                    Component suffix = customPrefix.apply(other);
+                    if (suffix != null && !suffix.equals(Component.empty())) {
+                        icon = icon.append(suffix);
+                    }
+                }
+            }
+            Component marker = Component.empty();
+            if (markerSuffix != null) {
+                Component resolved = markerSuffix.apply(other);
+                if (resolved != null) {
+                    marker = resolved;
                 }
             }
             String entry = other.getName();
             String name = teamName(other.getUniqueId());
-            if (icon.equals(Component.empty())) {
+            if (icon.equals(Component.empty()) && marker.equals(Component.empty())) {
                 remove(board, entry, name);
                 continue;
             }
@@ -63,7 +88,7 @@ public final class RankIconNameTags {
                 team.addEntry(entry);
             }
             team.prefix(icon);
-            team.suffix(Component.empty());
+            team.suffix(marker);
         }
     }
 

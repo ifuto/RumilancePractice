@@ -503,6 +503,10 @@ match:
   summary-report-btn: "レポート"
   summary-report-hover: "完全な試合レポートを開く"
   eliminated: "<red>脱落しました!"
+  eliminated-return-hint: "<gray>倒れました。残りを観戦しています。"
+  eliminated-return-button: "観戦をやめてロビーに戻る"
+  eliminated-return-hover: "/hub でロビーに戻る"
+
 
 spectator:
   now-spectating: "<gray><yellow><player></yellow> の観戦を開始しました。"

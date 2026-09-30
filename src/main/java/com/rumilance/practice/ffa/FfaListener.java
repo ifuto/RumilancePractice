@@ -190,7 +190,7 @@ public final class FfaListener implements Listener {
         }
         KitDefinition kit = kitOf(event.getPlayer().getUniqueId());
         FfaService.FfaArena arena = arenaOf(event.getPlayer().getUniqueId());
-        if (!mayPlace(arena, kit)) {
+        if (!mayPlace(arena, kit, event.getBlock().getType())) {
             event.setCancelled(true);
             return;
         }
@@ -226,17 +226,26 @@ public final class FfaListener implements Listener {
      * stay as a fallback so kit definitions migrated before this split keep working. The
      * "players can never break glass" safety still applies either way.
      */
-    private static boolean mayPlace(FfaService.FfaArena arena, KitDefinition kit) {
+    private static boolean mayPlace(FfaService.FfaArena arena, KitDefinition kit, Material type) {
+        // forceAdventure キットはアリーナの設置許可より厳しく扱う（シュルカー例外のみ有効）。
+        // 旧 ADVENTURE ゲームモードのブロックロックを KitBlockRules へ移した後の等価規則。
+        if (kit != null && kit.forceAdventure()) {
+            return KitBlockRules.isShulkerBox(type);
+        }
         if (arena != null && arena.blockPlace()) {
             return true;
         }
-        return KitBlockRules.mayPlace(kit);
+        return KitBlockRules.mayPlace(kit, type);
     }
 
     private static boolean mayBreak(FfaService.FfaArena arena, KitDefinition kit,
                                     Material type, boolean playerPlaced) {
         if (KitBlockRules.isGlass(type)) {
             return false;
+        }
+        // forceAdventure キット: アリーナ規則より厳しく、シュルカー（player-placed）のみ許可。
+        if (kit != null && kit.forceAdventure()) {
+            return KitBlockRules.mayBreak(kit, type, playerPlaced);
         }
         // A bed-bombing kit must be able to clean up (or re-use) its own beds.
         if (kit != null && kit.bedExplosion() && type != null && type.name().endsWith("_BED")) {

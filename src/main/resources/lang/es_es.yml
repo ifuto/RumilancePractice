@@ -502,6 +502,10 @@ match:
   summary-report-btn: "Informe"
   summary-report-hover: "Abrir el informe completo de la partida"
   eliminated: "<red>¡Fuiste eliminado!"
+  eliminated-return-hint: "<gray>Fuiste eliminado. Estás viendo el resto de la pelea."
+  eliminated-return-button: "Dejar de espectar y volver al lobby"
+  eliminated-return-hover: "Volver al lobby"
+
 
 spectator:
   now-spectating: "<gray>Ahora espectas a <yellow><player></yellow>."

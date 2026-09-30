@@ -502,6 +502,10 @@ match:
   summary-report-btn: "리포트"
   summary-report-hover: "전체 매치 리포트 열기"
   eliminated: "<red>탈락했습니다!"
+  eliminated-return-hint: "<gray>탈락했습니다. 남은 경기를 관전 중입니다."
+  eliminated-return-button: "관전을 그만하고 로비로 돌아가기"
+  eliminated-return-hover: "로비로 돌아가기"
+
 
 spectator:
   now-spectating: "<gray>이제 <yellow><player></yellow> 님을 관전합니다."

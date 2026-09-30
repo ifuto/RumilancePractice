@@ -502,6 +502,10 @@ match:
   summary-report-btn: "报告"
   summary-report-hover: "打开完整比赛报告"
   eliminated: "<red>你被淘汰了!"
+  eliminated-return-hint: "<gray>你已被淘汰。正在观战剩余比赛。"
+  eliminated-return-button: "停止观战并返回大厅"
+  eliminated-return-hover: "返回大厅"
+
 
 spectator:
   now-spectating: "<gray>你正在观战 <yellow><player></yellow>。"
