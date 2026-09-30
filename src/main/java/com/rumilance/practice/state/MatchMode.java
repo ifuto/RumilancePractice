@@ -1,13 +1,13 @@
 package com.rumilance.practice.state;
 
 /**
- * Matchmaking / statistics mode. Unranked must never mutate Elo or public ranked stats.
+ * Matchmaking / statistics mode. Unranked must never mutate PT or public ranked stats.
  */
 public enum MatchMode {
     RANKED,
     UNRANKED,
     FFA,
-    /** RED-vs-BLUE team battle (up to 20 per side, uneven ratios allowed). No Elo changes. */
+    /** RED-vs-BLUE team battle (up to 20 per side, uneven ratios allowed). No PT changes. */
     TEAM;
 
     public boolean isRanked() {

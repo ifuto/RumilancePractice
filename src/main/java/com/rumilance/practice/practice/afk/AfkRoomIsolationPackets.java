@@ -23,8 +23,9 @@ import java.util.UUID;
  *       break animations are dropped unless the chunk/position overlaps the room footprint, so a
  *       neighbour's arena 132 blocks away never appears on the client;</li>
  *   <li><b>entity packets</b> — dropped when the entity is not inside the room; packets about
- *       <em>players</em> are dropped unconditionally (both ways: a room owner sees no other
- *       player, and nobody sees a room owner).</li>
+ *       other <em>players</em> are dropped unless that player is standing inside the
+ *       receiver's own room (both ways: a room owner sees no player outside their room, and
+ *       nobody sees a room owner).</li>
  * </ul>
  *
  * <p>Rules are deliberately fail-open when a position cannot be read: dropping a packet we
@@ -155,20 +156,28 @@ final class AfkRoomIsolationPackets {
         } catch (Throwable t) {
             return false; // field layout unknown -> keep the packet
         }
+        if (room == null) {
+            // Viewer is not isolated: normal visibility, except other players' rooms hide
+            // their owners (belt and braces over Player#hidePlayer).
+            return entity instanceof Player target
+                    && source.roomOf(target.getUniqueId()) != null;
+        }
+        if (entity == null) {
+            // Fail-open, like every other unreadable case in this class: a packet whose
+            // entity cannot be resolved might belong to the receiver's own entities
+            // (recently spawned in-room), so dropping it desyncs the room itself.
+            return false;
+        }
+        // Everything inside the receiver's own room stays visible — what used to look like
+        // "afkc で範囲内のパケットも遮断される" happened when a resolvable-but-inside
+        // entity was wrongly lumped in with the outside world.
         if (entity instanceof Player target) {
             if (target.getUniqueId().equals(viewerId)) {
                 return false; // your own entity is always yours to see
             }
-            // Private rooms are single-player: no other player in, and no viewer sees a room
-            // owner (belt and braces over Player#hidePlayer).
-            return room != null || source.roomOf(target.getUniqueId()) != null;
-        }
-        if (room == null) {
-            return false; // not isolated -> normal visibility
-        }
-        if (entity == null) {
-            Integer id = event.getPacket().getIntegers().readSafely(0);
-            return id != null && id != receiver.getEntityId();
+            Location targetLoc = target.getLocation();
+            return !AfkRoomMath.positionInside(room.centerX(), room.centerZ(), room.floorRadius(),
+                    targetLoc.getX(), targetLoc.getZ());
         }
         if (!room.world().equals(entity.getWorld())) {
             return true;

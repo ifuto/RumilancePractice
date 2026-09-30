@@ -3,6 +3,7 @@ package com.rumilance.practice.queue;
 import com.rumilance.practice.config.PluginSettings;
 import com.rumilance.practice.config.RuntimeFlags;
 import com.rumilance.practice.database.repository.RankedStatsRepository;
+import com.rumilance.practice.glicko.GlickoCalculator;
 import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.lobby.LobbyService;
 import com.rumilance.practice.match.MatchService;
@@ -203,20 +204,20 @@ public final class QueueCoordinator {
             return;
         }
 
-        AtomicReference<Integer> elo = new AtomicReference<>(1000);
+        AtomicReference<Integer> pt = new AtomicReference<>(GlickoCalculator.DEFAULT_RATING_INT);
         if (mode == MatchMode.RANKED) {
             try {
-                elo.set(rankedStatsRepository.find(player.getUniqueId(), fightKitId)
-                        .map(RankedKitStats::elo)
-                        .orElse(1000));
+                pt.set(rankedStatsRepository.find(player.getUniqueId(), fightKitId)
+                        .map(RankedKitStats::pt)
+                        .orElse(GlickoCalculator.DEFAULT_RATING_INT));
             } catch (Exception ignored) {
-                elo.set(1000);
+                pt.set(GlickoCalculator.DEFAULT_RATING_INT);
             }
         }
 
         String ip = player.getAddress() == null ? null : player.getAddress().getAddress().getHostAddress();
         PlayerPlatform platform = PlayerPlatform.of(player);
-        if (!queueService.join(player.getUniqueId(), fightKitId, mode, elo.get(), ip, platform)) {
+        if (!queueService.join(player.getUniqueId(), fightKitId, mode, pt.get(), ip, platform)) {
             messageService.send(player, "queue.already-queued");
             return;
         }

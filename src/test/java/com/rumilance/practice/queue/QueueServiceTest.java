@@ -122,7 +122,8 @@ class QueueServiceTest {
                 "en_us", false, 1, 4, 2, 60L,
                 5, 0, 30, true, 5,
                 60, initial, growth, interval, 0,
-                1000, 20, 64, 32, 26, 0.10d,
+                // ranked: starting PT, starting deviation, starting volatility, tau, leaderboard max deviation
+                1500, 350.0d, 0.06d, 0.5d, 115.0d,
                 true, true, "world", false,
                 true, 30, true, true, 20, true,
                 "N.", "play.example.com", 40, false);

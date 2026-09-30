@@ -121,7 +121,7 @@ commands:
     permission: rumilance.user
   ranking:
     description: View ranked leaderboards.
-    usage: /ranking <elo|streak|kills>
+    usage: /ranking <pt|streak|kills>
     permission: rumilance.user
   ffa:
     description: Open FFA list GUI or manage FFA arenas.

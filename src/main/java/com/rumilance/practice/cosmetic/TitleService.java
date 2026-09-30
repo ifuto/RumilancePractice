@@ -17,7 +17,7 @@ import java.util.UUID;
  * Owns the cosmetic title ladder and decides which titles a player has unlocked. The selected
  * title is persisted through {@link PlayerSettings} (the {@code selected_title} column added by
  * migration v14), while unlock status is computed from the player's lifetime ranked wins and
- * best Elo via {@link StatsService}.
+ * best PT via {@link StatsService}.
  */
 public final class TitleService {
 
@@ -49,21 +49,21 @@ public final class TitleService {
     /** @return the highest-tier title a player has unlocked (always at least the Rookie tier). */
     public KillTitle bestUnlocked(UUID playerId) {
         int totalWins;
-        int bestElo;
+        int bestPt;
         try {
             List<RankedKitStats> kits = statsService.allKits(playerId);
             totalWins = kits.stream().mapToInt(RankedKitStats::wins).sum();
-            bestElo = kits.stream().mapToInt(RankedKitStats::bestElo).max().orElse(1000);
+            bestPt = kits.stream().mapToInt(RankedKitStats::bestPt).max().orElse(1500);
         } catch (Exception e) {
             totalWins = 0;
-            bestElo = 1000;
+            bestPt = 1500;
         }
         // Effectively-final copies for the lambda below.
         final int wins = totalWins;
-        final int elo = bestElo;
+        final int pt = bestPt;
         return titles.stream()
-                .filter(t -> wins >= t.requiredWins() && elo >= t.requiredElo())
-                .max(Comparator.comparingInt(t -> t.requiredWins() + t.requiredElo()))
+                .filter(t -> wins >= t.requiredWins() && pt >= t.requiredPt())
+                .max(Comparator.comparingInt(t -> t.requiredWins() + t.requiredPt()))
                 .orElse(KillTitle.NONE);
     }
 
@@ -72,15 +72,15 @@ public final class TitleService {
             return true;
         }
         int totalWins;
-        int bestElo;
+        int bestPt;
         try {
             List<RankedKitStats> kits = statsService.allKits(playerId);
             totalWins = kits.stream().mapToInt(RankedKitStats::wins).sum();
-            bestElo = kits.stream().mapToInt(RankedKitStats::bestElo).max().orElse(1000);
+            bestPt = kits.stream().mapToInt(RankedKitStats::bestPt).max().orElse(1500);
         } catch (Exception e) {
             return false;
         }
-        return totalWins >= title.requiredWins() && bestElo >= title.requiredElo();
+        return totalWins >= title.requiredWins() && bestPt >= title.requiredPt();
     }
 
     /** Sets the active title for the player, provided they have unlocked it. */

@@ -400,12 +400,12 @@ class PracticeGuardsTest {
             UUID id,
             String kit,
             MatchMode mode,
-            int elo,
+            int pt,
             String ip,
             PlayerPlatform platform,
             Instant joined
     ) {
-        return new QueueService.QueueEntry(id, kit, mode, elo, joined, ip, platform);
+        return new QueueService.QueueEntry(id, kit, mode, pt, joined, ip, platform);
     }
 
     // --- Item flow guards ---

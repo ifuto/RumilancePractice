@@ -90,8 +90,8 @@ public final class TitleGui extends AbstractGui {
             if (title.requiredWins() > 0) {
                 builder.lore(UiTheme.labelValue(line(player, "gui.titles-wins"), String.valueOf(title.requiredWins())));
             }
-            if (title.requiredElo() > 0) {
-                builder.lore(UiTheme.labelValue(line(player, "gui.titles-elo"), String.valueOf(title.requiredElo())));
+            if (title.requiredPt() > 0) {
+                builder.lore(UiTheme.labelValue(line(player, "gui.titles-pt"), String.valueOf(title.requiredPt())));
             }
         }
         return builder

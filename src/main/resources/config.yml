@@ -174,27 +174,25 @@ match:
 queue:
   # Maximum time, in seconds, a player may wait in a ranked queue before being notified.
   max-wait-notify-seconds: 60
-  # Maximum ELO difference tolerated when matching players, widened over time.
-  initial-elo-range: 75
-  elo-range-growth-per-interval: 25
+  # Maximum PT difference tolerated when matching players, widened over time.
+  initial-pt-range: 75
+  pt-range-growth-per-interval: 25
   growth-interval-seconds: 15
   # When greater than 0, players whose ping (ms) is above this value cannot join the ranked
   # queue (they receive a warning). 0 disables the check.
   max-ranked-ping-ms: 0
 
 ranking:
-  # Display points start (rounded OpenSkill mu). Hidden Gaussian is mu=1000, sigma=250.
-  starting-elo: 1000
-  # Legacy Elo K-factors are unused. Ranked uses a farm-protected OpenSkill (Weng-Lin) 1v1.
-  k-factor:
-    # First N ranked matches (per kit) use provisional-k.
-    provisional-games: 20
-    provisional-k: 64
-    standard-k: 32
-    # Players within the top-percent-fraction of Elo (among players with >=1 ranked match) use
-    # top-percent-k instead, overriding even the provisional K-factor.
-    top-percent-fraction: 0.10
-    top-percent-k: 26
+  # Glicko-2 rating system. Initial values are the Glicko-2 standard defaults.
+  glicko2:
+    starting-rating: 1500
+    starting-deviation: 350
+    starting-volatility: 0.06
+    # System constant tau constraining volatility change (paper recommends 0.3-1.2).
+    tau: 0.5
+  # A player's PT enters the public rankings only once their rating deviation is at most
+  # this value (i.e. the rating is trusted). Unrated/uncertain players stay unlisted.
+  leaderboard-max-deviation: 115
 
 spectator:
   allow-flight: true

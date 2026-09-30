@@ -28,7 +28,7 @@ import java.util.UUID;
 /**
  * Player profile / ranked summary. A player head anchors the top bar; two summary rows show
  * aggregate ranked stats (matches, wins, losses, win-rate, K/D, best streak, best kit, best
- * Elo); the bottom content row lists per-kit breakdowns; the close button is on the bottom bar.
+ * PT); the bottom content row lists per-kit breakdowns; the close button is on the bottom bar.
  */
 public final class ProfileGui extends AbstractGui {
 
@@ -95,7 +95,7 @@ public final class ProfileGui extends AbstractGui {
         int wins = kits.stream().mapToInt(RankedKitStats::wins).sum();
         int losses = kits.stream().mapToInt(RankedKitStats::losses).sum();
         int bestStreak = kits.stream().mapToInt(RankedKitStats::winStreak).max().orElse(0);
-        int bestElo = kits.stream().mapToInt(RankedKitStats::bestElo).max().orElse(1000);
+        int bestPt = kits.stream().mapToInt(RankedKitStats::bestPt).max().orElse(1500);
         String bestKit = kits.stream().max(Comparator.comparingInt(RankedKitStats::wins))
                 .map(RankedKitStats::kit).orElse("-");
         String winRate = matches < 21
@@ -103,7 +103,7 @@ public final class ProfileGui extends AbstractGui {
                 : String.format("%.1f%%", 100.0 * wins / Math.max(1, matches));
         String kd = String.format("%.2f", (double) wins / Math.max(1, losses));
 
-        // Elo is private: only the player viewing their own profile sees Elo numbers.
+        // PT is private: only the player viewing their own profile sees PT numbers.
         boolean self = target.equals(player.getUniqueId());
 
         paintFrame(player, session, inventory);
@@ -124,7 +124,7 @@ public final class ProfileGui extends AbstractGui {
                 .action("decorate");
         inventory.setItem(GuiSlots.slot(0, 4), head.build());
 
-        // Summary tiles (rows 1-2). Elo is only shown on the owner's own profile.
+        // Summary tiles (rows 1-2). PT is only shown on the owner's own profile.
         inventory.setItem(GuiSlots.slot(1, 1), summary(Material.BOOK, line(player, "gui.profile-matches"), String.valueOf(matches)));
         inventory.setItem(GuiSlots.slot(1, 3), summary(Material.DIAMOND_SWORD, line(player, "gui.profile-wins"), String.valueOf(wins)));
         inventory.setItem(GuiSlots.slot(1, 5), summary(Material.SHIELD, line(player, "gui.profile-losses"), String.valueOf(losses)));
@@ -133,9 +133,9 @@ public final class ProfileGui extends AbstractGui {
         inventory.setItem(GuiSlots.slot(2, 3), summary(Material.EMERALD, line(player, "gui.profile-best-streak"), String.valueOf(bestStreak)));
         inventory.setItem(GuiSlots.slot(2, 5), summary(Material.NETHER_STAR, line(player, "gui.profile-best-kit"), bestKit));
         if (self) {
-            inventory.setItem(GuiSlots.slot(2, 7), summary(Material.DIAMOND, line(player, "gui.profile-best-elo"), String.valueOf(bestElo)));
+            inventory.setItem(GuiSlots.slot(2, 7), summary(Material.DIAMOND, line(player, "gui.profile-best-pt"), String.valueOf(bestPt)));
         } else {
-            inventory.setItem(GuiSlots.slot(2, 7), summary(Material.DIAMOND, line(player, "gui.profile-best-elo"), line(player, "gui.profile-hidden")));
+            inventory.setItem(GuiSlots.slot(2, 7), summary(Material.DIAMOND, line(player, "gui.profile-best-pt"), line(player, "gui.profile-hidden")));
         }
 
         // Per-kit breakdown (rows 3-4 = 14 slots).
@@ -183,11 +183,11 @@ public final class ProfileGui extends AbstractGui {
                 );
         if (self) {
             builder.lore(
-                    UiTheme.labelValue("Elo", String.valueOf(stats.elo())),
-                    UiTheme.labelValue("Best", String.valueOf(stats.bestElo()))
+                    UiTheme.labelValue("PT", String.valueOf(stats.pt())),
+                    UiTheme.labelValue("Best", String.valueOf(stats.bestPt()))
             );
         } else {
-            builder.lore(UiTheme.labelValue("Elo", line(player, "gui.profile-hidden")));
+            builder.lore(UiTheme.labelValue("PT", line(player, "gui.profile-hidden")));
         }
         return builder
                 .glint(stats.gamesPlayed() > 0)

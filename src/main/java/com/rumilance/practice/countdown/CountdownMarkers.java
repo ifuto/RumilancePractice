@@ -201,6 +201,20 @@ public final class CountdownMarkers implements Listener {
         return set != null && player != null && set.ready.contains(player);
     }
 
+    /**
+     * True while the player is actually looking at their own Ready/Leave block. The
+     * pre-match countdown HUD skips such players so the gaze line ({@code 1/2 · Ready ✓})
+     * is not overwritten once a second — the two action bars used to fight each other.
+     */
+    public boolean isGazingMarker(UUID matchId, UUID playerId) {
+        MarkerSet set = sets.get(matchId);
+        if (set == null || playerId == null) {
+            return false;
+        }
+        Player player = Bukkit.getPlayer(playerId);
+        return player != null && gazedMarker(player, set) != null;
+    }
+
     /** True when both fighters of this match have pressed Ready. */
     public boolean allReady(MatchSession session) {
         if (session == null) {

@@ -16,7 +16,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Kit+mode separated matchmaking queues with expanding Elo range for ranked.
+ * Kit+mode separated matchmaking queues with expanding PT range for ranked.
  */
 public final class QueueService {
 
@@ -24,7 +24,7 @@ public final class QueueService {
             UUID playerId,
             String kitId,
             MatchMode mode,
-            int elo,
+            int pt, // queued Glicko-2 display rating snapshot, used only for matchmaking range
             Instant joinedAt,
             String ip,
             PlayerPlatform platform
@@ -52,7 +52,7 @@ public final class QueueService {
             UUID playerId,
             String kitId,
             MatchMode mode,
-            int elo,
+            int pt,
             String ip,
             PlayerPlatform platform
     ) {
@@ -60,7 +60,7 @@ public final class QueueService {
             return false;
         }
         PlayerPlatform resolved = platform == null ? PlayerPlatform.JAVA : platform;
-        QueueEntry entry = new QueueEntry(playerId, kitId.toLowerCase(), mode, elo, Instant.now(), ip, resolved);
+        QueueEntry entry = new QueueEntry(playerId, kitId.toLowerCase(), mode, pt, Instant.now(), ip, resolved);
         byPlayer.put(playerId, entry);
         byQueue.computeIfAbsent(queueKey(mode, kitId, resolved), k -> new ArrayList<>()).add(entry);
         return true;
@@ -166,7 +166,7 @@ public final class QueueService {
                     QueueEntry a = list.get(i);
                     for (int j = i + 1; j < list.size(); j++) {
                         QueueEntry b = list.get(j);
-                        // When only two players are waiting for this kit+mode, ignore Elo and
+                        // When only two players are waiting for this kit+mode, ignore PT and
                         // recent-opponent blocks so they are never stuck alone forever.
                         boolean lonelyPair = list.size() == 2;
                         if (!canMatch(a, b, blockSameIp, avoidRecent && !lonelyPair, now, lonelyPair)) {
@@ -191,19 +191,19 @@ public final class QueueService {
     }
 
     private boolean canMatch(QueueEntry a, QueueEntry b, boolean blockSameIp, boolean avoidRecent,
-                             Instant now, boolean ignoreElo) {
+                             Instant now, boolean ignorePt) {
         long waitedSeconds = Math.max(
                 now.getEpochSecond() - a.joinedAt().getEpochSecond(),
                 now.getEpochSecond() - b.joinedAt().getEpochSecond()
         );
         int intervals = (int) (waitedSeconds / Math.max(1, settings.queueGrowthIntervalSeconds()));
-        int range = settings.queueInitialEloRange() + intervals * settings.queueEloRangeGrowthPerInterval();
+        int range = settings.queueInitialPtRange() + intervals * settings.queuePtRangeGrowthPerInterval();
         return PracticeGuards.canPairInQueue(
                 a,
                 b,
                 blockSameIp,
                 avoidRecent,
-                ignoreElo,
+                ignorePt,
                 range,
                 recentOpponents.get(a.playerId()),
                 recentOpponents.get(b.playerId())

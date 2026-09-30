@@ -246,8 +246,8 @@ public final class PracticeGuards {
             QueueService.QueueEntry b,
             boolean blockSameIp,
             boolean avoidRecent,
-            boolean ignoreElo,
-            int eloRange,
+            boolean ignorePt,
+            int ptRange,
             UUID recentOpponentOfA,
             UUID recentOpponentOfB
     ) {
@@ -276,13 +276,13 @@ public final class PracticeGuards {
         if (a.mode() == MatchMode.UNRANKED) {
             return true;
         }
-        if (ignoreElo) {
+        if (ignorePt) {
             return true;
         }
-        if (eloRange < 0) {
+        if (ptRange < 0) {
             return false;
         }
-        return Math.abs(a.elo() - b.elo()) <= eloRange;
+        return Math.abs(a.pt() - b.pt()) <= ptRange;
     }
 
     // --- Platform ---

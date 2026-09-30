@@ -6,7 +6,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Anti-spam gate for queue interactions (queue menu clicks, queue signs, join commands).
  * Rejects re-triggers inside a short window so a player hammering a sign/menu cannot churn
- * the join/leave pipeline (matchmaking DB reads, ELO fetches, arena reservations) at click
+ * the join/leave pipeline (matchmaking DB reads, PT fetches, arena reservations) at click
  * speed. PvP combat traffic is explicitly out of scope — no fighting behaviour passes here.
  *
  * <p>Pure data structure: unit tests pin the cadence; the same instance is shared by the

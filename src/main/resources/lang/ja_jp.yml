@@ -432,11 +432,11 @@ lobby:
 
 ranking:
   stats-header: "<gray>--- ランク戦統計: <player> (<kit>) ---"
-  stats-line: "<gray>レート: <yellow><elo></yellow> <gray>| 勝: <green><wins></green> 敗: <red><losses></red>"
+  stats-line: "<gray>PT: <yellow><pt></yellow> <gray>| 勝: <green><wins></green> 敗: <red><losses></red>"
   leaderboard-header: "<gray>--- ランキング: <kit> ---"
-  leaderboard-entry: "<yellow>#<position></yellow> <white><player></white> <gray>-</gray> <elo> <gray>レート</gray>"
-  rank-up: "<green><kit> のレートが <elo> に上昇しました！"
-  rank-down: "<red><kit> のレートが <elo> に低下しました。"
+  leaderboard-entry: "<yellow>#<position></yellow> <white><player></white> <gray>-</gray> <pt> <gray>PT</gray>"
+  rank-up: "<green><kit> のPTが <pt> に上昇しました！"
+  rank-down: "<red><kit> のPTが <pt> に低下しました。"
   no-stats: "<red><player> の <kit> ランク統計はありません。"
 
 queue:
@@ -526,7 +526,7 @@ stats:
   wins: "<gray>勝利数: <green><wins></green>"
   losses: "<gray>敗北数: <red><losses></red>"
   win-rate: "<gray>勝率: <yellow><rate>%</yellow>"
-  elo: "<gray>レート: <yellow><elo></yellow>"
+  pt: "<gray>PT: <yellow><pt></yellow>"
 
 admin:
   reload-success: "<green>NARENA を再読み込みしました。"
@@ -780,6 +780,9 @@ gui:
   queue-closed: "閉鎖中"
   queue-closed-lore: "このキットのキューは止まっています。"
   queue-waiting-count: "待機"
+  queue-ranking-title: "ランキング"
+  queue-ranking-self-label: "あなた:"
+  queue-ranking-self-unranked: "計測中"
   queue-arena: "アリーナ"
   queue-random: "ランダム"
   queue-left-join: "左クリックでキュー参加"
@@ -1136,7 +1139,7 @@ gui:
   titles-click: "クリックで選択"
   titles-locked: "ロック中"
   titles-wins: "必要勝利数"
-  titles-elo: "必要 Best Elo"
+  titles-pt: "必要 Best PT"
   titles-locked-msg: "<red>そのタイトルはまだ解除されていません。"
   titles-set: "タイトルを <name> に設定しました。"
   preview-title: "プレビュー: <kit>"
@@ -1258,7 +1261,7 @@ gui:
   kit-arena-party: "パーティ: <name>"
   stats-title: "<name> — 統計"
   stats-unavailable: "統計を取得できません"
-  profile-best-elo: "Best Elo"
+  profile-best-pt: "Best PT"
   practice-layout-order-anchor: "リスポーンアンカー → グロウストーン"
   practice-layout-order-glow: "グロウストーン → リスポーンアンカー"
   team-settings-title: "チーム設定"
@@ -1484,11 +1487,11 @@ arena-source:
 
 tier:
   header: "<gold>— スキル・ティア（キット別・対人戦） —"
-  kit-line: "<yellow><kit></yellow>: <tier> <gray>（<population>人中 #<rank>・上位 <pct>%）</gray> — ELO <yellow><elo></yellow>・<yellow><matches></yellow> 戦"
+  kit-line: "<yellow><kit></yellow>: <tier> <gray>（<population>人中 #<rank>・上位 <pct>%）</gray> — PT <yellow><pt></yellow>・<yellow><matches></yellow> 戦"
   unranked: "<yellow>キット別プレースメントなし — 基準戦数未達です。"
   unranked-progress: "<gray>各キット <yellow><n></yellow> 戦でプレースメント開始。"
   bands-title: "<gold>ティア・ラダー（各キットのランク戦プレイヤー上位%）:"
-  hint: "<gray>ティアはキット別・対人戦成績（そのキットのランクELO）で決定。順位は HT1>LT1>HT2>…>LT5、HT1 = 上位0.1%。"
+  hint: "<gray>ティアはキット別・対人戦成績（そのキットのランクPT）で決定。順位は HT1>LT1>HT2>…>LT5、HT1 = 上位0.1%。"
 
 afkcrystal:
   build-limit: "<gold>[AFK BOT Crystal]</gold> <red>ブロックを置けるのは床から <max> ブロックの高さまでです(移動の制限はありません)。</red>"
@@ -1511,7 +1514,9 @@ afkcrystal:
   not-in-session: "<gold>[AFK BOT Crystal]</gold> <red>部屋に入っていません。/afkcrystal start</red>"
   usage: "<gold>[AFK BOT Crystal]</gold> <yellow>/afkcrystal [start|stop|kit|settings|reset]</yellow>"
   boundary: "<gold>[AFK BOT Crystal]</gold> <red>自分の部屋の外にはブロックを置けません。</red>"
-  protected: "<gold>[AFK BOT Crystal]</gold> <red>ネザライト床とボタンは破壊できません。</red>"
+  protected: "ネザライト床とボタンと設定看板は破壊できません。"
+  sign-settings-1: "設定"
+  sign-settings-2: "クリックで開く"
   kit-saved: "<gold>[AFK BOT Crystal]</gold> <green>キットを保存して装備しました。</green>"
   prototype-saved: "<gold>[AFK BOT Crystal]</gold> <light_purple>サーバー既定キット(プロトタイプ)を保存しました。</light_purple>"
   prototype-loaded: "<gold>[AFK BOT Crystal]</gold> <aqua>既定キットを読み込みました。</aqua>"

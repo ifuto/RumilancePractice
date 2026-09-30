@@ -431,11 +431,11 @@ lobby:
 
 ranking:
   stats-header: "<gray>--- 랭크 통계: <player> (<kit>) ---"
-  stats-line: "<gray>레이팅: <yellow><elo></yellow> <gray>| 승: <green><wins></green> 패: <red><losses></red>"
+  stats-line: "<gray>PT: <yellow><pt></yellow> <gray>| 승: <green><wins></green> 패: <red><losses></red>"
   leaderboard-header: "<gray>--- 리더보드: <kit> ---"
-  leaderboard-entry: "<yellow>#<position></yellow> <white><player></white> <gray>-</gray> <elo> <gray>레이팅</gray>"
-  rank-up: "<green><kit> 레이팅이 <elo>(으)로 올랐습니다!"
-  rank-down: "<red><kit> 레이팅이 <elo>(으)로 내렸습니다."
+  leaderboard-entry: "<yellow>#<position></yellow> <white><player></white> <gray>-</gray> <pt> <gray>PT</gray>"
+  rank-up: "<green><kit> PT가 <pt>(으)로 상승했습니다!"
+  rank-down: "<red><kit> PT가 <pt>(으)로 하락했습니다."
   no-stats: "<red><kit>에서 <player> 님의 랭크 기록이 없습니다."
 
 queue:
@@ -525,7 +525,7 @@ stats:
   wins: "<gray>승리: <green><wins></green>"
   losses: "<gray>패배: <red><losses></red>"
   win-rate: "<gray>승률: <yellow><rate>%</yellow>"
-  elo: "<gray>레이팅: <yellow><elo></yellow>"
+  pt: "<gray>PT: <yellow><pt></yellow>"
 
 admin:
   reload-success: "<green>NARENA를 다시 불러왔습니다."
@@ -779,6 +779,9 @@ gui:
   queue-closed: "Closed"
   queue-closed-lore: "This kit queue is paused."
   queue-waiting-count: "Waiting"
+  queue-ranking-title: "랭킹"
+  queue-ranking-self-label: "나:"
+  queue-ranking-self-unranked: "측정 중"
   queue-arena: "Arena"
   queue-random: "Random"
   queue-left-join: "Left-click to join queue"
@@ -1135,7 +1138,7 @@ gui:
   titles-click: "클릭해서 선택"
   titles-locked: "잠김"
   titles-wins: "필요 승리"
-  titles-elo: "필요 Best Elo"
+  titles-pt: "필요 Best PT"
   titles-locked-msg: "<red>아직 잠금 해제되지 않은 칭호입니다."
   titles-set: "칭호를 <name>(으)로 설정했습니다."
   preview-title: "미리보기: <kit>"
@@ -1257,7 +1260,7 @@ gui:
   kit-arena-party: "파티: <name>"
   stats-title: "<name> — 통계"
   stats-unavailable: "통계를 불러올 수 없음"
-  profile-best-elo: "Best Elo"
+  profile-best-pt: "Best PT"
   practice-layout-order-anchor: "리스폰 정박기 → 발광석"
   practice-layout-order-glow: "발광석 → 리스폰 정박기"
   team-settings-title: "팀 설정"
@@ -1483,11 +1486,11 @@ arena-source:
 
 tier:
   header: "<gold>— 스킬 티어 (키트별, 실전 PvP) —"
-  kit-line: "<yellow><kit></yellow>: <tier> <gray>(<population>명 중 #<rank>, 상위 <pct>%)</gray> — ELO <yellow><elo></yellow>, <yellow><matches></yellow>전"
+  kit-line: "<yellow><kit></yellow>: <tier> <gray>(<population>명 중 #<rank>·상위 <pct>%)</gray> — PT <yellow><pt></yellow>·<yellow><matches></yellow>전"
   unranked: "<yellow>키트별 배치 없음 — 배치 기준 미달."
   unranked-progress: "<gray>키트당 <yellow><n></yellow>전이면 배치됩니다."
   bands-title: "<gold>티어 래더 (키트별 랭크 플레이어 상위 %):"
-  hint: "<gray>티어는 키트별로, 실전 전적(해당 키트 랭크 ELO)으로 결정됩니다. 순서는 HT1>LT1>HT2>…>LT5, HT1 = 상위 0.1%."
+  hint: "<gray>티어는 킷별 대인전 성적(해당 킷의 랭크 PT)으로 결정됩니다. 순위는 HT1>LT1>HT2>…>LT5, HT1 = 상위 0.1%."
 
 afkcrystal:
   build-limit: "<gold>[AFK BOT Crystal]</gold> <red>블록은 바닥에서 <max>블록 높이까지만 설치할 수 있습니다(이동 제한은 없습니다).</red>"
@@ -1510,7 +1513,9 @@ afkcrystal:
   not-in-session: "<gold>[AFK BOT Crystal]</gold> <red>방에 들어가 있지 않습니다. /afkcrystal start</red>"
   usage: "<gold>[AFK BOT Crystal]</gold> <yellow>/afkcrystal [start|stop|kit|settings|reset]</yellow>"
   boundary: "<gold>[AFK BOT Crystal]</gold> <red>자신의 방 밖에는 블록을 설치할 수 없습니다.</red>"
-  protected: "<gold>[AFK BOT Crystal]</gold> <red>네더라이트 바닥과 버튼은 파괴할 수 없습니다.</red>"
+  protected: "네더라이트 바닥, 버튼, 설정 표지판은 파괴할 수 없습니다."
+  sign-settings-1: "설정"
+  sign-settings-2: "클릭해서 열기"
   kit-saved: "<gold>[AFK BOT Crystal]</gold> <green>키트를 저장하고 장착했습니다.</green>"
   prototype-saved: "<gold>[AFK BOT Crystal]</gold> <light_purple>서버 기본 키트(프로토타입)를 저장했습니다.</light_purple>"
   prototype-loaded: "<gold>[AFK BOT Crystal]</gold> <aqua>기본 키트를 불러왔습니다.</aqua>"

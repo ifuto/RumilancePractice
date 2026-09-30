@@ -431,11 +431,11 @@ lobby:
 
 ranking:
   stats-header: "<gray>--- Ranked Stats: <player> (<kit>) ---"
-  stats-line: "<gray>分数：<yellow><elo></yellow> <gray>| 胜：<green><wins></green> 负：<red><losses></red>"
+  stats-line: "<gray>PT：<yellow><pt></yellow> <gray>| 胜：<green><wins></green> 负：<red><losses></red>"
   leaderboard-header: "<gray>--- 排行榜：<kit> ---"
-  leaderboard-entry: "<yellow>#<position></yellow> <white><player></white> <gray>-</gray> <elo> <gray>分</gray>"
-  rank-up: "<green>你的 <kit> 分数上升至 <elo>！"
-  rank-down: "<red>你的 <kit> 分数降至 <elo>。"
+  leaderboard-entry: "<yellow>#<position></yellow> <white><player></white> <gray>-</gray> <pt> <gray>PT</gray>"
+  rank-up: "<green>你的 <kit> PT 上升到了 <pt>！"
+  rank-down: "<red>你的 <kit> PT 下降到了 <pt>。"
   no-stats: "<red><player> 在 <kit> 中没有排位数据。"
 
 queue:
@@ -525,7 +525,7 @@ stats:
   wins: "<gray>胜场：<green><wins></green>"
   losses: "<gray>负场：<red><losses></red>"
   win-rate: "<gray>胜率：<yellow><rate>%</yellow>"
-  elo: "<gray>分数：<yellow><elo></yellow>"
+  pt: "<gray>PT：<yellow><pt></yellow>"
 
 admin:
   reload-success: "<green>NARENA 已重载。"
@@ -779,6 +779,9 @@ gui:
   queue-closed: "已关闭"
   queue-closed-lore: "该套件队列已暂停。"
   queue-waiting-count: "等待中"
+  queue-ranking-title: "排行榜"
+  queue-ranking-self-label: "你："
+  queue-ranking-self-unranked: "未定级"
   queue-arena: "竞技场"
   queue-random: "随机"
   queue-left-join: "左键加入队列"
@@ -1135,7 +1138,7 @@ gui:
   titles-click: "点击选择"
   titles-locked: "未解锁"
   titles-wins: "所需胜场"
-  titles-elo: "所需最高分"
+  titles-pt: "需要 Best PT"
   titles-locked-msg: "<red>该称号尚未解锁。"
   titles-set: "称号已设为 <name>。"
   preview-title: "预览：<kit>"
@@ -1257,7 +1260,7 @@ gui:
   kit-arena-party: "队伍：<name>"
   stats-title: "<name> — 数据"
   stats-unavailable: "数据不可用"
-  profile-best-elo: "最高分"
+  profile-best-pt: "Best PT"
   practice-layout-order-anchor: "重生锚 → 萤石"
   practice-layout-order-glow: "萤石 → 重生锚"
   team-settings-title: "队伍设置"
@@ -1483,11 +1486,11 @@ arena-source:
 
 tier:
   header: "<gold>— 技术段位（按职业·实战PvP） —"
-  kit-line: "<yellow><kit></yellow>: <tier> <gray>（<population>人中 #<rank>，前 <pct>%）</gray> — ELO <yellow><elo></yellow>·<yellow><matches></yellow> 场"
+  kit-line: "<yellow><kit></yellow>：<tier> <gray>（<population> 人中第 <rank> 名·前 <pct>%）</gray> — PT <yellow><pt></yellow>·<yellow><matches></yellow> 场"
   unranked: "<yellow>尚无职业段位 — 未达到定级场次。"
   unranked-progress: "<gray>每个职业完成 <yellow><n></yellow> 场排位即可定级。"
   bands-title: "<gold>段位阶梯（各职业排位玩家的前 %）:"
-  hint: "<gray>段位按职业计算，来自实战（该职业排位ELO）。顺序 HT1>LT1>HT2>…>LT5，HT1 = 前 0.1%。"
+  hint: "<gray>段位按套件由真实 PvP 战绩（该套件的排位 PT）决定。顺序 HT1>LT1>HT2>…>LT5，HT1 = 前 0.1%。"
 
 afkcrystal:
   build-limit: "<gold>[AFK BOT Crystal]</gold> <red>方块只能放置在地面上方 <max> 格以内(移动不受限制)。</red>"
@@ -1510,7 +1513,9 @@ afkcrystal:
   not-in-session: "<gold>[AFK BOT Crystal]</gold> <red>你不在房间内。/afkcrystal start</red>"
   usage: "<gold>[AFK BOT Crystal]</gold> <yellow>/afkcrystal [start|stop|kit|settings|reset]</yellow>"
   boundary: "<gold>[AFK BOT Crystal]</gold> <red>不能在自己的房间外放置方块。</red>"
-  protected: "<gold>[AFK BOT Crystal]</gold> <red>下界合金地板和按钮无法破坏。</red>"
+  protected: "下界合金地面、按钮与设置告示牌均无法破坏。"
+  sign-settings-1: "设置"
+  sign-settings-2: "点击打开"
   kit-saved: "<gold>[AFK BOT Crystal]</gold> <green>装备已保存并穿戴。</green>"
   prototype-saved: "<gold>[AFK BOT Crystal]</gold> <light_purple>已保存服务器默认装备(原型)。</light_purple>"
   prototype-loaded: "<gold>[AFK BOT Crystal]</gold> <aqua>已加载默认装备。</aqua>"

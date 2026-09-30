@@ -13,8 +13,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TierServiceComputeTest {
 
-    private static RankedKitStats row(UUID player, String kit, int elo, int wins, int losses) {
-        return new RankedKitStats(UUID.randomUUID(), player, kit, elo, wins, losses, 0, elo);
+    private static RankedKitStats row(UUID player, String kit, int pt, int wins, int losses) {
+        // High games -> trusted rating (deviation 30), matching a real post-provisional row.
+        double deviation = Math.max(30.0d, 350.0d * Math.pow(0.85d, wins + losses));
+        return new RankedKitStats(UUID.randomUUID(), player, kit, pt, deviation, 0.06d,
+                wins, losses, 0, pt);
     }
 
     @Test
@@ -77,10 +80,10 @@ class TierServiceComputeTest {
         // rank 1 of 1000 = 0.1% → HT1; rank 2 = 0.2% → LT1
         for (var entry : result.standings().entrySet()) {
             var s = entry.getValue().get("sword");
-            if (s.elo() == 4000) {
+            if (s.pt() == 4000) {
                 assertEquals(TierService.Tier.HT1, s.tier());
             }
-            if (s.elo() == 3999) {
+            if (s.pt() == 3999) {
                 assertEquals(TierService.Tier.LT1, s.tier());
             }
         }

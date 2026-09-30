@@ -1477,7 +1477,14 @@ public final class MatchService {
             for (UUID id : session.participants()) {
                 Player player = Bukkit.getPlayer(id);
                 if (player != null) {
-                    player.sendActionBar(hud);
+                    // Ready/Leave ブロックを見ている間はカウントダウン HUD を送らない:
+                    // 1秒毎の上書きがゲイズ表示(1/2 · Ready ✓ 等)を消して操作の邪魔になる。
+                    // タイマー自体は全員共通で進む。
+                    boolean gazing = countdownMarkers != null
+                            && countdownMarkers.isGazingMarker(session.id(), id);
+                    if (!gazing) {
+                        player.sendActionBar(hud);
+                    }
                     soundService.play(player, "match-countdown-tick", 1.0f);
                 }
             }
@@ -2224,7 +2231,7 @@ public final class MatchService {
 
     /**
      * Lets a player leave a match during the pre-match countdown with no result recorded: the
-     * match is cancelled, both participants return to the lobby and no Elo/stats change happens.
+     * match is cancelled, both participants return to the lobby and no PT/stats change happens.
      * Repeated dodging is penalised - the third consecutive countdown-leave issues a 3-day
      * ChatBan. The streak resets the moment one of the player's matches reaches FIGHT.
      */

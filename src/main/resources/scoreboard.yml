@@ -121,7 +121,7 @@ layouts:
       - "<aqua>Lobby"
       - "<white>Wins <aqua>{wins}  <white>Losses <aqua>{losses}"
       - "<white>K/D <aqua>{kd}"
-      - "<white>Elo <aqua>{elo}"
+      - "<white>PT <aqua>{pt}"
       - "<white>連勝 <aqua>{best_streak}"
       - "<white>Matches <aqua>{matches}  <white>Kits <aqua>{kits}"
       - "<white>Online <aqua>{online}"
@@ -222,7 +222,8 @@ layouts:
 # プレースホルダ一覧
 #
 # 共通: {server_name} {server_ip} {online} {player} {ping} {world} {tps} {mspt} {server_time}
-# ロビー: {wins} {losses} {kd} {rating} {best_rating} {best_elo} {elo} {best_streak} {matches} {kits}
+# ロビー: {wins} {losses} {kd} {rating} {best_rating} {pt} {best_pt} {best_streak} {matches} {kits}
+# どのコンテキストでも使える自分の Glicko-2 レート: {pt} {best_pt} (TAB header/footer 含む)
 # キュー: {kit} {wait} {mode} {queue_position} {queue_total}
 # 1v1: {opponent} {my_color} {opp_color} {my_series} {opp_series} {time} {duel_id}
 # TAB: {spectators}

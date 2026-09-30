@@ -460,7 +460,7 @@ public final class AfkCrystalManager implements Listener, CommandExecutor,
                 setBlock(c, x, 0, z, Material.NETHERITE_BLOCK);
             }
         }
-        placeButton(s);
+        placeFixtures(s);
     }
 
     /** Floor-facing cherry button standing on the spawn centre block. */
@@ -469,6 +469,36 @@ public final class AfkCrystalManager implements Listener, CommandExecutor,
         FaceAttachable data = (FaceAttachable) Material.CHERRY_BUTTON.createBlockData();
         data.setAttachedFace(FaceAttachable.AttachedFace.FLOOR);
         b.setBlockData(data, false);
+    }
+
+    /**
+     * The settings sign, two blocks east of the reset button at floor height. Clicking it
+     * opens the same GUI as {@code /afkc settings} (ルームに看板で出入りできる導線)。
+     */
+    private void placeSettingsSign(AfkSession s) {
+        Block b = s.center.clone().add(2, 1, 0).getBlock();
+        if (b.getType() != Material.CHERRY_SIGN) {
+            org.bukkit.block.data.type.Sign data =
+                    (org.bukkit.block.data.type.Sign) Material.CHERRY_SIGN.createBlockData();
+            data.setRotation(org.bukkit.block.BlockFace.WEST);
+            b.setBlockData(data, false);
+        }
+        if (b.getState() instanceof org.bukkit.block.Sign sign) {
+            Player owner = Bukkit.getPlayer(s.playerId);
+            sign.getSide(org.bukkit.block.sign.Side.FRONT).line(0,
+                    owner != null ? messages.render(owner, "afkcrystal.sign-settings-1")
+                            : net.kyori.adventure.text.Component.text("Settings"));
+            sign.getSide(org.bukkit.block.sign.Side.FRONT).line(1,
+                    owner != null ? messages.render(owner, "afkcrystal.sign-settings-2")
+                            : net.kyori.adventure.text.Component.text("Click to open"));
+            sign.update(true, false);
+        }
+    }
+
+    /** Button + settings sign; rebuilt together whenever the room is reset. */
+    private void placeFixtures(AfkSession s) {
+        placeButton(s);
+        placeSettingsSign(s);
     }
 
     private void clearFloor(AfkSession s) {
@@ -481,6 +511,10 @@ public final class AfkCrystalManager implements Listener, CommandExecutor,
         Block button = c.clone().add(0, 1, 0).getBlock();
         if (button.getType() == Material.CHERRY_BUTTON) {
             button.setType(Material.AIR, false);
+        }
+        Block sign = c.clone().add(2, 1, 0).getBlock();
+        if (sign.getType() == Material.CHERRY_SIGN) {
+            sign.setType(Material.AIR, false);
         }
     }
 
@@ -512,7 +546,7 @@ public final class AfkCrystalManager implements Listener, CommandExecutor,
                 }
             }
         }
-        placeButton(s);
+        placeFixtures(s);
     }
 
     private void setBlock(Location center, int dx, int dy, int dz, Material type) {
@@ -620,9 +654,12 @@ public final class AfkCrystalManager implements Listener, CommandExecutor,
                 && bot.getHealth() < bot.getMaxHealth()) {
             bot.setHealth(Math.min(bot.getMaxHealth(), bot.getHealth() + 0.5d));
         }
-        // The reset button is the only fragile protected block — keep it alive.
+        // The reset button / settings sign are the only fragile protected blocks — keep them alive.
         if (s.center.clone().add(0, 1, 0).getBlock().getType() != Material.CHERRY_BUTTON) {
             placeButton(s);
+        }
+        if (s.center.clone().add(2, 1, 0).getBlock().getType() != Material.CHERRY_SIGN) {
+            placeSettingsSign(s);
         }
     }
 
@@ -1276,6 +1313,15 @@ public final class AfkCrystalManager implements Listener, CommandExecutor,
         if (buttonBlock) {
             event.setCancelled(true);
             resetRound(player, s, true);
+            return;
+        }
+        // 設定看板(ボタンの2ブロック東): 右クリックで /afkc settings と同じ GUI を開く。
+        // 1.20+ のサイン編集画面が出ないよう必ずキャンセルする。
+        boolean signBlock = b != null && b.getType() == Material.CHERRY_SIGN
+                && isProtected(s, b);
+        if (signBlock) {
+            event.setCancelled(true);
+            openSettings(player, s);
         }
         // Kit menu and settings live on /afkc kit and /afkc settings (plus the editor's
         // settings tile) — no hotbar slots are ever reserved, so nothing can vanish.
@@ -1347,7 +1393,7 @@ public final class AfkCrystalManager implements Listener, CommandExecutor,
     /** The netherite floor, the reset button (and its exact cell) stay untouchable. */
     private boolean isProtected(AfkSession s, Block b) {
         Material t = b.getType();
-        if (t == Material.CHERRY_BUTTON) {
+        if (t == Material.CHERRY_BUTTON || t == Material.CHERRY_SIGN) {
             return true;
         }
         if (t == Material.NETHERITE_BLOCK && b.getY() == (int) s.center.getY()) {

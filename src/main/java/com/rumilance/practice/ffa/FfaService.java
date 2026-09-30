@@ -39,7 +39,6 @@ import org.bukkit.scheduler.BukkitTask;
 
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -48,7 +47,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 
 /**
- * Separate FFA arenas. Never affects ranked Elo/stats.
+ * Separate FFA arenas. Never affects ranked PT/stats.
  */
 public final class FfaService {
 
@@ -260,7 +259,10 @@ public final class FfaService {
     private final java.util.List<java.util.function.Consumer<UUID>> leaveListeners =
             new java.util.concurrent.CopyOnWriteArrayList<>();
     private final Map<UUID, FfaStats> sessionStats = new ConcurrentHashMap<>();
-    private final Map<UUID, Integer> killStreaks = new ConcurrentHashMap<>();
+    /** Daily kill streaks: entries are stamped with the JST day and roll over at 00:00
+     *  Japan time ("連勝は日本時間の0時0分にリセット"). Arena resets and /ffa leave no
+     *  longer clear them — only midnight or the player's own death does. */
+    private final FfaDailyStreaks killStreaks = FfaDailyStreaks.serverDefault();
     private final Map<UUID, CombatTag> combatUntil = new ConcurrentHashMap<>();
     /** Rejects joins while the player sits in an AFK practice/crystal session. */
     private java.util.function.Predicate<UUID> sessionGuard;
@@ -331,6 +333,11 @@ public final class FfaService {
             tickCombat();
             tickResets();
         }, 20L, 20L);
+        // 0:00 JST 通過で日付が変わった古い連勝行を掃除する(読み取り側は常に当日判定
+        // なので、これはメモリ掃除。0時ちょうどの「見た目」のリセットは FfaDailyStreaks
+        // の日付スタンプが保証する)。
+        Bukkit.getScheduler().runTaskTimer(plugin, killStreaks::dropStale,
+                20L * 60L, 20L * 60L);
     }
 
     public void shutdown() {
@@ -576,7 +583,6 @@ public final class FfaService {
         }
         playerArena.put(player.getUniqueId(), arena.id());
         sessionStats.put(player.getUniqueId(), new FfaStats(0, 0));
-        killStreaks.put(player.getUniqueId(), 0);
         combatUntil.remove(player.getUniqueId());
         player.setCanPickupItems(true);
         // Spawn the joining player at a RANDOM standable spot in the arena (top-down
@@ -651,7 +657,7 @@ public final class FfaService {
         playerArena.remove(id);
         fireLeave(id);
         sessionStats.remove(id);
-        killStreaks.remove(id);
+        // 連勝は退場(=アリーナリセットの強制退出を含む)では消さない: JST 0:00 リセット制。
         combatUntil.remove(id);
         lastLethalTick.remove(id);
         stateManager.resetToLobby(id);
@@ -701,7 +707,7 @@ public final class FfaService {
     }
 
     public int killStreak(UUID player) {
-        return killStreaks.getOrDefault(player, 0);
+        return killStreaks.current(player);
     }
 
     public List<StreakRank> topKillStreaks(int limit) {
@@ -711,15 +717,15 @@ public final class FfaService {
     /** When {@code arenaId} is set, only streaks of players currently in that FFA. */
     public List<StreakRank> topKillStreaks(String arenaId, int limit) {
         int cap = Math.max(0, limit);
-        return killStreaks.entrySet().stream()
+        return killStreaks.snapshotPositive().stream()
                 .filter(entry -> {
                     String in = playerArena.get(entry.getKey());
-                    if (in == null || entry.getValue() <= 0) {
+                    if (in == null) {
                         return false;
                     }
                     return arenaId == null || arenaId.equalsIgnoreCase(in);
                 })
-                .sorted(Comparator.<Map.Entry<UUID, Integer>>comparingInt(Map.Entry::getValue).reversed())
+                .sorted(Map.Entry.<UUID, Integer>comparingByValue().reversed())
                 .limit(cap)
                 .map(entry -> new StreakRank(entry.getKey(), entry.getValue()))
                 .toList();
@@ -772,7 +778,7 @@ public final class FfaService {
             return false;
         }
         addDeath(victimId);
-        killStreaks.put(victimId, 0);
+        killStreaks.reset(victimId);
         asyncExecutor.execute(() -> {
             try {
                 ffaStatsRepository.addDeath(victimId, arenaId);
@@ -783,7 +789,7 @@ public final class FfaService {
         UUID killerId = tag.attackerId();
         if (killerId != null && !killerId.equals(victimId) && playerArena.containsKey(killerId)) {
             addKill(killerId);
-            int streak = killStreaks.merge(killerId, 1, Integer::sum);
+            int streak = killStreaks.bump(killerId);
             Player killer = Bukkit.getPlayer(killerId);
             if (killer != null) {
                 // Full kit refill on a confirmed kill (someone other than yourself).
@@ -1064,7 +1070,7 @@ public final class FfaService {
             victim.sendMessage(COMBAT_END);
         }
         combatUntil.remove(victim.getUniqueId());
-        killStreaks.put(victim.getUniqueId(), 0);
+        killStreaks.reset(victim.getUniqueId());
         addDeath(victim.getUniqueId());
         asyncExecutor.execute(() -> {
             try {
@@ -1084,7 +1090,7 @@ public final class FfaService {
                 }
             }
             addKill(killerId);
-            int streak = killStreaks.merge(killerId, 1, Integer::sum);
+            int streak = killStreaks.bump(killerId);
             Player killer = Bukkit.getPlayer(killerId);
             if (killer != null) {
                 double hp = killer.getHealth();

@@ -27,7 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <h3>Model</h3>
  * <ul>
  *   <li><b>Tiers are per kit.</b> Every kit owns its own ladder: score = that kit's ranked
- *       ELO, population = players with enough matches in that kit. A monster sword player
+ *       PT, population = players with enough matches in that kit. A monster sword player
  *       and a weak crystal record of the same person place independently.</li>
  *   <li>Placement gate per kit: at least {@link #MIN_MATCHES} ranked matches <em>in that
  *       kit</em> — fights come from whatever various opponents the queue provides, which is
@@ -110,7 +110,7 @@ public final class TierService {
 
     /** One player's standing on one kit's ladder in the latest snapshot. */
     public record Standing(Tier tier, String kit, int rank, int population, double percentile,
-                           int elo, int matches) {
+                           int pt, int matches) {
     }
 
     // ------------------------------------------------------------------ refresh
@@ -162,11 +162,11 @@ public final class TierService {
             String kit = kitRows.getKey();
             List<RankedKitStats> eligible = new ArrayList<>(kitRows.getValue().size());
             for (RankedKitStats row : kitRows.getValue()) {
-                if (row.gamesPlayed() >= MIN_MATCHES && row.elo() > 0) {
+                if (row.gamesPlayed() >= MIN_MATCHES && row.pt() > 0) {
                     eligible.add(row);
                 }
             }
-            eligible.sort(Comparator.comparingInt(RankedKitStats::elo).reversed());
+            eligible.sort(Comparator.comparingInt(RankedKitStats::pt).reversed());
             int population = eligible.size();
             populations.put(kit, population);
             int rank = 0;
@@ -174,7 +174,7 @@ public final class TierService {
                 rank++;
                 double percentile = rank / (double) population;
                 Standing standing = new Standing(bandOf(percentile), kit, rank, population,
-                        percentile, row.elo(), row.gamesPlayed());
+                        percentile, row.pt(), row.gamesPlayed());
                 out.computeIfAbsent(row.uuid(), id -> new HashMap<>(4)).put(kit, standing);
             }
         }
@@ -247,7 +247,7 @@ public final class TierService {
                                 players.getInt(base + ".rank"),
                                 players.getInt(base + ".population"),
                                 players.getDouble(base + ".percentile"),
-                                players.getInt(base + ".elo"),
+                                players.getInt(base + ".pt", players.getInt(base + ".elo")),
                                 players.getInt(base + ".matches")));
                     }
                     if (!playerStandings.isEmpty()) {
@@ -275,7 +275,7 @@ public final class TierService {
                 yaml.set(base + ".rank", s.rank());
                 yaml.set(base + ".population", s.population());
                 yaml.set(base + ".percentile", s.percentile());
-                yaml.set(base + ".elo", s.elo());
+                yaml.set(base + ".pt", s.pt());
                 yaml.set(base + ".matches", s.matches());
             }
         }

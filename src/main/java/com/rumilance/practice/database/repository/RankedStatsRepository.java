@@ -13,9 +13,14 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Persistence for ranked ELO statistics, one row per (player, kit) pair.
+ * Persistence for ranked Glicko-2 statistics, one row per (player, kit) pair. The public
+ * display value is {@code pt}; {@code deviation}/{@code volatility} carry the hidden
+ * confidence state. Leaderboard queries filter out players whose deviation is still too
+ * high to trust their PT.
  */
 public final class RankedStatsRepository {
+
+    private static final String COLUMNS = "id, uuid, kit, pt, deviation, volatility, wins, losses, win_streak, best_pt";
 
     private final DatabaseService databaseService;
 
@@ -24,7 +29,7 @@ public final class RankedStatsRepository {
     }
 
     public Optional<RankedKitStats> find(UUID uuid, String kit) throws SQLException {
-        String sql = "SELECT id, uuid, kit, elo, wins, losses, win_streak, best_elo FROM "
+        String sql = "SELECT " + COLUMNS + " FROM "
                 + databaseService.table("ranked_stats") + " WHERE uuid = ? AND kit = ?";
         try (Connection connection = databaseService.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -41,25 +46,32 @@ public final class RankedStatsRepository {
 
     public void upsert(RankedKitStats stats) throws SQLException {
         String sql = "INSERT INTO " + databaseService.table("ranked_stats")
-                + " (id, uuid, kit, elo, wins, losses, win_streak, best_elo) VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
-                + databaseService.upsertClause("uuid, kit", "elo", "wins", "losses", "win_streak", "best_elo");
+                + " (" + COLUMNS + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                + databaseService.upsertClause("uuid, kit", "pt", "deviation", "volatility",
+                        "wins", "losses", "win_streak", "best_pt");
         try (Connection connection = databaseService.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setString(1, stats.id().toString());
-            statement.setString(2, stats.uuid().toString());
-            statement.setString(3, stats.kit());
-            statement.setInt(4, stats.elo());
-            statement.setInt(5, stats.wins());
-            statement.setInt(6, stats.losses());
-            statement.setInt(7, stats.winStreak());
-            statement.setInt(8, stats.bestElo());
+            bind(statement, stats);
             statement.executeUpdate();
         }
     }
 
+    private static void bind(PreparedStatement statement, RankedKitStats stats) throws SQLException {
+        statement.setString(1, stats.id().toString());
+        statement.setString(2, stats.uuid().toString());
+        statement.setString(3, stats.kit());
+        statement.setInt(4, stats.pt());
+        statement.setDouble(5, stats.deviation());
+        statement.setDouble(6, stats.volatility());
+        statement.setInt(7, stats.wins());
+        statement.setInt(8, stats.losses());
+        statement.setInt(9, stats.winStreak());
+        statement.setInt(10, stats.bestPt());
+    }
+
     /**
      * On turning an existing kit into a folder, the original kit becomes its default child. Copy
-     * each player's ranked stats to that child so their existing ELO/W-L carry over. Old records
+     * each player's ranked stats to that child so their existing PT/W-L carry over. Old records
      * stay as historical backups; a rerun never overwrites stats earned under the child id.
      */
     public int copyForKit(String fromKit, String toKit) throws SQLException {
@@ -67,11 +79,11 @@ public final class RankedStatsRepository {
             return 0;
         }
         String table = databaseService.table("ranked_stats");
-        String select = "SELECT uuid, elo, wins, losses, win_streak, best_elo FROM " + table
+        String select = "SELECT uuid, pt, deviation, volatility, wins, losses, win_streak, best_pt FROM " + table
                 + " WHERE kit = ?";
         String insert = "INSERT INTO " + table
-                + " (id, uuid, kit, elo, wins, losses, win_streak, best_elo) "
-                + "SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM " + table
+                + " (" + COLUMNS + ") "
+                + "SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM " + table
                 + " WHERE uuid = ? AND kit = ?)";
         try (Connection connection = databaseService.getConnection()) {
             connection.setAutoCommit(false);
@@ -85,13 +97,15 @@ public final class RankedStatsRepository {
                         write.setString(1, UUID.randomUUID().toString());
                         write.setString(2, uuid);
                         write.setString(3, toKit);
-                        write.setInt(4, rows.getInt("elo"));
-                        write.setInt(5, rows.getInt("wins"));
-                        write.setInt(6, rows.getInt("losses"));
-                        write.setInt(7, rows.getInt("win_streak"));
-                        write.setInt(8, rows.getInt("best_elo"));
-                        write.setString(9, uuid);
-                        write.setString(10, toKit);
+                        write.setInt(4, rows.getInt("pt"));
+                        write.setDouble(5, rows.getDouble("deviation"));
+                        write.setDouble(6, rows.getDouble("volatility"));
+                        write.setInt(7, rows.getInt("wins"));
+                        write.setInt(8, rows.getInt("losses"));
+                        write.setInt(9, rows.getInt("win_streak"));
+                        write.setInt(10, rows.getInt("best_pt"));
+                        write.setString(11, uuid);
+                        write.setString(12, toKit);
                         copied += write.executeUpdate();
                     }
                 }
@@ -104,9 +118,10 @@ public final class RankedStatsRepository {
         }
     }
 
+    /** Raw top-N for one kit (admin views); public rankings use {@link #topEligibleByKit}. */
     public List<RankedKitStats> topByKit(String kit, int limit) throws SQLException {
-        String sql = "SELECT id, uuid, kit, elo, wins, losses, win_streak, best_elo FROM "
-                + databaseService.table("ranked_stats") + " WHERE kit = ? ORDER BY elo DESC LIMIT ?";
+        String sql = "SELECT " + COLUMNS + " FROM "
+                + databaseService.table("ranked_stats") + " WHERE kit = ? ORDER BY pt DESC LIMIT ?";
         List<RankedKitStats> result = new ArrayList<>();
         try (Connection connection = databaseService.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -121,9 +136,32 @@ public final class RankedStatsRepository {
         return result;
     }
 
+    /**
+     * Public PT ranking for one kit: only players with at least one ranked match whose rating
+     * deviation is already trusted enough (below the leaderboard gate). Uncertain players stay
+     * off the board until their deviation settles.
+     */
+    public List<RankedKitStats> topEligibleByKit(String kit, int limit, double maxDeviation) throws SQLException {
+        String sql = "SELECT " + COLUMNS + " FROM " + databaseService.table("ranked_stats")
+                + " WHERE kit = ? AND wins + losses >= 1 AND deviation <= ? ORDER BY pt DESC LIMIT ?";
+        List<RankedKitStats> result = new ArrayList<>();
+        try (Connection connection = databaseService.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, kit);
+            statement.setDouble(2, maxDeviation);
+            statement.setInt(3, limit);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    result.add(map(resultSet));
+                }
+            }
+        }
+        return result;
+    }
+
     public List<RankedKitStats> findAllForPlayer(UUID uuid) throws SQLException {
-        String sql = "SELECT id, uuid, kit, elo, wins, losses, win_streak, best_elo FROM "
-                + databaseService.table("ranked_stats") + " WHERE uuid = ? ORDER BY elo DESC";
+        String sql = "SELECT " + COLUMNS + " FROM "
+                + databaseService.table("ranked_stats") + " WHERE uuid = ? ORDER BY pt DESC";
         List<RankedKitStats> result = new ArrayList<>();
         try (Connection connection = databaseService.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -138,9 +176,9 @@ public final class RankedStatsRepository {
     }
 
     public List<RankedKitStats> findAllOrderedByWinStreak(int limit) throws SQLException {
-        String sql = "SELECT id, uuid, kit, elo, wins, losses, win_streak, best_elo FROM "
+        String sql = "SELECT " + COLUMNS + " FROM "
                 + databaseService.table("ranked_stats")
-                + " ORDER BY win_streak DESC, elo DESC LIMIT ?";
+                + " ORDER BY win_streak DESC, pt DESC LIMIT ?";
         List<RankedKitStats> result = new ArrayList<>();
         try (Connection connection = databaseService.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -154,14 +192,16 @@ public final class RankedStatsRepository {
         return result;
     }
 
-    public List<RankedKitStats> findTopEloOverall(int limit) throws SQLException {
-        String sql = "SELECT id, uuid, kit, elo, wins, losses, win_streak, best_elo FROM "
+    /** Cross-kit public PT ranking: one match minimum and a trusted (low) deviation. */
+    public List<RankedKitStats> findTopPtOverall(int limit, double maxDeviation) throws SQLException {
+        String sql = "SELECT " + COLUMNS + " FROM "
                 + databaseService.table("ranked_stats")
-                + " WHERE wins + losses >= 1 ORDER BY elo DESC LIMIT ?";
+                + " WHERE wins + losses >= 1 AND deviation <= ? ORDER BY pt DESC LIMIT ?";
         List<RankedKitStats> result = new ArrayList<>();
         try (Connection connection = databaseService.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setInt(1, limit);
+            statement.setDouble(1, maxDeviation);
+            statement.setInt(2, limit);
             try (ResultSet resultSet = statement.executeQuery()) {
                 while (resultSet.next()) {
                     result.add(map(resultSet));
@@ -173,8 +213,7 @@ public final class RankedStatsRepository {
 
     /** Every ranked-stats row (all players, all kits) — used by the tier snapshot. */
     public List<RankedKitStats> findAll() throws SQLException {
-        String sql = "SELECT id, uuid, kit, elo, wins, losses, win_streak, best_elo FROM "
-                + databaseService.table("ranked_stats");
+        String sql = "SELECT " + COLUMNS + " FROM " + databaseService.table("ranked_stats");
         List<RankedKitStats> result = new ArrayList<>();
         try (Connection connection = databaseService.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql);
@@ -208,11 +247,13 @@ public final class RankedStatsRepository {
                 UUID.fromString(resultSet.getString("id")),
                 UUID.fromString(resultSet.getString("uuid")),
                 resultSet.getString("kit"),
-                resultSet.getInt("elo"),
+                resultSet.getInt("pt"),
+                resultSet.getDouble("deviation"),
+                resultSet.getDouble("volatility"),
                 resultSet.getInt("wins"),
                 resultSet.getInt("losses"),
                 resultSet.getInt("win_streak"),
-                resultSet.getInt("best_elo")
+                resultSet.getInt("best_pt")
         );
     }
 }

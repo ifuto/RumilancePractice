@@ -133,16 +133,21 @@ public final class SchemaMigrator {
                         + ")"
         )));
 
+        // Glicko-2 ranked stats: pt (display rating) + deviation/volatility (confidence state).
+        // Databases created before v34 carried the old Elo columns and are converted + reset
+        // once by migration 34 below.
         migrations.add(new Migration(3, "create ranked_stats table", List.of(
                 "CREATE TABLE IF NOT EXISTS " + databaseService.table("ranked_stats") + " ("
                         + "id CHAR(36) PRIMARY KEY, "
                         + "uuid CHAR(36) NOT NULL, "
                         + "kit VARCHAR(64) NOT NULL, "
-                        + "elo INTEGER NOT NULL DEFAULT 1000, "
+                        + "pt INTEGER NOT NULL DEFAULT 1500, "
+                        + "deviation DOUBLE NOT NULL DEFAULT 350, "
+                        + "volatility DOUBLE NOT NULL DEFAULT 0.06, "
                         + "wins INTEGER NOT NULL DEFAULT 0, "
                         + "losses INTEGER NOT NULL DEFAULT 0, "
                         + "win_streak INTEGER NOT NULL DEFAULT 0, "
-                        + "best_elo INTEGER NOT NULL DEFAULT 1000, "
+                        + "best_pt INTEGER NOT NULL DEFAULT 1500, "
                         + "CONSTRAINT uq_ranked_stats_uuid_kit UNIQUE (uuid, kit)"
                         + ")"
         )));
@@ -444,6 +449,44 @@ public final class SchemaMigrator {
                     databaseService.ensureColumn(connection, table, "settings_json", "TEXT");
                 }));
 
+        // Elo -> Glicko-2 cut-over. Runs exactly once (schema_version gate): old elo/best_elo
+        // Elo columns become pt/best_pt and every rating is reset to the Glicko-2 defaults —
+        // the two scales are not convertible, so this is a deliberate one-time wipe of rating
+        // values only. W/L, streaks and rows survive. Fresh installs already get the new
+        // column names from migration 3, so only "elo" still being present means the upgrade
+        // happened here. Never re-runs on ordinary restarts.
+        migrations.add(new Migration(34, "migrate ranked_stats from Elo to Glicko-2 and reset ratings", connection -> {
+            String table = databaseService.table("ranked_stats");
+            legacyRenameColumn(connection, table, "elo", "pt");
+            legacyRenameColumn(connection, table, "best_elo", "best_pt");
+            databaseService.ensureColumn(connection, table, "deviation", "DOUBLE NOT NULL DEFAULT 350");
+            databaseService.ensureColumn(connection, table, "volatility", "DOUBLE NOT NULL DEFAULT 0.06");
+            try (var statement = connection.createStatement()) {
+                statement.executeUpdate("UPDATE " + table
+                        + " SET pt = 1500, best_pt = 1500, deviation = 350, volatility = 0.06");
+            }
+        }));
+
         return migrations;
+    }
+
+    /**
+     * Renames a legacy column to its new name on both SQLite and MariaDB. Silently continues
+     * when the old column is already gone (fresh installs) and errors only on real failures.
+     */
+    private void legacyRenameColumn(java.sql.Connection connection, String table,
+                                    String oldName, String newName) throws java.sql.SQLException {
+        try (var statement = connection.createStatement()) {
+            statement.executeUpdate("ALTER TABLE " + table + " RENAME COLUMN " + oldName + " TO " + newName);
+        } catch (java.sql.SQLException e) {
+            String message = e.getMessage() == null ? "" : e.getMessage().toLowerCase(java.util.Locale.ROOT);
+            boolean oldNameMissing = message.contains("no such column")
+                    || message.contains("unknown column")
+                    || message.contains("does not exist");
+            if (!oldNameMissing) {
+                throw e;
+            }
+            // New schema already in place (fresh install): nothing to rename.
+        }
     }
 }

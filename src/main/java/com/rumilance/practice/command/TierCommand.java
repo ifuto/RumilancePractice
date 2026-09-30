@@ -23,7 +23,7 @@ import java.util.Map;
 
 /**
  * {@code /tier} — shows the player's skill tiers <b>per kit</b> from real PvP: within one
- * kit, players with 20+ ranked matches are ranked by that kit's ELO and the resulting
+ * kit, players with 20+ ranked matches are ranked by that kit's PT and the resulting
  * rarity percentile maps to the tierlist ladder (HT1 &gt; LT1 &gt; HT2 &gt; … &gt; LT5;
  * HT1 = top 0.1%, "1 in 1000"). {@code /tier bands} lists the band table. Kits without a
  * placement yet simply don't appear. Self-view only.
@@ -68,7 +68,7 @@ public final class TierCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
-    /** One kit line: kit name, colored tier label, rarity, ELO and match count. */
+    /** One kit line: kit name, colored tier label, rarity, PT and match count. */
     private Component renderKitLine(Player player, TierService.Standing s) {
         NamedTextColor color = NamedTextColor.NAMES.value(s.tier().color().name().toLowerCase(Locale.ROOT));
         if (color == null) {
@@ -81,7 +81,7 @@ public final class TierCommand implements CommandExecutor, TabCompleter {
                 "rank", String.valueOf(s.rank()),
                 "population", String.valueOf(s.population()),
                 "pct", String.format(Locale.ROOT, "%.2f", s.percentile() * 100.0d),
-                "elo", String.valueOf(s.elo()),
+                "pt", String.valueOf(s.pt()),
                 "matches", String.valueOf(s.matches()));
         TagResolver[] all = Arrays.copyOf(tags, tags.length + 1);
         all[tags.length] = tierTag;

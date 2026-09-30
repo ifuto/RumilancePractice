@@ -26,17 +26,25 @@ public final class StatsService {
     private final MatchHistoryRepository matchHistoryRepository;
     private final DailyRankedStatsRepository dailyRankedStatsRepository;
     private final ConfigService configService;
+    private final double leaderboardMaxDeviation;
 
     public StatsService(
             RankedStatsRepository rankedStatsRepository,
             MatchHistoryRepository matchHistoryRepository,
             DailyRankedStatsRepository dailyRankedStatsRepository,
-            ConfigService configService
+            ConfigService configService,
+            double leaderboardMaxDeviation
     ) {
         this.rankedStatsRepository = rankedStatsRepository;
         this.matchHistoryRepository = matchHistoryRepository;
         this.dailyRankedStatsRepository = dailyRankedStatsRepository;
         this.configService = configService;
+        this.leaderboardMaxDeviation = leaderboardMaxDeviation;
+    }
+
+    /** Deviation gate for public PT leaderboards (players above it stay unranked). */
+    public double leaderboardMaxDeviation() {
+        return leaderboardMaxDeviation;
     }
 
     public Optional<RankedKitStats> kitStats(UUID uuid, String kit) throws Exception {
@@ -47,12 +55,17 @@ public final class StatsService {
         return rankedStatsRepository.findAllForPlayer(uuid);
     }
 
-    public List<RankedKitStats> topElo(String kit, int limit) throws Exception {
-        return rankedStatsRepository.topByKit(kit, limit);
+    /**
+     * Public PT leaderboard for one kit. Only players whose rating deviation has already
+     * dropped below the configured gate appear — uncertain PT must not enter the ranking.
+     */
+    public List<RankedKitStats> topPt(String kit, int limit) throws Exception {
+        return rankedStatsRepository.topEligibleByKit(kit, limit, leaderboardMaxDeviation);
     }
 
-    public List<RankedKitStats> topEloOverall(int limit) throws Exception {
-        return rankedStatsRepository.findTopEloOverall(limit);
+    /** Cross-kit public PT leaderboard with the same deviation confidence gate. */
+    public List<RankedKitStats> topPtOverall(int limit) throws Exception {
+        return rankedStatsRepository.findTopPtOverall(limit, leaderboardMaxDeviation);
     }
 
     public List<RankedKitStats> topWinStreak(int limit) throws Exception {

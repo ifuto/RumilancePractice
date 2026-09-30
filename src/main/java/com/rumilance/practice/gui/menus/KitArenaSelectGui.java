@@ -94,12 +94,22 @@ public final class KitArenaSelectGui extends AbstractGui {
                 .build());
 
         List<ArenaTemplate> templates = arenaStore.templates();
-        int row = 1;
-        int col = 0;
-        for (ArenaTemplate t : templates) {
-            if (row >= 5) {
-                break;
-            }
+        // 4 列 × 4 行(中段) = 1 ページ 16 面。以前は 17 個目以降のアリーナを一切描画
+        // しなかった(=「Arena を設定してもキットの一覧に出ない」バグ)のでページネーション
+        // を入れ、全テンプレートを巡回できるようにする。
+        int pageSize = 16;
+        int maxPage = Math.max(0, (templates.size() - 1) / pageSize);
+        int page = Math.min(session.page(), maxPage);
+        if (session.page() != page) {
+            session.setPage(page);
+        }
+        int from = page * pageSize;
+        int to = Math.min(from + pageSize, templates.size());
+        for (int slot = from; slot < to; slot++) {
+            ArenaTemplate t = templates.get(slot);
+            int local = slot - from;
+            int row = 1 + local / 4;
+            int col = local % 4;
             boolean inDuel = duel.contains(t.name().toLowerCase(Locale.ROOT));
             boolean inParty = party.contains(t.name().toLowerCase(Locale.ROOT));
             Material duelMat = inDuel ? Material.LIME_STAINED_GLASS_PANE : Material.GRAY_STAINED_GLASS_PANE;
@@ -124,11 +134,22 @@ public final class KitArenaSelectGui extends AbstractGui {
                             UiTheme.hint(line(player, "gui.arena-toggle")))
                     .action("party:" + t.name())
                     .build());
-
-            col++;
-            if (col >= 4) {
-                col = 0;
-                row++;
+        }
+        // 1 ページ 16 面の専用ページ送り(共通の paintPaging は 28 面グリッド前提なので
+        // このレイアウトではページ数・ボタン表示判定がずれる)。
+        if (templates.size() > pageSize) {
+            Component suffix = Component.text("  " + (page + 1) + "/" + (maxPage + 1), UiTheme.MUTED);
+            if (page > 0) {
+                inventory.setItem(GuiSlots.slot(5, 2), ItemBuilder.of(Material.ARROW)
+                        .name(Component.text("◀ ", UiTheme.PRIMARY).append(suffix))
+                        .action("page:prev")
+                        .build());
+            }
+            if (page < maxPage) {
+                inventory.setItem(GuiSlots.slot(5, 6), ItemBuilder.of(Material.ARROW)
+                        .name(Component.text("▶ ", UiTheme.PRIMARY).append(suffix))
+                        .action("page:next")
+                        .build());
             }
         }
     }
@@ -136,6 +157,18 @@ public final class KitArenaSelectGui extends AbstractGui {
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot, String action) {
         if (action == null || "noop".equals(action)) {
+            return;
+        }
+        if ("page:prev".equals(action)) {
+            session.setPage(Math.max(0, session.page() - 1));
+            sounds.play(player, "gui-click");
+            render(player, session, inventory);
+            return;
+        }
+        if ("page:next".equals(action)) {
+            session.setPage(session.page() + 1);
+            sounds.play(player, "gui-click");
+            render(player, session, inventory);
             return;
         }
         if ("back".equals(action)) {

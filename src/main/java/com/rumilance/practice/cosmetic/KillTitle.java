@@ -9,7 +9,7 @@ import java.util.List;
 
 /**
  * A cosmetic kill/win title shown as a screen-wide title when a player secures a kill or wins a
- * ranked match. Titles are unlocked by lifetime ranked wins or best-Elo thresholds; the player's
+ * ranked match. Titles are unlocked by lifetime ranked wins or best-PT thresholds; the player's
  * active selection is held in {@link TitleService}.
  */
 public record KillTitle(
@@ -18,7 +18,7 @@ public record KillTitle(
         Material icon,
         TextColor color,
         int requiredWins,
-        int requiredElo
+        int requiredPt
 ) {
 
     public static final KillTitle NONE = new KillTitle(
@@ -28,8 +28,8 @@ public record KillTitle(
         if (requiredWins < 0) {
             throw new IllegalArgumentException("requiredWins must not be negative");
         }
-        if (requiredElo < 0) {
-            throw new IllegalArgumentException("requiredElo must not be negative");
+        if (requiredPt < 0) {
+            throw new IllegalArgumentException("requiredPt must not be negative");
         }
     }
 
@@ -45,22 +45,23 @@ public record KillTitle(
 
     /**
      * The default, aqua-themed title ladder. Ordered from most to least easily unlocked so the
-     * highest tier a player qualifies for can be found with a simple loop.
+     * highest tier a player qualifies for can be found with a simple loop. PT thresholds were
+     * rebalanced to the Glicko-2 scale (start 1500): former Elo threshold + 500.
      */
     public static List<KillTitle> defaults() {
         return List.of(
                 new KillTitle("rookie", "Rookie", Material.WOODEN_SWORD,
                         TextColor.color(0xAAAAAA), 0, 0),
                 new KillTitle("warrior", "Warrior", Material.STONE_SWORD,
-                        TextColor.color(0x55FFFF), 25, 1050),
+                        TextColor.color(0x55FFFF), 25, 1550),
                 new KillTitle("duelist", "Duelist", Material.IRON_SWORD,
-                        TextColor.color(0x55FFFF), 100, 1150),
+                        TextColor.color(0x55FFFF), 100, 1650),
                 new KillTitle("gladiator", "Gladiator", Material.DIAMOND_SWORD,
-                        TextColor.color(0x00E5FF), 250, 1300),
+                        TextColor.color(0x00E5FF), 250, 1800),
                 new KillTitle("champion", "Champion", Material.NETHERITE_SWORD,
-                        TextColor.color(0xFFD700), 500, 1500),
+                        TextColor.color(0xFFD700), 500, 2000),
                 new KillTitle("legend", "Legend", Material.NETHER_STAR,
-                        TextColor.color(0xFF66FF), 1000, 1800)
+                        TextColor.color(0xFF66FF), 1000, 2300)
         );
     }
 }

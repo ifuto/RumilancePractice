@@ -78,7 +78,7 @@ import com.rumilance.practice.database.repository.WinStreakRepository;
 import com.rumilance.practice.duel.DuelLogStore;
 import com.rumilance.practice.duel.DuelRequestService;
 import com.rumilance.practice.ekit.EkitItems;
-import com.rumilance.practice.elo.EloCalculator;
+import com.rumilance.practice.glicko.GlickoCalculator;
 import com.rumilance.practice.ffa.FfaBlockTracker;
 import com.rumilance.practice.ffa.FfaListener;
 import com.rumilance.practice.ffa.FfaService;
@@ -280,7 +280,7 @@ public final class FeatureBootstrap {
         PlayerStateManager stateManager = services.get(PlayerStateManager.class);
         AsyncExecutor asyncExecutor = services.get(AsyncExecutor.class);
         FaweBridge faweBridge = services.get(FaweBridge.class);
-        EloCalculator eloCalculator = services.get(EloCalculator.class);
+        GlickoCalculator glickoCalculator = services.get(GlickoCalculator.class);
         RankedStatsRepository rankedStatsRepository = services.get(RankedStatsRepository.class);
         MatchHistoryRepository matchHistoryRepository = services.get(MatchHistoryRepository.class);
         AuditLogRepository auditLogRepository = services.get(AuditLogRepository.class);
@@ -402,7 +402,7 @@ public final class FeatureBootstrap {
 
         RankedResultProcessor rankedResultProcessor = new RankedResultProcessor(
                 rankedStatsRepository, matchHistoryRepository, dailyRankedStatsRepository,
-                eloCalculator, settings, true);
+                glickoCalculator, settings, true);
         UnrankedResultProcessor unrankedResultProcessor = new UnrankedResultProcessor(auditLogRepository);
         FfaResultProcessor ffaResultProcessor = new FfaResultProcessor(auditLogRepository);
 
@@ -667,10 +667,11 @@ public final class FeatureBootstrap {
         });
 
         StatsService statsService = new StatsService(
-                rankedStatsRepository, matchHistoryRepository, dailyRankedStatsRepository, configService);
+                rankedStatsRepository, matchHistoryRepository, dailyRankedStatsRepository, configService,
+                settings.rankedLeaderboardMaxDeviation());
         services.register(StatsService.class, statsService);
 
-        // Auto skill tiering from real PvP (best-kit ranked ELO -> rarity bands, HT1 = top 0.1%).
+        // Auto skill tiering from real PvP (best-kit ranked PT -> rarity bands, HT1 = top 0.1%).
         com.rumilance.practice.tier.TierService tierService =
                 new com.rumilance.practice.tier.TierService(plugin, rankedStatsRepository, asyncExecutor);
         services.register(com.rumilance.practice.tier.TierService.class, tierService);
@@ -865,6 +866,8 @@ public final class FeatureBootstrap {
 
         QueueKitGui rankedGui = new QueueKitGui(
                 guiSessions, soundService, kitService, queueService, queueCoordinator, true);
+        // ランク戦キットアイテムのホバーにトップ5ランキング lore を載せる
+        rankedGui.setRankedTopLore(rankedStatsRepository, settings.rankedLeaderboardMaxDeviation());
         QueueKitGui unrankedGui = new QueueKitGui(
                 guiSessions, soundService, kitService, queueService, queueCoordinator, false);
         KitSelectGui kitSelectGui = new KitSelectGui(guiSessions, soundService, kitService);

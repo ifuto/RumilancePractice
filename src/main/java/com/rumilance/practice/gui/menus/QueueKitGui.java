@@ -38,6 +38,9 @@ public final class QueueKitGui extends AbstractGui {
     private final boolean ranked;
     private KitPreviewGui previewGui;
     private com.rumilance.practice.database.repository.WinStreakRepository winStreakRepository;
+    // Ranked-only TOP5 hover lore: which repository and how confident a rating must be to list.
+    private com.rumilance.practice.database.repository.RankedStatsRepository rankedStatsRepository;
+    private double leaderboardMaxDeviation = 115.0d;
 
     public QueueKitGui(
             GuiSessionRegistry registry,
@@ -57,6 +60,13 @@ public final class QueueKitGui extends AbstractGui {
 
     public void setPreviewGui(KitPreviewGui previewGui) {
         this.previewGui = previewGui;
+    }
+
+    /** Wires the TOP5 hover ranking for the ranked queue (unused on the unranked GUI). */
+    public void setRankedTopLore(com.rumilance.practice.database.repository.RankedStatsRepository repository,
+                                 double leaderboardMaxDeviation) {
+        this.rankedStatsRepository = repository;
+        this.leaderboardMaxDeviation = leaderboardMaxDeviation;
     }
 
     public void openPreview(Player player, String kitId) {
@@ -228,6 +238,7 @@ public final class QueueKitGui extends AbstractGui {
                             ? com.rumilance.practice.util.KitNames.pretty(shown.arenaName())
                             : line(player, "gui.queue-random"))
             );
+            addRankedTopLore(player, kit, builder);
         }
         if (queuedHere) {
             builder.lore(
@@ -251,6 +262,133 @@ public final class QueueKitGui extends AbstractGui {
 
     private MatchMode mode() {
         return ranked ? MatchMode.RANKED : MatchMode.UNRANKED;
+    }
+
+    // ---------------------------------------------------------------- ranked TOP5 hover lore
+
+    /** Per-kit TOP5 cache so the DB is hit at most once per kit per TTL window. */
+    private final java.util.Map<String, java.util.AbstractMap.SimpleEntry<Long, List<Component>>> topCache =
+            new java.util.concurrent.ConcurrentHashMap<>();
+    private static final long TOP_CACHE_MS = 10_000L;
+
+    /**
+     * Adds the "Ranking" section to a ranked queue kit item: TOP5 eligible players as
+     * {@code N. - <face><name> - <bold aqua PT>}. Entries are built once per kit per
+     * {@value #TOP_CACHE_MS} ms (cached Components); the viewer's placeholder line is skipped —
+     * the click hint below the divider already tells them how to join.
+     */
+    private void addRankedTopLore(Player viewer, KitDefinition kit, ItemBuilder builder) {
+        if (rankedStatsRepository == null) {
+            return;
+        }
+        String fightKit = kitService.playableId(kit.name());
+        List<Component> lines = topCache.compute(fightKit, (ignored, cached) -> {
+            if (cached != null && System.currentTimeMillis() - cached.getKey() < TOP_CACHE_MS) {
+                return cached;
+            }
+            return new java.util.AbstractMap.SimpleEntry<>(System.currentTimeMillis(), loadTopLines(fightKit));
+        }).getValue();
+        if (lines == null || lines.isEmpty()) {
+            return;
+        }
+        builder.lore(UiTheme.divider());
+        builder.lore(Component.text(line(viewer, "gui.queue-ranking-title"), UiTheme.PRIMARY)
+                .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+        for (Component line : lines) {
+            builder.lore(line);
+        }
+        // 自分が載っていない場合に一目で分かる「あなた: n位 / 計測中」行。
+        builder.lore(selfRankLine(viewer, fightKit));
+    }
+
+    /** Runs the DB query for one kit's TOP5 (small DBs only — leaderboard usage). */
+    private List<Component> loadTopLines(String fightKit) {
+        try {
+            List<com.rumilance.practice.model.RankedKitStats> top =
+                    rankedStatsRepository.topEligibleByKit(fightKit, 5, leaderboardMaxDeviation);
+            List<Component> lines = new java.util.ArrayList<>(top.size());
+            int rank = 1;
+            for (com.rumilance.practice.model.RankedKitStats entry : top) {
+                lines.add(rankedTopLine(rank, entry));
+                rank++;
+            }
+            return lines;
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
+    /** One ranking row: rank number coloured by place, head sprite, white name, aqua bold PT. */
+    private static Component rankedTopLine(int rank, com.rumilance.practice.model.RankedKitStats entry) {
+        net.kyori.adventure.text.format.TextColor placeColor = switch (rank) {
+            case 1 -> net.kyori.adventure.text.format.TextColor.color(0xFFD700); // gold
+            case 2 -> net.kyori.adventure.text.format.TextColor.color(0xC0C0C0); // silver
+            case 3 -> net.kyori.adventure.text.format.TextColor.color(0xCD7F32); // copper
+            default -> net.kyori.adventure.text.format.NamedTextColor.WHITE;     // 4-5 white
+        };
+        String name = com.rumilance.practice.stats.StatsService.nameOf(entry.uuid());
+        return Component.empty()
+                .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false)
+                .append(Component.text(rank + ". ", placeColor))
+                .append(Component.text("- ", net.kyori.adventure.text.format.TextColor.color(0x666666)))
+                .append(com.rumilance.practice.headfont.HeadFontService.of(entry.uuid())
+                        .color(net.kyori.adventure.text.format.NamedTextColor.WHITE))
+                .append(Component.text(name, net.kyori.adventure.text.format.NamedTextColor.WHITE))
+                .append(Component.text(" - ", net.kyori.adventure.text.format.TextColor.color(0x666666)))
+                .append(Component.text(entry.pt(), net.kyori.adventure.text.format.NamedTextColor.AQUA)
+                        .decorate(net.kyori.adventure.text.format.TextDecoration.BOLD))
+                .append(Component.text("PT", net.kyori.adventure.text.format.NamedTextColor.AQUA)
+                        .decorate(net.kyori.adventure.text.format.TextDecoration.BOLD));
+    }
+
+    /** "{number}PT" chip in aqua bold, reused by the ranking rows and the self footer. */
+    private static Component ptChip(int pt) {
+        return Component.empty()
+                .append(Component.text(" "))
+                .append(Component.text(pt, net.kyori.adventure.text.format.NamedTextColor.AQUA)
+                        .decorate(net.kyori.adventure.text.format.TextDecoration.BOLD))
+                .append(Component.text(" PT", net.kyori.adventure.text.format.NamedTextColor.AQUA)
+                        .decorate(net.kyori.adventure.text.format.TextDecoration.BOLD))
+                .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false);
+    }
+
+    /** Footer row: the viewer's own PT position (or "計測中" while deviation is too high). */
+    private Component selfRankLine(Player viewer, String fightKit) {
+        try {
+            java.util.Optional<com.rumilance.practice.model.RankedKitStats> mine =
+                    rankedStatsRepository.find(viewer.getUniqueId(), fightKit);
+            if (mine.isEmpty() || mine.get().gamesPlayed() < 1) {
+                return UiTheme.hint(line(viewer, "gui.queue-ranking-self-unranked"));
+            }
+            com.rumilance.practice.model.RankedKitStats stats = mine.get();
+            if (!stats.isLeaderboardEligible(leaderboardMaxDeviation)) {
+                // 確信不足: 順位には入らないが自分の値は見せる
+                return UiTheme.labelValue(line(viewer, "gui.queue-ranking-self-label"),
+                        line(viewer, "gui.queue-ranking-self-unranked"))
+                        .append(ptChip(stats.pt()));
+            }
+            int rank = 1;
+            boolean included = false;
+            try {
+                List<com.rumilance.practice.model.RankedKitStats> top =
+                        rankedStatsRepository.topEligibleByKit(fightKit, Integer.MAX_VALUE, leaderboardMaxDeviation);
+                int pos = 1;
+                for (com.rumilance.practice.model.RankedKitStats entry : top) {
+                    if (entry.uuid().equals(viewer.getUniqueId())) {
+                        rank = pos;
+                        included = true;
+                        break;
+                    }
+                    pos++;
+                }
+            } catch (Exception ignored) {
+            }
+            return UiTheme.labelValue(line(viewer, "gui.queue-ranking-self-label"),
+                    included ? "#" + rank : line(viewer, "gui.queue-ranking-self-unranked"))
+                    .append(ptChip(stats.pt()));
+        } catch (Exception e) {
+            return UiTheme.hint(line(viewer, "gui.queue-ranking-self-unranked"));
+        }
     }
 
     @Override

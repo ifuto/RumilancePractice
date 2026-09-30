@@ -17,7 +17,7 @@ import com.rumilance.practice.database.repository.PlayerRepository;
 import com.rumilance.practice.database.repository.PunishmentRepository;
 import com.rumilance.practice.database.repository.RankedStatsRepository;
 import com.rumilance.practice.database.repository.SettingsRepository;
-import com.rumilance.practice.elo.EloCalculator;
+import com.rumilance.practice.glicko.GlickoCalculator;
 import com.rumilance.practice.arena.fawe.FaweBridge;
 import com.rumilance.practice.arena.fawe.FaweBridgeImpl;
 import com.rumilance.practice.arena.fawe.NoOpFaweBridge;
@@ -98,13 +98,8 @@ public final class RumilancePractice extends JavaPlugin {
             return;
         }
 
-        EloCalculator eloCalculator = new EloCalculator(
-                settings.rankedProvisionalGames(),
-                settings.rankedProvisionalK(),
-                settings.rankedStandardK(),
-                settings.rankedTopPercentK()
-        );
-        serviceRegistry.register(EloCalculator.class, eloCalculator);
+        GlickoCalculator glickoCalculator = new GlickoCalculator(settings.rankedGlickoTau());
+        serviceRegistry.register(GlickoCalculator.class, glickoCalculator);
 
         // WorldEdit/FAWE are optional: the API types only exist inside FaweBridgeImpl, and its
         // class cannot be loaded (let alone verified) without them — so probe the plugins here,

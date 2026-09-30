@@ -28,7 +28,7 @@ import java.util.UUID;
 
 /**
  * Per-kit ranked stats browser. The header shows whose stats are being viewed (with a head),
- * the content grid lists every enabled kit with W/L, win-rate, K/D, streak and Elo, and the
+ * the content grid lists every enabled kit with W/L, win-rate, K/D, streak and PT, and the
  * bottom bar holds a close button. Stats are loaded via {@link StatsService} with failures
  * degraded to a "Stats unavailable" lore rather than aborting the whole menu.
  */
@@ -160,9 +160,9 @@ public final class StatsKitGui extends AbstractGui {
                     UiTheme.labelValue(line(viewer, "gui.profile-wr"), statsService.winRateLabel(stats)),
                     UiTheme.labelValue("K/D", String.format("%.2f", statsService.kd(stats))),
                     UiTheme.labelValue(line(viewer, "gui.profile-streak"), String.valueOf(stats.winStreak())),
-                    UiTheme.labelValue("Elo", String.valueOf(stats.elo())),
+                    UiTheme.labelValue("PT", String.valueOf(stats.pt())),
                     UiTheme.blank(),
-                    UiTheme.labelValue(line(viewer, "gui.profile-best-elo"), String.valueOf(stats.bestElo()))
+                    UiTheme.labelValue(line(viewer, "gui.profile-best-pt"), String.valueOf(stats.bestPt()))
             );
         } catch (Exception e) {
             builder.lore(UiTheme.status(line(viewer, "gui.stats-unavailable"), UiTheme.DANGER));

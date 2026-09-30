@@ -8,7 +8,7 @@ import com.rumilance.practice.state.MatchMode;
 import java.util.UUID;
 
 /**
- * Unranked (and team-battle) results must never touch Elo or public ranked statistics.
+ * Unranked (and team-battle) results must never touch PT or public ranked statistics.
  * Team battles are audit-logged the same way — they are casual by design.
  */
 public final class UnrankedResultProcessor implements MatchResultProcessor {

@@ -311,7 +311,7 @@ public final class PlayerCommands implements CommandExecutor, TabCompleter {
 
     private void handleRanking(Player player, String[] args) {
         if (args.length < 1) {
-            player.sendMessage(Component.text("Usage: /ranking <elo|streak|kills>", NamedTextColor.YELLOW));
+            player.sendMessage(Component.text("Usage: /ranking <pt|streak|kills>", NamedTextColor.YELLOW));
             return;
         }
         String mode = args[0].toLowerCase(Locale.ROOT);
@@ -325,16 +325,16 @@ public final class PlayerCommands implements CommandExecutor, TabCompleter {
                             lines.add(Component.text("#" + rank + " " + StatsService.nameOf(stats.uuid())
                                     + " kit=" + stats.kit()
                                     + " streak=" + stats.winStreak()
-                                    + " elo=" + stats.elo(), NamedTextColor.GOLD));
+                                    + " pt=" + stats.pt(), NamedTextColor.GOLD));
                             rank++;
                         }
                     }
-                    case "elo", "rating" -> {
+                    case "pt", "elo", "rating" -> {
                         int rank = 1;
-                        for (RankedKitStats stats : statsService.topEloOverall(10)) {
+                        for (RankedKitStats stats : statsService.topPtOverall(10)) {
                             lines.add(Component.text("#" + rank + " " + StatsService.nameOf(stats.uuid())
                                     + " kit=" + stats.kit()
-                                    + " elo=" + stats.elo()
+                                    + " pt=" + stats.pt()
                                     + " W/L=" + stats.wins() + "/" + stats.losses(), NamedTextColor.GOLD));
                             rank++;
                         }
@@ -369,7 +369,7 @@ public final class PlayerCommands implements CommandExecutor, TabCompleter {
                                                 @NotNull String alias, @NotNull String[] args) {
         String current = TabCompletions.current(args);
         if (type == Type.RANKING && args.length == 1) {
-            return TabCompletions.filter(current, "elo", "streak", "kills");
+            return TabCompletions.filter(current, "pt", "streak", "kills");
         }
         if (type == Type.KDR && args.length == 1) {
             return TabCompletions.filter(current,

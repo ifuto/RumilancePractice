@@ -8,7 +8,7 @@ import com.rumilance.practice.state.MatchMode;
 import java.util.UUID;
 
 /**
- * FFA outcomes never affect ranked Elo/statistics.
+ * FFA outcomes never affect ranked PT/statistics.
  */
 public final class FfaResultProcessor implements MatchResultProcessor {
 

@@ -1,4 +1,4 @@
-package com.rumilance.practice.elo;
+package com.rumilance.practice.glicko;
 
 /**
  * Result of a rated match from the perspective of "player A" in a two-player comparison.
@@ -16,7 +16,7 @@ public enum MatchOutcome {
     }
 
     /**
-     * @return the "actual score" term used by the Elo formula (1.0 for a win, 0.5 for a draw, 0.0 for a loss).
+     * @return the "actual score" term used by the rating formula (1.0 win, 0.5 draw, 0.0 loss).
      */
     public double scoreForA() {
         return score;

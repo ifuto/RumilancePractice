@@ -431,11 +431,11 @@ lobby:
 
 ranking:
   stats-header: "<gray>--- Estadísticas ranked: <player> (<kit>) ---"
-  stats-line: "<gray>Puntos: <yellow><elo></yellow> <gray>| V: <green><wins></green> D: <red><losses></red>"
+  stats-line: "<gray>PT: <yellow><pt></yellow> <gray>| V: <green><wins></green> D: <red><losses></red>"
   leaderboard-header: "<gray>--- Clasificación: <kit> ---"
-  leaderboard-entry: "<yellow>#<position></yellow> <white><player></white> <gray>-</gray> <elo> <gray>puntos</gray>"
-  rank-up: "<green>¡Tu puntuación de <kit> subió a <elo>!"
-  rank-down: "<red>Tu puntuación de <kit> bajó a <elo>."
+  leaderboard-entry: "<yellow>#<position></yellow> <white><player></white> <gray>-</gray> <pt> <gray>PT</gray>"
+  rank-up: "<green>¡Tu PT de <kit> subió a <pt>!"
+  rank-down: "<red>Tu PT de <kit> bajó a <pt>."
   no-stats: "<red>Sin estadísticas ranked de <player> en <kit>."
 
 queue:
@@ -525,7 +525,7 @@ stats:
   wins: "<gray>Victorias: <green><wins></green>"
   losses: "<gray>Derrotas: <red><losses></red>"
   win-rate: "<gray>Tasa de victoria: <yellow><rate>%</yellow>"
-  elo: "<gray>Puntuación: <yellow><elo></yellow>"
+  pt: "<gray>PT: <yellow><pt></yellow>"
 
 admin:
   reload-success: "<green>NARENA recargado."
@@ -779,6 +779,9 @@ gui:
   queue-closed: "Cerrada"
   queue-closed-lore: "Esta cola de kit está en pausa."
   queue-waiting-count: "Esperando"
+  queue-ranking-title: "Clasificación"
+  queue-ranking-self-label: "Tú:"
+  queue-ranking-self-unranked: "Sin clasificar"
   queue-arena: "Arena"
   queue-random: "Aleatorio"
   queue-left-join: "Clic izquierdo para unirte a la cola"
@@ -1135,7 +1138,7 @@ gui:
   titles-click: "Clic para seleccionar"
   titles-locked: "BLOQUEADO"
   titles-wins: "Victorias necesarias"
-  titles-elo: "Mejor Elo necesario"
+  titles-pt: "Mejor PT necesario"
   titles-locked-msg: "<red>Ese título aún no está desbloqueado."
   titles-set: "Título fijado a <name>."
   preview-title: "Vista previa: <kit>"
@@ -1257,7 +1260,7 @@ gui:
   kit-arena-party: "Equipo: <name>"
   stats-title: "<name> — Estadísticas"
   stats-unavailable: "Estadísticas no disponibles"
-  profile-best-elo: "Mejor Elo"
+  profile-best-pt: "Mejor PT"
   practice-layout-order-anchor: "ANCLA DE REAPARICIÓN y luego PIEDRA LUMINOSA"
   practice-layout-order-glow: "PIEDRA LUMINOSA y luego ANCLA DE REAPARICIÓN"
   team-settings-title: "Ajustes de equipo"
@@ -1483,11 +1486,11 @@ arena-source:
 
 tier:
   header: "<gold>— Tiers de habilidad (por kit, PvP real) —"
-  kit-line: "<yellow><kit></yellow>: <tier> <gray>(n.º <rank> de <population>, top <pct>%)</gray> — ELO <yellow><elo></yellow>, <yellow><matches></yellow> clas."
+  kit-line: "<yellow><kit></yellow>: <tier> <gray>(#<rank> de <population>, top <pct>%)</gray> — PT <yellow><pt></yellow>, <yellow><matches></yellow> clasificatorias"
   unranked: "<yellow>Sin tier en ningún kit — por debajo del umbral."
   unranked-progress: "<gray>Cada kit requiere <yellow><n></yellow> partidas clasificatorias."
   bands-title: "<gold>Escalera de tiers (% de jugadores clasificados por kit):"
-  hint: "<gray>El tier es por kit y sale del PvP real (ELO clas. de ese kit). Orden: HT1>LT1>HT2>…>LT5; HT1 = top 0.1%."
+  hint: "<gray>Los tiers son por kit con PvP real (PT ranked de ese kit). Orden HT1>LT1>HT2>…>LT5; HT1 = top 0.1%."
 
 afkcrystal:
   build-limit: "<gold>[AFK BOT Crystal]</gold> <red>Solo puedes colocar bloques hasta <max> bloques sobre el suelo (el movimiento nunca está limitado).</red>"
@@ -1510,7 +1513,9 @@ afkcrystal:
   not-in-session: "<gold>[AFK BOT Crystal]</gold> <red>No estás dentro de la sala. Usa /afkcrystal start</red>"
   usage: "<gold>[AFK BOT Crystal]</gold> <yellow>/afkcrystal [start|stop|kit|settings|reset]</yellow>"
   boundary: "<gold>[AFK BOT Crystal]</gold> <red>No puedes colocar bloques fuera de tu sala.</red>"
-  protected: "<gold>[AFK BOT Crystal]</gold> <red>El suelo de netherite y el botón son indestructibles.</red>"
+  protected: "El suelo de netherite, el botón y el cartel de ajustes son indestructibles."
+  sign-settings-1: "Ajustes"
+  sign-settings-2: "Clic para abrir"
   kit-saved: "<gold>[AFK BOT Crystal]</gold> <green>Kit guardado y equipado.</green>"
   prototype-saved: "<gold>[AFK BOT Crystal]</gold> <light_purple>Kit prototipo del servidor guardado.</light_purple>"
   prototype-loaded: "<gold>[AFK BOT Crystal]</gold> <aqua>Kit prototipo cargado.</aqua>"

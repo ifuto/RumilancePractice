@@ -253,7 +253,7 @@ public final class AdminPlayerDataGui extends AbstractGui {
         statsLore.add(UiTheme.labelValue("Kits played", String.valueOf(stats.size())));
         statsLore.add(UiTheme.labelValue("Wins / Losses", wins + " / " + losses));
         statsLore.add(UiTheme.blank());
-        statsLore.addAll(List.of(topEloLines(stats)));
+        statsLore.addAll(List.of(topPtLines(stats)));
         inventory.setItem(GuiSlots.slot(3, 5),
                 ItemBuilder.of(Material.IRON_SWORD)
                         .name(Component.text("Ranked stats", UiTheme.PRIMARY))
@@ -306,11 +306,11 @@ public final class AdminPlayerDataGui extends AbstractGui {
         return lines.toArray(new Component[0]);
     }
 
-    private Component[] topEloLines(List<RankedKitStats> stats) {
+    private Component[] topPtLines(List<RankedKitStats> stats) {
         return stats.stream()
-                .sorted((a, b) -> Double.compare(b.elo(), a.elo()))
+                .sorted((a, b) -> Integer.compare(b.pt(), a.pt()))
                 .limit(3)
-                .map(s -> UiTheme.labelValue(s.kit(), String.valueOf((int) s.elo())))
+                .map(s -> UiTheme.labelValue(s.kit(), String.valueOf(s.pt())))
                 .toArray(Component[]::new);
     }
 

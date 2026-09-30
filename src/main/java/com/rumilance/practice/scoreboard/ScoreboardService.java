@@ -65,7 +65,7 @@ public final class ScoreboardService {
         }
     }
 
-    private record CachedStats(int bestElo, int wins, int losses, int bestStreak, int matches, int kits) {
+    private record CachedStats(int bestPt, int wins, int losses, int bestStreak, int matches, int kits) {
         static final CachedStats EMPTY = new CachedStats(0, 0, 0, 0, 0, 0);
 
         double kd() {
@@ -448,12 +448,12 @@ public final class ScoreboardService {
         try {
             List<com.rumilance.practice.model.RankedKitStats> kits =
                     rankedStatsRepository.findAllForPlayer(uuid);
-            int bestElo = 0;
+            int bestPt = 0;
             int wins = 0;
             int losses = 0;
             for (com.rumilance.practice.model.RankedKitStats stats : kits) {
-                if (stats.elo() >= bestElo) {
-                    bestElo = stats.elo();
+                if (stats.pt() >= bestPt) {
+                    bestPt = stats.pt();
                 }
                 wins += stats.wins();
                 losses += stats.losses();
@@ -463,7 +463,7 @@ public final class ScoreboardService {
                 bestStreak = winStreakRepository.find(uuid).map(WinStreak::bestStreak).orElse(0);
             } catch (Exception ignored) {
             }
-            return new CachedStats(bestElo, wins, losses, bestStreak, wins + losses, kits.size());
+            return new CachedStats(bestPt, wins, losses, bestStreak, wins + losses, kits.size());
         } catch (Exception e) {
             return CachedStats.EMPTY;
         }
@@ -472,7 +472,7 @@ public final class ScoreboardService {
     private ScoreboardContext baseContext(Player player, int onlineCount, ScoreboardConfig cfg) {
         double mspt = TickHealth.emaMspt();
         double tps = mspt <= 0.0d ? 20.0d : Math.min(20.0d, 1000.0d / mspt);
-        return new ScoreboardContext()
+        ScoreboardContext ctx = new ScoreboardContext()
                 .put("server_name", cfg.serverName())
                 .put("server_ip", cfg.serverIp())
                 .put("online", onlineCount)
@@ -483,6 +483,11 @@ public final class ScoreboardService {
                 .put("mspt", String.format(Locale.ROOT, "%.1f", mspt))
                 .put("server_time", java.time.LocalTime.now(java.time.ZoneId.systemDefault())
                         .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")));
+        // {pt} / {best_pt}: own Glicko-2 rating, available everywhere including TAB header/footer.
+        CachedStats stats = cachedStats(player.getUniqueId(), cfg);
+        ctx.put("pt", stats.bestPt())
+                .put("best_pt", stats.bestPt());
+        return ctx;
     }
 
     private String modeLabel(MatchMode mode, ScoreboardConfig cfg) {
@@ -614,10 +619,8 @@ public final class ScoreboardService {
         ctx.put("wins", stats.wins())
                 .put("losses", stats.losses())
                 .put("kd", String.format(Locale.ROOT, "%.2f", stats.kd()))
-                .put("best_elo", stats.bestElo())
-                .put("rating", stats.bestElo())
-                .put("best_rating", stats.bestElo())
-                .put("elo", stats.bestElo())
+                .put("rating", stats.bestPt())
+                .put("best_rating", stats.bestPt())
                 .put("best_streak", stats.bestStreak())
                 .put("matches", stats.matches())
                 .put("kits", stats.kits());

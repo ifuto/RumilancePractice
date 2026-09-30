@@ -10,7 +10,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Persistent FFA K/D, isolated from ranked Elo/stats.
+ * Persistent FFA K/D, isolated from ranked Glicko-2 PT/stats.
  */
 public final class FfaStatsRepository {
 
