@@ -17,6 +17,8 @@ public final class ServerStats {
     /** KB無効領域判定の回数 / 攻撃不成立の回数。 */
     public int noKbEvents;
     public int noDamageEvents;
+    /** 第三者（または環境）の同時攻撃で合成KB混入と判定され除外した回数。 */
+    public int contaminatedEvents;
     public long firstSeenEpochMs;
     public long lastSeenEpochMs;
 

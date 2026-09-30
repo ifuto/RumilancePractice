@@ -6,6 +6,8 @@
     "AttackHookMixin",
     "ClientTickMixin",
     "DamageConfirmMixin",
+    "EntitiesDestroyMixin",
+    "PositionTeleportMixin",
     "VelocityCaptureMixin"
   ],
   "injectors": {

@@ -13,10 +13,13 @@ package com.rumilance.kbprobe;
  * <pre>
  *   JAVA="$(python3 -c 'import jdk4py, os; print(os.path.join(jdk4py.JAVA_HOME, \"bin\", \"java\"))')"
  *   mkdir -p /tmp/kbprobe-sim && cd kb-probe
- *   "$("$JAVA" -version >/dev/null 2>&1; dirname "$JAVA")"/javac -d /tmp/kbprobe-sim \
- *       src/main/java/com/rumilance/kbprobe/KbProbeMath.java \
- *       src/main/java/com/rumilance/kbprobe/ServerStats.java sim/KbProbeSim.java
- *   "$JAVA" -cp /tmp/kbprobe-sim com.rumilance.kbprobe.KbProbeSim
+ *   # jdk4py は JRE のみで javac を持たないため、リポジトリ同梱の ECJ でコンパイルする:
+ *   mkdir -p /tmp/kbprobe-sim/classes
+ *   "$JAVA" -jar tools/localtest/ecj.jar -17 -d /tmp/kbprobe-sim/classes \
+ *       kb-probe/src/main/java/com/rumilance/kbprobe/KbProbeMath.java \
+ *       kb-probe/src/main/java/com/rumilance/kbprobe/ServerStats.java \
+ *       kb-probe/sim/KbProbeSim.java
+ *   "$JAVA" -cp /tmp/kbprobe-sim/classes com.rumilance.kbprobe.KbProbeSim
  * </pre>
  */
 public final class KbProbeSim {
@@ -84,7 +87,19 @@ public final class KbProbeSim {
         stats.noKbEvents++;
         note("attack -> damage -> (速度なし, 窓切れ) … noKbEvents: " + nk + " -> " + stats.noKbEvents);
 
-        header("11) チャット・アクションバーの実表示 (k=1 疾走サンプルの場合)");
+        header("12) 【0.4.0新規】攻撃〜成立の間に対象がジャンプ: Yは不変 (fV≈0) → 垂直のみ不採用");
+        // バニラはダメージ適用tickに被害者が空中ならYを触らない → 測れるdy≈0。
+        // Hは正しく採用されるが、Vは fV≈0 < VF_MIN として係数平均への混入を防ぐ。
+        feed(stats, 0.0, 0.0, 0.400f, 0.000f, 0.0f, true, 0.0f, true, true);
+        expectCount(stats, 4, 3);
+
+        header("13) 【0.4.0新規】外部インパルス混入 (Wind Charge等): fV=20 (>VF_MAX) → 垂直のみ不採用");
+        // r=0.95 の対象: 本来のV期待は0.02なのに測れたdy=0.4 → 係数×20 = 素の殴りではあり得ない。
+        // outlier(2.5)には掛からない帯なので、垂直妥当域ガードがここで止める。
+        feed(stats, 0.0, 0.95, 0.020f, 0.400f, 0.0f, true, 0.0f, true, true);
+        expectCount(stats, 5, 3);
+
+        header("14) チャット・アクションバーの実表示 (k=1 疾走サンプルの場合)");
         double hRaw = 0.7, dy = 0.4;
         double fH = hRaw / KbProbeMath.expectHorizontal(1.0, 0.0);
         double fV = dy / KbProbeMath.expectVertical(1.0, 0.0);
@@ -107,6 +122,7 @@ public final class KbProbeSim {
         System.out.println("  ✔ ガード閾値: idle/direction/outlier (KbProbe本体も同一関数を参照)");
         System.out.println("  ✔ 蓄積: ServerStats (本物のクラスをそのまま利用)");
         System.out.println("  ✔ 単位変換: unscaleVelocity(int)/8000 = 0.3.1 の修正箇所 (0.3.0 はこれが無く全件外れ値)");
+        System.out.println("  ✔ 垂直妥当域: verticalFactorPlausible (0.4.0 新規 — ジャンプ間隙/外部インパルスの垂直混入を排除)");
     }
 
     // ------------------------------------------------------------------ reproduction
@@ -144,14 +160,24 @@ public final class KbProbeSim {
         }
         double expectH = KbProbeMath.expectHorizontal(k, r);
         stats.addHorizontal(hRaw, hRaw / expectH);
+        // 0.4.0: 垂直妥当域ガード（KJava本体の verticalFactorPlausible と同一判定）。
+        // 「成立tickに空中でY不変 (fV≈0)」「外部インパルス (fV > 8)」を係数平均から外す。
+        String verticalNote = "";
         if (targetOnGround) {
             double expectV = KbProbeMath.expectVertical(k, r);
             if (expectV > 1.0e-4) {
-                stats.addVertical(dy, dy / expectV);
+                double candidate = dy / expectV;
+                if (KbProbeMath.verticalFactorPlausible(candidate)) {
+                    stats.addVertical(dy, candidate);
+                    verticalNote = String.format(" V=%.3f(f≈%.3f)", dy, candidate);
+                } else {
+                    verticalNote = String.format(" V=不採用(f=%.2f が妥当域[%.2f, %.2f]外)",
+                            candidate, KbProbeMath.VF_MIN, KbProbeMath.VF_MAX);
+                }
             }
         }
-        accept(String.format("H=%.3f(f≈%.3f)%s", hRaw, hRaw / expectH, targetOnGround
-                ? String.format(" V=%.3f(f≈%.3f)", dy, dy / KbProbeMath.expectVertical(k, r)) : ""));
+        accept(String.format("H=%.3f(f≈%.3f)%s", hRaw, hRaw / expectH,
+                targetOnGround ? verticalNote : ""));
     }
 
     /** Wraps a vanilla-ground-truth sample into wire ints and runs the fixed path. */

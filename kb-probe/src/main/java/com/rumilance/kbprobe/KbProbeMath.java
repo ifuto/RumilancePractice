@@ -34,6 +34,14 @@ public final class KbProbeMath {
     public static final double IDLE_VERTICAL = 0.1d;
     /** Vanilla velocity-packet scale: packets carry int velocity/8000-of-a-block. */
     public static final double VELOCITY_PACKET_SCALE = 8000.0d;
+    /**
+     * Vertical factors below this are rejected: vanilla leaves Y untouched when the victim is
+     * airborne, so a "grounded at click, airborne at damage" hit yields fV≈0 — a fake sample
+     * that would drag the vertical average toward ×0 (jump-between-click-and-hit exception).
+     */
+    public static final double VF_MIN = 0.05d;
+    /** Vertical factors above this are impossible for a plain melee hit (external impulse). */
+    public static final double VF_MAX = 8.0d;
 
     private KbProbeMath() {
     }
@@ -71,5 +79,14 @@ public final class KbProbeMath {
     /** True when no component jumps outside the believable knockback range. */
     public static boolean outlier(double hRaw, double dy) {
         return hRaw > OUTLIER || Math.abs(dy) > OUTLIER;
+    }
+    /**
+     * A vertical factor is only believable inside [{@link #VF_MIN}, {@link #VF_MAX}]:
+     * below the floor the victim almost certainly left the ground between the click and the
+     * server-side hit (vanilla keeps Y → measured fV≈0 is NOT the server's coefficient);
+     * above the ceiling an external impulse (mace smash, wind charge, plugin skill) is mixed in.
+     */
+    public static boolean verticalFactorPlausible(double fV) {
+        return fV >= VF_MIN && fV <= VF_MAX;
     }
 }
