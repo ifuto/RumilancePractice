@@ -715,9 +715,10 @@ public final class FeatureBootstrap {
         queueCoordinator.setAltDetectionService(this.altDetection);
         DuelCommand.configureSameIp(plugin.getConfig().getBoolean("queue.block-same-ip", true));
         DuelCommand.setAltDetectionService(this.altDetection);
-        pm.registerEvents(new com.rumilance.practice.alt.AltSignalListener(
-                this.altDetection, stateManager, services.get(
-                        com.rumilance.practice.ffa.FfaService.class)), plugin);
+        plugin.getServer().getPluginManager().registerEvents(
+                new com.rumilance.practice.alt.AltSignalListener(
+                        this.altDetection, stateManager, services.get(
+                                com.rumilance.practice.ffa.FfaService.class)), plugin);
         // One shared anti-click-spam guard for every queue entry point: menu joins AND
         // queue signs both draw from the same 800ms cadence, so alternating between them
         // cannot tunnel under the two guards individually.
