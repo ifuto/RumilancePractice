@@ -1,9 +1,10 @@
 plugins {
     id "java"
-    // 1.7-SNAPSHOT (進化するスナップショット) は内部で Gradle 9.x の Problems API を要求する
-    // までに前進しており互換切れ。リリース版 1.14.7 (Gradle 9.2+ 対応, root wrapper
-    // 9.6.1 と整合: deserialization は yarn (obf) で classic 動作) に固定する。
-    id "fabric-loom" version "1.14.7"
+    // loom はリリース版をピン — 1.7-SNAPSHOT は Gradle 9 のみの Problems.forNamespace を要
+    // 求するまで前進（CI 実証 2026-10-01）、1.14.7 もソースが N/A 解像で yarn の
+    // EntityVelocityUpdateS2CPacket 型が激変（double 化）して foul mismatch を起こした。
+    // 0.x 当時に安定動作した軸 = loom 1.7.4 (Gradle 8.8+ 向けリリース) に固定する。
+    id "fabric-loom" version "1.7.4"
 }
 
 group = "com.rumilance"

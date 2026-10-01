@@ -1,1 +1,1 @@
-# java-trigger — javac 詳細 annotation 取得 v4 (2026-10-01T12:35)
+# java-trigger — loom 1.7.4 + gradle 8.14 で mod 実ビルド検証 v5 (2026-10-01T12:50)
