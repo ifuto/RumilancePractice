@@ -1,4 +1,4 @@
-# Trigger: kb-probe (0.5.0) の Fabric (Loom) ビルド検証 v2
+# Trigger: kb-probe (0.5.0) の Fabric (Loom) ビルド検証 v3 (wrong-code marker付き — Execute失敗が正解)
 
 前回トリガは「wrapperがない kb-probe/ 内で ./gradlew を呼ぶ」失敗スクリプトでした。
 kb-probe は root の gradlew を借りてビルドする standalone 単独プロジェクトです
