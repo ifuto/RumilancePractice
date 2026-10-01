@@ -1,6 +1,9 @@
 plugins {
     id "java"
-    id "fabric-loom" version "1.7-SNAPSHOT"
+    // 1.7-SNAPSHOT (進化するスナップショット) は内部で Gradle 9.x の Problems API を要求する
+    // までに前進しており互換切れ。リリース版 1.14.7 (Gradle 9.2+ 対応, root wrapper
+    // 9.6.1 と整合: deserialization は yarn (obf) で classic 動作) に固定する。
+    id "fabric-loom" version "1.14.7"
 }
 
 group = "com.rumilance"

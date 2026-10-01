@@ -342,8 +342,9 @@ fi
 
 step "build: kb-probe mod (Fabric Loom)"
 # 連携クライアントMod (kb-probe/) — サーバープラグインとは別 Gradle プロジェクト。
-# fabric-loom 1.7-SNAPSHOT は Gradle 9 で除去された Problems API を呼ぶので、
-# kb-probe 専用 wrapper (gradle-8.13 固定: kb-probe/gradle/wrapper/) 経由でビルドする。
+# kb-probe は **専用 wrapper + fabric-loom 1.14.7 (リリース版固定)** で build する。
+# (loom 1.7-SNAPSHOT は Gradle 9 のみの Problems.forNamespace を要求するまで前進しており、
+#  SNAPSHOT 古い版でビルド互換が崩れた: 2026-10-01 CI で実証 → loom 9.2+ 対応リリースに pin)
 # Loom は dev-bundle/MC mappings を runner 側で取得する。output は bundle へ (人間が読める
 # artifact 前提) + sha256。サンドボックスからは annotation で成否だけ読む。
 if [ -x kb-probe/gradlew ] && [ -d kb-probe ]; then
