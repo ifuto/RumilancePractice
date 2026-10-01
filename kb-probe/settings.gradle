@@ -1,6 +1,8 @@
 // KB Probe — standalone client-mod project.
 // Intentionally NOT included from the repo-root settings.gradle.kts: the plugin CI build
-// never sees this project. Build it on its own:  cd kb-probe && ../gradlew build
+// never sees this project. Build it on its own:  cd kb-probe && ./gradlew build
+// (専用 wrapper は Gradle 8.13 ピン — root wrapper (9.x) では fabric-loom 1.7 が
+//  要求する Problems.forNamespace API が除去されているため、root から分離。)
 pluginManagement {
     repositories {
         maven { url = "https://maven.fabricmc.net/" }

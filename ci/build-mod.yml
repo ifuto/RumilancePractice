@@ -7,8 +7,9 @@
 #
 # [設計]
 #   発火: kb-probe/** への push、または手動。
-#   起動: actions/setup-java@v5 (Temurin 21) → repo-root の gradlew で `gradle -p kb-probe build`
-#        （kb-probe は root wrapper を借りる standalone プロジェクト: settings.gradle 冒頭参照）。
+#   起動: actions/setup-java@v5 (Temurin 21) → kb-probe 専用 wrapper (Gradle 8.13 ピン)
+#        で loom build。root wrapper は Gradle 9.6.1 — fabric-loom 1.7-SNAPSHOT が要求する
+#        Gradle 8 系 Problems API が剥がされているので分離必須（2026-10-01 に CI で実証）。
 #   成果: mod-jars アーティファクトに kb-probe-<version>.jar、失敗時は mod-build-log を解析。
 #
 # [なぜプラグインの build.yml に統合しないか]
@@ -43,13 +44,13 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: chmod gradlew (repo-root wrapper, borrowed by kb-probe)
-        run: chmod +x gradlew
+      - name: chmod gradlew
+        run: chmod +x kb-probe/gradlew
 
-      - name: Build mod (kb-probe, Gradle -p bridge)
+      - name: Build mod (kb-probe; dedicated Gradle 8.13 wrapper for fabric-loom compat)
         run: |
           set -o pipefail
-          ./gradlew -p kb-probe build --no-daemon --stacktrace 2>&1 | tee /tmp/mod-build.log
+          (cd kb-probe && ./gradlew build --no-daemon --stacktrace) 2>&1 | tee /tmp/mod-build.log
 
       - name: Upload mod jars
         if: always()

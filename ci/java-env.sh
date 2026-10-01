@@ -342,17 +342,17 @@ fi
 
 step "build: kb-probe mod (Fabric Loom)"
 # 連携クライアントMod (kb-probe/) — サーバープラグインとは別 Gradle プロジェクト。
-# repo ルートの gradlew で `gradle -p kb-probe build` として走らせる
-# (settings.gradle 冒頭コメントの公式ビルド手順: cd kb-probe && ../gradlew build)。
+# fabric-loom 1.7-SNAPSHOT は Gradle 9 で除去された Problems API を呼ぶので、
+# kb-probe 専用 wrapper (gradle-8.13 固定: kb-probe/gradle/wrapper/) 経由でビルドする。
 # Loom は dev-bundle/MC mappings を runner 側で取得する。output は bundle へ (人間が読める
 # artifact 前提) + sha256。サンドボックスからは annotation で成否だけ読む。
-if [ -x ./gradlew ] && [ -d kb-probe ]; then
+if [ -x kb-probe/gradlew ] && [ -d kb-probe ]; then
   export JAVA_HOME="$WORK/jdk"
   export PATH="$JAVA_HOME/bin:$PATH"
   export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$WORK/gradle-home}"
   export PATH="$JAVA_HOME/bin:$PATH"
   set +e
-  ./gradlew -p kb-probe build --no-daemon --stacktrace > "$WORK/kbprobe-build.log" 2>&1
+  (cd kb-probe && ./gradlew build --no-daemon --stacktrace) > "$WORK/kbprobe-build.log" 2>&1
   rc=$?
   set -e
   if [ "$rc" -ne 0 ]; then
