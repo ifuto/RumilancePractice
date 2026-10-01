@@ -318,6 +318,10 @@ general:
   loading: "<gray>読み込み中です、しばらくお待ちください..."
   mode-ranked: "ランク戦"
   mode-unranked: "アンランク戦"
+  kb-select: "<white>KB: {kb}"
+  kb-default-name: "既定 (デフォルト: {name})"
+  kb-off-name: "KBの変更無し"
+
 
 duel:
   request-sent: "<gray><yellow><target></yellow> に申請 <dark_gray>·</dark_gray> <mode> <dark_gray>·</dark_gray> <kit> <dark_gray>·</dark_gray> <map>"

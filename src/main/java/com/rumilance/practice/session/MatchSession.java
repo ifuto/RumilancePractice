@@ -86,6 +86,23 @@ public final class MatchSession {
      */
     private volatile String innerKitId;
 
+    /**
+     * KB プロファイル名 (Duel Request の KB 選択 -> startDuel で解決済みの具体名)。
+     * {@code null} = プロファイル層なし (明示の「KBの変更無し」、または既定が未設定)。
+     * リマッチは直前セッションの値でもう一度 startDuel するので自動的に引き継がれる。
+     */
+    private volatile String kbProfile;
+
+    /** KB プロファイル名をセット ({@code null}/blank = 層なし)。 */
+    public void setKbProfile(String name) {
+        this.kbProfile = name == null || name.isBlank() ? null : name;
+    }
+
+    /** 解決済みの KB プロファイル名、または {@code null} (層なし)。 */
+    public String kbProfile() {
+        return kbProfile;
+    }
+
     /** Stores a preset id, normalising {@code null} / blank / {@code default} to "no preset". */
     public void setInnerKit(String innerKitId) {
         this.innerKitId = com.rumilance.practice.kit.InnerKitService.isDefault(innerKitId)

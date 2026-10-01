@@ -1789,6 +1789,18 @@ public final class FeatureBootstrap {
                 configService.config().getDouble("knockback.horizontal", 1.0d),
                 configService.config().getDouble("knockback.vertical", 1.0d),
                 kbConfigCauses, kbConfigKits);
+
+        // --- KB プロファイル (2026-10-01, kb/*.json: Duel Request の KB 選択 / OP 既定) ---
+        // KB Probe mod のコピーボタンで得られる数値 JSON をそのまま置ける互換フォーマット。
+        com.rumilance.practice.kb.KbProfileService kbProfiles =
+                new com.rumilance.practice.kb.KbProfileService(
+                        PluginIdentity.dataFolder(plugin).toPath().resolve("kb"),
+                        plugin.getLogger());
+        kbProfiles.configureDefault(configService.config().getString("kb.default-profile", ""));
+        kbProfiles.reload();
+        services.register(com.rumilance.practice.kb.KbProfileService.class, kbProfiles);
+        matchService.setKbProfileService(kbProfiles);
+        duelRequestGui.setKbProfileService(kbProfiles);
         // Victim → current kit id (duel kit first, then the FFA arena's kit), for kit profiles.
         final java.util.function.Function<java.util.UUID, String> kbKitResolver = id -> {
             java.util.Optional<com.rumilance.practice.session.MatchSession> session =
@@ -1809,9 +1821,11 @@ public final class FeatureBootstrap {
             }
             return null;
         };
-        pm.registerEvents(
-                new com.rumilance.practice.combat.KnockbackTuningListener(knockbackTuning, kbKitResolver),
-                plugin);
+        com.rumilance.practice.combat.KnockbackTuningListener kbTuningListener =
+                new com.rumilance.practice.combat.KnockbackTuningListener(knockbackTuning, kbKitResolver);
+        kbTuningListener.setLiveProfileResolver(
+                com.rumilance.practice.kb.KbProfileRuntime.resolver(matchService.registry(), kbProfiles));
+        pm.registerEvents(kbTuningListener, plugin);
         paperCombatCompat.setKnockbackTuning(knockbackTuning, kbKitResolver);
         // Paper #11012/#9504: resync the hotbar when our kit/arena rules cancel a place/break.
         pm.registerEvents(new com.rumilance.practice.guard.BlockInteractionResyncListener(plugin, combatant), plugin);

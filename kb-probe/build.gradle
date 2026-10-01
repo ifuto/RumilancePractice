@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "com.rumilance"
-version = "0.4.0"
+version = "0.5.0"
 
 base {
     archivesName = "kb-probe"
@@ -26,7 +26,9 @@ dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
-    // fabric-api には依存しない（Mixin + loader のみの最小構成で導入摩擦を下げる）
+    // 0.5.0 で GUI(キーバインド) を追加するため fabric-api を採用（もともとサーバー側配布
+    // 環境には必須導入済み。KeyBinding の登録に必要）。
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 }
 
 tasks.withType(JavaCompile).configureEach {

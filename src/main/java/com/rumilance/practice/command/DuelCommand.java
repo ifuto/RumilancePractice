@@ -155,10 +155,9 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
         }
 
         String name = command.getName().toLowerCase(Locale.ROOT);
-        boolean ranked = rankedDefault;
-        if (name.equals("unranked") || name.equals("unrankduel") || name.equals("unduel") || name.equals("ud")) {
-            ranked = false;
-        }
+        // Duel Request は 2026-10-01 より Unranked 固定（ユーザー要求: ランク対戦の入口は
+        // Queue のみ、Duel Request はアンランク+任意 KB プロファイルの場にする）。
+        boolean ranked = false;
 
         if (args.length == 0) {
             if (ranked) {
@@ -293,7 +292,7 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
         matchService.startDuel(request.sender(), request.target(), request.kitName(),
                 request.ranked() ? MatchMode.RANKED : MatchMode.UNRANKED,
                 request.bestOf(), Map.of(), request.preferredArena().orElse(null), null, null,
-                request.firstTo(), request.innerKitName());
+                request.firstTo(), request.innerKitName(), request.kbChoice());
     }
 
     public void handleCancel(Player player) {

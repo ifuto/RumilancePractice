@@ -317,6 +317,10 @@ general:
   loading: "<gray>加载中，请稍候……"
   mode-ranked: "排位"
   mode-unranked: "休闲"
+  kb-select: "<white>KB: {kb}"
+  kb-default-name: "默认（默认KB：{name}）"
+  kb-off-name: "不更改KB"
+
 
 duel:
   request-sent: "<gray>已向 <yellow><target></yellow> 发送<mode>约战 <dark_gray>·</dark_gray> <kit> <dark_gray>·</dark_gray> <map>"

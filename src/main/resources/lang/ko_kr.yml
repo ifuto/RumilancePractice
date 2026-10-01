@@ -317,6 +317,10 @@ general:
   loading: "<gray>로딩 중입니다. 잠시 기다려 주세요..."
   mode-ranked: "랭크전"
   mode-unranked: "비랭크전"
+  kb-select: "<white>KB: {kb}"
+  kb-default-name: "기본값 (기본 KB: {name})"
+  kb-off-name: "KB 변경 없음"
+
 
 duel:
   request-sent: "<gray><yellow><target></yellow>에게 <mode> 듀얼 신청을 보냈습니다 (<kit>)."

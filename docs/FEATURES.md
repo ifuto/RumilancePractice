@@ -435,6 +435,16 @@ Paper 1.21.11 向け Practice PvP プラグイン **N Arena**(プラグイン名
 - **同一IPマッチ制限 (ランク戦のみ)**: RANKED で同じ接続元IP同士は絶対にペアにならない
   (キュー + ランクデュエル請求の両経路)。UNRANKED/パーティ戦などの気軽な対戦は対象外。
   `queue.block-same-ip`（既定 true）。
+- **KB プロファイル (kb/*.json) と Duel Request の KB 選択 (2026-10-01)**: KB Probe mod
+  (0.5.0) のコピーボタンで得られる「その鯖のKB再現数値 JSON」を `plugins/n-arena/kb/`
+  に `<名前>.json` として置くと、**Duel Request 画面の KB 選択**（旧ランク/アンランク
+  トグルの位置 — デュエル請求は Unranked 固定に変更）にファイル名 (.json除く) が
+  選択肢として表示される。選択肢は「**既定 (デフォルトKB)**」→「**KBの変更無し**」→
+  各プロファイル名の循環。既定未選択時と Queue/forcematch 等メニューを持たない試合には
+  OP設定の **デフォルトKB** (`kb.default-profile`、/practiceadmin kbdefault <名前|off>)
+  が自動適用される。適用は試合セッションに保持（rematch も同プロファイルで再現）、
+  試合プロファイル &gt; キット &gt; cause &gt; グローバルの最優先レイヤとして
+  Paper 最終ベクトルの乗数調整（バニラ計算・耐衝撃は無傷）。
 - **高度 Alt アカウント検知 (非公開・管理者のみ)**: 海外文献由来の行動バイオメトリクス—
   戦闘中スイング間隔分布 (mouse-dynamics 系, JS divergence)・JST 接続時間帯分布 (cosine)・
   IP 共有・短時間アカウント切替カデンス—を多層信号として超保守的に融合。無関係ペア母集団の

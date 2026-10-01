@@ -25,7 +25,9 @@ public final class DuelRequestService {
             String arenaName,
             int firstTo,
             /** 中キット (inner kit) preset id; null = the kit's own default loadout. */
-            String innerKitName
+            String innerKitName,
+            /** KB 選択 (KbProfileService の CHOICE_* はそのまま保持; null = 既定/デフォルトKB。 */
+            String kbChoice
     ) {
         public boolean isExpired(Instant now) {
             return now.isAfter(expiresAt);
@@ -103,6 +105,14 @@ public final class DuelRequestService {
             UUID sender, UUID target, String kit, boolean ranked, int bestOf, String arenaName,
             int firstTo, String innerKit
     ) {
+        return create(sender, target, kit, ranked, bestOf, arenaName, firstTo, innerKit, null);
+    }
+
+    /** Duel request carrying a KB profile choice (Duel Request GUI の KB セレクタ). */
+    public synchronized Optional<RichDuelRequest> create(
+            UUID sender, UUID target, String kit, boolean ranked, int bestOf, String arenaName,
+            int firstTo, String innerKit, String kbChoice
+    ) {
         if (sender.equals(target)) {
             return Optional.empty();
         }
@@ -125,7 +135,8 @@ public final class DuelRequestService {
                 com.rumilance.practice.match.FirstTo.normalise(firstTo),
                 com.rumilance.practice.kit.InnerKitService.isDefault(innerKit)
                         ? null
-                        : com.rumilance.practice.kit.InnerKitService.normalizeId(innerKit)
+                        : com.rumilance.practice.kit.InnerKitService.normalizeId(innerKit),
+                kbChoice == null || kbChoice.isBlank() ? null : kbChoice
         );
         byId.put(request.id(), request);
         byTarget.put(target, now);

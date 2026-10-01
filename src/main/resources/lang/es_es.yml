@@ -317,6 +317,10 @@ general:
   loading: "<gray>Cargando, por favor espera..."
   mode-ranked: "ranked"
   mode-unranked: "unranked"
+  kb-select: "<white>KB: {kb}"
+  kb-default-name: "Predeterminado (KB por defecto: {name})"
+  kb-off-name: "Sin cambio de KB"
+
 
 duel:
   request-sent: "<gray>Duelo <mode> enviado a <yellow><target></yellow> <dark_gray>·</dark_gray> <kit> <dark_gray>·</dark_gray> <map>"

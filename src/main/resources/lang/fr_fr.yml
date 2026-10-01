@@ -317,6 +317,10 @@ general:
   loading: "<gray>Chargement, patiente..."
   mode-ranked: "ranked"
   mode-unranked: "unranked"
+  kb-select: "<white>KB: {kb}"
+  kb-default-name: "Par défaut (KB par défaut : {name})"
+  kb-off-name: "Aucun changement de KB"
+
 
 duel:
   request-sent: "<gray>Duel <mode> envoyé à <yellow><target></yellow> <dark_gray>·</dark_gray> <kit> <dark_gray>·</dark_gray> <map>"

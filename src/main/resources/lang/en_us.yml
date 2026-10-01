@@ -319,6 +319,10 @@ general:
   loading: "<gray>Loading, please wait..."
   mode-ranked: "ranked"
   mode-unranked: "unranked"
+  kb-select: "<white>KB: {kb}"
+  kb-default-name: "Default (default KB: {name})"
+  kb-off-name: "No KB change"
+
 
 duel:
   request-sent: "<gray>Sent <mode> duel to <yellow><target></yellow> <dark_gray>·</dark_gray> <kit> <dark_gray>·</dark_gray> <map>"

@@ -90,6 +90,13 @@ public final class RumilanceReloadCommand implements CommandExecutor, TabComplet
                 .ifPresent(PresetItems::reload));
         safe(done, failed, "resource-pack", () -> services.find(ResourcePackService.class)
                 .ifPresent(ResourcePackService::reload));
+        safe(done, failed, "kb-profiles", () -> services.find(
+                com.rumilance.practice.kb.KbProfileService.class)
+                .ifPresent(kb -> {
+                    kb.configureDefault(services.get(ConfigService.class).config()
+                            .getString("kb.default-profile", ""));
+                    kb.reload();
+                }));
         // turbo requires no warm reload: its recipes read config.yml on every command. Only the
         // presence-based auto idle/wake flags are cached, so refresh them here.
         safe(done, failed, "turbo", () -> {

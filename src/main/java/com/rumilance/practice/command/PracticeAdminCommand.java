@@ -134,6 +134,11 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
     }
 
     private volatile com.rumilance.practice.alt.AltDetectionService altDetectionService;
+    private volatile com.rumilance.practice.kb.KbProfileService kbProfileService;
+
+    public void setKbProfileService(com.rumilance.practice.kb.KbProfileService kbProfileService) {
+        this.kbProfileService = kbProfileService;
+    }
     /** 直近に表示した altflags 一覧（sender → rows）。dismiss #n 用。 */
     private final Map<String, List<com.rumilance.practice.database.repository.AltRepository.FlagRow>>
             lastAltFlags = new java.util.concurrent.ConcurrentHashMap<>();
@@ -167,7 +172,7 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
 
         if (args.length == 0) {
             sender.sendMessage(Component.text(
-                    "/practiceadmin <menu|tool|sign|reload|status|matches|cleanup|maintenance|ffacommand|ffa|statsreset|broadcast|time|kick|forceend|forcematch|toggle|packpolicy|altflags>",
+                    "/practiceadmin <menu|tool|sign|reload|status|matches|cleanup|maintenance|ffacommand|ffa|statsreset|broadcast|time|kick|forceend|forcematch|toggle|packpolicy|altflags|kbdefault>",
                     NamedTextColor.YELLOW));
             return true;
         }
@@ -356,6 +361,39 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
                 sender.sendMessage(Component.text("Resource pack policy: "
                         + (required ? "REQUIRED" : "RECOMMENDED"), required
                         ? NamedTextColor.RED : NamedTextColor.GREEN));
+                yield true;
+            }
+            case "kbdefault" -> {
+                com.rumilance.practice.kb.KbProfileService kb = kbProfileService;
+                if (kb == null) {
+                    sender.sendMessage(Component.text("KB profile service not wired.", NamedTextColor.RED));
+                    yield true;
+                }
+                if (args.length == 1) {
+                    String current = kb.defaultProfileName();
+                    sender.sendMessage(Component.text("デフォルトKB: " + (current == null || current.isBlank()
+                            ? "(なし / knockback.json ルール)" : current), NamedTextColor.AQUA));
+                    sender.sendMessage(Component.text("プロファイル一覧: "
+                            + (kb.names().isEmpty() ? "(kb/*.json なし)" : String.join(", ", kb.names())),
+                            NamedTextColor.GRAY));
+                    sender.sendMessage(Component.text("変更: /practiceadmin kbdefault <名前|off>",
+                            NamedTextColor.YELLOW));
+                    yield true;
+                }
+                String name = args[1];
+                if (name.equalsIgnoreCase("off") || name.equalsIgnoreCase("none")) {
+                    name = "";
+                }
+                if (!name.isEmpty() && !kb.exists(name)) {
+                    sender.sendMessage(Component.text("未定義のKBプロファイル: " + name
+                            + "  (kb/" + name + ".json を配置して /practiceadmin reload)", NamedTextColor.RED));
+                    yield true;
+                }
+                configService.config().set("kb.default-profile", name);
+                configService.save(com.rumilance.practice.config.ConfigService.CONFIG);
+                kb.configureDefault(name);
+                sender.sendMessage(Component.text("デフォルトKB を " + (name.isEmpty()
+                        ? "(なし)" : name) + " に設定しました（config.yml へ保存済）。", NamedTextColor.GREEN));
                 yield true;
             }
             case "altflags" -> {
@@ -903,7 +941,7 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
             return TabCompletions.filter(current, "menu", "sign", "tool", "reload", "status",
                     "matches", "cleanup", "maintenance", "ffacommand", "ffa", "statsreset",
                     "broadcast", "time", "kick", "forceend", "forcematch", "toggle", "packpolicy",
-                    "altflags");
+                    "altflags", "kbdefault");
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
         if (args.length == 2) {

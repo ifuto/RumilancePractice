@@ -646,16 +646,33 @@ public final class MatchService {
                 carryArenaInstanceId, originalKit, firstTo, null);
     }
 
+    private volatile com.rumilance.practice.kb.KbProfileService kbProfileService;
+
+    public void setKbProfileService(com.rumilance.practice.kb.KbProfileService service) {
+        this.kbProfileService = service;
+    }
+
     /**
      * Terminal duel start. {@code innerKitId} is the 中キット both fighters use — {@code null},
      * blank or {@code default} keeps the kit's own loadout, which is what Queue and every caller
-     * that never asks for a preset gets.
+     * that never asks for a preset gets. {@code kbChoice} is the duel-request KB selection
+     * ({@code null}/既定 sentinel = operator's default profile — Queue and every non-menu
+     * caller thus ALSO get the default; 変更無し sentinel = no profile layer).
      */
     public void startDuel(UUID playerA, UUID playerB, String kitId, MatchMode mode,
                           int bestOf, Map<UUID, Integer> carrySeriesWins, String preferredArena,
                           UUID carryArenaInstanceId,
                           com.rumilance.practice.team.OriginalKitRef originalKit, int firstTo,
                           String innerKitId) {
+        startDuel(playerA, playerB, kitId, mode, bestOf, carrySeriesWins, preferredArena,
+                carryArenaInstanceId, originalKit, firstTo, innerKitId, null);
+    }
+
+    public void startDuel(UUID playerA, UUID playerB, String kitId, MatchMode mode,
+                          int bestOf, Map<UUID, Integer> carrySeriesWins, String preferredArena,
+                          UUID carryArenaInstanceId,
+                          com.rumilance.practice.team.OriginalKitRef originalKit, int firstTo,
+                          String innerKitId, String kbChoice) {
         // Hard gates before anything is reserved: a solo duel must never start for a player who
         // is in a party (parties fight together as a team, never 1v1), and never for a player
         // committed to a fight — including someone ELIMINATED from a team match (watching the
@@ -692,6 +709,12 @@ public final class MatchService {
         session.applySeries(carrySeriesWins);
         session.setFirstTo(firstTo);
         session.setInnerKit(innerKitId);
+        // KB 選択を具体プロファイル名に解決してセッションへ (リマッチはこの名でもう一度解く)。
+        com.rumilance.practice.kb.KbProfileService kbService = kbProfileService;
+        if (kbService != null) {
+            var resolved = kbService.resolveChoice(kbChoice);
+            session.setKbProfile(resolved.hasProfile() ? resolved.name() : null);
+        }
         session.setOriginalKitRef(originalKit);
         if (preferredArena != null && !preferredArena.isBlank()
                 && !"random".equalsIgnoreCase(preferredArena)) {
@@ -2742,7 +2765,7 @@ public final class MatchService {
                             carryOriginalKit, null, carryInnerKit);
                 } else {
                     startDuel(a, b, kit, mode, bestOf, carrySeries, preferredArena, carryArena,
-                            null, firstTo, carryInnerKit);
+                            null, firstTo, carryInnerKit, session.kbProfile());
                 }
             }
         });

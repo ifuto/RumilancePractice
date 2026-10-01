@@ -28,11 +28,22 @@ public final class KnockbackTuningListener implements Listener {
     private final KnockbackTuning tuning;
     /** Resolves the victim's current kit id (duel kit, FFA arena kit), or {@code null}. */
     private final java.util.function.Function<java.util.UUID, String> kitResolver;
+    /**
+     * Live per-match KB profile (Duel Request の KB 選択/既定プロファイル) —
+     * a {@code double[]{horizontal, vertical}} multiplicative factor, or {@code null}
+     * for "no profile layer" (classic kit > cause > global precedence).
+     */
+    private volatile java.util.function.Function<java.util.UUID, double[]> liveProfileResolver;
 
     public KnockbackTuningListener(KnockbackTuning tuning,
                                    java.util.function.Function<java.util.UUID, String> kitResolver) {
         this.tuning = tuning;
         this.kitResolver = kitResolver;
+    }
+
+    public void setLiveProfileResolver(
+            java.util.function.Function<java.util.UUID, double[]> liveProfileResolver) {
+        this.liveProfileResolver = liveProfileResolver;
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -42,6 +53,21 @@ public final class KnockbackTuningListener implements Listener {
         }
         if (!(event.getEntity() instanceof Player player)) {
             return; // 練習用ボットなど非プレイヤーは既存挙動のまま
+        }
+        java.util.function.Function<java.util.UUID, double[]> resolverFn = liveProfileResolver;
+        if (resolverFn != null) {
+            double[] live = resolverFn.apply(player.getUniqueId());
+            if (live != null) {
+                // 試合の KB プロファイルが何であれ最優先。中立 (1,1) なら vanilla のまま。
+                if (live[0] == 1.0d && live[1] == 1.0d) {
+                    return;
+                }
+                Vector liveKb = event.getFinalKnockback();
+                event.setFinalKnockback(new Vector(
+                        liveKb.getX() * live[0], liveKb.getY() * live[1],
+                        liveKb.getZ() * live[0]));
+                return;
+            }
         }
         String cause = event.getCause() != null ? event.getCause().name() : "UNKNOWN";
         String kit = kitResolver != null ? kitResolver.apply(player.getUniqueId()) : null;

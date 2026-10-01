@@ -36,6 +36,13 @@ public final class DuelRequestGui extends AbstractGui {
     private final KitSelectGui kitSelectGui;
     private final MessageService messageService;
     private DuelMapSelectGui mapSelectGui;
+    /** KB プロファイル選択 (Kb/kb フォルダの *.json + 既定/変更無し)。CH/ 未選択=既定。*/
+    public static final String KB_KEY = "kb-profile";
+    private volatile com.rumilance.practice.kb.KbProfileService kbProfileService;
+
+    public void setKbProfileService(com.rumilance.practice.kb.KbProfileService service) {
+        this.kbProfileService = service;
+    }
     private com.rumilance.practice.team.TeamService teamService;
     private com.rumilance.practice.match.MatchService matchService;
     /** 中キット (inner kits): the preset this duel fights with, chosen by right-clicking a kit. */
@@ -107,7 +114,8 @@ public final class DuelRequestGui extends AbstractGui {
                     com.rumilance.practice.kit.InnerKitService.normalizeId(innerKit));
         }
         session.setTargetPlayer(target.getUniqueId());
-        session.setRanked(ranked);
+        // Duel Request は Unranked 固定 (2026-10-01)。ランクの入口は Queue のみ。
+        session.setRanked(false);
         if (bestOf >= 1) {
             session.setBestOf(bestOf);
         } else if (session.bestOf() < 1) {
@@ -219,11 +227,15 @@ public final class DuelRequestGui extends AbstractGui {
                         .glint(session.firstTo() > 0)
                         .action("ft")
                         .build());
-        ItemStack modeButton = GuiDecorator.button(
-                session.ranked() ? Material.PURPLE_DYE : Material.BLUE_DYE,
-                messageService.render(locale, session.ranked() ? "duel-gui.mode-ranked" : "duel-gui.mode-unranked"), "mode");
-        modeButton.editMeta(meta -> meta.setEnchantmentGlintOverride(session.ranked()));
-        inventory.setItem(GuiSlots.slot(3, 5), modeButton);
+        // KB プロファイル選択 (以前のランク/アンランク トグルの位置 — Duel Request は
+        // 今は Unranked 固定なので、FT との対称軸に KB セレクタを据える)。
+        String kbLabel = kbLabel(session, player);
+        ItemStack kbButton = GuiDecorator.button(Material.SLIME_BLOCK,
+                messageService.render(locale, "duel-gui.kb-select", MessageService.tags("kb", kbLabel)), "kb");
+        String rawKb = session.get(KB_KEY, String.class);
+        kbButton.editMeta(meta -> meta.setEnchantmentGlintOverride(
+                rawKb != null && !com.rumilance.practice.kb.KbProfileService.CHOICE_DEFAULT.equals(rawKb)));
+        inventory.setItem(GuiSlots.slot(3, 5), kbButton);
         // Footer: dismiss at the far left corner, the hero action (SEND) centred on the bottom row.
         inventory.setItem(GuiSlots.slot(4, 0), GuiDecorator.button(Material.BARRIER,
                 messageService.render(locale, "duel-gui.cancel"), "cancel"));
@@ -269,8 +281,8 @@ public final class DuelRequestGui extends AbstractGui {
                     sounds.play(player, "error");
                 }
             }
-            case "mode" -> {
-                session.setRanked(!session.ranked());
+            case "kb" -> {
+                cycleKb(player, session);
                 sounds.play(player, "gui-click");
                 render(player, session, inventory);
             }
@@ -330,7 +342,8 @@ public final class DuelRequestGui extends AbstractGui {
             return;
         }
         if (duelRequestService.create(player.getUniqueId(), targetId, kit, session.ranked(),
-                session.bestOf(), map, session.firstTo(), innerChoice).isEmpty()) {
+                session.bestOf(), map, session.firstTo(), innerChoice,
+                kbChoiceOf(session)).isEmpty()) {
             sounds.play(player, "error");
             messageService.send(player, "duel.could-not-send");
             return;
@@ -374,5 +387,55 @@ public final class DuelRequestGui extends AbstractGui {
             return pretty; // a child is a normal kit; show that kit's own display name
         }
         return innerKits.displayOf(kit, inner, pretty);
+    }
+
+    /**
+     * KB 選択の表示名 (素文字 — 外側の minimessage 文字列へ埋め込むので render 済み
+     * Component は使えない。既定の表示名にプロファイル名を差し込む関係上、既定は
+     * 該当言語の yml キー断面から素文字を取れる raw API を使う)。
+     */
+    private String kbLabel(GuiSession session, Player player) {
+        String locale = messageService.resolveLocale(player);
+        String raw = session.get(KB_KEY, String.class);
+        com.rumilance.practice.kb.KbProfileService profiles = kbProfileService;
+        if (raw == null || com.rumilance.practice.kb.KbProfileService.CHOICE_DEFAULT.equals(raw)) {
+            String def = profiles == null ? "" : profiles.defaultProfileName();
+            return net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                            .serialize(messageService.render(locale, "duel-gui.kb-default-name",
+                                    MessageService.tags("name", def == null || def.isBlank() ? "—" : def)));
+        }
+        if (com.rumilance.practice.kb.KbProfileService.CHOICE_NONE.equals(raw)) {
+            return net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                            .serialize(messageService.render(locale, "duel-gui.kb-off-name"));
+        }
+        if (!profiles.exists(raw)) {
+            // json が外されていたら既定へ自動復帰（無効な選択で送らせない）。
+            session.put(KB_KEY, com.rumilance.practice.kb.KbProfileService.CHOICE_DEFAULT);
+            return kbLabel(session, player);
+        }
+        return raw;
+    }
+
+    /** KB セレクタを1歩進める: 既定 → KBの変更無し → 各プロファイル → 既定 … */
+    private void cycleKb(Player player, GuiSession session) {
+        java.util.List<String> cycle = new java.util.ArrayList<>();
+        cycle.add(com.rumilance.practice.kb.KbProfileService.CHOICE_DEFAULT);
+        cycle.add(com.rumilance.practice.kb.KbProfileService.CHOICE_NONE);
+        com.rumilance.practice.kb.KbProfileService profiles = kbProfileService;
+        if (profiles != null) {
+            cycle.addAll(profiles.names());
+        }
+        String raw = session.get(KB_KEY, String.class);
+        int index = raw == null ? -1 : cycle.indexOf(raw);
+        session.put(KB_KEY, cycle.get((index + 1) % cycle.size()));
+    }
+
+    /** GUI 発注値 → create() に載せる kbChoice (既定 = null で既定解決に任せる)。 */
+    static String kbChoiceOf(GuiSession session) {
+        String raw = session.get(KB_KEY, String.class);
+        if (raw == null || com.rumilance.practice.kb.KbProfileService.CHOICE_DEFAULT.equals(raw)) {
+            return null;
+        }
+        return raw;
     }
 }

@@ -592,3 +592,10 @@ alt-detection:
   min-swings: 300
   # 類似度スキャンの周期（分）。
   scan-interval-minutes: 30
+
+# KB プロファイル (2026-10-01): plugins/n-arena/kb/*.json に置いた数値 JSON が
+# Duel Request 画面の KB 選択肢（拡張子を除いたファイル名）として出る。OP が設定する
+# デフォルトKB は、リクエスト送信時に「既定」のままだったときと Queue/forcematch の
+# 試合で使用される。空文字 = プロファイル層なし（従来の knockback.json ルールのみ）。
+kb:
+  default-profile: ""

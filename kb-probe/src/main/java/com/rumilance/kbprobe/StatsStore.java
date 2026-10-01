@@ -37,6 +37,12 @@ public final class StatsStore {
         return stats.computeIfAbsent(serverKey, k -> new ServerStats());
     }
 
+    /** 計測済みサーバー (kbprobe.json のキー = 接続先ホスト名) の一覧。GUI の一覧表示用。 */
+    public static synchronized java.util.Set<String> serverKeys() {
+        loadIfNeeded();
+        return java.util.Set.copyOf(stats.keySet());
+    }
+
     public static synchronized void save() {
         if (stats == null) {
             return; // まだ誰も計測していない
