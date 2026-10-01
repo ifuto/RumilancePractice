@@ -357,8 +357,10 @@ if [ -x kb-probe/gradlew ] && [ -d kb-probe ]; then
   rc=$?
   set -e
   if [ "$rc" -ne 0 ]; then
-    grep -E "error:|FAILED|What went wrong|Caused by|> Task .*FAILED|Could not|Received status|Connection|PKIX|SSL|timed out" \
-      "$WORK/kbprobe-build.log" | tail -15 | sed 's/^/::error::kbprobe: /' || true
+    # javac エラーは「1 行目: file:line: error: ...」の後に symbol:/location: 行が続くので、
+    # error 行に加えて続く 3 行も annotation に載せる (実際の解決不能名が読める)。
+    grep -E -A 3 "error:|FAILED|What went wrong|Caused by|> Task .*FAILED|Could not|Received status|Connection|PKIX|SSL|timed out" \
+      "$WORK/kbprobe-build.log" | grep -v "^--$" | tail -40 | sed 's/^/::error::kbprobe: /' || true
     tail -30 "$WORK/kbprobe-build.log" | sed 's/^/::notice::kbprobe-tail: /' || true
     die "kb-probe mod ビルドに失敗 (rc=$rc)"
   fi
