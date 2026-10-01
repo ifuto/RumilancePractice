@@ -340,6 +340,37 @@ else
   echo "::warning::gradlew が見つからないためプラグインのビルドを省略します"
 fi
 
+step "build: kb-probe mod (Fabric Loom)"
+# 連携クライアントMod (kb-probe/) — サーバープラグインとは別 Gradle プロジェクト。
+# repo ルートの gradlew で `gradle -p kb-probe build` として走らせる
+# (settings.gradle 冒頭コメントの公式ビルド手順: cd kb-probe && ../gradlew build)。
+# Loom は dev-bundle/MC mappings を runner 側で取得する。output は bundle へ (人間が読める
+# artifact 前提) + sha256。サンドボックスからは annotation で成否だけ読む。
+if [ -x ./gradlew ] && [ -d kb-probe ]; then
+  export JAVA_HOME="$WORK/jdk"
+  export PATH="$JAVA_HOME/bin:$PATH"
+  export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$WORK/gradle-home}"
+  export PATH="$JAVA_HOME/bin:$PATH"
+  set +e
+  ./gradlew -p kb-probe build --no-daemon --stacktrace > "$WORK/kbprobe-build.log" 2>&1
+  rc=$?
+  set -e
+  if [ "$rc" -ne 0 ]; then
+    grep -E "error:|FAILED|What went wrong|Caused by|> Task .*FAILED|Could not|Received status|Connection|PKIX|SSL|timed out" \
+      "$WORK/kbprobe-build.log" | tail -15 | sed 's/^/::error::kbprobe: /' || true
+    tail -30 "$WORK/kbprobe-build.log" | sed 's/^/::notice::kbprobe-tail: /' || true
+    die "kb-probe mod ビルドに失敗 (rc=$rc)"
+  fi
+  tail -5 "$WORK/kbprobe-build.log" || true
+  mkdir -p "$BUNDLE/kb-probe"
+  cp kb-probe/build/libs/kb-probe-*.jar "$BUNDLE/kb-probe/" 2>/dev/null \
+    || die "kb-probe jar の収集に失敗 (build/libs/ を確認)"
+  ( cd "$BUNDLE/kb-probe" && sha256sum ./*.jar > sha256s.txt && cat sha256s.txt )
+  echo "::notice::kb-probe built: $(ls "$BUNDLE/kb-probe" | tr '\n' ' ')"
+else
+  echo "::notice::kb-probe skip (repo に gradlew/kb-probe なし)"
+fi
+
 step "deliver: mc-server-delivery"
 git branch -D mc-server-delivery >/dev/null 2>&1 || true
 git checkout -q --orphan mc-server-delivery
