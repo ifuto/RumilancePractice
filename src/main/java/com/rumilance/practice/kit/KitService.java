@@ -706,12 +706,15 @@ public final class KitService {
         if (kit.totem()) {
             PracticeGuards.enforceTotemCap(player, 14);
         }
-        // Default to SURVIVAL so PvP kits behave normally. forceAdventure kits ALSO stay in
-        // SURVIVAL now: kit.blockPlace/blockBreak are still denied for them by KitBlockRules
-        // (match/FFA listeners), which keeps the same user-visible restriction while making
-        // the shulker-box exception possible — in real ADVENTURE the vanilla client does not
-        // even send place/dig packets, so no server-side listener could ever allow it there.
-        player.setGameMode(GameMode.SURVIVAL);
+        // Default to SURVIVAL so PvP kits behave normally; kits flagged adventure force ADVENTURE
+        // (e.g. kits where block interaction should be fully disabled). Real ADVENTURE blocks
+        // place/dig CLIENT-side before any packet leaves, so the shulker-box exception is not a
+        // listener rule there — it rides on the item NBT (1.20.5+ data components can_break /
+        // can_place_on, known pre-1.20.5 as the CanDestroy / CanPlaceOn tags), attached below.
+        player.setGameMode(kit.forceAdventure() ? GameMode.ADVENTURE : GameMode.SURVIVAL);
+        if (kit.forceAdventure()) {
+            com.rumilance.practice.kit.AdventureShulkerCompat.tag(player);
+        }
     }
 
     /** Hidden custom_shield rank holders (OP-assigned model data) — never displayed. */

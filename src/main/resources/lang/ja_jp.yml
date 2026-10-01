@@ -212,6 +212,8 @@ party:
   decline-hover: "この招待を拒否"
   no-team-named: "<red>「<name>」という公開パーティはありません。"
   joined: "<aqua><player> がパーティに参加しました。"
+  same-ip-notice: "<yellow>同じ接続元のプレイヤーがこのランクキューに待機中です。同一IP同士はランク戦でマッチしません。"
+
   declined-owner: "<yellow><player> が招待を拒否しました。"
   declined-self: "<gray>招待を拒否しました。"
   left: "<yellow><player> がパーティを退出しました。"
@@ -327,6 +329,9 @@ duel:
   deny-own: "<gray><yellow><target></yellow> からの申請を拒否しました。"
   deny-all: "<gray>すべての申請を拒否しました。"
   no-pending-request: "<red>そのプレイヤーからの保留中の申請はありません。"
+  same-ip-ranked-blocked: "<red>同一の接続元からランクデュエルは行えません。"
+  restricted-pair-blocked: "<red>サーバーのAlt検知により、このペアはランクデュエルできません。不明な場合は運営に連絡してください。"
+
   no-request-to-deny: "<red>拒否できる申請はありません。"
   already-in-match: "<red>あなたはすでに試合中です。"
   target-already-in-match: "<red><target> はすでに試合中です。"

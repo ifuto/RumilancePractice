@@ -202,6 +202,27 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
         };
     }
 
+    private static volatile boolean blockSameIpRanked = true;
+    private static volatile com.rumilance.practice.alt.AltDetectionService altDetectionService;
+
+    public static void configureSameIp(boolean blockSameIpRanked) {
+        DuelCommand.blockSameIpRanked = blockSameIpRanked;
+    }
+
+    public static void setAltDetectionService(
+            com.rumilance.practice.alt.AltDetectionService service) {
+        DuelCommand.altDetectionService = service;
+    }
+
+    private static boolean sameCurrentIp(Player a, Player b) {
+        java.net.InetSocketAddress aa = a.getAddress();
+        java.net.InetSocketAddress bb = b.getAddress();
+        if (aa == null || bb == null || aa.getAddress() == null || bb.getAddress() == null) {
+            return false;
+        }
+        return aa.getAddress().getHostAddress().equals(bb.getAddress().getHostAddress());
+    }
+
     public void handleAccept(Player player, String fromName) {
         DuelRequestService.RichDuelRequest request;
         if (fromName == null || fromName.isBlank()) {
@@ -235,6 +256,22 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
         if (matchService.isBusyForSoloDuel(sender.getUniqueId())
                 || matchService.isBusyForSoloDuel(target.getUniqueId())) {
             messageService.send(player, "duel.already-in-match");
+            return;
+        }
+        // ランクデュエルの同一 IP / Alt フラグ済みペア制限（ユーザー要求: ランクのみ、
+        // ブースト稼ぎ対策。一致する場合はリクエストを成立させず双方に理由を通知）。
+        if (request.ranked() && blockSameIpRanked && sameCurrentIp(sender, target)) {
+            messageService.send(player, "duel.same-ip-ranked-blocked");
+            messageService.send(sender.getUniqueId().equals(player.getUniqueId()) ? target : sender,
+                    "duel.same-ip-ranked-blocked");
+            return;
+        }
+        com.rumilance.practice.alt.AltDetectionService alt = altDetectionService;
+        if (request.ranked() && alt != null
+                && alt.restrictedPair(request.sender(), request.target())) {
+            messageService.send(player, "duel.restricted-pair-blocked");
+            messageService.send(sender.getUniqueId().equals(player.getUniqueId()) ? target : sender,
+                    "duel.restricted-pair-blocked");
             return;
         }
         preparePlayersForDuel(sender);

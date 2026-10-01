@@ -152,6 +152,11 @@ public final class QueueService {
     }
 
     public synchronized List<MatchPair> pollMatches(boolean blockSameIp, boolean avoidRecent, Instant now) {
+        return pollMatches(blockSameIp, avoidRecent, now, null);
+    }
+
+    public synchronized List<MatchPair> pollMatches(boolean blockSameIp, boolean avoidRecent, Instant now,
+                                                    java.util.function.BiPredicate<UUID, UUID> pairBlocked) {
         List<MatchPair> pairs = new ArrayList<>();
         for (Map.Entry<String, List<QueueEntry>> entry : byQueue.entrySet()) {
             List<QueueEntry> list = entry.getValue();
@@ -169,7 +174,8 @@ public final class QueueService {
                         // When only two players are waiting for this kit+mode, ignore PT and
                         // recent-opponent blocks so they are never stuck alone forever.
                         boolean lonelyPair = list.size() == 2;
-                        if (!canMatch(a, b, blockSameIp, avoidRecent && !lonelyPair, now, lonelyPair)) {
+                        if (!canMatch(a, b, blockSameIp, avoidRecent && !lonelyPair, now, lonelyPair,
+                                pairBlocked)) {
                             continue;
                         }
                         pairs.add(new MatchPair(a, b));
@@ -191,7 +197,8 @@ public final class QueueService {
     }
 
     private boolean canMatch(QueueEntry a, QueueEntry b, boolean blockSameIp, boolean avoidRecent,
-                             Instant now, boolean ignorePt) {
+                             Instant now, boolean ignorePt,
+                             java.util.function.BiPredicate<UUID, UUID> pairBlocked) {
         long waitedSeconds = Math.max(
                 now.getEpochSecond() - a.joinedAt().getEpochSecond(),
                 now.getEpochSecond() - b.joinedAt().getEpochSecond()
@@ -206,11 +213,28 @@ public final class QueueService {
                 ignorePt,
                 range,
                 recentOpponents.get(a.playerId()),
-                recentOpponents.get(b.playerId())
+                recentOpponents.get(b.playerId()),
+                pairBlocked
         );
     }
 
     public synchronized void removeStale(UUID playerId) {
         leave(playerId);
+    }
+
+
+    /** ランクキュー参加時の案内用: 同モード+キット+プラットフォームに待機中の同一IPエントリがあるか。 */
+    public synchronized boolean hasSameIpWaiter(String kitId, MatchMode mode, PlayerPlatform platform,
+                                                String ip, UUID self) {
+        if (ip == null) {
+            return false;
+        }
+        String key = queueKey(mode, kitId, platform);
+        for (QueueEntry entry : byQueue.getOrDefault(key, List.of())) {
+            if (!entry.playerId().equals(self) && ip.equals(entry.ip())) {
+                return true;
+            }
+        }
+        return false;
     }
 }

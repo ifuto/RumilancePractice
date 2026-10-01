@@ -467,6 +467,26 @@ public final class SchemaMigrator {
             }
         }));
 
+        migrations.add(new Migration(35, "create alt-detection tables (ip history, switches, behavior, flags)", List.of(
+                "CREATE TABLE IF NOT EXISTS " + databaseService.table("alt_ip_history") + " ("
+                        + "player_uuid CHAR(36) NOT NULL, ip VARCHAR(45) NOT NULL,"
+                        + " first_ts BIGINT NOT NULL, last_ts BIGINT NOT NULL,"
+                        + " PRIMARY KEY (player_uuid, ip))",
+                "CREATE TABLE IF NOT EXISTS " + databaseService.table("alt_ipswitch") + " ("
+                        + "ip VARCHAR(45) NOT NULL, uuid_a CHAR(36) NOT NULL, uuid_b CHAR(36) NOT NULL,"
+                        + " switches INT NOT NULL DEFAULT 0, last_ts BIGINT NOT NULL,"
+                        + " PRIMARY KEY (ip, uuid_a, uuid_b))",
+                "CREATE TABLE IF NOT EXISTS " + databaseService.table("alt_behavior") + " ("
+                        + "player_uuid CHAR(36) NOT NULL, swings BIGINT NOT NULL DEFAULT 0,"
+                        + " interval_bins TEXT, hour_bins TEXT, updated_ts BIGINT NOT NULL,"
+                        + " PRIMARY KEY (player_uuid))",
+                "CREATE TABLE IF NOT EXISTS " + databaseService.table("alt_flags") + " ("
+                        + "uuid_a CHAR(36) NOT NULL, uuid_b CHAR(36) NOT NULL, score DOUBLE NOT NULL,"
+                        + " level VARCHAR(16) NOT NULL, evidence TEXT, status VARCHAR(16) NOT NULL DEFAULT 'NEW',"
+                        + " created_ts BIGINT NOT NULL, updated_ts BIGINT NOT NULL,"
+                        + " PRIMARY KEY (uuid_a, uuid_b))"
+        )));
+
         return migrations;
     }
 

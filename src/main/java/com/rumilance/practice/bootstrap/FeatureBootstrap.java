@@ -249,6 +249,7 @@ public final class FeatureBootstrap {
     private org.bukkit.scheduler.BukkitTask liveGuiTask;
     private final ServiceRegistry services;
     private QueueCoordinator queueCoordinator;
+    private com.rumilance.practice.alt.AltDetectionService altDetection;
     private MatchService matchService;
     private ScoreboardService scoreboardService;
     private ArrowEffectService arrowEffectService;
@@ -690,9 +691,33 @@ public final class FeatureBootstrap {
         queueCoordinator = new QueueCoordinator(
                 plugin, queueService, matchService, kitService, lobbyService, stateManager,
                 soundService, rankedStatsRepository, asyncExecutor, runtimeFlags, settings,
-                false, true, messageService);
+                plugin.getConfig().getBoolean("queue.block-same-ip", true), true, messageService);
         services.register(QueueCoordinator.class, queueCoordinator);
         queueCoordinator.start();
+
+        // --- Alt 検知 + 同一IPランク制限 (2026-10-01, ユーザー要望) ---
+        // 行動バイオメトリクス (クリック間隔分布 / 接続時間帯分布) + IP 共有・切替カデンスの
+        // 多層信号。フラグは管理者のみ閲覧。RESTRICT 閾値超過ペアはランク戦マッチングから除外
+        // (QueueCoordinator.pollMatches の pairBlocked と DuelCommand のランク請求拒否に接続)。
+        com.rumilance.practice.database.repository.AltRepository altRepository =
+                new com.rumilance.practice.database.repository.AltRepository(
+                        services.get(com.rumilance.practice.database.DatabaseService.class));
+        this.altDetection = new com.rumilance.practice.alt.AltDetectionService(
+                plugin, altRepository, asyncExecutor);
+        this.altDetection.configure(
+                plugin.getConfig().getBoolean("alt-detection.enabled", true),
+                plugin.getConfig().getInt("alt-detection.flag-threshold", 70),
+                plugin.getConfig().getInt("alt-detection.restrict-threshold", 85),
+                plugin.getConfig().getLong("alt-detection.min-swings", 300L),
+                plugin.getConfig().getLong("alt-detection.scan-interval-minutes", 30L));
+        this.altDetection.start();
+        services.register(com.rumilance.practice.alt.AltDetectionService.class, this.altDetection);
+        queueCoordinator.setAltDetectionService(this.altDetection);
+        DuelCommand.configureSameIp(plugin.getConfig().getBoolean("queue.block-same-ip", true));
+        DuelCommand.setAltDetectionService(this.altDetection);
+        pm.registerEvents(new com.rumilance.practice.alt.AltSignalListener(
+                this.altDetection, stateManager, services.get(
+                        com.rumilance.practice.ffa.FfaService.class)), plugin);
         // One shared anti-click-spam guard for every queue entry point: menu joins AND
         // queue signs both draw from the same 800ms cadence, so alternating between them
         // cannot tunnel under the two guards individually.
@@ -1928,6 +1953,7 @@ public final class FeatureBootstrap {
         practiceAdmin.setInnerKits(innerKits);
         practiceAdmin.setBanService(banService);
         practiceAdmin.setResourcePackService(resourcePackService);
+        practiceAdmin.setAltDetectionService(this.altDetection);
         AdminCommand adminCommand = new AdminCommand(
                 plugin, statsResetService, playerRepository, asyncExecutor, originalKitService);
         adminCommand.setScoreboardService(scoreboardService);
@@ -2187,6 +2213,10 @@ public final class FeatureBootstrap {
         // Revert the power plan / EcoQoS and stop the resident elevated helper on shutdown.
         services.find(com.rumilance.practice.turbo.WindowsOptimizationService.class)
                 .ifPresent(com.rumilance.practice.turbo.WindowsOptimizationService::shutdown);
+        if (this.altDetection != null) {
+            this.altDetection.shutdown();
+            this.altDetection = null;
+        }
         if (queueCoordinator != null) {
             queueCoordinator.stop();
         }

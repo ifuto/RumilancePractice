@@ -211,6 +211,8 @@ party:
   decline-hover: "拒绝该邀请"
   no-team-named: "<red>没有名为 '<name>' 的公开队伍。"
   joined: "<aqua><player> 加入了队伍。"
+  same-ip-notice: "<yellow>与你使用同一网络的玩家正在此排位队列中等待；同一IP的玩家在排位中不会被匹配到一起。"
+
   declined-owner: "<yellow><player> 拒绝了邀请。"
   declined-self: "<gray>已拒绝邀请。"
   left: "<yellow><player> 离开了队伍。"
@@ -326,6 +328,9 @@ duel:
   deny-own: "<gray>已拒绝来自 <yellow><target></yellow> 的约战请求。"
   deny-all: "<gray>已拒绝所有约战请求。"
   no-pending-request: "<red>没有来自该玩家的待处理约战请求。"
+  same-ip-ranked-blocked: "<red>不允许从同一网络发起排位决斗。"
+  restricted-pair-blocked: "<red>服务器的小号检测禁止此组合进行排位决斗。如有疑问请联系管理组。"
+
   no-request-to-deny: "<red>没有可拒绝的约战请求。"
   already-in-match: "<red>你已在比赛中。"
   target-already-in-match: "<red><target> 已在比赛中。"

@@ -213,6 +213,8 @@ party:
   decline-hover: "Decline this invite"
   no-team-named: "<red>No public party named '<name>'."
   joined: "<aqua><player> joined the party."
+  same-ip-notice: "<yellow>A player from the same connection is waiting in this ranked queue; same-IP players never pair in ranked."
+
   declined-owner: "<yellow><player> declined the invite."
   declined-self: "<gray>Invite declined."
   left: "<yellow><player> left the party."
@@ -328,6 +330,9 @@ duel:
   deny-own: "<gray>Denied the duel request from <yellow><target></yellow>."
   deny-all: "<gray>Denied all duel requests."
   no-pending-request: "<red>You have no pending duel request from that player."
+  same-ip-ranked-blocked: "<red>Ranked duels from the same connection are not allowed."
+  restricted-pair-blocked: "<red>This pair cannot play ranked duels (server anti-alt protection). Contact staff if this seems wrong."
+
   no-request-to-deny: "<red>You have no duel request to deny."
   already-in-match: "<red>You are already in a match."
   target-already-in-match: "<red><target> is already in a match."

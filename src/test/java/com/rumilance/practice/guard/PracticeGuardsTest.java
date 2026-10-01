@@ -253,9 +253,13 @@ class PracticeGuardsTest {
         QueueService.QueueEntry sameIp = entry(p2, "nodebuff", MatchMode.UNRANKED, 1400, "1.1.1.1", PlayerPlatform.JAVA, now);
         QueueService.QueueEntry rankedLow = entry(p1, "axe", MatchMode.RANKED, 800, "1.1.1.1", PlayerPlatform.JAVA, now);
         QueueService.QueueEntry rankedHigh = entry(p2, "axe", MatchMode.RANKED, 2000, "2.2.2.2", PlayerPlatform.JAVA, now);
+        QueueService.QueueEntry rankedSameIp = entry(p2, "axe", MatchMode.RANKED, 860, "1.1.1.1", PlayerPlatform.JAVA, now);
         return Stream.of(
                 Arguments.of(a, b, false, false, false, 75, null, null, true),
-                Arguments.of(a, sameIp, true, false, false, 75, null, null, false),
+                // 同一IPブロックは RANKED のみ (2026-10-01 の仕様変更: アンランクは対象外)。
+                Arguments.of(a, sameIp, true, false, false, 75, null, null, true),
+                Arguments.of(rankedLow, rankedSameIp, true, false, false, 75, null, null, false),
+                Arguments.of(rankedLow, rankedSameIp, false, false, false, 75, null, null, true),
                 Arguments.of(a, b, false, true, false, 75, p2, null, false),
                 Arguments.of(a, b, false, true, false, 75, null, p1, false),
                 Arguments.of(rankedLow, rankedHigh, false, false, false, 75, null, null, false),

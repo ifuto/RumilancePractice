@@ -251,6 +251,25 @@ public final class PracticeGuards {
             UUID recentOpponentOfA,
             UUID recentOpponentOfB
     ) {
+        return canPairInQueue(a, b, blockSameIp, avoidRecent, ignorePt, ptRange,
+                recentOpponentOfA, recentOpponentOfB, null);
+    }
+
+    /**
+     * {@code pairBlocked} は Alt 検知等によるランク戦マッチ制限（フラグ済みペアは
+     * ランク戦で絶対にペアにならない）。null なら従来通り評価しない。
+     */
+    public static boolean canPairInQueue(
+            QueueService.QueueEntry a,
+            QueueService.QueueEntry b,
+            boolean blockSameIp,
+            boolean avoidRecent,
+            boolean ignorePt,
+            int ptRange,
+            UUID recentOpponentOfA,
+            UUID recentOpponentOfB,
+            java.util.function.BiPredicate<UUID, UUID> pairBlocked
+    ) {
         if (a == null || b == null) {
             return false;
         }
@@ -259,11 +278,6 @@ public final class PracticeGuards {
         }
         if (!queueEntriesSamePool(a, b)) {
             return false;
-        }
-        if (blockSameIp) {
-            if (a.ip() != null && a.ip().equals(b.ip())) {
-                return false;
-            }
         }
         if (avoidRecent) {
             if (recentOpponentOfA != null && b.playerId().equals(recentOpponentOfA)) {
@@ -275,6 +289,14 @@ public final class PracticeGuards {
         }
         if (a.mode() == MatchMode.UNRANKED) {
             return true;
+        }
+        // 同一IPブロックは RANKED のみ（ユーザー指定 2026-10-01: アンランクの気軽な対戦
+        // （家族・同一宅内など）は阻害せず、PT へ影響するランク戦でのみ不成立とする）。
+        if (blockSameIp && a.ip() != null && a.ip().equals(b.ip())) {
+            return false;
+        }
+        if (pairBlocked != null && pairBlocked.test(a.playerId(), b.playerId())) {
+            return false;
         }
         if (ignorePt) {
             return true;

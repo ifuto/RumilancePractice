@@ -211,6 +211,8 @@ party:
   decline-hover: "이 초대를 거절"
   no-team-named: "<red>이름이 '<name>'인 공개 파티가 없습니다."
   joined: "<aqua><player> 님이 파티에 참가했습니다."
+  same-ip-notice: "<yellow>같은 접속에서 온 플레이어가 이 랭크 큐에서 대기 중입니다. 동일 IP끼리는 랭크전에서 매칭되지 않습니다."
+
   declined-owner: "<yellow><player> 님이 초대를 거절했습니다."
   declined-self: "<gray>초대를 거절했습니다."
   left: "<yellow><player> 님이 파티에서 나갔습니다."
@@ -326,6 +328,9 @@ duel:
   deny-own: "<gray><yellow><target></yellow>의 신청을 거절했습니다."
   deny-all: "<gray>모든 듀얼 신청을 거절했습니다."
   no-pending-request: "<red>해당 플레이어에게 받은 대기 중인 신청이 없습니다."
+  same-ip-ranked-blocked: "<red>같은 접속에서의 랭크 듀얼은 허용되지 않습니다."
+  restricted-pair-blocked: "<red>서버의 부계정 감지로 이 페어는 랭크 듀얼을 할 수 없습니다. 오류라고 생각되면 운영진에게 문의해 주세요."
+
   no-request-to-deny: "<red>거절할 신청이 없습니다."
   already-in-match: "<red>이미 경기 중입니다."
   target-already-in-match: "<red><target> 님은 이미 경기 중입니다."

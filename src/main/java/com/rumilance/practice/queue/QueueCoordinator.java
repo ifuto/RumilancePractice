@@ -97,6 +97,13 @@ public final class QueueCoordinator {
         this.ffaService = ffaService;
     }
 
+    private volatile com.rumilance.practice.alt.AltDetectionService altDetectionService;
+
+    public void setAltDetectionService(
+            com.rumilance.practice.alt.AltDetectionService altDetectionService) {
+        this.altDetectionService = altDetectionService;
+    }
+
     public void start() {
         matchTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tickMatchmaking, 40L, 40L);
         actionBarTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tickActionBars, 20L, 20L);
@@ -221,6 +228,13 @@ public final class QueueCoordinator {
             messageService.send(player, "queue.already-queued");
             return;
         }
+        // 同一IPランク制限は「絶対にペアにならない」が動作 — 待機中に同一IP相手がいる
+        // ことだけは黙ってはめられないよう参加直後に一度だけ案内する。
+        if (blockSameIp && mode == MatchMode.RANKED && ip != null
+                && queueService.hasSameIpWaiter(fightKitId, mode, platform,
+                        ip, player.getUniqueId())) {
+            messageService.send(player, "queue.same-ip-notice");
+        }
 
         try {
             stateManager.transition(player.getUniqueId(),
@@ -253,7 +267,9 @@ public final class QueueCoordinator {
         // Belt-and-suspenders: evict any queued player who is no longer online (e.g. missed by the
         // quit hook) BEFORE polling, so an offline entry can never be paired with a live waiter.
         queueService.pruneOffline();
-        List<QueueService.MatchPair> pairs = queueService.pollMatches(blockSameIp, avoidRecent, Instant.now());
+        com.rumilance.practice.alt.AltDetectionService alt = altDetectionService;
+        List<QueueService.MatchPair> pairs = queueService.pollMatches(blockSameIp, avoidRecent,
+                Instant.now(), alt == null ? null : alt::restrictedPair);
         for (QueueService.MatchPair pair : pairs) {
             matchService.startDuel(
                     pair.a().playerId(),

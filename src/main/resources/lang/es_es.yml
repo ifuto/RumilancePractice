@@ -211,6 +211,8 @@ party:
   decline-hover: "Rechazar esta invitación"
   no-team-named: "<red>No hay ningún equipo público llamado '<name>'."
   joined: "<aqua><player> se ha unido al equipo."
+  same-ip-notice: "<yellow>Un jugador con la misma conexión está esperando en esta cola clasificatoria; los jugadores con la misma IP nunca se emparejan en clasificatoria."
+
   declined-owner: "<yellow><player> rechazó la invitación."
   declined-self: "<gray>Invitación rechazada."
   left: "<yellow><player> salió del equipo."
@@ -326,6 +328,9 @@ duel:
   deny-own: "<gray>Rechazaste la solicitud de duelo de <yellow><target></yellow>."
   deny-all: "<gray>Todas las solicitudes de duelo rechazadas."
   no-pending-request: "<red>No tienes ninguna solicitud pendiente de ese jugador."
+  same-ip-ranked-blocked: "<red>No se permiten duelos clasificatorios desde la misma conexión."
+  restricted-pair-blocked: "<red>Este par no puede jugar duelos clasificatorios (protección anti-alt del servidor). Contacta al staff si parece un error."
+
   no-request-to-deny: "<red>No tienes ninguna solicitud de duelo que rechazar."
   already-in-match: "<red>Ya estás en una partida."
   target-already-in-match: "<red><target> ya está en una partida."

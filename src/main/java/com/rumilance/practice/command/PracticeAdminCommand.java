@@ -132,6 +132,16 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
         this.resourcePackService = resourcePackService;
     }
 
+    private volatile com.rumilance.practice.alt.AltDetectionService altDetectionService;
+    /** 直近に表示した altflags 一覧（sender → rows）。dismiss #n 用。 */
+    private final Map<String, List<com.rumilance.practice.database.repository.AltRepository.FlagRow>>
+            lastAltFlags = new java.util.concurrent.ConcurrentHashMap<>();
+
+    public void setAltDetectionService(
+            com.rumilance.practice.alt.AltDetectionService altDetectionService) {
+        this.altDetectionService = altDetectionService;
+    }
+
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command,
                              @NotNull String label, @NotNull String[] args) {
@@ -156,7 +166,7 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
 
         if (args.length == 0) {
             sender.sendMessage(Component.text(
-                    "/practiceadmin <menu|tool|sign|reload|status|matches|cleanup|maintenance|ffacommand|ffa|statsreset|broadcast|time|kick|forceend|forcematch|toggle|packpolicy>",
+                    "/practiceadmin <menu|tool|sign|reload|status|matches|cleanup|maintenance|ffacommand|ffa|statsreset|broadcast|time|kick|forceend|forcematch|toggle|packpolicy|altflags>",
                     NamedTextColor.YELLOW));
             return true;
         }
@@ -345,6 +355,76 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
                 sender.sendMessage(Component.text("Resource pack policy: "
                         + (required ? "REQUIRED" : "RECOMMENDED"), required
                         ? NamedTextColor.RED : NamedTextColor.GREEN));
+                yield true;
+            }
+            case "altflags" -> {
+                com.rumilance.practice.alt.AltDetectionService alt = altDetectionService;
+                if (alt == null) {
+                    sender.sendMessage(Component.text("Alt detection not wired.", NamedTextColor.RED));
+                    yield true;
+                }
+                if (args.length >= 3 && args[1].equalsIgnoreCase("dismiss")) {
+                    List<com.rumilance.practice.database.repository.AltRepository.FlagRow> rows =
+                            lastAltFlags.get(sender.getName());
+                    int index;
+                    try {
+                        index = Integer.parseInt(args[2]) - 1;
+                    } catch (NumberFormatException ex) {
+                        index = -1;
+                    }
+                    if (rows == null || index < 0 || index >= rows.size()) {
+                        sender.sendMessage(Component.text(
+                                "まず /practiceadmin altflags で一覧を出し、dismiss する番号を指定してください。",
+                                NamedTextColor.YELLOW));
+                        yield true;
+                    }
+                    var row = rows.get(index);
+                    alt.dismiss(row.a(), row.b());
+                    sender.sendMessage(Component.text("Flag #" + (index + 1) + " を棄却しました（対象ペアの"
+                            + "ランク制限も解除）。", NamedTextColor.GREEN));
+                    yield true;
+                }
+                sender.sendMessage(Component.text("Alt 検知フラグを読み込み中...",
+                        NamedTextColor.GRAY));
+                Runnable load = () -> {
+                    try {
+                        List<com.rumilance.practice.database.repository.AltRepository.FlagRow> rows =
+                                alt.activeFlags();
+                        Bukkit.getScheduler().runTask(plugin, () -> {
+                            lastAltFlags.put(sender.getName(), rows);
+                            if (rows.isEmpty()) {
+                                sender.sendMessage(Component.text(
+                                        "有効な Alt フラグはありません（検知は非公開・管理者のみ閲覧）。",
+                                        NamedTextColor.GREEN));
+                                return;
+                            }
+                            sender.sendMessage(Component.text("=== Alt 検知フラグ (" + rows.size()
+                                    + "件) — dismiss は /practiceadmin altflags dismiss <#> ===",
+                                    NamedTextColor.GOLD));
+                            int i = 1;
+                            for (var row : rows) {
+                                org.bukkit.OfflinePlayer pa = Bukkit.getOfflinePlayer(row.a());
+                                org.bukkit.OfflinePlayer pb = Bukkit.getOfflinePlayer(row.b());
+                                String na = pa.getName() != null ? pa.getName()
+                                        : row.a().toString().substring(0, 8);
+                                String nb = pb.getName() != null ? pb.getName()
+                                        : row.b().toString().substring(0, 8);
+                                sender.sendMessage(Component.text("  #" + i++ + " [" + row.level()
+                                        + "] " + na + " ⇔ " + nb + "  score=" + (int) row.score()
+                                        + "  §8" + row.evidence(), NamedTextColor.AQUA));
+                            }
+                        });
+                    } catch (Exception e) {
+                        Bukkit.getScheduler().runTask(plugin, () -> sender.sendMessage(
+                                Component.text("読み込みに失敗しました: " + e.getMessage(),
+                                        NamedTextColor.RED)));
+                    }
+                };
+                if (asyncExecutor != null) {
+                    asyncExecutor.runAsync(load);
+                } else {
+                    Bukkit.getScheduler().runTaskAsynchronously(plugin, load);
+                }
                 yield true;
             }
             default -> {
@@ -821,7 +901,8 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
         if (args.length == 1) {
             return TabCompletions.filter(current, "menu", "sign", "tool", "reload", "status",
                     "matches", "cleanup", "maintenance", "ffacommand", "ffa", "statsreset",
-                    "broadcast", "time", "kick", "forceend", "forcematch", "toggle", "packpolicy");
+                    "broadcast", "time", "kick", "forceend", "forcematch", "toggle", "packpolicy",
+                    "altflags");
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
         if (args.length == 2) {

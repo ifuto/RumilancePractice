@@ -181,6 +181,9 @@ queue:
   # When greater than 0, players whose ping (ms) is above this value cannot join the ranked
   # queue (they receive a warning). 0 disables the check.
   max-ranked-ping-ms: 0
+  # 同一IPランク戦制限（2026-10-01）: RANKED で同じ接続元IP同士は絶対にペアにならない
+  # （ランクデュエル請求の受理も拒否）。UNRANKED・パーティ战などの気軽な対戦は対象外。
+  block-same-ip: true
 
 ranking:
   # Glicko-2 rating system. Initial values are the Glicko-2 standard defaults.
@@ -572,3 +575,20 @@ practice:
   # players training at once — the default covers the spec'd parallel bot load.
   # 0 (or negative) = unlimited.
   room-concurrency: 10
+
+# 高度 Alt アカウント検知 (2026-10-01)。収集は「戦闘中のスイング間隔分布・JST 接続時間帯
+# 分布・IP 共有/短時間アカウント切替カデンス」のみ。非公開: 一般プレイヤーには通知されず、
+# フラグは rumilance.admin のみ閲覧可能 (/practiceadmin altflags)。誤検知優先の超保守閾値:
+# 行動類似度のみのペアは無関連母集団の最大スコア+マージン (null-floor 較正) を下回ると
+# 自動で抑制され、RESTRICT (ランク制限) にはそれに加えて conjunctive evidence
+# (IP共有 or 頻繁な切替 or 行動≈恒久一致) が必須。
+alt-detection:
+  enabled: true
+  # このスコア以上で管理者に証拠付き警告キュー（自動処罰は一切しない）。
+  flag-threshold: 70
+  # このスコア以上＋conjunctive evidence でランクマッチング制限。
+  restrict-threshold: 85
+  # クリック間隔分布が類似度評価に載る最小サンプル数（これ未満の挙動データは比較しない）。
+  min-swings: 300
+  # 類似度スキャンの周期（分）。
+  scan-interval-minutes: 30
