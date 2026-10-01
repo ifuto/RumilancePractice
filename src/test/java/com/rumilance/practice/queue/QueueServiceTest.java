@@ -87,11 +87,25 @@ class QueueServiceTest {
 
     @Test
     void sameIpBlockedWhenConfigured() {
+        // 2026-10-01 の仕様変更: 同一IPブロックは RANKED のみ。UNRANKED の同一IPは従来
+        // どおりマッチする（家族・知人の気軽な対戦を阻害しない）。
         QueueService queue = new QueueService(settings(75, 25, 15));
         UUID a = UUID.randomUUID();
         UUID b = UUID.randomUUID();
         queue.join(a, "nodebuff", MatchMode.UNRANKED, 1000, "9.9.9.9", PlayerPlatform.JAVA);
         queue.join(b, "nodebuff", MatchMode.UNRANKED, 1000, "9.9.9.9", PlayerPlatform.JAVA);
+        List<QueueService.MatchPair> pairs = queue.pollMatches(true, false, Instant.now());
+        assertEquals(1, pairs.size());
+        assertEquals(0, queue.totalWaiting());
+    }
+
+    @Test
+    void sameIpBlockedInRankedWhenConfigured() {
+        QueueService queue = new QueueService(settings(75, 25, 15));
+        UUID a = UUID.randomUUID();
+        UUID b = UUID.randomUUID();
+        queue.join(a, "nodebuff", MatchMode.RANKED, 1000, "9.9.9.9", PlayerPlatform.JAVA);
+        queue.join(b, "nodebuff", MatchMode.RANKED, 1000, "9.9.9.9", PlayerPlatform.JAVA);
         List<QueueService.MatchPair> pairs = queue.pollMatches(true, false, Instant.now());
         assertEquals(0, pairs.size());
         assertEquals(2, queue.totalWaiting());
