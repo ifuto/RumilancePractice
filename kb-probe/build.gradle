@@ -4,7 +4,7 @@ plugins {
     // 求するまで前進（CI 実証 2026-10-01）、1.14.7 もソースが N/A 解像で yarn の
     // EntityVelocityUpdateS2CPacket 型が激変（double 化）して foul mismatch を起こした。
     // 0.x 当時に安定動作した軸 = loom 1.7.4 (Gradle 8.8+ 向けリリース) に固定する。
-    id "fabric-loom" version "1.7.4"
+    id "fabric-loom" version "1.14.7"
 }
 
 group = "com.rumilance"

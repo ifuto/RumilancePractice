@@ -1,1 +1,1 @@
-# java-trigger — loom 1.7.4 + gradle 8.14 で mod 実ビルド検証 v5 (2026-10-01T12:50)
+# java-trigger — yarn アクセサ修正後 mod 実ビルド検証 v6 (2026-10-01T13:05)

@@ -19,11 +19,11 @@ public abstract class VelocityCaptureMixin {
 
     @Inject(method = "onEntityVelocityUpdate", at = @At("HEAD"))
     private void kbprobe$onVelocity(EntityVelocityUpdateS2CPacket packet, CallbackInfo ci) {
-        // 重要: 速度パケットの3成分は int (vel*8000)。そのまま渡すと ×8000 の値が
-        // 外れ値ガード(>2.5)に全て捌かれ、modが一切計測不能になる (修正: 0.3.1)。
-        KbProbe.onVelocityPacket(packet.getId(),
-                KbProbeMath.unscaleVelocity(packet.getVelocityX()),
-                KbProbeMath.unscaleVelocity(packet.getVelocityY()),
-                KbProbeMath.unscaleVelocity(packet.getVelocityZ()));
+        // yarn 1.21.1 の実記述 (FabricMC/yarn refs/heads/1.21.1 で確認): entity id アクセサは
+        // getEntityId() であり getId() は存在しない。getVelocityX/Y/Z は整ラweltasulation で
+        // 分解した wire(vel*8000)/8000 の double を返すので、外部の unscale(int) は不要
+        // （0.3.1 当時の int アクセサ想定を修正: 2026-10-01 CI で yarn コンパイル確認）。
+        KbProbe.onVelocityPacket(packet.getEntityId(),
+                packet.getVelocityX(), packet.getVelocityY(), packet.getVelocityZ());
     }
 }
