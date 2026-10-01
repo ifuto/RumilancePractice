@@ -380,20 +380,20 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
                             NamedTextColor.YELLOW));
                     yield true;
                 }
-                String name = args[1];
-                if (name.equalsIgnoreCase("off") || name.equalsIgnoreCase("none")) {
-                    name = "";
+                String kbName = args[1];
+                if (kbName.equalsIgnoreCase("off") || kbName.equalsIgnoreCase("none")) {
+                    kbName = "";
                 }
-                if (!name.isEmpty() && !kb.exists(name)) {
-                    sender.sendMessage(Component.text("未定義のKBプロファイル: " + name
-                            + "  (kb/" + name + ".json を配置して /practiceadmin reload)", NamedTextColor.RED));
+                if (!kbName.isEmpty() && !kb.exists(kbName)) {
+                    sender.sendMessage(Component.text("未定義のKBプロファイル: " + kbName
+                            + "  (kb/" + kbName + ".json を配置して /practiceadmin reload)", NamedTextColor.RED));
                     yield true;
                 }
-                configService.config().set("kb.default-profile", name);
+                configService.config().set("kb.default-profile", kbName);
                 configService.save(com.rumilance.practice.config.ConfigService.CONFIG);
-                kb.configureDefault(name);
-                sender.sendMessage(Component.text("デフォルトKB を " + (name.isEmpty()
-                        ? "(なし)" : name) + " に設定しました（config.yml へ保存済）。", NamedTextColor.GREEN));
+                kb.configureDefault(kbName);
+                sender.sendMessage(Component.text("デフォルトKB を " + (kbName.isEmpty()
+                        ? "(なし)" : kbName) + " に設定しました（config.yml へ保存済）。", NamedTextColor.GREEN));
                 yield true;
             }
             case "altflags" -> {
