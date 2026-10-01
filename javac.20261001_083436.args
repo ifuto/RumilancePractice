@@ -1,0 +1,9 @@
+-proc:none
+-nowarn
+-Xmaxerrs
+50000
+-cp
+/tmp/jdkfetch/delivery/paper-1.21.11-132.jar
+-d
+/tmp/realout
+@/tmp/allsrcs.txt

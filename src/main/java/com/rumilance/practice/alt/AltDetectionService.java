@@ -268,23 +268,23 @@ public final class AltDetectionService {
 
         double floor = Math.max(flagThreshold, nullFloor + 8);
         for (Candidate c : candidates) {
-            if (c.score < floor) {
+            if (c.score() < floor) {
                 continue;
             }
-            boolean conjunctive = c.hasIp || c.switches >= 2
-                    || (c.clickSim >= RESTRICT_CLICK_SIM && c.hourSim >= RESTRICT_HOUR_SIM);
-            String level = c.score >= restrictThreshold && conjunctive ? "RESTRICT" : "FLAG";
-            String evidence = "score=" + (int) c.score
-                    + " ip=" + (c.hasIp ? "共有" : "なし")
-                    + " switch=" + c.switches
-                    + " clickSim=" + sim(c.clickSim)
-                    + " hourSim=" + sim(c.hourSim)
+            boolean conjunctive = c.hasIp() || c.switches() >= 2
+                    || (c.clickSim() >= RESTRICT_CLICK_SIM && c.hourSim() >= RESTRICT_HOUR_SIM);
+            String level = c.score() >= restrictThreshold && conjunctive ? "RESTRICT" : "FLAG";
+            String evidence = "score=" + (int) c.score()
+                    + " ip=" + (c.hasIp() ? "共有" : "なし")
+                    + " switch=" + c.switches()
+                    + " clickSim=" + sim(c.clickSim())
+                    + " hourSim=" + sim(c.hourSim())
                     + " floor=" + (int) floor;
-            repository.upsertFlag(c.a, c.b, c.score, level, evidence, now);
+            repository.upsertFlag(c.a(), c.b(), c.score(), level, evidence, now);
             if ("RESTRICT".equals(level)) {
-                restrictedPairs.add(c.key);
+                restrictedPairs.add(c.key());
             }
-            if (announced.add(c.key) || "RESTRICT".equals(level)) {
+            if (announced.add(c.key()) || "RESTRICT".equals(level)) {
                 alertAdmins(c, level, evidence);
             }
         }
@@ -300,8 +300,8 @@ public final class AltDetectionService {
     }
 
     private void alertAdmins(Candidate c, String level, String evidence) {
-        String nameA = nameOf(c.a);
-        String nameB = nameOf(c.b);
+        String nameA = nameOf(c.a());
+        String nameB = nameOf(c.b());
         String line = "§8[§6Alt検知§8] §f" + nameA + " §7⇔ §f" + nameB
                 + " §7(" + level + ") §8" + evidence;
         for (Player online : Bukkit.getOnlinePlayers()) {

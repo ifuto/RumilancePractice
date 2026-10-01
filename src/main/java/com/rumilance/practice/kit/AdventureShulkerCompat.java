@@ -58,7 +58,7 @@ public final class AdventureShulkerCompat {
         }
         try {
             List<BlockType> shulkers = new ArrayList<>();
-            for (BlockType type : Registry.BLOCK_TYPE) {
+            for (BlockType type : Registry.BLOCK) {
                 if (type.getKey().getKey().endsWith("shulker_box")) {
                     shulkers.add(type);
                 }
