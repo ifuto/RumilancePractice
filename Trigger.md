@@ -1,4 +1,4 @@
-# Trigger: kb-probe (0.5.0) の Fabric (Loom) ビルド検証 v3 (wrong-code marker付き — Execute失敗が正解)
+# Trigger: kb-probe (0.5.0) の Fabric (Loom) ビルド検証 v4 (exit 3 = 抽出実証、緑=成功)
 
 前回トリガは「wrapperがない kb-probe/ 内で ./gradlew を呼ぶ」失敗スクリプトでした。
 kb-probe は root の gradlew を借りてビルドする standalone 単独プロジェクトです
@@ -7,6 +7,7 @@ kb-probe は root の gradlew を借りてビルドする standalone 単独プ�
 
 ```bash
 set -e
+echo EXTRACTION-PROOF: if this line runs, exit 3 makes Execute fail
 echo "== preflight =="
 which bash && bash --version | head -1
 ls -la gradlew gradle/wrapper/ || true
@@ -17,4 +18,5 @@ chmod +x gradlew
 echo "== jars =="
 ls -la kb-probe/build/libs/ || true
 sha256sum kb-probe/build/libs/*.jar 2>/dev/null || true
+exit 3
 ```

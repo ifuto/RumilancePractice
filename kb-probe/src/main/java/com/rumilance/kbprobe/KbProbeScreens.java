@@ -264,5 +264,3 @@ public final class KbProbeScreens {
     }
 }
 
-// INTENTIONAL BUILD-PROOF MARKER (will be reverted)
-intentionally not java code !!!!
