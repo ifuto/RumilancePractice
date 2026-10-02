@@ -31,7 +31,7 @@ import java.util.stream.Collectors;
 public final class TeamService {
 
     private static final int MAX_TEAM_SIZE = 30;
-    private static final int MIN_TEAM_SIZE = 2;
+    private static final int MIN_TEAM_SIZE = 3;
     /** Hard cap per battle side (matches {@link com.rumilance.practice.session.MatchSession#MAX_SIDE_SIZE}). */
     private static final int MAX_SIDE_SIZE = MatchSession.MAX_SIDE_SIZE;
     private static final Duration INVITE_TTL = Duration.ofSeconds(60);

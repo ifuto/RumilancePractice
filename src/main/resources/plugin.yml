@@ -221,6 +221,10 @@ commands:
     description: Leave a match during the pre-match countdown.
     usage: /leave
     aliases: [le]
+  partyffa:
+    description: Join the Party Fight Sword FFA after elimination.
+    usage: /partyffa join <matchId>
+    permission: rumilance.user
   friend:
     description: Friend system (coming soon).
     usage: /friend

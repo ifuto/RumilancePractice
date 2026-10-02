@@ -2165,6 +2165,14 @@ public final class FeatureBootstrap {
         com.rumilance.practice.team.PartyBotService partyBotService = new com.rumilance.practice.team.PartyBotService(plugin);
         teamCommand.setPartyBotService(partyBotService);
         bind("team", teamCommand);
+
+        // Party Fight FFA (デス後に参加する 100×100 Sword FFA)
+        com.rumilance.practice.team.PartyFfaService partyFfaService =
+                new com.rumilance.practice.team.PartyFfaService(plugin);
+        pm.registerEvents(partyFfaService, plugin);
+        matchService.setPartyFfaService(partyFfaService);
+        bind("partyffa", partyFfaService);
+
         bind("tournament", tournamentCommand);
         PracCommand pracCommand = new PracCommand(practiceService);
         pracCommand.setGuiOpener(practiceRoomGui::open);

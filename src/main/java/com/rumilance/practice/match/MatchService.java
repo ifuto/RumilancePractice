@@ -652,6 +652,12 @@ public final class MatchService {
         this.kbProfileService = service;
     }
 
+    private volatile com.rumilance.practice.team.PartyFfaService partyFfaService;
+
+    public void setPartyFfaService(com.rumilance.practice.team.PartyFfaService service) {
+        this.partyFfaService = service;
+    }
+
     /**
      * Terminal duel start. {@code innerKitId} is the 中キット both fighters use — {@code null},
      * blank or {@code default} keeps the kit's own loadout, which is what Queue and every caller
@@ -2019,23 +2025,30 @@ public final class MatchService {
             downed.sendActionBar(title(downed, "match.eliminated",
                     Component.text("You were eliminated!", NamedTextColor.RED))
                     .decorate(TextDecoration.BOLD));
-            // 観戦脱出導線: Party Fight で倒れた人のチャットに「観戦をやめてロビーに戻る」
-            // ボタンを出す。実体は /hub（LobbyCommand → leaveEliminatedTeamSpectator）で、
-            // 敗北処理（ドロップ・勝敗帳）は既に完了済みなので再実行も罰も発生しない。
-            downed.sendMessage(Component.text()
-                    .append(title(downed, "match.eliminated-return-hint",
-                            Component.text("You are watching the rest of the fight.",
-                                    NamedTextColor.GRAY)))
-                    .append(Component.text(" "))
-                    .append(com.rumilance.practice.chat.ChatButtons.decline(
-                            messageService == null
-                                    ? "Stop spectating and return to lobby"
-                                    : messageService.raw(downed, "match.eliminated-return-button"),
-                            "/hub",
-                            messageService == null
-                                    ? "Return to the lobby"
-                                    : messageService.raw(downed, "match.eliminated-return-hover")))
-                    .build().decoration(TextDecoration.ITALIC, false));
+
+            // Sword FFA 導線: Party Fight で倒されたら専用 FFA に参加できるボタンを出す。
+            com.rumilance.practice.team.PartyFfaService ffa = this.partyFfaService;
+            if (ffa != null) {
+                // ゾーンがまだなければ確保（初デス時に生成）
+                ffa.allocateZone(session.id());
+                ffa.onPartyFightDeath(downed, session.id());
+            } else {
+                // FFA サービス未配線: 従来の「観戦をやめてロビーに戻る」ボタン
+                downed.sendMessage(Component.text()
+                        .append(title(downed, "match.eliminated-return-hint",
+                                Component.text("You are watching the rest of the fight.",
+                                        NamedTextColor.GRAY)))
+                        .append(Component.text(" "))
+                        .append(com.rumilance.practice.chat.ChatButtons.decline(
+                                messageService == null
+                                        ? "Stop spectating and return to lobby"
+                                        : messageService.raw(downed, "match.eliminated-return-button"),
+                                "/hub",
+                                messageService == null
+                                        ? "Return to the lobby"
+                                        : messageService.raw(downed, "match.eliminated-return-hover")))
+                        .build().decoration(TextDecoration.ITALIC, false));
+            }
             if (spectatorService != null) {
                 spectatorService.hideInWorld(downed);
             }
@@ -2408,6 +2421,10 @@ public final class MatchService {
         if (session.state() == MatchState.ENDING || session.state() == MatchState.CLOSED
                 || session.state() == MatchState.CLEANING || session.state() == MatchState.FAILED) {
             return;
+        }
+        // Party FFA ゾーン解放（デスで生成された FFA を終了）
+        if (session.isTeamMatch() && partyFfaService != null) {
+            partyFfaService.onMatchEnd(session.id());
         }
         cancelTask(session.id());
         // Capture end inventories before rematch items wipe them (winner + loser / both sides).
