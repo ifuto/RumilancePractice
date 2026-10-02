@@ -17,6 +17,7 @@ import net.minecraft.item.Items;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.GameMode;
 
@@ -120,8 +121,8 @@ public final class KbProbe {
     private record GearInfo(double resistance, String summary) {
     }
 
-    /** 属性のレジストリID（汎用耐衝撃）。 */
-    private static final String KNOCKBACK_RESISTANCE_ID = "minecraft:generic.knockback_resistance";
+    /** 属性のレジストリID（汎用耐衝撃）。1.21.11 では GENERIC_ プレフィックスが削除。 */
+    private static final String KNOCKBACK_RESISTANCE_ID = "minecraft:knockback_resistance";
 
     /** entityId → 保留中の自前ヒット。 */
     private static final Map<Integer, PendingHit> PENDING = new HashMap<>();
@@ -183,7 +184,7 @@ public final class KbProbe {
         if (len < 1.0e-4) {
             return; // 完全に重なっている場合は方向定義不能（vanilla はランダム退避）
         }
-        double attackKb = me.getAttributeValue(EntityAttributes.GENERIC_ATTACK_KNOCKBACK);
+        double attackKb = me.getAttributeValue(EntityAttributes.ATTACK_KNOCKBACK);
         // vanilla 1.21.1 実装（ソース検証済）: 疾走ブーにはチャージ率>0.9 のゲートは無い。
         // 生粋の疾走ヒット = 疾走中に attack → ノックバックレベルに +1.0 で合成される。
         boolean sprintHit = me.isSprinting();
@@ -496,9 +497,9 @@ public final class KbProbe {
 
     private static boolean isKnockbackResistance(
             RegistryEntry<net.minecraft.entity.attribute.EntityAttribute> attribute) {
-        return attribute.getKey()
-                .map(key -> key.getValue().toString().equals(KNOCKBACK_RESISTANCE_ID))
-                .orElse(false);
+        // 1.21.11: GENERIC_ プレフィックス削除に伴い matchesId で直接比較
+        return attribute.matchesId(
+                Identifier.of("minecraft", "knockback_resistance"));
     }
 
     /** AttributeModifierSlot ↔ 実装備スロットの照合（yarn の matches() 更新に左右されない自前判定）。 */
