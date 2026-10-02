@@ -813,7 +813,6 @@ gui:
   kit-sub-button: "SUB KITS"
   kit-sub-button-lore: "打开副套装备列表。"
   kit-count-label: "数量"
-  kit-last-selected: "上次选择的套件"
   kit-button-hint: "按下后 0.2 秒打开"
   kit-selected: "已选择"
   kit-click-select: "点击选择"

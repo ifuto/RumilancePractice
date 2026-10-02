@@ -813,7 +813,6 @@ gui:
   kit-sub-button: "SUB KITS"
   kit-sub-button-lore: "Opens the sub kit list."
   kit-count-label: "Kits"
-  kit-last-selected: "Last selected kit"
   kit-button-hint: "Opens 0.2s after you press it"
   kit-selected: "Selected"
   kit-click-select: "Click to select"

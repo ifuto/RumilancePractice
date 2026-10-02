@@ -813,7 +813,6 @@ gui:
   kit-sub-button: "SUB KITS"
   kit-sub-button-lore: "Ouvre la liste des kits secondaires."
   kit-count-label: "Kits"
-  kit-last-selected: "Dernier kit sélectionné"
   kit-button-hint: "S'ouvre 0,2s apres avoir appuye"
   kit-selected: "Sélectionné"
   kit-click-select: "Clic pour sélectionner"
