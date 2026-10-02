@@ -146,7 +146,7 @@ public final class LobbyFloatingEntitiesService {
         baseY.put(sword.getEntityId(), swordLoc.getY());
 
         Location textLoc = safeLoc.clone().add(0, 0.5, 0);
-        world.spawn(textLoc, TextDisplay.class, t -> {
+        TextDisplay text = world.spawn(textLoc, TextDisplay.class, t -> {
             t.text(Component.text("↓ SWORD FFA ↓", NamedTextColor.AQUA, TextDecoration.BOLD));
             t.setBillboard(TextDisplay.Billboard.CENTER);
             t.setLineWidth(200);
@@ -162,6 +162,14 @@ public final class LobbyFloatingEntitiesService {
         me.type = EntityType.SWORD_FFA;
         me.originalLocation = safeLoc.clone();
         managed.add(me);
+
+        // Track the TextDisplay too so removeAll() cleans it up.
+        ManagedEntity textEntry = new ManagedEntity();
+        textEntry.entity = text;
+        textEntry.type = EntityType.SWORD_FFA;
+        textEntry.originalLocation = textLoc.clone();
+        managed.add(textEntry);
+
         startAnimation();
     }
 
