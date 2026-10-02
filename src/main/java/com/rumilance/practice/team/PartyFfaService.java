@@ -231,23 +231,33 @@ public final class PartyFfaService implements Listener, CommandExecutor {
 
     private void generatePlatform(World world, int originX, int originZ) {
         // 100×100 の石ブロックプラットフォームを Y=63 に生成
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            for (int x = originX; x < originX + PLATFORM_SIZE; x++) {
-                for (int z = originZ; z < originZ + PLATFORM_SIZE; z++) {
-                    final int fx = x, fz = z;
-                    Bukkit.getScheduler().runTask(plugin, () -> {
-                        Block block = world.getBlockAt(fx, PLATFORM_Y, fz);
-                        block.setType(Material.STONE, false);
-                        // 境界は石レンガで視覚的に区切る
-                        if (fx == originX || fx == originX + PLATFORM_SIZE - 1
-                                || fz == originZ || fz == originZ + PLATFORM_SIZE - 1) {
-                            Block wall = world.getBlockAt(fx, PLATFORM_Y + 1, fz);
-                            wall.setType(Material.STONE_BRICKS, false);
-                        }
-                    });
+        // バッチ処理: 20行ずつ同期タスクで処理して lag を分散
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            generatePlatformBatch(world, originX, originZ, 0);
+        }, 1L);
+    }
+
+    private void generatePlatformBatch(World world, int originX, int originZ, int rowOffset) {
+        int batchSize = 20; // 1 tick あたり 20 行
+        for (int row = rowOffset; row < rowOffset + batchSize && row < PLATFORM_SIZE; row++) {
+            int x = originX + row;
+            for (int z = originZ; z < originZ + PLATFORM_SIZE; z++) {
+                Block block = world.getBlockAt(x, PLATFORM_Y, z);
+                block.setType(Material.STONE, false);
+                // 境界は石レンガで視覚的に区切る
+                if (row == 0 || row == PLATFORM_SIZE - 1
+                        || z == originZ || z == originZ + PLATFORM_SIZE - 1) {
+                    Block wall = world.getBlockAt(x, PLATFORM_Y + 1, z);
+                    wall.setType(Material.STONE_BRICKS, false);
                 }
             }
-        });
+        }
+        int next = rowOffset + batchSize;
+        if (next < PLATFORM_SIZE) {
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                generatePlatformBatch(world, originX, originZ, next);
+            }, 1L);
+        }
     }
 
     // ---- zone data ----
