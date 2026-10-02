@@ -2030,8 +2030,8 @@ public final class MatchService {
             com.rumilance.practice.team.PartyFfaService ffa = this.partyFfaService;
             if (ffa != null) {
                 // ゾーンがまだなければ確保（初デス時に生成）
-                ffa.allocateZone(session.id());
-                ffa.onPartyFightDeath(downed, session.id());
+                ffa.allocateZone(session.id().toString());
+                ffa.onPartyFightDeath(downed, session.id().toString());
             } else {
                 // FFA サービス未配線: 従来の「観戦をやめてロビーに戻る」ボタン
                 downed.sendMessage(Component.text()
@@ -2424,7 +2424,7 @@ public final class MatchService {
         }
         // Party FFA ゾーン解放（デスで生成された FFA を終了）
         if (session.isTeamMatch() && partyFfaService != null) {
-            partyFfaService.onMatchEnd(session.id());
+            partyFfaService.onMatchEnd(session.id().toString());
         }
         cancelTask(session.id());
         // Capture end inventories before rematch items wipe them (winner + loser / both sides).
