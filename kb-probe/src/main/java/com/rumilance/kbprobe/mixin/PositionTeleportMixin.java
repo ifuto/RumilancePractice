@@ -19,6 +19,6 @@ public abstract class PositionTeleportMixin {
 
     @Inject(method = "onEntityPosition", at = @At("HEAD"))
     private void kbprobe$onTeleport(EntityPositionS2CPacket packet, CallbackInfo ci) {
-        KbProbe.onEntityTeleported(packet.getEntityId());
+        KbProbe.onEntityTeleported(packet.entityId());
     }
 }
