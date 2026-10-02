@@ -1,1 +1,1 @@
-# java-trigger — yarn アクセサ修正後 mod 実ビルド検証 v6 (2026-10-01T13:05)
+# java-trigger — plugin changes + mod build verification v7 (2026-10-02T17:00)
