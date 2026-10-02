@@ -91,26 +91,24 @@ public final class CombatStyleService implements Listener {
      * 指定プレイヤーの戦闘モードを適用。
      */
     public void applyToPlayer(Player player, CombatMode mode) {
-        AttributeInstance attr = player.getAttribute(Attribute.GENERIC_ATTACK_SPEED);
+        AttributeInstance attr = player.getAttribute(Attribute.ATTACK_SPEED);
         if (attr == null) return;
         double target = (mode == CombatMode.BEDROCK) ? BEDROCK_ATTACK_SPEED : JAVA_ATTACK_SPEED;
         // 既存の modifier を全除去してベース値を設定
         attr.getModifiers().forEach(attr::removeModifier);
         attr.setBaseValue(target);
         appliedModes.put(player.getUniqueId(), mode);
-        player.saveData();
     }
 
     /**
      * プレイヤーをデフォルトの Java 戦闘に戻す。
      */
     public void resetPlayer(Player player) {
-        AttributeInstance attr = player.getAttribute(Attribute.GENERIC_ATTACK_SPEED);
+        AttributeInstance attr = player.getAttribute(Attribute.ATTACK_SPEED);
         if (attr == null) return;
         attr.getModifiers().forEach(attr::removeModifier);
         attr.setBaseValue(JAVA_ATTACK_SPEED);
         appliedModes.remove(player.getUniqueId());
-        player.saveData();
     }
 
     /**

@@ -1983,6 +1983,12 @@ public final class FeatureBootstrap {
         pm.registerEvents(lunarRichPresence, plugin);
         lunarRichPresence.start();
 
+        // Combat Style (Java vs Bedrock 戦闘仕様の適用 — DuelCommand より先に初期化)
+        com.rumilance.practice.combat.CombatStyleService combatStyleService =
+                new com.rumilance.practice.combat.CombatStyleService(plugin);
+        pm.registerEvents(combatStyleService, plugin);
+        matchService.setCombatStyleService(combatStyleService);
+
         DuelCommand rankedDuel = new DuelCommand(
                 rankedGui, unrankedGui, duelRequestGui, duelRequestService, matchService, kitService,
                 stateManager, soundService, lobbyService, queueCoordinator, runtimeFlags, true, messageService);
@@ -2175,12 +2181,6 @@ public final class FeatureBootstrap {
         pm.registerEvents(partyFfaService, plugin);
         matchService.setPartyFfaService(partyFfaService);
         bind("partyffa", partyFfaService);
-
-        // Combat Style (Java vs Bedrock 戦闘仕様の適用)
-        com.rumilance.practice.combat.CombatStyleService combatStyleService =
-                new com.rumilance.practice.combat.CombatStyleService(plugin);
-        pm.registerEvents(combatStyleService, plugin);
-        matchService.setCombatStyleService(combatStyleService);
 
         bind("tournament", tournamentCommand);
         PracCommand pracCommand = new PracCommand(practiceService);

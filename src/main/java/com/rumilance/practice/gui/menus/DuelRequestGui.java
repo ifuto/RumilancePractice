@@ -470,7 +470,7 @@ public final class DuelRequestGui extends AbstractGui {
         } else if ("java".equalsIgnoreCase(raw)) {
             session.put(COMBAT_MODE_KEY, "bedrock");
         } else {
-            session.remove(COMBAT_MODE_KEY);
+            session.put(COMBAT_MODE_KEY, null);
         }
     }
 
