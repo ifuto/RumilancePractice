@@ -135,7 +135,7 @@ public final class KbProbeScreens {
             }
             int nav = this.height - 56;
             addDrawableChild(ButtonWidget.builder(Text.literal("< 前"),
-                            button -> { page--; init(client, width, height); })
+                            button -> { page--; init(); })
                     .dimensions(this.width / 2 - 160, nav, 76, 20)
                     .build());
             addDrawableChild(ButtonWidget.builder(Text.literal(
@@ -144,7 +144,7 @@ public final class KbProbeScreens {
                     .dimensions(this.width / 2 - 76, nav, 72, 20)
                     .build()).active = false;
             addDrawableChild(ButtonWidget.builder(Text.literal("次 >"),
-                            button -> { page++; init(client, width, height); })
+                            button -> { page++; init(); })
                     .dimensions(this.width / 2 + 4, nav, 76, 20)
                     .build());
             addDrawableChild(ButtonWidget.builder(Text.literal("戻る"),
