@@ -1095,6 +1095,22 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
                 case "toggle" -> {
                     return TabCompletions.filter(current, "enable", "disable");
                 }
+                case "rankedqueue" -> {
+                    if (args[1].equalsIgnoreCase("autounlock")) {
+                        return TabCompletions.filter(current, "on", "off");
+                    }
+                }
+                case "floatingspawn" -> {
+                    if (args[1].equalsIgnoreCase("queue")) {
+                        // 基本アイテム + 主要PvPアイテム
+                        return TabCompletions.filter(current,
+                                "diamond_sword", "iron_sword", "netherite_sword",
+                                "diamond_axe", "bow", "crossbow", "trident",
+                                "golden_apple", "enchanted_golden_apple",
+                                "shield", "ender_pearl", "experience_bottle",
+                                "fishing_rod", "compass", "blaze_rod");
+                    }
+                }
                 default -> {
                 }
             }
