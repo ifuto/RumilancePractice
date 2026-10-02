@@ -32,10 +32,15 @@ public final class TierCommand implements CommandExecutor, TabCompleter {
 
     private final TierService tierService;
     private final MessageService messageService;
+    private volatile java.util.function.Consumer<Player> guiOpener;
 
     public TierCommand(TierService tierService, MessageService messageService) {
         this.tierService = tierService;
         this.messageService = messageService;
+    }
+
+    public void setGuiOpener(java.util.function.Consumer<Player> guiOpener) {
+        this.guiOpener = guiOpener;
     }
 
     @Override
@@ -47,6 +52,11 @@ public final class TierCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length > 0 && args[0].equalsIgnoreCase("bands")) {
             showBands(player);
+            return true;
+        }
+        // No args: open GUI if available, else fall back to chat
+        if (args.length == 0 && guiOpener != null) {
+            guiOpener.accept(player);
             return true;
         }
         Map<String, TierService.Standing> standings = tierService.standingsOf(player.getUniqueId());

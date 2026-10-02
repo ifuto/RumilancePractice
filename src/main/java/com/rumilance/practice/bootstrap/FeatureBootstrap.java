@@ -1420,6 +1420,18 @@ public final class FeatureBootstrap {
         guiListener.register(shieldPatternGui);
         guiListener.register(customShieldAdminGui);
         guiListener.register(localeSelectGui);
+
+        // Tier display GUI (from /tier)
+        com.rumilance.practice.gui.menus.TierGui tierGui =
+                new com.rumilance.practice.gui.menus.TierGui(guiSessions, soundService, tierService);
+        guiListener.register(tierGui);
+
+        // Practice room browser GUI (from /prac)
+        com.rumilance.practice.gui.menus.PracticeRoomGui practiceRoomGui =
+                new com.rumilance.practice.gui.menus.PracticeRoomGui(guiSessions, soundService,
+                        services.get(com.rumilance.practice.practice.PracticeService.class));
+        guiListener.register(practiceRoomGui);
+
         guiListener.setMenuReturn(gameMenuGui::open);
         guiListener.setBattleMenuReturn(battleMenuGui::open);
         // The old chest-GUI editors are gone: a player who closes the original-kit confirm
@@ -2154,8 +2166,14 @@ public final class FeatureBootstrap {
         teamCommand.setPartyBotService(partyBotService);
         bind("team", teamCommand);
         bind("tournament", tournamentCommand);
-        bind("prac", new PracCommand(practiceService));
-        bind("tier", new com.rumilance.practice.command.TierCommand(tierService, messageService));
+        PracCommand pracCommand = new PracCommand(practiceService);
+        pracCommand.setGuiOpener(practiceRoomGui::open);
+        bind("prac", pracCommand);
+
+        com.rumilance.practice.command.TierCommand tierCommand =
+                new com.rumilance.practice.command.TierCommand(tierService, messageService);
+        tierCommand.setGuiOpener(tierGui::open);
+        bind("tier", tierCommand);
         // Server-wide crafting restriction: log -> planks only (lobby OPs exempt).
         plugin.getServer().getPluginManager().registerEvents(
                 new com.rumilance.practice.craft.CraftRestrictionListener(stateManager), plugin);

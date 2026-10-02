@@ -76,5 +76,7 @@ public enum GuiType {
     /** 中キット (inner kit) preset picker: right-click a kit in Duel / Party / Kit Edit. */
     INNER_KIT_SELECT,
     /** 中キット management (admin): create / rename / icon / delete / edit contents. */
-    INNER_KIT_ADMIN
+    INNER_KIT_ADMIN,
+    /** Per-kit skill tier display from /tier. */
+    TIER
 }

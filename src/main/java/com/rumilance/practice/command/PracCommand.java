@@ -21,9 +21,14 @@ import java.util.List;
 public final class PracCommand implements CommandExecutor, TabCompleter {
 
     private final PracticeService practiceService;
+    private volatile java.util.function.Consumer<Player> guiOpener;
 
     public PracCommand(PracticeService practiceService) {
         this.practiceService = practiceService;
+    }
+
+    public void setGuiOpener(java.util.function.Consumer<Player> guiOpener) {
+        this.guiOpener = guiOpener;
     }
 
     @Override
@@ -33,6 +38,11 @@ public final class PracCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         if (args.length < 1) {
+            // Open GUI if available, else show chat list
+            if (guiOpener != null) {
+                guiOpener.accept(player);
+                return true;
+            }
             player.sendMessage(Component.text("Usage: /prac <name>|leave", NamedTextColor.YELLOW));
             List<PracticeRoom> enabled = practiceService.enabled();
             if (!enabled.isEmpty()) {
