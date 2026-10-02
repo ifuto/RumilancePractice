@@ -1,7 +1,7 @@
 plugins {
     id "java"
-    // 1.21.11 対応: loom 1.18-SNAPSHOT (Gradle 9.2+ 要求)
-    id "fabric-loom" version "1.18-SNAPSHOT"
+    // 1.21.11 対応: fabric-loom-remap 1.18-SNAPSHOT (obfuscated 版は remap が必要)
+    id "net.fabricmc.fabric-loom-remap" version "1.18-SNAPSHOT"
 }
 
 group = "com.rumilance"
