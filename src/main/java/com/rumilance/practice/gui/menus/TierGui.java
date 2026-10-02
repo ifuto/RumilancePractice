@@ -38,7 +38,7 @@ public final class TierGui extends AbstractGui {
 
     @Override
     protected com.rumilance.practice.gui.GuiFrame.Theme theme() {
-        return com.rumilance.practice.gui.GuiFrame.Theme.DARK;
+        return com.rumilance.practice.gui.GuiFrame.Theme.PURPLE;
     }
 
     @Override
