@@ -59,6 +59,12 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
         this.teamService = teamService;
     }
 
+    private volatile com.rumilance.practice.combat.CombatStyleService combatStyleService;
+
+    public void setCombatStyleService(com.rumilance.practice.combat.CombatStyleService service) {
+        this.combatStyleService = service;
+    }
+
     private boolean inParty(UUID playerId) {
         return teamService != null && teamService.teamOf(playerId).isPresent();
     }
@@ -293,6 +299,21 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
                 request.ranked() ? MatchMode.RANKED : MatchMode.UNRANKED,
                 request.bestOf(), Map.of(), request.preferredArena().orElse(null), null, null,
                 request.firstTo(), request.innerKitName(), request.kbChoice());
+
+        // Combat style: クロスプラットフォーム Duel で選択された戦闘モードを適用
+        if (combatStyleService != null) {
+            com.rumilance.practice.combat.CombatMode cm = request.resolvedCombatMode();
+            if (cm != null) {
+                // matchId を startDuel から取得: 最新マッチを探す
+                String matchId = matchService.findActiveMatchId(request.sender())
+                        .orElse(matchService.findActiveMatchId(request.target()).orElse(null));
+                if (matchId != null) {
+                    combatStyleService.setMatchMode(matchId, cm);
+                    combatStyleService.applyToMatch(matchId,
+                            java.util.List.of(request.sender(), request.target()));
+                }
+            }
+        }
     }
 
     public void handleCancel(Player player) {

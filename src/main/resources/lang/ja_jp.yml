@@ -378,6 +378,10 @@ duel-gui:
   ping: "Ping: <n>ms"
   record: "勝 <wins>  負 <losses>"
   kd: "K/D <kd>  WR <wr>"
+  combat-mode: "<color:#FFAA00>戦闘仕様</color> <color:#334155>:</color> <white><mode></white>"
+  combat-mode-lore-auto: "クリックで戦闘スタイル切替"
+  combat-mode-lore-java: "Java: クールダウンあり、スイープ攻撃"
+  combat-mode-lore-bedrock: "Bedrock: 連打可能、クールダウンなし"
 
 ffa:
   maintenance: "<red>現在メンテナンス中です。"

@@ -107,6 +107,12 @@ public final class QueueCoordinator {
         this.altDetectionService = altDetectionService;
     }
 
+    private volatile com.rumilance.practice.combat.CombatStyleService combatStyleService;
+
+    public void setCombatStyleService(com.rumilance.practice.combat.CombatStyleService service) {
+        this.combatStyleService = service;
+    }
+
     public void start() {
         matchTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tickMatchmaking, 40L, 40L);
         actionBarTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tickActionBars, 20L, 20L);
@@ -293,6 +299,19 @@ public final class QueueCoordinator {
                     pair.a().mode(),
                     1
             );
+            // Queue: Bedrock vs Bedrock → 自動で Bedrock 戦闘仕様を適用
+            if (combatStyleService != null
+                    && pair.a().platform() == PlayerPlatform.BEDROCK
+                    && pair.b().platform() == PlayerPlatform.BEDROCK) {
+                String matchId = matchService.findActiveMatchId(pair.a().playerId())
+                        .orElse(null);
+                if (matchId != null) {
+                    combatStyleService.setMatchMode(matchId,
+                            com.rumilance.practice.combat.CombatMode.BEDROCK);
+                    combatStyleService.applyToMatch(matchId,
+                            java.util.List.of(pair.a().playerId(), pair.b().playerId()));
+                }
+            }
         }
     }
 

@@ -27,7 +27,12 @@ public final class DuelRequestService {
             /** 中キット (inner kit) preset id; null = the kit's own default loadout. */
             String innerKitName,
             /** KB 選択 (KbProfileService の CHOICE_* はそのまま保持; null = 既定/デフォルトKB。 */
-            String kbChoice
+            String kbChoice,
+            /**
+             * 戦闘モード選択 ({@code "java"} / {@code "bedrock"})。
+             * null = 自動判定（同一プラットフォーム同士ならデフォルト、クロスなら送信者優先）。
+             */
+            String combatMode
     ) {
         public boolean isExpired(Instant now) {
             return now.isAfter(expiresAt);
@@ -39,6 +44,12 @@ public final class DuelRequestService {
                 return Optional.empty();
             }
             return Optional.of(arenaName);
+        }
+
+        /** 戦闘モードを CombatMode enum で返す。null なら自動判定。 */
+        public com.rumilance.practice.combat.CombatMode resolvedCombatMode() {
+            if (combatMode == null || combatMode.isBlank()) return null;
+            return com.rumilance.practice.combat.CombatMode.fromString(combatMode);
         }
     }
 
@@ -113,6 +124,18 @@ public final class DuelRequestService {
             UUID sender, UUID target, String kit, boolean ranked, int bestOf, String arenaName,
             int firstTo, String innerKit, String kbChoice
     ) {
+        return create(sender, target, kit, ranked, bestOf, arenaName, firstTo, innerKit, kbChoice,
+                null);
+    }
+
+    /**
+     * Duel request carrying KB + combat mode choice.
+     * {@code combatMode}: {@code "java"} / {@code "bedrock"} / {@code null} (auto).
+     */
+    public synchronized Optional<RichDuelRequest> create(
+            UUID sender, UUID target, String kit, boolean ranked, int bestOf, String arenaName,
+            int firstTo, String innerKit, String kbChoice, String combatMode
+    ) {
         if (sender.equals(target)) {
             return Optional.empty();
         }
@@ -136,7 +159,8 @@ public final class DuelRequestService {
                 com.rumilance.practice.kit.InnerKitService.isDefault(innerKit)
                         ? null
                         : com.rumilance.practice.kit.InnerKitService.normalizeId(innerKit),
-                kbChoice == null || kbChoice.isBlank() ? null : kbChoice
+                kbChoice == null || kbChoice.isBlank() ? null : kbChoice,
+                combatMode == null || combatMode.isBlank() ? null : combatMode
         );
         byId.put(request.id(), request);
         byTarget.put(target, now);

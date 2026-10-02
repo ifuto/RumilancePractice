@@ -377,6 +377,10 @@ duel-gui:
   ping: "Ping : <n>ms"
   record: "V <wins>  D <losses>"
   kd: "K/D <kd>  WR <wr>"
+  combat-mode: "<color:#FFAA00>Combat</color> <color:#334155>:</color> <white><mode></white>"
+  combat-mode-lore-auto: "Click to switch combat style."
+  combat-mode-lore-java: "Java: cooldown, sweep attacks."
+  combat-mode-lore-bedrock: "Bedrock: fast clicks, no cooldown."
 
 ffa:
   maintenance: "<red>Le practice est en maintenance."

@@ -1993,13 +1993,16 @@ public final class FeatureBootstrap {
         rankedDuel.setSpectatorService(spectatorService);
         rankedDuel.setGuiSessions(guiSessions);
         rankedDuel.setTeamService(teamService);
+        rankedDuel.setCombatStyleService(combatStyleService);
         unrankedDuel.setFfaService(ffaService);
         unrankedDuel.setSpectatorService(spectatorService);
         unrankedDuel.setGuiSessions(guiSessions);
         unrankedDuel.setTeamService(teamService);
+        unrankedDuel.setCombatStyleService(combatStyleService);
         duelRequestGui.setTeamService(teamService);
         duelRequestGui.setMatchService(matchService);
         queueCoordinator.setTeamService(teamService);
+        queueCoordinator.setCombatStyleService(combatStyleService);
         // 申請一覧 — the centralised request inbox behind the Battle Menu button. Bedrock
         // ('.'-prefixed) clients struggle with chat clicks, so this GUI is the accept/deny
         // surface they get; the Battle Menu shows the button only to those players.
@@ -2172,6 +2175,12 @@ public final class FeatureBootstrap {
         pm.registerEvents(partyFfaService, plugin);
         matchService.setPartyFfaService(partyFfaService);
         bind("partyffa", partyFfaService);
+
+        // Combat Style (Java vs Bedrock 戦闘仕様の適用)
+        com.rumilance.practice.combat.CombatStyleService combatStyleService =
+                new com.rumilance.practice.combat.CombatStyleService(plugin);
+        pm.registerEvents(combatStyleService, plugin);
+        matchService.setCombatStyleService(combatStyleService);
 
         bind("tournament", tournamentCommand);
         PracCommand pracCommand = new PracCommand(practiceService);

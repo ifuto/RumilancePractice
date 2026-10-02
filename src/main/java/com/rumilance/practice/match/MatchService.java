@@ -530,6 +530,14 @@ public final class MatchService {
     }
 
     /**
+     * プレイヤーが参加中のマッチ ID を返す (CombatStyleService 連携用)。
+     */
+    public java.util.Optional<String> findActiveMatchId(UUID playerId) {
+        return registry().byPlayer(playerId)
+                .map(s -> s.id().toString());
+    }
+
+    /**
      * Hard block on opening the kit editors (/ekit, /originalkit): the player is committed to
      * any match lifecycle, queue, spectating, FFA or practice. Editing mid-fight used to reset
      * the player to lobby items on GUI close and strand their real inventory in the kit room.
@@ -658,6 +666,11 @@ public final class MatchService {
         this.partyFfaService = service;
     }
 
+    private volatile com.rumilance.practice.combat.CombatStyleService combatStyleService;
+
+    public void setCombatStyleService(com.rumilance.practice.combat.CombatStyleService service) {
+        this.combatStyleService = service;
+    }
     /**
      * Terminal duel start. {@code innerKitId} is the 中キット both fighters use — {@code null},
      * blank or {@code default} keeps the kit's own loadout, which is what Queue and every caller
@@ -2425,6 +2438,10 @@ public final class MatchService {
         // Party FFA ゾーン解放（デスで生成された FFA を終了）
         if (session.isTeamMatch() && partyFfaService != null) {
             partyFfaService.onMatchEnd(session.id().toString());
+        }
+        // Combat style リセット（Bedrock → Java に戻す）
+        if (combatStyleService != null) {
+            combatStyleService.resetMatch(session.id().toString());
         }
         cancelTask(session.id());
         // Capture end inventories before rematch items wipe them (winner + loser / both sides).

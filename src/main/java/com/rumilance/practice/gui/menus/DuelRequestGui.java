@@ -38,6 +38,9 @@ public final class DuelRequestGui extends AbstractGui {
     private DuelMapSelectGui mapSelectGui;
     /** KB プロファイル選択 (Kb/kb フォルダの *.json + 既定/変更無し)。CH/ 未選択=既定。*/
     public static final String KB_KEY = "kb-profile";
+
+    /** Combat mode selection key in GuiSession. Values: null (auto), "java", "bedrock". */
+    public static final String COMBAT_MODE_KEY = "combat-mode";
     private volatile com.rumilance.practice.kb.KbProfileService kbProfileService;
 
     public void setKbProfileService(com.rumilance.practice.kb.KbProfileService service) {
@@ -205,6 +208,27 @@ public final class DuelRequestGui extends AbstractGui {
         inventory.setItem(GuiSlots.slot(2, 3), GuiDecorator.button(Material.DIAMOND_SWORD,
                 messageService.render(locale, "duel-gui.kit-select",
                         MessageService.tags("kit", kitLabel(session))), "kit"));
+
+        // ---- Combat mode selector (クロスプラットフォーム Duel のみ表示) ----
+        UUID senderId = player.getUniqueId();
+        boolean crossPlatform = com.rumilance.practice.combat.CombatStyleService
+                .isCrossPlatform(senderId, targetId);
+        if (crossPlatform) {
+            String cmChoice = session.get(COMBAT_MODE_KEY, String.class);
+            com.rumilance.practice.combat.CombatMode cm =
+                    cmChoice == null
+                            ? com.rumilance.practice.combat.CombatStyleService.suggestedMode(senderId)
+                            : com.rumilance.practice.combat.CombatMode.fromString(cmChoice);
+            Material cmMat = cm == com.rumilance.practice.combat.CombatMode.BEDROCK
+                    ? Material.NETHERITE_SWORD : Material.DIAMOND_SWORD;
+            String cmLabel = cm == com.rumilance.practice.combat.CombatMode.BEDROCK
+                    ? "Bedrock" : "Java";
+            inventory.setItem(GuiSlots.slot(2, 4), GuiDecorator.button(cmMat,
+                    messageService.render(locale, "duel-gui.combat-mode",
+                            MessageService.tags("mode", cmLabel)),
+                    "combat-mode"));
+        }
+
         String mapLabel = session.selectedMap() == null || session.selectedMap().isBlank()
                 || "random".equalsIgnoreCase(session.selectedMap())
                 ? "Random"
@@ -286,6 +310,11 @@ public final class DuelRequestGui extends AbstractGui {
                 sounds.play(player, "gui-click");
                 render(player, session, inventory);
             }
+            case "combat-mode" -> {
+                cycleCombatMode(player, session);
+                sounds.play(player, "gui-click");
+                render(player, session, inventory);
+            }
             case "send" -> send(player, session, inventory);
             default -> {
             }
@@ -343,7 +372,7 @@ public final class DuelRequestGui extends AbstractGui {
         }
         if (duelRequestService.create(player.getUniqueId(), targetId, kit, session.ranked(),
                 session.bestOf(), map, session.firstTo(), innerChoice,
-                kbChoiceOf(session)).isEmpty()) {
+                kbChoiceOf(session), combatModeOf(session)).isEmpty()) {
             sounds.play(player, "error");
             messageService.send(player, "duel.could-not-send");
             return;
@@ -428,6 +457,29 @@ public final class DuelRequestGui extends AbstractGui {
         String raw = session.get(KB_KEY, String.class);
         int index = raw == null ? -1 : cycle.indexOf(raw);
         session.put(KB_KEY, cycle.get((index + 1) % cycle.size()));
+    }
+
+    /**
+     * Combat mode cycle: auto (null) → java → bedrock → auto.
+     * Only reachable when cross-platform, so auto = sender's platform default.
+     */
+    private void cycleCombatMode(Player player, GuiSession session) {
+        String raw = session.get(COMBAT_MODE_KEY, String.class);
+        if (raw == null) {
+            session.put(COMBAT_MODE_KEY, "java");
+        } else if ("java".equalsIgnoreCase(raw)) {
+            session.put(COMBAT_MODE_KEY, "bedrock");
+        } else {
+            session.remove(COMBAT_MODE_KEY);
+        }
+    }
+
+    /**
+     * GuiSession から create() に渡す combatMode を取得。
+     * null = クロスプラットフォーム時は送信者デフォルト、同一プラットフォーム時は null（自動）。
+     */
+    static String combatModeOf(GuiSession session) {
+        return session.get(COMBAT_MODE_KEY, String.class);
     }
 
     /** GUI 発注値 → create() に載せる kbChoice (既定 = null で既定解決に任せる)。 */
