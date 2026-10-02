@@ -1,7 +1,8 @@
 plugins {
     id "java"
-    // 1.21.11 対応: fabric-loom-remap 1.18 (obfuscated 版は remap が必要)
-    id "net.fabricmc.fabric-loom-remap" version "1.18"
+    // fabric-loom (legacy) は obfuscated 版 (1.21.11 以下) で引き続き動作。1.14.7 は
+    // Gradle 9.2+ 対応の安定リリース（2026-10-01 CI 実績あり）。
+    id "fabric-loom" version "1.14.7"
 }
 
 group = "com.rumilance"
