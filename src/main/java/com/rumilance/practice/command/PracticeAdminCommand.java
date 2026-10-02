@@ -18,6 +18,7 @@ import com.rumilance.practice.queue.QueueService;
 import com.rumilance.practice.resourcepack.ResourcePackService;
 import com.rumilance.practice.sound.SoundService;
 import com.rumilance.practice.state.MatchMode;
+import org.bukkit.Material;
 import com.rumilance.practice.stats.StatsResetService;
 import com.rumilance.practice.util.AsyncExecutor;
 import com.rumilance.practice.util.Cuboid;
@@ -63,6 +64,12 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
     private volatile AsyncExecutor asyncExecutor;
     private volatile BanService banService;
     private volatile ResourcePackService resourcePackService;
+    private volatile com.rumilance.practice.queue.QueueCoordinator queueCoordinator;
+    private volatile com.rumilance.practice.lobby.LobbyFloatingEntitiesService floatingEntitiesService;
+
+    public void setFloatingEntitiesService(com.rumilance.practice.lobby.LobbyFloatingEntitiesService svc) {
+        this.floatingEntitiesService = svc;
+    }
 
     public PracticeAdminCommand(
             RumilancePractice plugin,
@@ -133,6 +140,10 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
         this.resourcePackService = resourcePackService;
     }
 
+    public void setQueueCoordinator(com.rumilance.practice.queue.QueueCoordinator queueCoordinator) {
+        this.queueCoordinator = queueCoordinator;
+    }
+
     private volatile com.rumilance.practice.alt.AltDetectionService altDetectionService;
     private volatile com.rumilance.practice.kb.KbProfileService kbProfileService;
 
@@ -172,7 +183,7 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
 
         if (args.length == 0) {
             sender.sendMessage(Component.text(
-                    "/practiceadmin <menu|tool|sign|reload|status|matches|cleanup|maintenance|ffacommand|ffa|statsreset|broadcast|time|kick|forceend|forcematch|toggle|packpolicy|altflags|kbdefault>",
+                    "/practiceadmin <menu|tool|sign|reload|status|matches|cleanup|maintenance|ffacommand|ffa|statsreset|broadcast|time|kick|forceend|forcematch|toggle|packpolicy|altflags|kbdefault|rankedqueue|floatingspawn>",
                     NamedTextColor.YELLOW));
             return true;
         }
@@ -287,6 +298,86 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
                 configService.save(ConfigService.CONFIG);
                 runtimeFlags.setMaintenance(on);
                 sender.sendMessage(Component.text("Maintenance " + (on ? "ON" : "OFF"), NamedTextColor.GOLD));
+                yield true;
+            }
+            case "rankedqueue" -> {
+                if (queueCoordinator == null) {
+                    sender.sendMessage(Component.text("Queue not wired.", NamedTextColor.RED));
+                    yield true;
+                }
+                com.rumilance.practice.queue.RankedQueueState rs = queueCoordinator.rankedState();
+                if (args.length < 2) {
+                    sender.sendMessage(Component.text(
+                            "Ranked: " + (rs.isEnabled() ? "ON" : "OFF")
+                                    + " | Auto-unlock: " + (rs.isAutoUnlockEnabled() ? "ON" : "OFF")
+                                    + " | Unique joins: " + rs.uniqueJoinCount()
+                                    + "/" + com.rumilance.practice.queue.RankedQueueState.AUTO_UNLOCK_THRESHOLD,
+                            NamedTextColor.YELLOW));
+                    yield true;
+                }
+                switch (args[1].toLowerCase(Locale.ROOT)) {
+                    case "on" -> {
+                        rs.setEnabled(true);
+                        sender.sendMessage(Component.text("Ranked queue enabled.", NamedTextColor.GREEN));
+                    }
+                    case "off" -> {
+                        rs.setEnabled(false);
+                        sender.sendMessage(Component.text("Ranked queue disabled.", NamedTextColor.RED));
+                    }
+                    case "autounlock" -> {
+                        boolean auto = args.length < 3 || args[2].equalsIgnoreCase("on");
+                        rs.setAutoUnlockEnabled(auto);
+                        sender.sendMessage(Component.text("Ranked auto-unlock " + (auto ? "ON" : "OFF"), NamedTextColor.GOLD));
+                    }
+                    default -> sender.sendMessage(Component.text(
+                            "/practiceadmin rankedqueue <on|off|autounlock [on|off]>", NamedTextColor.YELLOW));
+                }
+                yield true;
+            }
+            case "floatingspawn" -> {
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage(Component.text("In-game only.", NamedTextColor.RED));
+                    yield true;
+                }
+                if (floatingEntitiesService == null) {
+                    sender.sendMessage(Component.text("Floating entity service not wired.", NamedTextColor.RED));
+                    yield true;
+                }
+                if (args.length < 2) {
+                    sender.sendMessage(Component.text(
+                            "/practiceadmin floatingspawn <queue [icon_material]|swordffa|removeall>",
+                            NamedTextColor.YELLOW));
+                    yield true;
+                }
+                switch (args[1].toLowerCase(Locale.ROOT)) {
+                    case "queue" -> {
+                        Material icon = Material.DIAMOND_SWORD;
+                        if (args.length >= 3) {
+                            Material m = Material.matchMaterial(args[2].toUpperCase(Locale.ROOT));
+                            if (m != null && !m.isAir()) icon = m;
+                        }
+                        floatingEntitiesService.spawnQueueItem(player.getLocation(), icon);
+                        // Save to lobby.yml for restart persistence.
+                        floatingEntitiesService.saveToConfig(configService.lobby());
+                        configService.save(ConfigService.LOBBY);
+                        sender.sendMessage(Component.text("Queue floating item spawned. Saved for restart.", NamedTextColor.GREEN));
+                    }
+                    case "swordffa" -> {
+                        floatingEntitiesService.spawnSwordFfaIndicator(player.getLocation());
+                        floatingEntitiesService.saveToConfig(configService.lobby());
+                        configService.save(ConfigService.LOBBY);
+                        sender.sendMessage(Component.text("Sword FFA indicator spawned. Saved for restart.", NamedTextColor.GREEN));
+                    }
+                    case "removeall" -> {
+                        floatingEntitiesService.removeAll();
+                        floatingEntitiesService.saveToConfig(configService.lobby());
+                        configService.save(ConfigService.LOBBY);
+                        sender.sendMessage(Component.text("All floating entities removed.", NamedTextColor.YELLOW));
+                    }
+                    default -> sender.sendMessage(Component.text(
+                            "/practiceadmin floatingspawn <queue [material]|swordffa|removeall>",
+                            NamedTextColor.YELLOW));
+                }
                 yield true;
             }
             case "ffacommand" -> {
@@ -941,7 +1032,7 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
             return TabCompletions.filter(current, "menu", "sign", "tool", "reload", "status",
                     "matches", "cleanup", "maintenance", "ffacommand", "ffa", "statsreset",
                     "broadcast", "time", "kick", "forceend", "forcematch", "toggle", "packpolicy",
-                    "altflags", "kbdefault");
+                    "altflags", "kbdefault", "rankedqueue", "floatingspawn");
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
         if (args.length == 2) {
@@ -972,6 +1063,12 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
                 }
                 case "status" -> {
                     return TabCompletions.filter(current, "tps");
+                }
+                case "rankedqueue" -> {
+                    return TabCompletions.filter(current, "on", "off", "autounlock");
+                }
+                case "floatingspawn" -> {
+                    return TabCompletions.filter(current, "queue", "swordffa", "removeall");
                 }
                 default -> {
                 }

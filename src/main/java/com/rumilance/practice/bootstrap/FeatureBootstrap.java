@@ -95,6 +95,7 @@ import com.rumilance.practice.gui.menus.AdminMenuGui;
 import com.rumilance.practice.gui.menus.AdminPlayerDataGui;
 import com.rumilance.practice.admin.AdminPlayerLookupListener;
 import com.rumilance.practice.gui.menus.ArenaAdminGui;
+import com.rumilance.practice.gui.menus.ArenaDetailGui;
 import com.rumilance.practice.gui.menus.ArrowEffectGui;
 import com.rumilance.practice.gui.menus.BanListGui;
 import com.rumilance.practice.gui.menus.BattleMenuGui;
@@ -250,6 +251,7 @@ public final class FeatureBootstrap {
     private final ServiceRegistry services;
     private QueueCoordinator queueCoordinator;
     private com.rumilance.practice.alt.AltDetectionService altDetection;
+    private com.rumilance.practice.lobby.LobbyFloatingEntitiesService floatingEntitiesService;
     private MatchService matchService;
     private ScoreboardService scoreboardService;
     private ArrowEffectService arrowEffectService;
@@ -688,10 +690,13 @@ public final class FeatureBootstrap {
         arrowEffectService.start();
         services.register(ArrowEffectService.class, arrowEffectService);
 
+        com.rumilance.practice.queue.RankedQueueState rankedQueueState =
+                new com.rumilance.practice.queue.RankedQueueState();
         queueCoordinator = new QueueCoordinator(
                 plugin, queueService, matchService, kitService, lobbyService, stateManager,
                 soundService, rankedStatsRepository, asyncExecutor, runtimeFlags, settings,
-                plugin.getConfig().getBoolean("queue.block-same-ip", true), true, messageService);
+                plugin.getConfig().getBoolean("queue.block-same-ip", true), true, messageService,
+                rankedQueueState);
         services.register(QueueCoordinator.class, queueCoordinator);
         queueCoordinator.start();
 
@@ -743,6 +748,12 @@ public final class FeatureBootstrap {
         lobbyWearService.setLobbyService(lobbyService);
         plugin.getServer().getPluginManager().registerEvents(lobbyWearService, plugin);
         lobbyWearService.startTask();
+        // Floating entities in the lobby (queue join items, sword FFA indicators).
+        this.floatingEntitiesService =
+                new com.rumilance.practice.lobby.LobbyFloatingEntitiesService(plugin);
+        com.rumilance.practice.lobby.LobbyFloatingEntitiesService floatingEntitiesService = this.floatingEntitiesService;
+        // Load persisted floating entities from lobby.yml on startup.
+        floatingEntitiesService.loadFromConfig(configService.lobby());
         // Hub gliding: firework-style boost on right-click (2s cooldown, silent while cooling)
         // and the mace-smash landing effect.
         plugin.getServer().getPluginManager().registerEvents(
@@ -890,13 +901,18 @@ public final class FeatureBootstrap {
             });
         });
 
+        com.rumilance.practice.kit.LastSelectedKitTracker lastKitTracker =
+                new com.rumilance.practice.kit.LastSelectedKitTracker();
         QueueKitGui rankedGui = new QueueKitGui(
                 guiSessions, soundService, kitService, queueService, queueCoordinator, true);
+        rankedGui.setLastKitTracker(lastKitTracker);
         // ランク戦キットアイテムのホバーにトップ5ランキング lore を載せる
         rankedGui.setRankedTopLore(rankedStatsRepository, settings.rankedLeaderboardMaxDeviation());
         QueueKitGui unrankedGui = new QueueKitGui(
                 guiSessions, soundService, kitService, queueService, queueCoordinator, false);
+        unrankedGui.setLastKitTracker(lastKitTracker);
         KitSelectGui kitSelectGui = new KitSelectGui(guiSessions, soundService, kitService);
+        kitSelectGui.setLastKitTracker(lastKitTracker);
         DuelRequestGui duelRequestGui = new DuelRequestGui(
                 guiSessions, soundService, kitService, duelRequestService, settingsService,
                 statsService, kitSelectGui, messageService);
@@ -1028,6 +1044,16 @@ public final class FeatureBootstrap {
                 guiSessions, soundService, arenaStore, arenaService);
         PartyIconListener partyIconListener = new PartyIconListener(plugin, arenaStore, arenaService);
         arenaAdminGui.setPartyIconPrompt(partyIconListener::await);
+        // Detail GUI cache — registration deferred until guiListener is available (line ~1349).
+        java.util.Map<String, ArenaDetailGui> detailCache = new java.util.concurrent.ConcurrentHashMap<>();
+        arenaAdminGui.setDetailGuiFactory(arenaName -> {
+            return detailCache.computeIfAbsent(arenaName, name -> {
+                ArenaDetailGui detail = new ArenaDetailGui(
+                        guiSessions, soundService, arenaStore, arenaService, name);
+                detail.setPartyIconPrompt(partyIconListener::await);
+                return detail;
+            });
+        });
 
         PresetItems presetItems = new PresetItems(configService);
         services.register(PresetItems.class, presetItems);
@@ -1314,6 +1340,21 @@ public final class FeatureBootstrap {
                 plugin, practiceService, stateManager));
 
         GuiListener guiListener = new GuiListener(guiSessions, stateManager, originalKitService, messageService);
+        // Wire deferred detail GUI registration (detail factory was set up before guiListener existed).
+        for (ArenaDetailGui detail : detailCache.values()) {
+            guiListener.register(detail);
+        }
+        // After this point, new detail GUIs created by the factory must also be registered.
+        // The factory lambda captures guiListener indirectly via this consumer.
+        arenaAdminGui.setDetailGuiFactory(arenaName -> {
+            return detailCache.computeIfAbsent(arenaName, name -> {
+                ArenaDetailGui detail = new ArenaDetailGui(
+                        guiSessions, soundService, arenaStore, arenaService, name);
+                detail.setPartyIconPrompt(partyIconListener::await);
+                guiListener.register(detail);
+                return detail;
+            });
+        });
         // 木時差式ボタン releases are scheduled off this plugin handle.
         guiListener.setPlugin(plugin);
         guiListener.register(rankedGui);
@@ -1902,6 +1943,24 @@ public final class FeatureBootstrap {
         // the bridge cancels after them. See DeathBridge / MatchListener.onDeath.
         com.rumilance.practice.combat.DeathBridge.start(plugin);
         pm.registerEvents(new BedrockJoinListener(plugin), plugin);
+        // Ranked queue auto-unlock: 30人以上のユニークプレイヤーが来たら自動解放。
+        pm.registerEvents(new org.bukkit.event.Listener() {
+            @org.bukkit.event.EventHandler
+            public void onJoin(org.bukkit.event.player.PlayerJoinEvent event) {
+                boolean unlocked = rankedQueueState.onPlayerJoin(event.getPlayer().getUniqueId());
+                if (unlocked) {
+                    String msg = "Ranked queue auto-unlocked ("
+                            + com.rumilance.practice.queue.RankedQueueState.AUTO_UNLOCK_THRESHOLD
+                            + " unique players reached)!";
+                    plugin.getLogger().info("[N Arena] " + msg);
+                    for (org.bukkit.entity.Player online : Bukkit.getOnlinePlayers()) {
+                        if (online.hasPermission("rumilance.admin")) {
+                            online.sendMessage(Component.text(msg, NamedTextColor.GOLD));
+                        }
+                    }
+                }
+            }
+        }, plugin);
         SmithingTrimListener smithingTrimListener =
                 new SmithingTrimListener(rankService, smithingTrimGui, stateManager, messageService);
         smithingTrimListener.setAfkBlocked(afkCrystalManager::hasSession);
@@ -1968,6 +2027,8 @@ public final class FeatureBootstrap {
         practiceAdmin.setInnerKits(innerKits);
         practiceAdmin.setBanService(banService);
         practiceAdmin.setResourcePackService(resourcePackService);
+        practiceAdmin.setQueueCoordinator(queueCoordinator);
+        practiceAdmin.setFloatingEntitiesService(floatingEntitiesService);
         practiceAdmin.setAltDetectionService(this.altDetection);
         AdminCommand adminCommand = new AdminCommand(
                 plugin, statsResetService, playerRepository, asyncExecutor, originalKitService);
@@ -2088,7 +2149,10 @@ public final class FeatureBootstrap {
         bind("leave", new LeaveCommand(matchService, messageService));
         // フレンド機能は未実装: いまは「実装予定」の告知だけ返す(コマンド名は先に確保)。
         bind("friend", new com.rumilance.practice.command.FriendCommand(messageService));
-        bind("team", new TeamCommand(teamService, kitService, teamHubGui, teamsBrowserGui, messageService));
+        TeamCommand teamCommand = new TeamCommand(teamService, kitService, teamHubGui, teamsBrowserGui, messageService);
+        com.rumilance.practice.team.PartyBotService partyBotService = new com.rumilance.practice.team.PartyBotService(plugin);
+        teamCommand.setPartyBotService(partyBotService);
+        bind("team", teamCommand);
         bind("tournament", tournamentCommand);
         bind("prac", new PracCommand(practiceService));
         bind("tier", new com.rumilance.practice.command.TierCommand(tierService, messageService));
@@ -2231,6 +2295,9 @@ public final class FeatureBootstrap {
         if (this.altDetection != null) {
             this.altDetection.shutdown();
             this.altDetection = null;
+        }
+        if (floatingEntitiesService != null) {
+            floatingEntitiesService.shutdown();
         }
         if (queueCoordinator != null) {
             queueCoordinator.stop();

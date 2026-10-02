@@ -55,6 +55,7 @@ public final class QueueCoordinator {
     private final PluginSettings settings;
     private final boolean blockSameIp;
     private final boolean avoidRecent;
+    private final RankedQueueState rankedState;
     private BukkitTask matchTask;
     private BukkitTask actionBarTask;
     private com.rumilance.practice.ffa.FfaService ffaService;
@@ -75,7 +76,8 @@ public final class QueueCoordinator {
             PluginSettings settings,
             boolean blockSameIp,
             boolean avoidRecent,
-            MessageService messageService
+            MessageService messageService,
+            RankedQueueState rankedState
     ) {
         this.plugin = plugin;
         this.queueService = queueService;
@@ -91,6 +93,7 @@ public final class QueueCoordinator {
         this.blockSameIp = blockSameIp;
         this.avoidRecent = avoidRecent;
         this.messageService = messageService;
+        this.rankedState = rankedState;
     }
 
     public void setFfaService(com.rumilance.practice.ffa.FfaService ffaService) {
@@ -127,6 +130,10 @@ public final class QueueCoordinator {
         this.signQueueService = signQueueService;
     }
 
+    public RankedQueueState rankedState() {
+        return rankedState;
+    }
+
     /** FeatureBootstrap injects the guard shared with the sign-queue service. */
     public void setClickGuard(QueueClickGuard clickGuard) {
         if (clickGuard != null) {
@@ -151,6 +158,14 @@ public final class QueueCoordinator {
             return;
         }
         if (mode == MatchMode.FFA) {
+            return;
+        }
+        if (mode == MatchMode.RANKED && !rankedState.isEnabled()) {
+            messageService.send(player, "queue.ranked-locked",
+                    MessageService.tags("count",
+                            String.valueOf(rankedState.uniqueJoinCount()),
+                            "threshold",
+                            String.valueOf(RankedQueueState.AUTO_UNLOCK_THRESHOLD)));
             return;
         }
         if (runtimeFlags.maintenance() && !player.hasPermission("rumilance.admin")) {

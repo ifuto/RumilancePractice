@@ -255,11 +255,19 @@ public final class LobbyService {
             }
         }
         if (lobbyInventory.length >= 40) {
-            ItemStack[] armor = new ItemStack[4];
+            // 置換先が空気(null)の際は置換しない — LobbyWearService が配布する
+            // 革靴・エリトラを壊さないため。clear() で消えた防具スロットに、
+            // /setlobbyitem で保存されたアイテムだけを戻す。null は「元から空」を意味する
+            // ので、LobbyWearService の reconcile が後から空きスロットへ入れてくれる。
             for (int i = 0; i < 4; i++) {
-                armor[i] = lobbyInventory[36 + i] == null ? null : lobbyInventory[36 + i].clone();
+                ItemStack saved = lobbyInventory[36 + i];
+                if (saved != null && !saved.getType().isAir()) {
+                    player.getInventory().setItem(
+                            org.bukkit.inventory.EquipmentSlot.values()[
+                                    org.bukkit.inventory.EquipmentSlot.FEET.ordinal() + i],
+                            saved.clone());
+                }
             }
-            player.getInventory().setArmorContents(armor);
         }
         if (lobbyInventory.length > 40 && lobbyInventory[40] != null && !isGameMenuItem(lobbyInventory[40])) {
             player.getInventory().setItemInOffHand(lobbyInventory[40].clone());

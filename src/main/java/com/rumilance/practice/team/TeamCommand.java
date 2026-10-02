@@ -27,6 +27,7 @@ public final class TeamCommand implements CommandExecutor, TabCompleter {
     private final com.rumilance.practice.gui.menus.TeamHubGui teamHubGui;
     private final com.rumilance.practice.gui.menus.TeamsBrowserGui teamsBrowserGui;
     private final com.rumilance.practice.locale.MessageService messageService;
+    private volatile PartyBotService partyBotService;
 
     public TeamCommand(TeamService teamService, com.rumilance.practice.kit.KitService kitService,
                        com.rumilance.practice.gui.menus.TeamHubGui teamHubGui,
@@ -43,6 +44,10 @@ public final class TeamCommand implements CommandExecutor, TabCompleter {
         this.teamHubGui = teamHubGui;
         this.teamsBrowserGui = teamsBrowserGui;
         this.messageService = messageService;
+    }
+
+    public void setPartyBotService(PartyBotService partyBotService) {
+        this.partyBotService = partyBotService;
     }
 
     @Override
@@ -232,6 +237,40 @@ public final class TeamCommand implements CommandExecutor, TabCompleter {
                         player.sendMessage(Component.text("  " + t.name() + " - " + t.size() + " players",
                                 NamedTextColor.GRAY)));
             }
+            case "addbot" -> {
+                var team = teamService.teamOf(player.getUniqueId());
+                if (team.isEmpty()) {
+                    player.sendMessage(Component.text("You are not in a team.", NamedTextColor.RED));
+                    return true;
+                }
+                if (team.get().owner() != player.getUniqueId()) {
+                    player.sendMessage(Component.text("Only the team owner can add bots.", NamedTextColor.RED));
+                    return true;
+                }
+                if (partyBotService == null) {
+                    player.sendMessage(Component.text("Bot service not available.", NamedTextColor.RED));
+                    return true;
+                }
+                UUID botId = partyBotService.addBot(team.get());
+                if (botId != null) {
+                    player.sendMessage(Component.text("Bot added to your team.", NamedTextColor.GREEN));
+                } else {
+                    player.sendMessage(Component.text("No more bot slots available.", NamedTextColor.RED));
+                }
+            }
+            case "removebot" -> {
+                var team = teamService.teamOf(player.getUniqueId());
+                if (team.isEmpty()) {
+                    player.sendMessage(Component.text("You are not in a team.", NamedTextColor.RED));
+                    return true;
+                }
+                if (partyBotService == null) {
+                    player.sendMessage(Component.text("Bot service not available.", NamedTextColor.RED));
+                    return true;
+                }
+                partyBotService.removeAllBots(team.get());
+                player.sendMessage(Component.text("All bots removed.", NamedTextColor.GREEN));
+            }
             default -> sendHelp(player, label);
         }
         return true;
@@ -312,7 +351,8 @@ public final class TeamCommand implements CommandExecutor, TabCompleter {
                 if (teamOpt.get().isOwner(player.getUniqueId())) {
                     subs.addAll(List.of("queue", "unqueue", "duel", "accept", "deny"));
                     subs.addAll(List.of("invite", "kick", "public", "side",
-                            "autosplit", "clearsides", "teamcount", "start", "disband"));
+                            "autosplit", "clearsides", "teamcount", "start", "disband",
+                            "addbot", "removebot"));
                 }
             }
             return filter(args[0], subs);

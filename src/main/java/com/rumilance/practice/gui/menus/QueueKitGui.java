@@ -41,6 +41,7 @@ public final class QueueKitGui extends AbstractGui {
     // Ranked-only TOP5 hover lore: which repository and how confident a rating must be to list.
     private com.rumilance.practice.database.repository.RankedStatsRepository rankedStatsRepository;
     private double leaderboardMaxDeviation = 115.0d;
+    private volatile com.rumilance.practice.kit.LastSelectedKitTracker lastKitTracker;
 
     public QueueKitGui(
             GuiSessionRegistry registry,
@@ -60,6 +61,10 @@ public final class QueueKitGui extends AbstractGui {
 
     public void setPreviewGui(KitPreviewGui previewGui) {
         this.previewGui = previewGui;
+    }
+
+    public void setLastKitTracker(com.rumilance.practice.kit.LastSelectedKitTracker lastKitTracker) {
+        this.lastKitTracker = lastKitTracker;
     }
 
     /** Wires the TOP5 hover ranking for the ranked queue (unused on the unranked GUI). */
@@ -174,6 +179,33 @@ public final class QueueKitGui extends AbstractGui {
                                         String.valueOf(subCount)),
                                 UiTheme.blank(),
                                 UiTheme.hint(line(player, "gui.kit-button-hint")))));
+        // 前回選択したキットを MAIN と SUB の間に表示
+        renderLastSelectedKit(player, inventory);
+    }
+
+    private void renderLastSelectedKit(Player player, Inventory inventory) {
+        com.rumilance.practice.kit.LastSelectedKitTracker tracker = lastKitTracker;
+        if (tracker == null) return;
+        String lastKitId = tracker.get(player.getUniqueId());
+        if (lastKitId == null) return;
+        KitDefinition kit = kitService.get(lastKitId).orElse(null);
+        if (kit == null || !kit.enabled() || !kitService.isQueueEnabled(kit.name())) return;
+        KitDefinition shown = kitService.tile(kit);
+        if (!shown.enabled() || !kitService.isQueueEnabled(shown.name())) return;
+        Material mat = ItemBuilder.materialOr(kit.icon(), Material.DIAMOND_SWORD);
+        inventory.setItem(MenuScaffold.gridSlot(10),
+                ItemBuilder.of(mat)
+                        .nameMini(kit.prettyDisplayName())
+                        .lore(
+                                UiTheme.divider(),
+                                UiTheme.line(line(player, "gui.kit-last-selected")),
+                                UiTheme.blank(),
+                                UiTheme.hint(line(player, "gui.queue-left-join"))
+                        )
+                        .glint(true)
+                        .action("kit:" + kit.name())
+                        .tag(com.rumilance.practice.util.ItemKeys.kitName(), kit.name())
+                        .build());
     }
 
     /** 選ばれたカテゴリのキットをグリッド一杯に並べる(Main と Sub が別画面になった)。 */
@@ -438,6 +470,9 @@ public final class QueueKitGui extends AbstractGui {
                 return;
             }
             player.closeInventory();
+            if (lastKitTracker != null) {
+                lastKitTracker.record(player.getUniqueId(), kitId);
+            }
             queueCoordinator.join(player, kitId, mode());
         }
     }

@@ -196,8 +196,27 @@ public final class Team {
         members.add(player);
     }
 
+    /** Public add for bot members (package-private add is for TeamService). */
+    public void addMember(UUID player, String displayName, TeamColor side) {
+        add(player);
+        if (side != null) {
+            assignSide(player, side);
+        }
+    }
+
     boolean remove(UUID player) {
         return members.remove(player);
+    }
+
+    /** Public remove for bot members. */
+    public void removeMember(UUID player) {
+        remove(player);
+        unassignSide(player);
+    }
+
+    /** True when the UUID is in the members set. */
+    public boolean isMember(UUID player) {
+        return members.contains(player);
     }
 
     Set<UUID> invites() {

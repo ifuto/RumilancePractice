@@ -34,6 +34,7 @@ public final class ArenaAdminGui extends AbstractGui {
     private final ArenaTemplateStore arenaStore;
     private final ArenaService arenaService;
     private BiConsumer<Player, String> partyIconPrompt = (p, n) -> { };
+    private volatile java.util.function.Function<String, ArenaDetailGui> detailGuiFactory;
 
     public ArenaAdminGui(GuiSessionRegistry registry, SoundService sounds,
                          ArenaTemplateStore arenaStore, ArenaService arenaService) {
@@ -44,6 +45,11 @@ public final class ArenaAdminGui extends AbstractGui {
 
     public void setPartyIconPrompt(BiConsumer<Player, String> partyIconPrompt) {
         this.partyIconPrompt = partyIconPrompt == null ? (p, n) -> { } : partyIconPrompt;
+    }
+
+    /** Factory for creating detail GUIs for individual arenas. Wired at bootstrap. */
+    public void setDetailGuiFactory(java.util.function.Function<String, ArenaDetailGui> factory) {
+        this.detailGuiFactory = factory;
     }
 
     @Override
@@ -88,11 +94,7 @@ public final class ArenaAdminGui extends AbstractGui {
                             UiTheme.status(line(player, t.party() ? "gui.arena-party-map" : "gui.arena-normal"),
                                     t.party() ? UiTheme.SECONDARY : UiTheme.MUTED),
                             UiTheme.blank(),
-                            UiTheme.hint(line(player, "gui.arena-left-toggle")),
-                            UiTheme.hint(line(player, "gui.arena-right-type")),
-                            UiTheme.hint(line(player, "gui.arena-shift-party")),
-                            UiTheme.hint(line(player, "gui.arena-shift-rename")),
-                            UiTheme.hint(line(player, "gui.arena-q-delete"))
+                            UiTheme.hint(line(player, "menu.click"))
                     )
                     .glint(t.enabled())
                     .action("arena:" + t.name())
@@ -140,6 +142,7 @@ public final class ArenaAdminGui extends AbstractGui {
             sounds.play(player, "error");
             return;
         }
+        // Q (drop) still works as a quick-delete shortcut
         if (click == ClickType.DROP || click == ClickType.CONTROL_DROP) {
             arenaStore.delete(name);
             arenaService.setTemplates(arenaStore.templates());
@@ -147,51 +150,19 @@ public final class ArenaAdminGui extends AbstractGui {
             refresh(player, session, inventory);
             return;
         }
-        if (click == ClickType.SHIFT_RIGHT) {
-            player.closeInventory();
-            player.sendMessage(t(player, "gui.arena-rename-prompt"));
-            String old = name;
-            PendingInput.await(player, text -> {
-                if (text.equalsIgnoreCase("cancel") || text.isBlank()) {
-                    player.sendMessage(t(player, "gui.arena-rename-cancel"));
-                } else {
-                    ArenaTemplateStore.RenameResult r = arenaStore.rename(old, text);
-                    arenaService.setTemplates(arenaStore.templates());
-                    player.sendMessage(t(player, r == ArenaTemplateStore.RenameResult.OK
-                            ? "gui.arena-renamed" : "gui.arena-rename-fail",
-                            MessageService.tags(
-                                    r == ArenaTemplateStore.RenameResult.OK ? "name" : "code",
-                                    r == ArenaTemplateStore.RenameResult.OK ? text : r.name()))
-                            .color(r == ArenaTemplateStore.RenameResult.OK ? UiTheme.SUCCESS : UiTheme.DANGER));
-                }
-                open(player);
-            });
-            return;
-        }
-        if (click == ClickType.SHIFT_LEFT) {
-            boolean next = !t.party();
-            arenaStore.setParty(name, next);
-            arenaService.setTemplates(arenaStore.templates());
-            if (next) {
-                player.sendMessage(t(player, "gui.arena-party-on"));
-                partyIconPrompt.accept(player, name);
+        // Any click opens the detail management page
+        sounds.play(player, "gui-click");
+        java.util.function.Function<String, ArenaDetailGui> factory = detailGuiFactory;
+        if (factory != null) {
+            ArenaDetailGui detail = factory.apply(name);
+            if (detail != null) {
+                detail.open(player);
+                return;
             }
-            sounds.play(player, "gui-click");
-            refresh(player, session, inventory);
-            return;
         }
-        if (click == ClickType.RIGHT) {
-            ArenaType[] values = ArenaType.values();
-            ArenaType next = values[(t.type().ordinal() + 1) % values.length];
-            arenaStore.setType(name, next);
-            arenaService.setTemplates(arenaStore.templates());
-            sounds.play(player, "gui-click");
-            refresh(player, session, inventory);
-            return;
-        }
+        // Fallback: old toggle behavior if factory not wired
         arenaStore.setEnabled(name, !t.enabled());
         arenaService.setTemplates(arenaStore.templates());
-        sounds.play(player, "gui-click");
         refresh(player, session, inventory);
     }
 }

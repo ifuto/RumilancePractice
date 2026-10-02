@@ -27,10 +27,15 @@ public final class KitSelectGui extends AbstractGui {
     private final KitService kitService;
     private DuelRequestGui duelRequestGui;
     private InnerKitSelectGui innerKitSelectGui;
+    private volatile com.rumilance.practice.kit.LastSelectedKitTracker lastKitTracker;
 
     public KitSelectGui(GuiSessionRegistry registry, SoundService sounds, KitService kitService) {
         super(registry, sounds, GuiType.KIT_SELECT, 6, true);
         this.kitService = kitService;
+    }
+
+    public void setLastKitTracker(com.rumilance.practice.kit.LastSelectedKitTracker lastKitTracker) {
+        this.lastKitTracker = lastKitTracker;
     }
 
     public void setDuelRequestGui(DuelRequestGui duelRequestGui) {
@@ -104,6 +109,32 @@ public final class KitSelectGui extends AbstractGui {
         inventory.setItem(GuiSlots.slot(CHOOSER_ROW, 5),
                 categoryTile(player, com.rumilance.practice.model.KitCategory.SUB,
                         "gui.kit-sub-button", UiTheme.SECONDARY));
+        // 前回選択したキットを MAIN と SUB の間に表示 (クリックで即選択)
+        renderLastSelectedKit(player, inventory);
+    }
+
+    private void renderLastSelectedKit(Player player, Inventory inventory) {
+        com.rumilance.practice.kit.LastSelectedKitTracker tracker = lastKitTracker;
+        if (tracker == null) return;
+        String lastKitId = tracker.get(player.getUniqueId());
+        if (lastKitId == null) return;
+        var kit = kitService.get(lastKitId).orElse(null);
+        if (kit == null || !kit.enabled()) return;
+        Material mat = Material.matchMaterial(kit.icon());
+        if (mat == null) mat = Material.DIAMOND_SWORD;
+        inventory.setItem(GuiSlots.slot(CHOOSER_ROW, 4),
+                ItemBuilder.of(mat)
+                        .name(Component.text(KitNames.pretty(kit.name()), UiTheme.VALUE)
+                                .decoration(TextDecoration.ITALIC, false))
+                        .lore(
+                                UiTheme.divider(),
+                                UiTheme.line(line(player, "gui.kit-last-selected")),
+                                UiTheme.blank(),
+                                UiTheme.hint(line(player, "gui.kit-click-select"))
+                        )
+                        .glint(true)
+                        .action("pick:" + kit.name())
+                        .build());
     }
 
     private ItemStack categoryTile(Player player, com.rumilance.practice.model.KitCategory category,
@@ -233,7 +264,11 @@ public final class KitSelectGui extends AbstractGui {
         }
         if (action != null && action.startsWith("pick:")) {
             // フォルダを選んだらデフォルトの子で進む(中メニューから選んだ子はそのまま)。
-            session.setSelectedKit(kitService.playableId(action.substring(5)));
+            String chosen = kitService.playableId(action.substring(5));
+            session.setSelectedKit(chosen);
+            if (lastKitTracker != null) {
+                lastKitTracker.record(player.getUniqueId(), chosen);
+            }
             sounds.play(player, "select");
             returnToDuel(player, session);
         }

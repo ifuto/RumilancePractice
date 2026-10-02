@@ -75,6 +75,8 @@ public final class BanCommand implements CommandExecutor, TabCompleter {
         Duration duration = null;
         String durationToken = null;
         int reasonEnd = args.length;
+
+        // Check the last arg first (standard: /ban Steve Cheating 30d).
         if (args.length >= 3 && BanDuration.looksLike(args[args.length - 1])) {
             durationToken = args[args.length - 1];
             reasonEnd = args.length - 1;
@@ -82,6 +84,7 @@ public final class BanCommand implements CommandExecutor, TabCompleter {
                 duration = BanDuration.parse(durationToken).orElse(null);
             }
         }
+
         StringBuilder reason = new StringBuilder();
         for (int i = 1; i < reasonEnd; i++) {
             if (i > 1) {
@@ -96,6 +99,20 @@ public final class BanCommand implements CommandExecutor, TabCompleter {
         // Multi-word reasons use underscores (Cheating_Teaming -> "Cheating Teaming"); typed
         // casing is preserved verbatim (same KEEP-casing rule as kit name registration).
         String reasonText = com.rumilance.practice.util.KitNames.pretty(reason.toString()).trim();
+
+        // Also check if the LAST underscore-separated token inside the reason is a duration.
+        // This handles /ban Steve Cheating_30d where "30d" is part of the underscore arg.
+        if (durationToken == null && reasonText.contains(" ")) {
+            int lastSpace = reasonText.lastIndexOf(' ');
+            String lastWord = reasonText.substring(lastSpace + 1).trim();
+            if (BanDuration.looksLike(lastWord)) {
+                durationToken = lastWord;
+                if (!lastWord.equalsIgnoreCase("auto")) {
+                    duration = BanDuration.parse(lastWord).orElse(null);
+                }
+                reasonText = reasonText.substring(0, lastSpace).trim();
+            }
+        }
         if (reasonText.isEmpty()) {
             sender.sendMessage(Component.text("Reason is required.", NamedTextColor.RED));
             return true;
