@@ -336,11 +336,11 @@ public final class KbProbe {
         }
 
         double hRaw = Math.hypot(dx, dz);
-        // KB無効領域ガード: 速度差分が極小 = サーバーがKBを抑制(ロビー保護等)。
-        // ダメージパケット+速度パケット(0)が来るパターンを防ぐ。
-        if (!KbProbeMath.horizontalImpulseReal(hRaw)) {
-            StatsStore.statsFor(serverKey()).noKbEvents++;
-            StatsStore.save();
+        // KB 抑制ガード: 速度パケットが来ても差分が0 ≈ サーバーがKBを抑制した
+        // （ロビー保護、damage event cancel 後の空パケット等）。fH≈0 の偽サンプルが
+        // 平均を破壊するので静かに棄却。noKbEvents には加算しない（速度パケットは届いている）。
+        // しきい値 = 速度パケット 1 単位 (1/8000 ≈ 0.000125) より少し余裕を持たせた値。
+        if (hRaw < 5.0e-4 && Math.abs(dy) < 5.0e-4) {
             return;
         }
         // 方向ガード: KB は攻撃者→被害者へ押し出すはず。逆向き/横向きの速度は他起因のノイズ
