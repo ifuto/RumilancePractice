@@ -651,6 +651,11 @@ public final class KitService {
         return RenameResult.OK;
     }
 
+    /** Returns the display name of a kit, falling back to the id itself. */
+    public String displayName(String kitId) {
+        return get(kitId).map(KitDefinition::displayName).orElse(kitId);
+    }
+
     public void setQueueEnabled(String kitId, boolean enabled) {
         queueEnabled.put(kitId.toLowerCase(Locale.ROOT), enabled);
     }

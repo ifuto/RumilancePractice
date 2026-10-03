@@ -77,6 +77,11 @@ public final class ItemKeys {
         return key(LEAVE_QUEUE);
     }
 
+    private static final String QUEUE_SELECT = "queue_select";
+    public static NamespacedKey queueSelect() {
+        return key(QUEUE_SELECT);
+    }
+
     public static NamespacedKey rematch() {
         return key(REMATCH);
     }

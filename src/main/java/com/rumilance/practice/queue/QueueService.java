@@ -7,6 +7,7 @@ import com.rumilance.practice.state.MatchMode;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -14,9 +15,11 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * Kit+mode separated matchmaking queues with expanding PT range for ranked.
+ * Supports multiple simultaneous queues per player (multi-queue).
  */
 public final class QueueService {
 
@@ -35,7 +38,8 @@ public final class QueueService {
     }
 
     private final PluginSettings settings;
-    private final Map<UUID, QueueEntry> byPlayer = new ConcurrentHashMap<>();
+    /** player → all their queue entries (multi-queue). */
+    private final Map<UUID, List<QueueEntry>> byPlayer = new ConcurrentHashMap<>();
     private final Map<String, List<QueueEntry>> byQueue = new ConcurrentHashMap<>();
     private final Map<UUID, UUID> recentOpponents = new ConcurrentHashMap<>();
 
@@ -48,6 +52,10 @@ public final class QueueService {
                 + (platform == null ? PlayerPlatform.JAVA.queueToken() : platform.queueToken());
     }
 
+    /**
+     * Join a queue. Multi-queue: a player may be in multiple kit queues simultaneously.
+     * Returns false only if already queued for this exact kit+mode.
+     */
     public synchronized boolean join(
             UUID playerId,
             String kitId,
@@ -56,39 +64,98 @@ public final class QueueService {
             String ip,
             PlayerPlatform platform
     ) {
-        if (!PracticeGuards.canEnterQueue(mode, byPlayer.containsKey(playerId))) {
-            return false;
-        }
         PlayerPlatform resolved = platform == null ? PlayerPlatform.JAVA : platform;
+        String key = queueKey(mode, kitId, resolved);
+        // 同一キット+モードに既にキューしていればスキップ
+        List<QueueEntry> playerEntries = byPlayer.computeIfAbsent(playerId, k -> new ArrayList<>());
+        for (QueueEntry existing : playerEntries) {
+            if (existing.mode() == mode && existing.kitId().equalsIgnoreCase(kitId)
+                    && existing.platform() == resolved) {
+                return false;
+            }
+        }
         QueueEntry entry = new QueueEntry(playerId, kitId.toLowerCase(), mode, pt, Instant.now(), ip, resolved);
-        byPlayer.put(playerId, entry);
-        byQueue.computeIfAbsent(queueKey(mode, kitId, resolved), k -> new ArrayList<>()).add(entry);
+        playerEntries.add(entry);
+        byQueue.computeIfAbsent(key, k -> new ArrayList<>()).add(entry);
         return true;
     }
 
+    /** Leave ALL queues for this player. Returns the first removed entry (for backward compat). */
     public synchronized Optional<QueueEntry> leave(UUID playerId) {
-        QueueEntry removed = byPlayer.remove(playerId);
-        if (removed == null) {
+        List<QueueEntry> entries = byPlayer.remove(playerId);
+        if (entries == null || entries.isEmpty()) {
             return Optional.empty();
         }
-        List<QueueEntry> list = byQueue.get(queueKey(removed.mode(), removed.kitId(), removed.platform()));
-        if (list != null) {
-            list.removeIf(e -> e.playerId().equals(playerId));
+        for (QueueEntry removed : entries) {
+            List<QueueEntry> list = byQueue.get(queueKey(removed.mode(), removed.kitId(), removed.platform()));
+            if (list != null) {
+                list.removeIf(e -> e.playerId().equals(playerId));
+            }
         }
-        return Optional.of(removed);
+        return Optional.of(entries.get(0));
     }
 
+    /** Leave a specific kit+mode queue. */
+    public synchronized boolean leaveKit(UUID playerId, String kitId, MatchMode mode, PlayerPlatform platform) {
+        List<QueueEntry> entries = byPlayer.get(playerId);
+        if (entries == null) return false;
+        PlayerPlatform resolved = platform == null ? PlayerPlatform.JAVA : platform;
+        Iterator<QueueEntry> it = entries.iterator();
+        boolean removed = false;
+        while (it.hasNext()) {
+            QueueEntry e = it.next();
+            if (e.mode() == mode && e.kitId().equalsIgnoreCase(kitId) && e.platform() == resolved) {
+                it.remove();
+                List<QueueEntry> list = byQueue.get(queueKey(mode, kitId, resolved));
+                if (list != null) list.removeIf(x -> x.playerId().equals(playerId));
+                removed = true;
+                break;
+            }
+        }
+        if (entries.isEmpty()) byPlayer.remove(playerId);
+        return removed;
+    }
+
+    /** First entry for backward compat (action bar, etc). */
     public Optional<QueueEntry> get(UUID playerId) {
-        return Optional.ofNullable(byPlayer.get(playerId));
+        List<QueueEntry> entries = byPlayer.get(playerId);
+        if (entries == null || entries.isEmpty()) return Optional.empty();
+        return Optional.of(entries.get(0));
+    }
+
+    /** All queue entries for a player. */
+    public List<QueueEntry> getAll(UUID playerId) {
+        return byPlayer.getOrDefault(playerId, List.of());
     }
 
     public boolean isQueued(UUID playerId) {
-        return byPlayer.containsKey(playerId);
+        List<QueueEntry> entries = byPlayer.get(playerId);
+        return entries != null && !entries.isEmpty();
+    }
+
+    /** Check if player is queued for a specific kit+mode. */
+    public boolean isQueuedFor(UUID playerId, String kitId, MatchMode mode) {
+        List<QueueEntry> entries = byPlayer.get(playerId);
+        if (entries == null) return false;
+        for (QueueEntry e : entries) {
+            if (e.mode() == mode && e.kitId().equalsIgnoreCase(kitId)) return true;
+        }
+        return false;
+    }
+
+    /** All kitIds the player is currently queued for in a given mode. */
+    public java.util.Set<String> queuedKitIds(UUID playerId, MatchMode mode) {
+        List<QueueEntry> entries = byPlayer.get(playerId);
+        if (entries == null) return java.util.Set.of();
+        return entries.stream()
+                .filter(e -> e.mode() == mode)
+                .map(QueueEntry::kitId)
+                .collect(Collectors.toSet());
     }
 
     /** 1-based position of {@code playerId} within their own kit+mode+platform wait list. */
     public int positionOf(UUID playerId) {
-        QueueEntry entry = byPlayer.get(playerId);
+        QueueEntry entry = get(playerId).orElse(null);
         if (entry == null) {
             return 0;
         }
@@ -107,7 +174,7 @@ public final class QueueService {
 
     /** Total waiters in the same kit+mode+platform list as {@code playerId}. */
     public int listSizeOf(UUID playerId) {
-        QueueEntry entry = byPlayer.get(playerId);
+        QueueEntry entry = get(playerId).orElse(null);
         if (entry == null) {
             return 0;
         }
@@ -121,16 +188,19 @@ public final class QueueService {
         return list == null ? 0 : list.size();
     }
 
+    /** Total unique queued players. */
     public int totalWaiting() {
         return byPlayer.size();
     }
 
-    /** Total waiters in one mode across all kits, for the given client platform. */
+    /** Total entries in one mode across all kits, for the given client platform. */
     public int totalWaiting(MatchMode mode, PlayerPlatform platform) {
         int count = 0;
-        for (QueueEntry entry : byPlayer.values()) {
-            if (entry.mode() == mode && entry.platform() == platform) {
-                count++;
+        for (List<QueueEntry> entries : byPlayer.values()) {
+            for (QueueEntry entry : entries) {
+                if (entry.mode() == mode && entry.platform() == platform) {
+                    count++;
+                }
             }
         }
         return count;
@@ -141,11 +211,12 @@ public final class QueueService {
         byQueue.clear();
     }
 
-    /** Remove entries for players who are no longer connected. Called before each matchmaking
-     *  poll so a disconnect-during-queue can never leave a ghost entry that pairs with a live
-     *  player. Runs on the main thread (scheduler tick). */
+    /** Remove entries for players who are no longer connected. */
     public synchronized void pruneOffline() {
-        byPlayer.values().removeIf(entry -> org.bukkit.Bukkit.getPlayer(entry.playerId()) == null);
+        byPlayer.values().removeIf(entries -> {
+            entries.removeIf(entry -> org.bukkit.Bukkit.getPlayer(entry.playerId()) == null);
+            return entries.isEmpty();
+        });
         for (List<QueueEntry> list : byQueue.values()) {
             list.removeIf(e -> org.bukkit.Bukkit.getPlayer(e.playerId()) == null);
         }
@@ -179,8 +250,9 @@ public final class QueueService {
                             continue;
                         }
                         pairs.add(new MatchPair(a, b));
-                        byPlayer.remove(a.playerId());
-                        byPlayer.remove(b.playerId());
+                        // Remove matched players from ALL queues (multi-queue cleanup)
+                        removePlayerFromAllQueues(a.playerId());
+                        removePlayerFromAllQueues(b.playerId());
                         list.remove(j);
                         list.remove(i);
                         if (avoidRecent) {
@@ -220,6 +292,16 @@ public final class QueueService {
 
     public synchronized void removeStale(UUID playerId) {
         leave(playerId);
+    }
+
+    /** Remove a player from ALL queues and clean up byQueue references. */
+    private void removePlayerFromAllQueues(UUID playerId) {
+        List<QueueEntry> entries = byPlayer.remove(playerId);
+        if (entries == null) return;
+        for (QueueEntry e : entries) {
+            List<QueueEntry> list = byQueue.get(queueKey(e.mode(), e.kitId(), e.platform()));
+            if (list != null) list.removeIf(x -> x.playerId().equals(playerId));
+        }
     }
 
 

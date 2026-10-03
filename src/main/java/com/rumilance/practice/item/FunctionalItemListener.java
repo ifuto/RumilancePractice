@@ -32,6 +32,7 @@ public final class FunctionalItemListener implements Listener {
     private final QueueKitGui rankedGui;
     private final QueueKitGui unrankedGui;
     private volatile com.rumilance.practice.signqueue.SignQueueService signQueueService;
+    private volatile java.util.function.Consumer<Player> multiQueueGuiOpener;
     private Consumer<Player> openSettings = p -> {
     };
     private Consumer<Player> openFfa = p -> {
@@ -75,6 +76,10 @@ public final class FunctionalItemListener implements Listener {
 
     public void setSignQueueService(com.rumilance.practice.signqueue.SignQueueService signQueueService) {
         this.signQueueService = signQueueService;
+    }
+
+    public void setMultiQueueGuiOpener(java.util.function.Consumer<Player> opener) {
+        this.multiQueueGuiOpener = opener;
     }
 
     public void setOpenSettings(Consumer<Player> openSettings) {
@@ -192,6 +197,13 @@ public final class FunctionalItemListener implements Listener {
                 signQueue.leave(player);
             } else {
                 queueCoordinator.leave(player);
+            }
+            return;
+        }
+        if (pdc.has(ItemKeys.queueSelect(), PersistentDataType.BYTE)) {
+            event.setCancelled(true);
+            if (multiQueueGuiOpener != null) {
+                multiQueueGuiOpener.accept(player);
             }
             return;
         }

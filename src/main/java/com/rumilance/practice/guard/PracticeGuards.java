@@ -220,9 +220,7 @@ public final class PracticeGuards {
         if (mode == MatchMode.FFA) {
             return false;
         }
-        if (alreadyQueued) {
-            return false;
-        }
+        // Multi-queue: 既にキュー中でも新しいキットのキュー参加を許可
         return true;
     }
 

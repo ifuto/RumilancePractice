@@ -132,6 +132,7 @@ import com.rumilance.practice.gui.menus.PracticeMaceGui;
 import com.rumilance.practice.gui.menus.PresetAdminGui;
 import com.rumilance.practice.gui.menus.ProfileGui;
 import com.rumilance.practice.gui.menus.QueueKitGui;
+import com.rumilance.practice.gui.menus.MultiQueueGui;
 import com.rumilance.practice.gui.menus.ReportGui;
 import com.rumilance.practice.gui.menus.ReportListGui;
 import com.rumilance.practice.gui.menus.SettingsGui;
@@ -911,6 +912,17 @@ public final class FeatureBootstrap {
         QueueKitGui unrankedGui = new QueueKitGui(
                 guiSessions, soundService, kitService, queueService, queueCoordinator, false);
         unrankedGui.setLastKitTracker(lastKitTracker);
+
+        // Multi-Queue GUIs (複数キット同時キュー参加)
+        MultiQueueGui multiQueueRanked = new MultiQueueGui(
+                guiSessions, soundService, kitService, queueService, queueCoordinator,
+                messageService, MatchMode.RANKED);
+        MultiQueueGui multiQueueUnranked = new MultiQueueGui(
+                guiSessions, soundService, kitService, queueService, queueCoordinator,
+                messageService, MatchMode.UNRANKED);
+        guiListener.register(multiQueueRanked);
+        guiListener.register(multiQueueUnranked);
+
         KitSelectGui kitSelectGui = new KitSelectGui(guiSessions, soundService, kitService);
         kitSelectGui.setLastKitTracker(lastKitTracker);
         DuelRequestGui duelRequestGui = new DuelRequestGui(
@@ -1464,6 +1476,15 @@ public final class FeatureBootstrap {
         functionalItemListener.setOpenSpectate(spectateListGui::open);
         functionalItemListener.setOpenMenu(gameMenuGui::open);
         functionalItemListener.setOpenBattle(battleMenuGui::open);
+        functionalItemListener.setMultiQueueGuiOpener(player -> {
+            // キュー選択アイテム: 現在のモードに応じて MultiQueueGui を開く
+            boolean inRanked = queueService.get(player.getUniqueId())
+                    .map(e -> e.mode() == MatchMode.RANKED).orElse(false);
+            var gui = inRanked ? multiQueueRanked : multiQueueUnranked;
+            GuiSession s = guiSessions.open(player.getUniqueId(), gui.type(), gui.rows());
+            s.setRanked(inRanked);
+            com.rumilance.practice.gui.menus.PracticeGuiOpen.open(gui, player, s);
+        });
         functionalItemListener.setOpenTitles(titleGui::open);
         functionalItemListener.setOpenParty(player -> {
             if (teamService.teamOf(player.getUniqueId()).isPresent()) {

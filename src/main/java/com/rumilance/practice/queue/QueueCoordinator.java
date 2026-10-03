@@ -210,24 +210,21 @@ public final class QueueCoordinator {
         if (signQueueService != null) {
             signQueueService.leaveIfQueued(player);
         }
-        // Handle "already queued" BEFORE the state check below (a queued player sits in
-        // QUEUED_* which would otherwise be rejected): clicking the same queue leaves it,
-        // clicking another kit/mode switches queues.
-        if (queueService.isQueued(player.getUniqueId())) {
-            boolean sameQueue = queueService.get(player.getUniqueId())
-                    .map(e -> e.mode() == mode && e.kitId().equalsIgnoreCase(fightKitId))
-                    .orElse(false);
-            if (sameQueue) {
-                leave(player);
-                return;
+        // Multi-queue: 同一キットクリック → そのキットだけ退出。それ以外 → 新規追加。
+        if (queueService.isQueuedFor(player.getUniqueId(), fightKitId, mode)) {
+            queueService.leaveKit(player.getUniqueId(), fightKitId, mode, PlayerPlatform.of(player));
+            sounds.play(player, "queue-leave");
+            messageService.send(player, "queue.left",
+                    MessageService.tags("kit", kitService.displayName(fightKitId)));
+            if (!queueService.isQueued(player.getUniqueId())) {
+                stateManager.resetToLobby(player.getUniqueId());
             }
-            // Switching queues: drop the old entry and fall through into a fresh join for the
-            // new kit/mode (QUEUED->QUEUED is not a legal state transition, so reset first).
-            queueService.leave(player.getUniqueId());
-            stateManager.resetToLobby(player.getUniqueId());
+            return;
         }
+        // Already in some queue(s) but joining a new kit: state is QUEUED_* which is fine.
         PlayerState state = stateManager.getState(player.getUniqueId());
-        if (state != PlayerState.LOBBY && state != PlayerState.OPENING_GUI) {
+        if (state != PlayerState.LOBBY && state != PlayerState.OPENING_GUI
+                && state != PlayerState.QUEUED_RANKED && state != PlayerState.QUEUED_UNRANKED) {
             messageService.send(player, "queue.cannot-join");
             return;
         }
@@ -281,6 +278,36 @@ public final class QueueCoordinator {
         });
     }
 
+    /** 1つのキットだけキューから抜く (MultiQueueGui 用)。 */
+    public void leaveKit(Player player, String kitId, MatchMode mode) {
+        if (queueService.leaveKit(player.getUniqueId(), kitId, mode, PlayerPlatform.of(player))) {
+            sounds.play(player, "queue-leave");
+            messageService.send(player, "queue.left",
+                    MessageService.tags("kit", kitService.displayName(kitId)));
+            if (!queueService.isQueued(player.getUniqueId())) {
+                stateManager.resetToLobby(player.getUniqueId());
+                lobbyService.applyLobbyInventory(player);
+            }
+        }
+    }
+
+    /** 全キューから退出 (MultiQueueGui 用)。 */
+    public void leaveAll(Player player) {
+        if (queueService.isQueued(player.getUniqueId())) {
+            leave(player);
+        }
+    }
+
+    /** 指定モードの全有効キットにキュー参加 (MultiQueueGui の「全部参加」用)。 */
+    public void joinAll(Player player, MatchMode mode) {
+        for (com.rumilance.practice.model.KitDefinition kit : kitService.enabled()) {
+            String id = kitService.playableId(kit.name());
+            if (kitService.isQueueEnabled(id)) {
+                join(player, id, mode);
+            }
+        }
+    }
+
     private void tickMatchmaking() {
         if (runtimeFlags.maintenance()) {
             return;
@@ -331,13 +358,23 @@ public final class QueueCoordinator {
     }
 
     private void giveLeaveItem(Player player) {
-        ItemStack item = new ItemStack(Material.RED_DYE);
-        ItemMeta meta = item.getItemMeta();
-        meta.displayName(messageService.render(player, "menu.leave-queue")
+        // Slot 4: Queue Leave (赤)
+        ItemStack leaveItem = new ItemStack(Material.RED_DYE);
+        ItemMeta leaveMeta = leaveItem.getItemMeta();
+        leaveMeta.displayName(messageService.render(player, "menu.leave-queue")
                 .color(NamedTextColor.RED)
                 .decoration(TextDecoration.ITALIC, false));
-        meta.getPersistentDataContainer().set(ItemKeys.leaveQueue(), PersistentDataType.BYTE, (byte) 1);
-        item.setItemMeta(meta);
-        player.getInventory().setItem(4, item);
+        leaveMeta.getPersistentDataContainer().set(ItemKeys.leaveQueue(), PersistentDataType.BYTE, (byte) 1);
+        leaveItem.setItemMeta(leaveMeta);
+        player.getInventory().setItem(4, leaveItem);
+
+        // Slot 3: Queue Select (MultiQueueGui を開く — 黄色)
+        ItemStack selectItem = new ItemStack(Material.CLOCK);
+        ItemMeta selectMeta = selectItem.getItemMeta();
+        selectMeta.displayName(Component.text("Queue Select", NamedTextColor.YELLOW)
+                .decoration(TextDecoration.ITALIC, false));
+        selectMeta.getPersistentDataContainer().set(ItemKeys.queueSelect(), PersistentDataType.BYTE, (byte) 1);
+        selectItem.setItemMeta(selectMeta);
+        player.getInventory().setItem(3, selectItem);
     }
 }

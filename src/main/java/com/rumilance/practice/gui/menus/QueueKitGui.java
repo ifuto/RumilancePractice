@@ -214,6 +214,10 @@ public final class QueueKitGui extends AbstractGui {
         List<KitDefinition> kits = kitService.enabled(sub
                 ? com.rumilance.practice.model.KitCategory.SUB
                 : com.rumilance.practice.model.KitCategory.MAIN);
+        // Per-kit ranked フィルタ: ranked=true のキットだけランダムキューに表示
+        if (ranked) {
+            kits = kits.stream().filter(KitDefinition::ranked).toList();
+        }
         int perPage = MenuScaffold.gridPageSize();
         int page = Math.min(session.page(), Math.max(0, (kits.size() - 1) / perPage));
         for (int i = 0; i < perPage && page * perPage + i < kits.size(); i++) {
@@ -242,12 +246,9 @@ public final class QueueKitGui extends AbstractGui {
                     .build();
         }
 
-        // The kit this player is already queued in gets a bright "you are here" marker and
-        // its hint flips to leave-queue (the coordinator's join toggles leave when queued).
-        QueueService.QueueEntry mine = queueService.get(player.getUniqueId()).orElse(null);
-        boolean queuedHere = mine != null && mine.mode() == mode()
-                && (shown.name().equalsIgnoreCase(mine.kitId())
-                        || kit.name().equalsIgnoreCase(mine.kitId()));
+        // Multi-queue: キュー参加中のキットはグロー + 「退出」表示
+        boolean queuedHere = queueService.isQueuedFor(player.getUniqueId(), shown.name(), mode())
+                || queueService.isQueuedFor(player.getUniqueId(), kit.name(), mode());
 
         // The top-level button keeps its original name/icon; the chosen default is shown in
         // lore and supplies the queue's arena/rules/items. A folder is not renamed into its child.
