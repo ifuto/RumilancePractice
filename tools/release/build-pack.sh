@@ -91,6 +91,24 @@ for path in sorted(font_files):
     if not providers:
         errors.append(f'{os.path.relpath(path, src)} に providers が無い')
     used_here = set()
+    # MrKinau/ResourcePackValidator の FontCharacterUsageValidator 相当:
+    # 同じ font json 内で同じ文字を複数 provider が持つとクライアントは重複定義で悩む。
+    seen_chars = {}
+    for provider in providers:
+        kind = str(provider.get('type', '')).split(':')[-1]
+        codepoints = []
+        if kind == 'bitmap':
+            for entry in provider.get('chars', []) or []:
+                codepoints.extend(entry)
+        elif kind == 'space':
+            codepoints.extend((provider.get('advances', {}) or {}).keys())
+        for cp in codepoints:
+            if cp in ('\x00', ' '):
+                continue
+            if cp in seen_chars:
+                errors.append(f'{os.path.relpath(path, src)}: 文字 U+{ord(cp):04X} が '
+                              f'複数の provider で重複定義されている')
+            seen_chars[cp] = True
     for provider in providers:
         kind = str(provider.get('type', '')).split(':')[-1]
         if kind != 'bitmap':
