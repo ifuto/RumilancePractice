@@ -10,15 +10,15 @@ sounds:
     key: entity.glow_item_frame.remove_item
     volume: 1.0
     pitch: 0.0
-  # Menu open and back are intentionally silent.
+  # Menu back is intentionally silent; gui-open clicks like a wooden button.
   gui-back:
     key: none
     volume: 1.0
     pitch: 0.0
   gui-open:
-    key: none
+    key: block.wooden_button.click_on
     volume: 1.0
-    pitch: 1.4
+    pitch: 0.0
   kit-select:
     key: block.note_block.iron_xylophone
     volume: 1.0

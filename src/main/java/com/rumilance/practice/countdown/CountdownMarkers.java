@@ -49,8 +49,8 @@ import java.util.function.Consumer;
  * "idle" rather than "machinery".</p>
  *
  * <p>Looking at a block makes it glow (green / red) and swaps the action bar for
- * {@code 1/2 - Ready ✓} or {@code 0/2 - Leave ☓}, where the leading number is 1 when the
- * opponent has already pressed Ready. While not looking, an opponent who is Ready shows
+ * {@code 1/2 - Ready ✓} or {@code 0/2 - Leave ☓}, where the leading number is how many
+ * fighters have already pressed Ready (so an opponent who readied always lights the 1). While not looking, an opponent who is Ready shows
  * {@code <name> is ready ✓}. Right-clicking the emerald block readies you; a left click
  * while looking at the redstone block leaves the match. Both Ready skips the countdown.</p>
  */
@@ -142,8 +142,16 @@ public final class CountdownMarkers implements Listener {
         if (session == null) {
             return;
         }
+        // A re-prepare (arena retry, re-teleport) must NOT wipe readiness that was already
+        // pressed — carry it into the fresh marker set, otherwise the opponent's Ready
+        // silently vanishes and the gaze line drops back to 0/2.
+        MarkerSet previous = sets.get(session.id());
+        java.util.Set<UUID> carriedReady = previous == null
+                ? new java.util.HashSet<>()
+                : new java.util.HashSet<>(previous.ready);
         remove(session.id());
         MarkerSet set = new MarkerSet();
+        set.ready.addAll(carriedReady);
         for (UUID id : session.participants()) {
             Player player = Bukkit.getPlayer(id);
             if (player == null) {
@@ -285,6 +293,22 @@ public final class CountdownMarkers implements Listener {
         }
     }
 
+    /**
+     * How many DISTINCT fighters of this set have actually pressed Ready (0..2), read
+     * straight from the ready set. Previously the gaze line counted only the opponent via a
+     * "first marker not owned by me" guess, which could read 0/2 even after the opponent
+     * readied.
+     */
+    private static int readyTotal(MarkerSet set) {
+        List<UUID> counted = new ArrayList<>();
+        for (Marker marker : set.markers) {
+            if (!counted.contains(marker.owner) && set.ready.contains(marker.owner)) {
+                counted.add(marker.owner);
+            }
+        }
+        return counted.size();
+    }
+
     private static List<UUID> readyOwners(MarkerSet set) {
         List<UUID> owners = new ArrayList<>();
         for (Marker marker : set.markers) {
@@ -310,9 +334,7 @@ public final class CountdownMarkers implements Listener {
             }
         }
         if (gazed != null) {
-            UUID opponent = opponentOf(player.getUniqueId(), set);
-            int readyCount = opponent != null && set.ready.contains(opponent) ? 1 : 0;
-            player.sendActionBar(gazeLine(player, gazed, readyCount));
+            player.sendActionBar(gazeLine(player, gazed, readyTotal(set)));
             return;
         }
         if (showReadyNotice) {
@@ -327,8 +349,8 @@ public final class CountdownMarkers implements Listener {
     }
 
     /**
-     * The line shown while looking at a block: the opponent's readiness, then the action of
-     * the block being looked at. The leading number turns green once it is 1.
+     * The line shown while looking at a block: how many fighters are Ready, then the action
+     * of the block being looked at. The leading number turns green once it is 1.
      */
     private Component gazeLine(Player player, Marker marker, int readyCount) {
         String key = marker.kind == Kind.READY ? "countdown.gaze-ready" : "countdown.gaze-leave";

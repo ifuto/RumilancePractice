@@ -125,10 +125,16 @@ public final class SpectatorService {
     }
 
     private boolean spectateMatch(Player spectator, Player target, MatchSession match) {
-        for (UUID participant : match.participants()) {
-            if (!settingsService.get(participant).spectateVisible()) {
-                send(spectator, "spectator.disabled-by-participant");
-                return false;
+        // Admins/OPs bypass the participants' "spectators: off" privacy — they open the same
+        // list as everyone (every entry is listed regardless of the setting) and a click must
+        // actually take them in for moderation.
+        boolean exempt = spectator.hasPermission("rumilance.admin");
+        if (!exempt) {
+            for (UUID participant : match.participants()) {
+                if (!settingsService.get(participant).spectateVisible()) {
+                    send(spectator, "spectator.disabled-by-participant");
+                    return false;
+                }
             }
         }
         try {

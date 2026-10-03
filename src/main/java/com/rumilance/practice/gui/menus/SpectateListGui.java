@@ -222,15 +222,15 @@ public final class SpectateListGui extends AbstractGui {
 
         java.util.List<Component> lore = new java.util.ArrayList<>();
         lore.add(UiTheme.divider());
-        lore.add(UiTheme.labelValue(line(viewer, "gui.spectate-kit"), match.kitName()));
         lore.add(UiTheme.labelValue(line(viewer, "gui.spectate-mode"), modeWord(viewer, match.mode().name())));
         lore.add(UiTheme.labelValue(line(viewer, "gui.spectate-score"), winsA + " - " + winsB));
         lore.add(UiTheme.labelValue(line(viewer, "gui.spectate-time"), elapsed));
-        if (match.isTeamMatch()) {
-            lore.add(UiTheme.blank());
-            lore.add(UiTheme.labelValue("RED", joinNames(match.team(TeamColor.RED))));
-            lore.add(UiTheme.labelValue("BLUE", joinNames(match.team(TeamColor.BLUE))));
-        }
+        // Names live on their own side lines, never in the title — long name pairs crammed
+        // into one title line were unreadable. A 1v1's sides are simply the two fighters.
+        lore.add(UiTheme.labelValue("RED",
+                match.isTeamMatch() ? joinNames(match.team(TeamColor.RED)) : StatsService.nameOf(a)));
+        lore.add(UiTheme.labelValue("BLUE",
+                match.isTeamMatch() ? joinNames(match.team(TeamColor.BLUE)) : StatsService.nameOf(b)));
         lore.add(UiTheme.blank());
         lore.add(live
                 ? UiTheme.status("LIVE", UiTheme.SUCCESS)
@@ -238,7 +238,8 @@ public final class SpectateListGui extends AbstractGui {
         lore.add(UiTheme.hint(line(viewer, "gui.spectate-hint")));
 
         return ItemBuilder.of(iconMat)
-                .name(Component.text(StatsService.nameOf(a) + " §7vs " + StatsService.nameOf(b)))
+                .name(Component.text(com.rumilance.practice.util.KitNames.pretty(match.kitName()))
+                        .decoration(TextDecoration.ITALIC, false))
                 .lore(lore.toArray(Component[]::new))
                 .glint(true)
                 .action("spec:" + a)

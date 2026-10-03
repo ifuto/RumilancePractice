@@ -125,6 +125,20 @@ public final class ConfigService {
 
         YamlConfiguration merged = deepMerge(jarDefaults, onDisk);
         merged.setDefaults(jarDefaults);
+        if (SOUNDS.equals(fileName) && onDisk != null) {
+            // 1.92.15: the bundled gui-open default changed from intentionally-silent to the
+            // wooden-button click. An UNTOUCHED legacy default (key none / volume 1.0 /
+            // pitch 1.4) follows the new bundled default; any other value is a deliberate
+            // owner choice and keeps winning — same policy as the legacy icons.font move.
+            if ("none".equalsIgnoreCase(onDisk.getString("sounds.gui-open.key", ""))
+                    && onDisk.getDouble("sounds.gui-open.volume", -1.0d) == 1.0d
+                    && onDisk.getDouble("sounds.gui-open.pitch", -1.0d) == 1.4d) {
+                merged.set("sounds.gui-open.key",
+                        jarDefaults.getString("sounds.gui-open.key"));
+                merged.set("sounds.gui-open.pitch",
+                        jarDefaults.getDouble("sounds.gui-open.pitch", 0.0d));
+            }
+        }
         return merged;
     }
 
