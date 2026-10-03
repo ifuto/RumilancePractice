@@ -1933,6 +1933,8 @@ public final class FeatureBootstrap {
         pm.registerEvents(new com.rumilance.practice.guard.BlockInteractionResyncListener(plugin, combatant), plugin);
         pm.registerEvents(new GoldenHeadListener(plugin, matchRegistry), plugin);
         pm.registerEvents(new TotemPickupListener(combatant), plugin);
+        // Anyone may pick up a landed arrow, not just its shooter (shared FFA/duel ammo).
+        pm.registerEvents(new com.rumilance.practice.combat.ArrowPickupListener(), plugin);
         pm.registerEvents(guiListener, plugin);
         pm.registerEvents(kitAnvilRenameService, plugin);
         pm.registerEvents(opponentHealthNametagService, plugin);
