@@ -200,10 +200,11 @@ class PracticeGuardsTest {
             "RANKED, false, true",
             "UNRANKED, false, true",
             "FFA, false, false",
-            "RANKED, true, false",
-            "UNRANKED, true, false",
+            "RANKED, true, true",
+            "UNRANKED, true, true",
     })
     void canEnterQueueMatrix(MatchMode mode, boolean alreadyQueued, boolean expected) {
+        // Multi-queue: 既にキュー中でも新しいキットのキュー参加を許可
         assertEquals(expected, PracticeGuards.canEnterQueue(mode, alreadyQueued));
     }
 
