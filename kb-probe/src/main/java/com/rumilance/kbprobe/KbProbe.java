@@ -361,19 +361,22 @@ public final class KbProbe {
             return;
         }
 
-        // 静止ベースラインガード: vanilla 式は「現在速度/2 + 強さ」の混合なので、動いている
-        // 相手だと外部係数が掛かる範囲（衝撃分だけか全体か）が一意に定まらない。クリーンな
-        // 静止サンプルのみ採用する。水平 0.06（歩行速度の約半分）/ 垂直 0.1 未満で静止とみなす。
-        if (!KbProbeMath.isIdle(current.x, current.y, current.z)) {
+        double hRaw = Math.hypot(dx, dz);
+
+        // KB 抑制ガード: 速度パケットが来ても差分が0 ≈ サーバーがKBを抑制した
+        // （ロビー保護、damage event cancel 後の空パケット等）。fH≈0 の偽サンプルが
+        // 平均を破壊するので静かに棄却。しきい値 = 速度パケット 1 単位 (1/8000 ≈ 0.000125) より余裕。
+        if (hRaw < 5.0e-4 && Math.abs(dy) < 5.0e-4) {
             return;
         }
 
-        double hRaw = Math.hypot(dx, dz);
-        // KB 抑制ガード: 速度パケットが来ても差分が0 ≈ サーバーがKBを抑制した
-        // （ロビー保護、damage event cancel 後の空パケット等）。fH≈0 の偽サンプルが
-        // 平均を破壊するので静かに棄却。noKbEvents には加算しない（速度パケットは届いている）。
-        // しきい値 = 速度パケット 1 単位 (1/8000 ≈ 0.000125) より少し余裕を持たせた値。
-        if (hRaw < 5.0e-4 && Math.abs(dy) < 5.0e-4) {
+        // 動いている相手にも計測できるよう、旧速度を考慮した推定式:
+        //   vanilla: newH = oldH/2 + impulseH  →  deltaH = impulseH - oldH/2
+        //   impulseH = deltaH + oldH_parallel/2
+        double oldH_parallel = (current.x * hit.dirX + current.z * hit.dirZ);
+        double impulseH = hRaw + Math.abs(oldH_parallel) / 2.0;
+        // 旧速度が大きすぎると推定精度が落ちる: スプリント速度(0.26)×2まで許容
+        if (Math.abs(oldH_parallel) > 0.5) {
             return;
         }
         // 方向ガード: KB は攻撃者→被害者へ押し出すはず。逆向き/横向きの速度は他起因のノイズ
@@ -398,14 +401,11 @@ public final class KbProbe {
         }
 
         ServerStats stats = StatsStore.statsFor(serverKey());
-        // vanilla 1.21.1 正確モデル（ソース検証済み）:
-        //   1段目: damage() → takeKnockback(0.4)（静止標的: Δh = 0.4(1−r)）
-        //   2段目: attack() → k>0 のとき takeKnockback(k*0.5)（1段目の速度を更に半減合成:
-        //          Δh += (0.2 + 0.5k)(1−r) − 0.4(1−r)… 正確には最終 Δh = (0.2+0.5k)(1−r)）
-        //   垂直（接地・静止）: Δy = min(0.4, Δh)（各段で min(0.4, vy/2+s) が合成される結果と一致）
         double k = hit.knockbackLevel();
         double expectH = KbProbeMath.expectHorizontal(k, hit.resistance);
-        double fH = hRaw / expectH;
+        // impulseH = deltaH + |oldH_parallel|/2 ≈ 実際のKBインパルス
+        // 静止標的なら impulseH ≈ hRaw（旧速度=0 なので等価）
+        double fH = impulseH / expectH;
         stats.addHorizontal(hRaw, fH);
         Double fV = null;
         if (hit.targetOnGround) {
@@ -424,7 +424,10 @@ public final class KbProbe {
             }
         }
         StatsStore.save();
-        announceSample(hRaw, fH, hit.targetOnGround ? dy : null, fV, k, stats);
+        // デバッグ: 生値をチャット表示
+        chat(String.format("§8[KBProbe] raw Δh=%.4f Δy=%.4f old∥=%.4f impl=%.4f fH=%.2f §7(H%d/V%d)",
+                hRaw, dy, oldH_parallel, impulseH, fH, stats.hSamples, stats.vSamples));
+        announceSample(impulseH, fH, hit.targetOnGround ? dy : null, fV, k, stats);
     }
 
     // ----------------------------------------------------------------------------------
