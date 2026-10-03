@@ -64,6 +64,9 @@ public final class QueueService {
             String ip,
             PlayerPlatform platform
     ) {
+        if (!PracticeGuards.canEnterQueue(mode, isQueued(playerId))) {
+            return false;
+        }
         PlayerPlatform resolved = platform == null ? PlayerPlatform.JAVA : platform;
         String key = queueKey(mode, kitId, resolved);
         // 同一キット+モードに既にキューしていればスキップ
@@ -250,11 +253,13 @@ public final class QueueService {
                             continue;
                         }
                         pairs.add(new MatchPair(a, b));
-                        // Remove matched players from ALL queues (multi-queue cleanup)
-                        removePlayerFromAllQueues(a.playerId());
-                        removePlayerFromAllQueues(b.playerId());
+                        // Remove matched players from ALL queues (multi-queue cleanup).
+                        // removePlayerFromAllQueues also cleans up byQueue references, so
+                        // remove from the current `list` manually first, then clear byPlayer.
                         list.remove(j);
                         list.remove(i);
+                        removePlayerFromAllQueues(a.playerId());
+                        removePlayerFromAllQueues(b.playerId());
                         if (avoidRecent) {
                             recentOpponents.put(a.playerId(), b.playerId());
                             recentOpponents.put(b.playerId(), a.playerId());
