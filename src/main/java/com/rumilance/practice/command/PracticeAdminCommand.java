@@ -35,6 +35,7 @@ import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -1066,6 +1067,17 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
                 }
                 case "rankedqueue" -> {
                     return TabCompletions.filter(current, "on", "off", "autounlock");
+                }
+                case "kbdefault" -> {
+                    // Queue fights run on this KB, so complete it straight from the live
+                    // kb/*.json profiles (+ "off") instead of a stale static list.
+                    List<String> choices = new ArrayList<>();
+                    com.rumilance.practice.kb.KbProfileService kb = kbProfileService;
+                    if (kb != null) {
+                        choices.addAll(kb.names());
+                    }
+                    choices.add("off");
+                    return TabCompletions.filter(current, choices);
                 }
                 case "floatingspawn" -> {
                     return TabCompletions.filter(current, "queue", "swordffa", "removeall");
