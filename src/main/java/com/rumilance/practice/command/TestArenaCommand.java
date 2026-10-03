@@ -49,6 +49,10 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
     private static final int SIZE_64_SLOT = 4;
     private static final int SIZE_100_SLOT = 5;
     private static final int SIZE_CUSTOM_SLOT = 6;
+    /** Layer width (fineness) button — sits next to the shape row. */
+    private static final int FINENESS_SLOT = 23;
+    /** Preset cell widths cycled by left-clicking the fineness button. */
+    private static final List<Integer> FINENESS_PRESETS = List.of(20, 10, 5, 40);
     private static final int START_SLOT = 49;
 
     private final SmoothTerrainGenerator generator;
@@ -97,8 +101,9 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
             }
             default -> {
                 player.sendMessage(Component.text(
-                        "/testarena spawn [size] [map] | /testarena delete [id|all] | " +
-                        "/testarena list | /testarena cancel", NamedTextColor.YELLOW));
+                        "/testarena spawn [size] [map] [f<layer width>] | " +
+                        "/testarena delete [id|all] | /testarena list | /testarena cancel",
+                        NamedTextColor.YELLOW));
                 return true;
             }
         }
@@ -124,6 +129,7 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
 
     private void spawn(Player player, String[] args) {
         int size = defaultSideLength();
+        int fineness = 0; // 0 = default cell width
         String mapKey = null;
         for (int i = 1; i < args.length; i++) {
             String raw = args[i];
@@ -137,9 +143,15 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
                 size = parsedSize;
                 continue;
             }
+            Integer parsedFineness = parseFineness(raw);
+            if (parsedFineness != null) {
+                fineness = parsedFineness;
+                continue;
+            }
             player.sendMessage(Component.text(
-                    "Unknown argument '" + raw + "'. Use a positive side length" +
-                            " and/or a map (grass-stone, sand-sandstone, red-sand-red-sandstone).",
+                    "Unknown argument '" + raw + "'. Use a positive side length, a map" +
+                            " (grass-stone, sand-sandstone, red-sand-red-sandstone) and/or a" +
+                            " layer width (f5, f10, f20, f40, ...).",
                     NamedTextColor.RED));
             return;
         }
@@ -153,7 +165,31 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
                 : SmoothTerrainGenerator.TerrainMap.parse(mapKey);
         start(player, new SmoothTerrainGenerator.TerrainSettings(
                 map, size, SmoothTerrainGenerator.TerrainShape.RANDOM, false,
-                SmoothTerrainGenerator.MAX_HEIGHT_DELTA));
+                SmoothTerrainGenerator.MAX_HEIGHT_DELTA, fineness));
+    }
+
+    /** Layer width token: {@code f<N>} / {@code spacing<N>} / {@code spacing=<N>}, N >= 1. */
+    private static Integer parseFineness(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String lowered = raw.toLowerCase(Locale.ROOT);
+        String digits;
+        if (lowered.startsWith("f") && lowered.length() > 1) {
+            digits = lowered.substring(1);
+        } else if (lowered.startsWith("spacing=")) {
+            digits = lowered.substring("spacing=".length());
+        } else if (lowered.startsWith("spacing")) {
+            digits = lowered.substring("spacing".length());
+        } else {
+            return null;
+        }
+        try {
+            int value = Integer.parseInt(digits);
+            return value >= 1 ? value : null;
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     private void start(Player player, SmoothTerrainGenerator.TerrainSettings settings) {
@@ -165,11 +201,14 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
         int size = settings.sideLength();
         String foundation = settings.surfaceOnly() ? "surface-only (2 underground layers)" :
                 "200 underground layers";
+        String fineness = settings.controlSpacing() == SmoothTerrainGenerator.CONTROL_SPACING
+                ? ""
+                : String.format(", layer width %d", settings.controlSpacing());
         player.sendMessage(Component.text(String.format(
-                        "Planning a %dx%d smooth %s terrain with %s, %s, max height difference %d. "
+                        "Planning a %dx%d smooth %s terrain with %s%s, %s, max height difference %d. "
                                 + "Block placement is batched to protect TPS...",
                         size, size, settings.shape().label().toLowerCase(Locale.ROOT),
-                        settings.map().displayName(), foundation, settings.maxHeightDelta()),
+                        settings.map().displayName(), fineness, foundation, settings.maxHeightDelta()),
                 NamedTextColor.AQUA));
         long seed = ThreadLocalRandom.current().nextLong();
         generator.generate(player, settings, seed, result -> player.sendMessage(Component.text(
@@ -208,8 +247,16 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
     }
 
     private void openSettingsMenu(Player player, int size) {
+        openSettingsMenu(player, size, 0);
+    }
+
+    /** {@code fineness >= 1} seeds the layer width (the {@code f<N>} spawn argument). */
+    private void openSettingsMenu(Player player, int size, int fineness) {
         MapMenuHolder holder = new MapMenuHolder();
         holder.size = Math.max(1, size);
+        if (fineness >= 1) {
+            holder.controlSpacing = fineness;
+        }
         openSettingsMenu(player, holder);
     }
 
@@ -250,6 +297,12 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
         inventory.setItem(BOWL_SLOT, item(Material.BOWL,
                 holder.shape == SmoothTerrainGenerator.TerrainShape.CENTER_LOW, "Centre-low bowl",
                 "Shape: centre gently slopes down", "Independent from the material choice"));
+        inventory.setItem(FINENESS_SLOT,
+                holder.shape == SmoothTerrainGenerator.TerrainShape.CENTER_LOW
+                        ? item(Material.GRAY_DYE, "Layer width: n/a (bowl)",
+                                "The centre-low bowl ignores the layer width.",
+                                "Pick the random shape to set it.")
+                        : finenessButton(holder.controlSpacing));
 
         inventory.setItem(UNDERGROUND_SLOT, item(Material.STONE,
                 !holder.surfaceOnly, "Underground: 200 blocks",
@@ -286,7 +339,10 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
                 "Enter any custom side length (no limit)", "Opens the anvil naming dialog"));
 
         inventory.setItem(START_SLOT, item(Material.EMERALD_BLOCK, "Generate test map",
-                "Click to create the selected " + holder.size + " x " + holder.size + " map"));
+                "Click to create the selected " + holder.size + " x " + holder.size + " map",
+                holder.shape == SmoothTerrainGenerator.TerrainShape.CENTER_LOW
+                        ? "Layer width: n/a (bowl shape)"
+                        : "Layer width: " + holder.controlSpacing));
         inventory.setItem(53, item(Material.BARRIER, "Close", "No map will be created."));
     }
 
@@ -302,6 +358,17 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
         }
         stack.setItemMeta(meta);
         return stack;
+    }
+
+    /** The layer-width picker tile: current value, presets, shift-click = any number. */
+    private static ItemStack finenessButton(int spacing) {
+        return item(Material.SCAFFOLDING,
+                spacing != SmoothTerrainGenerator.CONTROL_SPACING,
+                "Layer width (fineness): " + spacing,
+                "Width of ONE random terrain cell",
+                "5 = fine bumps · 10 = fine · 20 = default · 40 = broad",
+                "Click: cycle presets · Shift-click: any number (anvil)",
+                "Huge maps widen tiny cells automatically (memory guard)");
     }
 
     private static ItemStack item(Material material, String name, String... lore) {
@@ -331,6 +398,37 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
             case RED_SAND_SLOT -> holder.map = SmoothTerrainGenerator.TerrainMap.RED_SAND_RED_SANDSTONE;
             case RANDOM_SLOT -> holder.shape = SmoothTerrainGenerator.TerrainShape.RANDOM;
             case BOWL_SLOT -> holder.shape = SmoothTerrainGenerator.TerrainShape.CENTER_LOW;
+            case FINENESS_SLOT -> {
+                // 器型 (centre-low bowl) はセル幅を使わない: 押しても何も起きない。
+                if (holder.shape == SmoothTerrainGenerator.TerrainShape.CENTER_LOW) {
+                    return;
+                }
+                if (event.isShiftClick()) {
+                    if (anvilService != null) {
+                        int current = holder.controlSpacing;
+                        com.rumilance.practice.testarena.SideLengthAnvilService.OpenResult opened =
+                                anvilService.open(player, current,
+                                        (p, parsed) -> {
+                                            holder.controlSpacing = Math.max(1, parsed);
+                                            openSettingsAndReopen(p, holder);
+                                        },
+                                        (p, raw) -> openSettingsAndReopen(p, holder),
+                                        p -> openSettingsAndReopen(p, holder));
+                        if (opened == com.rumilance.practice.testarena.SideLengthAnvilService.OpenResult.BUSY) {
+                            player.sendMessage(Component.text(
+                                    "A number prompt is already open.", NamedTextColor.YELLOW));
+                        }
+                    } else {
+                        player.sendMessage(Component.text(
+                                "Custom layer width is unavailable.", NamedTextColor.RED));
+                    }
+                    return;
+                }
+                // Cycle the presets; an off-preset (custom) value restarts from the default.
+                int index = FINENESS_PRESETS.indexOf(holder.controlSpacing);
+                holder.controlSpacing = FINENESS_PRESETS.get(
+                        index < 0 ? 0 : (index + 1) % FINENESS_PRESETS.size());
+            }
             case UNDERGROUND_SLOT -> holder.surfaceOnly = false;
             case SURFACE_ONLY_SLOT -> holder.surfaceOnly = true;
             case HEIGHT_ZERO_SLOT -> holder.maxHeightDelta = 0;
@@ -366,7 +464,8 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
                 player.sendMessage(Component.text("Generating " + side + "x" + side + " test map...",
                         NamedTextColor.AQUA));
                 start(player, new SmoothTerrainGenerator.TerrainSettings(
-                        map, side, holder.shape, surfaceOnly, maxHeightDelta));
+                        map, side, holder.shape, surfaceOnly, maxHeightDelta,
+                        holder.controlSpacing));
                 return;
             }
             case 53 -> {
@@ -413,6 +512,13 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
             options.add(String.valueOf(defaultSideLength()));
             return TabCompletions.filter(args[1], options.toArray(String[]::new));
         }
+        if (args.length == 3 && args[0].equalsIgnoreCase("spawn")) {
+            options.add("f5");
+            options.add("f10");
+            options.add("f20");
+            options.add("f40");
+            return TabCompletions.filter(args[2], options.toArray(String[]::new));
+        }
         if (args.length == 2 && args[0].equalsIgnoreCase("delete")) {
             options.add("all");
             generator.maps().keySet().forEach(options::add);
@@ -428,6 +534,7 @@ public final class TestArenaCommand implements CommandExecutor, TabCompleter, Li
         private boolean surfaceOnly;
         private int maxHeightDelta = SmoothTerrainGenerator.MAX_HEIGHT_DELTA;
         private int size = SmoothTerrainGenerator.WIDTH;
+        private int controlSpacing = SmoothTerrainGenerator.CONTROL_SPACING;
 
         void bind(Inventory inventory) {
             this.inventory = inventory;

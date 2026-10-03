@@ -40,7 +40,11 @@ public final class SmoothTerrainGenerator {
     public static final int UNDERGROUND_DEPTH = 200;
     public static final int SURFACE_ONLY_FOUNDATION_LAYERS = 2;
     // Wider control cells make broad, gently rolling land instead of many small bumps.
-    private static final int CONTROL_SPACING = 20;
+    // Customisable per map since 2026-10 ("器型じゃない場合は1レイヤーの広さを好きに指定"):
+    // it is the width of ONE random terrain cell — small = fine detail, large = broad rolling.
+    public static final int CONTROL_SPACING = 20;
+    /** Control grid cap: the cell size is auto-widened on huge maps to bound memory (grid²). */
+    public static final int MAX_CONTROL_GRID = 128;
     private static final int COLUMNS_PER_TICK = 16;
     /** Kept as a public compatibility constant for callers that describe the surface stack. */
     public static final int LAYERS = 50;
@@ -145,7 +149,7 @@ public final class SmoothTerrainGenerator {
 
     /** Settings selected in the PvP map menu. */
     public record TerrainSettings(TerrainMap map, int sideLength, TerrainShape shape,
-                                  boolean surfaceOnly, int maxHeightDelta) {
+                                  boolean surfaceOnly, int maxHeightDelta, int controlSpacing) {
         public TerrainSettings {
             if (map == null) {
                 throw new IllegalArgumentException("map is required");
@@ -165,11 +169,26 @@ public final class SmoothTerrainGenerator {
             }
             sideLength = length;
             maxHeightDelta = Math.max(0, Math.min(MAX_HEIGHT_DELTA, maxHeightDelta));
+            // Any positive cell width goes; 0/negative means the default. On huge maps the
+            // cell size is widened just enough to keep the control grid <= MAX_CONTROL_GRID
+            // squared points (memory), so "fineness" stays freely specifiable everywhere else.
+            int requested = controlSpacing <= 0 ? CONTROL_SPACING : controlSpacing;
+            controlSpacing = Math.max(requested, minControlSpacing(length));
+        }
+
+        /** The narrowest cell width {@code sideLength} supports within the control-grid cap. */
+        public static int minControlSpacing(int sideLength) {
+            return Math.max(1, (int) Math.ceil((sideLength - 1) / (double) (MAX_CONTROL_GRID - 1)));
+        }
+
+        public TerrainSettings(TerrainMap map, int sideLength, TerrainShape shape,
+                               boolean surfaceOnly, int maxHeightDelta) {
+            this(map, sideLength, shape, surfaceOnly, maxHeightDelta, CONTROL_SPACING);
         }
 
         public TerrainSettings(TerrainMap map, TerrainShape shape, boolean surfaceOnly,
                                int maxHeightDelta) {
-            this(map, WIDTH, shape, surfaceOnly, maxHeightDelta);
+            this(map, WIDTH, shape, surfaceOnly, maxHeightDelta, CONTROL_SPACING);
         }
 
         /** Number of solid material layers below the surface before the bedrock layer. */
@@ -664,7 +683,8 @@ public final class SmoothTerrainGenerator {
     }
 
     private static List<ColumnData> plan(Area area, long seed) {
-        HeightMap map = HeightMap.create(area.width(), seed, area.settings().shape(), area.settings().maxHeightDelta());
+        HeightMap map = HeightMap.create(area.width(), seed, area.settings().shape(),
+                area.settings().maxHeightDelta(), area.settings().controlSpacing());
         List<ColumnData> columns = newColumnsList(area.width());
         for (int x = 0; x < area.width(); x++) {
             for (int z = 0; z < area.width(); z++) {
@@ -728,6 +748,7 @@ public final class SmoothTerrainGenerator {
             yaml.set(path + ".shape", area.settings().shape().name());
             yaml.set(path + ".surface-only", area.settings().surfaceOnly());
             yaml.set(path + ".max-height-delta", area.settings().maxHeightDelta());
+            yaml.set(path + ".control-spacing", area.settings().controlSpacing());
             yaml.set(path + ".foundation-depth", area.settings().foundationDepth());
             yaml.set(path + ".min-y", area.minY());
             yaml.set(path + ".max-y", area.maxY());
@@ -785,7 +806,8 @@ public final class SmoothTerrainGenerator {
         try {
             settings = new TerrainSettings(map, width, shape,
                     yaml.getBoolean(path + ".surface-only", false),
-                    yaml.getInt(path + ".max-height-delta", MAX_HEIGHT_DELTA));
+                    yaml.getInt(path + ".max-height-delta", MAX_HEIGHT_DELTA),
+                    yaml.getInt(path + ".control-spacing", CONTROL_SPACING));
         } catch (IllegalArgumentException ignored) {
             settings = new TerrainSettings(map, shape,
                     yaml.getBoolean(path + ".surface-only", false),
@@ -878,14 +900,24 @@ public final class SmoothTerrainGenerator {
         }
 
         static HeightMap create(int width, long seed, TerrainShape shape, int maxHeightDelta) {
+            return create(width, seed, shape, maxHeightDelta, CONTROL_SPACING);
+        }
+
+        /** {@code controlSpacing} = the width of one terrain cell (the layer fineness). */
+        static HeightMap create(int width, long seed, TerrainShape shape, int maxHeightDelta,
+                                int controlSpacing) {
             if (width < 1) {
                 throw new IllegalArgumentException("width must be positive");
             }
             maxHeightDelta = Math.max(0, Math.min(MAX_HEIGHT_DELTA, maxHeightDelta));
-            int gridSize = (int) Math.ceil((width - 1) / (double) CONTROL_SPACING) + 1;
+            int spacing = Math.max(1, controlSpacing);
+            int gridSize = (int) Math.ceil((width - 1) / (double) spacing) + 1;
+            if (gridSize < 2) {
+                gridSize = 2; // interpolatedHeight always reads two grid lines
+            }
             int[] positions = new int[gridSize];
             for (int i = 0; i < gridSize; i++) {
-                positions[i] = Math.min(width - 1, i * CONTROL_SPACING);
+                positions[i] = Math.min(width - 1, i * spacing);
             }
             positions[gridSize - 1] = width - 1;
             int[][] values = new int[gridSize][gridSize];
