@@ -366,9 +366,12 @@ class PracticeGuardsTest {
     }
 
     @Test
-    void matchBorderSizeUsesLargerHorizontalDimensionPlusMargin() {
-        assertEquals(52.0d, PracticeGuards.matchBorderSize(0, 49, 0, 10), 0.001d);
-        assertEquals(22.0d, PracticeGuards.matchBorderSize(0, 9, 0, 19), 0.001d);
+    void matchBorderSizeMatchesLargerHorizontalDimensionExactly() {
+        // The border plane must sit EXACTLY on the region's outer face (no +2 margin): the
+        // old margin left a one-block walk-in dead zone past the face that the server wall
+        // then pulled players out of.
+        assertEquals(50.0d, PracticeGuards.matchBorderSize(0, 49, 0, 10), 0.001d);
+        assertEquals(20.0d, PracticeGuards.matchBorderSize(0, 9, 0, 19), 0.001d);
     }
 
     @Test
