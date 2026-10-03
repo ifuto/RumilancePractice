@@ -7,6 +7,7 @@ import com.rumilance.practice.gui.GuiType;
 import com.rumilance.practice.gui.ItemBuilder;
 import com.rumilance.practice.gui.MenuScaffold;
 import com.rumilance.practice.gui.UiTheme;
+import com.rumilance.practice.locale.MessageService;
 import com.rumilance.practice.sound.SoundService;
 import com.rumilance.practice.state.TeamColor;
 import com.rumilance.practice.team.Team;
@@ -47,6 +48,8 @@ public final class TeamSettingsGui extends AbstractGui {
 
     /** Transfer mode flag (session key). */
     private static final String K_TRANSFER = "transfer_mode";
+    /** Danger subscreen flag (session key) — the mockup's red "Danger Settings" panel. */
+    private static final String K_DANGER = "danger_mode";
 
     private final TeamService teamService;
     private TeamHubGui teamHubGui;
@@ -65,7 +68,7 @@ public final class TeamSettingsGui extends AbstractGui {
 
     public TeamSettingsGui(GuiSessionRegistry registry, SoundService sounds,
                            TeamService teamService) {
-        super(registry, sounds, GuiType.TEAM_SETTINGS, 5, true);
+        super(registry, sounds, GuiType.TEAM_SETTINGS, 6, true);
         this.teamService = teamService;
     }
 
@@ -129,36 +132,63 @@ public final class TeamSettingsGui extends AbstractGui {
             renderTransferPicker(player, session, inventory, team);
             return;
         }
+        if (Boolean.TRUE.equals(session.get(K_DANGER, Boolean.class))) {
+            renderDanger(player, inventory, team);
+            return;
+        }
         renderMain(player, inventory, team);
     }
 
-    /** メイン画面(ルール/運営/危険の3帯 + フッターの戻る)。 */
+    /**
+     * 2026-10 mockup (docs/design/gui-mockups.md "Party Config GUI"): light-gray/white 装飾
+     * ring, TNT Friendly Fire (1,1), COMPARATOR Team Settings (1,4), LIME_DYE Public (1,7),
+     * NAME_TAG Party ID (3,1), a red band around the REDSTONE Danger Settings (3,4),
+     * PLAYER_HEAD Player List (4,1) and the Back arrow (4,6).
+     */
     private void renderMain(Player player, Inventory inventory, Team team) {
-        // === row1: ルール（バトル設定） ===
-        inventory.setItem(GuiSlots.slot(1, 2),
-                ItemBuilder.of(team.isPublic() ? UiTheme.TOGGLE_ON : UiTheme.TOGGLE_OFF)
-                        .name(t(player, team.isPublic() ? "party.public-team" : "party.private-team")
-                                .color(team.isPublic() ? UiTheme.SUCCESS : UiTheme.MUTED))
-                        .lore(UiTheme.divider(),
-                                UiTheme.line(team.isPublic()
-                                        ? line(player, "party.public-lore")
-                                        : line(player, "party.private-lore")),
-                                UiTheme.blank(),
-                                UiTheme.hint(line(player, "party.toggle-hint")))
-                        .action("toggle_public").build());
-        inventory.setItem(GuiSlots.slot(1, 4),
-                ItemBuilder.of(Material.MAP)
-                        .name(t(player, "party.select-map").color(UiTheme.PRIMARY))
-                        .lore(UiTheme.divider(),
-                                UiTheme.labelValue(line(player, "party.map-label"),
-                                        team.selectedArena() == null
-                                                ? line(player, "party.random")
-                                                : com.rumilance.practice.util.NameDisplay
-                                                        .pretty(team.selectedArena())),
-                                UiTheme.blank(),
-                                UiTheme.hint(line(player, "party.select-map-hint")))
-                        .action("select_map").build());
-        inventory.setItem(GuiSlots.slot(1, 6),
+        // --- ring ---
+        int[] lgRow0 = {0, 1, 2, 6, 7, 8};
+        for (int col : lgRow0) {
+            inventory.setItem(col, deco(player, Material.LIGHT_GRAY_STAINED_GLASS_PANE));
+        }
+        for (int col : new int[]{3, 4, 5}) {
+            inventory.setItem(col, deco(player, Material.WHITE_STAINED_GLASS_PANE));
+        }
+        for (int row = 1; row <= 3; row++) {
+            inventory.setItem(GuiSlots.slot(row, 0), deco(player, Material.LIGHT_GRAY_STAINED_GLASS_PANE));
+            inventory.setItem(GuiSlots.slot(row, 8), deco(player, Material.LIGHT_GRAY_STAINED_GLASS_PANE));
+        }
+        for (int row = 1; row <= 3; row++) {
+            for (int col = 1; col <= 7; col++) {
+                if (GuiSlots.slot(row, col) == GuiSlots.slot(1, 1)
+                        || GuiSlots.slot(row, col) == GuiSlots.slot(1, 4)
+                        || GuiSlots.slot(row, col) == GuiSlots.slot(1, 7)
+                        || GuiSlots.slot(row, col) == GuiSlots.slot(3, 1)
+                        || GuiSlots.slot(row, col) == GuiSlots.slot(3, 3)
+                        || GuiSlots.slot(row, col) == GuiSlots.slot(3, 4)
+                        || GuiSlots.slot(row, col) == GuiSlots.slot(3, 5)) {
+                    continue;
+                }
+                inventory.setItem(GuiSlots.slot(row, col),
+                        (row == 1 && (col == 2 || col == 3 || col == 5 || col == 6))
+                                ? deco(player, Material.WHITE_STAINED_GLASS_PANE)
+                                : (row == 3 ? deco(player, Material.WHITE_STAINED_GLASS_PANE)
+                                : deco(player, Material.LIGHT_GRAY_STAINED_GLASS_PANE)));
+            }
+        }
+        for (int col = 0; col < 9; col++) {
+            inventory.setItem(GuiSlots.slot(5, col), deco(player, Material.WHITE_STAINED_GLASS_PANE));
+        }
+        inventory.setItem(GuiSlots.slot(4, 0), deco(player, Material.WHITE_STAINED_GLASS_PANE));
+        inventory.setItem(GuiSlots.slot(4, 2), deco(player, Material.WHITE_STAINED_GLASS_PANE));
+        inventory.setItem(GuiSlots.slot(4, 3), deco(player, Material.WHITE_STAINED_GLASS_PANE));
+        inventory.setItem(GuiSlots.slot(4, 4), deco(player, Material.WHITE_STAINED_GLASS_PANE));
+        inventory.setItem(GuiSlots.slot(4, 5), deco(player, Material.LIGHT_GRAY_STAINED_GLASS_PANE));
+        inventory.setItem(GuiSlots.slot(4, 7), deco(player, Material.LIGHT_GRAY_STAINED_GLASS_PANE));
+        inventory.setItem(GuiSlots.slot(4, 8), deco(player, Material.WHITE_STAINED_GLASS_PANE));
+
+        // --- row1: rule tiles ---
+        inventory.setItem(GuiSlots.slot(1, 1),
                 ItemBuilder.of(team.friendlyFire() ? Material.TNT : Material.SHIELD)
                         .name(t(player, team.friendlyFire() ? "party.ff-on-label" : "party.ff-off-label")
                                 .color(team.friendlyFire() ? UiTheme.DANGER : UiTheme.SUCCESS))
@@ -169,35 +199,89 @@ public final class TeamSettingsGui extends AbstractGui {
                                 UiTheme.blank(),
                                 UiTheme.hint(line(player, "gui.toggle-hint")))
                         .action("toggle_ff").build());
+        inventory.setItem(GuiSlots.slot(1, 4),
+                ItemBuilder.of(Material.COMPARATOR)
+                        .name(t(player, "gui.team-config-open").color(UiTheme.PRIMARY))
+                        .lore(UiTheme.divider(),
+                                UiTheme.line(line(player, "gui.team-config-open-lore")),
+                                UiTheme.blank(),
+                                UiTheme.hint(line(player, "gui.toggle-hint")))
+                        .action("open_team_config").build());
+        inventory.setItem(GuiSlots.slot(1, 7),
+                ItemBuilder.of(team.isPublic() ? UiTheme.TOGGLE_ON : UiTheme.TOGGLE_OFF)
+                        .name(t(player, team.isPublic() ? "party.public-team" : "party.private-team")
+                                .color(team.isPublic() ? UiTheme.SUCCESS : UiTheme.MUTED))
+                        .lore(UiTheme.divider(),
+                                UiTheme.line(team.isPublic()
+                                        ? line(player, "party.public-lore")
+                                        : line(player, "party.private-lore")),
+                                UiTheme.blank(),
+                                UiTheme.hint(line(player, "party.toggle-hint")))
+                        .action("toggle_public").build());
 
-        // === row2: 運営(メンバー動作) ===
-        inventory.setItem(GuiSlots.slot(2, 2),
-                ItemBuilder.of(Material.NETHERITE_HELMET)
+        // --- row3: party ID + danger band ---
+        String shortId = team.id().toString().replace("-", "").substring(0, 6).toUpperCase(java.util.Locale.ROOT);
+        inventory.setItem(GuiSlots.slot(3, 1),
+                ItemBuilder.of(Material.NAME_TAG)
+                        .name(t(player, "party.party-id", MessageService.tags("id", shortId))
+                                .color(UiTheme.VALUE))
+                        .action("decorate").build());
+        for (int col : new int[]{3, 5}) {
+            inventory.setItem(GuiSlots.slot(3, col), deco(player, Material.RED_STAINED_GLASS_PANE));
+        }
+        inventory.setItem(GuiSlots.slot(3, 4),
+                ItemBuilder.of(Material.REDSTONE_BLOCK)
+                        .name(t(player, "gui.party-danger").color(UiTheme.DANGER))
+                        .lore(UiTheme.divider(),
+                                UiTheme.line(line(player, "gui.party-danger-lore")),
+                                UiTheme.blank(),
+                                UiTheme.hint(line(player, "menu.click")))
+                        .action("danger_mode").build());
+
+        // --- row4: player list + back ---
+        inventory.setItem(GuiSlots.slot(4, 1),
+                ItemBuilder.of(Material.PLAYER_HEAD)
+                        .name(t(player, "gui.party-player-list").color(UiTheme.PRIMARY))
+                        .lore(UiTheme.divider(),
+                                UiTheme.labelValue(line(player, "gui.party-members"),
+                                        String.valueOf(team.size())),
+                                UiTheme.blank(),
+                                UiTheme.hint(line(player, "menu.click")))
+                        .action("open_hub").build());
+        inventory.setItem(GuiSlots.slot(4, 6),
+                ItemBuilder.of(UiTheme.BACK)
+                        .name(t(player, "menu.back").color(UiTheme.WARNING))
+                        .action("back").build());
+    }
+
+    /**
+     * The mockup's red "Danger Settings GUI": full red ring, transfer / disband / clear-sides
+     * on the middle row (the mockup's BAN List cell carries clear-sides — the plugin has no
+     * party-ban feature yet), red rows below, black 存在しないマス filler + a back arrow.
+     */
+    private void renderDanger(Player player, Inventory inventory, Team team) {
+        for (int col = 0; col < 9; col++) {
+            inventory.setItem(col, deco(player, Material.RED_STAINED_GLASS_PANE));
+            inventory.setItem(GuiSlots.slot(3, col), deco(player, Material.RED_STAINED_GLASS_PANE));
+            inventory.setItem(GuiSlots.slot(4, col), deco(player, Material.RED_STAINED_GLASS_PANE));
+            inventory.setItem(GuiSlots.slot(5, col), com.rumilance.practice.gui.GuiMockups
+                    .noCell(player, messages()));
+        }
+        inventory.setItem(GuiSlots.slot(1, 0), deco(player, Material.RED_STAINED_GLASS_PANE));
+        inventory.setItem(GuiSlots.slot(1, 7), deco(player, Material.RED_STAINED_GLASS_PANE));
+        inventory.setItem(GuiSlots.slot(1, 8), deco(player, Material.RED_STAINED_GLASS_PANE));
+        inventory.setItem(GuiSlots.slot(2, 0), deco(player, Material.RED_STAINED_GLASS_PANE));
+        inventory.setItem(GuiSlots.slot(2, 1), deco(player, Material.RED_STAINED_GLASS_PANE));
+
+        inventory.setItem(GuiSlots.slot(2, 3),
+                ItemBuilder.of(Material.BLAZE_ROD)
                         .name(t(player, "party.transfer-title").color(UiTheme.SECONDARY))
                         .lore(UiTheme.divider(),
                                 UiTheme.line(line(player, "party.transfer-lore")),
                                 UiTheme.blank(),
                                 UiTheme.hint(line(player, "party.transfer-hint")))
                         .action("transfer_mode").build());
-        inventory.setItem(GuiSlots.slot(2, 4),
-                ItemBuilder.of(Material.WATER_BUCKET)
-                        .name(t(player, "party.clear-sides").color(UiTheme.WARNING))
-                        .lore(UiTheme.divider(),
-                                UiTheme.hint(line(player, "party.clear-sides-hint")))
-                        .action("clearsides").build());
-        if (teamConfigGui != null) {
-            inventory.setItem(GuiSlots.slot(2, 6),
-                    ItemBuilder.of(Material.COMMAND_BLOCK)
-                            .name(t(player, "gui.team-config-open").color(UiTheme.PRIMARY))
-                            .lore(UiTheme.divider(),
-                                    UiTheme.line(line(player, "gui.team-config-open-lore")),
-                                    UiTheme.blank(),
-                                    UiTheme.hint(line(player, "gui.toggle-hint")))
-                            .action("open_team_config").build());
-        }
-
-        // === row3: 危険ゾーンは最遠隅のみ ===
-        inventory.setItem(GuiSlots.slot(3, 7),
+        inventory.setItem(GuiSlots.slot(2, 5),
                 ItemBuilder.of(Material.BARRIER)
                         .name(t(player, "party.disband").color(UiTheme.DANGER))
                         .lore(UiTheme.divider(),
@@ -205,8 +289,21 @@ public final class TeamSettingsGui extends AbstractGui {
                                 UiTheme.blank(),
                                 UiTheme.hint(line(player, "party.disband-hint")))
                         .action("disband").build());
+        inventory.setItem(GuiSlots.slot(2, 7),
+                ItemBuilder.of(Material.WATER_BUCKET)
+                        .name(t(player, "party.clear-sides").color(UiTheme.WARNING))
+                        .lore(UiTheme.divider(),
+                                UiTheme.hint(line(player, "party.clear-sides-hint")))
+                        .action("clearsides").build());
 
-        MenuScaffold.returnButton(inventory, t(player, "gui.back-to-hub"));
+        inventory.setItem(GuiSlots.slot(4, 4),
+                ItemBuilder.of(UiTheme.BACK)
+                        .name(t(player, "menu.back").color(UiTheme.WARNING))
+                        .action("danger_exit").build());
+    }
+
+    private ItemStack deco(Player player, Material material) {
+        return com.rumilance.practice.gui.GuiMockups.deco(player, material, messages());
     }
 
     /** 権限移譲モードの描画: メンバー(自分以外)の選択グリッド + 戻るでメイン画面。 */
@@ -314,6 +411,23 @@ public final class TeamSettingsGui extends AbstractGui {
         switch (action) {
             case "back", "close" -> {
                 session.put(K_TRANSFER, Boolean.FALSE);
+                session.put(K_DANGER, Boolean.FALSE);
+                sounds.play(player, "gui-back");
+                backToHub(player);
+            }
+            case "danger_mode" -> {
+                if (owner) {
+                    session.put(K_DANGER, Boolean.TRUE);
+                    sounds.play(player, "gui-open");
+                    refresh(player, session, inventory);
+                }
+            }
+            case "danger_exit" -> {
+                session.put(K_DANGER, Boolean.FALSE);
+                sounds.play(player, "gui-back");
+                refresh(player, session, inventory);
+            }
+            case "open_hub" -> {
                 sounds.play(player, "gui-back");
                 backToHub(player);
             }
@@ -357,6 +471,7 @@ public final class TeamSettingsGui extends AbstractGui {
                                 .decoration(TextDecoration.ITALIC, false));
                     }
                     session.put(K_TRANSFER, Boolean.FALSE);
+                    session.put(K_DANGER, Boolean.FALSE);
                     // 旧オーナーは呼び出し元に戻る(管理画面の権限は移譲先へ)
                     player.closeInventory();
                     if (r == TeamService.Result.OK) {

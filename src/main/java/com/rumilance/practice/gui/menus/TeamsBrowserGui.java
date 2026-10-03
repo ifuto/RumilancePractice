@@ -26,6 +26,9 @@ import org.bukkit.inventory.ItemStack;
  */
 public final class TeamsBrowserGui extends AbstractGui {
 
+    /** Interior grid seats for party tiles: rows 1-4 × cols 1-7. */
+    private static final int GRID_SEATS = 28;
+
     private final TeamService teamService;
     private TeamHubGui teamHubGui;
     private final com.rumilance.practice.locale.MessageService messageService;
@@ -63,13 +66,65 @@ public final class TeamsBrowserGui extends AbstractGui {
         return t(player, "party.browser-title").color(UiTheme.PRIMARY);
     }
 
+    /**
+     * 2026-10 mockup (docs/design/gui-mockups.md "Party setfunc-item-main GUI"): yellow
+     * frame with a white 装飾 notch top-right, public parties as owner heads filling the
+     * interior grid, gray "No party available" panes in every free seat and down the right
+     * edge, and the footer [clock Update Data | prev arrow | next arrow | writable book
+     * Create a Party] with the two secondary create options folded beside the book.
+     */
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        paintFrame(player, session, inventory);
+        for (int col = 0; col <= 6; col++) {
+            inventory.setItem(col, ItemBuilder.of(Material.YELLOW_STAINED_GLASS_PANE)
+                    .action("decorate").build());
+        }
+        inventory.setItem(7, com.rumilance.practice.gui.GuiMockups.deco(player,
+                Material.WHITE_STAINED_GLASS_PANE, messageService));
+        // slot 8 stays empty per the mockup
+        for (int row = 1; row <= 4; row++) {
+            inventory.setItem(GuiSlots.slot(row, 0), ItemBuilder.of(Material.YELLOW_STAINED_GLASS_PANE)
+                    .action("decorate").build());
+        }
+        for (int row = 1; row <= 4; row++) {
+            inventory.setItem(GuiSlots.slot(row, 8), noParty(player));
+        }
 
-        // Create buttons (top of content area) — ヒエラルキービュ: 中央=私有パーティ(とりあえずこれ!
-        // でいい人向けヒーロー)、左右=公用/内部チームのオプション [Party GUI 完全リビルド 2026-09-29]。
-        inventory.setItem(GuiSlots.slot(1, 2),
+        var publicTeams = teamService.publicTeams();
+        int page = Math.max(0, session.page());
+        int perPage = GRID_SEATS;
+        int totalPages = Math.max(1, (publicTeams.size() + perPage - 1) / perPage);
+        if (page >= totalPages) {
+            page = totalPages - 1;
+            session.setPage(page);
+        }
+        // Interior grid cols 1-7, rows 1-4: parties first, gray No-party panes elsewhere.
+        for (int i = 0; i < GRID_SEATS; i++) {
+            int row = 1 + i / 7;
+            int col = 1 + i % 7;
+            int idx = page * perPage + i;
+            inventory.setItem(GuiSlots.slot(row, col), idx < publicTeams.size()
+                    ? teamIcon(player, publicTeams.get(idx))
+                    : noParty(player));
+        }
+
+        // Footer: clock Update Data, prev/next arrows, create cluster.
+        inventory.setItem(GuiSlots.slot(5, 0), ItemBuilder.of(Material.YELLOW_STAINED_GLASS_PANE)
+                .action("decorate").build());
+        inventory.setItem(GuiSlots.slot(5, 1),
+                ItemBuilder.of(Material.CLOCK)
+                        .name(t(player, "gui.update-data").color(UiTheme.PRIMARY))
+                        .lore(UiTheme.divider(), UiTheme.hint(line(player, "menu.click")))
+                        .action("update_data").build());
+        inventory.setItem(GuiSlots.slot(5, 3),
+                ItemBuilder.of(UiTheme.BACK)
+                        .name(t(player, "menu.page-prev").color(UiTheme.WARNING))
+                        .action("page:prev").build());
+        inventory.setItem(GuiSlots.slot(5, 7),
+                ItemBuilder.of(UiTheme.NEXT_PAGE)
+                        .name(t(player, "menu.page-next").color(UiTheme.WARNING))
+                        .action("page:next").build());
+        inventory.setItem(GuiSlots.slot(5, 5),
                 ItemBuilder.of(Material.WHITE_BANNER)
                         .name(t(player, "party.create-public").color(UiTheme.SUCCESS))
                         .lore(UiTheme.divider(),
@@ -77,16 +132,7 @@ public final class TeamsBrowserGui extends AbstractGui {
                                 UiTheme.blank(),
                                 UiTheme.hint(line(player, "menu.click")))
                         .action("create_public").build());
-        inventory.setItem(GuiSlots.slot(1, 4),
-                ItemBuilder.of(Material.NETHER_STAR)
-                        .name(t(player, "party.create-private").color(UiTheme.SECONDARY))
-                        .lore(UiTheme.divider(),
-                                UiTheme.line(line(player, "party.create-private-lore")),
-                                UiTheme.blank(),
-                                UiTheme.hint(line(player, "party.create-private-hint")))
-                        .glint(true)
-                        .action("create_private").build());
-        inventory.setItem(GuiSlots.slot(1, 6),
+        inventory.setItem(GuiSlots.slot(5, 6),
                 ItemBuilder.of(Material.IRON_SWORD)
                         .name(t(player, "party.create-team").color(UiTheme.SECONDARY))
                         .lore(UiTheme.divider(),
@@ -94,39 +140,23 @@ public final class TeamsBrowserGui extends AbstractGui {
                                 UiTheme.blank(),
                                 UiTheme.hint(line(player, "party.create-team-hint")))
                         .action("create_team").build());
-        inventory.setItem(GuiSlots.slot(0, 8),
+        inventory.setItem(GuiSlots.slot(5, 8),
                 ItemBuilder.of(Material.WRITABLE_BOOK)
-                        .name(t(player, "party.how-title").color(UiTheme.SECONDARY))
-                        .lore(
-                                UiTheme.line(line(player, "gui.party-how-1")),
-                                UiTheme.line(line(player, "gui.party-how-2")),
-                                UiTheme.line(line(player, "gui.party-how-3"))
-                        )
-                        .action("decorate").build());
+                        .name(t(player, "party.create-private").color(UiTheme.SECONDARY))
+                        .lore(UiTheme.divider(),
+                                UiTheme.line(line(player, "party.create-private-lore")),
+                                UiTheme.blank(),
+                                UiTheme.hint(line(player, "party.create-private-hint")))
+                        .glint(true)
+                        .action("create_private").build());
+    }
 
-        // Public teams grid (rows 2-4 of the standard content grid), paged.
-        int page = session.page();
-        var publicTeams = teamService.publicTeams();
-        int perPage = 21; // grid rows 2-4 (the create buttons occupy row 1)
-        int from = Math.min(page * perPage, publicTeams.size());
-        int to = Math.min(from + perPage, publicTeams.size());
-        int index = 7; // skip the first grid row (7 slots) used by the create buttons
-        for (int i = from; i < to; i++) {
-            Team team = publicTeams.get(i);
-            inventory.setItem(MenuScaffold.gridSlot(index++), teamIcon(player, team));
-        }
-        if (publicTeams.isEmpty()) {
-            inventory.setItem(GuiSlots.slot(3, 4),
-                    ItemBuilder.of(Material.LIGHT_GRAY_STAINED_GLASS)
-                            .name(t(player, "gui.party-none").color(UiTheme.MUTED))
-                            .lore(UiTheme.hint(line(player, "gui.party-none-lore")))
-                            .action("decorate").build());
-        }
-
-        // Paging (standard chrome buttons + page indicator).
-        paintPaging(player, inventory, page, Math.max(publicTeams.size(), 1));
-
-        MenuScaffold.closeButton(inventory, t(player, "menu.close"));
+    /** The mockup's gray "No party available" filler pane. */
+    private ItemStack noParty(Player player) {
+        return ItemBuilder.of(Material.LIGHT_GRAY_STAINED_GLASS_PANE)
+                .name(t(player, "gui.party-none").color(UiTheme.MUTED))
+                .lore(UiTheme.hint(line(player, "gui.party-none-lore")))
+                .action("decorate").build();
     }
 
     private ItemStack teamIcon(Player player, Team team) {
@@ -173,6 +203,10 @@ public final class TeamsBrowserGui extends AbstractGui {
                 teamService.create(player, player.getName() + "'s Team", isPublic,
                         com.rumilance.practice.team.GroupKind.TEAM);
                 teamHubGui.open(player);
+            }
+            case "update_data" -> {
+                sounds.play(player, "gui-click");
+                refresh(player, session, inventory);
             }
             case "page:prev" -> {
                 session.setPage(session.page() - 1);

@@ -46,10 +46,12 @@ import java.util.UUID;
 public final class TeamHubGui extends AbstractGui {
 
     private static final TextColor BLUE = TextColor.color(0x55AAFF);
-    /** One side column's slot count (rows1-3 × cols1-3 または 5-7). */
-    private static final int SIDE_SLOTS = 9;
-    /** Unassigned strip slots on row4 (cols1-7). */
-    private static final int UNASSIGNED_SLOTS = 7;
+    /** RED mockup seats: rows1-4 × cols1-3 minus the (1,2) invite pane (owner view). */
+    private static final int RED_SEATS = 11;
+    /** BLUE mockup seats: rows1-4 × cols5-7. */
+    private static final int BLUE_SEATS = 12;
+    /** Unassigned members overlay the light-gray separator column (col 4, rows 1-4). */
+    private static final int FREE_SEATS = 4;
 
     private final TeamService teamService;
     private final TeamsBrowserGui browser;
@@ -148,25 +150,130 @@ public final class TeamHubGui extends AbstractGui {
         TeamColor red = !activeColors.isEmpty() ? activeColors.getFirst() : TeamColor.RED;
         TeamColor blue = activeColors.size() >= 2 ? activeColors.get(1) : TeamColor.BLUE;
 
-        // row0: チーム名ヘッド(4) ∥ RED/BLUE チップ(1,2/6,7)
+        renderMockup(player, session, inventory, team, owner, red, blue);
+    }
+
+    /**
+     * 2026-10 mockup layout (docs/design/gui-mockups.md "Party MAIN GUI"): red band down the
+     * left edge, blue band down the right, side-count wools top-left/right around the owner
+     * head, ender-pearl Random Split top-right, RED seats cols 1-3 with the lime invite pane
+     * at (1,2), BLUE seats cols 5-7, a light-gray separator column (col 4) that doubles as
+     * the unassigned strip, and a footer of [back | prev sign | +N overflow | START/LEAVE |
+     * settings/close | tournament | next sign].
+     */
+    private void renderMockup(Player player, GuiSession session, Inventory inventory,
+                              Team team, boolean owner, TeamColor red, TeamColor blue) {
+        // --- bands + top row ---
+        for (int row = 0; row <= 5; row++) {
+            inventory.setItem(GuiSlots.slot(row, 0), com.rumilance.practice.gui.GuiMockups
+                    .deco(player, Material.RED_STAINED_GLASS_PANE, messageService));
+            inventory.setItem(GuiSlots.slot(row, 8), com.rumilance.practice.gui.GuiMockups
+                    .deco(player, Material.BLUE_STAINED_GLASS_PANE, messageService));
+        }
+        for (int col : new int[]{1, 3}) {
+            inventory.setItem(GuiSlots.slot(0, col), com.rumilance.practice.gui.GuiMockups
+                    .deco(player, Material.RED_STAINED_GLASS_PANE, messageService));
+        }
+        for (int col : new int[]{5, 7}) {
+            inventory.setItem(GuiSlots.slot(0, col), com.rumilance.practice.gui.GuiMockups
+                    .deco(player, Material.BLUE_STAINED_GLASS_PANE, messageService));
+        }
         inventory.setItem(GuiSlots.slot(0, 4), headerItem(player, team));
         inventory.setItem(GuiSlots.slot(0, 2), sideChip(player, team, red));
         inventory.setItem(GuiSlots.slot(0, 6), sideChip(player, team, blue));
+        if (owner) {
+            inventory.setItem(GuiSlots.slot(0, 8),
+                    ItemBuilder.of(Material.ENDER_PEARL)
+                            .name(t(player, "gui.party-auto-split").color(UiTheme.PRIMARY))
+                            .lore(UiTheme.divider(),
+                                    UiTheme.line(line(player, "gui.party-auto-split-lore")))
+                            .action("auto_split").build());
+        }
 
-        // rows1-3: RED 列 1-3 / BLUE 列 5-7 / row4 未割当ベルト列 1-7
+        // --- member paging state ---
         List<UUID> reds = sideMembers(team, red);
         List<UUID> blues = sideMembers(team, blue);
         List<UUID> free = unassignedMembers(team);
-        slotSideGrid(player, inventory, reds, 1, team, owner);
-        slotSideGrid(player, inventory, blues, 5, team, owner);
-        slotUnassignedStrip(player, inventory, free, team, owner);
+        int page = Math.max(0, session.page());
+        int totalPages = Math.max(1, Math.max(
+                (reds.size() + RED_SEATS - 1) / RED_SEATS,
+                Math.max((blues.size() + BLUE_SEATS - 1) / BLUE_SEATS,
+                        (free.size() + FREE_SEATS - 1) / FREE_SEATS)));
+        if (page >= totalPages) {
+            page = totalPages - 1;
+            session.setPage(page);
+        }
 
-        // 側っ端に余る時の「+N」のタグ
-        overflowBadge(inventory, GuiSlots.slot(3, 3), reds.size(), SIDE_SLOTS);
-        overflowBadge(inventory, GuiSlots.slot(3, 7), blues.size(), SIDE_SLOTS);
-        overflowBadge(inventory, GuiSlots.slot(4, 7), free.size(), UNASSIGNED_SLOTS);
+        // --- separator column (col 4): light-gray panes, unassigned members overlay ---
+        for (int row = 1; row <= 4; row++) {
+            inventory.setItem(GuiSlots.slot(row, 4), com.rumilance.practice.gui.GuiMockups
+                    .accent(Material.LIGHT_GRAY_STAINED_GLASS_PANE));
+        }
+        for (int i = 0; i < FREE_SEATS; i++) {
+            int idx = page * FREE_SEATS + i;
+            int row = 1 + i;
+            if (idx < free.size()) {
+                inventory.setItem(GuiSlots.slot(row, 4),
+                        memberItem(player, team, free.get(idx), owner));
+            }
+        }
 
-        // row5: フッター(Owner: [招待 2 | 自動分割 3 | START 4 | 設定 6 | 閉 8]、他: [退場 4 | 閉 8])
+        // --- RED seats (cols 1-3, invite pane fixed at (1,2) for the owner) ---
+        List<int[]> redCells = new ArrayList<>();
+        for (int row = 1; row <= 4; row++) {
+            for (int col = 1; col <= 3; col++) {
+                if (row == 1 && col == 2 && owner) {
+                    continue;
+                }
+                redCells.add(new int[]{row, col});
+            }
+        }
+        for (int[] cell : redCells) {
+            inventory.setItem(GuiSlots.slot(cell[0], cell[1]),
+                    com.rumilance.practice.gui.GuiMockups.emptySlot(player, messageService));
+        }
+        if (owner) {
+            inventory.setItem(GuiSlots.slot(1, 2),
+                    ItemBuilder.of(Material.LIME_STAINED_GLASS_PANE)
+                            .name(t(player, "gui.party-quick-invite").color(UiTheme.SUCCESS))
+                            .lore(UiTheme.divider(),
+                                    UiTheme.line(line(player, "gui.party-quick-invite-lore")))
+                            .action("quick_invite").build());
+        }
+        for (int i = 0; i < RED_SEATS && page * RED_SEATS + i < reds.size(); i++) {
+            int[] cell = redCells.get(i);
+            inventory.setItem(GuiSlots.slot(cell[0], cell[1]),
+                    memberItem(player, team, reds.get(page * RED_SEATS + i), owner));
+        }
+
+        // --- BLUE seats (cols 5-7) ---
+        for (int i = 0; i < BLUE_SEATS; i++) {
+            int row = 1 + i / 3;
+            int col = 5 + i % 3;
+            int idx = page * BLUE_SEATS + i;
+            inventory.setItem(GuiSlots.slot(row, col), idx < blues.size()
+                    ? memberItem(player, team, blues.get(idx), owner)
+                    : com.rumilance.practice.gui.GuiMockups.emptySlot(player, messageService));
+        }
+
+        // --- footer ---
+        int overflow = Math.max(0, reds.size() - page * RED_SEATS - RED_SEATS)
+                + Math.max(0, blues.size() - page * BLUE_SEATS - BLUE_SEATS)
+                + Math.max(0, free.size() - page * FREE_SEATS - FREE_SEATS);
+        inventory.setItem(GuiSlots.slot(5, 3), overflow > 0 ? overflowBadge(overflow)
+                : com.rumilance.practice.gui.GuiMockups.emptySlot(player, messageService));
+        inventory.setItem(GuiSlots.slot(5, 1),
+                ItemBuilder.of(UiTheme.BACK)
+                        .name(t(player, "menu.back").color(UiTheme.WARNING))
+                        .action("close").build());
+        inventory.setItem(GuiSlots.slot(5, 2),
+                ItemBuilder.of(Material.OAK_SIGN)
+                        .name(t(player, "menu.page-prev").color(UiTheme.MUTED))
+                        .action("page:prev").build());
+        inventory.setItem(GuiSlots.slot(5, 6),
+                ItemBuilder.of(Material.OAK_SIGN)
+                        .name(t(player, "menu.page-next").color(UiTheme.MUTED))
+                        .action("page:next").build());
         if (owner) {
             ownerBar(player, team, red, blue, inventory);
         } else {
@@ -175,40 +282,17 @@ public final class TeamHubGui extends AbstractGui {
                             .name(t(player, "party.leave").color(UiTheme.WARNING))
                             .lore(UiTheme.hint(line(player, "party.leave-hint")))
                             .action("leave").build());
-            inventory.setItem(GuiSlots.slot(5, 8),
+            inventory.setItem(GuiSlots.slot(5, 5),
                     ItemBuilder.action(UiTheme.CLOSE, t(player, "menu.close"), "close"));
         }
     }
 
-    /** サイド別要素のグリッド配置(rows1-3、cols=3)。 */
-    private void slotSideGrid(Player viewer, Inventory inventory, List<UUID> members, int baseCol,
-                              Team team, boolean viewerIsOwner) {
-        for (int i = 0; i < Math.min(members.size(), SIDE_SLOTS); i++) {
-            int row = 1 + i / 3;
-            int col = baseCol + i % 3;
-            inventory.setItem(GuiSlots.slot(row, col),
-                    memberItem(viewer, team, members.get(i), viewerIsOwner));
-        }
-    }
-
-    /** 未割当ベルト(row4、cols1-7)。 */
-    private void slotUnassignedStrip(Player viewer, Inventory inventory, List<UUID> members,
-                                     Team team, boolean viewerIsOwner) {
-        for (int i = 0; i < Math.min(members.size(), UNASSIGNED_SLOTS); i++) {
-            inventory.setItem(GuiSlots.slot(4, 1 + i),
-                    memberItem(viewer, team, members.get(i), viewerIsOwner));
-        }
-    }
-
-    /** 余った人数の +N バッジ(グリッド末尾の角に置く)。 */
-    private void overflowBadge(Inventory inventory, int slot, int size, int cap) {
-        if (size <= cap) {
-            return;
-        }
-        inventory.setItem(slot, ItemBuilder.of(Material.NAME_TAG)
-                .name(Component.text("+" + (size - cap), UiTheme.MUTED)
+    /** "+N more members" name tag (the mockup's "No more players" barrier slot). */
+    private ItemStack overflowBadge(int overflow) {
+        return ItemBuilder.of(Material.NAME_TAG)
+                .name(Component.text("+" + overflow, UiTheme.MUTED)
                         .decoration(TextDecoration.ITALIC, false))
-                .action("decorate").build());
+                .action("decorate").build();
     }
 
     /** RED ▸ [[0,2] chip] の人数チップ(装飾のみ)。 */
@@ -241,21 +325,9 @@ public final class TeamHubGui extends AbstractGui {
         return out;
     }
 
-    /** Owner 用のフッター一式。START にはレディネス(実行理由)を lore で。 */
+    /** Owner footer hero row: START (5,4), settings comparator (5,5), tournament (5,6). */
     private void ownerBar(Player player, Team team, TeamColor red, TeamColor blue, Inventory inventory) {
-        inventory.setItem(GuiSlots.slot(5, 2),
-                ItemBuilder.of(Material.NETHER_STAR)
-                        .name(t(player, "gui.party-quick-invite").color(UiTheme.PRIMARY))
-                        .lore(UiTheme.divider(),
-                                UiTheme.line(line(player, "gui.party-quick-invite-lore")))
-                        .action("quick_invite").build());
-        inventory.setItem(GuiSlots.slot(5, 3),
-                ItemBuilder.of(Material.ENDER_PEARL)
-                        .name(t(player, "gui.party-auto-split").color(UiTheme.PRIMARY))
-                        .lore(UiTheme.divider(),
-                                UiTheme.line(line(player, "gui.party-auto-split-lore")))
-                        .action("auto_split").build());
-        inventory.setItem(GuiSlots.slot(5, 6),
+        inventory.setItem(GuiSlots.slot(5, 5),
                 ItemBuilder.of(Material.COMPARATOR)
                         .name(t(player, "gui.team-settings-entry").color(UiTheme.PRIMARY))
                         .lore(UiTheme.divider(),
@@ -264,7 +336,7 @@ public final class TeamHubGui extends AbstractGui {
                                 UiTheme.hint(line(player, "gui.team-settings-hint")))
                         .action("team_settings").build());
         if (team.kind() == com.rumilance.practice.team.GroupKind.PARTY) {
-            inventory.setItem(GuiSlots.slot(5, 1),
+            inventory.setItem(GuiSlots.slot(5, 6),
                     ItemBuilder.of(Material.GOLDEN_SWORD)
                             .name(t(player, "tournament.hub-button").color(UiTheme.SECONDARY))
                             .lore(UiTheme.divider(),

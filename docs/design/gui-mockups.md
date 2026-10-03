@@ -10,12 +10,24 @@ gray panes for 空き枠 (empty but usable seats). Shared helpers: `GuiMockups`.
 | Mockup (save name)          | Plugin GUI            | Status |
 |-----------------------------|-----------------------|--------|
 | Duel Request GUI            | DuelRequestGui        | IMPLEMENTED (v1.92.8) |
-| Party MAIN GUI              | TeamHubGui            | planned |
-| Party Config GUI            | TeamConfigGui         | planned |
-| Danger Settings GUI         | TeamSettingsGui       | planned |
-| Party setfunc-item-main GUI | TeamsBrowserGui       | planned |
-| Battle Mode GUI             | party battle select   | planned |
-| Party Start Battle GUI      | party battle setup    | planned |
+| Party MAIN GUI              | TeamHubGui            | IMPLEMENTED (v1.92.9) |
+| Party Config GUI            | TeamSettingsGui       | IMPLEMENTED (v1.92.9) |
+| Danger Settings GUI         | TeamSettingsGui (danger mode) | IMPLEMENTED (v1.92.9) |
+| Party setfunc-item-main GUI | TeamsBrowserGui       | IMPLEMENTED (v1.92.9) |
+| Battle Mode GUI             | party battle select   | pending (needs a mode-select screen) |
+| Party Start Battle GUI      | TeamKitSelectGui flow | pending |
+
+Deviations (function set is larger than the mockups):
+- Party MAIN: the owner's settings comparator and tournament tiles sit at (5,5)/(5,6);
+  paging is global (11 RED / 12 BLUE / 4 unassigned seats per page, +N name tag at (5,3)
+  = the mockup's "No more players" barrier); the unassigned strip overlays the light-gray
+  separator column (col 4). The mockup's bottom-inventory "Set to X team" assignment panes
+  are NOT implemented — side assignment stays click-to-cycle on member heads.
+- Party Config: the mockup's BAN List cell carries Clear Sides (the plugin has no
+  party-ban feature yet); Select-a-Map moved out (it lives in the battle-start flow);
+  Player List opens the party hub.
+- Browser: the writable book creates a PRIVATE party (the hero action); public/team
+  create remain at (5,5)/(5,6).
 
 ## Duel Request layout (6 rows, 54 slots) — implemented
 
