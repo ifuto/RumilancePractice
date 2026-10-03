@@ -2019,9 +2019,11 @@ public final class AfkCrystalManager implements Listener, CommandExecutor,
             if (kitService.get(name).isEmpty()) {
                 return;
             }
-            // 木時差式ボタン: the tile is pressed onto the cursor, and the kit is applied when
-            // the button pops back 0.2s later — same feel as every other menu in the plugin.
-            com.rumilance.practice.gui.DelayedButton.press(plugin, player, event.getCurrentItem(),
+            // 木時差式ボタン: the tile is TAKEN onto the cursor (slot empties, pops back 0.2s
+            // later) and the kit is applied when the button releases — same feel as every
+            // other menu in the plugin.
+            com.rumilance.practice.gui.DelayedButton.press(plugin, player,
+                    event.getClickedInventory(), event.getSlot(),
                     name, picked -> {
                         if (!player.isOnline()) {
                             return;

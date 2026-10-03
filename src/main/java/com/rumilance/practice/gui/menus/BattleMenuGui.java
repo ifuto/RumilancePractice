@@ -49,8 +49,7 @@ import org.bukkit.inventory.ItemStack;
  */
 public final class BattleMenuGui extends AbstractGui {
 
-    private final QueueKitGui rankedGui;
-    private final QueueKitGui unrankedGui;
+    private final KitSelectGui kitSelectGui;
     private final PlayersGui playersGui;
     private final FfaListGui ffaListGui;
     private final MessageService messageService;
@@ -68,15 +67,13 @@ public final class BattleMenuGui extends AbstractGui {
     public BattleMenuGui(
             GuiSessionRegistry registry,
             SoundService sounds,
-            QueueKitGui rankedGui,
-            QueueKitGui unrankedGui,
+            KitSelectGui kitSelectGui,
             PlayersGui playersGui,
             FfaListGui ffaListGui,
             MessageService messageService
     ) {
         super(registry, sounds, GuiType.BATTLE_MENU, 5, true);
-        this.rankedGui = rankedGui;
-        this.unrankedGui = unrankedGui;
+        this.kitSelectGui = kitSelectGui;
         this.playersGui = playersGui;
         this.ffaListGui = ffaListGui;
         this.messageService = messageService;
@@ -380,8 +377,8 @@ public final class BattleMenuGui extends AbstractGui {
                     refresh(player, session, inventory);
                 }
             }
-            case "ranked" -> openChild(player, rankedGui::open);
-            case "unranked" -> openChild(player, unrankedGui::open);
+            case "ranked" -> openChild(player, p -> kitSelectGui.openForQueue(p, true));
+            case "unranked" -> openChild(player, p -> kitSelectGui.openForQueue(p, false));
             case "player-duel" -> openChild(player, playersGui::open);
             case "ffa" -> openChild(player, ffaListGui::open);
             case "bot" -> {

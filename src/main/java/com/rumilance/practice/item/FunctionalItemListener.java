@@ -1,6 +1,6 @@
 package com.rumilance.practice.item;
 
-import com.rumilance.practice.gui.menus.QueueKitGui;
+import com.rumilance.practice.gui.menus.KitSelectGui;
 import com.rumilance.practice.queue.QueueCoordinator;
 import com.rumilance.practice.sound.SoundService;
 import com.rumilance.practice.util.ItemKeys;
@@ -29,8 +29,7 @@ public final class FunctionalItemListener implements Listener {
 
     private final SoundService soundService;
     private final QueueCoordinator queueCoordinator;
-    private final QueueKitGui rankedGui;
-    private final QueueKitGui unrankedGui;
+    private final KitSelectGui kitSelectGui;
     private volatile com.rumilance.practice.signqueue.SignQueueService signQueueService;
     private volatile java.util.function.Consumer<Player> multiQueueGuiOpener;
     private Consumer<Player> openSettings = p -> {
@@ -65,13 +64,11 @@ public final class FunctionalItemListener implements Listener {
     public FunctionalItemListener(
             SoundService soundService,
             QueueCoordinator queueCoordinator,
-            QueueKitGui rankedGui,
-            QueueKitGui unrankedGui
+            KitSelectGui kitSelectGui
     ) {
         this.soundService = soundService;
         this.queueCoordinator = queueCoordinator;
-        this.rankedGui = rankedGui;
-        this.unrankedGui = unrankedGui;
+        this.kitSelectGui = kitSelectGui;
     }
 
     public void setSignQueueService(com.rumilance.practice.signqueue.SignQueueService signQueueService) {
@@ -221,8 +218,8 @@ public final class FunctionalItemListener implements Listener {
         event.setUseInteractedBlock(org.bukkit.event.Event.Result.DENY);
         soundService.play(player, "gui-open", 1.4f);
         switch (function.toLowerCase(Locale.ROOT)) {
-            case "ranked" -> rankedGui.open(player);
-            case "unranked" -> unrankedGui.open(player);
+            case "ranked" -> kitSelectGui.openForQueue(player, true);
+            case "unranked" -> kitSelectGui.openForQueue(player, false);
             case "ffa" -> openFfa.accept(player);
             case "ekit" -> openEkit.accept(player);
             case "settings" -> openSettings.accept(player);

@@ -3,7 +3,7 @@ package com.rumilance.practice.command;
 import com.rumilance.practice.config.RuntimeFlags;
 import com.rumilance.practice.duel.DuelRequestService;
 import com.rumilance.practice.guard.PracticeGuards;
-import com.rumilance.practice.gui.menus.QueueKitGui;
+import com.rumilance.practice.gui.menus.KitSelectGui;
 import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.lobby.LobbyService;
 import com.rumilance.practice.locale.MessageService;
@@ -37,8 +37,7 @@ import java.util.UUID;
  */
 public final class DuelCommand implements CommandExecutor, TabCompleter {
 
-    private final QueueKitGui rankedGui;
-    private final QueueKitGui unrankedGui;
+    private final KitSelectGui kitSelectGui;
     private final com.rumilance.practice.gui.menus.DuelRequestGui duelRequestGui;
     private final DuelRequestService duelRequestService;
     private final MatchService matchService;
@@ -84,8 +83,7 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
     }
 
     public DuelCommand(
-            QueueKitGui rankedGui,
-            QueueKitGui unrankedGui,
+            KitSelectGui kitSelectGui,
             DuelRequestService duelRequestService,
             MatchService matchService,
             KitService kitService,
@@ -97,14 +95,13 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
             boolean rankedDefault,
             MessageService messageService
     ) {
-        this(rankedGui, unrankedGui, null, duelRequestService, matchService, kitService,
+        this(kitSelectGui, null, duelRequestService, matchService, kitService,
                 stateManager, soundService, lobbyService, queueCoordinator, runtimeFlags,
                 rankedDefault, messageService);
     }
 
     public DuelCommand(
-            QueueKitGui rankedGui,
-            QueueKitGui unrankedGui,
+            KitSelectGui kitSelectGui,
             com.rumilance.practice.gui.menus.DuelRequestGui duelRequestGui,
             DuelRequestService duelRequestService,
             MatchService matchService,
@@ -117,8 +114,7 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
             boolean rankedDefault,
             MessageService messageService
     ) {
-        this.rankedGui = rankedGui;
-        this.unrankedGui = unrankedGui;
+        this.kitSelectGui = kitSelectGui;
         this.duelRequestGui = duelRequestGui;
         this.duelRequestService = duelRequestService;
         this.matchService = matchService;
@@ -166,11 +162,7 @@ public final class DuelCommand implements CommandExecutor, TabCompleter {
         boolean ranked = false;
 
         if (args.length == 0) {
-            if (ranked) {
-                rankedGui.open(player);
-            } else {
-                unrankedGui.open(player);
-            }
+            kitSelectGui.openForQueue(player, ranked);
             return true;
         }
 

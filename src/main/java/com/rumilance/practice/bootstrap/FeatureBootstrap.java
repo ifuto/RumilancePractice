@@ -132,7 +132,6 @@ import com.rumilance.practice.gui.menus.PracticeLayoutGui;
 import com.rumilance.practice.gui.menus.PracticeMaceGui;
 import com.rumilance.practice.gui.menus.PresetAdminGui;
 import com.rumilance.practice.gui.menus.ProfileGui;
-import com.rumilance.practice.gui.menus.QueueKitGui;
 import com.rumilance.practice.gui.menus.MultiQueueGui;
 import com.rumilance.practice.gui.menus.ReportGui;
 import com.rumilance.practice.gui.menus.ReportListGui;
@@ -906,14 +905,9 @@ public final class FeatureBootstrap {
 
         com.rumilance.practice.kit.LastSelectedKitTracker lastKitTracker =
                 new com.rumilance.practice.kit.LastSelectedKitTracker();
-        QueueKitGui rankedGui = new QueueKitGui(
-                guiSessions, soundService, kitService, queueService, queueCoordinator, true);
-        rankedGui.setLastKitTracker(lastKitTracker);
+        // Queue は専用のキット画面を持たない: THE KitSelectGui をキューモードで開く
+        // (画面は1つ、キュー参加/プレビューはキュー時のクリック挙動だけが違う)。
         // ランク戦キットアイテムのホバーにトップ5ランキング lore を載せる
-        rankedGui.setRankedTopLore(rankedStatsRepository, settings.rankedLeaderboardMaxDeviation());
-        QueueKitGui unrankedGui = new QueueKitGui(
-                guiSessions, soundService, kitService, queueService, queueCoordinator, false);
-        unrankedGui.setLastKitTracker(lastKitTracker);
 
         // Multi-Queue GUIs (複数キット同時キュー参加) — guiListener は後で生成されるので
         // インスタンスだけ先に作り、register は guiListener 生成後に行う。
@@ -926,6 +920,8 @@ public final class FeatureBootstrap {
 
         KitSelectGui kitSelectGui = new KitSelectGui(guiSessions, soundService, kitService);
         kitSelectGui.setLastKitTracker(lastKitTracker);
+        kitSelectGui.setQueueServices(queueService, queueCoordinator);
+        kitSelectGui.setRankedTopLore(rankedStatsRepository, settings.rankedLeaderboardMaxDeviation());
         DuelRequestGui duelRequestGui = new DuelRequestGui(
                 guiSessions, soundService, kitService, duelRequestService, settingsService,
                 statsService, kitSelectGui, messageService);
@@ -967,8 +963,7 @@ public final class FeatureBootstrap {
                 guiSessions, soundService, matchRegistry, spectatorService, ffaService, kitService);
         FfaListGui ffaListGui = new FfaListGui(guiSessions, soundService, ffaService);
         KitPreviewGui kitPreviewGui = new KitPreviewGui(guiSessions, soundService, kitService);
-        rankedGui.setPreviewGui(kitPreviewGui);
-        unrankedGui.setPreviewGui(kitPreviewGui);
+        kitSelectGui.setPreviewGui(kitPreviewGui);
 
         TitleService titleService = new TitleService(settingsService, statsService);
         services.register(TitleService.class, titleService);
@@ -1294,7 +1289,7 @@ public final class FeatureBootstrap {
         presetAdminGui.setReturnTo(adminMenuGui::open);
 
         BattleMenuGui battleMenuGui = new BattleMenuGui(
-                guiSessions, soundService, rankedGui, unrankedGui, playersGui, ffaListGui,
+                guiSessions, soundService, kitSelectGui, playersGui, ffaListGui,
                 messageService);
         battleMenuGui.setQueueServices(queueService, queueCoordinator);
         battleMenuGui.setStateManager(stateManager);
@@ -1378,8 +1373,6 @@ public final class FeatureBootstrap {
         });
         // 木時差式ボタン releases are scheduled off this plugin handle.
         guiListener.setPlugin(plugin);
-        guiListener.register(rankedGui);
-        guiListener.register(unrankedGui);
         guiListener.register(multiQueueRanked);
         guiListener.register(multiQueueUnranked);
         guiListener.register(kitSelectGui);
@@ -1474,7 +1467,7 @@ public final class FeatureBootstrap {
                 }, 20L, 20L);
 
         FunctionalItemListener functionalItemListener =
-                new FunctionalItemListener(soundService, queueCoordinator, rankedGui, unrankedGui);
+                new FunctionalItemListener(soundService, queueCoordinator, kitSelectGui);
         functionalItemListener.setSignQueueService(signQueueService);
         functionalItemListener.setOpenSettings(settingsGui::open);
         functionalItemListener.setOpenFfa(ffaListGui::open);
@@ -2025,10 +2018,10 @@ public final class FeatureBootstrap {
         matchService.setCombatStyleService(combatStyleService);
 
         DuelCommand rankedDuel = new DuelCommand(
-                rankedGui, unrankedGui, duelRequestGui, duelRequestService, matchService, kitService,
+                kitSelectGui, duelRequestGui, duelRequestService, matchService, kitService,
                 stateManager, soundService, lobbyService, queueCoordinator, runtimeFlags, true, messageService);
         DuelCommand unrankedDuel = new DuelCommand(
-                rankedGui, unrankedGui, duelRequestGui, duelRequestService, matchService, kitService,
+                kitSelectGui, duelRequestGui, duelRequestService, matchService, kitService,
                 stateManager, soundService, lobbyService, queueCoordinator, runtimeFlags, false, messageService);
         rankedDuel.setFfaService(ffaService);
         rankedDuel.setSpectatorService(spectatorService);
