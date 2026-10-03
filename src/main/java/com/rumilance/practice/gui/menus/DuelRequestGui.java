@@ -171,12 +171,38 @@ public final class DuelRequestGui extends AbstractGui {
                 session.ranked() ? "duel-gui.title-ranked" : "duel-gui.title-unranked");
     }
 
+    /**
+     * 2026-10 mockup layout (designed in an inventory editor, docs/design/gui-mockups.md):
+     * row 0 black 存在しないマス, row 1 orange ring + opponent head centre, kit/map row with
+     * copper chain corners, send centre, FT/KB row, orange bottom ring. Actions are keyed by
+     * PDC action strings, so the handlers are unchanged — only the cells moved.
+     */
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        paintFrame(player, session, inventory);
         String locale = messageService.resolveLocale(player);
         UUID targetId = session.targetPlayer();
         Player target = targetId == null ? null : Bukkit.getPlayer(targetId);
+
+        // --- mockup frame ---
+        com.rumilance.practice.gui.GuiMockups.fill(inventory,
+                com.rumilance.practice.gui.GuiMockups.noCell(player, messageService),
+                com.rumilance.practice.gui.GuiMockups.row(0));
+        com.rumilance.practice.gui.GuiMockups.fill(inventory,
+                com.rumilance.practice.gui.GuiMockups.accent(Material.ORANGE_STAINED_GLASS_PANE),
+                com.rumilance.practice.gui.GuiMockups.row(1));
+        for (int row = 2; row <= 4; row++) {
+            inventory.setItem(row * 9, com.rumilance.practice.gui.GuiMockups.chain());
+            inventory.setItem(row * 9 + 8, com.rumilance.practice.gui.GuiMockups.chain());
+        }
+        for (int slot : new int[]{19, 21, 23, 25, 28, 29, 33, 34, 37, 39, 41, 43}) {
+            inventory.setItem(slot, com.rumilance.practice.gui.GuiMockups.deco(player,
+                    slot == 22 || slot == 30 || slot == 32 || slot == 40
+                            ? Material.WHITE_STAINED_GLASS_PANE
+                            : Material.LIGHT_GRAY_STAINED_GLASS_PANE, messageService));
+        }
+        com.rumilance.practice.gui.GuiMockups.fill(inventory,
+                com.rumilance.practice.gui.GuiMockups.accent(Material.ORANGE_STAINED_GLASS_PANE),
+                com.rumilance.practice.gui.GuiMockups.row(5));
 
         // Opponent head on the top bar with ping, W/L and K/D beneath it.
         ItemBuilder headBuilder = ItemBuilder.of(Material.PLAYER_HEAD)
@@ -207,11 +233,11 @@ public final class DuelRequestGui extends AbstractGui {
                 // Stats are best-effort; the head still renders without them.
             }
         }
-        inventory.setItem(GuiSlots.slot(0, 4), headBuilder.build());
+        inventory.setItem(13, headBuilder.build()); // mockup: centre of the orange ring
 
         // Configuration tiles.
         // 中キットを選んでいれば、その名前をキット名に続けて表示する（相手にも同じ文言が届く）。
-        inventory.setItem(GuiSlots.slot(2, 3), GuiDecorator.button(Material.DIAMOND_SWORD,
+        inventory.setItem(20, GuiDecorator.button(Material.BARREL,
                 messageService.render(locale, "duel-gui.kit-select",
                         MessageService.tags("kit", kitLabel(session))), "kit"));
 
@@ -229,7 +255,7 @@ public final class DuelRequestGui extends AbstractGui {
                     ? Material.NETHERITE_SWORD : Material.DIAMOND_SWORD;
             String cmLabel = cm == com.rumilance.practice.combat.CombatMode.BEDROCK
                     ? "Bedrock" : "Java";
-            inventory.setItem(GuiSlots.slot(2, 4), GuiDecorator.button(cmMat,
+            inventory.setItem(28, GuiDecorator.button(cmMat,
                     messageService.render(locale, "duel-gui.combat-mode",
                             MessageService.tags("mode", cmLabel)),
                     "combat-mode"));
@@ -239,13 +265,13 @@ public final class DuelRequestGui extends AbstractGui {
                 || "random".equalsIgnoreCase(session.selectedMap())
                 ? "Random"
                 : com.rumilance.practice.util.KitNames.pretty(session.selectedMap());
-        inventory.setItem(GuiSlots.slot(2, 5), GuiDecorator.button(Material.GRASS_BLOCK,
+        inventory.setItem(24, GuiDecorator.button(Material.MAP,
                 messageService.render(locale, "duel-gui.map-select",
                         MessageService.tags("map", mapLabel)), "map"));
         // Symmetric config row: FT (先取点数) on the left, queue mode on the right.
         // FT: click +1, shift-click +5, 40 → ∞ → 1. ∞ means no score limit.
-        inventory.setItem(GuiSlots.slot(3, 3),
-                com.rumilance.practice.gui.ItemBuilder.of(Material.NETHERITE_SCRAP)
+        inventory.setItem(38,
+                com.rumilance.practice.gui.ItemBuilder.of(Material.GOLDEN_APPLE)
                         .name(messageService.render(locale, "duel-gui.ft", MessageService.tags(
                                 "n", com.rumilance.practice.match.FirstTo.label(session.firstTo()))))
                         .lore(
@@ -268,13 +294,11 @@ public final class DuelRequestGui extends AbstractGui {
         String rawKb = session.get(KB_KEY, String.class);
         kbButton.editMeta(meta -> meta.setEnchantmentGlintOverride(
                 rawKb != null && !com.rumilance.practice.kb.KbProfileService.CHOICE_DEFAULT.equals(rawKb)));
-        inventory.setItem(GuiSlots.slot(3, 5), kbButton);
-        // Footer: dismiss at the far left corner, the hero action (SEND) centred on the bottom row.
-        inventory.setItem(GuiSlots.slot(4, 0), GuiDecorator.button(Material.BARRIER,
-                messageService.render(locale, "duel-gui.cancel"), "cancel"));
+        inventory.setItem(42, kbButton);
+        // Mockup has no cancel tile: Esc (or /rpcancel) dismisses; SEND sits centre of row 3.
         boolean pending = Boolean.TRUE.equals(session.get("pending", Boolean.class));
-        inventory.setItem(GuiSlots.slot(4, 4), GuiDecorator.button(
-                pending ? Material.YELLOW_GLAZED_TERRACOTTA : Material.EMERALD,
+        inventory.setItem(31, GuiDecorator.button(
+                pending ? Material.YELLOW_GLAZED_TERRACOTTA : Material.DIAMOND_SWORD,
                 messageService.render(locale, pending ? "duel-gui.pending" : "duel-gui.send"), "send"));
     }
 
