@@ -134,7 +134,7 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
 
     private boolean handleToggle(CommandSender sender, String[] args) {
         if (args.length < 3) {
-            sender.sendMessage(Component.text("/toggle <queue|map> <enable|disable> <id>", NamedTextColor.YELLOW));
+            sender.sendMessage(Component.text("/toggle <queue|map|ranked> <enable|disable> <id>", NamedTextColor.YELLOW));
             return true;
         }
         boolean enable = args[1].equalsIgnoreCase("enable");
@@ -149,6 +149,18 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
             arenaStore.setEnabled(args[2], enable);
             arenaService.setTemplates(arenaStore.templates());
             sender.sendMessage(Component.text("Map " + args[2] + " " + (enable ? "enabled" : "disabled"),
+                    NamedTextColor.GREEN));
+            return true;
+        }
+        if (args[0].equalsIgnoreCase("ranked")) {
+            var kitOpt = kitService.get(args[2]);
+            if (kitOpt.isEmpty()) {
+                sender.sendMessage(Component.text("Kit not found: " + args[2], NamedTextColor.RED));
+                return true;
+            }
+            KitDefinition updated = kitOpt.get().toBuilder().ranked(enable).build();
+            kitService.save(updated);
+            sender.sendMessage(Component.text("Ranked " + args[2] + " " + (enable ? "enabled" : "disabled"),
                     NamedTextColor.GREEN));
             return true;
         }
@@ -781,7 +793,7 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
 
     private List<String> completeToggle(String[] args) {
         if (args.length == 1) {
-            return filter(List.of("queue", "map"), args[0]);
+            return filter(List.of("queue", "map", "ranked"), args[0]);
         }
         if (args.length == 2) {
             return filter(List.of("enable", "disable"), args[1]);
@@ -792,6 +804,9 @@ public final class ArenaKitAdminCommand implements CommandExecutor, TabCompleter
             }
             if (args[0].equalsIgnoreCase("map")) {
                 return filter(arenaStore.templates().stream().map(ArenaTemplate::name).toList(), args[2]);
+            }
+            if (args[0].equalsIgnoreCase("ranked")) {
+                return filter(kitService.all().stream().map(KitDefinition::name).toList(), args[2]);
             }
         }
         return List.of();
