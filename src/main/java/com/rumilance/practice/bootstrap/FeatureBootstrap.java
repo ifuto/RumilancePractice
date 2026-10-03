@@ -1483,7 +1483,7 @@ public final class FeatureBootstrap {
             boolean inRanked = queueService.get(player.getUniqueId())
                     .map((QueueService.QueueEntry e) -> e.mode() == MatchMode.RANKED)
                     .orElse(false);
-            var gui = inRanked ? multiQueueRanked : multiQueueUnranked;
+            MultiQueueGui gui = inRanked ? multiQueueRanked : multiQueueUnranked;
             GuiSession s = guiSessions.open(player.getUniqueId(), gui.type(), gui.rows());
             s.setRanked(inRanked);
             com.rumilance.practice.gui.menus.PracticeGuiOpen.open(gui, player, s);
