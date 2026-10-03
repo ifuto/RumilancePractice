@@ -398,12 +398,16 @@ public final class PracticeGuards {
     }
 
     /**
-     * Vanilla borders are square: cover the larger horizontal dimension (+2 margin).
+     * Vanilla borders are square: cover the larger horizontal dimension EXACTLY, so the
+     * border's solid plane sits precisely on that side's outer face — the client then blocks
+     * walking out natively, exactly like a block wall (no dead zone, no pull-back). The old
+     * +2 margin left a one-block gap past the region face where the client let you walk and
+     * the server wall then slid you back — the reported "引き戻してる感".
      */
     public static double matchBorderSize(int minX, int maxX, int minZ, int maxZ) {
         double width = maxX - minX + 1;
         double depth = maxZ - minZ + 1;
-        return Math.max(width, depth) + 2;
+        return Math.max(width, depth);
     }
 
     // --- Item handling invariants ---

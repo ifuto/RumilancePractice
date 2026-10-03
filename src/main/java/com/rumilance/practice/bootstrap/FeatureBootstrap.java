@@ -1770,6 +1770,10 @@ public final class FeatureBootstrap {
 
         pm.registerEvents(new TeamColoredArmorListener(teamColoredArmor, settingsService), plugin);
         pm.registerEvents(new ArenaBoundsListener(matchService, arenaService), plugin);
+        // The border is a solid wall for projectiles too: pearls teleport at the face, wind
+        // charges burst on it, arrows stick (they used to fly straight through the wall).
+        pm.registerEvents(new com.rumilance.practice.guard.ProjectileWall(
+                plugin, matchService, arenaService, ffaService), plugin);
         pm.registerEvents(new SpectatorBoundsListener(
                 spectatorService, matchRegistry, arenaService, ffaService), plugin);
         pm.registerEvents(new FfaListener(ffaService, kitService, stateManager, combatNet, practiceTnt,
