@@ -1149,6 +1149,17 @@ public final class FeatureBootstrap {
         confirmGui.setOriginalKitService(originalKitService);
         teamSettingsGui.setConfirmGui(confirmGui);
         teamHubGui.setStateManager(stateManager);
+        // Party Start Battle launchpad + Battle Mode picker (2026-10 mockups).
+        com.rumilance.practice.gui.menus.PartyStartBattleGui partyStartBattleGui =
+                new com.rumilance.practice.gui.menus.PartyStartBattleGui(
+                        guiSessions, soundService, teamService, teamKitSelectGui,
+                        partyMapSelectGui, messageService);
+        com.rumilance.practice.gui.menus.PartyBattleModeGui partyBattleModeGui =
+                new com.rumilance.practice.gui.menus.PartyBattleModeGui(
+                        guiSessions, soundService, partyStartBattleGui, messageService);
+        partyStartBattleGui.setBattleModeGui(partyBattleModeGui);
+        partyStartBattleGui.setStateManager(stateManager);
+        teamHubGui.setPartyStartBattleGui(partyStartBattleGui);
         // Original kits: paper grid -> per-slot hub -> (room edit | big settings screen).
         com.rumilance.practice.gui.menus.OriginalKitSettingsGui originalKitSettingsGui =
                 new com.rumilance.practice.gui.menus.OriginalKitSettingsGui(
@@ -1364,6 +1375,8 @@ public final class FeatureBootstrap {
         // 木時差式ボタン releases are scheduled off this plugin handle.
         guiListener.setPlugin(plugin);
         guiListener.register(kitSelectGui);
+        guiListener.register(partyStartBattleGui);
+        guiListener.register(partyBattleModeGui);
         guiListener.register(innerKitSelectGui);
         guiListener.register(innerKitAdminGui);
         guiListener.register(duelRequestGui);
@@ -2196,6 +2209,7 @@ public final class FeatureBootstrap {
                 new com.rumilance.practice.team.PartyFfaService(plugin);
         pm.registerEvents(partyFfaService, plugin);
         matchService.setPartyFfaService(partyFfaService);
+        partyStartBattleGui.setPartyFfaService(partyFfaService);
         bind("partyffa", partyFfaService);
 
         bind("tournament", tournamentCommand);

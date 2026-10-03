@@ -63,6 +63,7 @@ public final class TeamHubGui extends AbstractGui {
     private com.rumilance.practice.session.PlayerStateManager stateManager;
     private TeamConfigGui teamConfigGui;
     private TeamSettingsGui teamSettingsGui;
+    private PartyStartBattleGui partyStartBattleGui;
     private com.rumilance.practice.gui.menus.TournamentGui tournamentGui;
 
     public void setTeamConfigGui(TeamConfigGui teamConfigGui) {
@@ -71,6 +72,11 @@ public final class TeamHubGui extends AbstractGui {
 
     public void setTeamSettingsGui(TeamSettingsGui teamSettingsGui) {
         this.teamSettingsGui = teamSettingsGui;
+    }
+
+    /** The 2026-10 mockup launchpad (Select a Kit / Battle Mode / Map / Start Battle). */
+    public void setPartyStartBattleGui(PartyStartBattleGui partyStartBattleGui) {
+        this.partyStartBattleGui = partyStartBattleGui;
     }
 
     public void setTournamentGui(com.rumilance.practice.gui.menus.TournamentGui tournamentGui) {
@@ -541,7 +547,12 @@ public final class TeamHubGui extends AbstractGui {
                 Bukkit.getScheduler().runTask(
                         org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(TeamHubGui.class),
                         () -> {
-                            if (player.isOnline()) {
+                            if (!player.isOnline()) {
+                                return;
+                            }
+                            if (partyStartBattleGui != null) {
+                                partyStartBattleGui.openFor(player, PartyStartBattleGui.MODE_FIGHT);
+                            } else {
                                 kitSelect.open(player);
                             }
                         });

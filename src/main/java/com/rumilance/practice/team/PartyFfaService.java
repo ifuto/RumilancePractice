@@ -50,6 +50,8 @@ public final class PartyFfaService implements Listener, CommandExecutor {
     private final Map<String, PartyFfaZone> zones = new ConcurrentHashMap<>();
     /** player UUID → zone id (FFA 参加中) */
     private final Map<UUID, String> playerZone = new ConcurrentHashMap<>();
+    /** Zones opened standalone (the Party FFA battle mode) — released when everyone leaves. */
+    private final Set<String> standaloneZones = ConcurrentHashMap.newKeySet();
     /** player UUID → リスポーンタスク */
     private final Map<UUID, BukkitTask> respawnTasks = new ConcurrentHashMap<>();
 
@@ -81,6 +83,7 @@ public final class PartyFfaService implements Listener, CommandExecutor {
 
     /** Party Fight 終了時に呼ぶ: ゾーンを解放。 */
     public void releaseZone(String matchId) {
+        standaloneZones.remove(matchId);
         PartyFfaZone zone = zones.remove(matchId);
         if (zone == null) return;
         // ゾーン内のプレイヤーを全退出
@@ -89,6 +92,38 @@ public final class PartyFfaService implements Listener, CommandExecutor {
             cancelRespawn(uid);
         }
         zone.clear();
+    }
+
+    /**
+     * Standalone Private FFA for a whole party — the mockup's "Party FFA" battle mode. No team
+     * fight hosts the zone; it is released once the last participant leaves (see leaveFfa).
+     *
+     * @return the zone's matchId, or null when allocation failed / nobody could join
+     */
+    public String startForPlayers(java.util.Collection<UUID> playerIds) {
+        if (playerIds == null || playerIds.isEmpty()) {
+            return null;
+        }
+        String matchId = "pffa-" + UUID.randomUUID().toString().substring(0, 8);
+        PartyFfaZone zone = allocateZone(matchId);
+        if (zone == null) {
+            return null;
+        }
+        standaloneZones.add(matchId);
+        int joined = 0;
+        for (UUID id : playerIds) {
+            Player p = Bukkit.getPlayer(id);
+            if (p != null && p.isOnline()) {
+                joinFfa(p, matchId);
+                joined++;
+            }
+        }
+        if (joined == 0) {
+            standaloneZones.remove(matchId);
+            releaseZone(matchId);
+            return null;
+        }
+        return matchId;
     }
 
     /** プレイヤーを FFA に参加させる（デス後ボタンから呼ばれる）。 */
@@ -191,11 +226,20 @@ public final class PartyFfaService implements Listener, CommandExecutor {
     /** FFA 退出 */
     public void leaveFfa(Player player) {
         UUID uid = player.getUniqueId();
-        playerZone.remove(uid);
+        String matchId = playerZone.remove(uid);
         cancelRespawn(uid);
         player.setGameMode(GameMode.SURVIVAL);
         player.teleport(Bukkit.getWorlds().get(0).getSpawnLocation());
         player.sendMessage(Component.text("FFA から退出しました。", NamedTextColor.GRAY));
+        // A standalone party-FFA zone dies with its last participant.
+        if (matchId != null && standaloneZones.remove(matchId)) {
+            PartyFfaZone zone = zones.get(matchId);
+            if (zone == null || zone.joinedPlayers().isEmpty()) {
+                releaseZone(matchId);
+            } else {
+                standaloneZones.add(matchId);
+            }
+        }
     }
 
     /** プレイヤーが FFA 参加中かどうか */
@@ -304,8 +348,17 @@ public final class PartyFfaService implements Listener, CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player player)) return true;
+        if (args.length == 0 || args[0].equalsIgnoreCase("leave")) {
+            if (isInFfa(player.getUniqueId())) {
+                leaveFfa(player);
+            } else {
+                player.sendMessage(Component.text("You are not in a Party FFA.",
+                        NamedTextColor.YELLOW));
+            }
+            return true;
+        }
         if (args.length < 2 || !args[0].equalsIgnoreCase("join")) {
-            player.sendMessage(Component.text("Usage: /partyffa join <matchId>",
+            player.sendMessage(Component.text("Usage: /partyffa [leave|join <matchId>]",
                     NamedTextColor.YELLOW));
             return true;
         }

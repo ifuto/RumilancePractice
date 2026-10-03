@@ -14,8 +14,16 @@ gray panes for 空き枠 (empty but usable seats). Shared helpers: `GuiMockups`.
 | Party Config GUI            | TeamSettingsGui       | IMPLEMENTED (v1.92.9) |
 | Danger Settings GUI         | TeamSettingsGui (danger mode) | IMPLEMENTED (v1.92.9) |
 | Party setfunc-item-main GUI | TeamsBrowserGui       | IMPLEMENTED (v1.92.9) |
-| Battle Mode GUI             | party battle select   | pending (needs a mode-select screen) |
-| Party Start Battle GUI      | TeamKitSelectGui flow | pending |
+| Battle Mode GUI             | PartyBattleModeGui (new)      | IMPLEMENTED (v1.92.10) |
+| Party Start Battle GUI      | PartyStartBattleGui (new)     | IMPLEMENTED (v1.92.10) |
+
+Mode semantics (user-confirmed): **Party Fight** = the classic party battle
+(existing flow, unchanged); **Party FFA** = today's Private FFA
+(PartyFfaService) — START with the FFA mode selected sends every online,
+lobby-idle party member into a fresh party-ffa zone; /partyffa (or
+/partyffa leave) exits, and a standalone zone is released when the last
+participant leaves. The hub START button now opens the launchpad; its
+Select-a-Kit keeps the legacy behaviour (kit pick starts the fight).
 
 Deviations (function set is larger than the mockups):
 - Party MAIN: the owner's settings comparator and tournament tiles sit at (5,5)/(5,6);

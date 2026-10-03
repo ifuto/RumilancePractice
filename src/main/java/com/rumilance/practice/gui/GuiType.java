@@ -26,6 +26,8 @@ public enum GuiType {
     ADMIN_MENU,
     KIT_ADMIN,
     PROFILE,
+    PARTY_START_BATTLE,
+    PARTY_BATTLE_MODE,
     EKIT_SELECT,
     EKIT_EDIT,
     EKIT_CHOICE,
