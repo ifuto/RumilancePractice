@@ -213,7 +213,7 @@ public final class QueueCoordinator {
         // Multi-queue: 同一キットクリック → そのキットだけ退出。それ以外 → 新規追加。
         if (queueService.isQueuedFor(player.getUniqueId(), fightKitId, mode)) {
             queueService.leaveKit(player.getUniqueId(), fightKitId, mode, PlayerPlatform.of(player));
-            sounds.play(player, "queue-leave");
+            soundService.play(player, "queue-leave");
             messageService.send(player, "queue.left",
                     MessageService.tags("kit", kitService.displayName(fightKitId)));
             if (!queueService.isQueued(player.getUniqueId())) {
@@ -281,7 +281,7 @@ public final class QueueCoordinator {
     /** 1つのキットだけキューから抜く (MultiQueueGui 用)。 */
     public void leaveKit(Player player, String kitId, MatchMode mode) {
         if (queueService.leaveKit(player.getUniqueId(), kitId, mode, PlayerPlatform.of(player))) {
-            sounds.play(player, "queue-leave");
+            soundService.play(player, "queue-leave");
             messageService.send(player, "queue.left",
                     MessageService.tags("kit", kitService.displayName(kitId)));
             if (!queueService.isQueued(player.getUniqueId())) {

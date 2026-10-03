@@ -199,6 +199,7 @@ import com.rumilance.practice.security.sign.SignChangeGuardListener;
 import com.rumilance.practice.security.sign.SignGuardService;
 import com.rumilance.practice.security.sign.SignProbeService;
 import com.rumilance.practice.session.PlayerStateManager;
+import com.rumilance.practice.state.MatchMode;
 import com.rumilance.practice.state.PlayerState;
 import com.rumilance.practice.session.SessionManager;
 import com.rumilance.practice.settings.SettingsService;
@@ -1479,7 +1480,8 @@ public final class FeatureBootstrap {
         functionalItemListener.setMultiQueueGuiOpener(player -> {
             // キュー選択アイテム: 現在のモードに応じて MultiQueueGui を開く
             boolean inRanked = queueService.get(player.getUniqueId())
-                    .map(e -> e.mode() == MatchMode.RANKED).orElse(false);
+                    .map((QueueService.QueueEntry e) -> e.mode() == MatchMode.RANKED)
+                    .orElse(false);
             var gui = inRanked ? multiQueueRanked : multiQueueUnranked;
             GuiSession s = guiSessions.open(player.getUniqueId(), gui.type(), gui.rows());
             s.setRanked(inRanked);
