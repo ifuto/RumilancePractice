@@ -350,7 +350,9 @@ public final class EkitSelectGui extends AbstractGui {
             if (crystal && crystalKitSlotsGui != null) {
                 crystalKitSlotsGui.openPicker(player, kitId);
             } else if (editKitGui != null) {
-                editKitGui.openKitEditor(player, kitId);
+                // Remember the MAIN/SUB page this kit lives on so BACK lands back there.
+                editKitGui.openKitEditorWithReturn(player, kitId,
+                        session.kitCategory(), session.page());
             }
         }
     }

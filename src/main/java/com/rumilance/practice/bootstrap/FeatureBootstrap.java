@@ -552,6 +552,22 @@ public final class FeatureBootstrap {
                 plugin, configService, kitService, layoutCache, lobbyService, stateManager,
                 ffaStatsRepository, asyncExecutor, runtimeFlags, messageService, soundService);
         services.register(FfaService.class, ffaService);
+        // FFA chunk privacy: block + cache MAP_CHUNK packets outside the FFA region while a
+        // player is inside it (ProtocolLib soft dependency — off without it).
+        com.rumilance.practice.sight.FfaChunkMaskService ffaChunkMaskService = null;
+        if (hasPlugin("ProtocolLib")) {
+            try {
+                ffaChunkMaskService = new com.rumilance.practice.sight.FfaChunkMaskService(plugin);
+                ffaChunkMaskService.init();
+            } catch (LinkageError | RuntimeException e) {
+                plugin.getLogger().log(java.util.logging.Level.WARNING,
+                        "ProtocolLib detected but the FFA chunk mask failed to initialize;"
+                                + " FFA surroundings stay visible.",
+                        e);
+                ffaChunkMaskService = null;
+            }
+        }
+        ffaService.setChunkMaskService(ffaChunkMaskService);
         spectatorService.setFfaService(ffaService);
         // When an FFA arena resets, bail the spectator cameras watching it (they are not in
         // FfaService's occupant map, so the reset's own sweep never reaches them).
@@ -1184,6 +1200,7 @@ public final class FeatureBootstrap {
                         guiSessions, soundService, kitService, kitLayoutRepository, layoutCache,
                         crystalFfaStore);
         crystalKitSlotsGui.setEditKitGui(editKitGui);
+        editKitGui.setCrystalKitSlotsGui(crystalKitSlotsGui);
         crystalKitSlotsGui.setEkitSelectGui(ekitSelectGui);
         ekitSelectGui.setCrystalKitSlotsGui(crystalKitSlotsGui);
 
@@ -1206,6 +1223,8 @@ public final class FeatureBootstrap {
         duelRequestGui.setInnerKits(innerKits);
         matchService.setInnerKits(innerKits);
         ffaService.setCrystalFfaStore(crystalFfaStore);
+        // Queue/duel fights on the crystal kit also use each player's ACTIVE KIT slot now.
+        matchService.setCrystalFfaStore(crystalFfaStore);
         // /k quick picker: nine KIT buttons, one click equips (crystal FFA entry hands out
         // nothing, so this is how a fighter gears up after joining or respawning a life).
         com.rumilance.practice.gui.menus.CrystalKitQuickGui crystalKitQuickGui =
@@ -1756,6 +1775,9 @@ public final class FeatureBootstrap {
         pm.registerEvents(new FfaListener(ffaService, kitService, stateManager, combatNet, practiceTnt,
                 playerPlacedBlockTracker, explosionSources, damageAttribution), plugin);
         pm.registerEvents(new FfaBlockTracker(ffaService), plugin);
+        // MOB_GRIEFING is ON again (creeper terrain damage); this keeps the rest of vanilla
+        // mob griefing (endermen, sheep, silverfish, ...) cancelled per-event.
+        pm.registerEvents(new com.rumilance.practice.guard.MobGriefGuardListener(), plugin);
         // FFA command gate (default OFF): when an admin enables it via /practiceadmin
         // ffacommand, FFA occupants may only run the whitelisted commands and only while
         // not combat-tagged. See FfaCommandGateListener / FfaService.

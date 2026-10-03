@@ -108,6 +108,13 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         this.ekitSelectGui = ekitSelectGui;
     }
 
+    /** KIT1..9 variant picker (crystal kits): BACK from a variant editor returns here. */
+    private CrystalKitSlotsGui crystalKitSlotsGui;
+
+    public void setCrystalKitSlotsGui(CrystalKitSlotsGui crystalKitSlotsGui) {
+        this.crystalKitSlotsGui = crystalKitSlotsGui;
+    }
+
     public void setKitAnvilRenameService(com.rumilance.practice.gui.KitAnvilRenameService kitAnvilRenameService) {
         this.kitAnvilRenameService = kitAnvilRenameService;
     }
@@ -354,6 +361,20 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
      */
     public void openKitEditor(Player player, String kitName, String preset, Integer crystalVariant) {
         openKitEditor(player, kitName, preset, crystalVariant, null);
+    }
+
+    /**
+     * Opens the kit editor and records the MAIN/SUB category + page BACK should return to.
+     * Used by the Ekit kit chooser so backing out lands on the page the player came from.
+     */
+    public void openKitEditorWithReturn(Player player, String kitName,
+                                        String backCategory, int backPage) {
+        openKitEditor(player, kitName, null, null);
+        GuiSession session = registry.get(player.getUniqueId()).orElse(null);
+        if (session != null) {
+            session.put("back-category", backCategory);
+            session.put("back-page", backPage);
+        }
     }
 
     /**
@@ -912,10 +933,26 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
                 kitAdminGui.openConfig(player, session.selectedKit());
                 return;
             }
+            if ("back".equals(action) && crystalVariant(session) != null
+                    && crystalKitSlotsGui != null) {
+                // Editing a crystal variant (KIT1..9): BACK goes to that kit's full variant
+                // list, not the top-level kit chooser.
+                session.setNavigatingAway(true);
+                stateManager.resetToLobby(player.getUniqueId());
+                crystalKitSlotsGui.openPicker(player, session.selectedKit());
+                return;
+            }
             if ("back".equals(action) && ekitSelectGui != null) {
                 session.setNavigatingAway(true);
                 stateManager.resetToLobby(player.getUniqueId());
-                ekitSelectGui.open(player);
+                String backCategory = session.get("back-category", String.class);
+                Integer backPage = session.get("back-page", Integer.class);
+                if (backCategory != null) {
+                    ekitSelectGui.openAt(player, backCategory,
+                            backPage == null ? 0 : backPage);
+                } else {
+                    ekitSelectGui.open(player);
+                }
                 return;
             }
             stateManager.resetToLobby(player.getUniqueId());
@@ -1091,6 +1128,14 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         if (lastSave != null && now - lastSave < 1000L) {
             return;
         }
+        // Refuse to save while an item is still on the cursor: the cursor is not part of the
+        // layout, so saving would close the GUI and destroy it (the "my item vanished" bug).
+        if (player.getItemOnCursor() != null
+                && !player.getItemOnCursor().getType().isAir()) {
+            sounds.play(player, "error");
+            player.sendMessage(t(player, "gui.kit-save-cursor-blocked"));
+            return;
+        }
         if (session != null) {
             session.put("save_at", now);
         }
@@ -1100,7 +1145,7 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             player.sendMessage(t(player, "gui.save-failed"));
             return;
         }
-        sounds.play(player, "save-done");
+        player.playSound(player.getLocation(), org.bukkit.Sound.ITEM_ARMOR_EQUIP_DIAMOND, 1.0f, 1.0f);
         player.sendMessage(t(player, "gui.kit-saved"));
         restoreLobbyHands(player);
         if (kitEditStash != null) {

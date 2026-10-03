@@ -132,14 +132,8 @@ public final class TeamsBrowserGui extends AbstractGui {
                                 UiTheme.blank(),
                                 UiTheme.hint(line(player, "menu.click")))
                         .action("create_public").build());
-        inventory.setItem(GuiSlots.slot(5, 6),
-                ItemBuilder.of(Material.IRON_SWORD)
-                        .name(t(player, "party.create-team").color(UiTheme.SECONDARY))
-                        .lore(UiTheme.divider(),
-                                UiTheme.line(line(player, "party.create-team-lore")),
-                                UiTheme.blank(),
-                                UiTheme.hint(line(player, "party.create-team-hint")))
-                        .action("create_team").build());
+        // The Team concept is retired: no more "create a Team" entry. Parties are the only
+        // group that battles (each party is one side), so the slot is decoration now.
         inventory.setItem(GuiSlots.slot(5, 8),
                 ItemBuilder.of(Material.WRITABLE_BOOK)
                         .name(t(player, "party.create-private").color(UiTheme.SECONDARY))
@@ -194,14 +188,6 @@ public final class TeamsBrowserGui extends AbstractGui {
                 sounds.play(player, "select");
                 teamService.create(player, player.getName() + "'s Party", false,
                         com.rumilance.practice.team.GroupKind.PARTY);
-                teamHubGui.open(player);
-            }
-            case "create_team" -> {
-                boolean isPublic = click == org.bukkit.event.inventory.ClickType.RIGHT
-                        || click == org.bukkit.event.inventory.ClickType.SHIFT_RIGHT;
-                sounds.play(player, "select");
-                teamService.create(player, player.getName() + "'s Team", isPublic,
-                        com.rumilance.practice.team.GroupKind.TEAM);
                 teamHubGui.open(player);
             }
             case "update_data" -> {

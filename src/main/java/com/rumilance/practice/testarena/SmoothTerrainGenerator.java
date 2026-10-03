@@ -516,10 +516,25 @@ public final class SmoothTerrainGenerator {
         int maxX = minX + area.width() - 1;
         int maxZ = minZ + area.width() - 1;
         markEditInFlight(operationId);
-        CompletableFuture<Boolean> paste;
+        // Paste in 3-chunk-wide X slabs (48 blocks per FAWE edit) instead of one giant
+        // clipboard: each slab is its own small FAWE operation, so the server never has a
+        // whole-map edit in flight and the terrain fills in progressively.
+        final int slabCols = 3 * 16;
+        final int slabCount = (area.width() + slabCols - 1) / slabCols;
+        CompletableFuture<Boolean> paste = CompletableFuture.completedFuture(Boolean.TRUE);
         try {
-            paste = terrainEditBridge.paste(world, minX, area.minY(), minZ, maxX, area.maxY(), maxZ,
-                    area.settings(), columns);
+            for (int slab = 0; slab < slabCount; slab++) {
+                final int slabIndex = slab;
+                final int slabMinX = minX + slab * slabCols;
+                final int slabMaxX = Math.min(slabMinX + slabCols - 1, maxX);
+                final int from = slab * slabCols * area.width();
+                final int to = Math.min(columns.size(), (slab + 1) * slabCols * area.width());
+                final List<ColumnData> slice = new ArrayList<>(columns.subList(from, to));
+                paste = paste.thenCompose(previous -> Boolean.TRUE.equals(previous)
+                        ? terrainEditBridge.paste(world, slabMinX, area.minY(), minZ, slabMaxX,
+                                area.maxY(), maxZ, area.settings(), slice)
+                        : CompletableFuture.completedFuture(Boolean.FALSE));
+            }
         } catch (Throwable error) {
             running.remove(player.getUniqueId());
             busy.remove(player.getUniqueId());

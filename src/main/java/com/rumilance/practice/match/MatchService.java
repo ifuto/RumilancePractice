@@ -308,6 +308,14 @@ public final class MatchService {
         this.originalKitService = originalKitService;
     }
 
+    /** Per-player crystal variant store: queue/duel fights on a crystal FFA kit spawn every
+     * player with THEIR active KIT slot (KIT1..9) instead of the shared official layout. */
+    private volatile com.rumilance.practice.kit.CrystalFfaStore crystalFfaStore;
+
+    public void setCrystalFfaStore(com.rumilance.practice.kit.CrystalFfaStore crystalFfaStore) {
+        this.crystalFfaStore = crystalFfaStore;
+    }
+
     /** Rules kits synthesized from original-kit settings, keyed by synthetic kit name. */
     private final java.util.Map<String, KitDefinition> syntheticKits = new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -1117,6 +1125,11 @@ public final class MatchService {
             if (originalKit != null && originalKitService != null) {
                 originalLayout = originalKitService.loadLayout(originalKit.owner(), originalKit.slot());
             }
+            // Crystal-variant kits ("LT Vanilla"-style KIT1..9 kits): a queue or duel on such
+            // a kit fights with each player's OWN active variant layout — previously everyone
+            // got the shared official layout, which ignored the slot they activated.
+            boolean crystalVariants = originalLayout == null && kit != null && kit.crystalFfa()
+                    && crystalFfaStore != null;
             // The rule kit for this fight: the synthesized original-kit rules when the party
             // fights on an original kit, otherwise the shared match kit.
             KitDefinition rulesKit = resolveKit(session);
@@ -1134,6 +1147,19 @@ public final class MatchService {
                     // original kit when this is an original-kit fight).
                     if (originalLayout != null && !ownKitOverride) {
                         applyKit(player, rulesKit, originalLayout);
+                    } else if (crystalVariants && !ownKitOverride) {
+                        // This player's active KIT slot, falling back to the shared layout
+                        // when the slot was never saved.
+                        int variant = crystalFfaStore.selectedVariant(id);
+                        String variantKey = com.rumilance.practice.kit.CrystalFfaStore
+                                .variantKey(rulesKit.name(), variant);
+                        layoutCache.loadSyncIfAbsent(id, variantKey);
+                        ItemStack[] mine = layoutCache.get(id, variantKey).orElse(null);
+                        if (mine != null) {
+                            applyKit(player, rulesKit, mine);
+                        } else {
+                            applyKit(player, playerKit, session);
+                        }
                     } else {
                         applyKit(player, playerKit, session);
                     }

@@ -707,6 +707,7 @@ gui:
   language-partial: "部分翻译 - 缺失内容将以英文显示"
   save: "保存"
   save-failed: "<red>保存失败。"
+  kit-save-cursor-blocked: "<red>请先把手中的物品放回套件再保存。"</red>"
   kit-saved: "<green>已保存套件布局。"
   kit-reset: "重置为初始状态"
   kit-reset-done: "<green>已将套装布局重置为默认。"

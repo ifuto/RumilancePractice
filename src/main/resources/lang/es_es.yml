@@ -707,6 +707,7 @@ gui:
   language-partial: "Traducción parcial - lo que falte se muestra en inglés"
   save: "Guardar"
   save-failed: "<red>Error al guardar."
+  kit-save-cursor-blocked: "<red>Devuelve el objeto que sujetas al kit antes de guardar."</red>"
   kit-saved: "<green>Diseño del kit guardado."
   kit-reset: "Restablecer predeterminado"
   kit-reset-done: "<green>Distribución del kit restablecida."

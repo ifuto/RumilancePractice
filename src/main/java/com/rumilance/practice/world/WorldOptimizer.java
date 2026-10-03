@@ -53,7 +53,14 @@ public final class WorldOptimizer implements Listener {
         bool(world, GameRule.DO_MOB_SPAWNING, false);        // no passive/hostile mobs + their AI
         bool(world, GameRule.DO_WEATHER_CYCLE, false);       // no thunder/rain changes (no PvP weather)
         intg(world, GameRule.RANDOM_TICK_SPEED, 0);          // no crop growth / fire spread / leaf decay
-        bool(world, GameRule.MOB_GRIEFING, false);           // mobs/creatures can't alter blocks
+        // MOB_GRIEFING stays ON so creeper/TNT-mob explosions carve terrain like vanilla.
+        // The old blanket rule made creeper blasts harmless to blocks, which confused players
+        // ("why doesn't the creeper break anything?"). Explosions are still fully revertible:
+        // FfaBlockTracker records FFA diffs, duel arenas are disposable copies, and practice
+        // regions clear explosion block lists (PracticeListener). Non-explosion mob griefing
+        // (endermen picking blocks, sheep eating grass, silverfish/foxes, wither flight) is
+        // cancelled per-event by guard.MobGriefGuardListener instead of a global rule.
+        bool(world, GameRule.MOB_GRIEFING, true);
         bool(world, GameRule.DO_PATROL_SPAWNING, false);
         bool(world, GameRule.DO_TRADER_SPAWNING, false);
         bool(world, GameRule.DO_INSOMNIA, false);            // no phantom spawning

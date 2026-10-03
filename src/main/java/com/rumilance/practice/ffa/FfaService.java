@@ -229,6 +229,14 @@ public final class FfaService {
         this.viewControl = viewControl;
     }
 
+    /** ProtocolLib-backed chunk masking: while in FFA, chunks outside the arena are not sent. */
+    private volatile com.rumilance.practice.sight.FfaChunkMaskService chunkMaskService;
+
+    public void setChunkMaskService(
+            com.rumilance.practice.sight.FfaChunkMaskService chunkMaskService) {
+        this.chunkMaskService = chunkMaskService;
+    }
+
     private FfaSpawnIndex spawnIndex;
     private QueueService queueService;
     private com.rumilance.practice.team.TeamService teamService;
@@ -511,6 +519,9 @@ public final class FfaService {
         FfaArena arena = arenas.get(arenaId);
         if (arena != null && arena.region() != null) {
             viewControl.applyRegion(player, arena.region());
+            if (chunkMaskService != null) {
+                chunkMaskService.mask(player, arena.region());
+            }
         }
     }
 
@@ -628,6 +639,11 @@ public final class FfaService {
                     if (viewControl != null) {
                         viewControl.applyRegion(player, arena.region());
                     }
+                    // From here on, chunks outside the FFA region are withheld (and replayed
+                    // on leave) so neighbouring arenas/terrain stay invisible.
+                    if (chunkMaskService != null) {
+                        chunkMaskService.mask(player, arena.region());
+                    }
                     messageService.send(player, "ffa.joined", MessageService.tags("arena", arena.id()));
                 }));
         return true;
@@ -654,6 +670,11 @@ public final class FfaService {
 
     private void leave(Player player, boolean returnToLobby) {
         UUID id = player.getUniqueId();
+        // Reveal the held FFA-surrounding chunks before the hub teleport so the landscape
+        // behind the arena is already streaming back in.
+        if (chunkMaskService != null) {
+            chunkMaskService.reveal(id);
+        }
         playerArena.remove(id);
         fireLeave(id);
         sessionStats.remove(id);
@@ -1897,6 +1918,10 @@ public final class FfaService {
             if (spawnIndex != null) {
                 spawnIndex.reindex(arena);
             }
+            // One second after the terrain restore, sweep every leftover entity (dropped
+            // items and orbs that fell mid-restore can hover above the fresh ground, and
+            // projectiles/mobs from the fight have no business surviving the reset).
+            Bukkit.getScheduler().runTaskLater(plugin, () -> sweepArenaEntities(arena), 20L);
             if (announceOpen) {
                 announceResetOpen(arena);
             }
@@ -1941,6 +1966,41 @@ public final class FfaService {
                 finish.run();
             }
         });
+    }
+
+    /**
+     * Aggressive post-reset sweep: removes EVERY entity inside the arena one second after the
+     * terrain restore, except players and the service/persistent decorations (armor stands,
+     * item frames, paintings, leash knots, display entities). This is what clears the floating
+     * dropped items from the fight — the pre-reset {@link #cleanupEntities(FfaArena)} only
+     * removes a narrow set of combat entities at reset START.
+     */
+    private void sweepArenaEntities(FfaArena arena) {
+        if (arena == null || arena.region() == null) {
+            return;
+        }
+        World world = Bukkit.getWorld(arena.world());
+        if (world == null) {
+            return;
+        }
+        Cuboid region = arena.region();
+        org.bukkit.util.BoundingBox box = new org.bukkit.util.BoundingBox(
+                region.minX(), region.minY(), region.minZ(),
+                region.maxX() + 1.0d, region.maxY() + 1.0d, region.maxZ() + 1.0d);
+        for (Entity entity : world.getNearbyEntities(box,
+                e -> region.contains(e.getLocation()))) {
+            if (entity instanceof Player
+                    || entity instanceof org.bukkit.entity.ArmorStand
+                    || entity instanceof org.bukkit.entity.ItemFrame
+                    || entity instanceof org.bukkit.entity.Painting
+                    || entity instanceof org.bukkit.entity.Display) {
+                continue;
+            }
+            if (entity.getType() == org.bukkit.entity.EntityType.LEASH_KNOT) {
+                continue;
+            }
+            entity.remove();
+        }
     }
 
     private void cleanupEntities(FfaArena arena) {
