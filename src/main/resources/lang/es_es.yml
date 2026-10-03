@@ -317,9 +317,16 @@ general:
   loading: "<gray>Cargando, por favor espera..."
   mode-ranked: "ranked"
   mode-unranked: "unranked"
-  kb-select: "<white>KB: {kb}"
-  kb-default-name: "Predeterminado (KB por defecto: {name})"
+  kb-select: "<white>KB: <kb>"
+  kb-default-name: "Predeterminado (KB por defecto: <name>)"
   kb-off-name: "Sin cambio de KB"
+  kb-title: "Elegir perfil de KB"
+  kb-select-lore: "<gray>Haz clic para elegir de la lista."
+  kb-default-lore: "<gray>Pelea con el KB predeterminado del servidor."
+  kb-off-lore: "<gray>No aplica ningún perfil (knockback estándar)."
+  kb-profile-lore: "<gray>Horizontal ×<h> / Vertical ×<v>"
+  kb-empty: "No hay perfiles instalados"
+  kb-empty-lore: "<gray>Añade JSON en plugins/n-arena/kb/."
 
 
 duel:

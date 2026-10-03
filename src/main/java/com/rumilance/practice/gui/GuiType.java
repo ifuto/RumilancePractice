@@ -8,6 +8,7 @@ public enum GuiType {
     UNRANKED_QUEUE,
     DUEL_REQUEST,
     DUEL_MAP,
+    DUEL_KB_SELECT,
     KIT_SELECT,
     PLAYERS,
     SETTINGS,

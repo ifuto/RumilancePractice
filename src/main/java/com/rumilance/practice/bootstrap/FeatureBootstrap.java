@@ -933,6 +933,11 @@ public final class FeatureBootstrap {
         DuelMapSelectGui duelMapSelectGui = new DuelMapSelectGui(
                 guiSessions, soundService, kitService, duelRequestGui, messageService);
         duelRequestGui.setMapSelectGui(duelMapSelectGui);
+        // KB profile picker: press the KB tile on the request GUI, pick from the list.
+        com.rumilance.practice.gui.menus.DuelKbSelectGui duelKbSelectGui =
+                new com.rumilance.practice.gui.menus.DuelKbSelectGui(
+                        guiSessions, soundService, duelRequestGui, messageService);
+        duelRequestGui.setKbSelectGui(duelKbSelectGui);
 
         SettingsGui settingsGui = new SettingsGui(guiSessions, soundService, settingsService);
         // 容量を食む設定(味方グロウ)は有料プラン限定。GUI の表示と実際の適用が同じ判定を
@@ -1382,6 +1387,7 @@ public final class FeatureBootstrap {
         guiListener.register(innerKitAdminGui);
         guiListener.register(duelRequestGui);
         guiListener.register(duelMapSelectGui);
+        guiListener.register(duelKbSelectGui);
         guiListener.register(settingsGui);
         guiListener.register(chatSettingsGui);
         guiListener.register(nameColorGui);
@@ -1882,6 +1888,7 @@ public final class FeatureBootstrap {
         services.register(com.rumilance.practice.kb.KbProfileService.class, kbProfiles);
         matchService.setKbProfileService(kbProfiles);
         duelRequestGui.setKbProfileService(kbProfiles);
+        duelKbSelectGui.setKbProfileService(kbProfiles);
         // Victim → current kit id (duel kit first, then the FFA arena's kit), for kit profiles.
         final java.util.function.Function<java.util.UUID, String> kbKitResolver = id -> {
             java.util.Optional<com.rumilance.practice.session.MatchSession> session =

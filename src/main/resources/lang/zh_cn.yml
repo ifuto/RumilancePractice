@@ -317,9 +317,16 @@ general:
   loading: "<gray>加载中，请稍候……"
   mode-ranked: "排位"
   mode-unranked: "休闲"
-  kb-select: "<white>KB: {kb}"
-  kb-default-name: "默认（默认KB：{name}）"
+  kb-select: "<white>KB: <kb>"
+  kb-default-name: "默认（默认KB：<name>）"
   kb-off-name: "不更改KB"
+  kb-title: "选择KB配置"
+  kb-select-lore: "<gray>点击以从列表中选择。"
+  kb-default-lore: "<gray>使用服务器默认KB进行对战。"
+  kb-off-lore: "<gray>不应用任何配置（保持原版）。"
+  kb-profile-lore: "<gray>水平 ×<h> / 垂直 ×<v>"
+  kb-empty: "尚未安装配置"
+  kb-empty-lore: "<gray>将配置JSON放入 plugins/n-arena/kb/ 即可添加。"
 
 
 duel:

@@ -154,18 +154,9 @@ public final class DuelMapSelectGui extends AbstractGui {
             player.closeInventory();
             return;
         }
-        String kit = session.selectedKit();
-        String map = session.selectedMap();
-        int bestOf = session.bestOf();
-        boolean ranked = session.ranked();
-        boolean fromBattle = session.fromBattleMenu();
-        // Pass the choices into openFor so they are applied to the new session BEFORE render
-        // (otherwise the GUI paints the default kit/map and the picked selection never shows).
-        duelRequestGui.openFor(player, target, ranked, kit, map, bestOf);
-        registry.get(player.getUniqueId()).ifPresent(s -> {
-            s.setFromBattleMenu(fromBattle);
-            s.setFromGameMenu(session.fromGameMenu());
-        });
+        // Single carry-everything return: openFor builds a FRESH session, so returning through
+        // it used to wipe the KB choice, combat mode and FT picked before the map pick.
+        duelRequestGui.reopenCarrying(player, session);
     }
 
     private List<String> arenaPool(String kitId) {

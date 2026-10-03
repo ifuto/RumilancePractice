@@ -318,9 +318,16 @@ general:
   loading: "<gray>読み込み中です、しばらくお待ちください..."
   mode-ranked: "ランク戦"
   mode-unranked: "アンランク戦"
-  kb-select: "<white>KB: {kb}"
-  kb-default-name: "既定 (デフォルト: {name})"
+  kb-select: "<white>KB: <kb>"
+  kb-default-name: "既定 (デフォルト: <name>)"
   kb-off-name: "KBの変更無し"
+  kb-title: "KBプロファイル選択"
+  kb-select-lore: "<gray>クリックで一覧から選択します。"
+  kb-default-lore: "<gray>サーバー既定のKBで戦います。"
+  kb-off-lore: "<gray>プロファイルを適用しません（バニラのまま）。"
+  kb-profile-lore: "<gray>水平 ×<h> / 垂直 ×<v>"
+  kb-empty: "プロファイルがありません"
+  kb-empty-lore: "<gray>plugins/n-arena/kb/ にJSONを置くと追加できます。"
 
 
 duel:

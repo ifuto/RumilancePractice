@@ -42,9 +42,15 @@ public final class DuelRequestGui extends AbstractGui {
     /** Combat mode selection key in GuiSession. Values: null (auto), "java", "bedrock". */
     public static final String COMBAT_MODE_KEY = "combat-mode";
     private volatile com.rumilance.practice.kb.KbProfileService kbProfileService;
+    private DuelKbSelectGui kbSelectGui;
 
     public void setKbProfileService(com.rumilance.practice.kb.KbProfileService service) {
         this.kbProfileService = service;
+    }
+
+    /** The list-style KB picker the KB tile opens (2026-10 click-cycling removed). */
+    public void setKbSelectGui(DuelKbSelectGui kbSelectGui) {
+        this.kbSelectGui = kbSelectGui;
     }
     private com.rumilance.practice.team.TeamService teamService;
     private com.rumilance.practice.match.MatchService matchService;
@@ -256,6 +262,9 @@ public final class DuelRequestGui extends AbstractGui {
         String kbLabel = kbLabel(session, player);
         ItemStack kbButton = GuiDecorator.button(Material.SLIME_BLOCK,
                 messageService.render(locale, "duel-gui.kb-select", MessageService.tags("kb", kbLabel)), "kb");
+        kbButton.editMeta(meta -> meta.lore(java.util.List.of(
+                messageService.render(locale, "duel-gui.kb-select-lore")
+                        .decoration(TextDecoration.ITALIC, false))));
         String rawKb = session.get(KB_KEY, String.class);
         kbButton.editMeta(meta -> meta.setEnchantmentGlintOverride(
                 rawKb != null && !com.rumilance.practice.kb.KbProfileService.CHOICE_DEFAULT.equals(rawKb)));
@@ -306,9 +315,15 @@ public final class DuelRequestGui extends AbstractGui {
                 }
             }
             case "kb" -> {
-                cycleKb(player, session);
-                sounds.play(player, "gui-click");
-                render(player, session, inventory);
+                if (kbSelectGui != null) {
+                    player.closeInventory();
+                    kbSelectGui.openFor(player, session);
+                } else {
+                    // Picker missing (never wired): keep the old cycle as a fallback.
+                    cycleKb(player, session);
+                    sounds.play(player, "gui-click");
+                    render(player, session, inventory);
+                }
             }
             case "combat-mode" -> {
                 cycleCombatMode(player, session);
@@ -416,6 +431,34 @@ public final class DuelRequestGui extends AbstractGui {
             return pretty; // a child is a normal kit; show that kit's own display name
         }
         return innerKits.displayOf(kit, inner, pretty);
+    }
+
+    /**
+     * Re-opens the request GUI carrying EVERY choice on {@code from}: kit, 中キット, map,
+     * FT, KB profile and combat mode. All sub-pickers (kit / map / KB) return through this —
+     * {@code openFor} builds a fresh session, so any picker that returned through it used to
+     * silently wipe the KB choice, the combat mode and the FT count picked before.
+     */
+    public void reopenCarrying(Player player, GuiSession from) {
+        UUID targetId = from.targetPlayer();
+        Player target = targetId == null ? null : Bukkit.getPlayer(targetId);
+        if (target == null) {
+            player.closeInventory();
+            return;
+        }
+        String inner = from.get(InnerKitSelectGui.CHOICE_KEY, String.class);
+        openFor(player, target, from.ranked(), from.selectedKit(), from.selectedMap(),
+                from.bestOf(), inner);
+        registry.get(player.getUniqueId()).ifPresent(s -> {
+            s.put(KB_KEY, from.get(KB_KEY, String.class));
+            s.put(COMBAT_MODE_KEY, from.get(COMBAT_MODE_KEY, String.class));
+            s.setFirstTo(from.firstTo());
+            s.setFromBattleMenu(from.fromBattleMenu());
+            s.setFromGameMenu(from.fromGameMenu());
+        });
+        // openFor already rendered; repaint so the carried KB/FT labels show immediately.
+        registry.get(player.getUniqueId()).ifPresent(s ->
+                renderPublic(player, s, player.getOpenInventory().getTopInventory()));
     }
 
     /**

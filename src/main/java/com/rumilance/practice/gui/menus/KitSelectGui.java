@@ -280,14 +280,9 @@ public final class KitSelectGui extends AbstractGui {
             player.closeInventory();
             return;
         }
-        String kit = session.selectedKit();
-        String map = session.selectedMap();
-        int bestOf = session.bestOf();
-        boolean ranked = session.ranked();
-        boolean fromBattle = session.fromBattleMenu();
         player.closeInventory();
-        // Pass the choices into openFor so they are applied to the new session BEFORE render.
-        duelRequestGui.openFor(player, target, ranked, kit, map, bestOf);
-        registry.get(player.getUniqueId()).ifPresent(s -> s.setFromBattleMenu(fromBattle));
+        // Single carry-everything return: openFor builds a FRESH session, so returning through
+        // it used to wipe the KB choice, combat mode and FT picked before the kit pick.
+        duelRequestGui.reopenCarrying(player, session);
     }
 }

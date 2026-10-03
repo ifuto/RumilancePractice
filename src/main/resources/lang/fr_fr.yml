@@ -317,9 +317,16 @@ general:
   loading: "<gray>Chargement, patiente..."
   mode-ranked: "ranked"
   mode-unranked: "unranked"
-  kb-select: "<white>KB: {kb}"
-  kb-default-name: "Par défaut (KB par défaut : {name})"
+  kb-select: "<white>KB : <kb>"
+  kb-default-name: "Par défaut (KB par défaut : <name>)"
   kb-off-name: "Aucun changement de KB"
+  kb-title: "Choix du profil KB"
+  kb-select-lore: "<gray>Cliquez pour choisir dans la liste."
+  kb-default-lore: "<gray>Combat avec le KB par défaut du serveur."
+  kb-off-lore: "<gray>Aucun profil appliqué — knockback standard."
+  kb-profile-lore: "<gray>Horizontal ×<h> / Vertical ×<v>"
+  kb-empty: "Aucun profil installé"
+  kb-empty-lore: "<gray>Déposez des JSON dans plugins/n-arena/kb/."
 
 
 duel:

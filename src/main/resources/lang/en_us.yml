@@ -319,9 +319,16 @@ general:
   loading: "<gray>Loading, please wait..."
   mode-ranked: "ranked"
   mode-unranked: "unranked"
-  kb-select: "<white>KB: {kb}"
-  kb-default-name: "Default (default KB: {name})"
+  kb-select: "<white>KB: <kb>"
+  kb-default-name: "Default (default KB: <name>)"
   kb-off-name: "No KB change"
+  kb-title: "KB Profile"
+  kb-select-lore: "<gray>Click to pick from the list."
+  kb-default-lore: "<gray>Fight with the server default KB."
+  kb-off-lore: "<gray>Apply no profile — plain knockback rules."
+  kb-profile-lore: "<gray>Horizontal ×<h> / Vertical ×<v>"
+  kb-empty: "No profiles installed"
+  kb-empty-lore: "<gray>Drop profile JSONs into plugins/n-arena/kb/."
 
 
 duel:
