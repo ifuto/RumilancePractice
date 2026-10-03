@@ -87,6 +87,15 @@ public final class KbProbe {
         boolean contaminated;
         /** 速度パケットがダメージ確認より先着した（順序逆転）。KB無効領域とは区別して静かに破棄。 */
         boolean velocityBeforeConfirm;
+        // --- 先着速度の保存（順序逆転時でもサンプルを記録できるようにする） ---
+        /** 先着した速度パケットの速度差分（KB インパルス）。 */
+        double earlyDx, earlyDy, earlyDz;
+        /** 先着速度受信時のエンティティ速度（isIdle 判定用）。 */
+        double earlyCurX, earlyCurY, earlyCurZ;
+        /** 先着速度受信時の tick。 */
+        long earlyVelocityTick;
+        /** 先着速度パケットのエンティティ ID。 */
+        int earlyEntityId;
         final UUID victimUuid;
         final double dirX, dirZ;
         final boolean targetOnGround;
@@ -208,6 +217,14 @@ public final class KbProbe {
         }
         if (hit.confirmTick < 0L && clientTick - hit.hitTick <= CONFIRM_WINDOW) {
             hit.confirmTick = clientTick;
+            // 速度パケットが先着していた場合、今すぐサンプルを記録する
+            if (hit.velocityBeforeConfirm && !hit.sampled) {
+                hit.sampled = true;
+                // 先着時のエンティティ速度（isIdle 判定用）と差分を使用
+                Vec3d earlyCur = new Vec3d(hit.earlyCurX, hit.earlyCurY, hit.earlyCurZ);
+                recordSample(hit, hit.earlyEntityId, null,
+                        earlyCur, hit.earlyDx, hit.earlyDy, hit.earlyDz);
+            }
         }
     }
 
@@ -236,9 +253,25 @@ public final class KbProbe {
         }
         if (hit.confirmTick < 0L) {
             // 速度パケットがダメージ確認より先着 = パケット順序の逆転（tick 境界や
-            // リージョン跨ぎで起き得る）。後で「KB無効領域」と誤判定しないよう記録だけする。
+            // リージョン跨ぎで起き得る）。速度データを保存し、ダメージ確認後に記録する。
             if (clientTick - hit.hitTick <= CONFIRM_WINDOW) {
                 hit.velocityBeforeConfirm = true;
+                // エンティティの現在速度を取得して差分を保存
+                MinecraftClient mc = MinecraftClient.getInstance();
+                if (mc.world != null) {
+                    Entity entity = mc.world.getEntityById(entityId);
+                    if (entity != null) {
+                        Vec3d current = entity.getVelocity();
+                        hit.earlyDx = vx - current.x;
+                        hit.earlyDy = vy - current.y;
+                        hit.earlyDz = vz - current.z;
+                        hit.earlyCurX = current.x;
+                        hit.earlyCurY = current.y;
+                        hit.earlyCurZ = current.z;
+                        hit.earlyVelocityTick = clientTick;
+                        hit.earlyEntityId = entityId;
+                    }
+                }
             }
             return;
         }
