@@ -707,7 +707,7 @@ gui:
   language-partial: "部分的な翻訳 - 一部は英語で表示されます"
   save: "保存"
   save-failed: "<red>保存に失敗しました。"
-  kit-save-cursor-blocked: "<red>持っているアイテムをキットに戻してから保存してください。"</red>"
+  kit-save-cursor-blocked: "<red>持っているアイテムをキットに戻してから保存してください。"
   kit-saved: "<green>キットレイアウトを保存しました。"
   kit-reset: "初期状態にリセット"
   kit-reset-done: "<green>キットレイアウトを初期状態に戻しました。"

@@ -707,7 +707,7 @@ gui:
   language-partial: "Traduction partielle - le reste s'affiche en anglais"
   save: "Enregistrer"
   save-failed: "<red>Échec de l'enregistrement."
-  kit-save-cursor-blocked: "<red>Remettez l'objet que vous tenez dans le kit avant d'enregistrer."</red>"
+  kit-save-cursor-blocked: "<red>Remettez l'objet que vous tenez dans le kit avant d'enregistrer."
   kit-saved: "<green>Disposition du kit enregistrée."
   kit-reset: "Réinitialiser par défaut"
   kit-reset-done: "<green>Disposition du kit réinitialisée."
