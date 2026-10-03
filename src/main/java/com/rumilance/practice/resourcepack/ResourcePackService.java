@@ -81,7 +81,7 @@ public final class ResourcePackService implements Listener {
      * clients a hash that does not match the zip they download.
      */
     public static final String DEFAULT_URL =
-            "https://github.com/ifuto/RumilancePractice/releases/download/v1.76.60/RumilanceResourcePack.zip";
+            "https://github.com/ifuto/RumilancePractice/releases/download/v1.76.61/RumilanceResourcePack.zip";
     /** Operator-owned pack definition (url + prompt + the hash the server maintains). */
     private static final String JSON_FILE_NAME = "resource-pack.json";
 

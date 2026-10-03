@@ -47,7 +47,7 @@ command -v python3 >/dev/null || { echo "python3 is required" >&2; exit 1; }
 # 3. textures/font/*.png がどこかの provider から参照されているか (素材だけ置いて配線忘れ)
 echo "[pack] validating $SRC"
 python3 - "$SRC" <<'PY'
-import json, os, re, sys
+import json, os, re, struct, sys
 
 src = sys.argv[1]
 errors, notes = [], []
@@ -106,6 +106,36 @@ for path in sorted(font_files):
         if not os.path.isfile(target):
             errors.append(f'{os.path.relpath(path, src)}: {ref} の実体が無い '
                           f'({os.path.relpath(target, src)})')
+            continue
+        # cell = 縦のグリフ行の高さ (png縦px / chars行数)。宣言 height が cell を超えると
+        # テクスチャに無い領域まで(cell以下は)引き伸ばし/未定義扱いになり、環境によっては
+        # プロバイダごと沈黵して豆腐になる (1.92.17 修正の height 9 vs png 8 がその実例)。
+        rows = len(provider.get('chars', []))
+        if rows <= 0:
+            errors.append(f'{os.path.relpath(path, src)}: {ref} の chars が空')
+            continue
+        with open(target, 'rb') as fh:
+            head = fh.read(24)
+        if len(head) < 24 or head[:8] != b'\x89PNG\r\n\x1a\n':
+            errors.append(f'{os.path.relpath(path, src)}: {ref} は有効な PNG ではない')
+            continue
+        png_w, png_h = struct.unpack('>II', head[16:24])
+        cell = png_h / rows
+        if cell != int(cell):
+            errors.append(f'{os.path.relpath(path, src)}: {ref} の縦 {png_h}px が '
+                          f'chars {rows} 行で割り切れない')
+            continue
+        cell = int(cell)
+        declared = provider.get('height', 8)
+        if declared > cell:
+            errors.append(f'{os.path.relpath(path, src)}: {ref} の height {declared} が '
+                          f'テクスチャの行の高さ {cell}px を超えている (豆腐/歪みの原因)')
+        elif declared != cell:
+            notes.append(f'{os.path.relpath(path, src)}: {ref} の height {declared} が '
+                         f'テクスチャ行 {cell}px と不一致 (意図的なスケール以外は要確認)')
+        if 'ascent' in provider and provider['ascent'] > declared:
+            errors.append(f'{os.path.relpath(path, src)}: {ref} の ascent '
+                          f'{provider["ascent"]} が height {declared} を超えている')
     print(f'[pack]   {os.path.relpath(path, src)}: bitmap {len(used_here)} 件')
 
 # -- 置いてあるのに参照されていないテクスチャ --------------------------------

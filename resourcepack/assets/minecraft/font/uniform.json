@@ -3,30 +3,38 @@
     {
       "type": "bitmap",
       "file": "rumilance:font/admin.png",
-      "ascent": 8,
-      "height": 9,
-      "chars": ["\uE001"]
+      "ascent": 7,
+      "height": 8,
+      "chars": [
+        ""
+      ]
     },
     {
       "type": "bitmap",
       "file": "rumilance:font/vip.png",
-      "ascent": 8,
-      "height": 9,
-      "chars": ["\uE002"]
+      "ascent": 7,
+      "height": 8,
+      "chars": [
+        ""
+      ]
     },
     {
       "type": "bitmap",
       "file": "rumilance:font/vip_plus.png",
-      "ascent": 8,
-      "height": 9,
-      "chars": ["\uE003"]
+      "ascent": 7,
+      "height": 8,
+      "chars": [
+        ""
+      ]
     },
     {
       "type": "bitmap",
       "file": "rumilance:font/pro.png",
-      "ascent": 8,
-      "height": 9,
-      "chars": ["\uE004"]
+      "ascent": 7,
+      "height": 8,
+      "chars": [
+        ""
+      ]
     }
   ]
 }
