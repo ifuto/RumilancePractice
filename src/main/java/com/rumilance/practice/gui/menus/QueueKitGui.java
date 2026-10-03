@@ -470,11 +470,11 @@ public final class QueueKitGui extends AbstractGui {
                 openPreview(player, kitService.playableId(kitId));
                 return;
             }
-            player.closeInventory();
             if (lastKitTracker != null) {
                 lastKitTracker.record(player.getUniqueId(), kitId);
             }
             queueCoordinator.join(player, kitId, mode());
+            player.closeInventory();
         }
     }
 }

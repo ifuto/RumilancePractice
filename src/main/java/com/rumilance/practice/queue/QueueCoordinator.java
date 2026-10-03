@@ -219,6 +219,7 @@ public final class QueueCoordinator {
                     MessageService.tags("kit", kitService.displayName(fightKitId)));
             if (!queueService.isQueued(player.getUniqueId())) {
                 stateManager.resetToLobby(player.getUniqueId());
+                lobbyService.applyLobbyInventory(player);
             }
             return;
         }
