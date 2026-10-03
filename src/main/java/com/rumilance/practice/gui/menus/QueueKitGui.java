@@ -473,8 +473,10 @@ public final class QueueKitGui extends AbstractGui {
             if (lastKitTracker != null) {
                 lastKitTracker.record(player.getUniqueId(), kitId);
             }
-            queueCoordinator.join(player, kitId, mode());
+            // closeInventory FIRST: GuiListener.onClose で OPENING_GUI → LOBBY に戻す。
+            // そうしないと stateManager.transition(QUEUED) が例外→即 leave される。
             player.closeInventory();
+            queueCoordinator.join(player, kitId, mode());
         }
     }
 }
