@@ -293,6 +293,11 @@ public final class QueueCoordinator {
         }
     }
 
+    /** プレイヤーがキューに参加中かどうか。 */
+    public boolean isQueued(java.util.UUID playerId) {
+        return queueService.isQueued(playerId);
+    }
+
     /** 全キューから退出 (MultiQueueGui 用)。 */
     public void leaveAll(Player player) {
         if (queueService.isQueued(player.getUniqueId())) {

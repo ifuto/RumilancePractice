@@ -2192,7 +2192,9 @@ public final class FeatureBootstrap {
         services.register(FfaRtpService.class, ffaRtpService);
         services.register(FfaRtpQueueService.class, ffaRtpQueueService);
         bind("killeffect", new com.rumilance.practice.command.KillEffectCommand(killEffectGui));
-        bind("leave", new LeaveCommand(matchService, messageService));
+        LeaveCommand leaveCommand = new LeaveCommand(matchService, messageService);
+        leaveCommand.setQueueCoordinator(queueCoordinator);
+        bind("leave", leaveCommand);
         // フレンド機能は未実装: いまは「実装予定」の告知だけ返す(コマンド名は先に確保)。
         bind("friend", new com.rumilance.practice.command.FriendCommand(messageService));
         TeamCommand teamCommand = new TeamCommand(teamService, kitService, teamHubGui, teamsBrowserGui, messageService);

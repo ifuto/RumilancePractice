@@ -18,10 +18,15 @@ public final class LeaveCommand implements CommandExecutor {
 
     private final MatchService matchService;
     private final MessageService messageService;
+    private volatile com.rumilance.practice.queue.QueueCoordinator queueCoordinator;
 
     public LeaveCommand(MatchService matchService, MessageService messageService) {
         this.matchService = matchService;
         this.messageService = messageService;
+    }
+
+    public void setQueueCoordinator(com.rumilance.practice.queue.QueueCoordinator queueCoordinator) {
+        this.queueCoordinator = queueCoordinator;
     }
 
     @Override
@@ -31,6 +36,13 @@ public final class LeaveCommand implements CommandExecutor {
             messageService.send(sender, "general.player-only");
             return true;
         }
+        // Queue に参加中 → 全キューから退出
+        var qc = queueCoordinator;
+        if (qc != null && qc.isQueued(player.getUniqueId())) {
+            qc.leave(player);
+            return true;
+        }
+        // マッチカウントダウン中 → キャンセル
         MatchService.LeaveOutcome outcome = matchService.leaveDuringCountdown(player);
         String key = switch (outcome) {
             case NOT_COUNTDOWN -> "match.cannot-leave";
