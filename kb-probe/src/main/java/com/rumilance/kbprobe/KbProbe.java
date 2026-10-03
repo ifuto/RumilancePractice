@@ -88,10 +88,8 @@ public final class KbProbe {
         /** 速度パケットがダメージ確認より先着した（順序逆転）。KB無効領域とは区別して静かに破棄。 */
         boolean velocityBeforeConfirm;
         // --- 先着速度の保存（順序逆転時でもサンプルを記録できるようにする） ---
-        /** 先着した速度パケットの速度差分（KB インパルス）。 */
+        /** 先着した速度パケット値 (vx,vy,vz)。 */
         double earlyDx, earlyDy, earlyDz;
-        /** 先着速度受信時のエンティティ速度（isIdle 判定用）。 */
-        double earlyCurX, earlyCurY, earlyCurZ;
         /** 先着速度受信時の tick。 */
         long earlyVelocityTick;
         /** 先着速度パケットのエンティティ ID。 */
@@ -220,10 +218,9 @@ public final class KbProbe {
             // 速度パケットが先着していた場合、今すぐサンプルを記録する
             if (hit.velocityBeforeConfirm && !hit.sampled) {
                 hit.sampled = true;
-                // 先着時のエンティティ速度（isIdle 判定用）と差分を使用
-                Vec3d earlyCur = new Vec3d(hit.earlyCurX, hit.earlyCurY, hit.earlyCurZ);
+                // パケット値を直接渡す
                 recordSample(hit, hit.earlyEntityId, null,
-                        earlyCur, hit.earlyDx, hit.earlyDy, hit.earlyDz);
+                        hit.earlyDx, hit.earlyDy, hit.earlyDz);
             }
         }
     }
@@ -252,49 +249,23 @@ public final class KbProbe {
             return;
         }
         if (hit.confirmTick < 0L) {
-            // 速度パケットがダメージ確認より先着 = パケット順序の逆転（tick 境界や
-            // リージョン跨ぎで起き得る）。速度データを保存し、ダメージ確認後に記録する。
+            // 速度パケットがダメージ確認より先着 → パケット値を保存
             if (clientTick - hit.hitTick <= CONFIRM_WINDOW) {
                 hit.velocityBeforeConfirm = true;
-                // エンティティの現在速度を取得して差分を保存
-                MinecraftClient mc = MinecraftClient.getInstance();
-                if (mc.world != null) {
-                    Entity entity = mc.world.getEntityById(entityId);
-                    if (entity != null) {
-                        Vec3d current = entity.getVelocity();
-                        hit.earlyDx = vx - current.x;
-                        hit.earlyDy = vy - current.y;
-                        hit.earlyDz = vz - current.z;
-                        hit.earlyCurX = current.x;
-                        hit.earlyCurY = current.y;
-                        hit.earlyCurZ = current.z;
-                        hit.earlyVelocityTick = clientTick;
-                        hit.earlyEntityId = entityId;
-                    }
-                }
+                hit.earlyDx = vx;  // パケット値をそのまま保存 (旧: delta)
+                hit.earlyDy = vy;
+                hit.earlyDz = vz;
+                hit.earlyVelocityTick = clientTick;
+                hit.earlyEntityId = entityId;
             }
             return;
         }
         if (clientTick - hit.confirmTick > MOTION_WINDOW) {
             return;
         }
-        // ベースラインは「過去の速度パケット」では読めない（速度パケットは衝撃時のみ → 古い）。
-        // クライアントは対象エンティティの動きを tick ごとに再シミュレーションしているので、
-        // HEAD 時点（= vanilla が新速度を適用する直前）のローカル速度が最も正確な現在速度。
-        Vec3d current = null;
-        Entity entity = null;
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc.world != null) {
-            entity = mc.world.getEntityById(entityId);
-            if (entity != null) {
-                current = entity.getVelocity();
-            }
-        }
-        if (current == null) {
-            return;
-        }
+        // パケット値を直接渡す — entity.getVelocity() は不要
         hit.sampled = true;
-        recordSample(hit, entityId, entity, current, vx - current.x, vy - current.y, vz - current.z);
+        recordSample(hit, entityId, null, vx, vy, vz);
     }
 
     /** MinecraftClient#tick の TAIL から呼ばれる: タイムアウト処理と状態の清掃。 */
@@ -349,51 +320,47 @@ public final class KbProbe {
     // 測定処理
     // ----------------------------------------------------------------------------------
 
-    private static void recordSample(PendingHit hit, int entityId, Entity victim, Vec3d current,
-                                     double dx, double dy, double dz) {
+    private static void recordSample(PendingHit hit, int entityId, Entity victim,
+                                     double vx, double vy, double vz) {
         LAST_SAMPLED.put(entityId, clientTick);
 
-        // 混戦ガード: 窓内に第三者（または環境）のダメージが割り込んでいると、測れた速度は
-        // 自撃との合成値であり最大 +100% 偏る。送信者はクライアントから判別不能なので除外。
         if (hit.contaminated) {
             StatsStore.statsFor(serverKey()).contaminatedEvents++;
             StatsStore.save();
             return;
         }
 
-        double hRaw = Math.hypot(dx, dz);
+        // パケット値を直接使用 — entity.getVelocity() は使わない
+        // vanilla 式: newV = oldV/2 + impulse
+        // 静止標的 (oldV=0): newV = impulse → |packetVel|/2 = 実際のKBインパルス
+        // 動標的: newV = oldV/2 + impulse → |packetVel|/2 + |oldV|/2 = impulse
+        //   但し前回パケット速度を oldV の近似値として使う
+        double hPacket = Math.hypot(vx, vz);
+        double vPacket = Math.abs(vy);
 
-        // KB 抑制ガード: 速度パケットが来ても差分が0 ≈ サーバーがKBを抑制した
-        // （ロビー保護、damage event cancel 後の空パケット等）。fH≈0 の偽サンプルが
-        // 平均を破壊するので静かに棄却。しきい値 = 速度パケット 1 単位 (1/8000 ≈ 0.000125) より余裕。
-        if (hRaw < 5.0e-4 && Math.abs(dy) < 5.0e-4) {
+        // KB 抑制ガード: パケット速度が0付近 = KB無効
+        if (hPacket < 5.0e-4 && vPacket < 5.0e-4) {
             return;
         }
 
-        // 動いている相手にも計測できるよう、旧速度を考慮した推定式:
-        //   vanilla: newH = oldH/2 + impulseH  →  deltaH = impulseH - oldH/2
-        //   impulseH = deltaH + oldH_parallel/2
-        double oldH_parallel = (current.x * hit.dirX + current.z * hit.dirZ);
-        double impulseH = hRaw + Math.abs(oldH_parallel) / 2.0;
-        // 旧速度が大きすぎると推定精度が落ちる: スプリント速度(0.26)×2まで許容
-        if (Math.abs(oldH_parallel) > 0.5) {
+        // 方向ガード: 速度ベクトルが攻撃方向と一致するか
+        if (hPacket > 1.0e-4) {
+            double dotDir = (vx * hit.dirX + vz * hit.dirZ) / hPacket;
+            if (dotDir < 0.1) {
+                return; // 攻撃方向とほぼ逆/横 → KB ではない
+            }
+        }
+
+        // 外れ値ガード
+        if (hPacket > 2.5 || vPacket > 2.5) {
             return;
         }
-        // 方向ガード: KB は攻撃者→被害者へ押し出すはず。逆向き/横向きの速度は他起因のノイズ
-        if (!KbProbeMath.directionOk(dx, dz, hit.dirX, hit.dirZ, hRaw)) {
-            return;
-        }
-        // 外れ値ガード: 想定外の巨大速度は係数推定の母集団に入れない
-        if (KbProbeMath.outlier(hRaw, dy)) {
-            return;
-        }
-        // 耐衝撃ガード: 相手の推定耐衝撃が 1.0 以上なら水平は常に 0 → 計算不能
+
+        // 耐衝撃ガード
         if (hit.resistance >= 1.0d) {
             return;
         }
 
-        // 初回ヒット時に、対象の装備＋エンチャント（クライアントに同期されている表示用装備）と
-        // そこから算出した推定耐衝撃を一度だけ提示する。係数が掛かった「土台」を読み手が確認できる。
         if (GEAR_ANNOUNCED.add(hit.victimUuid)) {
             chat("§7[KBProbe] 対象の装備: "
                     + (hit.gearSummary.isEmpty() ? "(装備なし/非表示)" : hit.gearSummary)
@@ -402,32 +369,30 @@ public final class KbProbe {
 
         ServerStats stats = StatsStore.statsFor(serverKey());
         double k = hit.knockbackLevel();
-        double expectH = KbProbeMath.expectHorizontal(k, hit.resistance);
-        // impulseH = deltaH + |oldH_parallel|/2 ≈ 実際のKBインパルス
-        // 静止標的なら impulseH ≈ hRaw（旧速度=0 なので等価）
-        double fH = impulseH / expectH;
-        stats.addHorizontal(hRaw, fH);
+        double expectBase = KbProbeMath.expectHorizontal(k, 0.0); // resistance=0 の基準値
+
+        // impulseH = |packetVel| / 2 (静止標的の正しい推定)
+        double impulseH = hPacket / 2.0;
+        double fH = impulseH / expectBase;
+        stats.addHorizontal(hPacket, fH);
+
         Double fV = null;
         if (hit.targetOnGround) {
-            // 垂直は「攻撃時 は 接地」だけでなく、速度パケット到着時点でも接地していること
-            // が条件。バニラの onGround 判定はサーバー側ダメージ適用 tick で行われるため、
-            // クリック〜成立の間にジャンプされると Y は不変のまま (fV≈0 の偽サンプル) になる。
-            // さらに係数自体がバニラ上あり得る帯 (0.05〜8.0) に収まるサンプルのみ採用する。
-            boolean stillGrounded = victim != null && victim.isOnGround();
-            double expectV = KbProbeMath.expectVertical(k, hit.resistance);
-            if (stillGrounded && expectV > 1.0e-4) {
-                double candidate = dy / expectV;
+            double expectVBase = KbProbeMath.expectVertical(k, 0.0);
+            double impulseV = vPacket / 2.0;
+            if (expectVBase > 1.0e-4) {
+                double candidate = impulseV / expectVBase;
                 if (KbProbeMath.verticalFactorPlausible(candidate)) {
                     fV = candidate;
-                    stats.addVertical(dy, fV);
+                    stats.addVertical(vPacket, fV);
                 }
             }
         }
         StatsStore.save();
         // デバッグ: 生値をチャット表示
-        chat(String.format("§8[KBProbe] raw Δh=%.4f Δy=%.4f old∥=%.4f impl=%.4f fH=%.2f §7(H%d/V%d)",
-                hRaw, dy, oldH_parallel, impulseH, fH, stats.hSamples, stats.vSamples));
-        announceSample(impulseH, fH, hit.targetOnGround ? dy : null, fV, k, stats);
+        chat(String.format("§a[KBProbe] pkt=(%.4f,%.4f,%.4f) hP=%.4f vP=%.4f implH=%.4f fH=%.2f §7(H%d/V%d)",
+                vx, vy, vz, hPacket, vPacket, impulseH, fH, stats.hSamples, stats.vSamples));
+        announceSample(hPacket, fH, hit.targetOnGround ? vPacket : null, fV, k, stats);
     }
 
     // ----------------------------------------------------------------------------------
