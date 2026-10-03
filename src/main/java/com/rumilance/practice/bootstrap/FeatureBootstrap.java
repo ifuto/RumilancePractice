@@ -1929,6 +1929,10 @@ public final class FeatureBootstrap {
                 com.rumilance.practice.kb.KbProfileRuntime.resolver(matchService.registry(), kbProfiles));
         pm.registerEvents(kbTuningListener, plugin);
         paperCombatCompat.setKnockbackTuning(knockbackTuning, kbKitResolver);
+        // The manual Paper-#13426 shield re-application must scale with the SAME live match
+        // profile the event path uses, or shield-surviving hits would ignore the KB selection.
+        paperCombatCompat.setLiveProfileResolver(
+                com.rumilance.practice.kb.KbProfileRuntime.resolver(matchService.registry(), kbProfiles));
         // Paper #11012/#9504: resync the hotbar when our kit/arena rules cancel a place/break.
         pm.registerEvents(new com.rumilance.practice.guard.BlockInteractionResyncListener(plugin, combatant), plugin);
         pm.registerEvents(new GoldenHeadListener(plugin, matchRegistry), plugin);

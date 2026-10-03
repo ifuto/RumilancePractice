@@ -311,9 +311,9 @@ public class HeroBotPlayer extends PacketBot {
     private long lastExplosionHurtServerTick = -1L;
 
     /**
-     * ServerExplosion はこの Paper ビルドでは EntityKnockbackEvent を発火させず、
-     * BOT (ServerPlayer) への爆発 KB を直接 {@code push(Vec3)} で書く (実測: TNT/クリスタル
-     * ともに確認)。参照の ServerExplosionMixin 相当として、爆発ダメージと同 tick の push を
+     * BOT (ServerPlayer) の爆発 KB は EntityKnockbackEvent を経由しない (発火はするが kb は
+     * 常に 0 — 実クライアントは ClientboundExplodePacket で自前適用する前提のため)、
+     * 実適用は直接の {@code push(Vec3)} で行われる (実測: TNT/クリスタルともに確認)。参照の ServerExplosionMixin 相当として、爆発ダメージと同 tick の push を
      * 横取りして即時適用をやめ、{@code pingDelayTicks(2)} 後の tick 冒頭に
      * {@code super.push(生KB)} する (遅延・生ベクトル — 参照 {@code DelayedExplosionKB} は
      * 生KBのみを保存し、適用も Entity.push = 現在 delta への加算。同一 tick の複数爆発は

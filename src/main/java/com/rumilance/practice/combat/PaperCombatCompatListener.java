@@ -53,6 +53,12 @@ public final class PaperCombatCompatListener implements Listener {
     private com.rumilance.practice.combat.KnockbackTuning knockbackTuning;
     /** Victim kit resolver shared with {@link KnockbackTuningListener} (duel kit / FFA kit). */
     private java.util.function.Function<java.util.UUID, String> kitResolverFn;
+    /**
+     * Live per-match KB profile (Duel Request の KB 選択), shared with {@link KnockbackTuningListener}
+     * so the manual Paper-#13426 re-application scales with the SAME factor the event path uses —
+     * without it, shield-surviving hits ignored the match's KB selection entirely.
+     */
+    private volatile java.util.function.Function<java.util.UUID, double[]> liveProfileResolver;
 
     public PaperCombatCompatListener(Plugin plugin, Predicate<UUID> combatantTest) {
         this.plugin = plugin;
@@ -63,6 +69,11 @@ public final class PaperCombatCompatListener implements Listener {
                                    java.util.function.Function<java.util.UUID, String> kitResolver) {
         this.knockbackTuning = tuning;
         this.kitResolverFn = kitResolver;
+    }
+
+    public void setLiveProfileResolver(
+            java.util.function.Function<java.util.UUID, double[]> liveProfileResolver) {
+        this.liveProfileResolver = liveProfileResolver;
     }
 
     private boolean combatant(Player player) {
@@ -228,14 +239,27 @@ public final class PaperCombatCompatListener implements Listener {
         }
         // バニラ再現の完成ベクトルに、運用者係数だけを乗せる（計算式には触れない）。
         // compatのノックバックは近接攻撃由来なので Cause は ENTITY_ATTACK として解釈する。
-        var tuning = knockbackTuning;
-        if (tuning != null && !tuning.isNeutral()) {
-            String kit = kitResolverFn != null ? kitResolverFn.apply(victim.getUniqueId()) : null;
-            if (!tuning.isNeutralFor("ENTITY_ATTACK", kit)) {
-                double[] scaled = tuning.scale("ENTITY_ATTACK", kit, newX, newY, newZ);
-                newX = scaled[0];
-                newY = scaled[1];
-                newZ = scaled[2];
+        // 優先度は KnockbackTuningListener と完全に揃える: ライブ試合プロファイル最優先、
+        // その後 kit > cause > global。これがないと KB プロファイル試合の盾耐えヒットだけ
+        // 別の KB になっていた。
+        java.util.function.Function<java.util.UUID, double[]> resolverFn = liveProfileResolver;
+        double[] live = resolverFn == null ? null : resolverFn.apply(victim.getUniqueId());
+        if (live != null) {
+            if (live[0] != 1.0d || live[1] != 1.0d) {
+                newX *= live[0];
+                newY *= live[1];
+                newZ *= live[0];
+            }
+        } else {
+            var tuning = knockbackTuning;
+            if (tuning != null && !tuning.isNeutral()) {
+                String kit = kitResolverFn != null ? kitResolverFn.apply(victim.getUniqueId()) : null;
+                if (!tuning.isNeutralFor("ENTITY_ATTACK", kit)) {
+                    double[] scaled = tuning.scale("ENTITY_ATTACK", kit, newX, newY, newZ);
+                    newX = scaled[0];
+                    newY = scaled[1];
+                    newZ = scaled[2];
+                }
             }
         }
         victim.setVelocity(new Vector(newX, newY, newZ));
