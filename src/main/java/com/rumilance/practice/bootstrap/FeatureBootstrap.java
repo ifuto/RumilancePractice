@@ -914,15 +914,14 @@ public final class FeatureBootstrap {
                 guiSessions, soundService, kitService, queueService, queueCoordinator, false);
         unrankedGui.setLastKitTracker(lastKitTracker);
 
-        // Multi-Queue GUIs (複数キット同時キュー参加)
+        // Multi-Queue GUIs (複数キット同時キュー参加) — guiListener は後で生成されるので
+        // インスタンスだけ先に作り、register は guiListener 生成後に行う。
         MultiQueueGui multiQueueRanked = new MultiQueueGui(
                 guiSessions, soundService, kitService, queueService, queueCoordinator,
                 messageService, MatchMode.RANKED);
         MultiQueueGui multiQueueUnranked = new MultiQueueGui(
                 guiSessions, soundService, kitService, queueService, queueCoordinator,
                 messageService, MatchMode.UNRANKED);
-        guiListener.register(multiQueueRanked);
-        guiListener.register(multiQueueUnranked);
 
         KitSelectGui kitSelectGui = new KitSelectGui(guiSessions, soundService, kitService);
         kitSelectGui.setLastKitTracker(lastKitTracker);
@@ -1372,6 +1371,8 @@ public final class FeatureBootstrap {
         guiListener.setPlugin(plugin);
         guiListener.register(rankedGui);
         guiListener.register(unrankedGui);
+        guiListener.register(multiQueueRanked);
+        guiListener.register(multiQueueUnranked);
         guiListener.register(kitSelectGui);
         guiListener.register(innerKitSelectGui);
         guiListener.register(innerKitAdminGui);

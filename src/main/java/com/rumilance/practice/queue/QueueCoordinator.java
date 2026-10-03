@@ -16,6 +16,7 @@ import com.rumilance.practice.state.MatchMode;
 import com.rumilance.practice.state.PlayerState;
 import com.rumilance.practice.util.AsyncExecutor;
 import com.rumilance.practice.util.ItemKeys;
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
