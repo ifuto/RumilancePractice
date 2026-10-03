@@ -583,9 +583,9 @@ public final class ScoreboardService {
 
         MatchSession visualSession = match.orElseGet(() -> spectated.flatMap(matchRegistry::get).orElse(null));
         BoardHandle handle = boards.get(player.getUniqueId());
-        // Rank badges are image-only (resource-pack glyphs): no text fallback badges. The CSV
-        // also owns the lobby/queue/FFA priority; fight columns below intentionally take
-        // priority while a match is active.
+        // Badge rendering is per-viewer now (image when the viewer has the pack, CSV text
+        // when they do not); the CSV also owns the lobby/queue/FFA priority, and fight
+        // columns below intentionally take priority while a match is active.
         if (visualSession == null && tabCustomizationConfig != null && rankService != null) {
             try {
                 player.setPlayerListOrder(tabCustomizationConfig.order(player, rankService));
@@ -615,13 +615,18 @@ public final class ScoreboardService {
             // Lobby / FFA / queue: rank badge (admin / VIP+ / VIP) in front of each name,
             // 状態マーカーを名前の右に: 試合中 = ⚔️ / 観戦中 = 👁️ (ロビー視点の他人名)。
             // マーカーはリソースパック非依存の Unicode なので icons.enabled() に関係なく出す。
+            // RECOMMENDED ポリシー: パック適用済み viewer には画像バッジのみ、パック無し
+            // viewer には CSV テキストバッジのみ (両方は絶対に付かない → □ADMIN/重複がない)。
             if (handle != null && rankService != null) {
                 com.rumilance.practice.font.RankIconNameTags.apply(
                         handle.board, iconFontService, rankService,
                         Bukkit.getOnlinePlayers(),
                         tabCustomizationConfig == null ? null
                                 : other -> tabCustomizationConfig.prefix(other, rankService),
-                        this::tabStatusMarker);
+                        this::tabStatusMarker,
+                        player,
+                        viewer -> resourcePackService == null
+                                || resourcePackService.hasPack(viewer));
             } else if (handle != null) {
                 com.rumilance.practice.font.RankIconNameTags.clear(handle.board);
             }
