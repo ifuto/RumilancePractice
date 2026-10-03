@@ -330,11 +330,8 @@ public final class KbProbe {
             return;
         }
 
-        // パケット値を直接使用 — entity.getVelocity() は使わない
         // vanilla 式: newV = oldV/2 + impulse
-        // 静止標的 (oldV=0): newV = impulse → |packetVel|/2 = 実際のKBインパルス
-        // 動標的: newV = oldV/2 + impulse → |packetVel|/2 + |oldV|/2 = impulse
-        //   但し前回パケット速度を oldV の近似値として使う
+        // 静止標的 (oldV=0): newV = impulse → |packetVel| = 実際のKBインパルス
         double hPacket = Math.hypot(vx, vz);
         double vPacket = Math.abs(vy);
 
@@ -371,17 +368,15 @@ public final class KbProbe {
         double k = hit.knockbackLevel();
         double expectBase = KbProbeMath.expectHorizontal(k, 0.0); // resistance=0 の基準値
 
-        // impulseH = |packetVel| / 2 (静止標的の正しい推定)
-        double impulseH = hPacket / 2.0;
-        double fH = impulseH / expectBase;
+        // 静止標的: impulse = |packetVel| (newV = impulse, oldV=0)
+        double fH = hPacket / expectBase;
         stats.addHorizontal(hPacket, fH);
 
         Double fV = null;
         if (hit.targetOnGround) {
             double expectVBase = KbProbeMath.expectVertical(k, 0.0);
-            double impulseV = vPacket / 2.0;
             if (expectVBase > 1.0e-4) {
-                double candidate = impulseV / expectVBase;
+                double candidate = vPacket / expectVBase;
                 if (KbProbeMath.verticalFactorPlausible(candidate)) {
                     fV = candidate;
                     stats.addVertical(vPacket, fV);
@@ -390,8 +385,8 @@ public final class KbProbe {
         }
         StatsStore.save();
         // デバッグ: 生値をチャット表示
-        chat(String.format("§a[KBProbe] pkt=(%.4f,%.4f,%.4f) hP=%.4f vP=%.4f implH=%.4f fH=%.2f §7(H%d/V%d)",
-                vx, vy, vz, hPacket, vPacket, impulseH, fH, stats.hSamples, stats.vSamples));
+        chat(String.format("§a[KBProbe] pkt=(%.4f,%.4f,%.4f) hP=%.4f vP=%.4f fH=%.2f §7(H%d/V%d)",
+                vx, vy, vz, hPacket, vPacket, fH, stats.hSamples, stats.vSamples));
         announceSample(hPacket, fH, hit.targetOnGround ? vPacket : null, fV, k, stats);
     }
 
