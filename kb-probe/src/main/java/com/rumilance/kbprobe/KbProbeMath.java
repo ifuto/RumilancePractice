@@ -42,6 +42,13 @@ public final class KbProbeMath {
     public static final double VF_MIN = 0.05d;
     /** Vertical factors above this are impossible for a plain melee hit (external impulse). */
     public static final double VF_MAX = 8.0d;
+    /**
+     * Horizontal impulse below this is not real knockback: either the server suppressed KB
+     * (lobby protection that still sends damage+velocity packets) or the velocity-packet
+     * rounding produced a near-zero delta. Rejecting these prevents fH≈0 fake samples from
+     * dragging the average toward ×0.
+     */
+    public static final double HF_MIN = 0.01d;
 
     private KbProbeMath() {
     }
@@ -88,5 +95,13 @@ public final class KbProbeMath {
      */
     public static boolean verticalFactorPlausible(double fV) {
         return fV >= VF_MIN && fV <= VF_MAX;
+    }
+    /**
+     * True when the horizontal impulse is large enough to be real knockback.
+     * Lobby-protection plugins that still send velocity packets produce deltas near zero;
+     * these must be rejected to avoid fH≈0 samples dragging the average down.
+     */
+    public static boolean horizontalImpulseReal(double hRaw) {
+        return hRaw >= HF_MIN;
     }
 }

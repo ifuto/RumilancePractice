@@ -336,6 +336,13 @@ public final class KbProbe {
         }
 
         double hRaw = Math.hypot(dx, dz);
+        // KB無効領域ガード: 速度差分が極小 = サーバーがKBを抑制(ロビー保護等)。
+        // ダメージパケット+速度パケット(0)が来るパターンを防ぐ。
+        if (!KbProbeMath.horizontalImpulseReal(hRaw)) {
+            StatsStore.statsFor(serverKey()).noKbEvents++;
+            StatsStore.save();
+            return;
+        }
         // 方向ガード: KB は攻撃者→被害者へ押し出すはず。逆向き/横向きの速度は他起因のノイズ
         if (!KbProbeMath.directionOk(dx, dz, hit.dirX, hit.dirZ, hRaw)) {
             return;

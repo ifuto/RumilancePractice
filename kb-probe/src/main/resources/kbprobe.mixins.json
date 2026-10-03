@@ -8,6 +8,7 @@
     "DamageConfirmMixin",
     "EntitiesDestroyMixin",
     "PositionTeleportMixin",
+    "TitleScreenMixin",
     "VelocityCaptureMixin"
   ],
   "injectors": {
