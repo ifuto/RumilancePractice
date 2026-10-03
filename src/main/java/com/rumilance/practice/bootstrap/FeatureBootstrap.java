@@ -132,7 +132,6 @@ import com.rumilance.practice.gui.menus.PracticeLayoutGui;
 import com.rumilance.practice.gui.menus.PracticeMaceGui;
 import com.rumilance.practice.gui.menus.PresetAdminGui;
 import com.rumilance.practice.gui.menus.ProfileGui;
-import com.rumilance.practice.gui.menus.MultiQueueGui;
 import com.rumilance.practice.gui.menus.ReportGui;
 import com.rumilance.practice.gui.menus.ReportListGui;
 import com.rumilance.practice.gui.menus.SettingsGui;
@@ -909,15 +908,6 @@ public final class FeatureBootstrap {
         // (画面は1つ、キュー参加/プレビューはキュー時のクリック挙動だけが違う)。
         // ランク戦キットアイテムのホバーにトップ5ランキング lore を載せる
 
-        // Multi-Queue GUIs (複数キット同時キュー参加) — guiListener は後で生成されるので
-        // インスタンスだけ先に作り、register は guiListener 生成後に行う。
-        MultiQueueGui multiQueueRanked = new MultiQueueGui(
-                guiSessions, soundService, kitService, queueService, queueCoordinator,
-                messageService, MatchMode.RANKED);
-        MultiQueueGui multiQueueUnranked = new MultiQueueGui(
-                guiSessions, soundService, kitService, queueService, queueCoordinator,
-                messageService, MatchMode.UNRANKED);
-
         KitSelectGui kitSelectGui = new KitSelectGui(guiSessions, soundService, kitService);
         kitSelectGui.setLastKitTracker(lastKitTracker);
         kitSelectGui.setQueueServices(queueService, queueCoordinator);
@@ -1373,8 +1363,6 @@ public final class FeatureBootstrap {
         });
         // 木時差式ボタン releases are scheduled off this plugin handle.
         guiListener.setPlugin(plugin);
-        guiListener.register(multiQueueRanked);
-        guiListener.register(multiQueueUnranked);
         guiListener.register(kitSelectGui);
         guiListener.register(innerKitSelectGui);
         guiListener.register(innerKitAdminGui);
@@ -1482,14 +1470,12 @@ public final class FeatureBootstrap {
         functionalItemListener.setOpenMenu(gameMenuGui::open);
         functionalItemListener.setOpenBattle(battleMenuGui::open);
         functionalItemListener.setMultiQueueGuiOpener(player -> {
-            // キュー選択アイテム: 現在のモードに応じて MultiQueueGui を開く
+            // キュー選択アイテム: 現在のモードに応じて THE キット画面のキューモードを開く
+            // (複数Q同時参加・一斉参加/一斉退出は KitSelectGui 側に統合済み)。
             boolean inRanked = queueService.get(player.getUniqueId())
                     .map((QueueService.QueueEntry e) -> e.mode() == MatchMode.RANKED)
                     .orElse(false);
-            MultiQueueGui gui = inRanked ? multiQueueRanked : multiQueueUnranked;
-            GuiSession s = guiSessions.open(player.getUniqueId(), gui.type(), gui.rows());
-            s.setRanked(inRanked);
-            com.rumilance.practice.gui.menus.PracticeGuiOpen.open(gui, player, s);
+            kitSelectGui.openForQueue(player, inRanked);
         });
         functionalItemListener.setOpenTitles(titleGui::open);
         functionalItemListener.setOpenParty(player -> {

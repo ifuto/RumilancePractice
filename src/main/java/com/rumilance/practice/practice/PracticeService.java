@@ -128,6 +128,39 @@ public final class PracticeService {
         this.cloneService = cloneService;
         this.messages = messages;
         reload();
+        // 奈落ウォッチドッグ: whatever the cause (a partially pasted arena copy, a drill
+        // targeting an unpasted region, a bad template), a player below the world can neither
+        // fight nor navigate — and PRACTICE_* guards freeze chat/commands while they fall
+        // forever. Every 10 ticks any session whose player is under min-height -16 is force-
+        // left and the player is walked back to the lobby.
+        Bukkit.getScheduler().runTaskTimer(plugin, this::sweepVoidFalls, 20L, 10L);
+    }
+
+    /**
+     * Safety net for the "奈落に飛ばされてチャットが使えなくなる" report: force-leaves any
+     * session whose player has fallen below the world, so no state guard can keep them
+     * stranded in the void.
+     */
+    private void sweepVoidFalls() {
+        if (sessions.isEmpty()) {
+            return;
+        }
+        for (PracticeSession session : java.util.List.copyOf(sessions.values())) {
+            Player player = Bukkit.getPlayer(session.playerId());
+            if (player == null || !player.isOnline()) {
+                continue;
+            }
+            org.bukkit.World world = player.getWorld();
+            double floor = world.getMinHeight() - 16.0d;
+            if (player.getLocation().getY() >= floor) {
+                continue;
+            }
+            plugin.getLogger().warning("[N Arena][Practice] void-fall: player=" + player.getName()
+                    + " y=" + String.format(java.util.Locale.ROOT, "%.0f", player.getLocation().getY())
+                    + " practice=" + session.practiceId() + " — forcing leave");
+            leave(player, false);
+            player.sendMessage(messages.render(player, "practice.void-fall"));
+        }
     }
 
     public PracticeCloneService cloneService() {
@@ -1909,6 +1942,17 @@ public final class PracticeService {
         }
     }
 
+    /**
+     * True when {@code home} — the anchor a drill teleport is computed FROM — sits over a real
+     * floor. ELYTRA/DIVEBOMB intentionally drop the player into the AIR relative to this
+     * anchor, so the anchor itself is what must be verified: when the arena copy under the
+     * drill is not pasted, the anchor floats over the void and teleporting relative to it
+     * throws the player into the void at Y≈-300. The cycle is skipped instead.
+     */
+    private boolean drillAnchorOk(Location home) {
+        return home != null && home.getWorld() != null && ensureStandable(home.clone()) != null;
+    }
+
     /** Mace drill attempt dispatch (elytra / far-pearl / stun-slam / divebomb). */
     private void tickMaceDrill(Player player, PracticeSession session, BotBody bot,
                                PracticeRoom room, BotDifficulty diff, long now, PracticeMode mode,
@@ -1919,6 +1963,9 @@ public final class PracticeService {
                     () -> tickFarPearlAttempt(player, session, bot, room));
             case MACE_ELYTRA -> drillCycle(player, session, now, () -> {
                 Location home = session.botHome() != null ? session.botHome() : bot.getLocation();
+                if (!drillAnchorOk(home)) {
+                    return; // anchor over the void: never throw the player into the air there
+                }
                 Location start = home.clone().add(0, DrillKernel.ELYTRA_PLAYER_Y, DrillKernel.ELYTRA_PLAYER_Z);
                 player.teleport(LocationUtil.safeTeleportLocation(start.setDirection(
                         to.clone().setY(0))));
@@ -1934,6 +1981,9 @@ public final class PracticeService {
                 if (player.isOnGround()) {
                     // divebomb/loop: tp player ~ ~30 ~15 FACING THE BOT (kernel offsets).
                     Location home = session.botHome() != null ? session.botHome() : bot.getLocation();
+                    if (!drillAnchorOk(home)) {
+                        return; // anchor over the void: skip the cycle, keep the player safe
+                    }
                     Location start = home.clone().add(0, DrillKernel.DIVEBOMB_PLAYER_Y,
                             DrillKernel.DIVEBOMB_PLAYER_Z);
                     Vector towards = safeFlatForward(start, bot.getLocation());
@@ -2024,6 +2074,9 @@ public final class PracticeService {
             case CRYSTAL_DTAP -> drillCycle(player, session, now, () -> {
                 // crystal/dtap/loop: pair reset DTAP_RESET_DISTANCE apart on the home line.
                 Location home = session.botHome() != null ? session.botHome() : bot.getLocation();
+                if (!drillAnchorOk(home)) {
+                    return; // anchor over the void: skip the cycle, keep the player safe
+                }
                 Vector forward = safeFlatForward(home, player);
                 Location startP = home.clone().add(forward.clone().multiply(DrillKernel.DTAP_RESET_DISTANCE));
                 player.teleport(LocationUtil.safeTeleportLocation(

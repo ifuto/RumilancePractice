@@ -8,6 +8,7 @@ import com.rumilance.practice.gui.ItemBuilder;
 import com.rumilance.practice.gui.MenuScaffold;
 import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.kit.KitService;
+import com.rumilance.practice.locale.MessageService;
 import com.rumilance.practice.model.KitDefinition;
 import com.rumilance.practice.platform.PlayerPlatform;
 import com.rumilance.practice.queue.QueueCoordinator;
@@ -26,6 +27,7 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /**
  * THE kit selection screen — one implementation for both consumers:
@@ -173,6 +175,25 @@ public final class KitSelectGui extends AbstractGui {
             MenuScaffold.returnButton(inventory, t(player, "menu.back"));
         }
         if (queueMode(session)) {
+            // Multi-queue footer (旧 MultiQueueGui の機能): 一斉参加 / 参加数 / 一斉退出。
+            Set<String> queuedKits = queueService == null ? Set.of()
+                    : queueService.queuedKitIds(player.getUniqueId(), mode(session));
+            inventory.setItem(GuiSlots.slot(5, 3), ItemBuilder.of(Material.LIME_DYE)
+                    .name(t(player, "gui.queue-join-all").color(UiTheme.SUCCESS))
+                    .lore(UiTheme.divider(), UiTheme.hint(line(player, "gui.queue-join-all-hint")))
+                    .action("join-all")
+                    .build());
+            inventory.setItem(GuiSlots.slot(5, 4), ItemBuilder.of(Material.PAPER)
+                    .name(t(player, "gui.queue-joined-count",
+                            MessageService.tags("n", String.valueOf(queuedKits.size())))
+                            .color(UiTheme.VALUE))
+                    .action("decorate")
+                    .build());
+            inventory.setItem(GuiSlots.slot(5, 5), ItemBuilder.of(Material.RED_DYE)
+                    .name(t(player, "gui.queue-leave-all").color(UiTheme.DANGER))
+                    .lore(UiTheme.divider(), UiTheme.hint(line(player, "gui.queue-leave-all-hint")))
+                    .action("leave-all")
+                    .build());
             paintNav(player, session, inventory);
         }
     }
@@ -572,7 +593,7 @@ public final class KitSelectGui extends AbstractGui {
         if (clickType == org.bukkit.event.inventory.ClickType.RIGHT
                 && action != null && action.startsWith("kit:") && queueMode(session)) {
             // Queue: RIGHT opens a read-only kit preview (no inner-kit menus in queue).
-            handleQueueKitClick(player, session, action.substring(4), clickType);
+            handleQueueKitClick(player, session, action.substring(4), inventory, clickType);
             return;
         }
         if (clickType == org.bukkit.event.inventory.ClickType.RIGHT
@@ -632,8 +653,24 @@ public final class KitSelectGui extends AbstractGui {
             returnToDuel(player, session);
             return;
         }
+        if ("join-all".equals(action)) {
+            if (queueCoordinator != null) {
+                sounds.play(player, "gui-click");
+                queueCoordinator.joinAll(player, mode(session));
+                refresh(player, session, inventory);
+            }
+            return;
+        }
+        if ("leave-all".equals(action)) {
+            if (queueCoordinator != null) {
+                sounds.play(player, "queue-leave");
+                queueCoordinator.leaveAll(player);
+                refresh(player, session, inventory);
+            }
+            return;
+        }
         if (action != null && action.startsWith("kit:")) {
-            handleQueueKitClick(player, session, action.substring(4),
+            handleQueueKitClick(player, session, action.substring(4), inventory,
                     org.bukkit.event.inventory.ClickType.LEFT);
             return;
         }
@@ -649,9 +686,14 @@ public final class KitSelectGui extends AbstractGui {
         }
     }
 
-    /** Queue-mode kit tile: RIGHT = preview, LEFT (and any other click) = join the queue. */
+    /**
+     * Queue-mode kit tile: RIGHT = read-only preview, LEFT = multi-queue toggle —
+     * {@link QueueCoordinator#join} is the toggle (same kit again → leave that one, other kits
+     * join alongside), so several kits can queue at once and the screen stays OPEN, exactly
+     * like the old MultiQueueGui.
+     */
     private void handleQueueKitClick(Player player, GuiSession session, String kitId,
-                                     org.bukkit.event.inventory.ClickType clickType) {
+                                     Inventory inventory, org.bukkit.event.inventory.ClickType clickType) {
         if (queueCoordinator == null) {
             sounds.play(player, "error");
             return;
@@ -661,7 +703,6 @@ public final class KitSelectGui extends AbstractGui {
             sounds.play(player, "error");
             return;
         }
-        // Right-click opens a read-only kit preview; left-click (and any other click) joins the queue.
         if (clickType == org.bukkit.event.inventory.ClickType.RIGHT) {
             sounds.play(player, "gui-click");
             player.closeInventory();
@@ -671,10 +712,9 @@ public final class KitSelectGui extends AbstractGui {
         if (lastKitTracker != null) {
             lastKitTracker.record(player.getUniqueId(), kitId);
         }
-        // closeInventory FIRST: GuiListener.onClose で OPENING_GUI → LOBBY に戻す。
-        // そうしないと stateManager.transition(QUEUED) が例外→即 leave される。
-        player.closeInventory();
+        // join() toggles and multi-queues by itself; the GUI stays open and repaints.
         queueCoordinator.join(player, kitId, mode(session));
+        refresh(player, session, inventory);
     }
 
     private void returnToDuel(Player player, GuiSession session) {
