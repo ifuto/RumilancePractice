@@ -1098,6 +1098,9 @@ public final class FeatureBootstrap {
         originalKitRoomService.setMessageService(messageService);
         services.register(com.rumilance.practice.originalkit.OriginalKitRoomService.class, originalKitRoomService);
         originalKitService.setRoomService(originalKitRoomService);
+        // Room edits own the player-state machine (EDITING_KIT while building in the room):
+        // every command path then refuses an editing player exactly like the GUI editor does.
+        originalKitService.setStateManager(stateManager);
         matchService.setOriginalKitService(originalKitService);
         matchService.setEditKitGui(editKitGui);
         teamService.setEditKitGui(editKitGui);
@@ -2298,6 +2301,12 @@ public final class FeatureBootstrap {
                 if (matchService.isBusyForKitEdit(player.getUniqueId())) {
                     player.sendMessage(net.kyori.adventure.text.Component.text(
                             "You can't edit kits during a match.", net.kyori.adventure.text.format.NamedTextColor.RED));
+                    return true;
+                }
+                if (originalKitService.isEditing(player.getUniqueId())) {
+                    player.sendMessage(net.kyori.adventure.text.Component.text(
+                            "You are already editing an original kit — save it at the room sign first.",
+                            net.kyori.adventure.text.format.NamedTextColor.RED));
                     return true;
                 }
                 originalKitGui.open(player);

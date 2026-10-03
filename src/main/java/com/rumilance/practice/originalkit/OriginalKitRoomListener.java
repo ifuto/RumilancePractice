@@ -60,15 +60,18 @@ public final class OriginalKitRoomListener implements Listener {
             return;
         }
         Player player = event.getPlayer();
-        if (!roomService.isEditing(player.getUniqueId())) {
+        boolean editor = roomService.isEditing(player.getUniqueId())
+                || originalKitService.isEditing(player.getUniqueId());
+        if (!editor) {
             return;
         }
-        // The room is permanent; an editor can never break its blocks.
-        if (roomService.inRoom(block.getLocation())) {
-            event.setCancelled(true);
-            player.sendActionBar(Component.text("You cannot break blocks in the kit room.",
-                    NamedTextColor.RED));
-        }
+        // An editor is in creative building their kit: block breaking is impossible ANYWHERE —
+        // inside the room and outside it. Previously only the configured room region was
+        // protected, so a missing/mis-set region (or any escape from the room) handed a
+        // creative player the whole world.
+        event.setCancelled(true);
+        player.sendActionBar(Component.text("You cannot break blocks while editing a kit.",
+                NamedTextColor.RED));
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -86,17 +89,18 @@ public final class OriginalKitRoomListener implements Listener {
             return;
         }
 
-        if (!roomService.isEditing(player.getUniqueId())) {
+        boolean editor = roomService.isEditing(player.getUniqueId())
+                || originalKitService.isEditing(player.getUniqueId());
+        if (!editor) {
             return;
         }
-        // Editors cannot place any block in the room.
-        if (roomService.inRoom(placed.getLocation())) {
-            event.setCancelled(true);
-            // Creative placement would otherwise consume the client-side ghost; resync.
-            player.updateInventory();
-            player.sendActionBar(Component.text("You cannot place blocks in the kit room.",
-                    NamedTextColor.RED));
-        }
+        // Editors cannot place any block anywhere (same reasoning as breaking above); the only
+        // exception is the admin save-sign registration handled before this check.
+        event.setCancelled(true);
+        // Creative placement would otherwise consume the client-side ghost; resync.
+        player.updateInventory();
+        player.sendActionBar(Component.text("You cannot place blocks while editing a kit.",
+                NamedTextColor.RED));
     }
 
     @EventHandler(priority = EventPriority.HIGH)
@@ -293,7 +297,16 @@ public final class OriginalKitRoomListener implements Listener {
             return;
         }
         OriginalKitService.EditContext ctx = originalKitService.context(player.getUniqueId());
-        int slot = ctx != null ? ctx.slot : 22;
+        if (ctx == null) {
+            // Without an edit context the target paper slot is unknown; the old fallback
+            // silently banked the current inventory into slot 22 (which may not even be a
+            // kit). Refuse instead — re-open the kit from /ekit and press the sign again.
+            player.sendActionBar(Component.text(
+                    "No edit session found — open the kit from /ekit, then press this sign.",
+                    NamedTextColor.RED));
+            return;
+        }
+        int slot = ctx.slot;
         // Save the snapshot, swap back to survival, leave the room and hand the stashed lobby
         // inventory back in one place (finishRoomEdit), so the exit always restores cleanly.
         originalKitService.finishRoomEdit(player, slot);

@@ -157,6 +157,17 @@ public final class OriginalKitRoomService {
 
     /** Sends a player into the room; switches to creative only AFTER the teleport lands. */
     public void enter(Player player) {
+        enter(player, null);
+    }
+
+    /**
+     * Sends a player into the room; switches to creative only AFTER the teleport has actually
+     * landed. {@code onArrivalFailed} runs when the teleport could not complete (offline,
+     * unstandable spawn, error) — the caller rolls its edit session back there, because this
+     * room never granted creative in that case. Granting creative on a failed teleport used to
+     * flip the player to creative wherever they stood (lobby included).
+     */
+    public void enter(Player player, Runnable onArrivalFailed) {
         if (spawn == null) {
             com.rumilance.practice.locale.MessageService messages = messageService;
             String text = messages != null ? messages.raw(player, "gui.ekit-room-not-configured")
@@ -171,6 +182,17 @@ public final class OriginalKitRoomService {
         SafeTeleport.teleport(player, com.rumilance.practice.util.LocationUtil.safeTeleportLocation(spawn))
                 .whenComplete((ok, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
                     if (!player.isOnline() || !editors.contains(player.getUniqueId())) {
+                        return;
+                    }
+                    if (error != null || !Boolean.TRUE.equals(ok)) {
+                        // Never reached the room: undo the isolation and report back. The
+                        // caller's callback ends the edit session (inventory + state rollback).
+                        editors.remove(player.getUniqueId());
+                        applyIsolation(player, false);
+                        refreshVisibility();
+                        if (onArrivalFailed != null) {
+                            onArrivalFailed.run();
+                        }
                         return;
                     }
                     // Creative only once the teleport has actually completed.

@@ -40,6 +40,7 @@ public final class OriginalKitService {
     private final Logger logger;
     private final ConfigService configService;
     private volatile OriginalKitRoomService roomService;
+    private volatile com.rumilance.practice.session.PlayerStateManager stateManager;
     private final Map<UUID, ItemStack[]> pendingInventory = new ConcurrentHashMap<>();
     private final Map<UUID, EditContext> editContexts = new ConcurrentHashMap<>();
     private final Set<UUID> navigating = ConcurrentHashMap.newKeySet();
@@ -197,8 +198,46 @@ public final class OriginalKitService {
 
     // ---- inventory stash / restore (OrPlusGUI lifecycle) ----
 
+    /** Wiring so room edits own the {@link com.rumilance.practice.state.PlayerState} machine. */
+    public void setStateManager(com.rumilance.practice.session.PlayerStateManager stateManager) {
+        this.stateManager = stateManager;
+    }
+
+    /** Best-effort EDITING_KIT transition; state failures must never break the edit flow. */
+    private void enterEditingState(UUID uuid) {
+        com.rumilance.practice.session.PlayerStateManager states = stateManager;
+        if (states == null) {
+            return;
+        }
+        try {
+            if (states.getState(uuid) != com.rumilance.practice.state.PlayerState.EDITING_KIT) {
+                states.transition(uuid, com.rumilance.practice.state.PlayerState.EDITING_KIT);
+            }
+        } catch (Exception ignored) {
+            // keep going — the room flow itself does not depend on the state machine
+        }
+    }
+
+    /** Best-effort back-to-LOBBY after an edit session ends (any exit path). */
+    private void leaveEditingState(UUID uuid) {
+        com.rumilance.practice.session.PlayerStateManager states = stateManager;
+        if (states == null) {
+            return;
+        }
+        try {
+            if (states.getState(uuid) == com.rumilance.practice.state.PlayerState.EDITING_KIT) {
+                states.resetToLobby(uuid);
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
     public void stashInventory(Player player) {
-        pendingInventory.put(player.getUniqueId(), player.getInventory().getContents());
+        // putIfAbsent: the FIRST stash is always the player's real lobby inventory. A re-entry
+        // (impossible through the guarded GUI flow, but possible through /ekit races) used to
+        // overwrite it with the kit contents being edited — permanently destroying the lobby
+        // items on restore.
+        pendingInventory.putIfAbsent(player.getUniqueId(), player.getInventory().getContents());
         player.getInventory().clear();
     }
 
@@ -212,10 +251,17 @@ public final class OriginalKitService {
     public void restoreOnQuit(UUID uuid) {
         Player player = Bukkit.getPlayer(uuid);
         if (player != null) {
+            // playerdata (including the game mode) is written during the quit: leaving the
+            // editor in CREATIVE here would respawn them later with creative powers.
+            if ((pendingInventory.containsKey(uuid) || editContexts.containsKey(uuid))
+                    && player.getGameMode() == org.bukkit.GameMode.CREATIVE) {
+                player.setGameMode(org.bukkit.GameMode.SURVIVAL);
+            }
             restoreInventory(player);
         }
         pendingInventory.remove(uuid);
         editContexts.remove(uuid);
+        navigating.remove(uuid);
     }
 
     // ---- editor context ----
@@ -238,7 +284,26 @@ public final class OriginalKitService {
             }
             return;
         }
-        editContexts.computeIfAbsent(player.getUniqueId(), id -> new EditContext(slot, layout));
+        UUID uuid = player.getUniqueId();
+        if (editContexts.containsKey(uuid)) {
+            // Already editing (another room session is live): re-entering would double-stash
+            // and could target a different paper slot. The EDITING_KIT state blocks every
+            // command path here; this is the belt-and-braces guard.
+            player.sendMessage(Component.text(
+                    "You are already editing an original kit — save it at the room sign first.",
+                    NamedTextColor.RED));
+            return;
+        }
+        editContexts.computeIfAbsent(uuid, id -> new EditContext(slot, layout));
+        // The slot-menu GUI that launched this flow closes on the room teleport (or on an ESC
+        // right after). That close used to hit GuiListener's "stashed but not navigating"
+        // sweep and abort the flow: the lobby inventory was written back over the kit contents
+        // while the teleport still completed — leaving the editor in CREATIVE holding lobby
+        // items (a free creative cheat), where the SAVE sign then banked those items into the
+        // kit slot. Flag the intentional navigation BEFORE stashing so the close is recognised
+        // as flow-internal.
+        markNavigating(uuid);
+        enterEditingState(uuid);
         stashInventory(player);
         // Restore the existing kit contents for editing.
         if (layout != null) {
@@ -249,7 +314,11 @@ public final class OriginalKitService {
             player.getInventory().setContents(pad(copy));
         }
         if (roomService != null) {
-            roomService.enter(player);
+            roomService.enter(player, () -> {
+                // The room was never reached: roll the whole edit session back instead of
+                // staying stashed (or creative in place).
+                abortFlow(uuid);
+            });
         }
     }
 
@@ -270,6 +339,9 @@ public final class OriginalKitService {
     public void endEdit(Player player) {
         editContexts.remove(player.getUniqueId());
         restoreInventory(player);
+        if (player != null) {
+            leaveEditingState(player.getUniqueId());
+        }
     }
 
     /**
@@ -350,8 +422,18 @@ public final class OriginalKitService {
         navigating.remove(uuid);
         Player player = Bukkit.getPlayer(uuid);
         if (player != null) {
+            // An aborted editor must never stay in creative (the abort can fire after the
+            // room already flipped them, e.g. a manual /menu close in a broken state).
+            if (player.getGameMode() == org.bukkit.GameMode.CREATIVE) {
+                player.setGameMode(org.bukkit.GameMode.SURVIVAL);
+            }
             restoreInventory(player);
+            // Still registered as a room editor (abort raced the teleport)? Leave cleanly.
+            if (roomService != null && roomService.isEditing(uuid)) {
+                roomService.exit(player);
+            }
         }
+        leaveEditingState(uuid);
     }
 
     /** Called from InventoryCloseEvent: restore unless we are navigating to a sub-GUI. */

@@ -550,7 +550,11 @@ public final class MatchService {
         return switch (state) {
             case QUEUED_RANKED, QUEUED_UNRANKED, REQUESTING_DUEL,
                  PREPARING_MATCH, COUNTDOWN, FIGHTING, ENDING,
-                 SPECTATING, FFA, PRACTICE_WAIT, PRACTICE_ACTIVE -> true;
+                 SPECTATING, FFA, PRACTICE_WAIT, PRACTICE_ACTIVE,
+                 // Covers BOTH kit editors: the official-kit GUI and the original-kit room
+                 // session. Re-entering an editor mid-edit used to double-stash and destroy
+                 // the stashed lobby inventory.
+                 EDITING_KIT -> true;
             default -> false;
         };
     }

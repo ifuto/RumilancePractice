@@ -517,14 +517,15 @@ public final class GuiListener implements Listener {
                 && state == PlayerState.EDITING_KIT) {
             stateManager.resetToLobby(player.getUniqueId());
         }
-        if (originalKitService != null) {
-            if (holder.type() == GuiType.CONFIRM) {
-                boolean navigating = originalKitService.consumeNavigating(player.getUniqueId());
-                if (!navigating && originalKitService.isStashed(player.getUniqueId())) {
-                    originalKitService.abortFlow(player.getUniqueId());
-                }
-            } else if (originalKitService.isStashed(player.getUniqueId())
-                    && !originalKitService.consumeNavigating(player.getUniqueId())) {
+        if (originalKitService != null && OriginalKitFlow.isFlowGui(holder.type())) {
+            // ONLY the original-kit flow screens may abort the stashed edit inventory. This
+            // used to fire for ANY gui close while stashed: the slot-menu that launches the
+            // room teleport closed mid-flow (no navigation flag yet) and the sweep restored
+            // the lobby inventory over the kit contents — leaving the editor in CREATIVE
+            // holding lobby items, an effective cheat. GUIs the player opens later from the
+            // room (e.g. /menu) must never touch the edit session either.
+            boolean navigating = originalKitService.consumeNavigating(player.getUniqueId());
+            if (!navigating && originalKitService.isStashed(player.getUniqueId())) {
                 originalKitService.abortFlow(player.getUniqueId());
             }
         }

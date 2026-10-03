@@ -87,6 +87,11 @@ public final class LobbyCommand implements CommandExecutor {
                 || state == PlayerState.PRACTICE_ACTIVE) {
             return;
         }
+        // Kit editors (official GUI / original-kit room) own a stashed inventory: a hub
+        // teleport mid-edit would walk a possibly-creative player out with the wrong items.
+        if (state == PlayerState.EDITING_KIT) {
+            return;
+        }
         if (afkExit != null && afkExit.test(player)) {
             return; // the session end already sent the player to the lobby
         }
@@ -118,6 +123,14 @@ public final class LobbyCommand implements CommandExecutor {
         }
         if (state == PlayerState.FIGHTING || state == PlayerState.COUNTDOWN || state == PlayerState.PREPARING_MATCH) {
             player.sendMessage(Component.text("You cannot return to lobby during a match.", NamedTextColor.RED));
+            return true;
+        }
+        if (state == PlayerState.EDITING_KIT) {
+            // Original-kit room editors are creative with a stashed inventory; /hub would
+            // walk them out mid-edit. They leave the room via the room's SAVE sign.
+            player.sendMessage(Component.text(
+                    "Finish editing first — save your kit with the sign in the kit room.",
+                    NamedTextColor.RED));
             return true;
         }
         if (state == PlayerState.SPECTATING) {
