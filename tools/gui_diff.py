@@ -57,6 +57,7 @@ def short(item_id: str | None) -> str:
                 "green": "GREEN", "gray": "GRAY", "light_gray": "LGRY", "white": "WHT",
                 "black": "BLK", "red": "RED", "blue": "BLUE", "light_blue": "LBLU",
                 "yellow": "YEL", "lime": "LIME", "orange": "ORNG", "": "GLAS",
+                "weathered_copper": "CHN", "copper": "CHN",
             }.get(base, base[:4].upper())
     return name[:4].upper()
 
