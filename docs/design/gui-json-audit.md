@@ -243,3 +243,67 @@ gui.json 準拠に戻りました**（残り8画面は枠なしのまま）。
 
 > 方針（2026-10-04 確定）: **gui.json が唯一の正**。2026-09-28 の「枠廃止」を含む過去の判断は
 > すべて無視して、全画面を gui.json のグリッドへ合わせる。
+
+---
+
+# プログラムによる差分判別（gui.json ↔ 実装）
+
+**結論: 静的解析では無理、実行時スナップショットなら完全に判別できます。**
+
+`render()` はループ・ヘルパメソッド（`pane()` / `paintFrame` / `MenuScaffold.gridSlot`）・
+条件分岐・実行時データ（キット一覧、パーティ所属、キュー数）で格子を組み立てるため、
+ソースを読んでも正確なグリッドは復元できません。そこで **実際に描画させて JSON に落とし、
+gui.json と機械比較**します。
+
+## 仕組み
+
+```
+  サーバー(ヘッドレス可)                     手元
+  ─────────────────────                    ────────────────────────
+  /guisnapshot all
+        │  GuiSnapshotService が
+        │  renderPublic() で
+        │  ─ 画面は開かない(パケット0)
+        │  ─ インベントリは退避して復元
+        │  ─ ホットバー退避は一時停止
+        ▼
+  plugins/n-arena/gui-snapshots/*.json  ──copy──▶  ./gui-snapshots/
+                                                      │
+                             tools/gui_diff.py ◀──────┘
+                                    │  tools/gui_screen_map.json
+                                    │  (gui.json セーブ名 ↔ スナップショット名)
+                                    ▼
+                             1セル単位の差分表
+```
+
+## 使い方
+
+```bash
+# 1) サーバー側（権限 rumilance.admin、ヘッドレスで可）
+/guisnapshot all                 # 全画面
+/guisnapshot EKIT_SELECT MAIN 0  # 1画面だけ（カテゴリ・ページ指定可）
+
+# 2) 手元にコピーして比較
+cp -r <server>/plugins/n-arena/gui-snapshots ./gui-snapshots
+python3 tools/gui_diff.py                        # 全部
+python3 tools/gui_diff.py --screen "KIT SELECT GUI"
+python3 tools/gui_diff.py --json report.json     # 機械可読
+python3 tools/gui_diff.py --strict               # コンテンツ差異も失敗扱い
+```
+
+- 装飾cell（`*_stained_glass_pane` / `glass_pane` / `*_chain`）の不一致は **FAIL**（直すべき）
+- コンテンツcell（キットアイコン等、実行時に変わるもの）の不一致は **注記**
+- 装飾の不一致が1件でもあれば exit code 1（`--no-fail` で無効化）。将来 CI のゲートに使えます
+- 下段36マス（KIT SELECT のチップパネル等）も、gui.json 側に定義がある画面は比較対象
+
+## ファイル
+
+| ファイル | 役割 |
+|---|---|
+| `src/main/java/com/rumilance/practice/gui/GuiSnapshotService.java` | オフスクリーン描画＋JSON 書き出し |
+| `src/main/java/com/rumilance/practice/command/GuiSnapshotCommand.java` | `/guisnapshot` |
+| `tools/gui_diff.py` | 比較ツール |
+| `tools/gui_screen_map.json` | gui.json セーブ名 ↔ スナップショット名の対応表 |
+
+未マッピングの画面は `gui_screen_map.json` の値を `null` にしておくと
+「no snapshot mapping」として報告されます（現状 `Party setfunc-item-main GUI` が該当）。

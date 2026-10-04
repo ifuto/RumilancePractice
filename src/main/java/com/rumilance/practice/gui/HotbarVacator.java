@@ -26,10 +26,23 @@ public final class HotbarVacator {
     public static final int HOTBAR_SIZE = 9;
 
     private final Map<UUID, ItemStack[]> stash = new ConcurrentHashMap<>();
+    /**
+     * Off switch used by the GUI snapshot tool: rendering a screen must not empty the
+     * operator's hotbar when nothing is actually being opened.
+     */
+    private volatile boolean suspended;
 
     /** True while this player's hotbar is parked in the stash. */
     public boolean isVacated(UUID playerId) {
         return playerId != null && stash.containsKey(playerId);
+    }
+
+    public boolean isSuspended() {
+        return suspended;
+    }
+
+    public void setSuspended(boolean suspended) {
+        this.suspended = suspended;
     }
 
     /**
@@ -37,7 +50,7 @@ public final class HotbarVacator {
      * snapshot, so returning always restores what the player actually held before the chain.
      */
     public void vacate(Player player) {
-        if (player == null || !player.isOnline()) {
+        if (suspended || player == null || !player.isOnline()) {
             return;
         }
         UUID id = player.getUniqueId();

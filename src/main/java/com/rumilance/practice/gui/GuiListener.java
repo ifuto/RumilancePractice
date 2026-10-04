@@ -85,6 +85,11 @@ public final class GuiListener implements Listener {
         this.hotbarVacator = hotbarVacator;
     }
 
+    /** Live view of every registered menu — the GUI snapshot tool renders these offscreen. */
+    public Map<GuiType, AbstractGui> handlers() {
+        return java.util.Collections.unmodifiableMap(handlers);
+    }
+
     private org.bukkit.plugin.Plugin plugin() {
         org.bukkit.plugin.Plugin p = plugin;
         return p != null ? p : org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(GuiListener.class);

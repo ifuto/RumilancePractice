@@ -2487,6 +2487,16 @@ public final class FeatureBootstrap {
                 rankedDuel);
         services.register(com.rumilance.practice.testplayer.TestPlayerService.class, this.testPlayers);
         bind("testplayer", new com.rumilance.practice.testplayer.TestPlayerCommand(this.testPlayers));
+
+        // /guisnapshot — renders every registered menu offscreen into
+        // plugins/n-arena/gui-snapshots/*.json so tools/gui_diff.py can diff them against
+        // docs/design/gui.json. Registered last so guiListener already knows every menu.
+        com.rumilance.practice.gui.GuiSnapshotService snapshots =
+                new com.rumilance.practice.gui.GuiSnapshotService(plugin, guiSessions,
+                        guiListener.handlers(),
+                        services.find(com.rumilance.practice.gui.HotbarVacator.class).orElse(null));
+        services.register(com.rumilance.practice.gui.GuiSnapshotService.class, snapshots);
+        bind("guisnapshot", new com.rumilance.practice.command.GuiSnapshotCommand(snapshots));
         // /bot is the public entry point for the actual bundled QuantumBOT, not the old
         // Java-side PracticeBot selector — except inside FFA, where it toggles the mannequin
         // training dummy (FfaMannequinService) in arenas that turned FFA Bot on, and reports
