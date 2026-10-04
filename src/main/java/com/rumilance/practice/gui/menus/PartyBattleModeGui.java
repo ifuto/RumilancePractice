@@ -66,15 +66,23 @@ public final class PartyBattleModeGui extends AbstractGui {
         String mode = PartyStartBattleGui.normalizeMode(
                 session.get(MODE_KEY, String.class));
         boolean ffa = PartyStartBattleGui.MODE_FFA.equals(mode);
-        // --- mockup frame: light-blue ring rows 0-4, black no-cell row 5 ---
+        // --- docs/design/gui.json「Battle Mode GUI」1:1 ---
+        //   r0 / r4 : light-blue ×9            (上下の帯)
+        //   r5      : black ×9 = 存在しないマス
+        //   r1-r3   : light-blue は両端 col0/col8 のみ。内側 col1-7 は空気。
+        //             (以前は内側まで水色で埋めていた = gui.json と不一致)
         for (int col = 0; col < 9; col++) {
-            inventory.setItem(col, pane(player, Material.LIGHT_BLUE_STAINED_GLASS_PANE));
-            inventory.setItem(GuiSlots.slot(1, col), pane(player, Material.LIGHT_BLUE_STAINED_GLASS_PANE));
-            inventory.setItem(GuiSlots.slot(3, col), pane(player, Material.LIGHT_BLUE_STAINED_GLASS_PANE));
+            inventory.setItem(GuiSlots.slot(0, col), pane(player, Material.LIGHT_BLUE_STAINED_GLASS_PANE));
             inventory.setItem(GuiSlots.slot(4, col), pane(player, Material.LIGHT_BLUE_STAINED_GLASS_PANE));
             inventory.setItem(GuiSlots.slot(5, col),
                     com.rumilance.practice.gui.GuiMockups.noCell(player, messageService));
-            inventory.setItem(GuiSlots.slot(2, col), pane(player, Material.LIGHT_BLUE_STAINED_GLASS_PANE));
+        }
+        for (int row = 1; row <= 3; row++) {
+            inventory.setItem(GuiSlots.slot(row, 0), pane(player, Material.LIGHT_BLUE_STAINED_GLASS_PANE));
+            inventory.setItem(GuiSlots.slot(row, 8), pane(player, Material.LIGHT_BLUE_STAINED_GLASS_PANE));
+            for (int col = 1; col <= 7; col++) {
+                inventory.setItem(GuiSlots.slot(row, col), null);
+            }
         }
 
         // --- modes: Party Fight (2,3) and Party FFA (2,5) ---

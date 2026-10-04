@@ -103,17 +103,24 @@ public final class PartyStartBattleGui extends AbstractGui {
         String mode = normalizeMode(session.get(MODE_KEY, String.class));
         boolean ffa = MODE_FFA.equals(mode);
 
-        // --- mockup frame ---
+        // --- docs/design/gui.json「Party Start Battle GUI」1:1 ---
+        //   r0 / r4 : light-blue ×9            (上下の帯)
+        //   r5      : black ×9 = 存在しないマス
+        //   r1-r3   : light-blue は両端 col0/col8 のみ。内側 col1-7 は空気。
+        //             r1 = BARL(2) / IAXE(4) / MAP(6)、r3 = DSWD(4)、r2 は全て空気。
+        //             (以前は col1/col7 まで水色で埋め、開始ボタンも (3,3) に置いていた)
         for (int col = 0; col < 9; col++) {
-            inventory.setItem(col, pane(player, Material.LIGHT_BLUE_STAINED_GLASS_PANE));
-            inventory.setItem(GuiSlots.slot(1, col), pane(player, Material.LIGHT_BLUE_STAINED_GLASS_PANE));
+            inventory.setItem(GuiSlots.slot(0, col), pane(player, Material.LIGHT_BLUE_STAINED_GLASS_PANE));
             inventory.setItem(GuiSlots.slot(4, col), pane(player, Material.LIGHT_BLUE_STAINED_GLASS_PANE));
             inventory.setItem(GuiSlots.slot(5, col),
                     com.rumilance.practice.gui.GuiMockups.noCell(player, messageService));
-            inventory.setItem(GuiSlots.slot(3, col), col <= 1 || col >= 7
-                    ? pane(player, Material.LIGHT_BLUE_STAINED_GLASS_PANE) : null);
-            inventory.setItem(GuiSlots.slot(2, col), col <= 1 || col >= 7
-                    ? pane(player, Material.LIGHT_BLUE_STAINED_GLASS_PANE) : null);
+        }
+        for (int row = 1; row <= 3; row++) {
+            inventory.setItem(GuiSlots.slot(row, 0), pane(player, Material.LIGHT_BLUE_STAINED_GLASS_PANE));
+            inventory.setItem(GuiSlots.slot(row, 8), pane(player, Material.LIGHT_BLUE_STAINED_GLASS_PANE));
+            for (int col = 1; col <= 7; col++) {
+                inventory.setItem(GuiSlots.slot(row, col), null);
+            }
         }
 
         if (team == null || !team.isOwner(player.getUniqueId())) {
@@ -160,8 +167,8 @@ public final class PartyStartBattleGui extends AbstractGui {
                                 UiTheme.blank(),
                                 UiTheme.hint(line(player, "menu.click")))
                         .action("select_map").build());
-        // --- (3,3) Start Battle ---
-        inventory.setItem(GuiSlots.slot(3, 3),
+        // --- (3,4) Start Battle — 中央列 (gui.json「Party Start Battle GUI」1:1) ---
+        inventory.setItem(GuiSlots.slot(3, 4),
                 ItemBuilder.of(Material.DIAMOND_SWORD)
                         .name(t(player, "gui.party-launch-go").color(UiTheme.SUCCESS))
                         .lore(UiTheme.divider(),

@@ -28,8 +28,8 @@
 | 2 | KIT SELECT GUI | `EkitSelectGui#renderKitSelect` | ✅ 一致（v1.92.37 で修正） | bottom 13/31 が灰色→**ライムに修正済み** |
 | 3 | KIT EDIT GUI | `EditKitGui` | ❌ 不一致 | r1 の緑バー9枠なし / r2-5 の透明 `glass_pane` 36枠なし |
 | 4 | Duel Request GUI | `DuelRequestGui` | ❌ 不一致 | 枠なし。橙17・LGRY12・黒9・CHN6 の構成が未実装 |
-| 5 | Battle Mode GUI | `BattleMenuGui` | ❌ 不一致 | LBLU24 + 黒9 の枠が未実装 |
-| 6 | Party Start Battle GUI | `PartyStartBattleGui` | ❌ 一部 | LBLU はあるが 24枠の外枠＋黒9の下段が未実装 |
+| 5 | Battle Mode GUI | `PartyBattleModeGui` | ✅ 一致（v1.92.39 で修正） | 内側 col1-7 まで水色で埋めていた→**両端のみで中は空気** |
+| 6 | Party Start Battle GUI | `PartyStartBattleGui` | ✅ 一致（v1.92.39 で修正） | col1/7 の余分な水色を除去、**開始ボタンを (3,3)→(3,4)** へ |
 | 7 | Danger Settings GUI | `SettingsGui`（危険設定） | ❌ 不一致 | 赤24 + 黒9 の枠が未実装 |
 | 8 | Party Config GUI | `TeamConfigGui` | ❌ 不一致 | 白24 + LGRY20 + 赤3 の市松が未実装 |
 | 9 | Party MAIN GUI | `TeamHubGui` | ❌ 不一致 | 赤/青の陣営カラム・灰10・LGRY4 が未実装 |
@@ -236,9 +236,10 @@ gui.json 準拠に戻りました**（残り8画面は枠なしのまま）。
 ## 次の一手（提案）
 
 1. `KIT EDIT GUI` — /ekit 導線のど真ん中。r1 緑バー + r2-5 透明ガラス36枠を追加（影響範囲が閉じている）
-2. `Battle Mode GUI` / `Party Start Battle GUI` — 同じ LBLU + 黒の枠体系なので2画面まとめて
-3. `Danger Settings GUI` — 赤 + 黒
-4. `Party Config GUI` / `Party MAIN GUI` — パーティ系は TeamService の状態表示と絡むため最後
-5. `Duel Request GUI` — 2026-09-28 の「左右対称・主役中央」リデザインを**意図的に**採用しているので、
-   gui.json へ戻すかは要相談（レイアウト思想が競合します）
-6. `Party setfunc-item-main GUI` — 対応クラスの特定から
+2. `Danger Settings GUI` — 赤24 + 黒9
+3. `Party Config GUI` / `Party MAIN GUI` — パーティ系は TeamService の状態表示と絡むので2画面まとめて
+4. `Duel Request GUI`
+5. `Party setfunc-item-main GUI` — 対応クラスの特定から
+
+> 方針（2026-10-04 確定）: **gui.json が唯一の正**。2026-09-28 の「枠廃止」を含む過去の判断は
+> すべて無視して、全画面を gui.json のグリッドへ合わせる。
