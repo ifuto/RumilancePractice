@@ -23,25 +23,27 @@ public final class KitLayoutEditor {
      * @return layout index 0-40, or -1 for chrome (save/back/decorations).
      */
     public static int layoutIndexForGuiSlot(int guiSlot) {
-        if (guiSlot < 0 || guiSlot >= 45) {
+        if (guiSlot < 0 || guiSlot >= 54) {
             return -1;
         }
         int row = guiSlot / 9;
         int col = guiSlot % 9;
         if (row == 0) {
+            // KIT EDIT GUI mockup armor row: helmet/chest/legs/boots at cols 0-3, shield
+            // (off hand) at col 5; col 4 is decor, cols 6-8 are decor/save/reset chrome.
             return switch (col) {
-                case 1 -> 36;
-                case 2 -> 37;
-                case 3 -> 38;
-                case 4 -> 39;
-                case 6 -> 40;
+                case 0 -> 36;
+                case 1 -> 37;
+                case 2 -> 38;
+                case 3 -> 39;
+                case 5 -> 40;
                 default -> -1;
             };
         }
-        if (row >= 1 && row <= 3) {
-            return 9 + (row - 1) * 9 + col;
+        if (row >= 2 && row <= 4) {
+            return 9 + (row - 2) * 9 + col;
         }
-        if (row == 4) {
+        if (row == 5) {
             return col;
         }
         return -1;
@@ -53,17 +55,17 @@ public final class KitLayoutEditor {
 
     public static int guiSlotForLayoutIndex(int layoutIndex) {
         if (layoutIndex >= 0 && layoutIndex <= 8) {
-            return 36 + layoutIndex;
+            return 45 + layoutIndex;
         }
         if (layoutIndex >= 9 && layoutIndex <= 35) {
-            return 9 + (layoutIndex - 9);
+            return 18 + (layoutIndex - 9);
         }
         return switch (layoutIndex) {
-            case 36 -> 1;
-            case 37 -> 2;
-            case 38 -> 3;
-            case 39 -> 4;
-            case 40 -> 6;
+            case 36 -> 0;
+            case 37 -> 1;
+            case 38 -> 2;
+            case 39 -> 3;
+            case 40 -> 5;
             default -> -1;
         };
     }

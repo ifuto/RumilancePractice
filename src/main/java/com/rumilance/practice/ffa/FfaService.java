@@ -215,6 +215,7 @@ public final class FfaService {
     private final KitLayoutCache layoutCache;
     /** Selected KIT slot per player for the declared crystal FFA kit (null = feature off). */
     private volatile com.rumilance.practice.kit.CrystalFfaStore crystalFfaStore;
+    private volatile com.rumilance.practice.kit.KitVariantsStore kitVariantsStore;
     private final LobbyService lobbyService;
     private final PlayerStateManager stateManager;
     private final FfaStatsRepository ffaStatsRepository;
@@ -1187,6 +1188,11 @@ public final class FfaService {
         this.crystalFfaStore = store;
     }
 
+    /** Per-kit K1..K4 variant slots. FFA is Active Only: spawns the ACTIVE slot's layout. */
+    public void setKitVariantsStore(com.rumilance.practice.kit.KitVariantsStore store) {
+        this.kitVariantsStore = store;
+    }
+
     /** Spawn coordinate for the vanilla respawn event — kit apply happens in {@link #respawn}. */
     public Location respawnLocation(Player player) {
         String arenaId = playerArena.get(player.getUniqueId());
@@ -2056,6 +2062,17 @@ public final class FfaService {
             // to the kit's official layout when that slot was never saved).
             int variant = crystalFfaStore.selectedVariant(player.getUniqueId());
             String variantKey = com.rumilance.practice.kit.CrystalFfaStore.variantKey(
+                    kit.name(), variant);
+            layoutCache.loadSyncIfAbsent(player.getUniqueId(), variantKey);
+            if (layoutCache.get(player.getUniqueId(), variantKey).isPresent()) {
+                layoutKey = variantKey;
+            }
+        } else if (kitVariantsStore != null) {
+            // General kits: Active Only — FFA spawns the kit's ACTIVE K1..K4 slot's layout
+            // (falls back to the kit's base layout when that slot was never saved). There is
+            // deliberately no /k-style in-FFA switching for these.
+            int variant = kitVariantsStore.selected(player.getUniqueId(), kit.name());
+            String variantKey = com.rumilance.practice.kit.KitVariantsStore.variantKey(
                     kit.name(), variant);
             layoutCache.loadSyncIfAbsent(player.getUniqueId(), variantKey);
             if (layoutCache.get(player.getUniqueId(), variantKey).isPresent()) {

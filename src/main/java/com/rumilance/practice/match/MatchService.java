@@ -311,9 +311,15 @@ public final class MatchService {
     /** Per-player crystal variant store: queue/duel fights on a crystal FFA kit spawn every
      * player with THEIR active KIT slot (KIT1..9) instead of the shared official layout. */
     private volatile com.rumilance.practice.kit.CrystalFfaStore crystalFfaStore;
+    private volatile com.rumilance.practice.kit.KitVariantsStore kitVariantsStore;
 
     public void setCrystalFfaStore(com.rumilance.practice.kit.CrystalFfaStore crystalFfaStore) {
         this.crystalFfaStore = crystalFfaStore;
+    }
+
+    /** Per-kit K1..K4 variant slots (general kits; the ACTIVE slot's layout enters fights). */
+    public void setKitVariantsStore(com.rumilance.practice.kit.KitVariantsStore kitVariantsStore) {
+        this.kitVariantsStore = kitVariantsStore;
     }
 
     /** Rules kits synthesized from original-kit settings, keyed by synthetic kit name. */
@@ -1152,6 +1158,21 @@ public final class MatchService {
                         // when the slot was never saved.
                         int variant = crystalFfaStore.selectedVariant(id);
                         String variantKey = com.rumilance.practice.kit.CrystalFfaStore
+                                .variantKey(rulesKit.name(), variant);
+                        layoutCache.loadSyncIfAbsent(id, variantKey);
+                        ItemStack[] mine = layoutCache.get(id, variantKey).orElse(null);
+                        if (mine != null) {
+                            applyKit(player, rulesKit, mine);
+                        } else {
+                            applyKit(player, playerKit, session);
+                        }
+                    } else if (!ownKitOverride && kitVariantsStore != null && rulesKit != null) {
+                        // General K1..K4 (per-kit variants, LT Vanilla style): the fight uses
+                        // the player's ACTIVE slot's layout, falling back to the shared layout
+                        // when that slot was never saved. FFA-equivalents have no in-fight
+                        // switching — Active Only.
+                        int variant = kitVariantsStore.selected(id, rulesKit.name());
+                        String variantKey = com.rumilance.practice.kit.KitVariantsStore
                                 .variantKey(rulesKit.name(), variant);
                         layoutCache.loadSyncIfAbsent(id, variantKey);
                         ItemStack[] mine = layoutCache.get(id, variantKey).orElse(null);

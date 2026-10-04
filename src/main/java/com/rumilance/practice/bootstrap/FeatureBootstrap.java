@@ -1193,9 +1193,17 @@ public final class FeatureBootstrap {
         OriginalKitGui originalKitGui = new OriginalKitGui(guiSessions, soundService, originalKitService);
         originalKitGui.setSlotMenuGui(originalKitSlotMenuGui);
 
+        // General K1..K4 per-kit variant slots (LT Vanilla style): every kit gets four
+        // editable layouts and one ACTIVE slot. Duels/queue spawn the active slot's layout;
+        // FFA is Active Only (no in-FFA switching — that stays Crystal FFA's /k).
+        com.rumilance.practice.kit.KitVariantsStore kitVariantsStore =
+                new com.rumilance.practice.kit.KitVariantsStore(
+                        com.rumilance.practice.PluginIdentity
+                                .dataFile(plugin, "kit-variants.properties").toPath());
         EkitSelectGui ekitSelectGui = new EkitSelectGui(guiSessions, soundService, kitService);
         ekitSelectGui.setEditKitGui(editKitGui);
         ekitSelectGui.setOriginalKitGui(originalKitGui);
+        ekitSelectGui.setKitVariantsStore(kitVariantsStore);
         editKitGui.setEkitSelectGui(ekitSelectGui);
         // Crystal FFA: the declared crystal FFA kit edits through the 4-row KIT1..9 picker;
         // each slot keeps its own layout and FFA spawns the selected variant.
@@ -1229,8 +1237,11 @@ public final class FeatureBootstrap {
         duelRequestGui.setInnerKits(innerKits);
         matchService.setInnerKits(innerKits);
         ffaService.setCrystalFfaStore(crystalFfaStore);
-        // Queue/duel fights on the crystal kit also use each player's ACTIVE KIT slot now.
+        ffaService.setKitVariantsStore(kitVariantsStore);
+        // Queue/duel fights on the crystal kit also use each player's ACTIVE KIT slot now;
+        // every other kit uses the ACTIVE K1..K4 variant slot (Active Only).
         matchService.setCrystalFfaStore(crystalFfaStore);
+        matchService.setKitVariantsStore(kitVariantsStore);
         // /k quick picker: nine KIT buttons, one click equips (crystal FFA entry hands out
         // nothing, so this is how a fighter gears up after joining or respawning a life).
         com.rumilance.practice.gui.menus.CrystalKitQuickGui crystalKitQuickGui =

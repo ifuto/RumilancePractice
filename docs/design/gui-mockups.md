@@ -120,3 +120,47 @@ editor / shift=reset everyone). row2: punishments (click=lift all + cache evict)
 force-end · TNT FULL WIPE (shift = rank→NORM + stats + ekits + originals + WL + locale +
 color + punishments). Chat whitelist here is the per-player chat filter
 (`PlayerSettings.chatWhitelist()`), the same set edited from SettingsGui.
+
+## Kit variants (K1..K4) — saves v2 mockups (2026-10-04)
+
+> 注: ユーザー貼付の saves v2 JSON (10 GUI分) はchat compactで消失したため、この節は
+> その要約 (Cell配置・アイテム・ヘッダ) から復元した仕様記録。JSONそのものは未保存。
+
+### 機能要件
+
+- キットごとに K1..K4 のレイアウトを設定できる (LT Vanilla の番号キットと同じ感覚。GUIは別物)。
+- K選択は 本 (WRITABLE_BOOK) = Active / 紙 (PAPER) = Not Active。キットごとに1スロットがActive。
+- FFAに /k 等のコマンドは作らない — **Active Only** (試合/FFA開始時、active Kのレイアウトのみ適用)。
+- Crystal FFA の KIT1..9 (/#v<n>・/k) は既存のまま別系統 (#k と #v のキー空間は分離)。
+
+### KIT EDIT GUI (EditKitGui 6-row 再設計)
+
+row0: 防具4 (helmet/chest/legs/boots, cols0-3) + gray装飾 (col4) + 盾OFF HAND (col5) +
+gray装飾 (col6) + lime_wool SAVE (col7) + yellow_wool RESET (col8)。
+row1: 緑pane装飾 + BACK (中央)。
+rows2-4: キット中身27 (player inv 9-35)。 row5: HotBar9 (inv 0-8)。
+
+### KIT SELECT GUI (EkitSelectGui カテゴリ画面)
+
+main36ベース: slot19-25 (row2) にキットグリッド、K選択行 = 本KIT1/紙KIT2-4 + lime装飾の
+セパレータ、他gray/緑pane装飾、row5にBack barrier。実装: グリッド rows1-3 (21枠/頁)、
+chips row4 cols 2,3,5,6 (lime pane cols 1,4,7)。キット1回目クリック=選択 (glint・chipsが
+そのキットに切替)、2回目クリック=KIT EDIT GUI (active K)。chip クリック=Active切替 (即時保存)。
+
+### MAIN KIT SELECTER (EkitSelectGui 選択画面)
+
+container54: 緑pane + weathered copper chain装飾枠、MAIN KITS (wild trim) (2,2) /
+SUB KITS (bolt trim) (2,6) / SWORD (diamond_sword) (3,4)。SWORD = ffaEnabled キット一覧
+(FFA は Active Only の注記付き)。main36 = null (2択画面に下段不要)。
+
+### 既存7GUI (saves v2 正式デザイン・実装指示は明言なし)
+
+Duel Request (Opponent head + Select a Kit barrel + Select a Map map + Send Request sword +
+FT:∞ gapple + Select a KB slime + 黒「存在しないマス」枠) / Battle Mode (Party Fight sword /
+Party FFA end_crystal) / Party Start Battle (Select a Kit / Battle Mode iron axe / Map /
+Start Battle sword) / Danger Settings (Transfer OWNER blaze_rod / Disband Party barrier /
+BAN List oak_sign) / Party Config (Friendly Fire TNT / Team Settings comparator / Public
+Party lime_dye / Danger Settings redstone_block / Party ID name_tag / Player List head) /
+Party MAIN (red/blue wool人数 + owner head + Random Split pearl + Invite + member head
+グリッド + Page/spyglass See other team) / Party setfunc-item-main (partyリスト: head
+PlayerK's Team 等 + No party available + Update Data clock + Back/Next + Create a Party)。
