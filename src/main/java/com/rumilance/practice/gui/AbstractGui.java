@@ -28,6 +28,12 @@ public abstract class AbstractGui {
     protected final boolean rankedBorder;
     private PlayerStateManager stateManager;
     private MessageService messages;
+    /**
+     * Empties the player's hotbar while this menu is open (user spec 2026-10-04: 「GUI開いた際は
+     * ホットバー空にする」). Wired by {@code GuiListener#register}. Menus that already own the
+     * player's own inventory rows ({@link BottomInventoryClickHandler}) are skipped here.
+     */
+    private volatile HotbarVacator hotbarVacator;
 
     protected AbstractGui(GuiSessionRegistry registry, SoundService sounds, GuiType type, int rows, boolean rankedBorder) {
         this.registry = Objects.requireNonNull(registry);
@@ -47,6 +53,23 @@ public abstract class AbstractGui {
 
     public void setMessages(MessageService messages) {
         this.messages = messages;
+    }
+
+    public void setHotbarVacator(HotbarVacator hotbarVacator) {
+        this.hotbarVacator = hotbarVacator;
+    }
+
+    /**
+     * Parks the player's hotbar for the duration of this menu. Menus that paint the player's own
+     * inventory rows themselves ({@link BottomInventoryClickHandler} — the KIT SELECT chip panel
+     * and the kit/preset editors) keep their own snapshot, so they must not be double-stashed.
+     */
+    private void vacateHotbar(Player player) {
+        HotbarVacator vacator = this.hotbarVacator;
+        if (vacator == null || player == null || this instanceof BottomInventoryClickHandler) {
+            return;
+        }
+        vacator.vacate(player);
     }
 
     protected MessageService messages() {
@@ -138,6 +161,7 @@ public abstract class AbstractGui {
         PracticeGuiHolder holder = new PracticeGuiHolder(session.sessionId(), type, rows);
         Inventory inventory = Bukkit.createInventory(holder, rows * 9, title(player, session));
         holder.bind(inventory);
+        vacateHotbar(player);
         render(player, session, inventory);
         player.openInventory(inventory);
         sounds.play(player, "gui-open");
@@ -156,6 +180,7 @@ public abstract class AbstractGui {
     }
 
     public final void renderPublic(Player player, GuiSession session, Inventory inventory) {
+        vacateHotbar(player);
         inventory.clear();
         render(player, session, inventory);
     }

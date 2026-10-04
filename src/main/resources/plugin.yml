@@ -199,6 +199,10 @@ commands:
     description: Create or delete temporary smooth terrain test maps (side length selectable).
     usage: /testarena <spawn [size] [map]|delete [id|all]|list|cancel>
     permission: rumilance.admin
+  testplayer:
+    description: Spawn a stand-in opponent for solo action tests (auto-accepts duel requests).
+    usage: /testplayer <spawn [name]|despawn <name|all>|list>
+    permission: rumilance.admin
   team:
     description: Owner-invite style teams with public/private visibility and red-blue team battles.
     usage: /team <gui|create|invite|join|decline|leave|kick|public|list|info|side|autosplit|clearsides|start|disband|spectate>

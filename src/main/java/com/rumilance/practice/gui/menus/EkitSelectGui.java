@@ -383,11 +383,14 @@ public final class EkitSelectGui extends AbstractGui
         for (int i = 0; i < 9; i++) {
             inv.setItem(i, gray);                       // bottom panel row 0
         }
+        // docs/design/gui.json「KIT SELECT GUI」main36 と 1:1。中央のアサインセル(inv 22)は
+        // 上下左右をライムで囲む: 左右 21/23、上 13、下 31。その外側の四隅が緑 12/14/30/32。
+        // (以前は 13/31 が三項演算の else に落ちて灰色になり、ライムの十字が縦に欠けていた)
         for (int i = 9; i < 18; i++) {
-            inv.setItem(i, i == 12 || i == 14 ? green : gray);
+            inv.setItem(i, i == 13 ? lime : (i == 12 || i == 14) ? green : gray);
         }
         for (int i = 27; i < 36; i++) {
-            inv.setItem(i, i == 30 || i == 32 ? green : gray);
+            inv.setItem(i, i == 31 ? lime : (i == 30 || i == 32) ? green : gray);
         }
         for (int i = 18; i < 27; i++) {
             inv.setItem(i, i == 21 || i == 23 ? lime : gray);

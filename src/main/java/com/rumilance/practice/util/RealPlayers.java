@@ -5,6 +5,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * The real-player view of the server. Practice bots are real {@link PacketBot fake
@@ -18,11 +19,39 @@ import java.util.List;
  */
 public final class RealPlayers {
 
+    /**
+     * Fake players that must be treated as real ones: the {@code /testplayer} spawns. They are
+     * {@link PacketBot}s under the hood (so they can stand in a lobby, hold a kit and fight),
+     * but their whole purpose is to impersonate a real opponent for operator smoke tests — so
+     * they belong in the player list, the online count and every duel picker.
+     */
+    private static final java.util.Set<UUID> HONORARY = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     private RealPlayers() {
+    }
+
+    /** Starts counting a fake player as a real one (see {@link #HONORARY}). */
+    public static void include(UUID playerId) {
+        if (playerId != null) {
+            HONORARY.add(playerId);
+        }
+    }
+
+    /** Stops counting a fake player as a real one. */
+    public static void exclude(UUID playerId) {
+        if (playerId != null) {
+            HONORARY.remove(playerId);
+        }
     }
 
     /** True when the player is one of the plugin's fake bot players. */
     public static boolean isBot(Player player) {
+        if (player == null) {
+            return false;
+        }
+        if (HONORARY.contains(player.getUniqueId())) {
+            return false;
+        }
         return PacketBot.isBot(player);
     }
 

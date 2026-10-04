@@ -274,6 +274,8 @@ public final class FeatureBootstrap {
     /** {@code /bot} inside FFA: the unkillable mannequin training dummy. */
     private com.rumilance.practice.ffa.FfaMannequinService ffaMannequins;
     private TeamGlowLosService teamGlowLosService;
+    /** {@code /testplayer} — stand-in opponents for solo action tests. */
+    private com.rumilance.practice.testplayer.TestPlayerService testPlayers;
 
     public FeatureBootstrap(RumilancePractice plugin, ServiceRegistry services) {
         this.plugin = plugin;
@@ -338,6 +340,15 @@ public final class FeatureBootstrap {
 
         LobbyService lobbyService = new LobbyService(configService);
         services.register(LobbyService.class, lobbyService);
+
+        // Menu-open hotbar parking (user spec 2026-10-04: 「GUI開いた際はホットバー空にする」).
+        // Created before any GUI so GuiListener#register can hand it to every menu, and wired
+        // into the lobby so a full lobby re-apply drops a parked hotbar instead of restoring
+        // stale items over the fresh rows.
+        com.rumilance.practice.gui.HotbarVacator hotbarVacator =
+                new com.rumilance.practice.gui.HotbarVacator();
+        services.register(com.rumilance.practice.gui.HotbarVacator.class, hotbarVacator);
+        lobbyService.setHotbarVacator(hotbarVacator);
 
         KitService kitService = new KitService(configService);
         // A regular kit converted into a folder keeps its OLD inventory arrangements and ranked
@@ -1397,6 +1408,10 @@ public final class FeatureBootstrap {
                 plugin, practiceService, stateManager));
 
         GuiListener guiListener = new GuiListener(guiSessions, stateManager, originalKitService, messageService);
+        // Every menu registered below inherits the vacator through GuiListener#register, so the
+        // hotbar empties on open (and is handed back on close) without touching 77 menu classes.
+        guiListener.setHotbarVacator(
+                services.get(com.rumilance.practice.gui.HotbarVacator.class));
         // Wire deferred detail GUI registration (detail factory was set up before guiListener existed).
         for (ArenaDetailGui detail : detailCache.values()) {
             guiListener.register(detail);
@@ -2463,6 +2478,15 @@ public final class FeatureBootstrap {
         botSelectGui.setQuantumRuntime(this.quantum);
         bind("quantum", new com.rumilance.practice.quantum.QuantumCommand(plugin, this.quantum,
                 this.quantumBots));
+
+        // /testplayer — operator smoke-test doubles. They need the fake-player registry (which
+        // only exists from here on), the session/state managers so every guard accepts them, and
+        // the duel command so an incoming Duel Request is accepted exactly like a human would.
+        this.testPlayers = new com.rumilance.practice.testplayer.TestPlayerService(
+                plugin, this.quantumBots, sessionManager, stateManager, duelRequestService,
+                rankedDuel);
+        services.register(com.rumilance.practice.testplayer.TestPlayerService.class, this.testPlayers);
+        bind("testplayer", new com.rumilance.practice.testplayer.TestPlayerCommand(this.testPlayers));
         // /bot is the public entry point for the actual bundled QuantumBOT, not the old
         // Java-side PracticeBot selector — except inside FFA, where it toggles the mannequin
         // training dummy (FfaMannequinService) in arenas that turned FFA Bot on, and reports
@@ -2476,6 +2500,12 @@ public final class FeatureBootstrap {
     }
 
     public void disable() {
+        // Before Quantum tears down the fake-player registry: test doubles are fake players, and
+        // leaving them behind would strand them in the world across a reload.
+        if (this.testPlayers != null) {
+            this.testPlayers.shutdown();
+            this.testPlayers = null;
+        }
         if (this.quantum != null) {
             this.quantum.disable();
             this.quantum = null;

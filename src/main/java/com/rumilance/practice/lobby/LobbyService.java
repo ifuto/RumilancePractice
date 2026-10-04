@@ -31,6 +31,13 @@ public final class LobbyService {
     private volatile java.util.function.Consumer<Player> sightHook;
     /** When true, default lobby inventory is skipped (e.g. party hotbar). */
     private volatile java.util.function.Function<Player, Boolean> hubInventoryCustomizer;
+    /** Hotbar parking for open menus (user spec 2026-10-04); null = feature disabled. */
+    private volatile com.rumilance.practice.gui.HotbarVacator hotbarVacator;
+
+    /** Wired from bootstrap: lets the lobby drop a menu's parked hotbar on a full re-apply. */
+    public void setHotbarVacator(com.rumilance.practice.gui.HotbarVacator hotbarVacator) {
+        this.hotbarVacator = hotbarVacator;
+    }
 
     public LobbyService(ConfigService configService) {
         this.configService = Objects.requireNonNull(configService);
@@ -242,6 +249,12 @@ public final class LobbyService {
     }
 
     public void applyLobbyInventory(Player player) {
+        // This call re-writes the whole inventory (hotbar included) from the saved lobby
+        // standard, so any hotbar a menu parked is now redundant — drop it instead of restoring
+        // it afterwards, which would fight the rows this method has just filled.
+        if (hotbarVacator != null) {
+            hotbarVacator.drop(player.getUniqueId());
+        }
         // 1.92.32: the admin region selector (FFA/arena selection wand, PDC adminTool) must
         // survive the reset — since the functional-item reset shipped, opening any lobby GUI
         // wiped it from the operator's inventory ("FFAの選択ツールがなくなっちゃってる").

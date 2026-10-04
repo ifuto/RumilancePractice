@@ -37,6 +37,8 @@ public final class GuiListener implements Listener {
     private final OriginalKitService originalKitService;
     private final MessageService messages;
     private final Map<GuiType, AbstractGui> handlers = new EnumMap<>(GuiType.class);
+    /** Hotbar parking for open menus (user spec 2026-10-04); null = feature disabled. */
+    private volatile HotbarVacator hotbarVacator;
 
     /**
      * GUIs whose underlying data can change WHILE the player is looking at them (other
@@ -78,6 +80,11 @@ public final class GuiListener implements Listener {
         this.plugin = plugin;
     }
 
+    /** Wired from bootstrap: empties the hotbar while a menu is open and restores it after. */
+    public void setHotbarVacator(HotbarVacator hotbarVacator) {
+        this.hotbarVacator = hotbarVacator;
+    }
+
     private org.bukkit.plugin.Plugin plugin() {
         org.bukkit.plugin.Plugin p = plugin;
         return p != null ? p : org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(GuiListener.class);
@@ -88,6 +95,9 @@ public final class GuiListener implements Listener {
         gui.setStateManager(stateManager);
         if (messages != null) {
             gui.setMessages(messages);
+        }
+        if (hotbarVacator != null) {
+            gui.setHotbarVacator(hotbarVacator);
         }
     }
 
@@ -533,6 +543,18 @@ public final class GuiListener implements Listener {
             boolean navigating = originalKitService.consumeNavigating(player.getUniqueId());
             if (!navigating && originalKitService.isStashed(player.getUniqueId())) {
                 originalKitService.abortFlow(player.getUniqueId());
+            }
+        }
+        // Hand the hotbar back now that the menu chain is over — but only when the player really
+        // landed back in the lobby. Someone who accepted a duel / joined a queue / entered FFA
+        // from this screen is in a state that owns their inventory (kit, leave-queue dye, ...);
+        // restoring there would hand lobby items into a live fight. Their stash stays parked and
+        // is dropped by LobbyService#applyLobbyInventory when they next return to the lobby.
+        HotbarVacator vacator = this.hotbarVacator;
+        if (vacator != null) {
+            PlayerState settled = stateManager.getState(player.getUniqueId());
+            if (settled == PlayerState.LOBBY || settled == PlayerState.IDLE) {
+                vacator.restore(player);
             }
         }
     }
