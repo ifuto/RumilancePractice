@@ -1,0 +1,4009 @@
+{
+  "version": 2,
+  "saves": [
+    {
+      "id": "29929294-52a6-4596-97e5-b2c51b4c74ac",
+      "name": "KIT EDIT GUI",
+      "createdAt": 1791074933474,
+      "main": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {
+          "x": -1182,
+          "y": 40,
+          "z": -595
+        },
+        "items": [
+          {
+            "id": "minecraft:diamond_helmet",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装備"
+            }
+          },
+          {
+            "id": "minecraft:diamond_chestplate",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装備"
+            }
+          },
+          {
+            "id": "minecraft:diamond_leggings",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装備"
+            }
+          },
+          {
+            "id": "minecraft:diamond_boots",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装備"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:shield",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "OFF HAND"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:lime_wool",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "save"
+            }
+          },
+          {
+            "id": "minecraft:yellow_wool",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "reset"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身(HotBar)"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身(HotBar)"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身(HotBar)"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身(HotBar)"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身(HotBar)"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身(HotBar)"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身(HotBar)"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身(HotBar)"
+            }
+          },
+          {
+            "id": "minecraft:glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "ここにキットの中身(HotBar)"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "744f7fb4-b4eb-4d32-b976-a766eb34c434",
+      "name": "KIT SELECT GUI",
+      "createdAt": 1791074637913,
+      "main": [
+        {
+          "id": "minecraft:gray_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:gray_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:gray_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:gray_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:gray_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:gray_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:gray_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:gray_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:gray_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:gray_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:gray_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:gray_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:green_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:lime_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:green_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:gray_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:gray_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:gray_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:gray_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:book",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "KIT 1"
+          }
+        },
+        {
+          "id": "minecraft:paper",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "KIT 2"
+          }
+        },
+        {
+          "id": "minecraft:lime_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        null,
+        {
+          "id": "minecraft:lime_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:paper",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "KIT 3"
+          }
+        },
+        {
+          "id": "minecraft:paper",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "KIT 4"
+          }
+        },
+        {
+          "id": "minecraft:gray_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:gray_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:gray_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:gray_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:green_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:lime_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:green_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:gray_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:gray_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:gray_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        }
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {
+          "x": -1182,
+          "y": 40,
+          "z": -598
+        },
+        "items": [
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:wild_armor_trim_smithing_template",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "MAIN KITS"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:weathered_copper_chain",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:diamond_axe",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "きっと1"
+            }
+          },
+          {
+            "id": "minecraft:diamond_pickaxe",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "きっと2"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:weathered_copper_chain",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:weathered_copper_chain",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:weathered_copper_chain",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:weathered_copper_chain",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:weathered_copper_chain",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:weathered_copper_chain",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:weathered_copper_chain",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:barrier",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Back"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "6aacd784-ce32-436a-be81-e7a946f550ce",
+      "name": "MAIN KIT SELECTER",
+      "createdAt": 1791073984753,
+      "main": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {
+          "x": -1182,
+          "y": 40,
+          "z": -601
+        },
+        "items": [
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:weathered_copper_chain",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "id": "minecraft:weathered_copper_chain",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:weathered_copper_chain",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          null,
+          {
+            "id": "minecraft:wild_armor_trim_smithing_template",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "MAIN KITS"
+            }
+          },
+          null,
+          null,
+          null,
+          {
+            "id": "minecraft:bolt_armor_trim_smithing_template",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "SUB KITS"
+            }
+          },
+          null,
+          {
+            "id": "minecraft:weathered_copper_chain",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:weathered_copper_chain",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          null,
+          null,
+          null,
+          {
+            "id": "minecraft:diamond_sword",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "SWORD"
+            }
+          },
+          null,
+          null,
+          null,
+          {
+            "id": "minecraft:weathered_copper_chain",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:weathered_copper_chain",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "id": "minecraft:weathered_copper_chain",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:green_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "15e2354c-4554-4c39-8bf0-e7dc72bb2a7e",
+      "name": "Party setfunc-item-main GUI",
+      "createdAt": 1791025030240,
+      "main": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        {
+          "id": "minecraft:yellow_stained_glass_pane",
+          "count": 44
+        },
+        {
+          "id": "minecraft:white_stained_glass_pane",
+          "count": 58,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        {
+          "id": "minecraft:light_gray_stained_glass_pane",
+          "count": 38,
+          "components": {
+            "minecraft:custom_name": "No party available"
+          }
+        }
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {
+          "x": -1182,
+          "y": 40,
+          "z": -603
+        },
+        "items": [
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1,
+            "components": {
+              "minecraft:profile": {
+                "name": "PlayerK"
+              },
+              "minecraft:custom_name": "PlayerK's Team"
+            }
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1,
+            "components": {
+              "minecraft:profile": {
+                "name": "PlayerF"
+              },
+              "minecraft:custom_name": "PlayerF's Team"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "No party available"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "No party available"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "No party available"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "No party available"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "No party available"
+            }
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "No party available"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "No party available"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "No party available"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "No party available"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "No party available"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "No party available"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "No party available"
+            }
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "No party available"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "No party available"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "No party available"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "No party available"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "No party available"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "No party available"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "No party available"
+            }
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "No party available"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "No party available"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "No party available"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "No party available"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "No party available"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "No party available"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "No party available"
+            }
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:clock",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Update Data"
+            }
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:arrow",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "(If it had before page)Back"
+            }
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:arrow",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "(If it had next page)Next"
+            }
+          },
+          {
+            "id": "minecraft:yellow_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:writable_book",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Create a Party"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "652e2f98-c119-473b-875d-12bf18e5e508",
+      "name": "Duel Request GUI",
+      "createdAt": 1791023952198,
+      "main": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        {
+          "id": "minecraft:white_stained_glass_pane",
+          "count": 60,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {
+          "x": -1182,
+          "y": 40,
+          "z": -605
+        },
+        "items": [
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:orange_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:orange_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:orange_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:orange_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1,
+            "components": {
+              "minecraft:profile": {
+                "name": "Opponent"
+              }
+            }
+          },
+          {
+            "id": "minecraft:orange_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:orange_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:orange_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:orange_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:copper_chain",
+            "count": 1
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:barrel",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Select a Kit"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:map",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Select a Map"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:copper_chain",
+            "count": 1
+          },
+          {
+            "id": "minecraft:copper_chain",
+            "count": 1
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:diamond_sword",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Send Request"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:copper_chain",
+            "count": 1
+          },
+          {
+            "id": "minecraft:copper_chain",
+            "count": 1
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:golden_apple",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "FT : ∞"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:slime_block",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Select a KB"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:copper_chain",
+            "count": 1
+          },
+          {
+            "id": "minecraft:orange_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:orange_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:orange_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:orange_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:orange_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:orange_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:orange_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:orange_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:orange_stained_glass_pane",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "aaa82082-97bd-480f-bf96-6beda73ddd6c",
+      "name": "Battle Mode GUI",
+      "createdAt": 1791018095284,
+      "main": [
+        {
+          "id": "minecraft:netherite_sword",
+          "count": 1
+        },
+        {
+          "id": "minecraft:lead",
+          "count": 2
+        },
+        {
+          "id": "minecraft:leather",
+          "count": 2
+        },
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {
+          "x": -1180,
+          "y": 40,
+          "z": -595
+        },
+        "items": [
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          null,
+          null,
+          {
+            "id": "minecraft:diamond_sword",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Party Fight"
+            }
+          },
+          null,
+          {
+            "id": "minecraft:end_crystal",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Party FFA"
+            }
+          },
+          null,
+          null,
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "041cf4a8-2964-4e54-a33d-2af1ad5864a2",
+      "name": "Party Start Battle GUI",
+      "createdAt": 1791018020578,
+      "main": [
+        {
+          "id": "minecraft:netherite_sword",
+          "count": 1
+        },
+        {
+          "id": "minecraft:lead",
+          "count": 2
+        },
+        {
+          "id": "minecraft:leather",
+          "count": 2
+        },
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {
+          "x": -1180,
+          "y": 40,
+          "z": -596
+        },
+        "items": [
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          null,
+          {
+            "id": "minecraft:barrel",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Select a Kit"
+            }
+          },
+          null,
+          {
+            "id": "minecraft:iron_axe",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Select a Battle Mode"
+            }
+          },
+          null,
+          {
+            "id": "minecraft:map",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Select a Map"
+            }
+          },
+          null,
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          null,
+          null,
+          null,
+          {
+            "id": "minecraft:diamond_sword",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Start Battle"
+            }
+          },
+          null,
+          null,
+          null,
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "61dd5c55-b73e-4bf4-9d41-71556df00c37",
+      "name": "Danger Settings GUI",
+      "createdAt": 1791017595820,
+      "main": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {
+          "x": -1180,
+          "y": 40,
+          "z": -601
+        },
+        "items": [
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1
+          },
+          null,
+          {
+            "id": "minecraft:blaze_rod",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Transfer OWNER"
+            }
+          },
+          null,
+          {
+            "id": "minecraft:barrier",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Disband Party"
+            }
+          },
+          null,
+          {
+            "id": "minecraft:oak_sign",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "BAN List"
+            }
+          },
+          null,
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          },
+          {
+            "id": "minecraft:black_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "存在しないマス"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "c39ba2c9-5849-4fdc-95de-98ad0694376e",
+      "name": "Party Config GUI",
+      "createdAt": 1791016756433,
+      "main": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {
+          "x": -1180,
+          "y": 40,
+          "z": -603
+        },
+        "items": [
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:tnt",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Friendly Fire : ON"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:comparator",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Team Settings"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:lime_dye",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Public Party"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:redstone_block",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Danger Settings"
+            }
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:name_tag",
+            "count": 1,
+            "components": {
+              "minecraft:item_name": "Party ID : 17C7ZE"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Player List"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:arrow",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Back"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:white_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "87dad453-8e35-4339-adf7-a9c95007c537",
+      "name": "Party MAIN GUI",
+      "createdAt": 1791016375982,
+      "main": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        {
+          "id": "minecraft:blue_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "Set to Blue team"
+          }
+        },
+        {
+          "id": "minecraft:white_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:light_gray_stained_glass_pane",
+          "count": 1
+        },
+        {
+          "id": "minecraft:white_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:red_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "Set to Red team"
+          }
+        },
+        null,
+        null,
+        null,
+        null,
+        {
+          "id": "minecraft:lime_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "Set to Lime team"
+          }
+        },
+        {
+          "id": "minecraft:light_gray_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:player_head",
+          "count": 1,
+          "components": {
+            "minecraft:profile": {
+              "name": "PlayerZ"
+            }
+          }
+        },
+        {
+          "id": "minecraft:light_gray_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:yellow_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "Set to Yellow team"
+          }
+        },
+        null,
+        null,
+        null,
+        null,
+        null,
+        {
+          "id": "minecraft:white_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:light_gray_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        {
+          "id": "minecraft:white_stained_glass_pane",
+          "count": 1,
+          "components": {
+            "minecraft:custom_name": "装飾"
+          }
+        },
+        null,
+        null,
+        null
+      ],
+      "equipment": {},
+      "container": {
+        "columns": 9,
+        "pos": {
+          "x": -1180,
+          "y": 40,
+          "z": -605
+        },
+        "items": [
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:red_wool",
+            "count": 1,
+            "components": {
+              "minecraft:lore": [
+                "Player : 13 Members"
+              ]
+            }
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1,
+            "components": {
+              "minecraft:item_name": "Party Ownerのヘッド",
+              "minecraft:profile": {
+                "name": "Owner"
+              }
+            }
+          },
+          {
+            "id": "minecraft:blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:blue_wool",
+            "count": 1,
+            "components": {
+              "minecraft:lore": [
+                "Player : 31 Members"
+              ]
+            }
+          },
+          {
+            "id": "minecraft:blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:ender_pearl",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Random Split"
+            }
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1,
+            "components": {
+              "minecraft:profile": {
+                "name": "PlayerM"
+              }
+            }
+          },
+          {
+            "id": "minecraft:lime_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Invite Player to Red"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1,
+            "components": {
+              "minecraft:profile": {
+                "name": "PlayerA"
+              }
+            }
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1,
+            "components": {
+              "minecraft:profile": {
+                "name": "PlayerB"
+              }
+            }
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1,
+            "components": {
+              "minecraft:profile": {
+                "name": "PlayerC"
+              }
+            }
+          },
+          {
+            "id": "minecraft:blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1,
+            "components": {
+              "minecraft:profile": {
+                "name": "PlayerD"
+              }
+            }
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1,
+            "components": {
+              "minecraft:profile": {
+                "name": "PlayerE"
+              }
+            }
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1,
+            "components": {
+              "minecraft:profile": {
+                "name": "PlayerF"
+              }
+            }
+          },
+          {
+            "id": "minecraft:blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1,
+            "components": {
+              "minecraft:profile": {
+                "name": "PlayerG"
+              }
+            }
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1,
+            "components": {
+              "minecraft:profile": {
+                "name": "PlayerH"
+              }
+            }
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1,
+            "components": {
+              "minecraft:profile": {
+                "name": "PlayerI"
+              }
+            }
+          },
+          {
+            "id": "minecraft:blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:gray_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "空き枠"
+            }
+          },
+          {
+            "id": "minecraft:light_gray_stained_glass_pane",
+            "count": 1
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1,
+            "components": {
+              "minecraft:profile": {
+                "name": "PlayerJ"
+              }
+            }
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1,
+            "components": {
+              "minecraft:profile": {
+                "name": "PlayerK"
+              }
+            }
+          },
+          {
+            "id": "minecraft:player_head",
+            "count": 1,
+            "components": {
+              "minecraft:profile": {
+                "name": "PlayerL"
+              }
+            }
+          },
+          {
+            "id": "minecraft:blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:red_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          },
+          {
+            "id": "minecraft:arrow",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Back"
+            }
+          },
+          {
+            "id": "minecraft:oak_sign",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Page 2"
+            }
+          },
+          {
+            "id": "minecraft:barrier",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "No more players"
+            }
+          },
+          {
+            "id": "minecraft:spyglass",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "See other team"
+            }
+          },
+          {
+            "id": "minecraft:barrier",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "No pages available"
+            }
+          },
+          {
+            "id": "minecraft:oak_sign",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Page 1"
+            }
+          },
+          {
+            "id": "minecraft:arrow",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "Next"
+            }
+          },
+          {
+            "id": "minecraft:blue_stained_glass_pane",
+            "count": 1,
+            "components": {
+              "minecraft:custom_name": "装飾"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
+
+
+
+
