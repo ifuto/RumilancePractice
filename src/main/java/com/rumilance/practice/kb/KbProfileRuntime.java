@@ -32,7 +32,30 @@ public final class KbProfileRuntime {
             if (name == null) {
                 return null;
             }
-            return profiles.find(name).orElse(null);
+            return profiles.findFactor(name).orElse(null);
+        };
+    }
+
+    /**
+     * Same lookup for kb-probe 0.7.0 staged profiles: non-null exactly when the victim's
+     * match runs a staged file — the melee knockback is then REBUILT by the full model
+     * instead of being scaled ({@link StagedKnockback}).
+     */
+    public static Function<UUID, StagedKnockback> stagedResolver(MatchRegistry matchRegistry,
+                                                                 KbProfileService profiles) {
+        return playerId -> {
+            if (playerId == null || matchRegistry == null || profiles == null) {
+                return null;
+            }
+            MatchSession session = matchRegistry.byPlayer(playerId).orElse(null);
+            if (session == null) {
+                return null;
+            }
+            String name = session.kbProfile();
+            if (name == null) {
+                return null;
+            }
+            return profiles.findStaged(name).orElse(null);
         };
     }
 }

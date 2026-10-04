@@ -137,8 +137,8 @@ public final class DuelKbSelectGui extends AbstractGui {
             }
             boolean isSelected = profile.equals(selected);
             String lore = raw(player, "duel-gui.kb-profile-lore", MessageService.tags(
-                    "h", factor(kbProfileService.find(profile), 0),
-                    "v", factor(kbProfileService.find(profile), 1)));
+                    "h", factor(kbProfileService.findFactor(profile), 0),
+                    "v", factor(kbProfileService.findFactor(profile), 1)));
             inventory.setItem(MenuScaffold.gridSlot(index++), ItemBuilder.of(Material.PAPER)
                     .name(Component.text(profile, UiTheme.VALUE)
                             .decoration(TextDecoration.ITALIC, false))
@@ -174,6 +174,7 @@ public final class DuelKbSelectGui extends AbstractGui {
         return String.format(java.util.Locale.ROOT, "%.2f",
                 factors.map(f -> f[Math.min(i, f.length - 1)]).orElse(1.0d));
     }
+
 
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot, String action) {

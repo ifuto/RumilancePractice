@@ -593,9 +593,16 @@ alt-detection:
   # 類似度スキャンの周期（分）。
   scan-interval-minutes: 30
 
-# KB プロファイル (2026-10-01): plugins/n-arena/kb/*.json に置いた数値 JSON が
-# Duel Request 画面の KB 選択肢（拡張子を除いたファイル名）として出る。OP が設定する
-# デフォルトKB は、リクエスト送信時に「既定」のままだったときと Queue/forcematch の
-# 試合で使用される。空文字 = プロファイル層なし（従来の knockback.json ルールのみ）。
+# KB プロファイル (2026-10-01 / 2026-10-04): plugins/n-arena/kb/*.json に置いた JSON が
+# Duel Request 画面の KB 選択肢（拡張子を除いたファイル名）として出る。対応形式は2種:
+#  - 従来の KB Probe (≤0.5.x) コピーフォーマット {name, horizontal, vertical, source} =
+#    バニラ最終ノックバックへの乗算
+#  - KB Probe 0.7.0 の staged-knockback エクスポート (verticalLimit / extraHorizontal /
+#    extraVertical / frictionHorizontal / frictionVertical / airHorizontalMultiplier /
+#    airVerticalMultiplier / knockbackEnchant / extraReappliesFriction を含むもの) =
+#    近接ノックバック全体をそのサーバー向けにフィットした物理モデルで再構築する
+#    (欠けた項目はバニラ値で補完。attackerSlowdown / hitDelay / gravity は計測側補正のため無視)
+# OP が設定するデフォルトKB は、リクエスト送信時に「既定」のままだったときと
+# Queue/forcematch の試合で使用される。空文字 = プロファイル層なし（従来の knockback.json ルールのみ）。
 kb:
   default-profile: ""

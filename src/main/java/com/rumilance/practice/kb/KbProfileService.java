@@ -15,26 +15,34 @@ import java.util.stream.Stream;
 /**
  * Loads knockback reproduction profiles from {@code plugins/n-arena/kb/*.json}.
  *
- * <p>A profile file is written exactly like the JSON the KB Probe mod copies to the
- * clipboard (server name is taken from the FILE name with {@code .json} stripped, so
- * {@code PvPClub.json} shows up in the duel-request KB selector as "PvPClub"):</p>
+ * <p>Two file formats coexist (the extension-only keys of either are ignored):</p>
+ *
+ * <p><b>Legacy multiplier file</b> (kb-probe ≤ 0.5.x clipboard): scales the FINAL knockback
+ * vector vanilla produced.</p>
  *
  * <pre>{@code
  * {
  *   "name": "PvPClub",
  *   "horizontal": 1.05,
  *   "vertical": 0.63,
- *   "source": { "mod": "kb-probe", "samplesH": 128 }   // metadata, ignored
+ *   "source": { "mod": "kb-probe 0.5.0", "samplesH": 128 }   // metadata, ignored
  * }
  * }</pre>
  *
- * <p>{@code horizontal}/{@code vertical} are multipliers applied on top of Paper's final
- * knockback vector (the same scaling layer as the global knockback tuning) — the mod's
- * exported values are that server's factors vs vanilla, which is precisely the number
- * needed here. Malformed files are skipped with a warning and never kill the others.</p>
+ * <p><b>Staged file</b> (kb-probe 0.7.0 "staged-knockback" export): the full fitted physics
+ * model, detected by any of the extra keys ({@code verticalLimit}, {@code extraHorizontal},
+ * {@code extraVertical}, {@code frictionHorizontal}, {@code frictionVertical},
+ * {@code airHorizontalMultiplier}, {@code airVerticalMultiplier}, {@code knockbackEnchant},
+ * {@code extraReappliesFriction}). Values missing from the file fall back to the vanilla
+ * constants — see {@link StagedKnockback}. The export's {@code attackerSlowdown},
+ * {@code hitDelay} and {@code gravity} are measurement-side corrections and ignored.</p>
+ *
+ * <p>The profile name comes from the FILE name with {@code .json} stripped, so
+ * {@code VeltHC.json} shows up in the duel-request KB selector as "VeltHC". Malformed files
+ * are skipped with a warning and never kill the others.</p>
  *
  * <p>Pure-JDK on purpose (local-test runnable); profile state is re-read on reload so
- * Dropping in a new json takes effect with /practiceadmin reload.</p>
+ * dropping in a new json takes effect with /practiceadmin reload.</p>
  */
 public final class KbProfileService {
 
@@ -43,9 +51,16 @@ public final class KbProfileService {
     /** Explicit "KBの変更無し" choice — match runs plain knockback.json rules, no profile. */
     public static final String CHOICE_NONE = "\0none";
 
+    /** Keys whose presence marks a file as a 0.7.0 staged profile. */
+    private static final String[] STAGED_KEYS = {
+            "verticalLimit", "extraHorizontal", "extraVertical",
+            "frictionHorizontal", "frictionVertical",
+            "airHorizontalMultiplier", "airVerticalMultiplier",
+            "knockbackEnchant", "extraReappliesFriction"};
+
     private final Path directory;
     private final Logger logger;
-    private volatile Map<String, double[]> profiles = Map.of();
+    private volatile Map<String, Object> profiles = Map.of();
     private volatile String defaultProfileName = "";
 
     public KbProfileService(Path directory, Logger logger) {
@@ -63,7 +78,7 @@ public final class KbProfileService {
 
     /** (Re)reads every {@code *.json} in the kb directory. */
     public void reload() {
-        Map<String, double[]> loaded = new LinkedHashMap<>();
+        Map<String, Object> loaded = new LinkedHashMap<>();
         try {
             Files.createDirectories(directory);
         } catch (IOException e) {
@@ -89,7 +104,11 @@ public final class KbProfileService {
                                 + " has factors outside the 0..4 band — skipped");
                         continue;
                     }
-                    loaded.put(name, new double[]{h, v});
+                    if (isStagedFile(json)) {
+                        loaded.put(name, readStaged(json));
+                    } else {
+                        loaded.put(name, new double[]{h, v});
+                    }
                 } catch (Exception e) {
                     logger.warning("kb-profiles: " + file.getFileName()
                             + " is not a valid profile (" + e.getMessage() + ") — skipped");
@@ -99,6 +118,41 @@ public final class KbProfileService {
             logger.log(Level.WARNING, "kb-profiles: cannot list " + directory, e);
         }
         profiles = Map.copyOf(loaded);
+    }
+
+    private static boolean isStagedFile(Map<String, Object> json) {
+        for (String key : STAGED_KEYS) {
+            if (json.containsKey(key)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Reads a 0.7.0 staged export; missing fields fall back to the vanilla constants. */
+    private static StagedKnockback readStaged(Map<String, Object> json) {
+        return new StagedKnockback(
+                numberOr(json, "horizontal", StagedKnockback.VANILLA.horizontal()),
+                numberOr(json, "vertical", StagedKnockback.VANILLA.vertical()),
+                numberOr(json, "verticalLimit", StagedKnockback.VANILLA.verticalLimit()),
+                numberOr(json, "extraHorizontal", StagedKnockback.VANILLA.extraHorizontal()),
+                numberOr(json, "extraVertical", StagedKnockback.VANILLA.extraVertical()),
+                numberOr(json, "frictionHorizontal", StagedKnockback.VANILLA.frictionHorizontal()),
+                numberOr(json, "frictionVertical", StagedKnockback.VANILLA.frictionVertical()),
+                numberOr(json, "airHorizontalMultiplier", StagedKnockback.VANILLA.airHorizontalMultiplier()),
+                numberOr(json, "airVerticalMultiplier", StagedKnockback.VANILLA.airVerticalMultiplier()),
+                numberOr(json, "knockbackEnchant", StagedKnockback.VANILLA.knockbackEnchant()),
+                boolOr(json, "extraReappliesFriction", StagedKnockback.VANILLA.extraReappliesFriction()));
+    }
+
+    private static double numberOr(Map<String, Object> json, String key, double fallback) {
+        Object value = json.get(key);
+        return value instanceof Number n ? n.doubleValue() : fallback;
+    }
+
+    private static boolean boolOr(Map<String, Object> json, String key, boolean fallback) {
+        Object value = json.get(key);
+        return value instanceof Boolean b ? b : fallback;
     }
 
     private static double number(Map<String, Object> json, String key) {
@@ -118,9 +172,20 @@ public final class KbProfileService {
         return name != null && profiles.containsKey(name);
     }
 
-    public Optional<double[]> find(String name) {
-        double[] f = name == null ? null : profiles.get(name);
-        return f == null ? Optional.empty() : Optional.of(f);
+    /** The raw profile: {@link double[]} for legacy multiplier files, {@link StagedKnockback} for staged ones. */
+    public Optional<Object> find(String name) {
+        Object f = name == null ? null : profiles.get(name);
+        return Optional.ofNullable(f);
+    }
+
+    /** The legacy final-velocity multipliers — only for files without the staged keys. */
+    public Optional<double[]> findFactor(String name) {
+        return find(name).filter(double[].class::isInstance).map(double[].class::cast);
+    }
+
+    /** The staged model — only for kb-probe 0.7.0 "staged-knockback" files. */
+    public Optional<StagedKnockback> findStaged(String name) {
+        return find(name).filter(StagedKnockback.class::isInstance).map(StagedKnockback.class::cast);
     }
 
     /**
@@ -138,16 +203,25 @@ public final class KbProfileService {
         if (effective == null || effective.isBlank()) {
             return Resolved.noProfile();
         }
-        double[] factor = profiles.get(effective);
-        if (factor == null) {
+        Object profile = profiles.get(effective);
+        if (profile == null) {
             return Resolved.noProfile();
         }
-        return new Resolved(effective, factor[0], factor[1]);
+        if (profile instanceof StagedKnockback staged) {
+            return new Resolved(effective, staged.horizontal(), staged.vertical(), staged);
+        }
+        double[] factor = (double[]) profile;
+        return new Resolved(effective, factor[0], factor[1], null);
     }
 
-    /** The factor a STARTED match session uses (profile name already on the session). */
-    public record Resolved(String name, double horizontal, double vertical) {
-        private static final Resolved NO_PROFILE = new Resolved(null, 1.0, 1.0);
+    /**
+     * The factor a STARTED match session uses (profile name already on the session).
+     * {@code staged} is non-null exactly when the profile file was a 0.7.0 staged export —
+     * in that case the melee knockback is REBUILT by {@link StagedKnockback} and the
+     * {@code horizontal}/{@code vertical} components are informational only.
+     */
+    public record Resolved(String name, double horizontal, double vertical, StagedKnockback staged) {
+        private static final Resolved NO_PROFILE = new Resolved(null, 1.0, 1.0, null);
 
         static Resolved noProfile() {
             return NO_PROFILE;

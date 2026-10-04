@@ -76,6 +76,18 @@ public final class PaperCombatCompatListener implements Listener {
         this.liveProfileResolver = liveProfileResolver;
     }
 
+    /**
+     * kb-probe 0.7.0 staged profile for the shield re-application path — non-null rebuilds
+     * the melee knockback with the full fitted model, same as {@code KnockbackTuningListener}.
+     */
+    private volatile java.util.function.Function<java.util.UUID,
+            com.rumilance.practice.kb.StagedKnockback> stagedProfileResolver;
+
+    public void setStagedProfileResolver(java.util.function.Function<java.util.UUID,
+            com.rumilance.practice.kb.StagedKnockback> stagedProfileResolver) {
+        this.stagedProfileResolver = stagedProfileResolver;
+    }
+
     private boolean combatant(Player player) {
         return player != null && combatantTest.test(player.getUniqueId());
     }
@@ -211,6 +223,31 @@ public final class PaperCombatCompatListener implements Listener {
             unitZ = dz / horizontal;
         }
         double resistScale = knockbackResistanceScale(victim);
+
+        // kb-probe 0.7.0 staged profile: rebuild base + sprint/enchant stage with the fitted
+        // model (directions are the same attacker→victim unit vector, stages mirror vanilla's
+        // two knockback() calls) instead of scaling the vanilla formula.
+        var staged = stagedProfileResolver == null
+                ? null : stagedProfileResolver.apply(victim.getUniqueId());
+        if (staged != null) {
+            Vector v0 = victim.getVelocity();
+            boolean grounded = victim.isOnGround();
+            double[] base = staged.stageBase(v0.getX(), v0.getY(), v0.getZ(),
+                    unitX, unitZ, resistScale, grounded);
+            victim.setVelocity(new Vector(base[0], base[1], base[2]));
+            int level = knockbackEnchantLevel(attacker);
+            if (attacker.isSprinting() || level > 0) {
+                double extraHBase = (attacker.isSprinting() ? staged.extraHorizontal() : 0.0d)
+                        + level * staged.knockbackEnchant();
+                double extraVBase = (attacker.isSprinting() ? staged.extraVertical() : 0.0d)
+                        + level * staged.knockbackEnchant();
+                Vector v1 = victim.getVelocity();
+                double[] extra = staged.stageExtra(v1.getX(), v1.getY(), v1.getZ(),
+                        unitX, unitZ, resistScale, grounded, extraHBase, extraVBase);
+                victim.setVelocity(new Vector(extra[0], extra[1], extra[2]));
+            }
+            return;
+        }
 
         // Base melee knockback applied by LivingEntity#hurtServer (strength 0.4).
         applyKnockbackBody(victim, unitX, unitZ, 0.4d * resistScale);
