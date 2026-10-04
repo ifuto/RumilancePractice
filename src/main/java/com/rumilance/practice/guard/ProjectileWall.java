@@ -114,11 +114,17 @@ public final class ProjectileWall implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onRealHit(ProjectileHitEvent event) {
+        if (tracked.isEmpty()) {
+            return; // early-out: this event also fires for untracked projectiles
+        }
         tracked.remove(event.getEntity().getUniqueId());
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onRemoved(EntityRemoveEvent event) {
+        if (tracked.isEmpty()) {
+            return; // fires for EVERY entity removal server-wide — stay a single empty check
+        }
         tracked.remove(event.getEntity().getUniqueId());
     }
 
