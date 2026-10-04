@@ -508,6 +508,9 @@ public final class EkitSelectGui extends AbstractGui
             return; // 未代入: glass chips are inert
         }
         org.bukkit.event.inventory.ClickType click = event.getClick();
+        // Console ground truth for every chip interaction: with this line the server log
+        // proves which button arrived and which action ran (build-verification aid,
+        // 1.92.35 — the owner reports a left/right mapping that cannot come from this code).
         if (click == org.bukkit.event.inventory.ClickType.SHIFT_LEFT
                 || click == org.bukkit.event.inventory.ClickType.SHIFT_RIGHT) {
             com.rumilance.practice.sound.ClickSound.play(player);
@@ -515,6 +518,8 @@ public final class EkitSelectGui extends AbstractGui
                 editKitGui.resetVariantSlot(player, kitId, variant);
             }
             paintChipPanel(player, session);
+            org.bukkit.Bukkit.getLogger().info("[KIT SELECT] " + player.getName()
+                    + " K" + variant + " " + click + " -> reset");
             return;
         }
         if (click == org.bukkit.event.inventory.ClickType.RIGHT) {
@@ -524,12 +529,18 @@ public final class EkitSelectGui extends AbstractGui
                 editKitGui.openKitVariantEditorWithReturn(player, kitId, variant,
                         session.kitCategory(), session.page());
             }
+            org.bukkit.Bukkit.getLogger().info("[KIT SELECT] " + player.getName()
+                    + " K" + variant + " " + click + " -> edit"
+                    + (editKitGui == null ? " (SKIPPED: editor missing)" : ""));
             return;
         }
         if (click == org.bukkit.event.inventory.ClickType.LEFT) {
             kitVariantsStore.select(player.getUniqueId(), kitId, variant);
             com.rumilance.practice.sound.ClickSound.play(player);
             paintChipPanel(player, session);
+            org.bukkit.Bukkit.getLogger().info("[KIT SELECT] " + player.getName()
+                    + " K" + variant + " " + click + " -> active (now K"
+                    + kitVariantsStore.selected(player.getUniqueId(), kitId) + ")");
         }
     }
 
