@@ -4,6 +4,7 @@ import com.rumilance.practice.database.repository.PlayerRepository;
 import com.rumilance.practice.gui.GuiSession;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.menus.AdminPlayerDataGui;
+import com.rumilance.practice.gui.menus.AdminStatsGui;
 import io.papermc.paper.event.player.AsyncChatEvent;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
