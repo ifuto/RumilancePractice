@@ -33,7 +33,6 @@ final class SpectatorViewIsolationPackets {
             PacketType.Play.Server.ATTACH_ENTITY,
             PacketType.Play.Server.ENTITY_EFFECT,
             PacketType.Play.Server.ENTITY_EQUIPMENT,
-            PacketType.Play.Server.ENTITY_EVENT,
             PacketType.Play.Server.ENTITY_HEAD_ROTATION,
             PacketType.Play.Server.ENTITY_LOOK,
             PacketType.Play.Server.ENTITY_METADATA,
