@@ -123,59 +123,51 @@ color + punishments). Chat whitelist here is the per-player chat filter
 
 ## Kit variants (K1..K4) — saves v2 mockups (2026-10-04)
 
-> 注: ユーザー貼付の saves v2 JSON (10 GUI分) はchat compactで消失したため、この節は
-> その要約 (Cell配置・アイテム・ヘッダ) から復元した仕様記録。JSONそのものは未保存。
+> **正本 = `docs/design/gui.json`** (ユーザー確定・saves v2・10 GUI)。この節はその要点メモ。
+> 実装は必ず JSON のセルを1:1で再現する。**Unused cell は詰め物をしない (空気のまま)**、
+> チェスト縦幅はモックアップどおり。ユーザー指定の ui.button.click は sounds.yml を経由せず
+> `sound.ClickSound` で直接鳴らす。
 
-### 機能要件
+### KIT EDIT GUI (EditKitGui / 6 rows, main36 = null)
 
-- キットごとに K1..K4 のレイアウトを設定できる (LT Vanilla の番号キットと同じ感覚。GUIは別物)。
-- K選択は 本 (WRITABLE_BOOK) = Active / 紙 (PAPER) = Not Active。キットごとに1スロットがActive。
-- FFAに /k 等のコマンドは作らない — **Active Only** (試合/FFA開始時、active Kのレイアウトのみ適用)。
-- Crystal FFA の KIT1..9 (/#v<n>・/k) は既存のまま別系統 (#k と #v のキー空間は分離)。
+r0: 防具4 (c0-3, 中身は装備スロット) + **gray装飾 (c4)** + 盾OFF HAND (c5) + **gray装飾 (c6)**
+  + lime_wool save (c7) + yellow_wool reset (c8)。
+r1: green装飾 ×9。**Backボタンなし** — Save or Esc で戻る (special flow: crystal/admin/閲覧のみ Back)。
+r2-4: キットの中身27 (inv 9-35)。 r5: キットの中身(HotBar) 9 (inv 0-8)。
 
-### KIT EDIT GUI (EditKitGui 6-row 再設計)
+### KIT SELECT GUI (EkitSelectGui カテゴリ画面 / container54 + main36 両方)
 
-row0: 防具4 (helmet/chest/legs/boots, cols0-3) + gray装飾 (col4) + 盾OFF HAND (col5) +
-gray装飾 (col6) + lime_wool SAVE (col7) + yellow_wool RESET (col8)。
-row1: 緑pane装飾のみ — **Backボタンは不要 (2026-10-04確定)**。Save で保存して
-KIT SELECT GUI の元ページへ戻る、Esc で閉じる。BACK が残るのは special flow のみ
-(crystal KIT1..9 picker / admin共有キット / 閲覧モード)。
-rows2-4: キット中身27 (player inv 9-35)。 row5: HotBar9 (inv 0-8)。
+container: r0 = green装飾×4 + **カテゴリヘッダ (wild/bolt trim) (0,4)** + green×4。
+r1-4 = weathered_copper_chain の左右ボーダー (c0/c8) + キットグリッド c1-7 (28枠/頁、
+空き枠 = gray装飾)。きっと1=diamond_axe, きっと2=diamond_pickaxe はグリッドの例。
+r5 = green装飾×4 + **Back barrier (5,4)** + green×4 (頁>1 のときのみ矢 (5,3)/(5,5))。
+main36 (プレイヤーインベントリに描く = チップパネル): r0 gray×9 / r1 gray3+green+LIME(13)+green+gray3 /
+r2 gray, **K1 本/紙(19)**, **K2(20)**, lime(21), **代入セル(22=null)**, lime(23), **K3(24)**, **K4(25)**, gray /
+r3 gray3+green+LIME(31)+green+gray3。
+- キットをグリッドで選択 → ui.button.click と同時にキットアイテムが**代入セル(22)**へ。
+- **未代入**: チップと代入セルは**grayガラス**。代入後: Active K = 本 (WRITABLE_BOOK+glint)、他 = 紙 (PAPER)。
+- chip **右クリック** = ui.button.click でその K の KIT EDIT GUI 編集開始 / **左クリック** = Active 切替 /
+  **Shift+クリック** = 中身リセット (#k 行削除)。
+- 実装: パネルの間、プレイヤーインベントリを borrow して終了時/選択画面復帰時に restore。
 
-### KIT SELECT GUI (EkitSelectGui カテゴリ画面)
+### MAIN KIT SELECTER (EkitSelectGui 選択画面 / container54, main36 = null)
 
-row4 構成 (2026-10-04 確定): col0/4/7 = lime装飾、col1 = **代入セル**、col2/3/5/6 = K1〜K4 chips。
-- 編集したいキットをグリッドでクリック → **ui.button.click** と同時にキットのアイテムが代入セルに代入。
-- **未代入** (何も選んでいない) は代入セルと 本/紙 の部分が**ガラス** (gray stained glass)。
-- **代入後** は Active な K が本 (WRITABLE_BOOK, glint)、Active でない K が紙 (PAPER)。
-- chip **右クリック** = ui.button.click と同時にその K 番号の KIT EDIT GUI を編集開始。
-- chip **左クリック** = ui.button.click と同時にそのスロットを Active にする。
-- chip **Shift+クリック** = そのスロットの中身リセット (保存行削除→公式レイアウトに戻る)。
-main36ベース: slot19-25 (row2) にキットグリッド、row5にBack barrier。実装: グリッド rows1-3
-(21枠/頁)。キット選択で lastKitTracker も更新 (前回の KIT と共有)。
-※ ui.button.click を鳴らす箇所 (2026-10-04確定): KIT SELECT chips (代入/Active/編集/リセット)、
-  /setfunc 機能アイテム右クリック オープン (menu compass 含む)、Queue参加のキット押下。
-  **これらは sounds.yml を経由しない** (sound.ClickSound で直接鳴らす。yml エントリは作らない)。
-※ /setfunc の GUI を開く機能アイテム右クリック時は **ホットバー等をリセット**
-  (LobbyService#applyLobbyInventory でロビー標準インベントリへ戻してから GUI オープン)。
-  leavequeue / party トグル等のアクション系ではリセットしない。
+r0・r5 = green装飾 ×9。r1-4 = chain の c0/c8 のみ。**(2,2)=MAIN KITS (wild)**、**(2,6)=SUB KITS (bolt)**、
+**(3,4)=sword スロット = 前回の KIT** (LastSelectedKitTracker、クリックで active K を開く)。
+**それ以外の内側セルはすべて空 (null)** — 詰め物をしない。
 
-### MAIN KIT SELECTER (EkitSelectGui 選択画面)
+### 既存7GUI (同 JSON 内・正式デザイン)
 
-container54: 緑pane + weathered copper chain装飾枠、MAIN KITS (wild trim) (2,2) /
-SUB KITS (bolt trim) (2,6) / **前回の KIT** (3,4)。中央の sword ボタンは前回選択した
-キットへのショートカット (2026-10-04確定、ffaEnabled一覧ではない) — LastSelectedKitTracker
-(queue/duel/kit picker 共有) を使用、クリックで active K を開く。キット未選択なら
-gray_dye の非活性タイル。main36 = null (2択画面に下段不要)。
-
-### 既存7GUI (saves v2 正式デザイン・実装指示は明言なし)
-
-Duel Request (Opponent head + Select a Kit barrel + Select a Map map + Send Request sword +
-FT:∞ gapple + Select a KB slime + 黒「存在しないマス」枠) / Battle Mode (Party Fight sword /
-Party FFA end_crystal) / Party Start Battle (Select a Kit / Battle Mode iron axe / Map /
-Start Battle sword) / Danger Settings (Transfer OWNER blaze_rod / Disband Party barrier /
-BAN List oak_sign) / Party Config (Friendly Fire TNT / Team Settings comparator / Public
-Party lime_dye / Danger Settings redstone_block / Party ID name_tag / Player List head) /
-Party MAIN (red/blue wool人数 + owner head + Random Split pearl + Invite + member head
-グリッド + Page/spyglass See other team) / Party setfunc-item-main (partyリスト: head
-PlayerK's Team 等 + No party available + Update Data clock + Back/Next + Create a Party)。
+Party setfunc-item-main (partyリスト head+No party available+clock Update Data+矢 Back/Next+
+writable_book Create a Party / yellow枠+white角) / Duel Request (黒「存在しないマス」r0/r5、orange帯、
+head Opponent (1,4)、copper_chainボーダー、barrel Select a Kit (2,2)、map Select a Map (2,6)、
+diamond_sword Send Request (3,4)、gapple FT:∞ (4,2)、slime Select a KB (4,6)) / Battle Mode
+(light_blue枠、sword Party Fight (2,3)、end_crystal Party FFA (2,5)、黒 r5) / Party Start Battle
+(light_blue枠 + Select a Kit/iron axe Battle Mode/Map/Start Battle sword) / Danger Settings (red枠、
+blaze_rod Transfer OWNER (2,2)、barrier Disband (2,4)、oak_sign BAN List (2,6)、黒 r5) / Party Config
+(light_gray/white/checker、tnt FF (1,1)、comparator Team Settings (1,4)、lime_dye Public (1,7)、
+redstone_block Danger (3,4)、name_tag Party ID (4,1)、head Player List (4,7)、arrow Back (5,4)) /
+Party MAIN (red/blue wool人数+owner head (0,2/0,4/0,6)+pearl Random Split (0,8)+Invite lime (1,2)+
+red メンバー head グリッド左+blue 右+light_gray 中仕切り+arrow Back (5,1)+sign Page (5,2/5,6)+
+barrier No more players (5,3)+spyglass See other team (5,4)+Next (5,7))。
+→ **これらの実装は別タスク** (既存 GUI の刷新)。

@@ -597,6 +597,11 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
                 isViewOnly(session) ? "decorate" : "slot:39"));
         inventory.setItem(GuiSlots.slot(0, 5), tagged(player, layout.length > 40 ? layout[40] : null,
                 isViewOnly(session) ? "decorate" : "slot:40"));
+        // Mockup gray 装飾 between the armor and shield slots (cols 4 and 6 are chrome).
+        inventory.setItem(GuiSlots.slot(0, 4), ItemBuilder.action(Material.GRAY_STAINED_GLASS_PANE,
+                Component.text(" "), "decorate"));
+        inventory.setItem(GuiSlots.slot(0, 6), ItemBuilder.action(Material.GRAY_STAINED_GLASS_PANE,
+                Component.text(" "), "decorate"));
         // Main inventory slots 9-35 -> menu rows 2-4, ALL 9 columns (27 slots exactly).
         for (int inv = 9; inv < 36; inv++) {
             int local = inv - 9;

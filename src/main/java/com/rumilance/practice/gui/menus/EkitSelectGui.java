@@ -1,11 +1,12 @@
 package com.rumilance.practice.gui.menus;
 
 import com.rumilance.practice.gui.AbstractGui;
+import com.rumilance.practice.gui.BottomInventoryClickHandler;
+import com.rumilance.practice.gui.GuiCloseHandler;
 import com.rumilance.practice.gui.GuiSession;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.GuiType;
 import com.rumilance.practice.gui.ItemBuilder;
-import com.rumilance.practice.gui.MenuScaffold;
 import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.kit.KitService;
 import com.rumilance.practice.model.KitCategory;
@@ -26,7 +27,23 @@ import java.util.UUID;
 /**
  * /ekit entry: click a kit to edit immediately. Original kits sit on the bottom-left.
  */
-public final class EkitSelectGui extends AbstractGui {
+public final class EkitSelectGui extends AbstractGui
+        implements BottomInventoryClickHandler, GuiCloseHandler {
+
+    /** The mockup KIT SELECT GUI grid: rows 1-4 x cols 1-7 = 28 kits per page. */
+    private static final int KIT_GRID_SIZE = 28;
+
+    /** Bottom-inventory cells of the mockup's K-chip panel (K1..K4 chips). */
+    private static final int[] CHIP_SLOTS = {19, 20, 24, 25};
+    /** The mockup's null center cell between the lime separators: the assigned kit's item. */
+    private static final int ASSIGN_SLOT = 22;
+
+    /**
+     * The player's own inventory rows are borrowed for the K-chip panel (mockup main36);
+     * the real contents are stashed here and restored on every close / chooser return.
+     */
+    private final java.util.Map<java.util.UUID, ItemStack[]> bottomStash =
+            new java.util.concurrent.ConcurrentHashMap<>();
 
     private InnerKitSelectGui innerKitSelectGui;
     private InnerKitAdminGui innerKitAdminGui;
@@ -50,10 +67,6 @@ public final class EkitSelectGui extends AbstractGui {
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot,
                             String action, org.bukkit.event.inventory.ClickType clickType) {
-        if (action != null && action.startsWith("variant:")) {
-            handleVariantClick(player, session, inventory, action, clickType);
-            return;
-        }
         if (clickType == org.bukkit.event.inventory.ClickType.RIGHT
                 && action != null && action.startsWith("viewkit:")
                 && isViewer(session) && innerKitSelectGui != null) {
@@ -179,36 +192,40 @@ public final class EkitSelectGui extends AbstractGui {
     }
 
     /**
-     * Two-step picker (Queue と同じ構成): first screen is just the two wooden category
-     * buttons (Main Kits / Sub Kits); pressing one plays the wooden-button sting, holds for
-     * 0.2s, then opens that category's kit list. Originl Kit の紙は2択画面からも出しておく。
+     * Two screens, both painted CELL-FOR-CELL from docs/design/gui.json (saves v2,
+     * 2026-10-04): category==null → MAIN KIT SELECTER, otherwise the KIT SELECT GUI.
+     * No generic frame and no filler — every cell the mockup leaves empty stays EMPTY
+     * air (Unused cell は空気のまま), and the K-chip panel lives in the player's own
+     * inventory rows exactly like the mockup's main36.
      */
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        paintFrame(player, session, inventory);
-
         if (session.kitCategory() == null) {
+            restoreBottom(player);
             renderChooser(player, inventory);
-            if (!isViewer(session)) {
-                inventory.setItem(GuiSlots.slot(5, 1), originalPaper(player));
-            }
-            paintNav(player, session, inventory);
             return;
         }
-        renderCategory(player, session, inventory, session.kitCategory());
         if (!isViewer(session)) {
-            inventory.setItem(GuiSlots.slot(5, 1), originalPaper(player));
+            borrowBottom(player);
         }
-        MenuScaffold.returnButton(inventory, t(player, "menu.back"));
+        renderKitSelect(player, session, inventory);
     }
 
     /**
-     * MAIN KITS / SUB KITS / 前回の KIT — the chooser buttons of the first screen, on the
-     * KIT SELECT GUI mockup's cells: MAIN KITS (wild trim) at (2,2), SUB KITS (bolt trim)
-     * at (2,6), and centered between them at (3,4) the PREVIOUS KIT tile (the mockup's
-     * sword button = the kit the player had selected last; opens it on its Active K slot).
+     * MAIN KIT SELECTER — mockup cell-for-cell: full green glass bars on rows 0 and 5,
+     * weathered copper chain side borders on rows 1-4, MAIN KITS (wild trim) at (2,2),
+     * SUB KITS (bolt trim) at (2,6), and the 前回の KIT sword slot centered at (3,4).
+     * Every other interior cell stays EMPTY (air).
      */
     private void renderChooser(Player player, Inventory inventory) {
+        for (int col = 0; col < 9; col++) {
+            inventory.setItem(GuiSlots.slot(0, col), mockupPane(Material.GREEN_STAINED_GLASS_PANE));
+            inventory.setItem(GuiSlots.slot(5, col), mockupPane(Material.GREEN_STAINED_GLASS_PANE));
+        }
+        for (int row = 1; row <= 4; row++) {
+            inventory.setItem(GuiSlots.slot(row, 0), mockupPane(Material.WEATHERED_COPPER_CHAIN));
+            inventory.setItem(GuiSlots.slot(row, 8), mockupPane(Material.WEATHERED_COPPER_CHAIN));
+        }
         int mainCount = kitService.enabled(KitCategory.MAIN).size();
         int subCount = kitService.enabled(KitCategory.SUB).size();
         inventory.setItem(GuiSlots.slot(2, 2),
@@ -236,6 +253,83 @@ public final class EkitSelectGui extends AbstractGui {
                                 UiTheme.blank(),
                                 UiTheme.hint(line(player, "gui.kit-button-hint")))));
         inventory.setItem(GuiSlots.slot(3, 4), previousKitTile(player));
+    }
+
+    /**
+     * KIT SELECT GUI — mockup cell-for-cell. Container: green bar row0 with the category
+     * header (wild/bolt trim) centered at (0,4); weathered copper chain borders on
+     * rows 1-4 with the 28-cell kit grid between them (empty cells = gray 空き枠);
+     * green bar row5 with the Back barrier at (5,4) (paging arrows at (5,3)/(5,5) only
+     * when the category needs more than one page). The K-chip panel is painted into the
+     * player's own inventory rows (see {@link #paintChipPanel}).
+     */
+    private void renderKitSelect(Player player, GuiSession session, Inventory inventory) {
+        String categoryKey = session.kitCategory();
+        KitCategory category = "SUB".equalsIgnoreCase(categoryKey) ? KitCategory.SUB : KitCategory.MAIN;
+        List<KitDefinition> kits = kitService.enabled(category);
+        for (int col = 0; col < 9; col++) {
+            inventory.setItem(GuiSlots.slot(0, col), col == 4
+                    ? headerTile(player, category) : mockupPane(Material.GREEN_STAINED_GLASS_PANE));
+        }
+        int pages = Math.max(1, (kits.size() + KIT_GRID_SIZE - 1) / KIT_GRID_SIZE);
+        int page = Math.min(Math.max(0, session.page()), pages - 1);
+        String selected = session.get("selected-kit", String.class);
+        for (int row = 1; row <= 4; row++) {
+            inventory.setItem(GuiSlots.slot(row, 0), mockupPane(Material.WEATHERED_COPPER_CHAIN));
+            inventory.setItem(GuiSlots.slot(row, 8), mockupPane(Material.WEATHERED_COPPER_CHAIN));
+            for (int col = 1; col <= 7; col++) {
+                int idx = page * KIT_GRID_SIZE + (row - 1) * 7 + (col - 1);
+                if (idx < kits.size()) {
+                    KitDefinition kit = kits.get(idx);
+                    ItemStack icon = kitIcon(player, kit, isViewer(session));
+                    if (selected != null && selected.equals(kit.name())) {
+                        // 代入済みキット: the chips panel below belongs to this kit.
+                        icon.editMeta(meta -> meta.setEnchantmentGlintOverride(true));
+                    }
+                    inventory.setItem(GuiSlots.slot(row, col), icon);
+                } else {
+                    inventory.setItem(GuiSlots.slot(row, col), mockupPane(Material.GRAY_STAINED_GLASS_PANE));
+                }
+            }
+        }
+        for (int col = 0; col < 9; col++) {
+            inventory.setItem(GuiSlots.slot(5, col), col == 4
+                    ? ItemBuilder.action(Material.BARRIER, t(player, "menu.back"), "back").build()
+                    : mockupPane(Material.GREEN_STAINED_GLASS_PANE));
+        }
+        if (pages > 1) {
+            if (page > 0) {
+                inventory.setItem(GuiSlots.slot(5, 3), pageArrow(player, "page:prev", "menu.page-prev"));
+            }
+            if (page < pages - 1) {
+                inventory.setItem(GuiSlots.slot(5, 5), pageArrow(player, "page:next", "menu.page-next"));
+            }
+        }
+        paintChipPanel(player, session);
+    }
+
+    /** The mockup's category header tile (wild trim = MAIN, bolt trim = SUB), decorative. */
+    private ItemStack headerTile(Player player, KitCategory category) {
+        boolean main = category == KitCategory.MAIN;
+        return ItemBuilder.of(com.rumilance.practice.gui.KitSections.icon(category))
+                .name(Component.text(main ? "MAIN KITS" : "SUB KITS",
+                                main ? UiTheme.SUCCESS : UiTheme.SECONDARY)
+                        .decoration(TextDecoration.ITALIC, false))
+                .action("decorate")
+                .build();
+    }
+
+    private ItemStack pageArrow(Player player, String action, String loreKey) {
+        return ItemBuilder.of(Material.ARROW)
+                .name(t(player, loreKey).color(UiTheme.VALUE)
+                        .decoration(TextDecoration.ITALIC, false))
+                .action(action)
+                .build();
+    }
+
+    /** A plain, unclickable mockup decoration cell. */
+    private static ItemStack mockupPane(Material material) {
+        return ItemBuilder.action(material, Component.text(" "), "decorate").build();
     }
 
     /**
@@ -272,72 +366,54 @@ public final class EkitSelectGui extends AbstractGui {
                 .build();
     }
 
-    /** One category's kits, paginated over the standard content grid. */
-    private void renderCategory(Player player, GuiSession session, Inventory inventory, String category) {
-        List<KitDefinition> kits = kitService.enabled(
-                "SUB".equalsIgnoreCase(category) ? KitCategory.SUB : KitCategory.MAIN);
-        int pageSize = MenuScaffold.gridPageSize();
-        int pages = Math.max(1, (kits.size() + pageSize - 1) / pageSize);
-        int page = Math.min(Math.max(0, session.page()), pages - 1);
-        int from = page * pageSize;
-        for (int i = 0; i < pageSize && from + i < kits.size(); i++) {
-            KitDefinition kit = kits.get(from + i);
-            ItemStack icon = kitIcon(player, kit, isViewer(session));
-            String selected = session.get("selected-kit", String.class);
-            if (selected != null && selected.equals(kit.name())) {
-                // The highlighted kit: its K1..K4 chips are the row-4 本/紙 row.
-                icon.editMeta(meta -> meta.setEnchantmentGlintOverride(true));
-            }
-            inventory.setItem(MenuScaffold.gridSlot(i), icon);
-        }
-        if (kits.isEmpty()) {
-            inventory.setItem(MenuScaffold.gridSlot(13),
-                    ItemBuilder.of(Material.BARRIER)
-                            .name(t(player, "gui.kit-none").color(UiTheme.MUTED))
-                            .lore(UiTheme.line(line(player, "gui.kit-none-lore")))
-                            .action("decorate")
-                            .build());
-        }
-        paintPaging(player, inventory, page, kits.size());
-        renderVariantChips(player, session, inventory);
-    }
-
     /**
-     * K1..K4 chips row (mockup row: 本KIT1/紙KIT2-4 + lime装飾). Layout:
-     * col0/4/7 = lime separators, col1 = assignment cell, cols 2/3/5/6 = K1..K4.
-     *
-     * 未代入 (no kit assigned yet): the assignment cell AND the 本/紙 cells are gray
-     * glass. 代入 (a kit is picked in the grid, ui.button.click): the kit's item lands in
-     * the assignment cell and the chips turn 本 = Active / 紙 = Not Active.
+     * The mockup's K-chip panel, painted into the PLAYER's own inventory rows (main36):
+     * a gray outer frame with green inner corners and a lime accent column, chips
+     * K1/K2 (inv 19/20) and K3/K4 (inv 24/25) flanking the assigned kit's item at inv 22
+     * between lime separators. 未代入: the chip cells AND the assign cell are gray glass.
      */
-    private void renderVariantChips(Player player, GuiSession session, Inventory inventory) {
-        String selected = isViewer(session) ? null : session.get("selected-kit", String.class);
-        for (int col = 0; col <= 7; col++) {
-            if (col == 0 || col == 4 || col == 7) {
-                inventory.setItem(GuiSlots.slot(4, col), limeSeparator());
-            }
+    private void paintChipPanel(Player player, GuiSession session) {
+        if (isViewer(session)) {
+            return; // viewer: their inventory is never touched
         }
+        org.bukkit.inventory.PlayerInventory inv = player.getInventory();
+        ItemStack gray = mockupPane(Material.GRAY_STAINED_GLASS_PANE);
+        ItemStack green = mockupPane(Material.GREEN_STAINED_GLASS_PANE);
+        ItemStack lime = mockupPane(Material.LIME_STAINED_GLASS_PANE);
+        for (int i = 0; i < 9; i++) {
+            inv.setItem(i, gray);                       // bottom panel row 0
+        }
+        for (int i = 9; i < 18; i++) {
+            inv.setItem(i, i == 12 || i == 14 ? green : gray);
+        }
+        for (int i = 27; i < 36; i++) {
+            inv.setItem(i, i == 30 || i == 32 ? green : gray);
+        }
+        for (int i = 18; i < 27; i++) {
+            inv.setItem(i, i == 21 || i == 23 ? lime : gray);
+        }
+        String selected = session.get("selected-kit", String.class);
         KitDefinition kit = selected == null ? null : kitService.get(selected).orElse(null);
         if (kit == null) {
-            // 未代入: glass where the assignment and the 本/紙 chips would be.
-            for (int col : new int[]{1, 2, 3, 5, 6}) {
-                inventory.setItem(GuiSlots.slot(4, col), grayGlass());
+            // 未代入: glass where the 本/紙 chips and the assigned item would be.
+            for (int slot : CHIP_SLOTS) {
+                inv.setItem(slot, mockupPane(Material.GRAY_STAINED_GLASS_PANE));
             }
+            inv.setItem(ASSIGN_SLOT, mockupPane(Material.GRAY_STAINED_GLASS_PANE));
             return;
         }
-        // 代入済み: the kit's representative item sits in the assignment cell.
-        inventory.setItem(GuiSlots.slot(4, 1),
+        // 代入済み: the kit's representative item sits in the center assign cell.
+        inv.setItem(ASSIGN_SLOT,
                 ItemBuilder.of(ItemBuilder.materialOr(kit.icon(), Material.DIAMOND_SWORD))
                         .nameMini(kit.prettyDisplayName())
                         .lore(UiTheme.divider(),
-                                UiTheme.line("Assigned kit — edit it with the K chips."),
-                                UiTheme.line("Left: Active · Right: edit · Shift: reset"),
+                                UiTheme.line("Assigned kit"),
+                                UiTheme.line("Use the K1-K4 chips around it."),
                                 UiTheme.line("FFA uses the Active slot only."))
-                        .action("decorate")
                         .build());
-        int active = kitVariantsStore.selected(player.getUniqueId(), selected);
+        int active = kitVariantsStore == null ? 1
+                : kitVariantsStore.selected(player.getUniqueId(), selected);
         for (int k = 1; k <= com.rumilance.practice.kit.KitVariantsStore.SLOTS; k++) {
-            int col = k <= 2 ? 1 + k : 2 + k; // K1->2 K2->3 K3->5 K4->6
             boolean isActive = k == active;
             ItemStack chip = ItemBuilder.of(isActive ? Material.WRITABLE_BOOK : Material.PAPER)
                     .name(Component.text("KIT " + k,
@@ -356,20 +432,99 @@ public final class EkitSelectGui extends AbstractGui {
             if (isActive) {
                 chip.editMeta(meta -> meta.setEnchantmentGlintOverride(true));
             }
-            inventory.setItem(GuiSlots.slot(4, col),
-                    ItemBuilder.of(chip).action("variant:" + k).build());
+            inv.setItem(CHIP_SLOTS[k - 1], chip);
         }
     }
 
-    private static ItemStack limeSeparator() {
-        return ItemBuilder.action(Material.LIME_STAINED_GLASS_PANE,
-                Component.text(" "), "decorate");
+    /** Stashes the player's real inventory rows once, before the chip panel paints. */
+    private void borrowBottom(Player player) {
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+        bottomStash.computeIfAbsent(player.getUniqueId(), uuid -> {
+            ItemStack[] copy = player.getInventory().getStorageContents();
+            ItemStack[] saved = new ItemStack[36];
+            for (int i = 0; i < 36 && i < copy.length; i++) {
+                saved[i] = copy[i] == null ? null : copy[i].clone();
+            }
+            return saved;
+        });
     }
 
-    /** 未代入 placeholder: plain gray glass (the mockup's gray装飾). */
-    private static ItemStack grayGlass() {
-        return ItemBuilder.action(Material.GRAY_STAINED_GLASS_PANE,
-                Component.text(" "), "decorate");
+    /** Hands the player's real inventory rows back (idempotent). */
+    private void restoreBottom(Player player) {
+        if (player == null) {
+            return;
+        }
+        ItemStack[] saved = bottomStash.remove(player.getUniqueId());
+        if (saved == null || !player.isOnline()) {
+            return;
+        }
+        org.bukkit.inventory.PlayerInventory inv = player.getInventory();
+        for (int i = 0; i < 36; i++) {
+            inv.setItem(i, saved[i] == null ? null : saved[i].clone());
+        }
+    }
+
+    /**
+     * Bottom-inventory clicks (player's own rows): the K-chip panel is the only live
+     * area. LEFT = make Active, RIGHT = open the KIT EDIT GUI on exactly that K slot,
+     * SHIFT+click = reset that slot's contents — each with the direct ui.button.click.
+     * Everything else stays cancelled (the listener cancels before dispatch).
+     */
+    @Override
+    public void handleBottomClick(Player player, GuiSession session,
+                                  org.bukkit.event.inventory.InventoryClickEvent event) {
+        if (session == null || isViewer(session)
+                || session.kitCategory() == null || kitVariantsStore == null) {
+            return;
+        }
+        int slot = event.getSlot();
+        int variant = -1;
+        for (int k = 0; k < CHIP_SLOTS.length; k++) {
+            if (CHIP_SLOTS[k] == slot) {
+                variant = k + 1;
+                break;
+            }
+        }
+        if (variant < 0) {
+            return; // panel frame / assign cell / anything else: no action
+        }
+        String kitId = session.get("selected-kit", String.class);
+        if (kitId == null) {
+            return; // 未代入: glass chips are inert
+        }
+        org.bukkit.event.inventory.ClickType click = event.getClick();
+        if (click == org.bukkit.event.inventory.ClickType.SHIFT_LEFT
+                || click == org.bukkit.event.inventory.ClickType.SHIFT_RIGHT) {
+            com.rumilance.practice.sound.ClickSound.play(player);
+            if (editKitGui != null) {
+                editKitGui.resetVariantSlot(player, kitId, variant);
+            }
+            paintChipPanel(player, session);
+            return;
+        }
+        if (click == org.bukkit.event.inventory.ClickType.RIGHT) {
+            if (editKitGui != null) {
+                com.rumilance.practice.sound.ClickSound.play(player);
+                session.setNavigatingAway(true);
+                editKitGui.openKitVariantEditorWithReturn(player, kitId, variant,
+                        session.kitCategory(), session.page());
+            }
+            return;
+        }
+        if (click == org.bukkit.event.inventory.ClickType.LEFT) {
+            kitVariantsStore.select(player.getUniqueId(), kitId, variant);
+            com.rumilance.practice.sound.ClickSound.play(player);
+            paintChipPanel(player, session);
+        }
+    }
+
+    /** Always hand the borrowed inventory rows back when the GUI goes away. */
+    @Override
+    public void onGuiClose(Player player, GuiSession session, Inventory top,
+                           org.bukkit.event.inventory.InventoryCloseEvent.Reason reason) {
+        restoreBottom(player);
     }
 
     private ItemStack kitIcon(Player player, KitDefinition kit, boolean viewer) {
@@ -408,17 +563,6 @@ public final class EkitSelectGui extends AbstractGui {
                 .build();
     }
 
-    private ItemStack originalPaper(Player player) {
-        return ItemBuilder.of(Material.PAPER)
-                .name(t(player, "gui.original-kit").color(UiTheme.DANGER))
-                .lore(UiTheme.divider(),
-                        UiTheme.line(line(player, "gui.original-kit-lore")),
-                        UiTheme.blank(),
-                        UiTheme.hint(line(player, "menu.click")))
-                .action("original")
-                .build();
-    }
-
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot, String action) {
         if (action != null && action.startsWith("cat:")) {
@@ -432,8 +576,7 @@ public final class EkitSelectGui extends AbstractGui {
             List<KitDefinition> kits = kitService.enabled(
                     "SUB".equalsIgnoreCase(session.kitCategory())
                             ? KitCategory.SUB : KitCategory.MAIN);
-            int pages = Math.max(1, (kits.size() + MenuScaffold.gridPageSize() - 1)
-                    / MenuScaffold.gridPageSize());
+            int pages = Math.max(1, (kits.size() + KIT_GRID_SIZE - 1) / KIT_GRID_SIZE);
             int page = "page:next".equals(action) ? session.page() + 1 : session.page() - 1;
             session.setPage(Math.min(Math.max(0, page), pages - 1));
             sounds.play(player, "gui-click");
@@ -451,14 +594,6 @@ public final class EkitSelectGui extends AbstractGui {
             }
             sounds.play(player, "gui-back");
             player.closeInventory();
-            return;
-        }
-        if ("original".equals(action)) {
-            sounds.play(player, "select");
-            session.setNavigatingAway(true);
-            if (originalKitGui != null) {
-                originalKitGui.open(player);
-            }
             return;
         }
         if (action != null && action.startsWith("viewkit:")) {
@@ -533,48 +668,4 @@ public final class EkitSelectGui extends AbstractGui {
         }
     }
 
-    /**
-     * Chip interactions need the {@link org.bukkit.event.inventory.ClickType}: LEFT =
-     * make Active, RIGHT = edit that slot, SHIFT+click = reset its contents — every one
-     * with the ui.button.click sound (user spec 2026-10-04). Dispatched from the
-     * ClickType-aware {@code handleClick} at the top of this class.
-     */
-    private void handleVariantClick(Player player, GuiSession session, Inventory inventory,
-                                    String action, org.bukkit.event.inventory.ClickType clickType) {
-        String kitId = session.get("selected-kit", String.class);
-        if (kitVariantsStore == null || kitId == null) {
-            return;
-        }
-        int variant;
-        try {
-            variant = Integer.parseInt(action.substring("variant:".length()));
-        } catch (NumberFormatException ignored) {
-            return; // Malformed chip action.
-        }
-        if (clickType == org.bukkit.event.inventory.ClickType.SHIFT_LEFT
-                || clickType == org.bukkit.event.inventory.ClickType.SHIFT_RIGHT) {
-            // Shift+click: reset that K slot's contents (drop the saved row, back to the
-            // kit's official layout everywhere).
-            com.rumilance.practice.sound.ClickSound.play(player);
-            if (editKitGui != null) {
-                editKitGui.resetVariantSlot(player, kitId, variant);
-            }
-            refresh(player, session, inventory);
-            return;
-        }
-        if (clickType == org.bukkit.event.inventory.ClickType.RIGHT) {
-            // Right-click: open the KIT EDIT GUI on exactly that K slot.
-            if (editKitGui != null) {
-                com.rumilance.practice.sound.ClickSound.play(player);
-                session.setNavigatingAway(true);
-                editKitGui.openKitVariantEditorWithReturn(player, kitId, variant,
-                        session.kitCategory(), session.page());
-            }
-            return;
-        }
-        // Left-click: make this slot the kit's Active one (本 moves here).
-        kitVariantsStore.select(player.getUniqueId(), kitId, variant);
-        com.rumilance.practice.sound.ClickSound.play(player);
-        refresh(player, session, inventory);
-    }
 }

@@ -228,7 +228,11 @@ public final class GuiListener implements Listener {
         event.setCancelled(true);
 
         boolean topShiftClick = clicked == top && click.isShiftClick();
-        if (!topShiftClick
+        // Shift-clicks on the player's own rows are dispatched to BottomInventoryClickHandler
+        // menus too (e.g. the KIT SELECT chip panel's Shift = reset slot action); the event is
+        // already cancelled, so nothing vanilla can leak through.
+        boolean bottomShiftClick = clicked != top && click.isShiftClick();
+        if (!topShiftClick && !bottomShiftClick
                 && (click == ClickType.NUMBER_KEY
                 || click == ClickType.DOUBLE_CLICK
                 || click == ClickType.DROP
