@@ -45,10 +45,15 @@ public final class EkitSelectGui extends AbstractGui {
      * Players edit their own layout for that child, the same as any other kit. Admins can reach
      * the management screen from the child list's Manage button; an empty parent opens the
      * management screen directly so they can create the first child. LEFT uses the default child.
+     * The K1..K4 chips are handled here too — they need the {@code ClickType}.
      */
     @Override
     public void handleClick(Player player, GuiSession session, Inventory inventory, int slot,
                             String action, org.bukkit.event.inventory.ClickType clickType) {
+        if (action != null && action.startsWith("variant:")) {
+            handleVariantClick(player, session, inventory, action, clickType);
+            return;
+        }
         if (clickType == org.bukkit.event.inventory.ClickType.RIGHT
                 && action != null && action.startsWith("viewkit:")
                 && isViewer(session) && innerKitSelectGui != null) {
@@ -531,19 +536,9 @@ public final class EkitSelectGui extends AbstractGui {
     /**
      * Chip interactions need the {@link org.bukkit.event.inventory.ClickType}: LEFT =
      * make Active, RIGHT = edit that slot, SHIFT+click = reset its contents — every one
-     * with the ui.button.click sound (user spec 2026-10-04). Everything else delegates
-     * to the click-type-agnostic handler.
+     * with the ui.button.click sound (user spec 2026-10-04). Dispatched from the
+     * ClickType-aware {@code handleClick} at the top of this class.
      */
-    @Override
-    public void handleClick(Player player, GuiSession session, Inventory inventory, int slot,
-                            String action, org.bukkit.event.inventory.ClickType clickType) {
-        if (action != null && action.startsWith("variant:")) {
-            handleVariantClick(player, session, inventory, action, clickType);
-            return;
-        }
-        handleClick(player, session, inventory, slot, action);
-    }
-
     private void handleVariantClick(Player player, GuiSession session, Inventory inventory,
                                     String action, org.bukkit.event.inventory.ClickType clickType) {
         String kitId = session.get("selected-kit", String.class);
