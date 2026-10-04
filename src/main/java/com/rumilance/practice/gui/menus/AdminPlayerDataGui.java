@@ -1,5 +1,6 @@
 package com.rumilance.practice.gui.menus;
 
+import com.rumilance.practice.ban.BanService;
 import com.rumilance.practice.cosmetic.namecolor.NameColorSelection;
 import com.rumilance.practice.cosmetic.namecolor.NameColorService;
 import com.rumilance.practice.database.repository.KitLayoutRepository;
@@ -10,7 +11,6 @@ import com.rumilance.practice.gui.GuiSession;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.GuiType;
 import com.rumilance.practice.gui.ItemBuilder;
-import com.rumilance.practice.gui.MenuScaffold;
 import com.rumilance.practice.gui.UiTheme;
 import com.rumilance.practice.kit.KitLayoutCache;
 import com.rumilance.practice.model.KitLayoutSnapshot;
@@ -19,11 +19,13 @@ import com.rumilance.practice.model.PlayerSettings;
 import com.rumilance.practice.model.PunishmentRecord;
 import com.rumilance.practice.model.RankedKitStats;
 import com.rumilance.practice.originalkit.OriginalKitService;
+import com.rumilance.practice.punishment.ChatBanService;
 import com.rumilance.practice.rank.PlayerRank;
 import com.rumilance.practice.rank.RankService;
 import com.rumilance.practice.settings.SettingsService;
 import com.rumilance.practice.sound.SoundService;
 import com.rumilance.practice.stats.StatsService;
+import com.rumilance.practice.stats.StatsResetService;
 import com.rumilance.practice.util.GuiSlots;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -41,9 +43,12 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Admin panel showing EVERYTHING stored for one player (search by UUID or MCID via the
- * admin menu prompt) plus data-edit actions: reset ekits (this player / everyone), clear the
- * name color, reset the locale to auto.
+ * Admin panel with EVERYTHING stored for one player — and every value editable in place:
+ * rank (click cycles up / shift down), settings toggles, chat whitelist (chat-input add,
+ * shift clears), ekits (this player / everyone), original kits (clear slots), name color,
+ * ranked stats (reset this player / everyone), punishments (lift all), kick and force-end,
+ * plus the shift-gated full wipe. This is the GUI face of /urank, /practiceadmin statsreset
+ * and the old read-only data screen combined.
  */
 public final class AdminPlayerDataGui extends AbstractGui {
 
@@ -61,6 +66,11 @@ public final class AdminPlayerDataGui extends AbstractGui {
     private final PunishmentRepository punishmentRepository;
     private final StatsService statsService;
     private java.util.function.Consumer<Player> backToAdminMenu = p -> { };
+    private StatsResetService statsResetService;
+    private ChatBanService chatBanService;
+    private BanService banService;
+    private com.rumilance.practice.match.MatchService matchService;
+    private org.bukkit.plugin.Plugin plugin;
 
     public AdminPlayerDataGui(GuiSessionRegistry registry, SoundService sounds,
                               PlayerRepository playerRepository, RankService rankService,
@@ -82,6 +92,31 @@ public final class AdminPlayerDataGui extends AbstractGui {
 
     public void setBackToAdminMenu(java.util.function.Consumer<Player> backToAdminMenu) {
         this.backToAdminMenu = backToAdminMenu == null ? p -> { } : backToAdminMenu;
+    }
+
+    /** Enables the ranked-stats reset actions (/practiceadmin statsreset path). */
+    public void setStatsResetService(StatsResetService statsResetService) {
+        this.statsResetService = statsResetService;
+    }
+
+    /** Enables the punishment lift action (cache-aware unban). */
+    public void setChatBanService(ChatBanService chatBanService) {
+        this.chatBanService = chatBanService;
+    }
+
+    /** Enables the kick action in this panel. */
+    public void setBanService(BanService banService) {
+        this.banService = banService;
+    }
+
+    /** Enables the force-end action in this panel. */
+    public void setMatchService(com.rumilance.practice.match.MatchService matchService) {
+        this.matchService = matchService;
+    }
+
+    /** Plugin handle for off-main-thread stats resets. */
+    public void setPlugin(org.bukkit.plugin.Plugin plugin) {
+        this.plugin = plugin;
     }
 
     /** Pending lookup targets handed into {@link #configureSession} (session is fresh there). */
@@ -161,7 +196,7 @@ public final class AdminPlayerDataGui extends AbstractGui {
                                         : UiTheme.labelValue("Last seen", TIME_FORMAT.format(data.lastSeen())))
                         .action("decorate").build());
 
-        // --- rank ---
+        // --- rank (editable: click cycles up, shift cycles down) ---
         PlayerRank rank = rankService == null ? PlayerRank.NORM : rankService.get(target);
         inventory.setItem(GuiSlots.slot(1, 1),
                 ItemBuilder.of(Material.GOLDEN_HELMET)
@@ -169,27 +204,62 @@ public final class AdminPlayerDataGui extends AbstractGui {
                                 rank.isVipPlusOrAbove() ? NamedTextColor.LIGHT_PURPLE
                                         : rank.isVipOrAbove() ? NamedTextColor.GREEN
                                         : rank == PlayerRank.PRO ? NamedTextColor.AQUA : UiTheme.MUTED))
-                        .lore(UiTheme.line("Change with /urank"),
-                                UiTheme.hint("Read-only here"))
-                        .action("decorate").build());
+                        .lore(UiTheme.labelValue("Order", "NORM < PRO < VIP < VIP+ < ADMIN"),
+                                UiTheme.blank(),
+                                UiTheme.hint("Click: promote one step"),
+                                UiTheme.hint("Shift-click: demote one step"))
+                        .glint(rank != PlayerRank.NORM)
+                        .action("act:rank").build());
 
-        // --- settings ---
+        // --- settings (editable toggles) ---
         try {
             PlayerSettings settings = settingsService.get(target);
-            inventory.setItem(GuiSlots.slot(1, 3),
+            inventory.setItem(GuiSlots.slot(1, 2),
                     ItemBuilder.of(Material.BOOK)
                             .name(Component.text("Settings", UiTheme.PRIMARY))
                             .lore(UiTheme.labelValue("Locale", settings.locale()),
                                     UiTheme.labelValue("Sounds", settings.soundsEnabled() ? "on" : "off"),
                                     UiTheme.labelValue("Scoreboard", settings.scoreboardEnabled() ? "on" : "off"),
                                     UiTheme.labelValue("Duel requests", settings.acceptDuelRequests() ? "on" : "off"),
-                                    UiTheme.labelValue("Whitelist size", String.valueOf(settings.chatWhitelist().size())),
                                     UiTheme.blank(),
-                                    UiTheme.hint("Click: reset locale to auto"))
-                            .action("act:reset_locale").build());
+                                    UiTheme.hint("Click: reset locale to auto"),
+                                    UiTheme.hint("Shift-click: toggle sounds"),
+                                    UiTheme.hint("Right-click: toggle scoreboard"))
+                            .action("act:settings").build());
         } catch (RuntimeException e) {
-            errorTile(inventory, GuiSlots.slot(1, 3), "Settings");
+            errorTile(inventory, GuiSlots.slot(1, 2), "Settings");
         }
+
+        // --- chat whitelist (editable) ---
+        List<String> whitelist = List.of();
+        try {
+            whitelist = List.copyOf(settingsService.get(target).chatWhitelist());
+        } catch (RuntimeException e) {
+            // no profile yet — render an empty list
+        }
+        List<Component> wlLore = new ArrayList<>();
+        if (whitelist.isEmpty()) {
+            wlLore.add(UiTheme.line("empty — sees every chat"));
+        } else {
+            int shown = 0;
+            for (String entry : whitelist) {
+                if (shown++ >= 8) {
+                    wlLore.add(UiTheme.line("+ " + (whitelist.size() - shown + 1) + " more"));
+                    break;
+                }
+                wlLore.add(UiTheme.line("- " + entry));
+            }
+        }
+        wlLore.add(UiTheme.blank());
+        wlLore.add(UiTheme.hint("Click: add by typing name in chat"));
+        wlLore.add(UiTheme.hint("(type 'clear' to wipe it)"));
+        wlLore.add(UiTheme.hint("Shift-click: clear whitelist now"));
+        inventory.setItem(GuiSlots.slot(1, 3),
+                ItemBuilder.of(whitelist.isEmpty() ? Material.PAPER : Material.WRITABLE_BOOK)
+                        .name(Component.text("Chat whitelist: " + whitelist.size(),
+                                UiTheme.PRIMARY))
+                        .lore(wlLore.toArray(new Component[0]))
+                        .action("act:whitelist").build());
 
         // --- ekit layouts ---
         List<KitLayoutSnapshot> layouts = safeList(() -> kitLayoutRepository.findAllForPlayer(target));
@@ -197,13 +267,13 @@ public final class AdminPlayerDataGui extends AbstractGui {
         ekitLore.add(UiTheme.blank());
         ekitLore.add(UiTheme.hint("Click: reset THIS player's ekits"));
         ekitLore.add(UiTheme.hint("Shift-click: reset EVERY player's ekits"));
-        inventory.setItem(GuiSlots.slot(1, 5),
+        inventory.setItem(GuiSlots.slot(1, 4),
                 ItemBuilder.of(Material.ENDER_CHEST, Math.max(1, layouts.size()))
                         .name(Component.text("Ekit layouts: " + layouts.size(), UiTheme.PRIMARY))
                         .lore(ekitLore.toArray(new Component[0]))
                         .action("act:reset_ekits").build());
 
-        // --- original kits ---
+        // --- original kits (clearable) ---
         List<String> originalSlots = new ArrayList<>();
         if (originalKitService != null) {
             for (int slot = 0; slot < 9; slot++) {
@@ -212,18 +282,21 @@ public final class AdminPlayerDataGui extends AbstractGui {
                 }
             }
         }
-        inventory.setItem(GuiSlots.slot(1, 7),
+        inventory.setItem(GuiSlots.slot(1, 5),
                 ItemBuilder.of(Material.NETHER_STAR)
                         .name(Component.text("Original kits: " + originalSlots.size(), UiTheme.PRIMARY))
                         .lore(originalSlots.isEmpty()
-                                ? UiTheme.line("none saved")
-                                : UiTheme.line(String.join(", ", originalSlots)))
-                        .action("decorate").build());
+                                        ? UiTheme.line("none saved")
+                                        : UiTheme.line(String.join(", ", originalSlots)),
+                                UiTheme.blank(),
+                                UiTheme.hint("Shift-click: delete ALL of this"),
+                                UiTheme.hint("player's original kit slots"))
+                        .action("act:original_kits").build());
 
         // --- name color ---
         NameColorSelection color = nameColorService == null
                 ? NameColorSelection.DEFAULT : nameColorService.selection(target);
-        inventory.setItem(GuiSlots.slot(3, 1),
+        inventory.setItem(GuiSlots.slot(1, 6),
                 ItemBuilder.of(Material.NAME_TAG)
                         .name(Component.text("Name color: " + color.mode().name().toLowerCase(),
                                 color.active() ? UiTheme.SUCCESS : UiTheme.MUTED))
@@ -236,38 +309,74 @@ public final class AdminPlayerDataGui extends AbstractGui {
                                 UiTheme.hint("Click: clear name color"))
                         .action("act:clear_namecolor").build());
 
-        // --- punishments ---
-        List<PunishmentRecord> active = safeList(() -> punishmentRepository.findActiveForPlayer(target));
-        inventory.setItem(GuiSlots.slot(3, 3),
-                ItemBuilder.of(active.isEmpty() ? Material.LIME_DYE : Material.RED_DYE)
-                        .name(Component.text("Active punishments: " + active.size(),
-                                active.isEmpty() ? UiTheme.SUCCESS : UiTheme.DANGER))
-                        .lore(punishmentLore(active))
-                        .action("decorate").build());
-
-        // --- ranked stats summary ---
+        // --- ranked stats (resettlable) ---
         List<RankedKitStats> stats = safeList(() -> statsService.allKits(target));
         long wins = stats.stream().mapToLong(RankedKitStats::wins).sum();
         long losses = stats.stream().mapToLong(RankedKitStats::losses).sum();
         List<Component> statsLore = new ArrayList<>();
         statsLore.add(UiTheme.labelValue("Kits played", String.valueOf(stats.size())));
         statsLore.add(UiTheme.labelValue("Wins / Losses", wins + " / " + losses));
-        statsLore.add(UiTheme.blank());
         statsLore.addAll(List.of(topPtLines(stats)));
-        inventory.setItem(GuiSlots.slot(3, 5),
+        statsLore.add(UiTheme.blank());
+        statsLore.add(UiTheme.hint("Click: reset THIS player's stats & rating"));
+        statsLore.add(UiTheme.hint("Shift-click: reset EVERY player's"));
+        inventory.setItem(GuiSlots.slot(1, 7),
                 ItemBuilder.of(Material.IRON_SWORD)
                         .name(Component.text("Ranked stats", UiTheme.PRIMARY))
                         .lore(statsLore.toArray(new Component[0]))
-                        .action("decorate").build());
+                        .action("act:reset_stats").build());
 
-        // --- bulk tools ---
-        inventory.setItem(GuiSlots.slot(3, 7),
+        // --- punishments (liftable) ---
+        List<PunishmentRecord> active = safeList(() -> punishmentRepository.findActiveForPlayer(target));
+        List<Component> punishLore = new ArrayList<>(List.of(punishmentLore(active)));
+        if (!active.isEmpty()) {
+            punishLore.add(UiTheme.blank());
+            punishLore.add(UiTheme.hint("Click: lift ALL active punishments"));
+        }
+        inventory.setItem(GuiSlots.slot(2, 2),
+                ItemBuilder.of(active.isEmpty() ? Material.LIME_DYE : Material.RED_DYE)
+                        .name(Component.text("Active punishments: " + active.size(),
+                                active.isEmpty() ? UiTheme.SUCCESS : UiTheme.DANGER))
+                        .lore(punishLore.toArray(new Component[0]))
+                        .glint(!active.isEmpty())
+                        .action("act:lift_punishments").build());
+
+        // --- kick (online only) ---
+        inventory.setItem(GuiSlots.slot(2, 4),
+                ItemBuilder.of(online == null ? Material.GRAY_DYE : Material.IRON_BOOTS)
+                        .name(Component.text("Kick", online == null ? UiTheme.MUTED : UiTheme.DANGER))
+                        .lore(online == null
+                                        ? UiTheme.line("target is offline")
+                                        : UiTheme.labelValue("Reason", "Kicked by staff"),
+                                UiTheme.blank(),
+                                UiTheme.hint(online == null ? "-" : "Click: kick now"))
+                        .action(online == null ? "decorate" : "act:kick").build());
+
+        // --- force-end ---
+        boolean inMatch = matchService != null && matchService.busyReason(target) != null;
+        inventory.setItem(GuiSlots.slot(2, 6),
+                ItemBuilder.of(inMatch ? Material.TNT_MINECART : Material.MINECART)
+                        .name(Component.text("Force-end match",
+                                inMatch ? UiTheme.DANGER : UiTheme.MUTED))
+                        .lore(inMatch
+                                        ? UiTheme.labelValue("State", matchService.busyReason(target))
+                                        : UiTheme.line("not in a live match"),
+                                UiTheme.blank(),
+                                UiTheme.hint("Click: draw-end their match"))
+                        .glint(inMatch)
+                        .action("act:forceend").build());
+
+        // --- full wipe ---
+        inventory.setItem(GuiSlots.slot(2, 7),
                 ItemBuilder.of(Material.TNT)
-                        .name(Component.text("Reset ALL players' ekits", UiTheme.DANGER))
-                        .lore(UiTheme.line("Deletes every saved ekit layout on the server."),
+                        .name(Component.text("FULL WIPE this player", UiTheme.DANGER))
+                        .lore(UiTheme.line("Rank→NORM, stats, ekits, original kits,"),
+                                UiTheme.line("whitelist, locale, name color,"),
+                                UiTheme.line("active punishments — everything."),
                                 UiTheme.blank(),
                                 UiTheme.hint("Shift-click: execute"))
-                        .action("act:reset_ekits_all").build());
+                        .glint(true)
+                        .action("act:full_wipe").build());
 
         backToMenu(inventory, player);
     }
@@ -286,7 +395,7 @@ public final class AdminPlayerDataGui extends AbstractGui {
         List<Component> lines = new ArrayList<>();
         int shown = 0;
         for (KitLayoutSnapshot snapshot : layouts) {
-            if (shown++ >= 10) {
+            if (shown++ >= 8) {
                 lines.add(UiTheme.line("+ " + (layouts.size() - shown + 1) + " more"));
                 break;
             }
@@ -351,27 +460,85 @@ public final class AdminPlayerDataGui extends AbstractGui {
             return;
         }
         UUID target = targetOf(session);
-        if (target == null) {
+        if (target == null || action == null || !action.startsWith("act:")) {
             return;
         }
         boolean shift = clickType == org.bukkit.event.inventory.ClickType.SHIFT_LEFT
                 || clickType == org.bukkit.event.inventory.ClickType.SHIFT_RIGHT;
+        boolean right = clickType == org.bukkit.event.inventory.ClickType.RIGHT
+                || clickType == org.bukkit.event.inventory.ClickType.SHIFT_RIGHT;
+        Player online = Bukkit.getPlayer(target);
 
         switch (action) {
-            case "act:reset_locale" -> {
+            case "act:rank" -> {
+                if (rankService != null) {
+                    PlayerRank current = rankService.get(target);
+                    PlayerRank[] order = PlayerRank.values();
+                    int index = current.ordinal();
+                    PlayerRank next = shift
+                            ? order[Math.max(0, index - 1)]
+                            : order[Math.min(order.length - 1, index + 1)];
+                    if (next != current) {
+                        rankService.setRank(target, next);
+                        player.sendMessage(Component.text("Rank of " + displayName(target)
+                                + ": " + current + " → " + next, NamedTextColor.GREEN));
+                    }
+                    sounds.play(player, "select");
+                }
+                refresh(player, session, inventory);
+            }
+            case "act:settings" -> {
                 try {
                     PlayerSettings settings = settingsService.get(target);
-                    settingsService.update(settings.withLocale(PlayerSettings.LOCALE_AUTO));
-                    Player online = Bukkit.getPlayer(target);
+                    PlayerSettings next;
+                    String note;
+                    if (shift) {
+                        next = settings.withSoundsEnabled(!settings.soundsEnabled());
+                        note = "sounds " + (next.soundsEnabled() ? "on" : "off");
+                    } else if (right) {
+                        next = settings.withScoreboardEnabled(!settings.scoreboardEnabled());
+                        note = "scoreboard " + (next.scoreboardEnabled() ? "on" : "off");
+                    } else {
+                        next = settings.withLocale(PlayerSettings.LOCALE_AUTO);
+                        note = "locale reset to auto";
+                    }
+                    settingsService.update(next);
                     if (online != null) {
                         online.sendMessage(Component.text(
-                                "Your language setting was reset by an admin.", NamedTextColor.YELLOW));
+                                "A setting was changed by an admin (" + note + ").",
+                                NamedTextColor.YELLOW));
                     }
+                    player.sendMessage(Component.text(
+                            displayName(target) + ": " + note + ".", NamedTextColor.GREEN));
                     sounds.play(player, "select");
                 } catch (RuntimeException e) {
                     sounds.play(player, "error");
                 }
                 refresh(player, session, inventory);
+            }
+            case "act:whitelist" -> {
+                if (shift) {
+                    try {
+                        settingsService.update(settingsService.get(target)
+                                .withChatWhitelist(java.util.Set.of()));
+                        player.sendMessage(Component.text(
+                                "Chat whitelist cleared for " + displayName(target) + ".",
+                                NamedTextColor.YELLOW));
+                        sounds.play(player, "select");
+                    } catch (RuntimeException e) {
+                        sounds.play(player, "error");
+                    }
+                    refresh(player, session, inventory);
+                } else {
+                    sounds.play(player, "gui-click");
+                    session.put(com.rumilance.practice.admin.AdminPlayerLookupListener.AWAIT_WL_TARGET,
+                            target.toString());
+                    player.closeInventory();
+                    player.sendMessage(Component.text(
+                            "Type a name to ADD to " + displayName(target)
+                                    + "'s chat whitelist, or 'clear' to wipe it.",
+                            NamedTextColor.LIGHT_PURPLE));
+                }
             }
             case "act:reset_ekits" -> {
                 if (shift) {
@@ -380,7 +547,6 @@ public final class AdminPlayerDataGui extends AbstractGui {
                     try {
                         int removed = kitLayoutRepository.deleteAllForPlayer(target);
                         kitLayoutCache.unload(target);
-                        Player online = Bukkit.getPlayer(target);
                         if (online != null) {
                             online.sendMessage(Component.text(
                                     "Your ekit layouts were reset by an admin.", NamedTextColor.YELLOW));
@@ -394,20 +560,26 @@ public final class AdminPlayerDataGui extends AbstractGui {
                 }
                 refresh(player, session, inventory);
             }
-            case "act:reset_ekits_all" -> {
-                if (shift) {
-                    resetAllEkits(player);
-                } else {
-                    player.sendMessage(Component.text(
-                            "Shift-click the TNT to really reset every player's ekits.",
-                            NamedTextColor.YELLOW));
+            case "act:original_kits" -> {
+                if (originalKitService != null) {
+                    if (shift) {
+                        int removed = originalKitService.deleteAllForPlayer(target);
+                        player.sendMessage(Component.text("Deleted " + removed
+                                + " original-kit slot(s) of " + displayName(target) + ".",
+                                NamedTextColor.YELLOW));
+                        sounds.play(player, "select");
+                    } else {
+                        sounds.play(player, "error");
+                        player.sendMessage(Component.text(
+                                "Shift-click to delete this player's original kit slots.",
+                                NamedTextColor.YELLOW));
+                    }
                 }
                 refresh(player, session, inventory);
             }
             case "act:clear_namecolor" -> {
                 if (nameColorService != null) {
                     nameColorService.save(target, NameColorSelection.DEFAULT);
-                    Player online = Bukkit.getPlayer(target);
                     if (online != null) {
                         nameColorService.applyToPlayer(online);
                     }
@@ -415,7 +587,188 @@ public final class AdminPlayerDataGui extends AbstractGui {
                 }
                 refresh(player, session, inventory);
             }
+            case "act:reset_stats" -> {
+                if (statsResetService == null) {
+                    sounds.play(player, "error");
+                    refresh(player, session, inventory);
+                    return;
+                }
+                if (shift) {
+                    runStatsReset(player, null);
+                } else {
+                    runStatsReset(player, target);
+                }
+                refresh(player, session, inventory);
+            }
+            case "act:lift_punishments" -> {
+                List<PunishmentRecord> active = safeList(() -> punishmentRepository.findActiveForPlayer(target));
+                if (active.isEmpty()) {
+                    sounds.play(player, "error");
+                    refresh(player, session, inventory);
+                    return;
+                }
+                int lifted = 0;
+                for (PunishmentRecord record : active) {
+                    try {
+                        punishmentRepository.revoke(record.id());
+                        lifted++;
+                    } catch (Exception e) {
+                        // keep lifting the rest
+                    }
+                }
+                if (chatBanService != null) {
+                    chatBanService.unban(target); // evicts the cached chat-ban record
+                }
+                player.sendMessage(Component.text("Lifted " + lifted + " punishment(s) for "
+                        + displayName(target) + ".", NamedTextColor.GREEN));
+                sounds.play(player, "select");
+                refresh(player, session, inventory);
+            }
+            case "act:kick" -> {
+                if (online == null) {
+                    sounds.play(player, "error");
+                    refresh(player, session, inventory);
+                    return;
+                }
+                if (banService != null) {
+                    banService.kick(online, player.getName(), "Kicked by staff");
+                } else {
+                    online.kick(Component.text("Kicked by staff", NamedTextColor.RED));
+                }
+                player.sendMessage(Component.text("Kicked " + online.getName() + ".",
+                        NamedTextColor.GREEN));
+                sounds.play(player, "select");
+                refresh(player, session, inventory);
+            }
+            case "act:forceend" -> {
+                if (matchService == null || !matchService.forceEndMatch(target)) {
+                    sounds.play(player, "error");
+                    player.sendMessage(Component.text(
+                            displayName(target) + " is not in a live match.", NamedTextColor.RED));
+                } else {
+                    player.sendMessage(Component.text(
+                            "Force-ended the match of " + displayName(target) + ".",
+                            NamedTextColor.GREEN));
+                    sounds.play(player, "select");
+                }
+                refresh(player, session, inventory);
+            }
+            case "act:full_wipe" -> {
+                if (!shift) {
+                    sounds.play(player, "error");
+                    player.sendMessage(Component.text(
+                            "Shift-click the TNT to really wipe " + displayName(target) + ".",
+                            NamedTextColor.YELLOW));
+                    refresh(player, session, inventory);
+                    return;
+                }
+                // rank → NORM
+                if (rankService != null && rankService.get(target) != PlayerRank.NORM) {
+                    rankService.setRank(target, PlayerRank.NORM);
+                }
+                // ekits
+                try {
+                    kitLayoutRepository.deleteAllForPlayer(target);
+                    kitLayoutCache.unload(target);
+                } catch (Exception ignored) {
+                    // continue the wipe
+                }
+                // original kits
+                if (originalKitService != null) {
+                    originalKitService.deleteAllForPlayer(target);
+                }
+                // whitelist + locale
+                try {
+                    settingsService.update(settingsService.get(target)
+                            .withChatWhitelist(java.util.Set.of())
+                            .withLocale(PlayerSettings.LOCALE_AUTO));
+                } catch (RuntimeException ignored) {
+                    // no profile yet
+                }
+                // name color
+                if (nameColorService != null) {
+                    nameColorService.save(target, NameColorSelection.DEFAULT);
+                    if (online != null) {
+                        nameColorService.applyToPlayer(online);
+                    }
+                }
+                // punishments
+                for (PunishmentRecord record : safeList(() -> punishmentRepository.findActiveForPlayer(target))) {
+                    try {
+                        punishmentRepository.revoke(record.id());
+                    } catch (Exception ignored) {
+                        // continue
+                    }
+                }
+                if (chatBanService != null) {
+                    chatBanService.unban(target);
+                }
+                // ranked stats
+                runStatsReset(player, target);
+                if (online != null) {
+                    online.sendMessage(Component.text(
+                            "Your data was reset by an admin.", NamedTextColor.RED));
+                }
+                player.sendMessage(Component.text(
+                        "FULL WIPE executed for " + displayName(target) + ".", NamedTextColor.RED));
+                sounds.play(player, "match-found");
+                refresh(player, session, inventory);
+            }
             default -> { }
+        }
+    }
+
+    private String displayName(UUID target) {
+        Player online = Bukkit.getPlayer(target);
+        if (online != null) {
+            return online.getName();
+        }
+        PlayerData data = safe(() -> playerRepository.findByUuid(target).orElse(null));
+        return data != null && data.username() != null ? data.username() : target.toString();
+    }
+
+    /** Same async shape as /practiceadmin statsreset: DB work off-thread, report on main. */
+    private void runStatsReset(Player admin, UUID target) {
+        if (statsResetService == null) {
+            sounds.play(admin, "error");
+            return;
+        }
+        UUID wiped = target;
+        boolean async = plugin != null && plugin.isEnabled();
+        Runnable report = () -> {
+            admin.sendMessage(Component.text(wiped == null
+                    ? "ALL stats & ratings reset."
+                    : "Stats & rating reset for " + displayName(wiped) + ".", NamedTextColor.GREEN));
+            sounds.play(admin, wiped == null ? "match-found" : "select");
+        };
+        Runnable failure = () -> {
+            admin.sendMessage(Component.text("Stats reset failed.", NamedTextColor.RED));
+            sounds.play(admin, "error");
+        };
+        Runnable work = () -> {
+            try {
+                if (wiped == null) {
+                    statsResetService.resetAll();
+                } else {
+                    statsResetService.resetPlayer(wiped);
+                }
+                if (async) {
+                    Bukkit.getScheduler().runTask(plugin, report);
+                } else {
+                    report.run();
+                }
+            } catch (Exception e) {
+                if (async) {
+                    Bukkit.getScheduler().runTask(plugin, failure);
+                } else {
+                    failure.run();
+                }
+            }
+        };
+        if (async) {
+            Bukkit.getScheduler().runTaskAsynchronously(plugin, work);
+        } else {
+            work.run();
         }
     }
 

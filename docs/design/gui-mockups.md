@@ -75,3 +75,47 @@ Red ring; blaze rod "Transfer OWNER" · barrier "Disband Party" · oak sign "BAN
 Yellow/white 装飾 frame; party heads ("<owner>'s Team") in the grid, gray panes
 "No party available" when empty; clock "Update Data", page arrows, writable book
 "Create a Party".
+
+## Admin suite refresh (target: AdminMenuGui + 5 new screens) — implemented (v1.92.23)
+
+The /practiceadmin surface became the GUI face of every subcommand. These screens were
+laid out in-repo (not user-mockup'd) and keep the classic `paintFrame` PURPLE chrome
+(perimeter pane ring + title icon), matching the pre-existing AdminMenuGui /
+AdminPlayerDataGui style. Interior = rows 1–4, cols 1–7 (28 tiles); back/close at (5,4);
+page arrows via MenuScaffold.
+
+### AdminMenuGui (6 rows)
+
+- row1 content: (1,1) Kits → KitAdminGui · (1,2) Presets · (1,3) Original kits → EkitAdmin ·
+  (1,5) Sign item · (1,6) Player data editor (chat lookup)
+- row2 live: (2,1) Live matches · (2,3) FFA settings · (2,5) Arena source · (2,7) Queues & maps
+- row3 players/world: (3,1) Players · (3,2) Broadcast (chat input) · (3,3) Default KB profile ·
+  (3,4) Alt flags · (3,5) Pack policy · (3,6) Time/weather cycle · (3,7) Floating items
+  (click=queue / right=sword-ffa / shift=removeall)
+- row4 switches: (4,1) Maintenance toggle · (4,2) Ranked queue (click=on/off,
+  shift=auto-unlock) · (4,3) TNT reset ALL ranked stats (shift) · (4,4) Cleanup (shift) ·
+  (4,5) Reload (shift) · (4,6) FFA command gate · (4,7) Status (live lore)
+
+One-shot tiles run through a command bridge (`PracticeAdminCommand.dispatch`) so GUI and
+typed command can never drift.
+
+### New screens (all 6 rows, PURPLE, paged grids)
+
+| Screen | Purpose | Actions |
+|--------|---------|---------|
+| AdminPlayersGui | online players as heads + spyglass chat lookup | click=data editor, right=kick, shift=force-end |
+| AdminMatchesGui | live matches with mode/state/kit/participants | click=force-end (draw) |
+| AdminToggleGui  | kit queues + arena maps, one dye tile each | click=enable/disable (`toggle` bridge) |
+| KbDefaultGui    | kb/*.json profiles + OFF tile, current glints | click=set default (`kbdefault` bridge) |
+| AltFlagsGui     | open alt-detection flags (admin-private)     | click=dismiss + lift pair restriction |
+
+### AdminPlayerDataGui v2 (player-linked data, all editable)
+
+row1: rank (click promote / shift demote, live via RankService) · settings (click locale
+reset / shift sounds / right scoreboard) · chat whitelist (click=chat-input add or
+`clear`, shift=clear now) · ekits (click=this player / shift=everyone) · original kits
+(shift=delete this player's slots) · name color (click=clear) · ranked stats (click=this
+player / shift=everyone). row2: punishments (click=lift all + cache evict) · kick ·
+force-end · TNT FULL WIPE (shift = rank→NORM + stats + ekits + originals + WL + locale +
+color + punishments). Chat whitelist here is the per-player chat filter
+(`PlayerSettings.chatWhitelist()`), the same set edited from SettingsGui.

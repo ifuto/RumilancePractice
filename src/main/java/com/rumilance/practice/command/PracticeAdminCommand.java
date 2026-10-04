@@ -163,7 +163,19 @@ public final class PracticeAdminCommand implements CommandExecutor, TabCompleter
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command,
                              @NotNull String label, @NotNull String[] args) {
-        String name = command.getName().toLowerCase(Locale.ROOT);
+        return dispatch(sender, command.getName(), args);
+    }
+
+    /**
+     * GUI bridge: runs the exact same code path as typing the subcommand by hand. Admin GUIs
+     * call this so a behaviour change in the command is instantly reflected in the GUI.
+     *
+     * @param commandName raw command name ({@code practiceadmin} for the main executor)
+     * @param args        argument list, args[0] = subcommand
+     */
+    public boolean dispatch(@NotNull CommandSender sender, @NotNull String commandName,
+                            @NotNull String[] args) {
+        String name = commandName.toLowerCase(Locale.ROOT);
         if (!sender.hasPermission("rumilance.admin") && !sender.isOp()) {
             sender.sendMessage(Component.text("No permission.", NamedTextColor.RED));
             return true;

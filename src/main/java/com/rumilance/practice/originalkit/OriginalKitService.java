@@ -114,6 +114,36 @@ public final class OriginalKitService {
         return find(uuid, slot).isPresent();
     }
 
+    /**
+     * Admin action: deletes one saved original-kit slot. Returns {@code false} when the slot
+     * was already empty (no row, no write).
+     */
+    public boolean deleteSlot(UUID uuid, int slot) {
+        if (find(uuid, slot).isEmpty()) {
+            return false;
+        }
+        asyncExecutor.execute(() -> {
+            try {
+                repository.delete(uuid, slot);
+            } catch (Exception e) {
+                logger.log(Level.WARNING, "Failed deleting original kit " + uuid + "/" + slot, e);
+            }
+        });
+        return true;
+    }
+
+    /** Admin action: deletes every saved original-kit slot of one player (returns the count). */
+    public int deleteAllForPlayer(UUID uuid) {
+        int removed = 0;
+        for (int slot = 0; slot < 9; slot++) {
+            if (deleteSlot(uuid, slot)) {
+                removed++;
+            }
+        }
+        return removed;
+    }
+
+
     public Optional<OriginalKitSnapshot> find(UUID uuid, int slot) {
         try {
             return repository.find(uuid, slot);

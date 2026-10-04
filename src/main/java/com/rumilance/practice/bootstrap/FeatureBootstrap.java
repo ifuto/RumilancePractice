@@ -94,6 +94,11 @@ import com.rumilance.practice.gui.GuiSession;
 import com.rumilance.practice.gui.GuiSessionRegistry;
 import com.rumilance.practice.gui.menus.AdminMenuGui;
 import com.rumilance.practice.gui.menus.AdminPlayerDataGui;
+import com.rumilance.practice.gui.menus.AdminPlayersGui;
+import com.rumilance.practice.gui.menus.AdminMatchesGui;
+import com.rumilance.practice.gui.menus.AdminToggleGui;
+import com.rumilance.practice.gui.menus.AltFlagsGui;
+import com.rumilance.practice.gui.menus.KbDefaultGui;
 import com.rumilance.practice.admin.AdminPlayerLookupListener;
 import com.rumilance.practice.gui.menus.ArenaAdminGui;
 import com.rumilance.practice.gui.menus.ArenaDetailGui;
@@ -2110,6 +2115,70 @@ public final class FeatureBootstrap {
         practiceAdmin.setQueueCoordinator(queueCoordinator);
         practiceAdmin.setFloatingEntitiesService(floatingEntitiesService);
         practiceAdmin.setAltDetectionService(this.altDetection);
+        // ---- admin GUI refresh: every /practiceadmin subcommand reachable from the menu ----
+        java.util.function.BiConsumer<Player, String[]> adminBridge =
+                (admin, args) -> practiceAdmin.dispatch(admin, "practiceadmin", args);
+        adminMenuGui.setCommandBridge((admin, args) -> adminBridge.accept(admin, args));
+        adminMenuGui.setStatusLine(() -> "Active matches: " + matchService.registry().activeCount()
+                + " | maintenance=" + runtimeFlags.maintenance()
+                + " | online=" + com.rumilance.practice.util.RealPlayers.count()
+                + " | FFA players=" + ffaService.occupantIds().size()
+                + " | queued=" + (queueService == null ? 0 : queueService.totalWaiting()));
+        adminMenuGui.setMaintenanceState(runtimeFlags::maintenance);
+        adminMenuGui.setRankedQueueState(() -> {
+            com.rumilance.practice.queue.RankedQueueState rs =
+                    queueCoordinator == null ? null : queueCoordinator.rankedState();
+            return rs == null ? "not wired" : (rs.isEnabled() ? "ON" : "OFF")
+                    + " | auto-unlock " + (rs.isAutoUnlockEnabled() ? "ON" : "OFF")
+                    + " | " + rs.uniqueJoinCount() + "/"
+                    + com.rumilance.practice.queue.RankedQueueState.AUTO_UNLOCK_THRESHOLD;
+        });
+        adminMenuGui.setFfaGateState(() -> {
+            if (!ffaService.commandGateEnabled()) {
+                return "OFF (all commands blocked in FFA)";
+            }
+            java.util.Set<String> cmds = ffaService.whitelistedCommands();
+            return "ON" + (cmds.isEmpty() ? "" : " · /"
+                    + String.join(", /", new java.util.TreeSet<>(cmds)));
+        });
+
+        AdminPlayersGui adminPlayersGui =
+                new AdminPlayersGui(guiSessions, soundService, matchService);
+        adminPlayersGui.setDataGui(adminPlayerDataGui);
+        adminPlayersGui.setCommandBridge((admin, args) -> adminBridge.accept(admin, args));
+        AdminMatchesGui adminMatchesGui =
+                new AdminMatchesGui(guiSessions, soundService, matchService);
+        AdminToggleGui adminToggleGui =
+                new AdminToggleGui(guiSessions, soundService, kitService, arenaStore);
+        adminToggleGui.setCommandBridge((admin, args) -> adminBridge.accept(admin, args));
+        KbDefaultGui kbDefaultGui =
+                new KbDefaultGui(guiSessions, soundService, kbProfiles);
+        kbDefaultGui.setCommandBridge((admin, args) -> adminBridge.accept(admin, args));
+        AltFlagsGui altFlagsGui =
+                new AltFlagsGui(guiSessions, soundService, this.altDetection);
+        adminPlayersGui.setBackToAdminMenu(adminMenuGui::open);
+        adminMatchesGui.setBackToAdminMenu(adminMenuGui::open);
+        adminToggleGui.setBackToAdminMenu(adminMenuGui::open);
+        kbDefaultGui.setBackToAdminMenu(adminMenuGui::open);
+        altFlagsGui.setBackToAdminMenu(adminMenuGui::open);
+
+        adminMenuGui.setOpenPlayers(adminPlayersGui::open);
+        adminMenuGui.setOpenMatches(adminMatchesGui::open);
+        adminMenuGui.setOpenToggles(adminToggleGui::open);
+        adminMenuGui.setOpenKbDefault(kbDefaultGui::open);
+        adminMenuGui.setOpenAltFlags(altFlagsGui::open);
+        guiListener.register(adminPlayersGui);
+        guiListener.register(adminMatchesGui);
+        guiListener.register(adminToggleGui);
+        guiListener.register(kbDefaultGui);
+        guiListener.register(altFlagsGui);
+
+        adminPlayerDataGui.setStatsResetService(statsResetService);
+        adminPlayerDataGui.setChatBanService(chatBanService);
+        adminPlayerDataGui.setBanService(banService);
+        adminPlayerDataGui.setMatchService(matchService);
+        adminPlayerDataGui.setPlugin(plugin);
+        adminPlayerLookupListener.setSettingsService(settingsService);
         AdminCommand adminCommand = new AdminCommand(
                 plugin, statsResetService, playerRepository, asyncExecutor, originalKitService);
         adminCommand.setScoreboardService(scoreboardService);
