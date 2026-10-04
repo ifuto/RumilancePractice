@@ -144,10 +144,16 @@ rows2-4: キット中身27 (player inv 9-35)。 row5: HotBar9 (inv 0-8)。
 
 ### KIT SELECT GUI (EkitSelectGui カテゴリ画面)
 
-main36ベース: slot19-25 (row2) にキットグリッド、K選択行 = 本KIT1/紙KIT2-4 + lime装飾の
-セパレータ、他gray/緑pane装飾、row5にBack barrier。実装: グリッド rows1-3 (21枠/頁)、
-chips row4 cols 2,3,5,6 (lime pane cols 1,4,7)。キット1回目クリック=選択 (glint・chipsが
-そのキットに切替)、2回目クリック=KIT EDIT GUI (active K)。chip クリック=Active切替 (即時保存)。
+row4 構成 (2026-10-04 確定): col0/4/7 = lime装飾、col1 = **代入セル**、col2/3/5/6 = K1〜K4 chips。
+- 編集したいキットをグリッドでクリック → **ui.button.click** と同時にキットのアイテムが代入セルに代入。
+- **未代入** (何も選んでいない) は代入セルと 本/紙 の部分が**ガラス** (gray stained glass)。
+- **代入後** は Active な K が本 (WRITABLE_BOOK, glint)、Active でない K が紙 (PAPER)。
+- chip **右クリック** = ui.button.click と同時にその K 番号の KIT EDIT GUI を編集開始。
+- chip **左クリック** = ui.button.click と同時にそのスロットを Active にする。
+- chip **Shift+クリック** = そのスロットの中身リセット (保存行削除→公式レイアウトに戻る)。
+main36ベース: slot19-25 (row2) にキットグリッド、row5にBack barrier。実装: グリッド rows1-3
+(21枠/頁)。キット選択で lastKitTracker も更新 (前回の KIT と共有)。
+※ /setfunc の機能アイテム右クリック オープン時も ui.button.click を鳴らす (menu compass 含む)。
 
 ### MAIN KIT SELECTER (EkitSelectGui 選択画面)
 

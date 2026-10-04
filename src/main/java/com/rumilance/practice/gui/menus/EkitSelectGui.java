@@ -298,19 +298,38 @@ public final class EkitSelectGui extends AbstractGui {
     }
 
     /**
-     * K1..K4 chips (row 4, mockup cells 2/3/5/6 with lime separators): 本 = the kit's ACTIVE
-     * slot, 紙 = Not Active. The chips always reflect the highlighted (selected) kit; tapping
-     * a paper chip activates that slot. FFA kits fight with the ACTIVE slot only.
+     * K1..K4 chips row (mockup row: 本KIT1/紙KIT2-4 + lime装飾). Layout:
+     * col0/4/7 = lime separators, col1 = assignment cell, cols 2/3/5/6 = K1..K4.
+     *
+     * 未代入 (no kit assigned yet): the assignment cell AND the 本/紙 cells are gray
+     * glass. 代入 (a kit is picked in the grid, ui.button.click): the kit's item lands in
+     * the assignment cell and the chips turn 本 = Active / 紙 = Not Active.
      */
     private void renderVariantChips(Player player, GuiSession session, Inventory inventory) {
-        String selected = session.get("selected-kit", String.class);
-        if (isViewer(session) || kitVariantsStore == null || selected == null) {
+        String selected = isViewer(session) ? null : session.get("selected-kit", String.class);
+        for (int col = 0; col <= 7; col++) {
+            if (col == 0 || col == 4 || col == 7) {
+                inventory.setItem(GuiSlots.slot(4, col), limeSeparator());
+            }
+        }
+        KitDefinition kit = selected == null ? null : kitService.get(selected).orElse(null);
+        if (kit == null) {
+            // 未代入: glass where the assignment and the 本/紙 chips would be.
+            for (int col : new int[]{1, 2, 3, 5, 6}) {
+                inventory.setItem(GuiSlots.slot(4, col), grayGlass());
+            }
             return;
         }
-        for (int col = 1; col <= 7; col += 3) {
-            inventory.setItem(GuiSlots.slot(4, col), ItemBuilder.action(
-                    Material.LIME_STAINED_GLASS_PANE, Component.text(" "), "decorate"));
-        }
+        // 代入済み: the kit's representative item sits in the assignment cell.
+        inventory.setItem(GuiSlots.slot(4, 1),
+                ItemBuilder.of(ItemBuilder.materialOr(kit.icon(), Material.DIAMOND_SWORD))
+                        .nameMini(kit.prettyDisplayName())
+                        .lore(UiTheme.divider(),
+                                UiTheme.line("Assigned kit — edit it with the K chips."),
+                                UiTheme.line("Left: Active · Right: edit · Shift: reset"),
+                                UiTheme.line("FFA uses the Active slot only."))
+                        .action("decorate")
+                        .build());
         int active = kitVariantsStore.selected(player.getUniqueId(), selected);
         for (int k = 1; k <= com.rumilance.practice.kit.KitVariantsStore.SLOTS; k++) {
             int col = k <= 2 ? 1 + k : 2 + k; // K1->2 K2->3 K3->5 K4->6
@@ -324,10 +343,10 @@ public final class EkitSelectGui extends AbstractGui {
                                     isActive ? UiTheme.SUCCESS : UiTheme.MUTED),
                             UiTheme.line("Kit: "
                                     + com.rumilance.practice.util.KitNames.pretty(selected)),
-                            UiTheme.line("FFA uses the Active slot only."),
                             UiTheme.blank(),
-                            UiTheme.hint(isActive ? "Active slot — fights spawn this layout"
-                                                  : "Click: make this the Active slot"))
+                            UiTheme.hint("Left-click: make Active"),
+                            UiTheme.hint("Right-click: edit this slot"),
+                            UiTheme.hint("Shift+click: reset contents"))
                     .build();
             if (isActive) {
                 chip.editMeta(meta -> meta.setEnchantmentGlintOverride(true));
@@ -335,6 +354,17 @@ public final class EkitSelectGui extends AbstractGui {
             inventory.setItem(GuiSlots.slot(4, col),
                     ItemBuilder.of(chip).action("variant:" + k).build());
         }
+    }
+
+    private static ItemStack limeSeparator() {
+        return ItemBuilder.action(Material.LIME_STAINED_GLASS_PANE,
+                Component.text(" "), "decorate");
+    }
+
+    /** 未代入 placeholder: plain gray glass (the mockup's gray装飾). */
+    private static ItemStack grayGlass() {
+        return ItemBuilder.action(Material.GRAY_STAINED_GLASS_PANE,
+                Component.text(" "), "decorate");
     }
 
     private ItemStack kitIcon(Player player, KitDefinition kit, boolean viewer) {
@@ -451,24 +481,16 @@ public final class EkitSelectGui extends AbstractGui {
                 crystalKitSlotsGui.openPicker(player, kitId);
                 return;
             }
-            if (kitVariantsStore != null && editKitGui != null && !isViewer(session)) {
-                // K1..K4 flow: first tap highlights the kit and shows its 本/紙 chips; a tap
-                // on the already-highlighted kit opens the KIT EDIT GUI on its Active slot.
-                String selected = session.get("selected-kit", String.class);
-                if (!kitId.equals(selected)) {
-                    session.put("selected-kit", kitId);
-                    if (lastKitTracker != null) {
-                        lastKitTracker.record(player.getUniqueId(), kitId);
-                    }
-                    sounds.play(player, "gui-click");
-                    refresh(player, session, inventory);
-                    return;
+            if (kitVariantsStore != null && !isViewer(session)) {
+                // K1..K4 flow: tapping a kit ASSIGNS it (ui.button.click) — its item lands
+                // in the assignment cell and the 本/紙 chips appear. Editing happens on the
+                // chips (right-click), activation on left-click, reset on shift-click.
+                session.put("selected-kit", kitId);
+                if (lastKitTracker != null) {
+                    lastKitTracker.record(player.getUniqueId(), kitId);
                 }
-                sounds.play(player, "select");
-                session.setNavigatingAway(true);
-                editKitGui.openKitVariantEditorWithReturn(player, kitId,
-                        kitVariantsStore.selected(player.getUniqueId(), kitId),
-                        session.kitCategory(), session.page());
+                sounds.play(player, "button-click");
+                refresh(player, session, inventory);
                 return;
             }
             sounds.play(player, "select");
@@ -504,18 +526,60 @@ public final class EkitSelectGui extends AbstractGui {
             }
             return;
         }
+    }
+
+    /**
+     * Chip interactions need the {@link org.bukkit.event.inventory.ClickType}: LEFT =
+     * make Active, RIGHT = edit that slot, SHIFT+click = reset its contents — every one
+     * with the ui.button.click sound (user spec 2026-10-04). Everything else delegates
+     * to the click-type-agnostic handler.
+     */
+    @Override
+    public void handleClick(Player player, GuiSession session, Inventory inventory, int slot,
+                            String action, org.bukkit.event.inventory.ClickType clickType) {
         if (action != null && action.startsWith("variant:")) {
-            String kitId = session.get("selected-kit", String.class);
-            if (kitVariantsStore != null && kitId != null) {
-                try {
-                    kitVariantsStore.select(player.getUniqueId(), kitId,
-                            Integer.parseInt(action.substring("variant:".length())));
-                    sounds.play(player, "select");
-                    refresh(player, session, inventory);
-                } catch (NumberFormatException ignored) {
-                    // Malformed chip action: ignore.
-                }
-            }
+            handleVariantClick(player, session, inventory, action, clickType);
+            return;
         }
+        handleClick(player, session, inventory, slot, action);
+    }
+
+    private void handleVariantClick(Player player, GuiSession session, Inventory inventory,
+                                    String action, org.bukkit.event.inventory.ClickType clickType) {
+        String kitId = session.get("selected-kit", String.class);
+        if (kitVariantsStore == null || kitId == null) {
+            return;
+        }
+        int variant;
+        try {
+            variant = Integer.parseInt(action.substring("variant:".length()));
+        } catch (NumberFormatException ignored) {
+            return; // Malformed chip action.
+        }
+        if (clickType == org.bukkit.event.inventory.ClickType.SHIFT_LEFT
+                || clickType == org.bukkit.event.inventory.ClickType.SHIFT_RIGHT) {
+            // Shift+click: reset that K slot's contents (drop the saved row, back to the
+            // kit's official layout everywhere).
+            sounds.play(player, "button-click");
+            if (editKitGui != null) {
+                editKitGui.resetVariantSlot(player, kitId, variant);
+            }
+            refresh(player, session, inventory);
+            return;
+        }
+        if (clickType == org.bukkit.event.inventory.ClickType.RIGHT) {
+            // Right-click: open the KIT EDIT GUI on exactly that K slot.
+            if (editKitGui != null) {
+                sounds.play(player, "button-click");
+                session.setNavigatingAway(true);
+                editKitGui.openKitVariantEditorWithReturn(player, kitId, variant,
+                        session.kitCategory(), session.page());
+            }
+            return;
+        }
+        // Left-click: make this slot the kit's Active one (本 moves here).
+        kitVariantsStore.select(player.getUniqueId(), kitId, variant);
+        sounds.play(player, "button-click");
+        refresh(player, session, inventory);
     }
 }

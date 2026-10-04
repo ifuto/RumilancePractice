@@ -27,6 +27,12 @@ sounds:
     key: block.note_block.hat
     volume: 1.0
     pitch: 0.0
+  # The vanilla button click — used by the KIT SELECT GUI chip interactions and
+  # /setfunc item right-click opens (user spec 2026-10-04).
+  button-click:
+    key: ui.button.click
+    volume: 1.0
+    pitch: 1.0
   duel-request-received:
     key: block.note_block.bell
     volume: 1.0

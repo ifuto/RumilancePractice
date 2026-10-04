@@ -1105,6 +1105,28 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         player.sendMessage(t(player, "gui.kit-reset-done"));
     }
 
+    /**
+     * Shift-click reset from the KIT SELECT GUI chips (user spec 2026-10-04): drops the
+     * player's saved K{@code variant} row so that slot falls back to the kit's official
+     * layout in the editor, duels and FFA alike. The Active choice is NOT touched.
+     */
+    public void resetVariantSlot(Player player, String kitId, int variant) {
+        KitDefinition kit = kitId == null ? null : kitService.get(kitId).orElse(null);
+        if (kit == null || player == null) {
+            return;
+        }
+        String key = KitVariantsStore.variantKey(kitId, KitVariantsStore.clamp(variant));
+        layoutCache.invalidate(player.getUniqueId(), key);
+        asyncExecutor.execute(() -> {
+            try {
+                layoutRepository.delete(player.getUniqueId(), key);
+            } catch (Exception ignored) {
+                // Nothing saved yet: there is no row to delete, the default loads anyway.
+            }
+        });
+        player.sendMessage(t(player, "gui.kit-reset-done"));
+    }
+
     @Override
     public void handleBottomClick(Player player, GuiSession session, InventoryClickEvent event) {
         if (!isPresetEdit(session)) {

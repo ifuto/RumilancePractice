@@ -216,6 +216,8 @@ public final class FunctionalItemListener implements Listener {
         event.setCancelled(true);
         event.setUseItemInHand(org.bukkit.event.Event.Result.DENY);
         event.setUseInteractedBlock(org.bukkit.event.Event.Result.DENY);
+        // ui.button.click on open (user spec 2026-10-04), alongside the usual open sting.
+        soundService.play(player, "button-click");
         soundService.play(player, "gui-open", 1.4f);
         switch (function.toLowerCase(Locale.ROOT)) {
             case "ranked" -> kitSelectGui.openForQueue(player, true);

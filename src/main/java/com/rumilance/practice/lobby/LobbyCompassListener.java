@@ -94,6 +94,8 @@ public final class LobbyCompassListener implements Listener {
         if (stateManager.getState(player.getUniqueId()) != PlayerState.LOBBY) {
             return;
         }
+        // ui.button.click on open (user spec 2026-10-04), alongside the usual open sting.
+        soundService.play(player, "button-click");
         soundService.play(player, "gui-open");
         openMenu.accept(player);
     }
