@@ -2,17 +2,22 @@
   "_comment": [
     "gui.json のセーブ名 → /guisnapshot が書き出すファイル名 (拡張子なし) の対応表。",
     "未対応の画面は entry を null のままにしておくと gui_diff.py が『未マッピング』として報告する。",
-    "EKIT_SELECT は1クラスで2画面を描くため、chooser(カテゴリ null) と KIT SELECT(category=MAIN) を",
-    "別ファイルに書き分けている。"
+    "1クラスで複数画面を描くものは別ファイルに書き分ける:",
+    "  EKIT_SELECT         chooser(category null) と KIT SELECT(category=MAIN)",
+    "  TEAM_SETTINGS       通常描画 と Danger Settings(danger_mode フラグ)",
+    "bottom: true の画面だけ、gui.json の main[36] (プレイヤーインベントリ) も比較する。",
+    "他セーブの main[36] は製作者が撮影時に持っていた道具であり設計ではない。",
+    "パーティ系 (TEAM_HUB / TEAM_SETTINGS) はパーティに所属していないと描画されないため、",
+    "/team create してから /guisnapshot を実行すること。"
   ],
   "MAIN KIT SELECTER": { "file": "EKIT_SELECT" },
-  "KIT SELECT GUI": { "file": "EKIT_SELECT__KIT_SELECT" },
+  "KIT SELECT GUI": { "file": "EKIT_SELECT__KIT_SELECT", "bottom": true },
   "KIT EDIT GUI": { "file": "EDIT_KIT" },
   "Duel Request GUI": { "file": "DUEL_REQUEST" },
   "Battle Mode GUI": { "file": "PARTY_BATTLE_MODE" },
   "Party Start Battle GUI": { "file": "PARTY_START_BATTLE" },
-  "Danger Settings GUI": { "file": "SETTINGS" },
-  "Party Config GUI": { "file": "TEAM_CONFIG" },
-  "Party MAIN GUI": { "file": "TEAM_HUB" },
-  "Party setfunc-item-main GUI": null
+  "Danger Settings GUI": { "file": "TEAM_SETTINGS__DANGER" },
+  "Party Config GUI": { "file": "TEAM_SETTINGS" },
+  "Party MAIN GUI": { "file": "TEAM_HUB", "bottom": true },
+  "Party setfunc-item-main GUI": { "file": "TEAMS_BROWSER" }
 }

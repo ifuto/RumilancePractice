@@ -263,11 +263,10 @@ public final class TeamHubGui extends AbstractGui {
         }
 
         // --- footer ---
-        int overflow = Math.max(0, reds.size() - page * RED_SEATS - RED_SEATS)
-                + Math.max(0, blues.size() - page * BLUE_SEATS - BLUE_SEATS)
-                + Math.max(0, free.size() - page * FREE_SEATS - FREE_SEATS);
-        inventory.setItem(GuiSlots.slot(5, 3), overflow > 0 ? overflowBadge(overflow)
-                : com.rumilance.practice.gui.GuiMockups.emptySlot(player, messageService));
+        // docs/design/gui.json「Party MAIN GUI」footer, left→right:
+        //   RED | ARROW Back | OAK_SIGN Page 2 | BARRIER No more players |
+        //   SPYGLASS See other team | BARRIER No pages available | OAK_SIGN Page 1 |
+        //   ARROW Next | BLUE
         inventory.setItem(GuiSlots.slot(5, 1),
                 ItemBuilder.of(UiTheme.BACK)
                         .name(t(player, "menu.back").color(UiTheme.WARNING))
@@ -276,29 +275,38 @@ public final class TeamHubGui extends AbstractGui {
                 ItemBuilder.of(Material.OAK_SIGN)
                         .name(t(player, "menu.page-prev").color(UiTheme.MUTED))
                         .action("page:prev").build());
+        inventory.setItem(GuiSlots.slot(5, 3),
+                ItemBuilder.of(Material.BARRIER)
+                        .name(t(player, "gui.party-no-more-players").color(UiTheme.MUTED)
+                                .decoration(TextDecoration.ITALIC, false))
+                        .action("decorate").build());
+        inventory.setItem(GuiSlots.slot(5, 4),
+                ItemBuilder.of(Material.SPYGLASS)
+                        .name(t(player, "gui.party-see-other-team").color(UiTheme.SECONDARY))
+                        .lore(UiTheme.divider(),
+                                UiTheme.hint(line(player, "menu.click")))
+                        .action("see_other_team").build());
+        inventory.setItem(GuiSlots.slot(5, 5),
+                ItemBuilder.of(Material.BARRIER)
+                        .name(t(player, "gui.party-no-pages").color(UiTheme.MUTED)
+                                .decoration(TextDecoration.ITALIC, false))
+                        .action("decorate").build());
         inventory.setItem(GuiSlots.slot(5, 6),
                 ItemBuilder.of(Material.OAK_SIGN)
                         .name(t(player, "menu.page-next").color(UiTheme.MUTED))
                         .action("page:next").build());
+        inventory.setItem(GuiSlots.slot(5, 7),
+                ItemBuilder.of(Material.ARROW)
+                        .name(t(player, "menu.next").color(UiTheme.MUTED))
+                        .action("page:next").build());
         if (owner) {
+            // OPEN QUESTION (docs/design/gui-json-audit.md): the mockup's row 5 has no cell
+            // for these three — (5,4) is SPYGLASS "See other team", (5,5) is a BARRIER and
+            // (5,6) is the page sign. Dropping them would leave the party with no way to
+            // start a battle, open its settings or start a tournament from the GUI, so the
+            // owner keeps them here until the mockup says otherwise.
             ownerBar(player, team, red, blue, inventory);
-        } else {
-            inventory.setItem(GuiSlots.slot(5, 4),
-                    ItemBuilder.of(Material.OAK_DOOR)
-                            .name(t(player, "party.leave").color(UiTheme.WARNING))
-                            .lore(UiTheme.hint(line(player, "party.leave-hint")))
-                            .action("leave").build());
-            inventory.setItem(GuiSlots.slot(5, 5),
-                    ItemBuilder.action(UiTheme.CLOSE, t(player, "menu.close"), "close"));
         }
-    }
-
-    /** "+N more members" name tag (the mockup's "No more players" barrier slot). */
-    private ItemStack overflowBadge(int overflow) {
-        return ItemBuilder.of(Material.NAME_TAG)
-                .name(Component.text("+" + overflow, UiTheme.MUTED)
-                        .decoration(TextDecoration.ITALIC, false))
-                .action("decorate").build();
     }
 
     /** RED ▸ [[0,2] chip] の人数チップ(装飾のみ)。 */
@@ -331,7 +339,11 @@ public final class TeamHubGui extends AbstractGui {
         return out;
     }
 
-    /** Owner footer hero row: START (5,4), settings comparator (5,5), tournament (5,6). */
+    /**
+     * Owner-only footer tiles layered on top of the mockup row: START (5,4), settings
+     * comparator (5,5) and tournament (5,6). The close button that used to sit at (5,8)
+     * is gone — the mockup keeps that cell in the blue band.
+     */
     private void ownerBar(Player player, Team team, TeamColor red, TeamColor blue, Inventory inventory) {
         inventory.setItem(GuiSlots.slot(5, 5),
                 ItemBuilder.of(Material.COMPARATOR)
@@ -374,8 +386,6 @@ public final class TeamHubGui extends AbstractGui {
                                 UiTheme.hint(line(player, "gui.party-start-hint")))
                         .glintIf(ready)
                         .action("choose_kit").build());
-        inventory.setItem(GuiSlots.slot(5, 8),
-                ItemBuilder.action(UiTheme.CLOSE, t(player, "menu.close"), "close"));
     }
 
     private ItemStack headerItem(Player viewer, Team team) {
@@ -556,6 +566,11 @@ public final class TeamHubGui extends AbstractGui {
                                 kitSelect.open(player);
                             }
                         });
+            }
+            case "see_other_team" -> {
+                // TODO: the mockup labels this SPYGLASS "See other team" but does not say
+                // what it shows. Until then it acknowledges the click and nothing more.
+                sounds.play(player, "gui-click");
             }
             case "page:prev" -> {
                 session.setPage(session.page() - 1);

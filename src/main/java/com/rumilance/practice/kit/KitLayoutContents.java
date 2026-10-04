@@ -94,7 +94,8 @@ public final class KitLayoutContents {
             return false;
         }
         Material type = item.getType();
-        return type == Material.GRAY_STAINED_GLASS_PANE
+        return type == Material.GLASS_PANE
+                || type == Material.GRAY_STAINED_GLASS_PANE
                 || type == Material.CYAN_STAINED_GLASS_PANE
                 || type == Material.LIGHT_GRAY_STAINED_GLASS_PANE
                 || type == Material.WHITE_STAINED_GLASS_PANE

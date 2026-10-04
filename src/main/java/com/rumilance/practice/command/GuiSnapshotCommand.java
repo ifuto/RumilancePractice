@@ -43,6 +43,9 @@ public final class GuiSnapshotCommand implements CommandExecutor, TabCompleter {
         String which = args.length > 0 ? args[0] : "all";
         String category = args.length > 1 && !"-".equals(args[1]) ? args[1] : null;
         int page = args.length > 2 ? parseInt(args[2]) : 0;
+        // Subscreen switch, e.g. /guisnapshot TEAM_SETTINGS - 0 danger_mode for the
+        // Danger Settings GUI (docs/design/gui.json).
+        String flag = args.length > 3 && !"-".equals(args[3]) ? args[3] : null;
         try {
             if ("all".equalsIgnoreCase(which)) {
                 List<Path> written = service.dumpAll(player);
@@ -57,7 +60,7 @@ public final class GuiSnapshotCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(Component.text("Unknown GuiType: " + which, NamedTextColor.RED));
                 return true;
             }
-            Path file = service.dump(player, type, category, page);
+            Path file = service.dump(player, type, category, page, flag);
             sender.sendMessage(file == null
                     ? Component.text("No registered handler for " + type, NamedTextColor.RED)
                     : Component.text("Wrote " + file, NamedTextColor.GREEN));

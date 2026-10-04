@@ -57,6 +57,8 @@ public final class TeamSettingsGui extends AbstractGui {
     private TeamKitSelectGui kitSelect;
     private TeamConfigGui teamConfigGui;
     private ConfirmGui confirmGui;
+    /** The mockup's BAN List tile (2,6) on the danger screen opens the global ban list. */
+    private BanListGui banListGui;
     /** select_map タイルの直 link(キット選択を経ずにマップだけ開いて帰る経路)。 */
     private PartyMapSelectGui directMapSelect;
 
@@ -90,6 +92,10 @@ public final class TeamSettingsGui extends AbstractGui {
 
     public void setConfirmGui(ConfirmGui confirmGui) {
         this.confirmGui = confirmGui;
+    }
+
+    public void setBanListGui(BanListGui banListGui) {
+        this.banListGui = banListGui;
     }
 
     public void setArenaStoreSupplier(TeamHubGui.ArenaTemplateStoreSupplier arenaStoreSupplier) {
@@ -140,52 +146,41 @@ public final class TeamSettingsGui extends AbstractGui {
     }
 
     /**
-     * 2026-10 mockup (docs/design/gui-mockups.md "Party Config GUI"): light-gray/white 装飾
-     * ring, TNT Friendly Fire (1,1), COMPARATOR Team Settings (1,4), LIME_DYE Public (1,7),
-     * NAME_TAG Party ID (3,1), a red band around the REDSTONE Danger Settings (3,4),
-     * PLAYER_HEAD Player List (4,1) and the Back arrow (4,6).
+     * docs/design/gui.json「Party Config GUI」: three 3-wide vertical bands. Rows 0-2 are
+     * light-gray in the outer bands and white in the centre; rows 3-5 flip to white in the
+     * outer bands and red in the centre. Tiles: TNT Friendly Fire (1,1), COMPARATOR Team
+     * Settings (1,4), LIME_DYE Public Party (1,7), REDSTONE_BLOCK Danger Settings (3,4),
+     * NAME_TAG Party ID (4,1), PLAYER_HEAD Player List (4,7), ARROW Back (5,4).
      */
     private void renderMain(Player player, Inventory inventory, Team team) {
-        // --- ring ---
-        int[] lgRow0 = {0, 1, 2, 6, 7, 8};
-        for (int col : lgRow0) {
-            inventory.setItem(col, deco(player, Material.LIGHT_GRAY_STAINED_GLASS_PANE));
-        }
-        for (int col : new int[]{3, 4, 5}) {
-            inventory.setItem(col, deco(player, Material.WHITE_STAINED_GLASS_PANE));
-        }
-        for (int row = 1; row <= 3; row++) {
-            inventory.setItem(GuiSlots.slot(row, 0), deco(player, Material.LIGHT_GRAY_STAINED_GLASS_PANE));
-            inventory.setItem(GuiSlots.slot(row, 8), deco(player, Material.LIGHT_GRAY_STAINED_GLASS_PANE));
-        }
-        for (int row = 1; row <= 3; row++) {
-            for (int col = 1; col <= 7; col++) {
-                if (GuiSlots.slot(row, col) == GuiSlots.slot(1, 1)
-                        || GuiSlots.slot(row, col) == GuiSlots.slot(1, 4)
-                        || GuiSlots.slot(row, col) == GuiSlots.slot(1, 7)
-                        || GuiSlots.slot(row, col) == GuiSlots.slot(3, 1)
-                        || GuiSlots.slot(row, col) == GuiSlots.slot(3, 3)
-                        || GuiSlots.slot(row, col) == GuiSlots.slot(3, 4)
-                        || GuiSlots.slot(row, col) == GuiSlots.slot(3, 5)) {
-                    continue;
+        // --- ring (docs/design/gui.json「Party Config GUI」, three 3-wide vertical bands) ---
+        //   left band  cols 0-2 : light-gray rows 0-2, white rows 3-5
+        //   centre band cols 3-5: white rows 0-2, red/danger rows 3-5
+        //   right band cols 6-8 : light-gray rows 0-2, white rows 3-5
+        for (int r = 0; r < 6; r++) {
+            for (int c = 0; c < 9; c++) {
+                Material pane;
+                if (r <= 2) {
+                    pane = (c >= 3 && c <= 5)
+                            ? Material.WHITE_STAINED_GLASS_PANE
+                            : Material.LIGHT_GRAY_STAINED_GLASS_PANE;
+                } else if (r == 3) {
+                    pane = (c >= 3 && c <= 5)
+                            ? Material.RED_STAINED_GLASS_PANE
+                            : Material.WHITE_STAINED_GLASS_PANE;
+                } else if (r == 4) {
+                    pane = (c == 3 || c == 5)
+                            ? Material.LIGHT_GRAY_STAINED_GLASS_PANE
+                            : (c == 4 ? Material.RED_STAINED_GLASS_PANE
+                            : Material.WHITE_STAINED_GLASS_PANE);
+                } else {
+                    pane = (c == 3 || c == 5)
+                            ? Material.LIGHT_GRAY_STAINED_GLASS_PANE
+                            : Material.WHITE_STAINED_GLASS_PANE;
                 }
-                inventory.setItem(GuiSlots.slot(row, col),
-                        (row == 1 && (col == 2 || col == 3 || col == 5 || col == 6))
-                                ? deco(player, Material.WHITE_STAINED_GLASS_PANE)
-                                : (row == 3 ? deco(player, Material.WHITE_STAINED_GLASS_PANE)
-                                : deco(player, Material.LIGHT_GRAY_STAINED_GLASS_PANE)));
+                inventory.setItem(GuiSlots.slot(r, c), deco(player, pane));
             }
         }
-        for (int col = 0; col < 9; col++) {
-            inventory.setItem(GuiSlots.slot(5, col), deco(player, Material.WHITE_STAINED_GLASS_PANE));
-        }
-        inventory.setItem(GuiSlots.slot(4, 0), deco(player, Material.WHITE_STAINED_GLASS_PANE));
-        inventory.setItem(GuiSlots.slot(4, 2), deco(player, Material.WHITE_STAINED_GLASS_PANE));
-        inventory.setItem(GuiSlots.slot(4, 3), deco(player, Material.WHITE_STAINED_GLASS_PANE));
-        inventory.setItem(GuiSlots.slot(4, 4), deco(player, Material.WHITE_STAINED_GLASS_PANE));
-        inventory.setItem(GuiSlots.slot(4, 5), deco(player, Material.LIGHT_GRAY_STAINED_GLASS_PANE));
-        inventory.setItem(GuiSlots.slot(4, 7), deco(player, Material.LIGHT_GRAY_STAINED_GLASS_PANE));
-        inventory.setItem(GuiSlots.slot(4, 8), deco(player, Material.WHITE_STAINED_GLASS_PANE));
 
         // --- row1: rule tiles ---
         inventory.setItem(GuiSlots.slot(1, 1),
@@ -219,16 +214,7 @@ public final class TeamSettingsGui extends AbstractGui {
                                 UiTheme.hint(line(player, "party.toggle-hint")))
                         .action("toggle_public").build());
 
-        // --- row3: party ID + danger band ---
-        String shortId = team.id().toString().replace("-", "").substring(0, 6).toUpperCase(java.util.Locale.ROOT);
-        inventory.setItem(GuiSlots.slot(3, 1),
-                ItemBuilder.of(Material.NAME_TAG)
-                        .name(t(player, "party.party-id", MessageService.tags("id", shortId))
-                                .color(UiTheme.VALUE))
-                        .action("decorate").build());
-        for (int col : new int[]{3, 5}) {
-            inventory.setItem(GuiSlots.slot(3, col), deco(player, Material.RED_STAINED_GLASS_PANE));
-        }
+        // --- row3: danger band only; the party ID chip moved to (4,1) per the mockup ---
         inventory.setItem(GuiSlots.slot(3, 4),
                 ItemBuilder.of(Material.REDSTONE_BLOCK)
                         .name(t(player, "gui.party-danger").color(UiTheme.DANGER))
@@ -238,8 +224,14 @@ public final class TeamSettingsGui extends AbstractGui {
                                 UiTheme.hint(line(player, "menu.click")))
                         .action("danger_mode").build());
 
-        // --- row4: player list + back ---
+        // --- row4: party ID chip (4,1) + Player List (4,7); row5: Back (5,4) ---
+        String shortId = team.id().toString().replace("-", "").substring(0, 6).toUpperCase(java.util.Locale.ROOT);
         inventory.setItem(GuiSlots.slot(4, 1),
+                ItemBuilder.of(Material.NAME_TAG)
+                        .name(t(player, "party.party-id", MessageService.tags("id", shortId))
+                                .color(UiTheme.VALUE))
+                        .action("decorate").build());
+        inventory.setItem(GuiSlots.slot(4, 7),
                 ItemBuilder.of(Material.PLAYER_HEAD)
                         .name(t(player, "gui.party-player-list").color(UiTheme.PRIMARY))
                         .lore(UiTheme.divider(),
@@ -248,32 +240,33 @@ public final class TeamSettingsGui extends AbstractGui {
                                 UiTheme.blank(),
                                 UiTheme.hint(line(player, "menu.click")))
                         .action("open_hub").build());
-        inventory.setItem(GuiSlots.slot(4, 6),
+        inventory.setItem(GuiSlots.slot(5, 4),
                 ItemBuilder.of(UiTheme.BACK)
                         .name(t(player, "menu.back").color(UiTheme.WARNING))
                         .action("back").build());
     }
 
     /**
-     * The mockup's red "Danger Settings GUI": full red ring, transfer / disband / clear-sides
-     * on the middle row (the mockup's BAN List cell carries clear-sides — the plugin has no
-     * party-ban feature yet), red rows below, black 存在しないマス filler + a back arrow.
+     * The mockup's red "Danger Settings GUI" (docs/design/gui.json): row 0 solid red, rows 1
+     * and 3 edges only, row 2 carries Transfer OWNER (2,2) / Disband Party (2,4) / BAN List
+     * (2,6), row 4 solid red, row 5 black 存在しないマス. There is no back arrow — Esc exits.
      */
     private void renderDanger(Player player, Inventory inventory, Team team) {
+        // docs/design/gui.json「Danger Settings GUI」: row 0 solid red, rows 1 and 3 are
+        // EDGES ONLY (the interior stays empty), row 2 carries the three tiles at cols
+        // 2 / 4 / 6 (centred on col 4), row 4 solid red, row 5 black 存在しないマス.
         for (int col = 0; col < 9; col++) {
             inventory.setItem(col, deco(player, Material.RED_STAINED_GLASS_PANE));
-            inventory.setItem(GuiSlots.slot(3, col), deco(player, Material.RED_STAINED_GLASS_PANE));
             inventory.setItem(GuiSlots.slot(4, col), deco(player, Material.RED_STAINED_GLASS_PANE));
             inventory.setItem(GuiSlots.slot(5, col), com.rumilance.practice.gui.GuiMockups
                     .noCell(player, messages()));
         }
-        inventory.setItem(GuiSlots.slot(1, 0), deco(player, Material.RED_STAINED_GLASS_PANE));
-        inventory.setItem(GuiSlots.slot(1, 7), deco(player, Material.RED_STAINED_GLASS_PANE));
-        inventory.setItem(GuiSlots.slot(1, 8), deco(player, Material.RED_STAINED_GLASS_PANE));
-        inventory.setItem(GuiSlots.slot(2, 0), deco(player, Material.RED_STAINED_GLASS_PANE));
-        inventory.setItem(GuiSlots.slot(2, 1), deco(player, Material.RED_STAINED_GLASS_PANE));
+        for (int row : new int[]{1, 2, 3}) {
+            inventory.setItem(GuiSlots.slot(row, 0), deco(player, Material.RED_STAINED_GLASS_PANE));
+            inventory.setItem(GuiSlots.slot(row, 8), deco(player, Material.RED_STAINED_GLASS_PANE));
+        }
 
-        inventory.setItem(GuiSlots.slot(2, 3),
+        inventory.setItem(GuiSlots.slot(2, 2),
                 ItemBuilder.of(Material.BLAZE_ROD)
                         .name(t(player, "party.transfer-title").color(UiTheme.SECONDARY))
                         .lore(UiTheme.divider(),
@@ -281,7 +274,7 @@ public final class TeamSettingsGui extends AbstractGui {
                                 UiTheme.blank(),
                                 UiTheme.hint(line(player, "party.transfer-hint")))
                         .action("transfer_mode").build());
-        inventory.setItem(GuiSlots.slot(2, 5),
+        inventory.setItem(GuiSlots.slot(2, 4),
                 ItemBuilder.of(Material.BARRIER)
                         .name(t(player, "party.disband").color(UiTheme.DANGER))
                         .lore(UiTheme.divider(),
@@ -289,17 +282,16 @@ public final class TeamSettingsGui extends AbstractGui {
                                 UiTheme.blank(),
                                 UiTheme.hint(line(player, "party.disband-hint")))
                         .action("disband").build());
-        inventory.setItem(GuiSlots.slot(2, 7),
-                ItemBuilder.of(Material.WATER_BUCKET)
-                        .name(t(player, "party.clear-sides").color(UiTheme.WARNING))
+        // The mockup's third tile is an OAK_SIGN named BAN List (the plugin's global ban
+        // list). It replaces the old clear-sides bucket, which had no mockup cell.
+        inventory.setItem(GuiSlots.slot(2, 6),
+                ItemBuilder.of(Material.OAK_SIGN)
+                        .name(t(player, "gui.party-ban-list").color(UiTheme.WARNING))
                         .lore(UiTheme.divider(),
-                                UiTheme.hint(line(player, "party.clear-sides-hint")))
-                        .action("clearsides").build());
-
-        inventory.setItem(GuiSlots.slot(4, 4),
-                ItemBuilder.of(UiTheme.BACK)
-                        .name(t(player, "menu.back").color(UiTheme.WARNING))
-                        .action("danger_exit").build());
+                                UiTheme.hint(line(player, "menu.click")))
+                        .action("banlist").build());
+        // NOTE: the mockup has no back arrow — row 4 is nine red panes. Exiting is Esc,
+        // which closes the inventory and ends the session.
     }
 
     private ItemStack deco(Player player, Material material) {
@@ -514,12 +506,14 @@ public final class TeamSettingsGui extends AbstractGui {
                 sounds.play(player, "gui-open");
                 openLater(player, teamConfigGui);
             }
-            case "clearsides" -> {
-                if (owner) {
-                    teamService.clearSides(player);
-                    sounds.play(player, "gui-click");
-                    refresh(player, session, inventory);
+            case "banlist" -> {
+                if (!player.hasPermission("rumilance.admin")) {
+                    sounds.play(player, "error");
+                    player.sendMessage(t(player, "general.no-permission"));
+                    return;
                 }
+                sounds.play(player, "gui-open");
+                banListGui.open(player);
             }
             case "disband" -> {
                 if (!owner) {

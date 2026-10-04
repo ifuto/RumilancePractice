@@ -70,20 +70,35 @@ public final class GuiSnapshotService {
                     written.add(kitSelect);
                 }
             }
+            if (type == GuiType.TEAM_SETTINGS) {
+                // One class, two mockups: the plain render is the Party Config GUI and the
+                // danger subscreen (session flag danger_mode) is the Danger Settings GUI.
+                Path danger = dump(operator, dir, type, null, 0, "TEAM_SETTINGS__DANGER",
+                        "danger_mode");
+                if (danger != null) {
+                    written.add(danger);
+                }
+            }
         }
         return written;
     }
 
     public Path dump(Player operator, GuiType type, String category, int page) throws IOException {
-        return dump(operator, prepare(outputDir()), type, category, page);
+        return dump(operator, prepare(outputDir()), type, category, page, null);
     }
 
-    private Path dump(Player operator, Path dir, GuiType type, String category, int page) {
-        return dump(operator, dir, type, category, page, type.name());
+    public Path dump(Player operator, GuiType type, String category, int page, String flag)
+            throws IOException {
+        return dump(operator, prepare(outputDir()), type, category, page, flag);
     }
 
     private Path dump(Player operator, Path dir, GuiType type, String category, int page,
-                      String fileName) {
+                      String flag) {
+        return dump(operator, dir, type, category, page, type.name(), flag);
+    }
+
+    private Path dump(Player operator, Path dir, GuiType type, String category, int page,
+                      String fileName, String flag) {
         AbstractGui gui = handlers.get(type);
         if (gui == null || operator == null || !operator.isOnline()) {
             return null;
@@ -96,6 +111,10 @@ public final class GuiSnapshotService {
                 session.setKitCategory(category);
             }
             session.setPage(Math.max(0, page));
+            if (flag != null) {
+                // Subscreen switch (e.g. danger_mode on TEAM_SETTINGS) — the render reads it.
+                session.put(flag, Boolean.TRUE);
+            }
             Inventory inventory = Bukkit.createInventory(
                     new PracticeGuiHolder(session.sessionId(), type, gui.rows()),
                     gui.rows() * 9,

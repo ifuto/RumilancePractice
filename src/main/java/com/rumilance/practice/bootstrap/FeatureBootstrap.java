@@ -1368,6 +1368,8 @@ public final class FeatureBootstrap {
         // Live free-slot count on the BOT tile (10+ parallel bot fights per room).
         battleMenuGui.setPracticeService(practiceService);
         BanListGui banListGui = new BanListGui(guiSessions, soundService, banService);
+        // docs/design/gui.json「Danger Settings GUI」(2,6) — the BAN List tile.
+        teamSettingsGui.setBanListGui(banListGui);
         ReportGui reportGui = new ReportGui(guiSessions, soundService, reportService);
         ReportListGui reportListGui =
                 new ReportListGui(guiSessions, soundService, reportService, replayService);

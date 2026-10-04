@@ -25,15 +25,15 @@
 | # | gui.json の画面 | 実装クラス | 状態 | 主な差分 |
 |---|---|---|---|---|
 | 1 | MAIN KIT SELECTER | `EkitSelectGui#renderChooser` | ✅ 一致 | なし |
-| 2 | KIT SELECT GUI | `EkitSelectGui#renderKitSelect` | ✅ 一致（v1.92.37 で修正） | bottom 13/31 が灰色→**ライムに修正済み** |
-| 3 | KIT EDIT GUI | `EditKitGui` | ❌ 不一致 | r1 の緑バー9枠なし / r2-5 の透明 `glass_pane` 36枠なし |
-| 4 | Duel Request GUI | `DuelRequestGui` | ❌ 不一致 | 枠なし。橙17・LGRY12・黒9・CHN6 の構成が未実装 |
-| 5 | Battle Mode GUI | `PartyBattleModeGui` | ✅ 一致（v1.92.39 で修正） | 内側 col1-7 まで水色で埋めていた→**両端のみで中は空気** |
-| 6 | Party Start Battle GUI | `PartyStartBattleGui` | ✅ 一致（v1.92.39 で修正） | col1/7 の余分な水色を除去、**開始ボタンを (3,3)→(3,4)** へ |
-| 7 | Danger Settings GUI | `SettingsGui`（危険設定） | ❌ 不一致 | 赤24 + 黒9 の枠が未実装 |
-| 8 | Party Config GUI | `TeamConfigGui` | ❌ 不一致 | 白24 + LGRY20 + 赤3 の市松が未実装 |
-| 9 | Party MAIN GUI | `TeamHubGui` | ❌ 不一致 | 赤/青の陣営カラム・灰10・LGRY4 が未実装 |
-| 10 | Party setfunc-item-main GUI | （未特定 / 黄+LGRY+白） | ❌ 未特定 | 対応クラスが特定できていない |
+| 2 | KIT SELECT GUI | `EkitSelectGui#renderKitSelect` | ✅ 一致（v1.92.37） | bottom 13/31 を灰色→ライムに修正済み |
+| 3 | KIT EDIT GUI | `EditKitGui` | ✅ 一致（v1.92.42） | r1 が **LIME だったのを GREEN に**、r2-5 の空スロットに `glass_pane` プレースホルダを追加 |
+| 4 | Duel Request GUI | `DuelRequestGui` | ✅ 一致（v1.92.42） | 白パネル4枚 (2,4)(3,3)(3,5)(4,4) がスロット一覧から漏れていて**十字が消えていた** |
+| 5 | Battle Mode GUI | `PartyBattleModeGui` | ✅ 一致（v1.92.39） | 内側 col1-7 まで水色で埋めていた→両端のみで中は空気 |
+| 6 | Party Start Battle GUI | `PartyStartBattleGui` | ✅ 一致（v1.92.39） | col1/7 の余分な水色を除去、開始ボタンを (3,3)→(3,4) |
+| 7 | Danger Settings GUI | `TeamSettingsGui#renderDanger` | ✅ 一致（v1.92.42） | クラス特定を誤っていた(旧 `SettingsGui`)。r1/r3 は**両端のみ**、タイルは (2,2)(2,4)(2,6) の中央揃え |
+| 8 | Party Config GUI | `TeamSettingsGui#renderMain` | ✅ 一致（v1.92.42） | クラス特定を誤っていた(旧 `TeamConfigGui`)。**3列×3バンド**構成に全面書き直し |
+| 9 | Party MAIN GUI | `TeamHubGui#renderMockup` | ⚠️ 一部（v1.92.42） | フッターを mockup 通りに統一。**(5,4)(5,5)(5,6) のみ未解決** — 後述 |
+| 10 | Party setfunc-item-main GUI | `TeamsBrowserGui` | ✅ 一致（v1.92.42） | クラス特定できた。r0 両端が白、r1-4 右端は黄、フッターが1列ずれていた |
 
 ## なぜ大半が「枠なし」なのか（重要な方針転換）
 
@@ -307,3 +307,62 @@ python3 tools/gui_diff.py --strict               # コンテンツ差異も失�
 
 未マッピングの画面は `gui_screen_map.json` の値を `null` にしておくと
 「no snapshot mapping」として報告されます（現状 `Party setfunc-item-main GUI` が該当）。
+
+---
+
+## 未解決（gui.json と機能が衝突している箇所）
+
+v1.92.42 で 10 画面中 9 画面を gui.json と 1:1 にした。残りは「図面にセルが無い /
+図面のラベルと既存機能が食い違う」3 点。どれも**レイアウトではなく機能の判断**が必要なの
+で、機械的に合わせずに残してある。
+
+### 1. Party MAIN GUI のフッター中央3マス（最重要）
+
+gui.json の r5 は 9 マスすべてが埋まっている:
+
+| (5,0) | (5,1) | (5,2) | (5,3) | (5,4) | (5,5) | (5,6) | (5,7) | (5,8) |
+|---|---|---|---|---|---|---|---|---|
+| RED | AROW Back | OAK_SIGN Page 2 | BARR No more players | **SPYGLASS See other team** | **BARR No pages available** | **OAK_SIGN Page 1** | AROW Next | BLUE |
+
+ここには **START BATTLE / パーティ設定 / トーナメント のセルが無い**。
+現在の実装はオーナーのときだけこの3マスを上書きして次のようにしている:
+
+- (5,4) `DIAMOND_SWORD` START BATTLE
+- (5,5) `COMPARATOR` パーティ設定
+- (5,6) `GOLDEN_SWORD` トーナメント
+
+mockup に厳密に合わせるとこの3つが消え、GUI からバトルを開始できなくなる
+（`/team start` コマンドは残る）。**消すか、mockup 側にセルを足すか**の判断待ち。
+
+### 2. Danger Settings GUI に戻るボタンが無い
+
+gui.json の r4 は赤9マスで、BACK 矢印のセルが無い。mockup に合わせて (4,4) の
+戻る矢印は撤去済み。 exit は Esc（インベントリを閉じるとセッション終了）。
+同時に、mockup の (2,6) は `OAK_SIGN`「BAN List」なので、
+従来の clear-sides（サイド白紙）バケツは置き換えた。BAN List タイルは
+グローバル BAN 一覧（`BanListGui`）を開く。権限なしだとエラー音 + 権限メッセージ。
+
+### 3. Party setfunc-item-main GUI の作成ボタンが1つ
+
+mockup の (5,8) は `WRITABLE_BOOK`「Create a Party」の1つのみ。
+従来の public / private の2ボタン構成を1つに畳み、**公開パーティを作成**する挙動にした。
+非公開パーティを作る GUI 経路は消えた（`/team create` → `/team public` で代替）。
+
+---
+
+## 判定方法について（v1.92.42 時点の注記）
+
+ローカルに paper-api が無くコンパイルもサーバー起動もできないため、
+本レポートの判定は **`tools/gui_grid.py` で gui.json を印刷し、実装の `render()` を
+読み起こしてセルを突き合わせる**という手作業＋突合スクリプトで行った。
+`render()` はループ・ヘルパ・実行時データを含むため機械的な抽出は不可能で、
+**読み間違いの可能性は残る**。
+
+本当の自動チェックは実行時スナップショット（`tools/gui_diff.py`）側。
+サーバーで次を実行すれば本レポートの判定を機械的に検証できる:
+
+```
+/team create              # パーティ系は所属していないと描画されない
+/guisnapshot all
+python3 tools/gui_diff.py
+```

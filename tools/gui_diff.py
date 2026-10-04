@@ -73,7 +73,8 @@ def pad(rows: list, size: int) -> list:
     return out
 
 
-def compare_screen(name: str, expected: dict, snapshot: dict, strict: bool):
+def compare_screen(name: str, expected: dict, snapshot: dict, strict: bool,
+                   compare_bottom: bool = False):
     exp_container = expected.get("container", {}).get("items") or []
     got_container = snapshot.get("container") or []
     rows = snapshot.get("rows") or (len(exp_container) // 9)
@@ -99,8 +100,11 @@ def compare_screen(name: str, expected: dict, snapshot: dict, strict: bool):
         grid.append(row)
 
     # Bottom (player inventory) rows — only for screens whose mockup defines them.
+    # Only screens the mockup really designs a bottom panel for (see gui_screen_map.json
+    # "bottom": true). Every other save's main[36] is just what the author happened to be
+    # holding when they took the screenshot, so comparing it would be pure noise.
     exp_main = expected.get("main") or []
-    if any(exp_main) and snapshot.get("bottomOwned"):
+    if compare_bottom and any(exp_main) and snapshot.get("bottomOwned"):
         got_main = pad(snapshot.get("main") or [], 36)
         exp_main = pad(exp_main, 36)
         for r in range(4):
@@ -162,7 +166,8 @@ def main() -> int:
             report.append({"screen": name, "grid": [], "problems": [],
                            "notes": [f"snapshot missing: {snap_file.name}"]})
             continue
-        report.append(compare_screen(name, save, json.loads(snap_file.read_text()), args.strict))
+        report.append(compare_screen(name, save, json.loads(snap_file.read_text()), args.strict,
+                                     bool(entry.get("bottom"))))
 
     total_problems = 0
     for entry in report:

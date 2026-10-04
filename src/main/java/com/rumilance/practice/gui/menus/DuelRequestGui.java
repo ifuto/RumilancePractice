@@ -194,7 +194,10 @@ public final class DuelRequestGui extends AbstractGui {
             inventory.setItem(row * 9, com.rumilance.practice.gui.GuiMockups.chain());
             inventory.setItem(row * 9 + 8, com.rumilance.practice.gui.GuiMockups.chain());
         }
-        for (int slot : new int[]{19, 21, 23, 25, 28, 29, 33, 34, 37, 39, 41, 43}) {
+        // Interior 装飾 panes: light-gray except the white cross that frames the SEND tile
+        // — (2,4) (3,3) (3,5) (4,4), i.e. slots 22 / 30 / 32 / 40. Those four were missing
+        // from the slot list, so the cross never rendered (docs/design/gui.json).
+        for (int slot : new int[]{19, 21, 22, 23, 25, 28, 29, 30, 32, 33, 34, 37, 39, 40, 41, 43}) {
             inventory.setItem(slot, com.rumilance.practice.gui.GuiMockups.deco(player,
                     slot == 22 || slot == 30 || slot == 32 || slot == 40
                             ? Material.WHITE_STAINED_GLASS_PANE

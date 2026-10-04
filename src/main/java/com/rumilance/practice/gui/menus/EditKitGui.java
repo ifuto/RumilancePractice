@@ -607,13 +607,13 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             int local = inv - 9;
             int row = 2 + local / 9;
             int col = local % 9;
-            inventory.setItem(GuiSlots.slot(row, col), tagged(player, layout[inv],
-                    isViewOnly(session) ? "decorate" : "slot:" + inv));
+            inventory.setItem(GuiSlots.slot(row, col), taggedSlot(player, layout[inv],
+                    isViewOnly(session) ? "decorate" : "slot:" + inv, false));
         }
         // hotbar row 5
         for (int hot = 0; hot < 9; hot++) {
-            inventory.setItem(GuiSlots.slot(5, hot), tagged(player, layout[hot],
-                    isViewOnly(session) ? "decorate" : "slot:" + hot));
+            inventory.setItem(GuiSlots.slot(5, hot), taggedSlot(player, layout[hot],
+                    isViewOnly(session) ? "decorate" : "slot:" + hot, true));
         }
         // Decor strip. The KIT EDIT GUI itself has NO Back button — Save or Esc returns
         // (mockup 2026-10-04). Only the special flows sharing this editor keep one:
@@ -884,12 +884,55 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
     }
 
     /** Plain decorated lime pane — the KIT EDIT GUI mockup's row-1 decoration strip. */
+    /**
+     * The mockup's row-1 strip. docs/design/gui.json「KIT EDIT GUI」row 1 is
+     * {@code green_stained_glass_pane} ×9 — NOT lime. Lime is a noticeably brighter,
+     * yellower green, and the two are different materials.
+     */
     private static ItemStack decorPane() {
-        return ItemBuilder.action(Material.LIME_STAINED_GLASS_PANE,
+        return ItemBuilder.action(Material.GREEN_STAINED_GLASS_PANE,
                 Component.text(" "), "decorate");
     }
 
+    /**
+     * Placeholder for an empty kit slot (docs/design/gui.json「KIT EDIT GUI」rows 2-5):
+     * a plain {@code glass_pane} named ここにキットの中身. KitLayoutContents treats it as a
+     * placeholder, so it can never be saved into the kit as a real item.
+     */
+    private ItemStack contentPlaceholder(Player player, boolean hotbar) {
+        return ItemBuilder.of(Material.GLASS_PANE)
+                .name(t(player, hotbar ? "gui.kit-content-hotbar" : "gui.kit-content")
+                        .color(UiTheme.MUTED)
+                        .decoration(TextDecoration.ITALIC, false))
+                .build();
+    }
+
     private ItemStack tagged(Player player, ItemStack stack, String action) {
+        if (stack == null || stack.getType().isAir()) {
+            return null;
+        }
+        return taggedNonEmpty(player, stack, action);
+    }
+
+    /**
+     * Same as {@link #tagged(Player, ItemStack, String)} but keeps an empty content slot
+     * visible: the mockup fills every unused kit cell with a ここにキットの中身 glass pane
+     * instead of leaving a hole. The action string survives so the click still resolves to
+     * the underlying slot.
+     */
+    private ItemStack taggedSlot(Player player, ItemStack stack, String action, boolean hotbar) {
+        if (stack == null || stack.getType().isAir()) {
+            ItemStack placeholder = contentPlaceholder(player, hotbar);
+            ItemMeta meta = placeholder.getItemMeta();
+            meta.getPersistentDataContainer().set(ItemKeys.guiAction(),
+                    PersistentDataType.STRING, action);
+            placeholder.setItemMeta(meta);
+            return placeholder;
+        }
+        return taggedNonEmpty(player, stack, action);
+    }
+
+    private ItemStack taggedNonEmpty(Player player, ItemStack stack, String action) {
         if (stack == null || stack.getType().isAir()) {
             return null;
         }

@@ -75,19 +75,22 @@ public final class TeamsBrowserGui extends AbstractGui {
      */
     @Override
     protected void render(Player player, GuiSession session, Inventory inventory) {
-        for (int col = 0; col <= 6; col++) {
+        // docs/design/gui.json「Party setfunc-item-main GUI」row 0: white corners with
+        // yellow across the middle — (0,0) and (0,8), not a single notch at col 7.
+        inventory.setItem(0, com.rumilance.practice.gui.GuiMockups.deco(player,
+                Material.WHITE_STAINED_GLASS_PANE, messageService));
+        for (int col = 1; col <= 7; col++) {
             inventory.setItem(col, ItemBuilder.of(Material.YELLOW_STAINED_GLASS_PANE)
                     .action("decorate").build());
         }
-        inventory.setItem(7, com.rumilance.practice.gui.GuiMockups.deco(player,
+        inventory.setItem(8, com.rumilance.practice.gui.GuiMockups.deco(player,
                 Material.WHITE_STAINED_GLASS_PANE, messageService));
-        // slot 8 stays empty per the mockup
+        // Rows 1-4: yellow down BOTH edges (the right edge is yellow, not a No-party pane).
         for (int row = 1; row <= 4; row++) {
             inventory.setItem(GuiSlots.slot(row, 0), ItemBuilder.of(Material.YELLOW_STAINED_GLASS_PANE)
                     .action("decorate").build());
-        }
-        for (int row = 1; row <= 4; row++) {
-            inventory.setItem(GuiSlots.slot(row, 8), noParty(player));
+            inventory.setItem(GuiSlots.slot(row, 8), ItemBuilder.of(Material.YELLOW_STAINED_GLASS_PANE)
+                    .action("decorate").build());
         }
 
         var publicTeams = teamService.publicTeams();
@@ -108,41 +111,37 @@ public final class TeamsBrowserGui extends AbstractGui {
                     : noParty(player));
         }
 
-        // Footer: clock Update Data, prev/next arrows, create cluster.
-        inventory.setItem(GuiSlots.slot(5, 0), ItemBuilder.of(Material.YELLOW_STAINED_GLASS_PANE)
-                .action("decorate").build());
-        inventory.setItem(GuiSlots.slot(5, 1),
+        // Footer (docs/design/gui.json): clock Update Data (5,0), prev arrow (5,2),
+        // next arrow (5,6), Create a Party book (5,8), yellow panes everywhere else.
+        for (int col : new int[]{1, 3, 4, 5, 7}) {
+            inventory.setItem(GuiSlots.slot(5, col), ItemBuilder.of(Material.YELLOW_STAINED_GLASS_PANE)
+                    .action("decorate").build());
+        }
+        inventory.setItem(GuiSlots.slot(5, 0),
                 ItemBuilder.of(Material.CLOCK)
                         .name(t(player, "gui.update-data").color(UiTheme.PRIMARY))
                         .lore(UiTheme.divider(), UiTheme.hint(line(player, "menu.click")))
                         .action("update_data").build());
-        inventory.setItem(GuiSlots.slot(5, 3),
+        inventory.setItem(GuiSlots.slot(5, 2),
                 ItemBuilder.of(UiTheme.BACK)
                         .name(t(player, "menu.page-prev").color(UiTheme.WARNING))
                         .action("page:prev").build());
-        inventory.setItem(GuiSlots.slot(5, 7),
+        inventory.setItem(GuiSlots.slot(5, 6),
                 ItemBuilder.of(UiTheme.NEXT_PAGE)
                         .name(t(player, "menu.page-next").color(UiTheme.WARNING))
                         .action("page:next").build());
-        inventory.setItem(GuiSlots.slot(5, 5),
-                ItemBuilder.of(Material.WHITE_BANNER)
-                        .name(t(player, "party.create-public").color(UiTheme.SUCCESS))
+        // The mockup carries a single "Create a Party" book. The public/private pair is
+        // folded into it: the Team concept is retired and every new group is a public
+        // party, so one tile is all there is to offer.
+        inventory.setItem(GuiSlots.slot(5, 8),
+                ItemBuilder.of(Material.WRITABLE_BOOK)
+                        .name(t(player, "party.create-party").color(UiTheme.SECONDARY))
                         .lore(UiTheme.divider(),
                                 UiTheme.line(line(player, "party.create-public-lore")),
                                 UiTheme.blank(),
                                 UiTheme.hint(line(player, "menu.click")))
-                        .action("create_public").build());
-        // The Team concept is retired: no more "create a Team" entry. Parties are the only
-        // group that battles (each party is one side), so the slot is decoration now.
-        inventory.setItem(GuiSlots.slot(5, 8),
-                ItemBuilder.of(Material.WRITABLE_BOOK)
-                        .name(t(player, "party.create-private").color(UiTheme.SECONDARY))
-                        .lore(UiTheme.divider(),
-                                UiTheme.line(line(player, "party.create-private-lore")),
-                                UiTheme.blank(),
-                                UiTheme.hint(line(player, "party.create-private-hint")))
                         .glint(true)
-                        .action("create_private").build());
+                        .action("create_public").build());
     }
 
     /** The mockup's gray "No party available" filler pane. */
