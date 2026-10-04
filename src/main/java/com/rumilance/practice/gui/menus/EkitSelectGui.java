@@ -294,7 +294,7 @@ public final class EkitSelectGui extends AbstractGui
         }
         for (int col = 0; col < 9; col++) {
             inventory.setItem(GuiSlots.slot(5, col), col == 4
-                    ? ItemBuilder.action(Material.BARRIER, t(player, "menu.back"), "back").build()
+                    ? ItemBuilder.action(Material.BARRIER, t(player, "menu.back"), "back")
                     : mockupPane(Material.GREEN_STAINED_GLASS_PANE));
         }
         if (pages > 1) {
@@ -329,7 +329,7 @@ public final class EkitSelectGui extends AbstractGui
 
     /** A plain, unclickable mockup decoration cell. */
     private static ItemStack mockupPane(Material material) {
-        return ItemBuilder.action(material, Component.text(" "), "decorate").build();
+        return ItemBuilder.action(material, Component.text(" "), "decorate");
     }
 
     /**
