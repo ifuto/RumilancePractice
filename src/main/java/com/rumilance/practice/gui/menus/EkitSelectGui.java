@@ -478,8 +478,17 @@ public final class EkitSelectGui extends AbstractGui
                                   org.bukkit.event.inventory.InventoryClickEvent event) {
         if (session == null || isViewer(session)
                 || session.kitCategory() == null || kitVariantsStore == null) {
+            org.bukkit.Bukkit.getLogger().info("[KIT SELECT] chip click IGNORED for "
+                    + player.getName() + " slot=" + event.getSlot()
+                    + " click=" + event.getClick()
+                    + " session=" + (session == null ? "null" : "ok")
+                    + " viewer=" + isViewer(session)
+                    + " category=" + (session == null ? "-" : session.kitCategory())
+                    + " store=" + (kitVariantsStore != null));
             return;
         }
+        org.bukkit.Bukkit.getLogger().info("[KIT SELECT] chip click: " + player.getName()
+                + " slot=" + event.getSlot() + " " + event.getClick());
         try {
             handleChipClick(player, session, event);
         } catch (Throwable t) {
@@ -655,8 +664,13 @@ public final class EkitSelectGui extends AbstractGui
                 }
                 com.rumilance.practice.sound.ClickSound.play(player);
                 refresh(player, session, inventory);
+                org.bukkit.Bukkit.getLogger().info("[KIT SELECT] " + player.getName()
+                        + " tapped " + kitId + " -> ASSIGNED (chips painted)");
                 return;
             }
+            org.bukkit.Bukkit.getLogger().info("[KIT SELECT] " + player.getName()
+                    + " tapped " + kitId + " -> EDITOR OPENED (viewer=" + isViewer(session)
+                    + ", store=" + (kitVariantsStore != null) + ")");
             sounds.play(player, "select");
             session.setNavigatingAway(true);
             if (editKitGui != null) {

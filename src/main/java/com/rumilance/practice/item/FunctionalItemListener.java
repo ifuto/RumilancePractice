@@ -238,6 +238,9 @@ public final class FunctionalItemListener implements Listener {
         event.setUseInteractedBlock(org.bukkit.event.Event.Result.DENY);
         // ui.button.click on open (user spec 2026-10-04) — direct, not via sounds.yml.
         com.rumilance.practice.sound.ClickSound.play(player);
+        // Ground-truth log: proves THIS build handled the item (verification aid 1.92.36).
+        org.bukkit.Bukkit.getLogger().info("[FUNC ITEM] " + player.getName()
+                + " right-clicked '" + function + "' -> open (ui.button.click played)");
         soundService.play(player, "gui-open", 1.4f);
         // GUI を開く機能アイテムの右クリックではホットバー等をロビー標準にリセット
         // (user spec 2026-10-04)。アクション系 (leavequeue / party トグル) では触らない。
