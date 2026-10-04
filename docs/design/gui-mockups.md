@@ -137,7 +137,9 @@ color + punishments). Chat whitelist here is the per-player chat filter
 
 row0: 防具4 (helmet/chest/legs/boots, cols0-3) + gray装飾 (col4) + 盾OFF HAND (col5) +
 gray装飾 (col6) + lime_wool SAVE (col7) + yellow_wool RESET (col8)。
-row1: 緑pane装飾 + BACK (中央)。
+row1: 緑pane装飾のみ — **Backボタンは不要 (2026-10-04確定)**。Save で保存して
+KIT SELECT GUI の元ページへ戻る、Esc で閉じる。BACK が残るのは special flow のみ
+(crystal KIT1..9 picker / admin共有キット / 閲覧モード)。
 rows2-4: キット中身27 (player inv 9-35)。 row5: HotBar9 (inv 0-8)。
 
 ### KIT SELECT GUI (EkitSelectGui カテゴリ画面)
@@ -150,8 +152,10 @@ chips row4 cols 2,3,5,6 (lime pane cols 1,4,7)。キット1回目クリック=�
 ### MAIN KIT SELECTER (EkitSelectGui 選択画面)
 
 container54: 緑pane + weathered copper chain装飾枠、MAIN KITS (wild trim) (2,2) /
-SUB KITS (bolt trim) (2,6) / SWORD (diamond_sword) (3,4)。SWORD = ffaEnabled キット一覧
-(FFA は Active Only の注記付き)。main36 = null (2択画面に下段不要)。
+SUB KITS (bolt trim) (2,6) / **前回の KIT** (3,4)。中央の sword ボタンは前回選択した
+キットへのショートカット (2026-10-04確定、ffaEnabled一覧ではない) — LastSelectedKitTracker
+(queue/duel/kit picker 共有) を使用、クリックで active K を開く。キット未選択なら
+gray_dye の非活性タイル。main36 = null (2択画面に下段不要)。
 
 ### 既存7GUI (saves v2 正式デザイン・実装指示は明言なし)
 

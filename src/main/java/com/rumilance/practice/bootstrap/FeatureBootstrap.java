@@ -1204,6 +1204,7 @@ public final class FeatureBootstrap {
         ekitSelectGui.setEditKitGui(editKitGui);
         ekitSelectGui.setOriginalKitGui(originalKitGui);
         ekitSelectGui.setKitVariantsStore(kitVariantsStore);
+        ekitSelectGui.setLastKitTracker(lastKitTracker);
         editKitGui.setEkitSelectGui(ekitSelectGui);
         // Crystal FFA: the declared crystal FFA kit edits through the 4-row KIT1..9 picker;
         // each slot keeps its own layout and FFA spawns the selected variant.

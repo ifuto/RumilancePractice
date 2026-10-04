@@ -88,6 +88,7 @@ public final class EkitSelectGui extends AbstractGui {
     private OriginalKitGui originalKitGui;
     private CrystalKitSlotsGui crystalKitSlotsGui;
     private com.rumilance.practice.kit.KitVariantsStore kitVariantsStore;
+    private volatile com.rumilance.practice.kit.LastSelectedKitTracker lastKitTracker;
 
     public EkitSelectGui(GuiSessionRegistry registry, SoundService sounds, KitService kitService) {
         super(registry, sounds, GuiType.EKIT_SELECT, 6, false);
@@ -101,6 +102,11 @@ public final class EkitSelectGui extends AbstractGui {
     /** Per-kit K1..K4 variant slots (本=Active/紙=Not Active chips). Null hides the chips. */
     public void setKitVariantsStore(com.rumilance.practice.kit.KitVariantsStore kitVariantsStore) {
         this.kitVariantsStore = kitVariantsStore;
+    }
+
+    /** Shared last-selected-kit tracker (also fed by queue/duel pickers) — 前回の KIT tile. */
+    public void setLastKitTracker(com.rumilance.practice.kit.LastSelectedKitTracker lastKitTracker) {
+        this.lastKitTracker = lastKitTracker;
     }
 
     public void setOriginalKitGui(OriginalKitGui originalKitGui) {
@@ -192,15 +198,14 @@ public final class EkitSelectGui extends AbstractGui {
     }
 
     /**
-     * MAIN KITS / SUB KITS / SWORD — the chooser buttons of the first screen, on the
+     * MAIN KITS / SUB KITS / 前回の KIT — the chooser buttons of the first screen, on the
      * KIT SELECT GUI mockup's cells: MAIN KITS (wild trim) at (2,2), SUB KITS (bolt trim)
-     * at (2,6), SWORD at (3,4). SWORD collects the FFA-enabled kits: FFA is Active Only
-     * (the fight always spawns the kit's active K1..K4 slot — no in-FFA switching).
+     * at (2,6), and centered between them at (3,4) the PREVIOUS KIT tile (the mockup's
+     * sword button = the kit the player had selected last; opens it on its Active K slot).
      */
     private void renderChooser(Player player, Inventory inventory) {
         int mainCount = kitService.enabled(KitCategory.MAIN).size();
         int subCount = kitService.enabled(KitCategory.SUB).size();
-        int swordCount = ffaKits().size();
         inventory.setItem(GuiSlots.slot(2, 2),
                 com.rumilance.practice.gui.KitSections.categoryButton(
                         KitCategory.MAIN,
@@ -225,37 +230,47 @@ public final class EkitSelectGui extends AbstractGui {
                                         String.valueOf(subCount)),
                                 UiTheme.blank(),
                                 UiTheme.hint(line(player, "gui.kit-button-hint")))));
-        inventory.setItem(GuiSlots.slot(3, 4),
-                ItemBuilder.of(Material.DIAMOND_SWORD)
-                        .name(Component.text("SWORD", UiTheme.PRIMARY)
-                                .decoration(TextDecoration.ITALIC, false))
-                        .lore(UiTheme.divider(),
-                                UiTheme.line("FFA kits (sword / crystal FFA)"),
-                                UiTheme.line("Active Only: FFA spawns the kit's"),
-                                UiTheme.line("active K slot — no /k switching."),
-                                UiTheme.blank(),
-                                UiTheme.labelValue(line(player, "gui.kit-count-label"),
-                                        String.valueOf(swordCount)),
-                                UiTheme.blank(),
-                                UiTheme.hint(line(player, "gui.kit-button-hint")))
-                        // The wooden-button delay for parity with the category buttons.
-                        .action(com.rumilance.practice.gui.DelayedButton.wrap("cat:SWORD"))
-                        .build());
+        inventory.setItem(GuiSlots.slot(3, 4), previousKitTile(player));
     }
 
-    /** The kits SWORD shows: every FFA-enabled kit, in the standard order. */
-    private java.util.List<KitDefinition> ffaKits() {
-        return kitService.enabled().stream()
-                .filter(KitDefinition::ffaEnabled)
-                .toList();
+    /**
+     * 前回の KIT — the centered shortcut between MAIN and SUB: the kit the player selected
+     * last (tracked across this picker AND the queue/duel kit screens). One click opens the
+     * KIT EDIT GUI on that kit's ACTIVE K1..K4 slot.
+     */
+    private ItemStack previousKitTile(Player player) {
+        com.rumilance.practice.kit.LastSelectedKitTracker tracker = lastKitTracker;
+        String lastId = tracker == null ? null : tracker.get(player.getUniqueId());
+        KitDefinition kit = lastId == null ? null : kitService.get(lastId).orElse(null);
+        if (kit == null) {
+            return ItemBuilder.of(Material.GRAY_DYE)
+                    .name(Component.text("Previous Kit", UiTheme.MUTED)
+                            .decoration(TextDecoration.ITALIC, false))
+                    .lore(UiTheme.divider(),
+                            UiTheme.line("No kit selected yet."),
+                            UiTheme.line("Pick MAIN KITS or SUB KITS first."),
+                            UiTheme.blank(),
+                            UiTheme.hint(line(player, "gui.kit-button-hint")))
+                    .action("decorate")
+                    .build();
+        }
+        return ItemBuilder.of(ItemBuilder.materialOr(kit.icon(), Material.DIAMOND_SWORD))
+                .nameMini(kit.prettyDisplayName())
+                .lore(UiTheme.divider(),
+                        UiTheme.status("Previous Kit", UiTheme.SUCCESS),
+                        UiTheme.line("The kit you had selected last."),
+                        UiTheme.line("Opens on its Active K slot."),
+                        UiTheme.blank(),
+                        UiTheme.hint(line(player, "gui.kit-button-hint")))
+                // The wooden-button delay for parity with the category buttons.
+                .action(com.rumilance.practice.gui.DelayedButton.wrap("prevkit"))
+                .build();
     }
 
     /** One category's kits, paginated over the standard content grid. */
     private void renderCategory(Player player, GuiSession session, Inventory inventory, String category) {
-        boolean sword = "SWORD".equalsIgnoreCase(category);
-        List<KitDefinition> kits = sword ? ffaKits()
-                : kitService.enabled(
-                        "SUB".equalsIgnoreCase(category) ? KitCategory.SUB : KitCategory.MAIN);
+        List<KitDefinition> kits = kitService.enabled(
+                "SUB".equalsIgnoreCase(category) ? KitCategory.SUB : KitCategory.MAIN);
         int pageSize = MenuScaffold.gridPageSize();
         int pages = Math.max(1, (kits.size() + pageSize - 1) / pageSize);
         int page = Math.min(Math.max(0, session.page()), pages - 1);
@@ -379,11 +394,9 @@ public final class EkitSelectGui extends AbstractGui {
             return;
         }
         if (action != null && action.startsWith("page:")) {
-            List<KitDefinition> kits = "SWORD".equalsIgnoreCase(session.kitCategory())
-                    ? ffaKits()
-                    : kitService.enabled(
-                            "SUB".equalsIgnoreCase(session.kitCategory())
-                                    ? KitCategory.SUB : KitCategory.MAIN);
+            List<KitDefinition> kits = kitService.enabled(
+                    "SUB".equalsIgnoreCase(session.kitCategory())
+                            ? KitCategory.SUB : KitCategory.MAIN);
             int pages = Math.max(1, (kits.size() + MenuScaffold.gridPageSize() - 1)
                     / MenuScaffold.gridPageSize());
             int page = "page:next".equals(action) ? session.page() + 1 : session.page() - 1;
@@ -444,6 +457,9 @@ public final class EkitSelectGui extends AbstractGui {
                 String selected = session.get("selected-kit", String.class);
                 if (!kitId.equals(selected)) {
                     session.put("selected-kit", kitId);
+                    if (lastKitTracker != null) {
+                        lastKitTracker.record(player.getUniqueId(), kitId);
+                    }
                     sounds.play(player, "gui-click");
                     refresh(player, session, inventory);
                     return;
@@ -461,6 +477,30 @@ public final class EkitSelectGui extends AbstractGui {
                 // Remember the MAIN/SUB page this kit lives on so BACK lands back there.
                 editKitGui.openKitEditorWithReturn(player, kitId,
                         session.kitCategory(), session.page());
+            }
+            return;
+        }
+        if ("prevkit".equals(action)) {
+            // 前回の KIT: open the last-selected kit's editor on its ACTIVE K slot. From the
+            // chooser the Save return target is the chooser itself (null category).
+            String lastId = lastKitTracker == null ? null : lastKitTracker.get(player.getUniqueId());
+            if (lastId == null) {
+                return;
+            }
+            boolean crystal = kitService.get(lastId).map(KitDefinition::crystalFfa).orElse(false);
+            String kitId = crystal ? lastId : kitService.playableId(lastId);
+            sounds.play(player, "select");
+            session.setNavigatingAway(true);
+            if (crystal && crystalKitSlotsGui != null) {
+                crystalKitSlotsGui.openPicker(player, kitId);
+                return;
+            }
+            if (kitVariantsStore != null && editKitGui != null) {
+                lastKitTracker.record(player.getUniqueId(), kitId);
+                editKitGui.openKitVariantEditorWithReturn(player, kitId,
+                        kitVariantsStore.selected(player.getUniqueId(), kitId), null, 0);
+            } else if (editKitGui != null) {
+                editKitGui.openKitEditorWithReturn(player, kitId, null, 0);
             }
             return;
         }

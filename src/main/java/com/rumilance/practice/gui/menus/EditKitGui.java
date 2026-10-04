@@ -610,14 +610,16 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             inventory.setItem(GuiSlots.slot(5, hot), tagged(player, layout[hot],
                     isViewOnly(session) ? "decorate" : "slot:" + hot));
         }
-        // BACK lives centered in the decor row (the mockup KIT EDIT GUI has no back in the
-        // armor row — it is all armor slots + save/reset there).
-        inventory.setItem(GuiSlots.slot(1, 4),
-                ItemBuilder.action(UiTheme.BACK, t(player, "menu.back"), "back"));
+        // Decor strip. The KIT EDIT GUI itself has NO Back button — Save or Esc returns
+        // (mockup 2026-10-04). Only the special flows sharing this editor keep one:
+        // crystal variants go back to the KIT1..9 picker, official edits to the admin
+        // config, and read-only viewers to their kit list.
         for (int col = 0; col < 9; col++) {
-            if (col != 4) {
-                inventory.setItem(GuiSlots.slot(1, col), decorPane());
-            }
+            inventory.setItem(GuiSlots.slot(1, col), decorPane());
+        }
+        if (crystalVariant(session) != null || isOfficialEdit(session) || isViewOnly(session)) {
+            inventory.setItem(GuiSlots.slot(1, 4),
+                    ItemBuilder.action(UiTheme.BACK, t(player, "menu.back"), "back"));
         }
         if (isViewOnly(session)) {
             inventory.setItem(GuiSlots.slot(0, 8),
@@ -1203,6 +1205,18 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         restoreLobbyHands(player);
         if (kitEditStash != null) {
             kitEditStash.clear(player.getUniqueId());
+        }
+        // The KIT EDIT GUI has no Back: Save is one of its two exits (mockup: Save or Esc
+        // で戻る). When the editor was opened from the KIT SELECT GUI, land back on that
+        // page; every other entry point keeps the plain close-to-lobby behaviour.
+        String backCategory = session.get("back-category", String.class);
+        Integer backPage = session.get("back-page", Integer.class);
+        if (crystalVariant(session) == null && !isOfficialEdit(session)
+                && backCategory != null && ekitSelectGui != null) {
+            session.setNavigatingAway(true);
+            stateManager.resetToLobby(player.getUniqueId());
+            ekitSelectGui.openAt(player, backCategory, backPage == null ? 0 : backPage);
+            return;
         }
         registry.close(player.getUniqueId());
         player.closeInventory();
