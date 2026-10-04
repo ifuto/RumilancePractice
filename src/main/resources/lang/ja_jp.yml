@@ -935,7 +935,7 @@ gui:
   admin-kits: "キット管理"
   admin-presets: "プリセット候補"
   admin-original: "オリジナルキット候補"
-  admin-wand: "範囲選択について"
+  admin-wand: "Pos選択棒を取得"
   kit-admin-duel: "デュエル: <arenas>"
   kit-admin-party: "パーティ: <arenas>"
   kit-admin-shift-up: "Shift+左クリック: 上へ移動"

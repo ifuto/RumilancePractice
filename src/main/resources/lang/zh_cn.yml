@@ -934,7 +934,7 @@ gui:
   admin-kits: "套件管理"
   admin-presets: "预设候选"
   admin-original: "原创套件候选"
-  admin-wand: "区域选择说明"
+  admin-wand: "获取范围选择棒"
   kit-admin-duel: "约战：<arenas>"
   kit-admin-party: "队伍：<arenas>"
   kit-admin-shift-up: "Shift+左键：上移"

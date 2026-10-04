@@ -934,7 +934,7 @@ gui:
   admin-kits: "Admin de kits"
   admin-presets: "Candidatos de preset"
   admin-original: "Candidatos de kit original"
-  admin-wand: "Sobre la selección de región"
+  admin-wand: "Obtener vara de selección"
   kit-admin-duel: "Duelo: <arenas>"
   kit-admin-party: "Equipo: <arenas>"
   kit-admin-shift-up: "Shift+clic izquierdo: subir"

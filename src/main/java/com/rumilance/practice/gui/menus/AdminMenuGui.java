@@ -412,6 +412,20 @@ public final class AdminMenuGui extends AbstractGui {
                 .action("status")
                 .build());
 
+        // ---- row 1 middle: region selection wand (1.92.33: hands out the rod again) ----
+        inventory.setItem(GuiSlots.slot(1, 4), ItemBuilder.of(Material.BLAZE_ROD)
+                .name(t(player, "gui.admin-wand").color(NamedTextColor.GOLD))
+                .lore(
+                        UiTheme.divider(),
+                        UiTheme.line(line(player, "gui.admin-wand-lore-1")),
+                        UiTheme.line(line(player, "gui.admin-wand-lore-2")),
+                        UiTheme.line(line(player, "gui.admin-wand-lore-3")),
+                        UiTheme.blank(),
+                        UiTheme.hint(line(player, "menu.click"))
+                )
+                .action("wand")
+                .build());
+
         // ---- row 1 middle: player data chat lookup (kept from the old layout) ----
         inventory.setItem(GuiSlots.slot(1, 6), ItemBuilder.of(Material.NAME_TAG)
                 .name(Component.text("Player data editor", NamedTextColor.LIGHT_PURPLE))
@@ -436,6 +450,14 @@ public final class AdminMenuGui extends AbstractGui {
         }
         switch (action) {
             case "close" -> player.closeInventory();
+            case "wand" -> {
+                // 1.92.33: hands out the region selector + setup menu item again (the old
+                // admin menu had this; the reset no longer eats the rod either way).
+                sounds.play(player, "gui-click");
+                com.rumilance.practice.admin.AdminTools.give(player);
+                player.sendMessage(Component.text("Selection wand + setup menu item given.",
+                        NamedTextColor.GREEN));
+            }
             case "kits" -> {
                 sounds.play(player, "gui-click");
                 openKitAdmin.accept(player);

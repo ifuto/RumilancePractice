@@ -2313,6 +2313,14 @@ public final class MatchService {
         if (shuttingDown || session.isShuttingDown()) {
             return;
         }
+        // 1.92.33: an already-eliminated team player who disconnects is NOT a forfeit and must
+        // not be eliminated a second time — their death already ran the kill feed, drops and
+        // the win re-check once. Detach them like the /hub path (leaveEliminatedTeamSpectator)
+        // does: the match keeps running for everyone else.
+        if (session.isTeamMatch() && session.isEliminated(playerId)) {
+            registry.removePlayer(playerId);
+            return;
+        }
         // The match is decided by a forfeit: the opponent who is still here must NOT be
         // offered rematch items / flow (the other side is gone anyway).
         session.markDisconnectForfeit();

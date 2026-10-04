@@ -1,67 +1,20 @@
 package com.rumilance.practice.join;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerKickEvent;
 
 /**
- * Join/quit lines: {@code [+] name} / {@code [-] name}. Plus is green, minus is red, the rest is white.
+ * Kick/ban leave silence only. Since 1.92.33 no join/quit line is shown anywhere any more
+ * (user spec 2026-10-04) — the old {@code [+] name} / {@code [-] name} broadcast is gone, so
+ * the only presence line this class still manages is the one following a kick screen: kicked
+ * or banned players leave with no chat line at all.
  */
 public final class JoinQuitMessages {
-
-    /** Players whose quit line is suppressed (kicks / bans leave via their own screen already). */
-    private static final java.util.Set<java.util.UUID> SUPPRESSED_QUITS =
-            java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     private JoinQuitMessages() {
     }
 
-    /**
-     * Marks the player's upcoming quit message for suppression. Used before kicking/banning:
-     * the player already sees the kick/ban screen, so a {@code [-] name} line would be noise.
-     */
-    public static void suppressQuit(java.util.UUID playerId) {
-        SUPPRESSED_QUITS.add(playerId);
-    }
-
-    /**
-     * @return true when this quit line is suppressed (the player was kicked/banned and
-     *         already saw that screen) — callers must then send nothing to anyone.
-     */
-    public static boolean consumeQuitSuppression(java.util.UUID playerId) {
-        return SUPPRESSED_QUITS.remove(playerId);
-    }
-
-    public static Component join(String playerName) {
-        return bracketed("+", NamedTextColor.GREEN).append(Component.text(" " + playerName, NamedTextColor.WHITE));
-    }
-
-    public static Component quit(String playerName) {
-        return bracketed("-", NamedTextColor.RED).append(Component.text(" " + playerName, NamedTextColor.WHITE));
-    }
-
-    public static void apply(PlayerJoinEvent event) {
-        event.joinMessage(join(event.getPlayer().getName()));
-    }
-
-    public static void apply(PlayerQuitEvent event) {
-        if (SUPPRESSED_QUITS.remove(event.getPlayer().getUniqueId())) {
-            event.quitMessage(null);
-            return;
-        }
-        event.quitMessage(quit(event.getPlayer().getName()));
-    }
-
     /** Kicked/banned players leave silently — no {@code [-] name} line in chat. */
     public static void apply(org.bukkit.event.player.PlayerKickEvent event) {
-        SUPPRESSED_QUITS.add(event.getPlayer().getUniqueId());
         event.leaveMessage(null);
-    }
-
-    private static Component bracketed(String mark, NamedTextColor markColor) {
-        return Component.text("[", NamedTextColor.WHITE)
-                .append(Component.text(mark, markColor))
-                .append(Component.text("]", NamedTextColor.WHITE));
     }
 }

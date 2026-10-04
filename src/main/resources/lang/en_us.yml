@@ -936,7 +936,7 @@ gui:
   admin-kits: "Kit admin"
   admin-presets: "Preset candidates"
   admin-original: "Original kit candidates"
-  admin-wand: "About region selection"
+  admin-wand: "Get selection wand"
   kit-admin-duel: "Duel: <arenas>"
   kit-admin-party: "Party: <arenas>"
   kit-admin-shift-up: "Shift+left-click: move up"
