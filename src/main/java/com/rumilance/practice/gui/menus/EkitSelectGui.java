@@ -395,9 +395,10 @@ public final class EkitSelectGui extends AbstractGui
         String selected = session.get("selected-kit", String.class);
         KitDefinition kit = selected == null ? null : kitService.get(selected).orElse(null);
         if (kit == null) {
-            // 未代入: glass where the 本/紙 chips and the assigned item would be.
+            // 未代入 (user spec 2026-10-04): the 本/紙 chip cells show TRANSPARENT glass
+            // (the assign cell keeps the frame's gray glass).
             for (int slot : CHIP_SLOTS) {
-                inv.setItem(slot, mockupPane(Material.GRAY_STAINED_GLASS_PANE));
+                inv.setItem(slot, mockupPane(Material.GLASS_PANE));
             }
             inv.setItem(ASSIGN_SLOT, mockupPane(Material.GRAY_STAINED_GLASS_PANE));
             return;
@@ -415,7 +416,7 @@ public final class EkitSelectGui extends AbstractGui
                 : kitVariantsStore.selected(player.getUniqueId(), selected);
         for (int k = 1; k <= com.rumilance.practice.kit.KitVariantsStore.SLOTS; k++) {
             boolean isActive = k == active;
-            ItemStack chip = ItemBuilder.of(isActive ? Material.WRITABLE_BOOK : Material.PAPER)
+            ItemStack chip = ItemBuilder.of(isActive ? Material.BOOK : Material.PAPER)
                     .name(Component.text("KIT " + k,
                                     isActive ? UiTheme.SUCCESS : UiTheme.MUTED)
                             .decoration(TextDecoration.ITALIC, false))
@@ -479,6 +480,18 @@ public final class EkitSelectGui extends AbstractGui
                 || session.kitCategory() == null || kitVariantsStore == null) {
             return;
         }
+        try {
+            handleChipClick(player, session, event);
+        } catch (Throwable t) {
+            // A failing chip action must never look like "the click did nothing": log it
+            // and give the player the error cue so the breakage is audible.
+            org.bukkit.Bukkit.getLogger().warning("[KIT SELECT] chip click failed: " + t);
+            sounds.play(player, "error");
+        }
+    }
+
+    private void handleChipClick(Player player, GuiSession session,
+                                 org.bukkit.event.inventory.InventoryClickEvent event) {
         int slot = event.getSlot();
         int variant = -1;
         for (int k = 0; k < CHIP_SLOTS.length; k++) {
