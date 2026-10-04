@@ -58,14 +58,15 @@ public final class GuiSnapshotService {
         List<Path> written = new ArrayList<>();
         for (Map.Entry<GuiType, AbstractGui> entry : handlers.entrySet()) {
             GuiType type = entry.getKey();
-            Path file = dump(operator, dir, type, null, 0);
+            Path file = dump(operator, dir, type, null, 0, (String) null);
             if (file != null) {
                 written.add(file);
             }
             if (type == GuiType.EKIT_SELECT) {
                 // The same class paints two mockups: the chooser (category == null) and the
                 // KIT SELECT GUI (a category set). Snapshot both under distinct names.
-                Path kitSelect = dump(operator, dir, type, "MAIN", 0, "EKIT_SELECT__KIT_SELECT");
+                Path kitSelect = dump(operator, dir, type, "MAIN", 0,
+                        "EKIT_SELECT__KIT_SELECT", null);
                 if (kitSelect != null) {
                     written.add(kitSelect);
                 }
