@@ -108,14 +108,15 @@ typed command can never drift.
 | AdminToggleGui  | kit queues + arena maps, one dye tile each | click=enable/disable (`toggle` bridge) |
 | KbDefaultGui    | kb/*.json profiles + OFF tile, current glints | click=set default (`kbdefault` bridge) |
 | AltFlagsGui     | open alt-detection flags (admin-private)     | click=dismiss + lift pair restriction |
+| AdminStatsGui   | **W/L editor (WL = wins & losses)** per ranked-kit row | click=type exact "12 8", right=+1 win, shift=+1 loss, TNT=reset player (PT untouched) |
 
 ### AdminPlayerDataGui v2 (player-linked data, all editable)
 
 row1: rank (click promote / shift demote, live via RankService) · settings (click locale
 reset / shift sounds / right scoreboard) · chat whitelist (click=chat-input add or
 `clear`, shift=clear now) · ekits (click=this player / shift=everyone) · original kits
-(shift=delete this player's slots) · name color (click=clear) · ranked stats (click=this
-player / shift=everyone). row2: punishments (click=lift all + cache evict) · kick ·
+(shift=delete this player's slots) · name color (click=clear) · ranked stats (click=W/L
+editor / shift=reset everyone). row2: punishments (click=lift all + cache evict) · kick ·
 force-end · TNT FULL WIPE (shift = rank→NORM + stats + ekits + originals + WL + locale +
 color + punishments). Chat whitelist here is the per-player chat filter
 (`PlayerSettings.chatWhitelist()`), the same set edited from SettingsGui.

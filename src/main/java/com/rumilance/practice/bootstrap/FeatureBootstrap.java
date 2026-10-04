@@ -99,6 +99,7 @@ import com.rumilance.practice.gui.menus.AdminMatchesGui;
 import com.rumilance.practice.gui.menus.AdminToggleGui;
 import com.rumilance.practice.gui.menus.AltFlagsGui;
 import com.rumilance.practice.gui.menus.KbDefaultGui;
+import com.rumilance.practice.gui.menus.AdminStatsGui;
 import com.rumilance.practice.admin.AdminPlayerLookupListener;
 import com.rumilance.practice.gui.menus.ArenaAdminGui;
 import com.rumilance.practice.gui.menus.ArenaDetailGui;
@@ -2156,6 +2157,13 @@ public final class FeatureBootstrap {
         kbDefaultGui.setCommandBridge((admin, args) -> adminBridge.accept(admin, args));
         AltFlagsGui altFlagsGui =
                 new AltFlagsGui(guiSessions, soundService, this.altDetection);
+        // W/L (wins & losses) editor for one player's ranked rows
+        AdminStatsGui adminStatsGui = new AdminStatsGui(guiSessions, soundService, statsService);
+        adminStatsGui.setDataGui(adminPlayerDataGui);
+        adminPlayerDataGui.setOpenWlEditor(adminStatsGui::openFor);
+        adminPlayerLookupListener.setStatsService(statsService);
+        adminPlayerLookupListener.setStatsGui(adminStatsGui);
+        guiListener.register(adminStatsGui);
         adminPlayersGui.setBackToAdminMenu(adminMenuGui::open);
         adminMatchesGui.setBackToAdminMenu(adminMenuGui::open);
         adminToggleGui.setBackToAdminMenu(adminMenuGui::open);

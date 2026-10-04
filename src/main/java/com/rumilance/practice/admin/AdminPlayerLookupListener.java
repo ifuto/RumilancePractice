@@ -35,11 +35,19 @@ public final class AdminPlayerLookupListener implements Listener {
     /** Session flag: waiting for the broadcast message text. */
     public static final String AWAIT_BROADCAST = "await_admin_broadcast";
 
+    /**
+     * Session value = "{@code <target-uuid>|<kit>}": waiting for an exact "wins losses"
+     * pair (e.g. {@code 12 8}) to write into that player's ranked row for the kit.
+     */
+    public static final String AWAIT_STATS_TARGET = "await_admin_wl_target";
+
     private final Plugin plugin;
     private final GuiSessionRegistry guiSessions;
     private final PlayerRepository playerRepository;
     private AdminPlayerDataGui dataGui;
     private com.rumilance.practice.settings.SettingsService settingsService;
+    private com.rumilance.practice.stats.StatsService statsService;
+    private AdminStatsGui statsGui;
 
     public AdminPlayerLookupListener(Plugin plugin, GuiSessionRegistry guiSessions,
                                      PlayerRepository playerRepository) {
@@ -57,6 +65,16 @@ public final class AdminPlayerLookupListener implements Listener {
         this.settingsService = settingsService;
     }
 
+    /** Needed to apply the exact W/L write for the {@link #AWAIT_STATS_TARGET} flow. */
+    public void setStatsService(com.rumilance.practice.stats.StatsService statsService) {
+        this.statsService = statsService;
+    }
+
+    /** Editor screen reopened after a successful W/L write. */
+    public void setStatsGui(AdminStatsGui statsGui) {
+        this.statsGui = statsGui;
+    }
+
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onChat(AsyncChatEvent event) {
         Player player = event.getPlayer();
@@ -66,7 +84,8 @@ public final class AdminPlayerLookupListener implements Listener {
         }
         GuiSession session = sessionOpt.get();
         if (handleWhitelistInput(event, player, session)
-                || handleBroadcastInput(event, player, session)) {
+                || handleBroadcastInput(event, player, session)
+                || handleStatsInput(event, player, session)) {
             return;
         }
         if (!Boolean.TRUE.equals(session.get(AWAIT_LOOKUP, Boolean.class))) {
@@ -134,6 +153,71 @@ public final class AdminPlayerLookupListener implements Listener {
                     "Failed to update whitelist (player has no profile yet?).",
                     NamedTextColor.RED));
         }
+        return true;
+    }
+
+    /** Handles the exact W/L input ("12 8" / "12:8" / "12/8"). Returns true when consumed. */
+    private boolean handleStatsInput(AsyncChatEvent event, Player player, GuiSession session) {
+        String raw = session.get(AWAIT_STATS_TARGET, String.class);
+        if (raw == null || raw.isBlank()) {
+            return false;
+        }
+        event.setCancelled(true);
+        session.put(AWAIT_STATS_TARGET, null);
+        int sep = raw.indexOf('|');
+        if (sep <= 0) {
+            return true;
+        }
+        UUID target;
+        try {
+            target = UUID.fromString(raw.substring(0, sep));
+        } catch (IllegalArgumentException e) {
+            return true;
+        }
+        String kit = raw.substring(sep + 1);
+        String input = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
+                .plainText().serialize(event.message()).trim();
+        if (input.isEmpty()) {
+            return true;
+        }
+        String[] parts = input.split("[^0-9]+");
+        int wins;
+        int losses;
+        try {
+            if (parts.length < 2 || parts[0].isBlank() || parts[1].isBlank()) {
+                throw new NumberFormatException();
+            }
+            wins = Integer.parseInt(parts[0]);
+            losses = Integer.parseInt(parts[1]);
+            if (wins > 1_000_000 || losses > 1_000_000) {
+                throw new NumberFormatException();
+            }
+        } catch (NumberFormatException e) {
+            player.sendMessage(Component.text(
+                    "Type W/L as two numbers, e.g. '12 8'.", NamedTextColor.RED));
+            return true;
+        }
+        UUID done = target;
+        String doneKit = kit;
+        int doneWins = wins;
+        int doneLosses = losses;
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (!player.isOnline() || statsService == null) {
+                return;
+            }
+            try {
+                statsService.setWinsLosses(done, doneKit, doneWins, doneLosses);
+                player.sendMessage(Component.text("W/L set for " + doneKit + ": "
+                        + doneWins + " / " + doneLosses, NamedTextColor.GREEN));
+                player.playSound(player.getLocation(),
+                        org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.7f, 1.2f);
+                if (statsGui != null) {
+                    statsGui.openFor(player, done);
+                }
+            } catch (Exception e) {
+                player.sendMessage(Component.text("W/L update failed.", NamedTextColor.RED));
+            }
+        });
         return true;
     }
 

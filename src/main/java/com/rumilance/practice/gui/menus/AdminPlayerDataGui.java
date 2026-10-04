@@ -52,7 +52,7 @@ import java.util.UUID;
  */
 public final class AdminPlayerDataGui extends AbstractGui {
 
-    private static final String KEY_TARGET = "admin_data_target";
+    static final String KEY_TARGET = "admin_data_target";
     private static final DateTimeFormatter TIME_FORMAT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault());
 
@@ -66,6 +66,8 @@ public final class AdminPlayerDataGui extends AbstractGui {
     private final PunishmentRepository punishmentRepository;
     private final StatsService statsService;
     private java.util.function.Consumer<Player> backToAdminMenu = p -> { };
+    /** Opens the per-kit W/L editor for the current target (wired from FeatureBootstrap). */
+    private java.util.function.BiConsumer<Player, UUID> openWlEditor;
     private StatsResetService statsResetService;
     private ChatBanService chatBanService;
     private BanService banService;
@@ -92,6 +94,11 @@ public final class AdminPlayerDataGui extends AbstractGui {
 
     public void setBackToAdminMenu(java.util.function.Consumer<Player> backToAdminMenu) {
         this.backToAdminMenu = backToAdminMenu == null ? p -> { } : backToAdminMenu;
+    }
+
+    /** Wires the W/L editor screen opened by the ranked-stats tile. */
+    public void setOpenWlEditor(java.util.function.BiConsumer<Player, UUID> openWlEditor) {
+        this.openWlEditor = openWlEditor;
     }
 
     /** Enables the ranked-stats reset actions (/practiceadmin statsreset path). */
@@ -318,11 +325,12 @@ public final class AdminPlayerDataGui extends AbstractGui {
         statsLore.add(UiTheme.labelValue("Wins / Losses", wins + " / " + losses));
         statsLore.addAll(List.of(topPtLines(stats)));
         statsLore.add(UiTheme.blank());
-        statsLore.add(UiTheme.hint("Click: reset THIS player's stats & rating"));
+        statsLore.add(UiTheme.hint("Click: open the W/L editor"));
+        statsLore.add(UiTheme.hint("(edit wins/losses per kit)"));
         statsLore.add(UiTheme.hint("Shift-click: reset EVERY player's"));
         inventory.setItem(GuiSlots.slot(1, 7),
                 ItemBuilder.of(Material.IRON_SWORD)
-                        .name(Component.text("Ranked stats", UiTheme.PRIMARY))
+                        .name(Component.text("Ranked stats (W/L)", UiTheme.PRIMARY))
                         .lore(statsLore.toArray(new Component[0]))
                         .action("act:reset_stats").build());
 
@@ -588,17 +596,21 @@ public final class AdminPlayerDataGui extends AbstractGui {
                 refresh(player, session, inventory);
             }
             case "act:reset_stats" -> {
-                if (statsResetService == null) {
-                    sounds.play(player, "error");
-                    refresh(player, session, inventory);
-                    return;
-                }
                 if (shift) {
-                    runStatsReset(player, null);
+                    if (statsResetService == null) {
+                        sounds.play(player, "error");
+                        refresh(player, session, inventory);
+                        return;
+                    }
+                    adminResetStats(player, null);
+                    refresh(player, session, inventory);
+                } else if (openWlEditor != null) {
+                    sounds.play(player, "gui-click");
+                    player.closeInventory();
+                    openWlEditor.accept(player, target);
                 } else {
-                    runStatsReset(player, target);
+                    sounds.play(player, "error");
                 }
-                refresh(player, session, inventory);
             }
             case "act:lift_punishments" -> {
                 List<PunishmentRecord> active = safeList(() -> punishmentRepository.findActiveForPlayer(target));
@@ -704,7 +716,7 @@ public final class AdminPlayerDataGui extends AbstractGui {
                     chatBanService.unban(target);
                 }
                 // ranked stats
-                runStatsReset(player, target);
+                adminResetStats(player, target);
                 if (online != null) {
                     online.sendMessage(Component.text(
                             "Your data was reset by an admin.", NamedTextColor.RED));
@@ -728,7 +740,7 @@ public final class AdminPlayerDataGui extends AbstractGui {
     }
 
     /** Same async shape as /practiceadmin statsreset: DB work off-thread, report on main. */
-    private void runStatsReset(Player admin, UUID target) {
+    void adminResetStats(Player admin, UUID target) {
         if (statsResetService == null) {
             sounds.play(admin, "error");
             return;

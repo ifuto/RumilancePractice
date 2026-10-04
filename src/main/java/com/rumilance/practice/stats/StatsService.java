@@ -51,6 +51,22 @@ public final class StatsService {
         return rankedStatsRepository.find(uuid, kit);
     }
 
+    /**
+     * Admin edit: overwrites the W/L record of one (player, kit) pair, keeping the Glicko-2
+     * rating fields untouched. Creates the row at unrated starting values when the player
+     * never played the kit. Negative inputs are clamped to 0.
+     */
+    public void setWinsLosses(UUID uuid, String kit, int wins, int losses) throws Exception {
+        int w = Math.max(0, wins);
+        int l = Math.max(0, losses);
+        RankedKitStats row = rankedStatsRepository.find(uuid, kit).orElse(null);
+        if (row == null) {
+            row = RankedKitStats.starting(uuid, kit);
+        }
+        rankedStatsRepository.upsert(new RankedKitStats(row.id(), row.uuid(), row.kit(), row.pt(),
+                row.deviation(), row.volatility(), w, l, row.winStreak(), row.bestPt()));
+    }
+
     public List<RankedKitStats> allKits(UUID uuid) throws Exception {
         return rankedStatsRepository.findAllForPlayer(uuid);
     }
