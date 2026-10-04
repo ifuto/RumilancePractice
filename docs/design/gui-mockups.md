@@ -153,7 +153,12 @@ row4 構成 (2026-10-04 確定): col0/4/7 = lime装飾、col1 = **代入セル**
 - chip **Shift+クリック** = そのスロットの中身リセット (保存行削除→公式レイアウトに戻る)。
 main36ベース: slot19-25 (row2) にキットグリッド、row5にBack barrier。実装: グリッド rows1-3
 (21枠/頁)。キット選択で lastKitTracker も更新 (前回の KIT と共有)。
-※ /setfunc の機能アイテム右クリック オープン時も ui.button.click を鳴らす (menu compass 含む)。
+※ ui.button.click を鳴らす箇所 (2026-10-04確定): KIT SELECT chips (代入/Active/編集/リセット)、
+  /setfunc 機能アイテム右クリック オープン (menu compass 含む)、Queue参加のキット押下。
+  **これらは sounds.yml を経由しない** (sound.ClickSound で直接鳴らす。yml エントリは作らない)。
+※ /setfunc の GUI を開く機能アイテム右クリック時は **ホットバー等をリセット**
+  (LobbyService#applyLobbyInventory でロビー標準インベントリへ戻してから GUI オープン)。
+  leavequeue / party トグル等のアクション系ではリセットしない。
 
 ### MAIN KIT SELECTER (EkitSelectGui 選択画面)
 

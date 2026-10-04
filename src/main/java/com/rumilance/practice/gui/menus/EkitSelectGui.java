@@ -494,7 +494,7 @@ public final class EkitSelectGui extends AbstractGui {
                 if (lastKitTracker != null) {
                     lastKitTracker.record(player.getUniqueId(), kitId);
                 }
-                sounds.play(player, "button-click");
+                com.rumilance.practice.sound.ClickSound.play(player);
                 refresh(player, session, inventory);
                 return;
             }
@@ -555,7 +555,7 @@ public final class EkitSelectGui extends AbstractGui {
                 || clickType == org.bukkit.event.inventory.ClickType.SHIFT_RIGHT) {
             // Shift+click: reset that K slot's contents (drop the saved row, back to the
             // kit's official layout everywhere).
-            sounds.play(player, "button-click");
+            com.rumilance.practice.sound.ClickSound.play(player);
             if (editKitGui != null) {
                 editKitGui.resetVariantSlot(player, kitId, variant);
             }
@@ -565,7 +565,7 @@ public final class EkitSelectGui extends AbstractGui {
         if (clickType == org.bukkit.event.inventory.ClickType.RIGHT) {
             // Right-click: open the KIT EDIT GUI on exactly that K slot.
             if (editKitGui != null) {
-                sounds.play(player, "button-click");
+                com.rumilance.practice.sound.ClickSound.play(player);
                 session.setNavigatingAway(true);
                 editKitGui.openKitVariantEditorWithReturn(player, kitId, variant,
                         session.kitCategory(), session.page());
@@ -574,7 +574,7 @@ public final class EkitSelectGui extends AbstractGui {
         }
         // Left-click: make this slot the kit's Active one (本 moves here).
         kitVariantsStore.select(player.getUniqueId(), kitId, variant);
-        sounds.play(player, "button-click");
+        com.rumilance.practice.sound.ClickSound.play(player);
         refresh(player, session, inventory);
     }
 }

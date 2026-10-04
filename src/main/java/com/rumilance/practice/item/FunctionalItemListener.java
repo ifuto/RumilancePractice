@@ -54,6 +54,21 @@ public final class FunctionalItemListener implements Listener {
     };
     private Consumer<Player> openPartyMap = p -> {
     };
+
+    /**
+     * Hotbar reset applied when a GUI-opening functional item is right-clicked (user spec
+     * 2026-10-04) — wired to LobbyService#applyLobbyInventory so the player's hotbar /
+     * armor / offhand go back to the saved lobby standard before the menu opens.
+     */
+    private volatile java.util.function.Consumer<Player> resetHotbar;
+
+    /**
+     * The functional item types that OPEN a GUI (hotbar reset applies); pure actions
+     * (leave queue, party toggles/leave) keep the inventory untouched.
+     */
+    private static final java.util.Set<String> RESET_HOTBAR_FUNCTIONS = java.util.Set.of(
+            "ranked", "unranked", "ffa", "ekit", "settings", "spectate", "titles",
+            "party", "party_hub", "party_invite", "party_start", "party_map", "battle");
     private Consumer<Player> partyLeave = p -> {
     };
     private Consumer<Player> partyTogglePublic = p -> {
@@ -77,6 +92,11 @@ public final class FunctionalItemListener implements Listener {
 
     public void setMultiQueueGuiOpener(java.util.function.Consumer<Player> opener) {
         this.multiQueueGuiOpener = opener;
+    }
+
+    /** Wired from bootstrap: LobbyService#applyLobbyInventory. */
+    public void setResetHotbar(java.util.function.Consumer<Player> resetHotbar) {
+        this.resetHotbar = resetHotbar;
     }
 
     public void setOpenSettings(Consumer<Player> openSettings) {
@@ -216,9 +236,17 @@ public final class FunctionalItemListener implements Listener {
         event.setCancelled(true);
         event.setUseItemInHand(org.bukkit.event.Event.Result.DENY);
         event.setUseInteractedBlock(org.bukkit.event.Event.Result.DENY);
-        // ui.button.click on open (user spec 2026-10-04), alongside the usual open sting.
-        soundService.play(player, "button-click");
+        // ui.button.click on open (user spec 2026-10-04) — direct, not via sounds.yml.
+        com.rumilance.practice.sound.ClickSound.play(player);
         soundService.play(player, "gui-open", 1.4f);
+        // GUI を開く機能アイテムの右クリックではホットバー等をロビー標準にリセット
+        // (user spec 2026-10-04)。アクション系 (leavequeue / party トグル) では触らない。
+        if (RESET_HOTBAR_FUNCTIONS.contains(function.toLowerCase(Locale.ROOT))) {
+            java.util.function.Consumer<Player> reset = resetHotbar;
+            if (reset != null) {
+                reset.accept(player);
+            }
+        }
         switch (function.toLowerCase(Locale.ROOT)) {
             case "ranked" -> kitSelectGui.openForQueue(player, true);
             case "unranked" -> kitSelectGui.openForQueue(player, false);

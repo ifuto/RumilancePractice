@@ -149,6 +149,11 @@ public final class QueueCoordinator {
     }
 
     public void join(Player player, String kitId, MatchMode mode) {
+        join(player, kitId, mode, true);
+    }
+
+    /** Full form: {@code playJoinSound}=false lets joinAll play ONE click for the batch. */
+    public void join(Player player, String kitId, MatchMode mode, boolean playJoinSound) {
         if (player == null) {
             return;
         }
@@ -266,7 +271,10 @@ public final class QueueCoordinator {
 
         player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 40, 0, false, false, false));
         giveLeaveItem(player);
-        soundService.play(player, "queue-joined");
+        // Queue参加のキット押下音 = ui.button.click (user spec 2026-10-04, sounds.yml 経由なし)。
+        if (playJoinSound) {
+            com.rumilance.practice.sound.ClickSound.play(player);
+        }
         messageService.send(player, "queue.joined",
                 MessageService.tags("mode", messageService.modeWord(player, mode == MatchMode.RANKED), "kit", fightKitId));
     }
@@ -307,11 +315,17 @@ public final class QueueCoordinator {
 
     /** 指定モードの全有効キットにキュー参加 (MultiQueueGui の「全部参加」用)。 */
     public void joinAll(Player player, MatchMode mode) {
+        boolean joined = false;
         for (com.rumilance.practice.model.KitDefinition kit : kitService.enabled()) {
             String id = kitService.playableId(kit.name());
             if (kitService.isQueueEnabled(id)) {
-                join(player, id, mode);
+                join(player, id, mode, false);
+                joined = true;
             }
+        }
+        // One click for the whole batch (join() is per-kit silent in the joinAll path).
+        if (joined) {
+            com.rumilance.practice.sound.ClickSound.play(player);
         }
     }
 

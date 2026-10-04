@@ -32,6 +32,18 @@ public final class LobbyCompassListener implements Listener {
     private final SoundService soundService;
     private final Consumer<org.bukkit.entity.Player> openMenu;
 
+    /**
+     * Hotbar reset before the Game Menu opens (user spec 2026-10-04) — wired to
+     * LobbyService#applyLobbyInventory so the hotbar returns to the saved lobby standard.
+     */
+    private volatile java.util.function.Consumer<org.bukkit.entity.Player> resetHotbar;
+
+    /** Wired from bootstrap: LobbyService#applyLobbyInventory. */
+    public void setResetHotbar(java.util.function.Consumer<org.bukkit.entity.Player> resetHotbar) {
+        this.resetHotbar = resetHotbar;
+    }
+
+
     public LobbyCompassListener(PlayerStateManager stateManager, SoundService soundService,
                                 Consumer<org.bukkit.entity.Player> openMenu) {
         this.stateManager = stateManager;
@@ -94,8 +106,12 @@ public final class LobbyCompassListener implements Listener {
         if (stateManager.getState(player.getUniqueId()) != PlayerState.LOBBY) {
             return;
         }
-        // ui.button.click on open (user spec 2026-10-04), alongside the usual open sting.
-        soundService.play(player, "button-click");
+        // ui.button.click on open (user spec 2026-10-04) — direct, not via sounds.yml.
+        com.rumilance.practice.sound.ClickSound.play(player);
+        java.util.function.Consumer<org.bukkit.entity.Player> reset = resetHotbar;
+        if (reset != null) {
+            reset.accept(player);
+        }
         soundService.play(player, "gui-open");
         openMenu.accept(player);
     }

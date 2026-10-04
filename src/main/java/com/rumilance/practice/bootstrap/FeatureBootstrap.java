@@ -1507,6 +1507,8 @@ public final class FeatureBootstrap {
         FunctionalItemListener functionalItemListener =
                 new FunctionalItemListener(soundService, queueCoordinator, kitSelectGui);
         functionalItemListener.setSignQueueService(signQueueService);
+        // GUI を開く機能アイテムの右クリックではホットバー等をロビー標準へ戻す (2026-10-04)。
+        functionalItemListener.setResetHotbar(lobbyService::applyLobbyInventory);
         functionalItemListener.setOpenSettings(settingsGui::open);
         functionalItemListener.setOpenFfa(ffaListGui::open);
         functionalItemListener.setOpenEkit(p -> {
@@ -1970,7 +1972,10 @@ public final class FeatureBootstrap {
         pm.registerEvents(kitAnvilRenameService, plugin);
         pm.registerEvents(opponentHealthNametagService, plugin);
         pm.registerEvents(functionalItemListener, plugin);
-        pm.registerEvents(new LobbyCompassListener(stateManager, soundService, gameMenuGui::open), plugin);
+        LobbyCompassListener lobbyCompassListener =
+                new LobbyCompassListener(stateManager, soundService, gameMenuGui::open);
+        lobbyCompassListener.setResetHotbar(lobbyService::applyLobbyInventory);
+        pm.registerEvents(lobbyCompassListener, plugin);
         pm.registerEvents(new com.rumilance.practice.lobby.DuelRightClickListener(
                 stateManager, duelRequestGui, soundService, messageService), plugin);
         AdminToolListener adminToolListener = new AdminToolListener(soundService);
