@@ -52,9 +52,10 @@ time:
   with-minutes: "{m}m{s}s"
 
 # チーム色トークン（{my_color} {opp_color} に入る MiniMessage）
+# blue は 1.92.32 から名前等と同じチーム青 (UiColors.TEAM_BLUE = #6C86FF)。
 colors:
   red: "<red>"
-  blue: "<blue>"
+  blue: "<#6C86FF>"
 
 # 観戦者名の区切り（TAB {spectators}）
 spectators-join: "<gray>, <white>"
@@ -83,8 +84,15 @@ lists:
   spec_blue:
     max: 2
     empty: ""
-    more: "<blue>+{extra} more"
-    entry: "<blue>{name} <white>{hearts} <yellow>T:{totems}"
+    more: "<#6C86FF>+{extra} more"
+    entry: "<#6C86FF>{name} <white>{hearts} <yellow>T:{totems}"
+  # 1.92.32: パーティーバトルで自チームの名前をサイドバーに全員表示（名前は白）。
+  # サイドバーは最大15行なので max 9 + あふれ行「+N more」。max は team_match の固定行と合計15以内に。
+  ally_list:
+    max: 9
+    empty: ""
+    more: "<gray>+{extra} more"
+    entry: "<white>{name} <white>{hearts} <yellow>T:{totems}"
 
 # ---------------------------------------------------------------------------
 # TAB リスト
@@ -169,11 +177,11 @@ layouts:
     lines:
       - "<aqua>Team Match"
       - "{my_color}Ally <white>{ally_alive}<aqua>/{ally_size}"
+      - "@ally_list"
       - "{opp_color}Enemy <white>{enemy_alive}<aqua>/{enemy_size}"
       - "<white>Kit <aqua>{kit}"
       - "<white>Kills <aqua>{my_kills}"
       - "<white>Time <aqua>{time}"
-      - "<white>Ping <aqua>{ping}ms"
 
   spectate:
     title: "<aqua><bold>{server_name}"
@@ -182,7 +190,7 @@ layouts:
     show-footer-line: true
     lines:
       - "<aqua>Spectating"
-      - "<red>{red_series} <white>— <blue>{blue_series}"
+      - "<red>{red_series} <white>— <#6C86FF>{blue_series}"
       - "<white>Kit <aqua>{kit}"
       - "<white>Mode <aqua>{mode}"
       - "@spec_red"

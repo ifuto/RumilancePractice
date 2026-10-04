@@ -256,13 +256,19 @@ public final class ScoreboardService {
                 //   を通らないため、試合 TAB 取り込み (playerListName 上書き / list order /
                 //   filler行 / listed=false) が一生クリアされず、ロビー復帰後も ● が残って
                 //   いた。TAB プレイヤーリストはサイドバー用スコアボード設定とは無関係なので、
-                //   表示 OFF の人にも毎 tick クリアを走らせる（試合中の人は後段の fight-grid
-                //   apply が同 tick に再適用するので表示は維持される）。
-                if (tabFightListService != null
-                        && matchRegistry.byPlayer(player.getUniqueId()).isEmpty()
-                        && (spectatorService == null
-                            || spectatorService.matchOf(player.getUniqueId()).isEmpty())) {
-                    tabFightListService.clear(player);
+                //   表示 OFF の人にも毎 tick クリアを走らせる。1.92.32: 試合中/観戦中の人は
+                //   clear の代わりに per-viewer のパッド+表示名を適用する (update() と同待遇)。
+                MatchSession liveSession = matchRegistry.byPlayer(player.getUniqueId()).orElse(null);
+                if (liveSession == null && spectatorService != null) {
+                    liveSession = spectatorService.matchOf(player.getUniqueId())
+                            .flatMap(matchRegistry::get).orElse(null);
+                }
+                if (tabFightListService != null) {
+                    if (liveSession == null) {
+                        tabFightListService.clear(player);
+                    } else {
+                        tabFightListService.applyViewerPads(player, liveSession);
+                    }
                 }
                 continue;
             }
@@ -289,7 +295,21 @@ public final class ScoreboardService {
                             .flatMap(matchRegistry::get).orElse(null);
                 }
                 if (session != null && applied.add(session.id())) {
-                    tabFightListService.apply(session, online);
+                    // 1.92.32: the grid's styled names + gamemode notation are per-viewer
+                    // packets — only this match's participants and spectators may see the
+                    // team colours / ●, and only their clients get the real gamemode back
+                    // (the lobby reads every grid member as survival).
+                    java.util.List<Player> viewers = new java.util.ArrayList<>();
+                    for (Player candidate : online) {
+                        if (session.isParticipant(candidate.getUniqueId())
+                                || (spectatorService != null && spectatorService
+                                        .matchOf(candidate.getUniqueId())
+                                        .map(session.id()::equals).orElse(false))) {
+                            viewers.add(candidate);
+                        }
+                    }
+                    tabFightListService.apply(session, online, viewers);
+                    tabFightListService.applyGameModes(session, online, viewers);
                 }
             }
             tabFightListService.prune(applied);

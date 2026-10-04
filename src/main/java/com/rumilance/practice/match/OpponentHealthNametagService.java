@@ -4,7 +4,7 @@ import com.rumilance.practice.session.MatchSession;
 import com.rumilance.practice.state.MatchState;
 import io.papermc.paper.scoreboard.numbers.NumberFormat;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.entity.Player;
@@ -32,9 +32,9 @@ import java.util.UUID;
  *
  * <p>Rendering uses per-score {@link NumberFormat#fixed(Component)} (Paper 1.20.3+): the whole
  * line is replaced by a styled component, so each fighter gets their own coloured readout —
- * the number in white (health capped at 20, absorption on top), and the {@code ♥} red by
- * default or yellow while absorption hearts are present. The objective display name stays
- * empty so nothing else is appended.</p>
+ * 「♥ 12.4」(1.92.32): heart first, then the health+absorption value capped at 20, the whole
+ * readout in {@code #F24F44}; while absorption hearts are up only the heart switches to
+ * {@code #DFE305}. The objective display name stays empty so nothing else is appended.</p>
  */
 public final class OpponentHealthNametagService implements Listener {
 
@@ -141,11 +141,14 @@ public final class OpponentHealthNametagService implements Listener {
         // The integer score itself is never rendered (the fixed format replaces it); keep it
         // close to the shown value anyway so sorting/debugging matches what players see.
         score.setScore((int) Math.ceil(value));
-        Component heart = Component.text("\u2665",
-                absorption > 0.0d ? NamedTextColor.YELLOW : NamedTextColor.RED);
+        // 1.92.32 user spec: 「♥ 12.4」— the whole readout in #F24F44; while absorption
+        // hearts are up only the heart switches to #DFE305 (the number stays #F24F44).
+        TextColor base = TextColor.color(0xF24F44);
+        TextColor heartColor = absorption > 0.0d ? TextColor.color(0xDFE305) : base;
         score.numberFormat(NumberFormat.fixed(
-                Component.text(String.format(java.util.Locale.ROOT, "%.1f", shown), NamedTextColor.WHITE)
-                        .append(heart)));
+                Component.text("♥ ", heartColor)
+                        .append(Component.text(
+                                String.format(java.util.Locale.ROOT, "%.1f", shown), base))));
     }
 
     /** Lazily creates (or reuses) the per-viewer below-name objective. */

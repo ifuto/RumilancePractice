@@ -177,6 +177,47 @@ final class TabEntryPackets {
         send(viewer, new ClientboundPlayerInfoRemovePacket(List.copyOf(ids)));
     }
 
+    /**
+     * Per-viewer display-name override of a <em>real</em> entry (1.92.32): the fight grid's
+     * styled row text reaches only {@code viewer}'s client, so everyone outside the match
+     * keeps seeing the plain name. {@code display == null} resets to the profile name.
+     */
+    static void setDisplayName(Player viewer, UUID id, Component display) {
+        ClientboundPlayerInfoUpdatePacket.Entry entry = new ClientboundPlayerInfoUpdatePacket.Entry(
+                id,
+                null,
+                false,
+                0,
+                GameType.SURVIVAL,
+                display == null ? null : PaperAdventure.asVanilla(display),
+                false,
+                0,
+                null);
+        send(viewer, new ClientboundPlayerInfoUpdatePacket(
+                EnumSet.of(ClientboundPlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME), entry));
+    }
+
+    /**
+     * Per-viewer gamemode override of a real entry: the client greys spectator-gamemode rows
+     * out from the list on its own, so a lobby viewer would see parked fighters dimmed.
+     * Sending {@link GameType#SURVIVAL} for them keeps the lobby TAB notation identical to
+     * survival players, while viewers inside the match get the real value back.
+     */
+    static void setGameMode(Player viewer, UUID id, GameType mode) {
+        ClientboundPlayerInfoUpdatePacket.Entry entry = new ClientboundPlayerInfoUpdatePacket.Entry(
+                id,
+                null,
+                false,
+                0,
+                mode,
+                null,
+                false,
+                0,
+                null);
+        send(viewer, new ClientboundPlayerInfoUpdatePacket(
+                EnumSet.of(ClientboundPlayerInfoUpdatePacket.Action.UPDATE_GAME_MODE), entry));
+    }
+
     private static void send(Player viewer, Packet<?> packet) {
         ((CraftPlayer) viewer).getHandle().connection.send(packet);
     }

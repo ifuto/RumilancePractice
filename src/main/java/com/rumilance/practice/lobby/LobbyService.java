@@ -242,11 +242,23 @@ public final class LobbyService {
     }
 
     public void applyLobbyInventory(Player player) {
+        // 1.92.32: the admin region selector (FFA/arena selection wand, PDC adminTool) must
+        // survive the reset — since the functional-item reset shipped, opening any lobby GUI
+        // wiped it from the operator's inventory ("FFAの選択ツールがなくなっちゃってる").
+        java.util.List<ItemStack> adminTools = new java.util.ArrayList<>();
+        org.bukkit.inventory.PlayerInventory inv = player.getInventory();
+        for (ItemStack stack : inv.getContents()) {
+            if (isAdminTool(stack)) {
+                adminTools.add(stack.clone());
+            }
+        }
         player.getInventory().clear();
         if (hubInventoryCustomizer != null && Boolean.TRUE.equals(hubInventoryCustomizer.apply(player))) {
+            restoreAdminTools(player, adminTools);
             return;
         }
         if (lobbyInventory == null) {
+            restoreAdminTools(player, adminTools);
             return;
         }
         for (int i = 0; i < Math.min(36, lobbyInventory.length); i++) {
@@ -272,6 +284,55 @@ public final class LobbyService {
         if (lobbyInventory.length > 40 && lobbyInventory[40] != null && !isGameMenuItem(lobbyInventory[40])) {
             player.getInventory().setItemInOffHand(lobbyInventory[40].clone());
         }
+        restoreAdminTools(player, adminTools);
+    }
+
+    /**
+     * Puts the admin tools (region selector / setup menu, PDC {@code adminTool}) back after
+     * a lobby-standard reset. Saved lobby inventories that already contain the same tool win
+     * — no duplicates. Anything left lands in the first free slot (tools only ever occupy
+     * storage slots, so armor is untouched).
+     */
+    private static void restoreAdminTools(Player player, java.util.List<ItemStack> tools) {
+        if (tools.isEmpty()) {
+            return;
+        }
+        org.bukkit.inventory.PlayerInventory inv = player.getInventory();
+        for (ItemStack tool : tools) {
+            String value = adminToolValue(tool);
+            boolean present = false;
+            for (ItemStack current : inv.getContents()) {
+                if (current != null && current.getType() == tool.getType()
+                        && Objects.equals(adminToolValue(current), value)) {
+                    present = true;
+                    break;
+                }
+            }
+            if (present) {
+                continue;
+            }
+            int first = inv.firstEmpty();
+            if (first >= 0) {
+                inv.setItem(first, tool);
+            } else {
+                // Nowhere to put it: drop it at the player's feet instead of deleting it.
+                player.getWorld().dropItemNaturally(player.getLocation(), tool);
+            }
+        }
+    }
+
+    /** PDC {@code adminTool} value of a stack, or null when it is not an admin tool. */
+    private static String adminToolValue(ItemStack stack) {
+        if (stack == null || !stack.hasItemMeta()) {
+            return null;
+        }
+        return stack.getItemMeta().getPersistentDataContainer()
+                .get(com.rumilance.practice.util.ItemKeys.adminTool(),
+                        org.bukkit.persistence.PersistentDataType.STRING);
+    }
+
+    private static boolean isAdminTool(ItemStack stack) {
+        return adminToolValue(stack) != null;
     }
 
     /**

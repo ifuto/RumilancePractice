@@ -530,6 +530,9 @@ public final class FeatureBootstrap {
                 plugin, matchRegistry, stateManager, settingsService, lobbyService, settings);
         services.register(SpectatorService.class, spectatorService);
         matchService.setSpectatorService(spectatorService);
+        // 1.92.32: while spectating, other spectator-gamemode bodies never render (TAB keeps
+        // listing them). ProtocolLib soft-depend, like the AFK room isolation.
+        com.rumilance.practice.spectator.SpectatorViewIsolation.register(plugin, spectatorService);
 
         TeamColoredArmorService teamColoredArmor =
                 new TeamColoredArmorService(plugin, matchRegistry, settingsService);

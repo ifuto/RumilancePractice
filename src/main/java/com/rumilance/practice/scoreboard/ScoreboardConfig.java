@@ -135,10 +135,12 @@ public final class ScoreboardConfig {
                 : Objects.toString(time.getString("with-minutes", "{m}m{s}s"), "{m}m{s}s");
 
         ConfigurationSection colors = yaml.getConfigurationSection("colors");
+        // 1.92.32: the scoreboard blue is the team blue of the names/TAB grid
+        // (UiColors.TEAM_BLUE = #6C86FF), not vanilla's <blue> (#5555FF).
         this.colorRed = colors == null ? "<red>"
                 : Objects.toString(colors.getString("red", "<red>"), "<red>");
-        this.colorBlue = colors == null ? "<blue>"
-                : Objects.toString(colors.getString("blue", "<blue>"), "<blue>");
+        this.colorBlue = colors == null ? teamBlueTag()
+                : Objects.toString(colors.getString("blue", teamBlueTag()), teamBlueTag());
         this.spectatorsJoin = Objects.toString(
                 yaml.getString("spectators-join", "<gray>, <white>"), "<gray>, <white>");
 
@@ -163,15 +165,15 @@ public final class ScoreboardConfig {
         }
         ListStyle specBlue = ListStyle.of(
                 listsSec == null ? null : listsSec.getConfigurationSection("spec_blue"),
-                2, "", "<blue>{name} <white>{hearts} <yellow>T:{totems}");
+                2, "", teamBlueTag() + "{name} <white>{hearts} <yellow>T:{totems}");
         if (listsSec != null && listsSec.getConfigurationSection("spec_blue") != null) {
             ConfigurationSection s = listsSec.getConfigurationSection("spec_blue");
             specBlue = new ListStyle(specBlue.max(), specBlue.empty(), specBlue.entry(),
-                    Objects.toString(s.getString("more", "<blue>+{extra} more"), ""));
+                    Objects.toString(s.getString("more", teamBlueTag() + "+{extra} more"), ""));
         }
         ListStyle allyList = ListStyle.of(
                 listsSec == null ? null : listsSec.getConfigurationSection("ally_list"),
-                5, "", "<white>{name} <white>{hearts} <yellow>T:{totems}");
+                9, "", "<white>{name} <white>{hearts} <yellow>T:{totems}");
         if (listsSec != null && listsSec.getConfigurationSection("ally_list") != null) {
             ConfigurationSection s = listsSec.getConfigurationSection("ally_list");
             allyList = new ListStyle(allyList.max(), allyList.empty(), allyList.entry(),
@@ -275,6 +277,12 @@ public final class ScoreboardConfig {
 
     public String colorBlue() {
         return colorBlue;
+    }
+
+    /** MiniMessage tag of the shared team blue ({@code UiColors.TEAM_BLUE} = #6C86FF). */
+    private static String teamBlueTag() {
+        return "<#" + String.format(java.util.Locale.ROOT, "%06X",
+                com.rumilance.practice.ui.UiColors.TEAM_BLUE.value()) + ">";
     }
 
     public String spectatorsJoin() {

@@ -2,6 +2,7 @@ package com.rumilance.practice.scoreboard;
 
 import com.rumilance.practice.session.MatchSession;
 import com.rumilance.practice.state.MatchState;
+import net.minecraft.world.level.GameType;
 import com.rumilance.practice.state.TeamColor;
 import com.rumilance.practice.util.RealPlayers;
 import net.kyori.adventure.text.Component;
@@ -93,6 +94,12 @@ public final class TabFightListService {
     private final Set<UUID> layoutApplied = new HashSet<>();
     /** Per player: the list-name content the layout last wrote (null = cleared for teams). */
     private final Map<UUID, Component> layoutNames = new HashMap<>();
+    /** Players whose list order the grid took over (restored on leaving the layout). */
+    private final Set<UUID> orderedPlayers = new HashSet<>();
+    /** Per viewer: real entry id -> grid display name currently spoofed to that client. */
+    private final Map<UUID, Map<UUID, Component>> viewerDisplays = new ConcurrentHashMap<>();
+    /** Per viewer: real entry id -> gamemode we last forced on that client (survival spoof). */
+    private final Map<UUID, Map<UUID, GameType>> viewerModes = new ConcurrentHashMap<>();
     /** Stable column-band slot per running match id. */
     private final Map<UUID, Integer> matchSlots = new HashMap<>();
     /** Per viewer: filler id -> entry state currently sent to that client. */
@@ -219,21 +226,61 @@ public final class TabFightListService {
     }
 
     /** Applies the fight grid (real players' order + names) for one match. */
-    public void apply(MatchSession session, Collection<? extends Player> online) {
+    public void apply(MatchSession session, Collection<? extends Player> online,
+                      List<Player> viewers) {
         if (!running(session)) {
             return;
         }
         layoutApplied.removeIf(id -> Bukkit.getPlayer(id) == null);
+        viewerDisplays.keySet().removeIf(id -> Bukkit.getPlayer(id) == null);
+        viewerModes.keySet().removeIf(id -> Bukkit.getPlayer(id) == null);
         boolean ordering = columnsEnabled();
+        // 1.92.32: the styled grid row (team colour + ●) is per-viewer packet data — a lobby
+        // viewer must see the plain name (the global playerListName write made every client
+        // render it). When the packet layer is unavailable the old global takeover stays.
+        boolean perViewer = ordering && padsUsable();
         Grid grid = buildGrid(session, online);
         long matchSlot = slotFor(session.id());
         int slot = 0;
+        Map<UUID, Component> wanted = perViewer ? new LinkedHashMap<>() : null;
         for (GridRow row : grid.rows()) {
             slot++;
             if (row.player() == null || slot > SLOTS_PER_MATCH) {
                 continue;
             }
-            applyListEntry(row.player(), ordering, orderOf(matchSlot, slot), row.display());
+            applyListEntry(row.player(), ordering, orderOf(matchSlot, slot),
+                    perViewer ? null : row.display());
+            if (wanted != null) {
+                wanted.put(row.player().getUniqueId(), row.display());
+            }
+        }
+        if (wanted != null) {
+            applyEntryDisplays(viewers, wanted);
+        }
+    }
+
+    /**
+     * Sends the styled grid display of each real row only to this match's viewers
+     * (participants + its spectators). Viewers who already show the row keep their packet
+     * until the content changes (a fighter falling to the "- Death" row).
+     */
+    private void applyEntryDisplays(List<Player> viewers, Map<UUID, Component> wanted) {
+        for (Player viewer : viewers) {
+            Map<UUID, Component> sent = viewerDisplays.computeIfAbsent(
+                    viewer.getUniqueId(), id -> new HashMap<>());
+            for (Map.Entry<UUID, Component> entry : wanted.entrySet()) {
+                if (Objects.equals(sent.get(entry.getKey()), entry.getValue())) {
+                    continue;
+                }
+                try {
+                    TabEntryPackets.setDisplayName(viewer, entry.getKey(), entry.getValue());
+                    sent.put(entry.getKey(), entry.getValue());
+                } catch (Throwable t) {
+                    padsBroken = true;
+                    fail(t);
+                    return;
+                }
+            }
         }
     }
 
@@ -600,18 +647,23 @@ public final class TabFightListService {
     /**
      * Applies one tablist entry. Ordering is only written when it changed (this runs on the
      * periodic scoreboard refresh and must not re-broadcast identical player-info updates
-     * every cycle). The list name is taken over once on entering the layout, and re-synced
-     * when the styled content changes (e.g. a fighter falling to the "- Death" row).
+     * every cycle). With {@code display == null} (1.92.32 per-viewer mode) the styled name is
+     * delivered as viewer packets by {@link #applyEntryDisplays} instead of the global
+     * {@code playerListName}, so only this match's clients ever render it.
      */
     private void applyListEntry(Player player, boolean ordering, int order, Component display) {
         if (ordering) {
             try {
                 if (player.getPlayerListOrder() != order) {
                     player.setPlayerListOrder(order);
+                    orderedPlayers.add(player.getUniqueId());
                 }
             } catch (Throwable ignored) {
                 // Never let a tab-layout write break the scoreboard refresh.
             }
+        }
+        if (display == null) {
+            return;
         }
         UUID id = player.getUniqueId();
         boolean entering = layoutApplied.add(id);
@@ -621,6 +673,85 @@ public final class TabFightListService {
         } else if (!Objects.equals(layoutNames.get(id), display)) {
             player.playerListName(display);
             layoutNames.put(id, display);
+        }
+    }
+
+    /**
+     * 1.92.32: per-viewer gamemode notation for the TAB grid. The vanilla client greys out
+     * spectator-gamemode rows on its own, so a lobby viewer would see every parked fighter
+     * dimmed — the user wants the lobby TAB to read a party fight exactly like survival.
+     * Viewers inside this match (participants and its spectators) get the real gamemode back;
+     * everyone else sees this match's grid members as survival. Only differences to the last
+     * value we forced on a client are sent.
+     */
+    public void applyGameModes(MatchSession session, Collection<? extends Player> online,
+                               List<Player> viewers) {
+        if (!running(session) || !padsUsable()) {
+            return;
+        }
+        Set<UUID> inside = new HashSet<>();
+        for (Player viewer : viewers) {
+            inside.add(viewer.getUniqueId());
+        }
+        for (Player target : online) {
+            GameType real = gameTypeOf(target.getGameMode());
+            UUID id = target.getUniqueId();
+            boolean member = session.isParticipant(id) || real == GameType.SPECTATOR;
+            if (!member) {
+                continue;
+            }
+            for (Player viewer : online) {
+                if (inside.contains(viewer.getUniqueId())) {
+                    sendGameMode(viewer, id, real);
+                } else if (real != GameType.SURVIVAL) {
+                    // Lobby / other-match notation: survival, whatever the member's mode is.
+                    sendGameMode(viewer, id, GameType.SURVIVAL);
+                }
+            }
+        }
+    }
+
+    private void sendGameMode(Player viewer, UUID id, GameType mode) {
+        Map<UUID, GameType> sent = viewerModes.computeIfAbsent(
+                viewer.getUniqueId(), key -> new HashMap<>());
+        if (sent.get(id) == mode) {
+            return;
+        }
+        try {
+            TabEntryPackets.setGameMode(viewer, id, mode);
+            sent.put(id, mode);
+        } catch (Throwable t) {
+            padsBroken = true;
+            fail(t);
+        }
+    }
+
+    private static GameType gameTypeOf(GameMode mode) {
+        return switch (mode) {
+            case SURVIVAL -> GameType.SURVIVAL;
+            case CREATIVE -> GameType.CREATIVE;
+            case ADVENTURE -> GameType.ADVENTURE;
+            case SPECTATOR -> GameType.SPECTATOR;
+        };
+    }
+
+    /**
+     * Restores the vanilla player-info state one viewer's client holds for the grid: the
+     * per-viewer display names go back to the profile names. Gamemode overrides are kept on
+     * purpose — a spectator returning to the lobby must keep reading the parked fighters of
+     * the match they just left as survival (see {@link #applyGameModes}).
+     */
+    private void restoreViewerSpoofs(Player viewer) {
+        Map<UUID, Component> displays = viewerDisplays.remove(viewer.getUniqueId());
+        if (displays == null || displays.isEmpty()) {
+            return;
+        }
+        for (UUID id : displays.keySet()) {
+            try {
+                TabEntryPackets.setDisplayName(viewer, id, null);
+            } catch (Throwable t) {
+                fail(t);
+            }
         }
     }
 
@@ -635,8 +766,11 @@ public final class TabFightListService {
                 fail(t);
             }
         }
+        restoreViewerSpoofs(player);
         layoutNames.remove(player.getUniqueId());
-        if (!layoutApplied.remove(player.getUniqueId())) {
+        boolean wasEntry = layoutApplied.remove(player.getUniqueId());
+        boolean wasOrdered = orderedPlayers.remove(player.getUniqueId());
+        if (!wasEntry && !wasOrdered) {
             return;
         }
         try {
@@ -646,12 +780,14 @@ public final class TabFightListService {
         } catch (Throwable ignored) {
             // see applyListEntry
         }
-        if (rankService != null) {
-            rankService.applyNametag(player);
-        }
-        com.rumilance.practice.cosmetic.namecolor.NameColorService ncs = nameColorService;
-        if (ncs != null && ncs.selection(player.getUniqueId()).active()) {
-            player.playerListName(ncs.styledName(player));
+        if (wasEntry) {
+            if (rankService != null) {
+                rankService.applyNametag(player);
+            }
+            com.rumilance.practice.cosmetic.namecolor.NameColorService ncs = nameColorService;
+            if (ncs != null && ncs.selection(player.getUniqueId()).active()) {
+                player.playerListName(ncs.styledName(player));
+            }
         }
     }
 

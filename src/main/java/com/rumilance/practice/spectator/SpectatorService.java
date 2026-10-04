@@ -417,6 +417,10 @@ public final class SpectatorService {
             online.showEntity(plugin, player);
             player.showEntity(plugin, online);
         }
+        // 1.92.32: the packet filter cancelled every spectator body while this player was
+        // spectating; the tracker still believes their client has those entities, so force
+        // a fresh spawn chain for each of them (hide + show pair).
+        SpectatorViewIsolation.revealSpectatorsTo(plugin, player);
     }
 
     public void clearMatch(UUID matchId) {

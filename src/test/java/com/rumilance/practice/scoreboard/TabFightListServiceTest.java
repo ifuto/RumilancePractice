@@ -98,7 +98,7 @@ class TabFightListServiceTest {
         // plugin: the filler rows are built from the server's own classes.
         TabFightListService service = new TabFightListService(null);
         assertNotNull(service);
-        service.apply(null, List.of());
+        service.apply(null, List.of(), List.of());
     }
 
     @Test
