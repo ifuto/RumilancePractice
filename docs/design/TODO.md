@@ -8,11 +8,11 @@
 
 ## 進行中（新バッチ 2026-10-05）
 
-- [ ] **10. FFA の `lff` 設定 + `/lff`** — 下に仕様メモ
-- [ ] **11. Duel アリーナの貼り付けキュー** — 3件目以降を順番に貼る
-- [ ] **12. `/tps` を自前実装** — LuckPerms で一般ユーザーは不可
+- [x] **10. FFA の `lff` 設定 + `/lff`** — v1.92.53
+- [x] **11. Duel アリーナの貼り付けキュー** — v1.92.54
+- [x] **12. `/tps` を自前実装** — v1.92.55–56
 - [ ] **13. Duel Chat の書式 + 受信/送信の切り替え**
-- [ ] **14. `/setting` の整理** — 重複機能の統一
+- [ ] **14. `/setting` の整理** — 重複機能の統一（13と関係が深いので一緒にやる）
 - [ ] **15. `/block` `/ignore`** — Queue でブロック相手と当たらない
 
 ## 完了（8項目リスト + 追加2件）
@@ -71,7 +71,48 @@
 
 ---
 
-# 10〜15. 新バッチ（2026-10-05）— 仕様メモは各項目の調査後に追記
+# 10〜15. 新バッチ（2026-10-05）
+
+## 10. FFA の `lff` — 実装メモ（v1.92.53）
+
+- 設定: `arenas.<id>.settings.lff` / 既定 OFF / `FfaSettingsGui` の `gridSlot(20)`。
+  `FfaArena` は18項目（`lffEnabled` = 17→18）。
+- アイテム: `FfaLookingForFight`（`com.rumilance.practice.ffa`）。`SLOT = 8`（ホットバー最後）。
+  - 待機: `GUNPOWDER` / 灰色 / `⚔️ Looking for fight (/lff) ⚔️`
+  - 募集中: `GLOWSTONE_DUST` / 金色 / `⚔️ Now looking for fight ... (/lff)`
+  - 識別は PDC `ffa_lff`（`ItemKeys.ffaLff()`）。
+- 強制配置: `FfaService#applyKit` の `kitService.apply(...)` の直後。`lffEnabled(arenaId)` なら
+  `lookingForFight.refresh(player)`。リスポーンでも呼ばれるので頭上表示の復元も兼ねる。
+- 頭上表示: プレイヤーを vehicle にした `TextDisplay`（`Transformation` で y=+2.35、金色）。
+  ネームタグの書き換えやチーム prefix はランクアイコンと競合するので使っていない。
+- クリック: `FfaListener#onLffToggle`（`PlayerInteractEvent`）。`/lff` は `LffCommand`。
+- 解除: `FfaService#leave(...)` で `clear(player)`。
+
+## 11. Duel アリーナの貼り付けキュー — 実装メモ（v1.92.54）
+
+- 対象は `DisposableArenaService#pasteCopy`（マッチごとに schematic を貼る）。
+- `ArenaPasteQueue<T>`（純粋・Bukkit 非依存）を新設。`MAX_CONCURRENT_PASTES = 2`。
+- `pasteCopy` は受付窓口になり、`tryStart` で空きがあれば即実行、無ければキューへ。
+  完了時に `onFinished()` が次の1件を返し、それを**メインスレッド**に戻して実行する
+  （配置探索とチャンクチケットが Bukkit 状態を触るため、FAWE の完了スレッドでは駄目）。
+- テスト: `ArenaPasteQueueTest`（2件まで同時、3件目は待つ、FIFO、上限厳守、0は1に丸める）。
+
+## 12. `/tps` — 実装メモ（v1.92.55–56）
+
+- `plugin.yml` に `tps:` コマンドと `rumilance.tps`（`default: op`）を宣言。
+  未宣言ノードだと OP 全員に通ってしまうので明示している（既存コメントと同じ理由）。
+- `TpsTracker`（`com.rumilance.practice.util`、純粋）:
+  - 20秒ごとに1サンプル × 60件 = 20分窓。MSPT→TPS は `TickHealth` と同じ式。
+  - `%` は `averageTps / 20 × 100`（20 TPS = 100%）。
+  - 閾値 `17.0` 以下を `Dip` として記録、24時間で忘れる。継続中は `ongoing()`。
+- `TpsCommand`: 権限なしは Bukkit 側で拒否（Built-in へのフォールバックなし）。
+  プレイヤーは10秒クールダウン、コンソールは対象外。
+- **履歴はメモリのみ。再起動で24時間の履歴は消える。**
+- テスト: `TpsTrackerTest`。
+
+---
+
+# 13〜15. 残り（仕様は上にそのまま記載）
 
 ## 10. FFA の `lff` 設定 + `/lff`
 
