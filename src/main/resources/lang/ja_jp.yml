@@ -721,6 +721,7 @@ gui:
   delete-hint: "ここにドラッグするか、カーソルでドロップして削除"
   preset-removable: "削除を許可"
   preset-more-enchant: "More Enchant Item"
+  enchant-done: "完了"
   trim-title: "アーマートリム"
   trim-apply: "適用"
   trim-apply-lore: "選択中のパターンと鉱石を装備に付ける。"

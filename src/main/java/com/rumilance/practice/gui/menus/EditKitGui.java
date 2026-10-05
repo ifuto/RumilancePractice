@@ -27,6 +27,7 @@ import com.rumilance.practice.sound.SoundService;
 import com.rumilance.practice.state.PlayerState;
 import com.rumilance.practice.util.AsyncExecutor;
 import com.rumilance.practice.util.GuiSlots;
+import com.rumilance.practice.util.EnchantmentRules;
 import com.rumilance.practice.util.ItemKeys;
 import com.rumilance.practice.util.ItemSerializer;
 import com.rumilance.practice.util.KitLayoutDelta;
@@ -251,6 +252,14 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
     /** True when editing a kit with preset candidates enabled (hotbar palette + Q-drop delete). */
     /** Session key: the preset entry whose config screen is open in the bottom inventory. */
     private static final String K_PRESET_CONFIG = "preset_config";
+    /** Enchantment customiser (More Enchant Item): stage, entry, working stack, pick. */
+    private static final String K_ENCHANT_STAGE = "enchant_stage";
+    private static final String K_ENCHANT_ENTRY = "enchant_entry";
+    private static final String K_ENCHANT_ITEM = "enchant_item";
+    private static final String K_ENCHANT_PICK = "enchant_pick";
+    private static final String STAGE_LIST = "list";
+    private static final String STAGE_LEVELS = "levels";
+    private static final String STAGE_RESULT = "result";
 
     public boolean isPresetEdit(GuiSession session) {
         if (session == null || presetItems == null || !"edit".equals(session.get("mode", String.class))) {
@@ -700,6 +709,10 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             renderPresetItemConfig(player, session, category, configEntry, inv);
             return;
         }
+        if (session.get(K_ENCHANT_STAGE, String.class) != null) {
+            renderPresetEnchant(player, session, category, inv);
+            return;
+        }
         String kitId = session.selectedKit();
         java.util.Map<Integer, String> slotMap = presetItems.slots(kitId, category);
         // Never strand the player on an empty page: clamp to the last page with content
@@ -744,6 +757,177 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             case "Consumables" -> Material.GOLDEN_APPLE;
             default -> Material.CHEST;
         };
+    }
+
+    // ===================================================== More Enchant Item customiser
+
+    /**
+     * The enchantment customiser a normal player walks through when they take a preset entry
+     * whose "More Enchant Item" flag is ON (user spec 2026-10-05). Everything happens in the
+     * bottom inventory, in three stages:
+     *
+     * <ul>
+     *   <li><b>list</b> — every enchantment the item can take, plus 完了. Click an enchantment
+     *       that is already applied to remove it, or one that is not to pick a level.</li>
+     *   <li><b>levels</b> — one button per level 1..max; choosing one applies it with the
+     *       enchanting-table sound and returns to the list.</li>
+     *   <li><b>result</b> — 完了 hands over the finished item: anvil sound, the item appears in
+     *       the centre, and taking it drops the player back on the normal palette.</li>
+     * </ul>
+     */
+    private void renderPresetEnchant(Player player, GuiSession session, String category,
+                                     PlayerInventory inv) {
+        String stage = session.get(K_ENCHANT_STAGE, String.class);
+        ItemStack working = session.get(K_ENCHANT_ITEM, ItemStack.class);
+        if (working == null) {
+            session.put(K_ENCHANT_STAGE, null);
+            renderPlayerPresetPalette(player, session);
+            return;
+        }
+        if (STAGE_RESULT.equals(stage)) {
+            inv.setItem(13, working.clone());
+            return;
+        }
+        if (STAGE_LEVELS.equals(stage)) {
+            org.bukkit.enchantments.Enchantment pick = enchantmentByKey(
+                    session.get(K_ENCHANT_PICK, String.class));
+            inv.setItem(0, GuiDecorator.button(UiTheme.BACK, t(player, "menu.back"),
+                    "enchant:back"));
+            if (pick == null) {
+                session.put(K_ENCHANT_STAGE, STAGE_LIST);
+                renderPlayerPresetPalette(player, session);
+                return;
+            }
+            for (int level = 1; level <= pick.getMaxLevel() && level <= 9; level++) {
+                inv.setItem(8 + level, GuiDecorator.button(Material.ENCHANTED_BOOK,
+                        Component.text(EnchantmentRules.label(pick) + " " + roman(level),
+                                UiTheme.VALUE).decoration(TextDecoration.ITALIC, false),
+                        "enchant:level:" + level));
+            }
+            return;
+        }
+        // --- list stage ---
+        inv.setItem(0, GuiDecorator.button(Material.EMERALD,
+                Component.text(line(player, "gui.enchant-done"), UiTheme.SUCCESS)
+                        .decoration(TextDecoration.ITALIC, false), "enchant:done"));
+        inv.setItem(4, working.clone());
+        java.util.List<org.bukkit.enchantments.Enchantment> options =
+                EnchantmentRules.applicable(working);
+        for (int i = 0; i < options.size() && i < 27; i++) {
+            org.bukkit.enchantments.Enchantment ench = options.get(i);
+            int level = working.getEnchantmentLevel(ench);
+            boolean on = level > 0;
+            inv.setItem(9 + i, GuiDecorator.button(Material.ENCHANTED_BOOK,
+                    Component.text(EnchantmentRules.label(ench)
+                                    + (on ? " " + roman(level) : ""),
+                            on ? UiTheme.SUCCESS : UiTheme.VALUE)
+                            .decoration(TextDecoration.ITALIC, false),
+                    "enchant:" + ench.getKey().getKey()));
+        }
+    }
+
+    private static org.bukkit.enchantments.Enchantment enchantmentByKey(String key) {
+        if (key == null || key.isBlank()) {
+            return null;
+        }
+        try {
+            return org.bukkit.Registry.ENCHANTMENT.get(
+                    org.bukkit.NamespacedKey.minecraft(key));
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static String roman(int level) {
+        String[] numerals = {"", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"};
+        return level >= 1 && level < numerals.length ? numerals[level] : String.valueOf(level);
+    }
+
+    /** Clicks inside the enchantment customiser (bottom inventory). */
+    private void handleEnchantClick(Player player, GuiSession session, InventoryClickEvent event) {
+        int slot = event.getSlot();
+        String stage = session.get(K_ENCHANT_STAGE, String.class);
+        ItemStack working = session.get(K_ENCHANT_ITEM, ItemStack.class);
+        if (working == null) {
+            session.put(K_ENCHANT_STAGE, null);
+            renderPlayerPresetPalette(player, session);
+            return;
+        }
+        if (STAGE_RESULT.equals(stage)) {
+            if (slot == 13) {
+                event.getView().setCursor(working.clone());
+                session.put(K_ENCHANT_STAGE, null);
+                session.put(K_ENCHANT_ITEM, null);
+                session.put(K_ENCHANT_PICK, null);
+                renderPlayerPresetPalette(player, session);
+                sounds.play(player, "gui-click");
+            }
+            return;
+        }
+        if (slot == 0) {
+            if (STAGE_LEVELS.equals(stage)) {
+                session.put(K_ENCHANT_STAGE, STAGE_LIST);
+                renderPlayerPresetPalette(player, session);
+                sounds.play(player, "gui-back");
+            } else {
+                // 完了 — anvil use, then hand the finished item over from the centre.
+                player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_ANVIL_USE, 1.0f, 1.0f);
+                session.put(K_ENCHANT_STAGE, STAGE_RESULT);
+                renderPlayerPresetPalette(player, session);
+            }
+            return;
+        }
+        if (STAGE_LEVELS.equals(stage)) {
+            org.bukkit.enchantments.Enchantment pick =
+                    enchantmentByKey(session.get(K_ENCHANT_PICK, String.class));
+            if (pick == null) {
+                return;
+            }
+            int level = slot - 8;
+            java.util.Map<org.bukkit.enchantments.Enchantment, Integer> existing =
+                    new java.util.HashMap<>(working.getEnchantments());
+            if (!EnchantmentRules.canApply(working, pick, level, existing)) {
+                sounds.play(player, "error");
+                return;
+            }
+            working.removeEnchantment(pick);
+            working.addEnchantment(pick, level);
+            session.put(K_ENCHANT_ITEM, working);
+            // Same sound as enchanting at an enchanting table.
+            player.playSound(player.getLocation(),
+                    org.bukkit.Sound.BLOCK_ENCHANTMENT_TABLE_USE, 1.0f, 1.0f);
+            session.put(K_ENCHANT_STAGE, STAGE_LIST);
+            renderPlayerPresetPalette(player, session);
+            return;
+        }
+        // --- list stage: an enchantment tile ---
+        if (slot >= 9 && slot <= 35) {
+            java.util.List<org.bukkit.enchantments.Enchantment> options =
+                    EnchantmentRules.applicable(working);
+            int index = slot - 9;
+            if (index >= options.size()) {
+                return;
+            }
+            org.bukkit.enchantments.Enchantment ench = options.get(index);
+            if (working.getEnchantmentLevel(ench) > 0) {
+                // Already applied — clicking removes it.
+                working.removeEnchantment(ench);
+                session.put(K_ENCHANT_ITEM, working);
+                sounds.play(player, "delete");
+                renderPlayerPresetPalette(player, session);
+                return;
+            }
+            java.util.Map<org.bukkit.enchantments.Enchantment, Integer> existing =
+                    new java.util.HashMap<>(working.getEnchantments());
+            if (!EnchantmentRules.canApply(working, ench, 1, existing)) {
+                sounds.play(player, "error");
+                return;
+            }
+            session.put(K_ENCHANT_PICK, ench.getKey().getKey());
+            session.put(K_ENCHANT_STAGE, STAGE_LEVELS);
+            renderPlayerPresetPalette(player, session);
+            sounds.play(player, "gui-click");
+        }
     }
 
     /**
@@ -1292,6 +1476,10 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             handlePresetConfigClick(player, session, event, configEntry);
             return;
         }
+        if (session.get(K_ENCHANT_STAGE, String.class) != null) {
+            handleEnchantClick(player, session, event);
+            return;
+        }
         int slot = event.getSlot();
         ItemStack cursor = event.getCursor();
         if (slot >= 9 && slot <= 35) {
@@ -1315,6 +1503,18 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             if (click == org.bukkit.event.inventory.ClickType.RIGHT
                     || click == org.bukkit.event.inventory.ClickType.SHIFT_RIGHT) {
                 session.put(K_PRESET_CONFIG, entry);
+                renderPlayerPresetPalette(player, session);
+                sounds.play(player, "gui-open");
+                return;
+            }
+            // "More Enchant Item": a normal player customises the enchantments before the
+            // item reaches their cursor. OPs (who curate the pool) still get it raw.
+            if (presetItems.isMoreEnchant(category, entry)
+                    && !player.hasPermission("rumilance.admin")) {
+                session.put(K_ENCHANT_ENTRY, entry);
+                session.put(K_ENCHANT_ITEM, item.clone());
+                session.put(K_ENCHANT_STAGE, STAGE_LIST);
+                session.put(K_ENCHANT_PICK, null);
                 renderPlayerPresetPalette(player, session);
                 sounds.play(player, "gui-open");
                 return;

@@ -721,6 +721,7 @@ gui:
   delete-hint: "Glisse ici ou lâche avec le curseur pour supprimer"
   preset-removable: "Autoriser la suppression"
   preset-more-enchant: "More Enchant Item"
+  enchant-done: "Terminé"
   trim-title: "Ornement d'armure"
   trim-apply: "Appliquer"
   trim-apply-lore: "Applique le motif et le matériau choisis."
