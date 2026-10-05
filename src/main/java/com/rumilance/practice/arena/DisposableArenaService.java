@@ -44,6 +44,13 @@ public final class DisposableArenaService extends AbstractArenaService {
     private static final int MAX_PLACEMENT_ATTEMPTS = 60;
 
     /**
+     * How many arena copies may be pasted at once. Pasting is the heaviest thing that happens on
+     * a duel start, so a burst of three or more near-simultaneous matches sends everything past
+     * the second one through the {@link ArenaPasteQueue} instead.
+     */
+    private static final int MAX_CONCURRENT_PASTES = 2;
+
+    /**
      * Release barrier: how many 2-tick re-checks (1s) the copy waits for the match-end
      * teleports to land before it stops trusting them.
      */
@@ -64,6 +71,12 @@ public final class DisposableArenaService extends AbstractArenaService {
 
     /** Live pasted copies (instanceId -> instance); used for overlap checks and cleanup. */
     private final Map<UUID, ArenaInstance> liveCopies = new ConcurrentHashMap<>();
+
+    /**
+     * Arena Paste Queue: the third and later copies of a near-simultaneous burst wait here and
+     * are pasted in order as earlier ones finish.
+     */
+    private final ArenaPasteQueue<Runnable> pasteQueue = new ArenaPasteQueue<>(MAX_CONCURRENT_PASTES);
 
     /**
      * Optional "get this player out of the arena" hook (wired to the lobby return). When a copy
@@ -133,7 +146,40 @@ public final class DisposableArenaService extends AbstractArenaService {
     }
 
     /** Pastes a fresh disposable copy of {@code template} at a free random origin. */
+    /**
+     * Entry point for a disposable copy: takes a slot in the {@link ArenaPasteQueue} when one is
+     * free, otherwise queues the paste and completes the returned future once its turn comes.
+     */
     private CompletableFuture<Optional<ArenaInstance>> pasteCopy(ArenaTemplate template, UUID matchId) {
+        CompletableFuture<Optional<ArenaInstance>> future = new CompletableFuture<>();
+        Runnable paste = () -> pasteCopyNow(template, matchId).whenComplete((value, throwable) -> {
+            if (throwable != null) {
+                future.completeExceptionally(throwable);
+            } else {
+                future.complete(value);
+            }
+            Runnable next = pasteQueue.onFinished();
+            if (next != null) {
+                // The next paste touches Bukkit state (placement search, chunk tickets), so
+                // hand it back to the main thread rather than running on FAWE's completions.
+                if (plugin.isEnabled()) {
+                    Bukkit.getScheduler().runTask(plugin, next);
+                } else {
+                    next.run();
+                }
+            }
+        });
+        if (pasteQueue.tryStart(paste)) {
+            paste.run();
+        } else {
+            LOGGER.info("Arena paste queued for '" + template.name() + "' — " + pasteQueue.queued()
+                    + " waiting, " + pasteQueue.active() + " pasting");
+        }
+        return future;
+    }
+
+    /** The paste itself: pick a free origin, paste the schematic, preload the chunks. */
+    private CompletableFuture<Optional<ArenaInstance>> pasteCopyNow(ArenaTemplate template, UUID matchId) {
         World world = Bukkit.getWorld(template.world());
         if (world == null) {
             return CompletableFuture.completedFuture(Optional.empty());
