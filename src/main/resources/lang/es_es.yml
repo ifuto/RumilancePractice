@@ -305,6 +305,8 @@ party:
   hotbar-kit-edit-hint: "<gray>Edita los diseños de tu kit"
   hotbar-leave: "<red>Salir del equipo"
   hotbar-leave-hint: "<gray>Salir del equipo"
+  hotbar-settings: "Ajustes del grupo"
+  hotbar-settings-hint: "Solo el dueño: reglas y zona peligrosa"
 
 general:
   prefix: ""

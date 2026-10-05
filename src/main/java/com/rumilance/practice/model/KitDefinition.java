@@ -9,7 +9,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
-public record KitDefinition(String name, String displayName, String icon, KitCategory category, boolean ranked, boolean ffaEnabled, double maxHealth, boolean naturalHealthRegen, double knockbackMultiplier, List<KitItemEntry> items, Map<String, String> armor, boolean enabled, boolean autoFood, boolean swordShieldBreak, boolean blockPlace, boolean blockBreak, boolean breakPlayerPlacedOnly, List<String> canBreak, boolean pearl, boolean totem, boolean forceAdventure, int timeoutSeconds, List<String> arenas, List<String> partyArenas, List<String> startCommands, List<KitStartEffect> startEffects, boolean presetEnabled, boolean bedExplosion, boolean crystalFfa, String parent, String defaultChild) {
+public record KitDefinition(String name, String displayName, String icon, KitCategory category, boolean ranked, boolean ffaEnabled, double maxHealth, boolean naturalHealthRegen, double knockbackMultiplier, List<KitItemEntry> items, Map<String, String> armor, boolean enabled, boolean autoFood, boolean swordShieldBreak, boolean blockPlace, boolean blockBreak, boolean breakPlayerPlacedOnly, List<String> canBreak, boolean pearl, boolean totem, boolean forceAdventure, int timeoutSeconds, List<String> arenas, List<String> partyArenas, List<String> startCommands, List<KitStartEffect> startEffects, boolean presetEnabled, boolean bedExplosion, boolean crystalFfa, String parent, String defaultChild, boolean heartIndicator) {
     public KitDefinition {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(displayName, "displayName");
@@ -163,6 +163,8 @@ public record KitDefinition(String name, String displayName, String icon, KitCat
          * player with the variant they selected. At most one kit carries the flag.
          */
         private boolean crystalFfa;
+        /** Heart indicator (♥ HP readout) for this kit. ON by default. */
+        private boolean heartIndicator = true;
         /** Id of the kit whose sub-menu this kit lives in (null = a top-level kit). */
         private String parent;
         /** For a folder kit: which child its own tile uses (null = the first child). */
@@ -404,6 +406,11 @@ public record KitDefinition(String name, String displayName, String icon, KitCat
             return this;
         }
 
+        public Builder heartIndicator(boolean value) {
+            this.heartIndicator = value;
+            return this;
+        }
+
         public Builder crystalFfa(boolean value) {
             this.crystalFfa = value;
             return this;
@@ -427,7 +434,8 @@ public record KitDefinition(String name, String displayName, String icon, KitCat
         }
 
         public KitDefinition build() {
-            return new KitDefinition(this.name, this.displayName, this.icon, this.category, this.ranked, this.ffaEnabled, this.maxHealth, this.naturalHealthRegen, this.knockbackMultiplier, this.items, this.armor, this.enabled, this.autoFood, this.swordShieldBreak, this.blockPlace, this.blockBreak, this.breakPlayerPlacedOnly, this.canBreak, this.pearl, this.totem, this.forceAdventure, this.timeoutSeconds, this.arenas, this.partyArenas, this.startCommands, this.startEffects, this.presetEnabled, this.bedExplosion, this.crystalFfa, this.parent, this.defaultChild);
+            return new KitDefinition(this.name, this.displayName, this.icon, this.category, this.ranked, this.ffaEnabled, this.maxHealth, this.naturalHealthRegen, this.knockbackMultiplier, this.items, this.armor, this.enabled, this.autoFood, this.swordShieldBreak, this.blockPlace, this.blockBreak, this.breakPlayerPlacedOnly, this.canBreak, this.pearl, this.totem, this.forceAdventure, this.timeoutSeconds, this.arenas, this.partyArenas, this.startCommands, this.startEffects, this.presetEnabled, this.bedExplosion, this.crystalFfa, this.parent, this.defaultChild,
+                    this.heartIndicator);
         }
     }
 }

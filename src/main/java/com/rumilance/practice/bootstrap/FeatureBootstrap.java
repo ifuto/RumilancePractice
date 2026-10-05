@@ -1588,6 +1588,16 @@ public final class FeatureBootstrap {
         // The party-map hotkey routes through kit selection: a map can only be chosen for
         // a specific kit (kit -> that kit's party maps -> pick to start).
         functionalItemListener.setOpenPartyMap(guardedPartyStart);
+        // Party Settings has no cell in the Party MAIN GUI mockup, so it lives on the party
+        // hotbar instead. Owner only — TeamSettingsGui already refuses non-owners.
+        functionalItemListener.setOpenPartySettings(player -> {
+            if (teamService.teamOf(player.getUniqueId()).isEmpty()) {
+                player.sendMessage(Component.text(
+                        messageService.raw(player, "party.err-not-in"), NamedTextColor.RED));
+                return;
+            }
+            teamSettingsGui.open(player);
+        });
         functionalItemListener.setPartyLeave(player -> {
             TeamService.Result r = teamService.leave(player);
             if (r != TeamService.Result.OK) {
@@ -1634,6 +1644,7 @@ public final class FeatureBootstrap {
         matchService.setTabVisibilityService(tabVisibilityService);
         OpponentHealthNametagService opponentHealthNametagService =
                 new OpponentHealthNametagService(plugin, matchRegistry);
+        opponentHealthNametagService.setKitService(kitService);
         services.register(OpponentHealthNametagService.class, opponentHealthNametagService);
         scoreboardService.setOpponentHealthNametagService(opponentHealthNametagService);
         opponentHealthNametagService.start();

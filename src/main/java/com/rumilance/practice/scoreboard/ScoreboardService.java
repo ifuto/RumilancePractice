@@ -305,7 +305,10 @@ public final class ScoreboardService {
                                 || (spectatorService != null && spectatorService
                                         .matchOf(candidate.getUniqueId())
                                         .map(session.id()::equals).orElse(false))) {
-                            viewers.add(candidate);
+                            // Sneaking viewers keep the lobby TAB (user spec 2026-10-05).
+                            if (!candidate.isSneaking()) {
+                                viewers.add(candidate);
+                            }
                         }
                     }
                     tabFightListService.apply(session, online, viewers);

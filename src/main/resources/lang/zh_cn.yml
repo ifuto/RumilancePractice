@@ -305,6 +305,8 @@ party:
   hotbar-kit-edit-hint: "<gray>编辑你的套件布局"
   hotbar-leave: "<red>离开队伍"
   hotbar-leave-hint: "<gray>离开当前队伍"
+  hotbar-settings: "派对设置"
+  hotbar-settings-hint: "仅队长 — 规则与危险操作"
 
 general:
   prefix: ""

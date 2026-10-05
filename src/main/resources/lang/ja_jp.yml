@@ -306,6 +306,8 @@ party:
   hotbar-kit-edit-hint: "<gray>キットのレイアウトを編集"
   hotbar-leave: "<red>パーティー退出"
   hotbar-leave-hint: "<gray>パーティーから退出"
+  hotbar-settings: "パーティ設定"
+  hotbar-settings-hint: "オーナー専用 — ルールと危険操作"
 
 general:
   prefix: ""

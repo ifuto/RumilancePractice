@@ -176,11 +176,8 @@ public final class PlayerCommands implements CommandExecutor, TabCompleter {
                     ekitSelectGui.open(player);
                     return true;
                 }
-                if (hiddenRankService == null || !hiddenRankService.hasTester(player.getUniqueId())) {
-                    player.sendMessage(Component.text(
-                            "この形式の /ekit はテスター専用です。", NamedTextColor.RED));
-                    return true;
-                }
+                // /ekit <mcid> is open to everyone (2026-10-05): it only ever opens the
+                // read-only viewer, so there is nothing a non-tester could abuse here.
                 if (args.length != 1) {
                     player.sendMessage(Component.text("Usage: /ekit <mcid>", NamedTextColor.YELLOW));
                     return true;
@@ -379,10 +376,7 @@ public final class PlayerCommands implements CommandExecutor, TabCompleter {
             return TabCompletions.filter(current,
                     kitService.enabled().stream().map(k -> k.name()).toList());
         }
-        if (type == Type.EKIT && args.length == 1
-                && sender instanceof Player player
-                && hiddenRankService != null
-                && hiddenRankService.hasTester(player.getUniqueId())) {
+        if (type == Type.EKIT && args.length == 1 && sender instanceof Player) {
             return TabCompletions.filter(current,
                     Bukkit.getOnlinePlayers().stream().map(Player::getName).toList());
         }

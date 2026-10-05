@@ -305,6 +305,8 @@ party:
   hotbar-kit-edit-hint: "<gray>Edit your kit layouts"
   hotbar-leave: "<red>Leave Party"
   hotbar-leave-hint: "<gray>Leave the party"
+  hotbar-settings: "Party Settings"
+  hotbar-settings-hint: "Owner only — rules and danger zone"
 
 general:
   prefix: ""

@@ -256,6 +256,11 @@ public final class KitAdminGui extends AbstractGui {
                         .decoration(TextDecoration.ITALIC, false), "open:start-effects"));
         inventory.setItem(GuiSlots.slot(4, 6), ItemBuilder.action(Material.NETHER_STAR,
                 Component.text(rawGui(locale, "gui.kit-admin-preset-open"), UiTheme.SECONDARY), "open:preset"));
+        // Heart indicator (♥ HP readout under the nametag). ON by default; the kit config
+        // screen is where a kit opts out.
+        inventory.setItem(GuiSlots.slot(5, 2), toggle("Heart Indicator", kit.heartIndicator(),
+                "toggle:heartindicator",
+                kit.heartIndicator() ? Material.LIME_DYE : Material.GRAY_DYE, locale));
 
         if (kit.isChild()) {
             inventory.setItem(GuiSlots.slot(5, 7), entry(Material.HOPPER,
@@ -511,6 +516,7 @@ public final class KitAdminGui extends AbstractGui {
             case "toggle:swordshieldbreak" -> b.swordShieldBreak(!kit.swordShieldBreak()).build();
             case "toggle:preset" -> b.presetEnabled(!kit.presetEnabled()).build();
             case "toggle:bedexplosion" -> b.bedExplosion(!kit.bedExplosion()).build();
+            case "toggle:heartindicator" -> b.heartIndicator(!kit.heartIndicator()).build();
             default -> null;
         };
     }

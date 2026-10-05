@@ -54,6 +54,8 @@ public final class FunctionalItemListener implements Listener {
     };
     private Consumer<Player> openPartyMap = p -> {
     };
+    private Consumer<Player> openPartySettings = p -> {
+    };
 
     /**
      * Hotbar reset applied when a GUI-opening functional item is right-clicked (user spec
@@ -68,7 +70,8 @@ public final class FunctionalItemListener implements Listener {
      */
     private static final java.util.Set<String> RESET_HOTBAR_FUNCTIONS = java.util.Set.of(
             "ranked", "unranked", "ffa", "ekit", "settings", "spectate", "titles",
-            "party", "party_hub", "party_invite", "party_start", "party_map", "battle");
+            "party", "party_hub", "party_invite", "party_start", "party_map", "battle",
+            "party_settings");
     private Consumer<Player> partyLeave = p -> {
     };
     private Consumer<Player> partyTogglePublic = p -> {
@@ -141,6 +144,10 @@ public final class FunctionalItemListener implements Listener {
 
     public void setOpenPartyMap(Consumer<Player> openPartyMap) {
         this.openPartyMap = openPartyMap == null ? p -> { } : openPartyMap;
+    }
+
+    public void setOpenPartySettings(Consumer<Player> openPartySettings) {
+        this.openPartySettings = openPartySettings == null ? p -> { } : openPartySettings;
     }
 
     public void setPartyLeave(Consumer<Player> partyLeave) {
@@ -260,6 +267,7 @@ public final class FunctionalItemListener implements Listener {
             case "party_invite" -> openPartyInvite.accept(player);
             case "party_start" -> openPartyStart.accept(player);
             case "party_map" -> openPartyMap.accept(player);
+            case "party_settings" -> openPartySettings.accept(player);
             case "party_ff" -> partyToggleFf.accept(player);
             case "party_leave" -> partyLeave.accept(player);
             case "party_public" -> partyTogglePublic.accept(player);

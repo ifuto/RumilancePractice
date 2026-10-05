@@ -45,6 +45,12 @@ public final class OpponentHealthNametagService implements Listener {
 
     private final Plugin plugin;
     private final MatchRegistry matchRegistry;
+    /** Optional: when set, kits may opt out of the heart readout (default ON). */
+    private volatile com.rumilance.practice.kit.KitService kitService;
+
+    public void setKitService(com.rumilance.practice.kit.KitService kitService) {
+        this.kitService = kitService;
+    }
 
     public OpponentHealthNametagService(Plugin plugin, MatchRegistry matchRegistry) {
         this.plugin = java.util.Objects.requireNonNull(plugin, "plugin");
@@ -133,6 +139,12 @@ public final class OpponentHealthNametagService implements Listener {
             score.numberFormat(NumberFormat.blank());
             return;
         }
+        if (!heartIndicatorFor(target)) {
+            // Per-kit opt-out (KitDefinition#heartIndicator, ON by default).
+            score.setScore(0);
+            score.numberFormat(NumberFormat.blank());
+            return;
+        }
         double absorption = Math.max(0.0d, target.getAbsorptionAmount());
         double health = Math.min(target.getHealth(), HEALTH_CAP);
         double value = Math.max(0.0d, health) + absorption;
@@ -149,6 +161,23 @@ public final class OpponentHealthNametagService implements Listener {
                 Component.text("♥ ", heartColor)
                         .append(Component.text(
                                 String.format(java.util.Locale.ROOT, "%.1f", shown), base))));
+    }
+
+    /**
+     * True when the kit this fighter is playing allows the heart readout. Unresolvable kits
+     * keep the indicator (the field defaults to ON and the service may run without KitService).
+     */
+    private boolean heartIndicatorFor(Player target) {
+        com.rumilance.practice.kit.KitService kits = kitService;
+        if (kits == null) {
+            return true;
+        }
+        MatchSession session = matchRegistry.byPlayer(target.getUniqueId()).orElse(null);
+        String kitId = session == null ? null : session.kitFor(target.getUniqueId());
+        if (kitId == null) {
+            return true;
+        }
+        return kits.get(kitId).map(kit -> kit.heartIndicator()).orElse(true);
     }
 
     /** Lazily creates (or reuses) the per-viewer below-name objective. */

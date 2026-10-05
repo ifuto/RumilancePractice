@@ -305,6 +305,8 @@ party:
   hotbar-kit-edit-hint: "<gray>킷 레이아웃 편집"
   hotbar-leave: "<red>파티 나가기"
   hotbar-leave-hint: "<gray>파티에서 나갑니다"
+  hotbar-settings: "파티 설정"
+  hotbar-settings-hint: "소유자 전용 — 규칙과 위험 설정"
 
 general:
   prefix: ""

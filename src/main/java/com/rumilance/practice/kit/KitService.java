@@ -110,6 +110,8 @@ public final class KitService {
                     .bedExplosion(section.getBoolean("bed-explosion", false))
                     // "Crystal FFA" declaration: THE crystal FFA kit gets the KIT1..9 variant editor.
                     .crystalFfa(section.getBoolean("crystal-ffa", false))
+                    // Heart indicator (♥ HP readout under the nametag). ON unless a kit opts out.
+                    .heartIndicator(section.getBoolean("heart-indicator", true))
                     // 中メニュー: `parent` = このキットは別キットの子メニューの中に入っている、
                     // `default-child` = フォルダ化した自分のタイルが使う子。どちらも普通のキット id。
                     .parent(section.getString("parent", null))
@@ -891,6 +893,7 @@ public final class KitService {
                 .bedExplosion(source.bedExplosion())
                 // Crystal FFA is exclusive; do not duplicate its flag on a new child.
                 .crystalFfa(false)
+                .heartIndicator(source.heartIndicator())
                 .parent(parentKey)
                 .build();
         save(child);
@@ -943,6 +946,7 @@ public final class KitService {
         yaml.set(path + ".preset-enabled", kit.presetEnabled());
         yaml.set(path + ".bed-explosion", kit.bedExplosion());
         yaml.set(path + ".crystal-ffa", kit.crystalFfa());
+        yaml.set(path + ".heart-indicator", kit.heartIndicator());
         // 中メニューの親子関係（未設定のときはキーごと消す）。
         yaml.set(path + ".parent", kit.parent());
         yaml.set(path + ".default-child", kit.defaultChild());

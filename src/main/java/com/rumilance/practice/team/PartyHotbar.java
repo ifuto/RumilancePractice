@@ -19,6 +19,8 @@ public final class PartyHotbar {
     public static final String HUB = "party_hub";
     public static final String INVITE = "party_invite";
     public static final String LEAVE = "party_leave";
+    /** Owner-only: opens the Party Config GUI (TeamSettingsGui). */
+    public static final String SETTINGS = "party_settings";
     public static final String START = "party_start";
     public static final String PUBLIC = "party_public";
     public static final String MAP = "party_map";
@@ -51,11 +53,11 @@ public final class PartyHotbar {
         if (player == null) {
             return;
         }
-        // Deliberately minimal: every party control (invite, visibility, friendly fire,
-        // map select, start battle, side assignment...) lives inside the Party Hub GUI, so
-        // the hotbar only keeps things the hub cannot do — open the hub, edit your kit,
-        // and leave. (The extra party_* functions stay supported by the item listener for
-        // legacy / custom lobby items.)
+        // Deliberately minimal: the Party Hub GUI carries the roster and the battle flow, so
+        // the hotbar only keeps things the hub cannot do — open the hub, edit your kit, and
+        // leave. Party Settings gets its OWN hotbar slot because the mockup
+        // (docs/design/gui.json「Party MAIN GUI」) has no cell for it and cramming it into the
+        // hub footer would break the START BATTLE row. Owner only.
         player.getInventory().clear();
         player.getInventory().setItem(0, tagged(HUB, Material.NETHER_STAR,
                 name(player, "party.hotbar-hub", UiTheme.menuTitle("Party Hub")),
@@ -63,6 +65,12 @@ public final class PartyHotbar {
         player.getInventory().setItem(1, tagged("ekit", Material.CHEST,
                 name(player, "party.hotbar-kit-edit", Component.text("Kit Edit", UiTheme.PRIMARY)),
                 name(player, "party.hotbar-kit-edit-hint", UiTheme.hint("Edit your kit layouts"))));
+        if (owner) {
+            player.getInventory().setItem(7, tagged(SETTINGS, Material.COMPARATOR,
+                    name(player, "party.hotbar-settings", Component.text("Party Settings", UiTheme.PRIMARY)),
+                    name(player, "party.hotbar-settings-hint",
+                            UiTheme.hint("Owner only — rules, danger zone"))));
+        }
         player.getInventory().setItem(8, tagged(LEAVE, Material.OAK_DOOR,
                 name(player, "party.hotbar-leave", Component.text("Leave Party", UiTheme.DANGER)),
                 name(player, "party.hotbar-leave-hint", UiTheme.hint("Leave the party"))));
@@ -88,7 +96,7 @@ public final class PartyHotbar {
             return false;
         }
         return switch (function.toLowerCase()) {
-            case HUB, INVITE, LEAVE, START, PUBLIC, MAP, FF -> true;
+            case HUB, INVITE, LEAVE, START, PUBLIC, MAP, FF, SETTINGS -> true;
             default -> false;
         };
     }

@@ -266,6 +266,12 @@ public final class TabFightListService {
      */
     private void applyEntryDisplays(List<Player> viewers, Map<UUID, Component> wanted) {
         for (Player viewer : viewers) {
+            // Sneaking while holding TAB shows the LOBBY list (user spec 2026-10-05): the
+            // fight grid is per-viewer, so simply never sending it to a sneaking viewer
+            // leaves them with the plain lobby ordering and names.
+            if (viewer.isSneaking()) {
+                continue;
+            }
             Map<UUID, Component> sent = viewerDisplays.computeIfAbsent(
                     viewer.getUniqueId(), id -> new HashMap<>());
             for (Map.Entry<UUID, Component> entry : wanted.entrySet()) {
@@ -294,6 +300,14 @@ public final class TabFightListService {
         unlisted.keySet().removeIf(id -> Bukkit.getPlayer(id) == null);
         Map<UUID, PadState> sent =
                 sentPads.computeIfAbsent(viewer.getUniqueId(), id -> new ConcurrentHashMap<>());
+        if (viewer.isSneaking()) {
+            // Sneak + TAB = lobby list. Drop this viewer's grid and give them the vanilla
+            // listing back; the next tick re-applies it as soon as they stand up.
+            removeAllPads(viewer, sent);
+            restoreListing(viewer);
+            restoreViewerSpoofs(viewer);
+            return;
+        }
         if (!running(session) || !padsUsable()) {
             removeAllPads(viewer, sent);
             restoreListing(viewer);

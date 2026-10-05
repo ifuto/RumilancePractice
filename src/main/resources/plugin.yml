@@ -222,7 +222,7 @@ commands:
     usage: /title
     permission: rumilance.user
   ekit:
-    description: Edit your official kit layout, or let the hidden tester role view another player's layout.
+    description: Edit your official kit layout, or open a read-only view of another player's layout.
     usage: /ekit [mcid]
     permission: rumilance.user
   leave:
