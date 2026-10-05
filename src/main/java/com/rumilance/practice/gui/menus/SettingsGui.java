@@ -103,9 +103,20 @@ public final class SettingsGui extends AbstractGui {
         inventory.setItem(GuiSlots.slot(1, 5), toggle(player, Material.ENDER_EYE, "gui.allow-spectate",
                 s.spectateVisible(), "spectators",
                 "gui.allow-spectate-lore"));
-        inventory.setItem(GuiSlots.slot(1, 7), toggle(player, Material.PAPER, "gui.hide-chat",
-                s.hideOtherChat(), "hide_chat",
-                "gui.hide-chat-lore"));
+        // Chat settings: Duel Chat / Global Chat reception plus the send-target switch. This
+        // replaces the old "hide chat" toggle, which duplicated the Global Chat reception
+        // switch that already lives on the screen this button opens.
+        inventory.setItem(GuiSlots.slot(1, 7),
+                ItemBuilder.of(Material.BOOK)
+                        .name(t(player, "gui.chat-settings-entry").color(UiTheme.SECONDARY))
+                        .lore(
+                                UiTheme.divider(),
+                                UiTheme.line(line(player, "gui.chat-settings-entry-lore")),
+                                UiTheme.blank(),
+                                UiTheme.hint(line(player, "gui.chat-settings-open-hint"))
+                        )
+                        .action(com.rumilance.practice.gui.DelayedButton.wrap("chat_settings"))
+                        .build());
         inventory.setItem(GuiSlots.slot(2, 1), toggle(player, Material.NOTE_BLOCK, "gui.sounds",
                 s.soundsEnabled(), "sounds",
                 "gui.sounds-lore"));
@@ -133,19 +144,6 @@ public final class SettingsGui extends AbstractGui {
                                 UiTheme.hint(line(player, "gui.chat-whitelist-hint"))
                         )
                         .action(com.rumilance.practice.gui.DelayedButton.wrap("whitelist"))
-                        .build());
-
-        // 「メッセージの受信」— the five reception switches live on their own screen.
-        inventory.setItem(GuiSlots.slot(4, 4),
-                ItemBuilder.of(Material.BOOK)
-                        .name(t(player, "gui.chat-settings-entry").color(UiTheme.SECONDARY))
-                        .lore(
-                                UiTheme.divider(),
-                                UiTheme.line(line(player, "gui.chat-settings-entry-lore")),
-                                UiTheme.blank(),
-                                UiTheme.hint(line(player, "gui.chat-settings-open-hint"))
-                        )
-                        .action(com.rumilance.practice.gui.DelayedButton.wrap("chat_settings"))
                         .build());
 
         paintNav(player, session, inventory);
@@ -295,7 +293,6 @@ public final class SettingsGui extends AbstractGui {
             case "toggle:deny_duels" -> s.withAcceptDuelRequests(!s.acceptDuelRequests());
             case "toggle:auto_requeue" -> s.withAutoRequeue(!s.autoRequeue());
             case "toggle:spectators" -> s.withSpectateVisible(!s.spectateVisible());
-            case "toggle:hide_chat" -> s.withHideOtherChat(!s.hideOtherChat());
             case "toggle:sounds" -> s.withSoundsEnabled(!s.soundsEnabled());
             case "toggle:match_report" -> s.withShowMatchReport(!s.showMatchReport());
             case "toggle:scoreboard" -> s.withScoreboardEnabled(!s.scoreboardEnabled());

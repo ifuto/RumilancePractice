@@ -1816,7 +1816,8 @@ public final class FeatureBootstrap {
                 playerPlacedBlockTracker, explosionSources, damageAttribution), plugin);
         pm.registerEvents(new MatchCommandGuardListener(stateManager, messageService), plugin);
         pm.registerEvents(new MatchCountdownLockListener(stateManager), plugin);
-        pm.registerEvents(new com.rumilance.practice.match.MatchChatListener(matchRegistry, spectatorService), plugin);
+        pm.registerEvents(new com.rumilance.practice.match.MatchChatListener(
+                matchRegistry, spectatorService, settingsService), plugin);
         // /matchchat — duel chat scope toggle (local [Duel] channel vs global public chat).
 
         pm.registerEvents(new TeamColoredArmorListener(teamColoredArmor, settingsService), plugin);
@@ -2310,7 +2311,7 @@ public final class FeatureBootstrap {
         tellCommand.setSoundService(soundService);
         plugin.getServer().getPluginManager().registerEvents(tellCommand, plugin);
         bind("tell", tellCommand);
-        bind("matchchat", new com.rumilance.practice.command.MatchChatCommand(matchRegistry));
+        bind("matchchat", new com.rumilance.practice.command.MatchChatCommand(matchRegistry, settingsService));
         bind("reply", tellCommand);
         bind("ekitadmin", new EkitAdminCommand(ekitAdminGui,
                 services.get(com.rumilance.practice.originalkit.OriginalKitRoomService.class)));

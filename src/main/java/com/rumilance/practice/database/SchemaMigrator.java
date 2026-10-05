@@ -487,6 +487,13 @@ public final class SchemaMigrator {
                         + " PRIMARY KEY (uuid_a, uuid_b))"
         )));
 
+        migrations.add(new Migration(36, "add duel-chat columns to player_settings", List.of(
+                "ALTER TABLE " + databaseService.table("player_settings")
+                        + " ADD COLUMN receive_duel_chat INTEGER NOT NULL DEFAULT 1",
+                "ALTER TABLE " + databaseService.table("player_settings")
+                        + " ADD COLUMN duel_chat_global INTEGER NOT NULL DEFAULT 0"
+        )));
+
         return migrations;
     }
 

@@ -63,14 +63,19 @@ public final class ChatSettingsGui extends AbstractGui {
         int col = 2;
         inventory.setItem(GuiSlots.slot(1, col++), toggle(player, Material.BOOK, "gui.recv-global-chat",
                 s.receiveGlobalChat(), "global_chat", "gui.recv-global-chat-lore"));
+        inventory.setItem(GuiSlots.slot(1, col++), toggle(player, Material.PLAYER_HEAD, "gui.recv-duel-chat",
+                s.receiveDuelChat(), "duel_chat", "gui.recv-duel-chat-lore"));
         inventory.setItem(GuiSlots.slot(1, col++), toggle(player, Material.WRITTEN_BOOK, "gui.recv-friend-messages",
                 s.receiveFriendMessages(), "friend_messages", "gui.recv-friend-messages-lore"));
         inventory.setItem(GuiSlots.slot(1, col++), toggle(player, Material.WRITABLE_BOOK, "gui.recv-stranger-messages",
                 s.receiveStrangerMessages(), "stranger_messages", "gui.recv-stranger-messages-lore"));
         inventory.setItem(GuiSlots.slot(1, col++), toggle(player, Material.OAK_DOOR, "gui.recv-friend-joinquit",
                 s.receiveFriendJoinQuit(), "friend_join_quit", "gui.recv-friend-joinquit-lore"));
-        inventory.setItem(GuiSlots.slot(1, col), toggle(player, Material.IRON_DOOR, "gui.recv-stranger-joinquit",
+        inventory.setItem(GuiSlots.slot(1, col++), toggle(player, Material.IRON_DOOR, "gui.recv-stranger-joinquit",
                 s.receiveStrangerJoinQuit(), "stranger_join_quit", "gui.recv-stranger-joinquit-lore"));
+        inventory.setItem(GuiSlots.slot(1, col++), mode(player, Material.ENDER_PEARL, "gui.send-duel-chat",
+                s.duelChatGlobal(), "duel_send", "gui.send-duel-chat-lore",
+                "gui.send-duel-chat-duel", "gui.send-duel-chat-global"));
         paintNav(player, session, inventory);
     }
 
@@ -87,6 +92,27 @@ public final class ChatSettingsGui extends AbstractGui {
                         UiTheme.hint(line(player, "gui.toggle-hint"))
                 )
                 .glint(enabled)
+                .action(DelayedButton.wrap("toggle:" + key))
+                .build();
+    }
+
+    /**
+     * A two-way switch rather than an ON/OFF flag: the lore names the channel currently
+     * selected, and {@code duelChatGlobal} decides which of the two labels is shown.
+     */
+    private ItemStack mode(Player player, Material material, String nameKey, boolean global,
+                           String key, String descriptionKey, String duelKey, String globalKey) {
+        return ItemBuilder.of(material)
+                .name(t(player, nameKey).color(UiTheme.PRIMARY))
+                .lore(
+                        UiTheme.divider(),
+                        UiTheme.line(line(player, descriptionKey)),
+                        UiTheme.blank(),
+                        UiTheme.status(line(player, global ? globalKey : duelKey),
+                                global ? UiTheme.SECONDARY : UiTheme.SUCCESS),
+                        UiTheme.hint(line(player, "gui.toggle-hint"))
+                )
+                .glint(true)
                 .action(DelayedButton.wrap("toggle:" + key))
                 .build();
     }
@@ -111,6 +137,8 @@ public final class ChatSettingsGui extends AbstractGui {
             case "toggle:stranger_messages" -> s.withReceiveStrangerMessages(!s.receiveStrangerMessages());
             case "toggle:friend_join_quit" -> s.withReceiveFriendJoinQuit(!s.receiveFriendJoinQuit());
             case "toggle:stranger_join_quit" -> s.withReceiveStrangerJoinQuit(!s.receiveStrangerJoinQuit());
+            case "toggle:duel_chat" -> s.withReceiveDuelChat(!s.receiveDuelChat());
+            case "toggle:duel_send" -> s.withDuelChatGlobal(!s.duelChatGlobal());
             default -> s;
         };
         if (next != s) {

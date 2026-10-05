@@ -1,7 +1,7 @@
 package com.rumilance.practice.command;
 
-import com.rumilance.practice.match.MatchChatListener;
 import com.rumilance.practice.match.MatchRegistry;
+import com.rumilance.practice.settings.SettingsService;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.command.Command;
@@ -15,19 +15,24 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * {@code /matchchat [local|global]} — picks where a fighter's own chat lines go while a duel
- * or party battle is running: {@code local} (default) keeps them inside the match
- * ({@code [Duel]} tagged, fighters + spectators only), {@code global} lets them reach the
- * normal public chat. The choice sticks for the rest of the server session and can be
- * flipped mid-match at any time. Other player's reading is never affected — rerouting only
- * rewrites the speaker's recipients.
+ * {@code /matchchat [local|global]} — command-line shortcut for the send-toggle that also
+ * lives on the Chat Settings screen of {@code /setting}. It picks where a fighter's own chat
+ * lines go while a duel or party battle is running: {@code local} (default) keeps them inside
+ * the match ({@code [Duel]} tagged, fighters + spectators only), {@code global} lets them reach
+ * the normal public chat.
+ *
+ * <p>The choice is stored in the player's settings, so — unlike the old in-memory flag — it
+ * survives a restart. Receiving is unaffected: that is the Duel Chat / Global Chat reception
+ * pair on the same settings screen. Flipping it mid-match takes effect immediately.</p>
  */
 public final class MatchChatCommand implements CommandExecutor, TabCompleter {
 
     private final MatchRegistry registry;
+    private final SettingsService settingsService;
 
-    public MatchChatCommand(MatchRegistry registry) {
+    public MatchChatCommand(MatchRegistry registry, SettingsService settingsService) {
         this.registry = registry;
+        this.settingsService = settingsService;
     }
 
     @Override
@@ -37,7 +42,11 @@ public final class MatchChatCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(Component.text("Players only.", NamedTextColor.RED));
             return true;
         }
-        boolean current = MatchChatListener.isGlobal(player.getUniqueId());
+        if (settingsService == null) {
+            sender.sendMessage(Component.text("Settings are not available.", NamedTextColor.RED));
+            return true;
+        }
+        boolean current = settingsService.get(player).duelChatGlobal();
         boolean target = current;
         if (args.length > 0) {
             String word = args[0].toLowerCase(Locale.ROOT);
@@ -54,7 +63,7 @@ public final class MatchChatCommand implements CommandExecutor, TabCompleter {
         } else {
             target = !current;
         }
-        MatchChatListener.setGlobal(player.getUniqueId(), target);
+        settingsService.update(settingsService.get(player).withDuelChatGlobal(target));
         boolean inMatch = registry != null && registry.byPlayer(player.getUniqueId()).isPresent();
         if (!inMatch) {
             player.sendMessage(Component.text(

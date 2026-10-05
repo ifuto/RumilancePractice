@@ -31,7 +31,8 @@ public final class SettingsRepository {
                 + "accept_duel_requests, auto_requeue, hide_other_chat, chat_whitelist, locale, "
                 + "selected_title, show_match_report, team_glow, team_colored_armor, kill_effect, "
                 + "receive_global_chat, receive_friend_messages, receive_stranger_messages, "
-                + "receive_friend_join_quit, receive_stranger_join_quit FROM "
+                + "receive_friend_join_quit, receive_stranger_join_quit, "
+                + "receive_duel_chat, duel_chat_global FROM "
                 + databaseService.table("player_settings") + " WHERE uuid = ?";
         try (Connection connection = databaseService.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -55,14 +56,16 @@ public final class SettingsRepository {
                 + "accept_duel_requests, auto_requeue, hide_other_chat, chat_whitelist, locale, "
                 + "selected_title, show_match_report, team_glow, team_colored_armor, kill_effect, "
                 + "receive_global_chat, receive_friend_messages, receive_stranger_messages, "
-                + "receive_friend_join_quit, receive_stranger_join_quit) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                + "receive_friend_join_quit, receive_stranger_join_quit, "
+                + "receive_duel_chat, duel_chat_global) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
                 + databaseService.upsertClause("uuid", "sounds_enabled", "scoreboard_enabled", "arrow_effect",
                 "spectate_visible", "accept_duel_requests", "auto_requeue", "hide_other_chat",
                 "chat_whitelist", "locale", "selected_title", "show_match_report",
                 "team_glow", "team_colored_armor", "kill_effect",
                 "receive_global_chat", "receive_friend_messages", "receive_stranger_messages",
-                "receive_friend_join_quit", "receive_stranger_join_quit");
+                "receive_friend_join_quit", "receive_stranger_join_quit",
+                "receive_duel_chat", "duel_chat_global");
         try (Connection connection = databaseService.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, settings.uuid().toString());
@@ -85,6 +88,8 @@ public final class SettingsRepository {
             statement.setInt(18, settings.receiveStrangerMessages() ? 1 : 0);
             statement.setInt(19, settings.receiveFriendJoinQuit() ? 1 : 0);
             statement.setInt(20, settings.receiveStrangerJoinQuit() ? 1 : 0);
+            statement.setInt(21, settings.receiveDuelChat() ? 1 : 0);
+            statement.setInt(22, settings.duelChatGlobal() ? 1 : 0);
             statement.executeUpdate();
         }
     }
@@ -117,7 +122,9 @@ public final class SettingsRepository {
                 columnOrDefault(resultSet, "receive_friend_messages", 1) != 0,
                 columnOrDefault(resultSet, "receive_stranger_messages", 1) != 0,
                 columnOrDefault(resultSet, "receive_friend_join_quit", 1) != 0,
-                columnOrDefault(resultSet, "receive_stranger_join_quit", 1) != 0
+                columnOrDefault(resultSet, "receive_stranger_join_quit", 1) != 0,
+                columnOrDefault(resultSet, "receive_duel_chat", 1) != 0,
+                columnOrDefault(resultSet, "duel_chat_global", 0) != 0
         );
     }
 

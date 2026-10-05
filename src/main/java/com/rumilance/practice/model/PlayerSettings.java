@@ -30,7 +30,9 @@ public record PlayerSettings(
         boolean receiveFriendMessages,
         boolean receiveStrangerMessages,
         boolean receiveFriendJoinQuit,
-        boolean receiveStrangerJoinQuit
+        boolean receiveStrangerJoinQuit,
+        boolean receiveDuelChat,
+        boolean duelChatGlobal
 ) {
 
     /**
@@ -66,7 +68,8 @@ public record PlayerSettings(
         this(uuid, soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
                 acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale, selectedTitle,
                 showMatchReport, true, true, "none",
-                true, true, true, true, true);
+                true, true, true, true, true,
+                true, false);
     }
 
     public PlayerSettings(
@@ -77,7 +80,8 @@ public record PlayerSettings(
         this(uuid, soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
                 acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale, selectedTitle,
                 false, true, true, "none",
-                true, true, true, true, true);
+                true, true, true, true, true,
+                true, false);
     }
 
     public static PlayerSettings defaultsFor(UUID uuid, String defaultLocale) {
@@ -85,7 +89,8 @@ public record PlayerSettings(
         // to players who never chose one. The parameter stays for signature compatibility.
         return new PlayerSettings(uuid, true, true, "none", true, true, false, false,
                 Set.of(), LOCALE_AUTO, "none", false, true, true, "none",
-                true, true, true, true, true);
+                true, true, true, true, true,
+                true, false);
     }
 
     private PlayerSettings copy(
@@ -98,7 +103,8 @@ public record PlayerSettings(
                 acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
                 selectedTitle, showMatchReport, teamGlow, teamColoredArmor, killEffect,
                 receiveGlobalChat, receiveFriendMessages, receiveStrangerMessages,
-                receiveFriendJoinQuit, receiveStrangerJoinQuit);
+                receiveFriendJoinQuit, receiveStrangerJoinQuit,
+                receiveDuelChat, duelChatGlobal);
     }
 
     /**
@@ -111,7 +117,8 @@ public record PlayerSettings(
                 acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
                 selectedTitle, showMatchReport, teamGlow, teamColoredArmor, killEffect,
                 enabled, receiveFriendMessages, receiveStrangerMessages,
-                receiveFriendJoinQuit, receiveStrangerJoinQuit);
+                receiveFriendJoinQuit, receiveStrangerJoinQuit,
+                receiveDuelChat, duelChatGlobal);
     }
 
     public PlayerSettings withReceiveFriendMessages(boolean enabled) {
@@ -119,7 +126,8 @@ public record PlayerSettings(
                 acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
                 selectedTitle, showMatchReport, teamGlow, teamColoredArmor, killEffect,
                 receiveGlobalChat, enabled, receiveStrangerMessages,
-                receiveFriendJoinQuit, receiveStrangerJoinQuit);
+                receiveFriendJoinQuit, receiveStrangerJoinQuit,
+                receiveDuelChat, duelChatGlobal);
     }
 
     public PlayerSettings withReceiveStrangerMessages(boolean enabled) {
@@ -127,7 +135,8 @@ public record PlayerSettings(
                 acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
                 selectedTitle, showMatchReport, teamGlow, teamColoredArmor, killEffect,
                 receiveGlobalChat, receiveFriendMessages, enabled,
-                receiveFriendJoinQuit, receiveStrangerJoinQuit);
+                receiveFriendJoinQuit, receiveStrangerJoinQuit,
+                receiveDuelChat, duelChatGlobal);
     }
 
     public PlayerSettings withReceiveFriendJoinQuit(boolean enabled) {
@@ -135,7 +144,8 @@ public record PlayerSettings(
                 acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
                 selectedTitle, showMatchReport, teamGlow, teamColoredArmor, killEffect,
                 receiveGlobalChat, receiveFriendMessages, receiveStrangerMessages,
-                enabled, receiveStrangerJoinQuit);
+                enabled, receiveStrangerJoinQuit,
+                receiveDuelChat, duelChatGlobal);
     }
 
     public PlayerSettings withReceiveStrangerJoinQuit(boolean enabled) {
@@ -143,7 +153,35 @@ public record PlayerSettings(
                 acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
                 selectedTitle, showMatchReport, teamGlow, teamColoredArmor, killEffect,
                 receiveGlobalChat, receiveFriendMessages, receiveStrangerMessages,
-                receiveFriendJoinQuit, enabled);
+                receiveFriendJoinQuit, enabled,
+                receiveDuelChat, duelChatGlobal);
+    }
+
+    /**
+     * Whether a fighter's lines reach this player while they are not part of that duel.
+     * Default ON: duel chat is opt-out, matching the global-chat toggle next to it.
+     */
+    public PlayerSettings withReceiveDuelChat(boolean enabled) {
+        return new PlayerSettings(uuid, soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
+                acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
+                selectedTitle, showMatchReport, teamGlow, teamColoredArmor, killEffect,
+                receiveGlobalChat, receiveFriendMessages, receiveStrangerMessages,
+                receiveFriendJoinQuit, receiveStrangerJoinQuit,
+                enabled, duelChatGlobal);
+    }
+
+    /**
+     * Where this player's own lines go while they are inside a duel. Default OFF, i.e. the
+     * match-scoped Duel Chat; ON keeps them on the public channel. Replaces the old
+     * in-memory {@code /matchchat} flag so the choice survives a restart.
+     */
+    public PlayerSettings withDuelChatGlobal(boolean enabled) {
+        return new PlayerSettings(uuid, soundsEnabled, scoreboardEnabled, arrowEffect, spectateVisible,
+                acceptDuelRequests, autoRequeue, hideOtherChat, chatWhitelist, locale,
+                selectedTitle, showMatchReport, teamGlow, teamColoredArmor, killEffect,
+                receiveGlobalChat, receiveFriendMessages, receiveStrangerMessages,
+                receiveFriendJoinQuit, receiveStrangerJoinQuit,
+                receiveDuelChat, enabled);
     }
 
     public PlayerSettings withKillEffect(String newKillEffect) {

@@ -76,21 +76,9 @@ public final class PracticeSideListener implements Listener {
                 }
             }
         });
-        // hide other chat setting
-        try {
-            event.viewers().removeIf(audience -> {
-                if (!(audience instanceof Player viewer) || viewer.getUniqueId().equals(player.getUniqueId())) {
-                    return false;
-                }
-                var settings = settingsService.get(viewer);
-                if (!settings.hideOtherChat()) {
-                    return false;
-                }
-                return !settings.chatWhitelist().contains(player.getName().toLowerCase(Locale.ROOT));
-            });
-        } catch (Exception e) {
-            // Never let an async chat event be killed by a settings/storage hiccup.
-        }
+        // NOTE: deciding who *reads* the line is MatchChatListener's job (NORMAL, runs before
+        // this handler). It applies one pair of toggles — Duel Chat reception and Global Chat
+        // reception — so the old duplicate "hide other chat" filter is gone from here.
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
