@@ -92,7 +92,9 @@ final class TpsTrackerTest {
         tracker.sample(10.0d, T0);
         tracker.sample(20.0d, T0 + STEP);
 
-        long dayLater = T0 + TpsTracker.HISTORY_MS + STEP;
+        // A whole day past the end of the dip, not exactly on the boundary: something that
+        // finished precisely 24 hours ago is still "within 24 hours" and is kept.
+        long dayLater = T0 + TpsTracker.HISTORY_MS + 2 * STEP;
         assertTrue(tracker.recentDips(dayLater).isEmpty(),
                 "a dip from more than 24 hours ago is not reported");
         tracker.sample(20.0d, dayLater);
