@@ -630,6 +630,8 @@ gui:
   ffa-settings-rtpqueue-lore: "キュー待ち2人を同じランダム地点へTPして対戦。"
   ffa-settings-bot-name: "FFA Bot"
   ffa-settings-bot-lore: "ONにすると、このアリーナでは /bot がマネキンBOT（NARENA BOT）を出します。既定はOFF。"
+  ffa-settings-freehit-name: "FreeHit 対策"
+  ffa-settings-freehit-lore: "先制攻撃を無効化 · 殴り返しで開始"
   innerkit-default-label: "デフォルトの子"
   innerkit-admin-convert: "このキットをフォルダ化"
   innerkit-admin-convert-lore: "本体を最初の子としてコピー"

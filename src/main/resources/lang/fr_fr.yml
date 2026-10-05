@@ -629,6 +629,8 @@ gui:
   ffa-settings-rtpqueue-lore: "Associe deux joueurs en file sur un point aléatoire commun."
   ffa-settings-bot-name: "FFA Bot"
   ffa-settings-bot-lore: "Si ON, /bot dans cette arène fait apparaître le mannequin (NARENA BOT). OFF par défaut."
+  ffa-settings-freehit-name: "Anti FreeHit"
+  ffa-settings-freehit-lore: "Bloque les coups gratuits · commence au retour"
   innerkit-default-label: "Enfant par défaut"
   innerkit-admin-convert: "Transformer ce kit en dossier"
   innerkit-admin-convert-lore: "Copie le kit comme premier enfant"

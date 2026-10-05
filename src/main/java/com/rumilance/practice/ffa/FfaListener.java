@@ -7,7 +7,10 @@ import com.rumilance.practice.state.PlayerState;
 import com.rumilance.practice.util.KitBlockRules;
 import com.rumilance.practice.util.LocationUtil;
 import com.rumilance.practice.util.PlayerPlacedBlockTracker;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Material;
+import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
 import org.bukkit.event.EventHandler;
@@ -110,6 +113,85 @@ public final class FfaListener implements Listener {
         // Lethal frames are NOT intercepted or predicted: vanilla kills the player for real
         // and the death catch (see onDeath) scores it on the resurrected player — an HP-0
         // prediction can diverge from vanilla's true application; a real death cannot.
+    }
+
+    /**
+     * FreeHit 対策: アリーナの {@code settings.freehit-guard} が ON のとき、本Combat が成立して
+     * いない相手への攻撃からダメージ・ノックバック・Combat 判定を取り除く。ヒット音などの演出は
+     * 通常どおり残る。
+     *
+     * <p>{@link #onDamage} より先に動く必要があるので、HIGHEST より一段低い HIGH を使う。
+     * ここで cancel すると {@code ignoreCancelled = true} の {@link #onDamage} は走らず、
+     * 結果として {@code tagCombat} も呼ばれない — 「Combat 判定が入らない」はこうして実現する。
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onFreeHitGuard(EntityDamageByEntityEvent event) {
+        if (!(event.getEntity() instanceof Player victim)) {
+            return;
+        }
+        Player attacker = attackerOf(event);
+        if (attacker == null || attacker.equals(victim)) {
+            return;
+        }
+        String arenaId = ffaService.arenaOf(victim.getUniqueId()).orElse(null);
+        if (arenaId == null || !ffaService.freehitGuardEnabled(arenaId)) {
+            return;
+        }
+        if (!arenaId.equals(ffaService.arenaOf(attacker.getUniqueId()).orElse(null))) {
+            return;
+        }
+        FfaFreeHitGuard guard = ffaService.freeHitGuard();
+        long now = System.currentTimeMillis();
+        switch (guard.evaluate(attacker.getUniqueId(), victim.getUniqueId(), now)) {
+            case ALLOW -> guard.noteLandedHit(attacker.getUniqueId(), victim.getUniqueId(), now);
+            case BLOCKED -> {
+                // 本Combat 中の2人は相手以外を殴れず、他の人もその2人を殴れない。
+                // どちらの場合もダメージ・KB・仮Combat は一切付かない。
+                event.setCancelled(true);
+                playHitFeedback(victim);
+            }
+            case FREE_HIT -> {
+                // 誰も Combat 中でない: ダメージは消すが当たった音は通常どおり鳴らし、
+                // 非表示の仮Combat を付ける。10 秒以内に殴り返されれば本Combat になる。
+                event.setCancelled(true);
+                playHitFeedback(victim);
+                if (guard.registerFreeHit(attacker.getUniqueId(), victim.getUniqueId(), now)) {
+                    announceCombatStart(attacker, victim);
+                }
+            }
+        }
+    }
+
+    /**
+     * キャンセルした攻撃でも「当たった音」は通常どおり鳴らす。バニラは damage と一緒に音も
+     * 止めてしまうため、被弾した音だけ鳴らし直す（ノックバックは cancel で消える）。
+     */
+    private static void playHitFeedback(Player victim) {
+        victim.getWorld().playSound(victim.getLocation(), Sound.ENTITY_PLAYER_HURT, 1.0f, 1.0f);
+    }
+
+    /** 本Combat 成立の瞬間: exp の pickup 音 + 黄色の警告（仕様どおりの文言）。 */
+    private static void announceCombatStart(Player first, Player second) {
+        announceToOne(first, second);
+        announceToOne(second, first);
+    }
+
+    private static void announceToOne(Player receiver, Player opponent) {
+        receiver.playSound(receiver.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
+        receiver.sendMessage(Component.text(
+                "⚠ Combat with " + opponent.getName() + " has started", NamedTextColor.YELLOW));
+    }
+
+    /** 攻撃者を解決する（素手・近接・矢などの飛び道具）。 */
+    private static Player attackerOf(EntityDamageByEntityEvent event) {
+        if (event.getDamager() instanceof Player player) {
+            return player;
+        }
+        if (event.getDamager() instanceof Projectile projectile
+                && projectile.getShooter() instanceof Player shooter) {
+            return shooter;
+        }
+        return null;
     }
 
     /**

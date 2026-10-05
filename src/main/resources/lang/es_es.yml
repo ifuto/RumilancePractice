@@ -629,6 +629,8 @@ gui:
   ffa-settings-rtpqueue-lore: "Empareja jugadores en cola en un punto aleatorio común."
   ffa-settings-bot-name: "FFA Bot"
   ffa-settings-bot-lore: "Si está ON, /bot en esta arena genera el maniquí (NARENA BOT). OFF por defecto."
+  ffa-settings-freehit-name: "Anti FreeHit"
+  ffa-settings-freehit-lore: "Bloquea golpes traicioneros · empieza al devolver"
   innerkit-default-label: "Hijo predeterminado"
   innerkit-admin-convert: "Convertir este kit en carpeta"
   innerkit-admin-convert-lore: "Copia el kit como primer hijo"

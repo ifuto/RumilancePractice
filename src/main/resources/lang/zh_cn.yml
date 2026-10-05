@@ -629,6 +629,8 @@ gui:
   ffa-settings-rtpqueue-lore: "将排队中的两名玩家传送到同一随机地点。"
   ffa-settings-bot-name: "FFA Bot"
   ffa-settings-bot-lore: "开启后，在该竞技场内 /bot 会生成假人 BOT（NARENA BOT）。默认关闭。"
+  ffa-settings-freehit-name: "FreeHit 防护"
+  ffa-settings-freehit-lore: "禁用偷袭 · 还手后开始"
   innerkit-default-label: "默认子套件"
   innerkit-admin-convert: "将此套件转为文件夹"
   innerkit-admin-convert-lore: "复制为第一个子套件"

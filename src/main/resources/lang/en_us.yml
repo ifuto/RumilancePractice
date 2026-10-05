@@ -631,6 +631,8 @@ gui:
   ffa-settings-rtpqueue-lore: "Pair queued players onto a shared random spot."
   ffa-settings-bot-name: "FFA Bot"
   ffa-settings-bot-lore: "When ON, /bot in this arena spawns the mannequin dummy (NARENA BOT). OFF by default."
+  ffa-settings-freehit-name: "FreeHit Guard"
+  ffa-settings-freehit-lore: "Blocks cheap shots · starts on a hit back"
   innerkit-default-label: "Default child"
   innerkit-admin-convert: "Make this kit a folder"
   innerkit-admin-convert-lore: "Copies the kit as its first child"

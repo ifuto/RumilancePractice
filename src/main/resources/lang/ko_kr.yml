@@ -629,6 +629,8 @@ gui:
   ffa-settings-rtpqueue-lore: "대기 중인 두 명을 같은 무작위 지점으로 TP."
   ffa-settings-bot-name: "FFA Bot"
   ffa-settings-bot-lore: "ON이면 이 아레나에서 /bot가 마네킹 BOT(NARENA BOT)을 소환합니다. 기본값은 OFF."
+  ffa-settings-freehit-name: "FreeHit 방지"
+  ffa-settings-freehit-lore: "선제 공격 무효 · 반격 시 시작"
   innerkit-default-label: "기본 하위 킷"
   innerkit-admin-convert: "이 킷을 폴더로 변환"
   innerkit-admin-convert-lore: "본체를 첫 하위 킷으로 복사"
