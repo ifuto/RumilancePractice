@@ -537,10 +537,12 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
     protected Component title(Player player, GuiSession session) {
         String kit = session.selectedKit();
         Integer crystal = crystalVariant(session);
+        String pretty = kit == null ? "" : com.rumilance.practice.util.KitNames.pretty(kit);
         if (isViewOnly(session)) {
-            return Component.text("Kit View: "
-                            + session.get("viewer-target-name", String.class) + " / "
-                            + com.rumilance.practice.util.KitNames.pretty(kit), UiTheme.PRIMARY)
+            String target = session.get("viewer-target-name", String.class);
+            return Component.text(line(player, "gui.kit-view-layout-title")
+                            .replace("<player>", target == null ? "" : target)
+                            .replace("<kit>", pretty), UiTheme.PRIMARY)
                     .decoration(TextDecoration.ITALIC, false);
         }
         String inner = innerKit(session);
@@ -548,12 +550,18 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         String innerName = inner == null ? null : innerKits == null ? null
                 : innerKits.get(kit, inner).map(com.rumilance.practice.kit.InnerKitService.InnerKit::displayName)
                         .orElse(null);
-        return Component.text(kit == null ? "Edit Kit"
-                : (isOfficialEdit(session) ? "Shared Kit: " : "Edit: ")
-                        + com.rumilance.practice.util.KitNames.pretty(kit)
-                        + (innerName == null ? "" : " \u203a " + innerName)
-                        + (crystal == null ? "" : " (KIT" + crystal + ")")
-                        + (variant == null ? "" : " (K" + variant + ")"), UiTheme.PRIMARY)
+        StringBuilder label = new StringBuilder(line(player, isOfficialEdit(session)
+                ? "gui.kit-shared-layout-title" : "gui.kit-layout-title").replace("<kit>", pretty));
+        if (innerName != null) {
+            label.append(" \u203a ").append(innerName);
+        }
+        if (crystal != null) {
+            label.append(" (KIT").append(crystal).append(')');
+        }
+        if (variant != null) {
+            label.append(" (K").append(variant).append(')');
+        }
+        return Component.text(label.toString(), UiTheme.PRIMARY)
                 .decoration(TextDecoration.ITALIC, false);
     }
 
@@ -599,16 +607,12 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         // armor row visually: helmet/chest/legs/boots + offhand shield (mockup KIT EDIT GUI).
         // 6-row editor: row0 = armor + save/reset, row1 = decor + BACK, rows2-4 = main
         // inventory, row5 = hotbar.
-        inventory.setItem(GuiSlots.slot(0, 0), tagged(player, layout.length > 36 ? layout[36] : null,
-                isViewOnly(session) ? "decorate" : "slot:36"));
-        inventory.setItem(GuiSlots.slot(0, 1), tagged(player, layout.length > 37 ? layout[37] : null,
-                isViewOnly(session) ? "decorate" : "slot:37"));
-        inventory.setItem(GuiSlots.slot(0, 2), tagged(player, layout.length > 38 ? layout[38] : null,
-                isViewOnly(session) ? "decorate" : "slot:38"));
-        inventory.setItem(GuiSlots.slot(0, 3), tagged(player, layout.length > 39 ? layout[39] : null,
-                isViewOnly(session) ? "decorate" : "slot:39"));
-        inventory.setItem(GuiSlots.slot(0, 5), tagged(player, layout.length > 40 ? layout[40] : null,
-                isViewOnly(session) ? "decorate" : "slot:40"));
+        boolean viewOnly = isViewOnly(session);
+        inventory.setItem(GuiSlots.slot(0, 0), equipmentSlot(player, layout, 36, "gui.kit-armor", viewOnly));
+        inventory.setItem(GuiSlots.slot(0, 1), equipmentSlot(player, layout, 37, "gui.kit-armor", viewOnly));
+        inventory.setItem(GuiSlots.slot(0, 2), equipmentSlot(player, layout, 38, "gui.kit-armor", viewOnly));
+        inventory.setItem(GuiSlots.slot(0, 3), equipmentSlot(player, layout, 39, "gui.kit-armor", viewOnly));
+        inventory.setItem(GuiSlots.slot(0, 5), equipmentSlot(player, layout, 40, "gui.kit-offhand", viewOnly));
         // Mockup gray 装飾 between the armor and shield slots (cols 4 and 6 are chrome).
         inventory.setItem(GuiSlots.slot(0, 4), ItemBuilder.action(Material.GRAY_STAINED_GLASS_PANE,
                 Component.text(" "), "decorate"));
@@ -634,7 +638,7 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         for (int col = 0; col < 9; col++) {
             inventory.setItem(GuiSlots.slot(1, col), decorPane());
         }
-        if (crystalVariant(session) != null || isOfficialEdit(session) || isViewOnly(session)) {
+        if (crystalVariant(session) != null || isOfficialEdit(session) || viewOnly) {
             inventory.setItem(GuiSlots.slot(1, 4),
                     ItemBuilder.action(UiTheme.BACK, t(player, "menu.back"), "back"));
         }
@@ -1159,15 +1163,32 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
                 .build();
     }
 
-    private ItemStack tagged(Player player, ItemStack stack, String action) {
-        if (stack == null || stack.getType().isAir()) {
-            return null;
+    /**
+     * Armour / off-hand cell (docs/design/gui.json「KIT EDIT GUI」row 0): the real item when the
+     * kit carries one, otherwise a labelled glass pane — the mockup names these cells 装備 and
+     * OFF HAND, and leaving them empty just punched holes in the row. The pane is a
+     * {@link com.rumilance.practice.kit.KitLayoutContents#isPlaceholder(ItemStack)} material, so
+     * {@code KitLayoutEditor#itemFromDisplay} reads it back as "no item" and it can never be
+     * saved into the kit.
+     */
+    private ItemStack equipmentSlot(Player player, ItemStack[] layout, int index, String nameKey,
+                                    boolean viewOnly) {
+        String action = viewOnly ? "decorate" : "slot:" + index;
+        ItemStack stack = index < layout.length ? layout[index] : null;
+        if (stack != null && !stack.getType().isAir()) {
+            return taggedNonEmpty(player, stack, action);
         }
-        return taggedNonEmpty(player, stack, action);
+        ItemStack pane = ItemBuilder.of(Material.GLASS_PANE)
+                .name(t(player, nameKey).color(UiTheme.MUTED)
+                        .decoration(TextDecoration.ITALIC, false))
+                .build();
+        pane.editMeta(meta -> meta.getPersistentDataContainer().set(ItemKeys.guiAction(),
+                PersistentDataType.STRING, action));
+        return pane;
     }
 
     /**
-     * Same as {@link #tagged(Player, ItemStack, String)} but keeps an empty content slot
+     * Same as {@link #taggedNonEmpty(Player, ItemStack, String)} but keeps an empty content slot
      * visible: the mockup fills every unused kit cell with a ここにキットの中身 glass pane
      * instead of leaving a hole. The action string survives so the click still resolves to
      * the underlying slot.
@@ -1188,15 +1209,24 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         if (stack == null || stack.getType().isAir()) {
             return null;
         }
-        java.util.ArrayList<Component> extra = new java.util.ArrayList<>();
-        if (!"decorate".equals(action)
-                && stack.getItemMeta() instanceof org.bukkit.inventory.meta.ArmorMeta) {
-            extra.add(t(player, "gui.kit-trim-hint").color(UiTheme.MUTED)
-                    .decoration(TextDecoration.ITALIC, false));
+        // One hint line per item, never two: a full kit of tools and armour used to
+        // stack "右クリックでトリム" over "右クリックで改名" on every second slot.
+        String hintKey = null;
+        if (!"decorate".equals(action)) {
+            boolean trim = stack.getItemMeta() instanceof org.bukkit.inventory.meta.ArmorMeta;
+            boolean rename = com.rumilance.practice.gui.KitAnvilRenameService
+                    .isRenameableTool(stack.getType());
+            if (trim && rename) {
+                hintKey = "gui.kit-trim-rename-hint";
+            } else if (trim) {
+                hintKey = "gui.kit-trim-hint";
+            } else if (rename) {
+                hintKey = "gui.kit-rename-hint";
+            }
         }
-        if (!"decorate".equals(action)
-                && com.rumilance.practice.gui.KitAnvilRenameService.isRenameableTool(stack.getType())) {
-            extra.add(t(player, "gui.kit-rename-hint").color(UiTheme.MUTED)
+        java.util.ArrayList<Component> extra = new java.util.ArrayList<>();
+        if (hintKey != null) {
+            extra.add(t(player, hintKey).color(UiTheme.MUTED)
                     .decoration(TextDecoration.ITALIC, false));
         }
         return KitLayoutEditor.tagLayoutItem(stack, action, extra);
