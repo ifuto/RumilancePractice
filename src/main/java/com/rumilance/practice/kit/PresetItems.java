@@ -35,10 +35,20 @@ public final class PresetItems {
     public static final String KITS_ROOT = "kits";
     /** One-shot migration marker: set once the legacy global pool has been copied per kit. */
     public static final String MIGRATION_KEY = "_per-kit-migrated";
+    /** Per-entry flags for preset candidates (docs: OP-specified behaviour). */
+    public static final String FLAGS_ROOT = "entry-flags";
+    public static final String FLAG_REMOVABLE = "removable";
+    public static final String FLAG_MORE_ENCHANT = "more-enchant";
     /** One-shot repair marker: set once per-kit overrides were re-synced from the global pool. */
     public static final String GLOBAL_RESYNC_KEY = "_global-resynced";
 
     private final ConfigService configService;
+    /**
+     * Per-entry flags, keyed {@code <canonical category>|<entry string>}. Two bits:
+     * [0] removable (may an OP drop it out of the pool?) and [1] more-enchant
+     * (does taking this item open the enchantment customiser?). Both default OFF.
+     */
+    private final java.util.Map<String, boolean[]> entryFlags = new java.util.concurrent.ConcurrentHashMap<>();
     private final Map<String, Map<Integer, String>> items = new ConcurrentHashMap<>();
     /** Disk YAML key used per canonical category (e.g. {@code 防具} for {@code Armor}). */
     private final Map<String, String> yamlKeyByCategory = new ConcurrentHashMap<>();
@@ -120,6 +130,7 @@ public final class PresetItems {
         items.clear();
         yamlKeyByCategory.clear();
         kitItems.clear();
+        entryFlags.clear();
         FileConfiguration yaml = configService.presetItems();
         ConfigurationSection root = yaml.getConfigurationSection("categories");
         if (root != null) {
@@ -172,6 +183,7 @@ public final class PresetItems {
             yamlKeyByCategory.putIfAbsent("Armor", "Armor");
         }
         reloadKitOverrides(yaml);
+        loadEntryFlags(yaml);
     }
 
     private static Map<String, Object> serializeSlots(Map<Integer, String> map) {
@@ -542,6 +554,77 @@ public final class PresetItems {
             return true;
         }
         return false;
+    }
+
+    // ============================================================ per-entry flags
+
+    /** Identity of one candidate inside a category — the entry string is its own key. */
+    public static String flagKey(String category, String entry) {
+        return CategoryKeys.canonicalPreset(category) + "|" + entry;
+    }
+
+    private boolean[] flagsFor(String category, String entry) {
+        return entryFlags.get(flagKey(category, entry));
+    }
+
+    public boolean isRemovable(String category, String entry) {
+        boolean[] f = flagsFor(category, entry);
+        return f != null && f[0];
+    }
+
+    /**
+     * Marks a candidate as removable. Only removable entries may be dropped out of the
+     * pool (Q / delete zone) — everything else is pinned so an OP cannot lose it by accident.
+     */
+    public void setRemovable(String category, String entry, boolean value) {
+        setFlag(category, entry, 0, value);
+    }
+
+    /**
+     * "More Enchant Item": when a normal user takes this entry out of the preset they first
+     * get an enchantment customiser. Only meaningful for enchantable items that carry no
+     * enchantment yet.
+     */
+    public boolean isMoreEnchant(String category, String entry) {
+        boolean[] f = flagsFor(category, entry);
+        return f != null && f[1];
+    }
+
+    public void setMoreEnchant(String category, String entry, boolean value) {
+        setFlag(category, entry, 1, value);
+    }
+
+    private void setFlag(String category, String entry, int index, boolean value) {
+        String key = flagKey(category, entry);
+        boolean[] flags = entryFlags.computeIfAbsent(key, k -> new boolean[2]);
+        flags[index] = value;
+        if (!flags[0] && !flags[1]) {
+            entryFlags.remove(key);
+            configService.presetItems().set(FLAGS_ROOT + ".\"" + key + "\"", null);
+        } else {
+            configService.presetItems().set(FLAGS_ROOT + ".\"" + key + "\"." + FLAG_REMOVABLE, flags[0]);
+            configService.presetItems().set(FLAGS_ROOT + ".\"" + key + "\"." + FLAG_MORE_ENCHANT, flags[1]);
+        }
+        configService.save(ConfigService.PRESET_ITEMS);
+    }
+
+    private void loadEntryFlags(FileConfiguration yaml) {
+        entryFlags.clear();
+        ConfigurationSection root = yaml.getConfigurationSection(FLAGS_ROOT);
+        if (root == null) {
+            return;
+        }
+        for (String key : root.getKeys(false)) {
+            ConfigurationSection section = root.getConfigurationSection(key);
+            if (section == null) {
+                continue;
+            }
+            boolean removable = section.getBoolean(FLAG_REMOVABLE, false);
+            boolean moreEnchant = section.getBoolean(FLAG_MORE_ENCHANT, false);
+            if (removable || moreEnchant) {
+                entryFlags.put(key, new boolean[]{removable, moreEnchant});
+            }
+        }
     }
 
     public ItemStack displayItem(String category, String entry) {

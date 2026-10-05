@@ -719,6 +719,8 @@ gui:
   page-next: "Next page"
   delete: "Delete"
   delete-hint: "Drag here or drop with cursor to delete"
+  preset-removable: "삭제 허용"
+  preset-more-enchant: "More Enchant Item"
   trim-title: "Armor Trim"
   trim-apply: "Apply"
   trim-apply-lore: "Attach the selected pattern and material."

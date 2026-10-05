@@ -719,6 +719,8 @@ gui:
   page-next: "下一页"
   delete: "删除"
   delete-hint: "拖到此处或按住物品丢出以删除"
+  preset-removable: "允许删除"
+  preset-more-enchant: "More Enchant Item"
   trim-title: "盔甲纹饰"
   trim-apply: "应用"
   trim-apply-lore: "附上所选花纹与材料。"

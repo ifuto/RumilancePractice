@@ -249,6 +249,9 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
     }
 
     /** True when editing a kit with preset candidates enabled (hotbar palette + Q-drop delete). */
+    /** Session key: the preset entry whose config screen is open in the bottom inventory. */
+    private static final String K_PRESET_CONFIG = "preset_config";
+
     public boolean isPresetEdit(GuiSession session) {
         if (session == null || presetItems == null || !"edit".equals(session.get("mode", String.class))) {
             return false;
@@ -692,6 +695,11 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
 
         PlayerInventory inv = player.getInventory();
         inv.clear();
+        String configEntry = session.get(K_PRESET_CONFIG, String.class);
+        if (configEntry != null) {
+            renderPresetItemConfig(player, session, category, configEntry, inv);
+            return;
+        }
         String kitId = session.selectedKit();
         java.util.Map<Integer, String> slotMap = presetItems.slots(kitId, category);
         // Never strand the player on an empty page: clamp to the last page with content
@@ -736,6 +744,66 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             case "Consumables" -> Material.GOLDEN_APPLE;
             default -> Material.CHEST;
         };
+    }
+
+    /**
+     * Per-item config screen for one preset candidate (user spec 2026-10-05): opened by
+     * RIGHT-CLICKING the entry in the palette. It lives in the bottom inventory like the
+     * palette itself, so no second GUI type is needed.
+     *
+     * <ul>
+     *   <li>(0) Back — returns to the palette.</li>
+     *   <li>(4) the entry itself, as a preview.</li>
+     *   <li>(20) Removable — may an OP drop this entry out of the pool?</li>
+     *   <li>(24) More Enchant Item — only offered when the entry can take enchantments and
+     *       carries none yet. ON means a normal user taking it gets the enchantment
+     *       customiser first. Default OFF.</li>
+     * </ul>
+     */
+    private void renderPresetItemConfig(Player player, GuiSession session, String category,
+                                        String entry, PlayerInventory inv) {
+        ItemStack preview = presetItems.displayItem(category, entry);
+        inv.setItem(0, GuiDecorator.button(UiTheme.BACK, t(player, "menu.back"), "preset-cfg:back"));
+        inv.setItem(4, preview.clone());
+        inv.setItem(20, configToggle(player, "gui.preset-removable", "gui.preset-removable-hint",
+                presetItems.isRemovable(category, entry), "preset-cfg:removable"));
+        if (canCarryEnchantments(preview)) {
+            inv.setItem(24, configToggle(player, "gui.preset-more-enchant",
+                    "gui.preset-more-enchant-hint",
+                    presetItems.isMoreEnchant(category, entry), "preset-cfg:more-enchant"));
+        }
+    }
+
+    private ItemStack configToggle(Player player, String nameKey, String hintKey, boolean on,
+                                   String action) {
+        return GuiDecorator.button(on ? Material.LIME_DYE : Material.GRAY_DYE,
+                Component.text(line(player, nameKey), on ? UiTheme.SUCCESS : UiTheme.MUTED)
+                        .decoration(TextDecoration.ITALIC, false), action);
+    }
+
+    /**
+     * "More Enchant Item" only makes sense for something that CAN be enchanted and is not
+     * enchanted yet — a pre-enchanted sword is already finished.
+     */
+    private static boolean canCarryEnchantments(ItemStack stack) {
+        if (stack == null || stack.getType().isAir()) {
+            return false;
+        }
+        Material type = stack.getType();
+        if (type == Material.ENCHANTED_BOOK || type == Material.BOOK) {
+            return false;
+        }
+        if (stack.hasItemMeta() && stack.getItemMeta().hasEnchants()) {
+            return false;
+        }
+        String n = type.name();
+        return type.getMaxDurability() > 0
+                || n.endsWith("_SWORD") || n.endsWith("_AXE") || n.endsWith("_PICKAXE")
+                || n.endsWith("_SHOVEL") || n.endsWith("_HOE") || n.endsWith("_HELMET")
+                || n.endsWith("_CHESTPLATE") || n.endsWith("_LEGGINGS") || n.endsWith("_BOOTS")
+                || type == Material.BOW || type == Material.CROSSBOW || type == Material.TRIDENT
+                || type == Material.MACE || type == Material.FISHING_ROD
+                || type == Material.SHIELD || type == Material.ELYTRA;
     }
 
     private ItemStack deleteGlass(Player player) {
@@ -1176,8 +1244,52 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
     }
 
     @Override
+    /** Clicks inside the per-item preset config screen (bottom inventory). */
+    private void handlePresetConfigClick(Player player, GuiSession session,
+                                         InventoryClickEvent event, String entry) {
+        int slot = event.getSlot();
+        String category = session.get("preset_category", String.class);
+        if (slot == 0) {
+            session.put(K_PRESET_CONFIG, null);
+            renderPlayerPresetPalette(player, session);
+            sounds.play(player, "gui-back");
+            return;
+        }
+        if (slot == 20) {
+            presetItems.setRemovable(category, entry,
+                    !presetItems.isRemovable(category, entry));
+            sounds.play(player, "gui-click");
+            renderPlayerPresetPalette(player, session);
+            return;
+        }
+        if (slot == 24) {
+            ItemStack preview = presetItems.displayItem(category, entry);
+            if (!canCarryEnchantments(preview)) {
+                sounds.play(player, "error");
+                return;
+            }
+            presetItems.setMoreEnchant(category, entry,
+                    !presetItems.isMoreEnchant(category, entry));
+            sounds.play(player, "gui-click");
+            renderPlayerPresetPalette(player, session);
+            return;
+        }
+        if (slot == 4) {
+            // The preview is decorative — treat a click on it as "take the item".
+            event.getView().setCursor(presetItems.displayItem(category, entry).clone());
+            session.put(K_PRESET_CONFIG, null);
+            renderPlayerPresetPalette(player, session);
+            sounds.play(player, "gui-click");
+        }
+    }
+
     public void handleBottomClick(Player player, GuiSession session, InventoryClickEvent event) {
         if (!isPresetEdit(session)) {
+            return;
+        }
+        String configEntry = session.get(K_PRESET_CONFIG, String.class);
+        if (configEntry != null) {
+            handlePresetConfigClick(player, session, event, configEntry);
             return;
         }
         int slot = event.getSlot();
@@ -1198,7 +1310,17 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             if (item == null) {
                 return;
             }
+            // RIGHT-click opens the entry's own config screen (user spec 2026-10-05).
+            org.bukkit.event.inventory.ClickType click = event.getClick();
+            if (click == org.bukkit.event.inventory.ClickType.RIGHT
+                    || click == org.bukkit.event.inventory.ClickType.SHIFT_RIGHT) {
+                session.put(K_PRESET_CONFIG, entry);
+                renderPlayerPresetPalette(player, session);
+                sounds.play(player, "gui-open");
+                return;
+            }
             event.getView().setCursor(item.clone());
+            session.put("preset_cursor_entry", entry);
             sounds.play(player, "gui-click");
             return;
         }
@@ -1233,6 +1355,14 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             }
             if (slot == 5 || slot == 6) {
                 if (cursor != null && !cursor.getType().isAir()) {
+                    // Only entries an OP marked removable may be thrown away.
+                    String taken = session.get("preset_cursor_entry", String.class);
+                    if (taken != null && !presetItems.isRemovable(
+                            session.get("preset_category", String.class), taken)) {
+                        sounds.play(player, "error");
+                        return;
+                    }
+                    session.put("preset_cursor_entry", null);
                     event.getView().setCursor(null);
                     sounds.play(player, "delete");
                 }

@@ -719,6 +719,8 @@ gui:
   page-next: "Página siguiente"
   delete: "Eliminar"
   delete-hint: "Arrastra aquí o suelta con el cursor para eliminar"
+  preset-removable: "Permitir borrar"
+  preset-more-enchant: "More Enchant Item"
   trim-title: "Ornamento de armadura"
   trim-apply: "Aplicar"
   trim-apply-lore: "Aplica el patrón y material elegidos."
