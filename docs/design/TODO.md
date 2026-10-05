@@ -1,16 +1,16 @@
 # RumilancePractice — やるべきことリスト
 
-更新: 2026-10-05 / ブランチ `arena/01a106b3-rumilancepractice` / HEAD `42442fb` (v1.92.49)
+更新: 2026-10-05 / ブランチ `arena/01a106b3-rumilancepractice` / HEAD `3b053c1` (v1.92.51)
 
 > 定期自動要約で文脈が消えても追えるようにするためのメモ。
-> 同じ内容をリポジトリ側 `docs/design/TODO.md` にも置いてあります（/tmp はサンドボックスの
-> スナップショットに残らないため）。
+> `/tmp/todo.md` にも同じものを置いているが、サンドボックスの /tmp はスナップショットに
+> 残らないので**本体はこのファイル**。
 
 ## 進行中
 
-- [ ] **9. FFA FreeHit 対策（未着手）** — 詳細は下記「9. FFA FreeHit 対策」を参照。
+- なし
 
-## 完了（8項目リスト）
+## 完了（8項目リスト + 追加1件）
 
 | # | 内容 | バージョン | commit |
 |---|---|---|---|
@@ -22,6 +22,7 @@
 | 6 | キットごとのハートインジケーター ON/OFF（デフォルト ON） | 1.92.44 | `338d006` |
 | 7 | Duel 中スニーク+TAB でロビーと同じ TAB | 1.92.44 | `338d006` |
 | 8 | `/ekit <player>` を全員が閲覧のみで実行可 | 1.92.44 | `338d006` |
+| 9 | FFA FreeHit 対策（下に仕様・実装メモ） | 1.92.50–51 | `c28d407` `3b053c1` |
 
 - gui.json（docs/design/gui.json）10画面の完全再現: **完了**（v1.92.42、監査レポートは
   `docs/design/gui-json-audit.md`、未解決3件あり）
@@ -30,6 +31,11 @@
 
 - [ ] Party MAIN GUI の (5,5) パーティ設定タイルを外すか（1番でホットバーに移したので二重に
       なっている）。外すと gui.json の r5 にも一致するが、明示的な指示はまだ無いので保留。
+- [ ] FreeHit 対策の ON/OFF をアリーナ単位ではなく**キット単位**（/kit のコンフィグ画面）に
+      置くべきか。現在はアリーナ単位。各 FFA アリーナはキットを1つしか持たないので実用上は
+      同じだが、複数アリーナでキットを共有すると挙動が分かれる。
+- [ ] FreeHit のヒット演出は現在「音だけ」。cancel するとバニラの被弾フラッシュとパーティクル
+      まで消えるため。赤い点滅まで欲しい場合は別途パケット処理が必要。
 
 ## 作業ルール（このリポジトリでの約束）
 
@@ -40,6 +46,21 @@
 - GUI に該当セルが無い機能は、その画面に無理やり入れない。
 - 数値は検証済みのものだけを結果として出す。
 - 作業の途中で止めない。
+
+### よくある事故と対処
+
+- **リポジトリが再クローンされてローカル履歴が巻き戻る**ことがある（v1.92.50 push 時に発生）。
+  症状: push が non-fast-forward で弾かれ、`git log` の親が古いベースコミットになっている。
+  作業ツリーは無事なので、次で復旧できる:
+  ```
+  git fetch origin
+  git reset --soft origin/arena/01a106b3-rumilancepractice
+  git diff --cached --stat     # 今回の変更だけが差分に出ることを確認
+  git commit && git push origin arena/01a106b3-rumilancepractice
+  ```
+  `reset --soft` 前の HEAD の sha をメモしておけば、`git reset --soft <sha>` で戻せる。
+- レコードに項目を足したら**テストのコンストラクタ呼び出しも直す**。`FfaArena` 追加時、
+  本体は通って `compileTestJava` だけ落ちた（v1.92.50 → 1.92.51 で修正）。
 
 ---
 
@@ -57,22 +78,46 @@
 > しか殴ることができません。AやBが他の人を殴ったりしてもダメージKB、仮Combatにならず、他の人が
 > AやBを殴ってもKbやダメージ、仮combatが付きません。
 
-## 仕様（分解）
+## 実装メモ
 
-1. **設定**: FFA のキットごとに ON/OFF トグル。デフォルトは **OFF**。
-2. **ON のとき**
-   - FFA 参加者は誰を殴っても **ダメージ・ノックバック・Combat判定が入らない**。
-     ただし **ヒット音などの演出は通常通り**。
-   - 殴った瞬間、**非表示の「仮Combat」状態が 10 秒**続く（プレイヤーには見えない）。
-     仮Combat 中に抜けても **ペナルティなし**。
-   - 殴ってから **10 秒以内に相手から殴り返されたら**、その2人の間に本Combat が成立。
-     成立時に **exp の pickup 音** + 黄色で `⚠ Combat with {Opponent} has started`。
-   - **本Combat 中**（A vs B）
-     - 片方が **死ぬ / 抜ける**、または **最後の攻撃から 30 秒経過** まで継続。
-     - A は B しか、B は A しか殴れない（この場合は通常どおりダメージ・KB が入る）。
-     - A・B が **他の人を殴っても** ダメージ・KB・仮Combat ともに入らない。
-     - **他の人が A・B を殴っても** ダメージ・KB・仮Combat ともに入らない。
+### 設定
 
-## 実装メモ（調査後に追記）
+- `FfaSettingsGui` のアリーナ detail ページ、`MenuScaffold.gridSlot(19)`（FFA Bot の隣）。
+  アクション `toggle:freehit` → `FfaService#setFreehitGuard`。
+- 保存先は `arenas.<id>.settings.freehit-guard`（ffa.yml）。**既定 OFF**。
+- `FfaArena` レコードに17個目の項目 `freehitGuard` を追加し、`withFreehitGuard` を用意。
+  コンストラクタ呼び出し17箇所すべて更新済み（`create()` は `false`）。
 
-- （調査中）
+### 状態機械
+
+`src/main/java/com/rumilance/practice/ffa/FfaFreeHitGuard.java`（Bukkit 非依存、時刻は引数）
+
+- `Verdict evaluate(attacker, victim, now)` → `ALLOW` / `FREE_HIT` / `BLOCKED`
+  - 互いが本Combat の相手どうし → `ALLOW`
+  - どちらかが本Combat 中（相手ではない） → `BLOCKED`
+  - どちらも本Combat 中でない → `FREE_HIT`
+- `PROVISIONAL_MS = 10_000`（仮Combat）、`COMBAT_IDLE_MS = 30_000`（本Combat の無攻撃期限）
+- `registerFreeHit` が仮Combat を記録し、相手からの仮Combat が生きていれば本Combat を成立
+  させて `true` を返す。
+- インスタンスは `FfaService#freeHitGuard()` が1つだけ持つ。
+  解除は `leave(Player, boolean)`（退出・切断・マッチ移動すべての共通経路）と
+  `handleLethal`（死亡）で `clear()`。
+
+### ダメージの差し替え
+
+`FfaListener#onFreeHitGuard` — `EntityDamageByEntityEvent`、`EventPriority.HIGH` + `ignoreCancelled`。
+
+- `FfaListener#onDamage` は `HIGHEST` + `ignoreCancelled = true` なので、ここで cancel すると
+  そちらが走らず `tagCombat` も呼ばれない＝「Combat 判定が入らない」の実体。
+- cancel は ダメージ・ノックバック両方を消す。
+- 演出: cancel 後に `Sound.ENTITY_PLAYER_HURT` を被害者座標で鳴らし直す。
+- 本Combat 成立時: 両者に `Sound.ENTITY_EXPERIENCE_ORB_PICKUP` + 黄色の
+  `⚠ Combat with <name> has started`。
+- 攻撃者は近接・素手に加え `Projectile` の shooter も解決する。
+
+### テスト
+
+- `FfaArenaBotFlagTest` — 17引数に更新、`copies()` に `withFreehitGuard` を追加。
+- `FfaArenaFreeHitFlagTest` — 同じことを `freehitGuard` 側について検証（新規）。
+- `FfaFreeHitGuardTest` — 仕様そのものを固定（新規）。10秒の境界（9s で成立 / 10.001s で
+  不成立）、組の排他、30秒の期限延長、退出・死亡での解放。
