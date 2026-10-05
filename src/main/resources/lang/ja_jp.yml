@@ -497,6 +497,13 @@ tell:
   from: "<aqua>From <target></aqua> <gray>»</gray> <white><message></white>"
   blocked: "<gray><target> はメッセージを受け取っていません。</gray>"
 
+block:
+  usage: "<gray>使い方:</gray> <yellow>/block \\<player></yellow>"
+  self: "<red>自分はブロックできません。</red>"
+  unknown: "<red>プレイヤー <name> が見つかりません。</red>"
+  added: "<yellow><name> をブロックしました。Queue でマッチしなくなります。</yellow>"
+  removed: "<green><name> のブロックを解除しました。</green>"
+
 packpolicy:
   usage: "<gray>使い方:</gray> <yellow>/packpolicy [required|recommended|status]</yellow>"
   set-required: "<red>リソースパック方針: 必須 — 拒否・ダウンロード失敗したプレイヤーはキックされます。"

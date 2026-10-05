@@ -496,6 +496,13 @@ tell:
   from: "<aqua>From <target></aqua> <gray>»</gray> <white><message></white>"
   blocked: "<gray><target> 不接收消息。</gray>"
 
+block:
+  usage: "<gray>用法:</gray> <yellow>/block \\<player></yellow>"
+  self: "<red>不能屏蔽自己。</red>"
+  unknown: "<red>找不到玩家 <name>。</red>"
+  added: "<yellow>已屏蔽 <name> — 之后不会匹配到一起。</yellow>"
+  removed: "<green>已解除对 <name> 的屏蔽。</green>"
+
 packpolicy:
   usage: "<gray>用法：</gray> <yellow>/packpolicy [required|recommended|status]</yellow>"
   set-required: "<red>资源包策略：必须 — 拒绝或下载失败的玩家将被踢出。"

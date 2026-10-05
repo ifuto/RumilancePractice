@@ -494,6 +494,13 @@ public final class SchemaMigrator {
                         + " ADD COLUMN duel_chat_global INTEGER NOT NULL DEFAULT 0"
         )));
 
+        migrations.add(new Migration(37, "create player_blocks table", List.of(
+                "CREATE TABLE IF NOT EXISTS " + databaseService.table("player_blocks") + " ("
+                        + "blocker_uuid CHAR(36) NOT NULL, blocked_uuid CHAR(36) NOT NULL,"
+                        + " created_ts BIGINT NOT NULL,"
+                        + " PRIMARY KEY (blocker_uuid, blocked_uuid))"
+        )));
+
         return migrations;
     }
 

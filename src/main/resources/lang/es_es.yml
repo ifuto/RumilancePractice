@@ -496,6 +496,13 @@ tell:
   from: "<aqua>From <target></aqua> <gray>»</gray> <white><message></white>"
   blocked: "<gray><target> no acepta mensajes.</gray>"
 
+block:
+  usage: "<gray>Uso:</gray> <yellow>/block \\<jugador></yellow>"
+  self: "<red>No puedes bloquearte a ti mismo.</red>"
+  unknown: "<red>Jugador <name> no encontrado.</red>"
+  added: "<yellow>Bloqueado <name> — no te emparejarás con esa persona.</yellow>"
+  removed: "<green><name> desbloqueado.</green>"
+
 packpolicy:
   usage: "<gray>Uso:</gray> <yellow>/packpolicy [required|recommended|status]</yellow>"
   set-required: "<red>Política del paquete de recursos: OBLIGATORIO — los jugadores que lo rechacen o fallen al descargarlo serán expulsados."

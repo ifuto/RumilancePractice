@@ -58,6 +58,8 @@ public final class QueueCoordinator {
     private final boolean avoidRecent;
     private final RankedQueueState rankedState;
     private BukkitTask matchTask;
+    /** Block lists (`/block`, `/ignore`); blocks a pair from ever being matched. */
+    private com.rumilance.practice.social.BlockListService blockListService;
     private BukkitTask actionBarTask;
     private com.rumilance.practice.ffa.FfaService ffaService;
     private com.rumilance.practice.team.TeamService teamService;
@@ -329,6 +331,27 @@ public final class QueueCoordinator {
         }
     }
 
+    public void setBlockListService(com.rumilance.practice.social.BlockListService blockListService) {
+        this.blockListService = blockListService;
+    }
+
+    /**
+     * Combines the two reasons a pair may not be matched: the alt-detection restriction and
+     * either player having blocked the other. {@code null} means "no restriction at all".
+     */
+    private java.util.function.BiPredicate<UUID, UUID> pairBlocked(
+            com.rumilance.practice.alt.AltDetectionService alt) {
+        java.util.function.BiPredicate<UUID, UUID> altBlock = alt == null ? null : alt::restrictedPair;
+        com.rumilance.practice.social.BlockListService blocks = blockListService;
+        if (blocks == null) {
+            return altBlock;
+        }
+        if (altBlock == null) {
+            return blocks::isBlockedEitherWay;
+        }
+        return (a, b) -> altBlock.test(a, b) || blocks.isBlockedEitherWay(a, b);
+    }
+
     private void tickMatchmaking() {
         if (runtimeFlags.maintenance()) {
             return;
@@ -338,7 +361,7 @@ public final class QueueCoordinator {
         queueService.pruneOffline();
         com.rumilance.practice.alt.AltDetectionService alt = altDetectionService;
         List<QueueService.MatchPair> pairs = queueService.pollMatches(blockSameIp, avoidRecent,
-                Instant.now(), alt == null ? null : alt::restrictedPair);
+                Instant.now(), pairBlocked(alt));
         for (QueueService.MatchPair pair : pairs) {
             matchService.startDuel(
                     pair.a().playerId(),

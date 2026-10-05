@@ -31,6 +31,11 @@ commands:
     usage: /afkcrystal [start|stop|kit|settings|reset|bindkit|unbindkit]
     aliases: [afkc]
     permission: rumilance.user
+  block:
+    description: Block a player — you will never be matched with them in a queue.
+    usage: /block <player>
+    aliases: [ignore, unblock]
+    permission: rumilance.user
   duel:
     description: Unranked queue, or challenge a player (GUI / kit).
     usage: /duel [player [kit]|cancel|accept|deny]

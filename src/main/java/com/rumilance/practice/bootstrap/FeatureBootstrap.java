@@ -263,6 +263,8 @@ public final class FeatureBootstrap {
     private ScoreboardService scoreboardService;
     private ArrowEffectService arrowEffectService;
     private SettingsService settingsService;
+    /** Block lists behind `/block` / `/ignore`; also consulted by the queue. */
+    private com.rumilance.practice.social.BlockListService blockListService;
     private ChatBanService chatBanService;
     private BanService banService;
     private MatchActionRecorder matchActionRecorder;
@@ -755,6 +757,17 @@ public final class FeatureBootstrap {
         this.altDetection.start();
         services.register(com.rumilance.practice.alt.AltDetectionService.class, this.altDetection);
         queueCoordinator.setAltDetectionService(this.altDetection);
+
+        // --- /block・/ignore (2026-10-05): ブロックした相手とは Queue でマッチしない ---
+        // 片方向のブロックで十分: どちらかが相手をブロックしていればそのペアは組まない。
+        com.rumilance.practice.database.repository.BlockRepository blockRepository =
+                new com.rumilance.practice.database.repository.BlockRepository(
+                        services.get(com.rumilance.practice.database.DatabaseService.class));
+        com.rumilance.practice.social.BlockListService blockListService =
+                new com.rumilance.practice.social.BlockListService(plugin, blockRepository);
+        services.register(com.rumilance.practice.social.BlockListService.class, blockListService);
+        queueCoordinator.setBlockListService(blockListService);
+        this.blockListService = blockListService;
         DuelCommand.configureSameIp(plugin.getConfig().getBoolean("queue.block-same-ip", true));
         DuelCommand.setAltDetectionService(this.altDetection);
         plugin.getServer().getPluginManager().registerEvents(
@@ -1778,6 +1791,7 @@ public final class FeatureBootstrap {
         SessionBootstrapListener sessionBootstrapListener = new SessionBootstrapListener(
                 sessionManager, stateManager, lobbyService, settings.defaultLocale(), playerRepository,
                 layoutCache, settingsService, asyncExecutor, plugin, messageService, rankService, chatBanService);
+        sessionBootstrapListener.setBlockListService(blockListService);
         sessionBootstrapListener.setLanguagePicker(localeSelectGui::open);
         // 参加時の言語ピッカーは既定で出さない(設定言語に合わせる)。/lang は残る。
         sessionBootstrapListener.setLanguagePickerOnJoin(
@@ -2312,6 +2326,7 @@ public final class FeatureBootstrap {
         plugin.getServer().getPluginManager().registerEvents(tellCommand, plugin);
         bind("tell", tellCommand);
         bind("matchchat", new com.rumilance.practice.command.MatchChatCommand(matchRegistry, settingsService));
+        bind("block", new com.rumilance.practice.command.BlockCommand(blockListService, messageService));
         bind("reply", tellCommand);
         bind("ekitadmin", new EkitAdminCommand(ekitAdminGui,
                 services.get(com.rumilance.practice.originalkit.OriginalKitRoomService.class)));

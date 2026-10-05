@@ -496,6 +496,13 @@ tell:
   from: "<aqua>From <target></aqua> <gray>»</gray> <white><message></white>"
   blocked: "<gray><target> 님은 메시지를 받지 않습니다.</gray>"
 
+block:
+  usage: "<gray>사용법:</gray> <yellow>/block \\<player></yellow>"
+  self: "<red>자신은 차단할 수 없습니다.</red>"
+  unknown: "<red>플레이어 <name> 을(를) 찾을 수 없습니다.</red>"
+  added: "<yellow><name> 차단 — 이제 매치되지 않습니다.</yellow>"
+  removed: "<green><name> 차단 해제.</green>"
+
 packpolicy:
   usage: "<gray>사용법:</gray> <yellow>/packpolicy [required|recommended|status]</yellow>"
   set-required: "<red>리소스팩 정책: 필수 — 팩을 거부하거나 다운로드에 실패한 플레이어는 추방됩니다."

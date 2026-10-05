@@ -496,6 +496,13 @@ tell:
   from: "<aqua>From <target></aqua> <grey>»</grey> <white><message></white>"
   blocked: "<gray><target> is not accepting messages.</gray>"
 
+block:
+  usage: "<gray>Usage:</gray> <yellow>/block \\<player></yellow>"
+  self: "<red>You cannot block yourself.</red>"
+  unknown: "<red>Player <name> not found.</red>"
+  added: "<yellow>Blocked <name> — you will not be matched with them.</yellow>"
+  removed: "<green>Unblocked <name>.</green>"
+
 packpolicy:
   usage: "<gray>Usage:</gray> <yellow>/packpolicy [required|recommended|status]</yellow>"
   set-required: "<red>Resource pack policy: REQUIRED — players who decline/fail the pack are kicked."

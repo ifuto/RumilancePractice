@@ -38,6 +38,8 @@ public final class SessionBootstrapListener implements Listener {
     private final PlayerRepository playerRepository;
     private final KitLayoutCache layoutCache;
     private final SettingsService settingsService;
+    /** Block lists (`/block`, `/ignore`); loaded on join so the queue can consult it. */
+    private com.rumilance.practice.social.BlockListService blockListService;
     private final AsyncExecutor asyncExecutor;
     private final Plugin plugin;
     private final MessageService messageService;
@@ -132,6 +134,11 @@ public final class SessionBootstrapListener implements Listener {
     }
 
     @EventHandler(priority = EventPriority.LOWEST)
+    public void setBlockListService(
+            com.rumilance.practice.social.BlockListService blockListService) {
+        this.blockListService = blockListService;
+    }
+
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
         // Fake players (HeroBot/PacketBot) join through the same event but are not players of this
@@ -170,6 +177,9 @@ public final class SessionBootstrapListener implements Listener {
             rankService.load(player.getUniqueId());
         }
         layoutCache.preload(player.getUniqueId());
+        if (blockListService != null) {
+            blockListService.load(player.getUniqueId());
+        }
         if (chatBanService != null) {
             chatBanService.warmCache(player.getUniqueId());
             // Tell the player if they were chat-banned while offline (or have an active ban they
@@ -241,6 +251,9 @@ public final class SessionBootstrapListener implements Listener {
         event.quitMessage(null);
         // 1.92.33: no [-] line anywhere any more — nothing is broadcast, on any channel.
         settingsService.unload(player.getUniqueId());
+        if (blockListService != null) {
+            blockListService.unload(player.getUniqueId());
+        }
         if (rankService != null) {
             rankService.unload(player.getUniqueId());
         }
