@@ -1243,7 +1243,6 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         player.sendMessage(t(player, "gui.kit-reset-done"));
     }
 
-    @Override
     /** Clicks inside the per-item preset config screen (bottom inventory). */
     private void handlePresetConfigClick(Player player, GuiSession session,
                                          InventoryClickEvent event, String entry) {
@@ -1283,6 +1282,7 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         }
     }
 
+    @Override
     public void handleBottomClick(Player player, GuiSession session, InventoryClickEvent event) {
         if (!isPresetEdit(session)) {
             return;
