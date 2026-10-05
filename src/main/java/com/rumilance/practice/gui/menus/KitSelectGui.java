@@ -355,8 +355,7 @@ public final class KitSelectGui extends AbstractGui {
         Material mat = Material.matchMaterial(kit.icon());
         boolean selected = kit.name().equalsIgnoreCase(current)
                 || kitService.get(current).map(k -> kit.name().equalsIgnoreCase(k.parent())).orElse(false);
-        List<Component> lore = new ArrayList<>(List.of(
-                UiTheme.line(kit.prettyDisplayName())));
+        List<Component> lore = new ArrayList<>();
         if (!children.isEmpty()) {
             lore.add(UiTheme.hint(line(player, "gui.innerkit-right-hint")));
         }

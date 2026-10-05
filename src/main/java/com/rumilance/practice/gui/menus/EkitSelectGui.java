@@ -347,19 +347,14 @@ public final class EkitSelectGui extends AbstractGui
                             .decoration(TextDecoration.ITALIC, false))
                     .lore(UiTheme.divider(),
                             UiTheme.line("No kit selected yet."),
-                            UiTheme.line("Pick MAIN KITS or SUB KITS first."),
-                            UiTheme.blank(),
-                            UiTheme.hint(line(player, "gui.kit-button-hint")))
+                            UiTheme.hint(line(player, "gui.pick-category-first")))
                     .action("decorate")
                     .build();
         }
         return ItemBuilder.of(ItemBuilder.materialOr(kit.icon(), Material.DIAMOND_SWORD))
                 .nameMini(kit.prettyDisplayName())
                 .lore(UiTheme.divider(),
-                        UiTheme.status("Previous Kit", UiTheme.SUCCESS),
-                        UiTheme.line("The kit you had selected last."),
-                        UiTheme.line("Opens on its Active K slot."),
-                        UiTheme.blank(),
+                        UiTheme.status(line(player, "gui.prev-kit-lore"), UiTheme.SUCCESS),
                         UiTheme.hint(line(player, "gui.kit-button-hint")))
                 // The wooden-button delay for parity with the category buttons.
                 .action(com.rumilance.practice.gui.DelayedButton.wrap("prevkit"))
@@ -411,9 +406,8 @@ public final class EkitSelectGui extends AbstractGui
                 ItemBuilder.of(ItemBuilder.materialOr(kit.icon(), Material.DIAMOND_SWORD))
                         .nameMini(kit.prettyDisplayName())
                         .lore(UiTheme.divider(),
-                                UiTheme.line("Assigned kit"),
-                                UiTheme.line("Use the K1-K4 chips around it."),
-                                UiTheme.line("FFA uses the Active slot only."))
+                                UiTheme.status(line(player, "gui.assigned-kit-lore"),
+                                        UiTheme.SUCCESS))
                         .build());
         int active = kitVariantsStore == null ? 1
                 : kitVariantsStore.selected(player.getUniqueId(), selected);
@@ -563,11 +557,10 @@ public final class EkitSelectGui extends AbstractGui
                 UiTheme.divider(),
                 (kit.crystalFfa() || shown.crystalFfa())
                         ? UiTheme.status("Crystal FFA Kit", UiTheme.SUCCESS)
-                        : UiTheme.line(line(player, viewer ? "gui.kit-view-only" : "gui.kit-edit-hint"))));
+                        : UiTheme.hint(line(player, viewer ? "gui.kit-view-only" : "gui.kit-edit-hint"))));
         boolean canManage = innerKitAdminGui != null && player.hasPermission("rumilance.admin");
         if (!children.isEmpty() || (!viewer && canManage)) {
             // Admin には右クリックの案内を常に出す（子が0件でも、そこで中メニューを作るため）。
-            lore.add(UiTheme.blank());
             lore.add(UiTheme.labelValue(line(player, "gui.innerkit-count-label"),
                     String.valueOf(children.size())));
             if (!children.isEmpty()) {
@@ -576,9 +569,9 @@ public final class EkitSelectGui extends AbstractGui
             }
             lore.add(UiTheme.hint(line(player, children.isEmpty() && canManage
                     ? "gui.innerkit-admin-right-hint" : "gui.innerkit-right-hint")));
+        } else {
+            lore.add(UiTheme.hint(line(player, "gui.kit-button-hint")));
         }
-        lore.add(UiTheme.blank());
-        lore.add(UiTheme.hint(line(player, "gui.kit-button-hint")));
         return ItemBuilder.of(material == null ? Material.DIAMOND_SWORD : material)
                 .name(MiniMessage.miniMessage().deserialize(kit.prettyDisplayName())
                         .decoration(TextDecoration.ITALIC, false))
