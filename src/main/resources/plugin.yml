@@ -131,6 +131,10 @@ commands:
     description: Toggle Looking For Fight inside an FFA arena (per-arena switch, default OFF).
     usage: /lff
     permission: rumilance.user
+  tps:
+    description: Server TPS as a percentage (20-minute average) plus any dips in the last 24 hours.
+    usage: /tps
+    permission: rumilance.tps
   regear:
     description: Crystal FFA only, out of combat - refill consumables from your last selected KIT slot (no armor/totems).
     usage: /regear
@@ -473,6 +477,9 @@ permissions:
   rumilance.user:
     description: Base practice player permission.
     default: true
+  rumilance.tps:
+    description: Allows /tps. Deliberately not granted to normal players — grant it per group with LuckPerms.
+    default: op
   rumilance.duel.use:
     description: Allow duel/queue commands.
     default: true

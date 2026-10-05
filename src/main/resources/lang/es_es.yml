@@ -400,6 +400,13 @@ ffa:
   kit-missing: "<red>No se encontró el kit de FFA."
   arena-full: "<red>Esa arena FFA está llena."
   no-arenas: "<red>No hay arenas FFA disponibles ahora."
+
+ffa-bot:
+  spawned: "<gray>Maniquí </gray><aqua><bold>NARENA BOT</bold></aqua><gray> generado. Usa </gray><yellow>/bot</yellow><gray> otra vez para quitarlo."
+  removed: "<gray>Maniquí eliminado."
+  failed: "<red>No se pudo generar el maniquí."
+  arena-disabled: "<red>FFA Bot está OFF en esta arena.</red> <gray>Activa</gray> <yellow>FFA Bot</yellow> <gray>en /practiceadmin → FFA Config para generar</gray> <aqua><bold>NARENA BOT</bold></aqua><gray>.</gray>"
+
   lff-disabled: "<red>LFF no está activado en esta arena.</red>"
   lff-on: "<gold>Buscando pelea: ON</gold>"
   lff-off: "<gray>Buscando pelea: OFF</gray>"
@@ -412,13 +419,13 @@ ffa:
   kills-bar: "<gold>Bajas: <kills>  Muertes: <deaths>"
   kill-streak: "<gold>¡Racha de <n> bajas!"
   combat-bar: "<red>Combate: <secs>s"
-
-ffa-bot:
-  spawned: "<gray>Maniquí </gray><aqua><bold>NARENA BOT</bold></aqua><gray> generado. Usa </gray><yellow>/bot</yellow><gray> otra vez para quitarlo."
-  removed: "<gray>Maniquí eliminado."
-  failed: "<red>No se pudo generar el maniquí."
-  arena-disabled: "<red>FFA Bot está OFF en esta arena.</red> <gray>Activa</gray> <yellow>FFA Bot</yellow> <gray>en /practiceadmin → FFA Config para generar</gray> <aqua><bold>NARENA BOT</bold></aqua><gray>.</gray>"
-
+tps:
+  denied: "<red>No puedes usar /tps.</red>"
+  cooldown: "<red>Sin spam — espera <secs>s.</red>"
+  header: "<gold>TPS <percent>%</gold> <gray>(<tps>/20 · media de 20 min)</gray>"
+  no-dip: "<gray>Sin bajadas a <threshold> o menos en las últimas 24 h.</gray>"
+  dip-title: "<yellow>Bajadas en las últimas 24 h (<threshold> o menos):</yellow>"
+  dip-line: "<gray><from> – <to></gray>"
 kit:
   created: "<green>Kit <kit> creado."
   deleted: "<green>Kit <kit> eliminado."

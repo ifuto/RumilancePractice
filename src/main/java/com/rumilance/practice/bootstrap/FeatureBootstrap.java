@@ -2342,6 +2342,16 @@ public final class FeatureBootstrap {
         bind("rtp", ffaRtpCommand);
         // LFF: the typed equivalent of clicking the 9th hotbar slot item.
         bind("lff", new com.rumilance.practice.command.LffCommand(ffaService, messageService));
+        // /tps: sample every 20s so the 20-minute window holds 60 readings.
+        com.rumilance.practice.util.TpsTracker tpsTracker = new com.rumilance.practice.util.TpsTracker();
+        plugin.getServer().getScheduler().runTaskTimer(plugin,
+                () -> tpsTracker.sample(
+                        com.rumilance.practice.util.TpsTracker.tpsFromMspt(
+                                com.rumilance.practice.util.TickHealth.emaMspt()),
+                        System.currentTimeMillis()),
+                com.rumilance.practice.util.TpsTracker.SAMPLE_PERIOD_TICKS,
+                com.rumilance.practice.util.TpsTracker.SAMPLE_PERIOD_TICKS);
+        bind("tps", new com.rumilance.practice.command.TpsCommand(tpsTracker, messageService));
         // Drop stale TPA requests / RTP queue entries on quit or when a player leaves an arena.
         pm.registerEvents(new org.bukkit.event.Listener() {
             @org.bukkit.event.EventHandler

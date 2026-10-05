@@ -401,6 +401,13 @@ ffa:
   kit-missing: "<red>FFA用キットが見つかりません。"
   arena-full: "<red>そのFFAアリーナは現在満員です。"
   no-arenas: "<red>現在利用可能なFFAアリーナがありません。"
+
+ffa-bot:
+  spawned: "<gray>マネキン </gray><aqua><bold>NARENA BOT</bold></aqua><gray> をスポーンさせました。もう一度 </gray><yellow>/bot</yellow><gray> で削除します。"
+  removed: "<gray>マネキン BOT を削除しました。"
+  failed: "<red>マネキン BOT をスポーンできませんでした。"
+  arena-disabled: "<red>このアリーナでは FFA Bot は OFF です。</red> <gray>/practiceadmin</gray> <gray>→ FFA Config の</gray> <yellow>FFA Bot</yellow> <gray>を ON にすると</gray> <aqua><bold>NARENA BOT</bold></aqua> <gray>を出せます。</gray>"
+
   lff-disabled: "<red>このアリーナでは LFF は無効です。</red>"
   lff-on: "<gold>募集中: ON</gold>"
   lff-off: "<gray>募集中: OFF</gray>"
@@ -413,13 +420,13 @@ ffa:
   kills-bar: "<gold>キル: <kills>  デス: <deaths>"
   kill-streak: "<gold><n>キルストリーク!"
   combat-bar: "<red>戦闘中: <secs>秒"
-
-ffa-bot:
-  spawned: "<gray>マネキン </gray><aqua><bold>NARENA BOT</bold></aqua><gray> をスポーンさせました。もう一度 </gray><yellow>/bot</yellow><gray> で削除します。"
-  removed: "<gray>マネキン BOT を削除しました。"
-  failed: "<red>マネキン BOT をスポーンできませんでした。"
-  arena-disabled: "<red>このアリーナでは FFA Bot は OFF です。</red> <gray>/practiceadmin</gray> <gray>→ FFA Config の</gray> <yellow>FFA Bot</yellow> <gray>を ON にすると</gray> <aqua><bold>NARENA BOT</bold></aqua> <gray>を出せます。</gray>"
-
+tps:
+  denied: "<red>/tps を使う権限がありません。</red>"
+  cooldown: "<red>連打禁止 — <secs>秒待ってください。</red>"
+  header: "<gold>TPS <percent>%</gold> <gray>(<tps>/20 · 20分平均)</gray>"
+  no-dip: "<gray>直近24時間に <threshold> 以下の低下はありません。</gray>"
+  dip-title: "<yellow>直近24時間の低下 (<threshold> 以下):</yellow>"
+  dip-line: "<gray><from> – <to></gray>"
 kit:
   created: "<green>キット <kit> を作成しました。"
   deleted: "<green>キット <kit> を削除しました。"
