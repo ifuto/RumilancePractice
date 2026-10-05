@@ -43,7 +43,8 @@ final class FfaArenaFreeHitFlagTest {
                 true,
                 List.of("STONE"),
                 false,
-                freehitGuard);
+                freehitGuard,
+                false);
     }
 
     /** Every copy method except withFreehitGuard itself, so the loop cannot miss one. */
@@ -64,6 +65,7 @@ final class FfaArenaFreeHitFlagTest {
         all.put("withCanBreak", a -> a.withCanBreak(List.of()));
         all.put("withIconMaterial", a -> a.withIconMaterial("GOLD_SWORD"));
         all.put("withBot", a -> a.withBot(true));
+        all.put("withLff", a -> a.withLff(true));
         return all;
     }
 

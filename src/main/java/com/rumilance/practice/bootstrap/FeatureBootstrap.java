@@ -2340,6 +2340,8 @@ public final class FeatureBootstrap {
         FfaRtpService ffaRtpService = new FfaRtpService(ffaService, ffaSpawnIndex, messageService);
         FfaRtpCommand ffaRtpCommand = new FfaRtpCommand(ffaRtpService);
         bind("rtp", ffaRtpCommand);
+        // LFF: the typed equivalent of clicking the 9th hotbar slot item.
+        bind("lff", new com.rumilance.practice.command.LffCommand(ffaService, messageService));
         // Drop stale TPA requests / RTP queue entries on quit or when a player leaves an arena.
         pm.registerEvents(new org.bukkit.event.Listener() {
             @org.bukkit.event.EventHandler

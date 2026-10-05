@@ -14,18 +14,18 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * FFA Bot is a per-arena flag ({@code arenas.<id>.settings.bot}, default OFF — the opt-in switch an
- * admin flips in {@code /practiceadmin} → FFA Config). {@link FfaArena} is a wide record with a copy
- * method per field, and every one of those copies has to carry the flag along: a copy that drops it
- * would silently switch the dummy off (or on) the moment an admin edits anything else about the
- * arena, and the flag is only ever read back from the arena, never from the file directly.
+ * Mirror of {@link FfaArenaBotFlagTest} for the LFF flag ({@code arenas.<id>.settings.lff},
+ * default OFF — the opt-in switch an admin flips in {@code /ffa settings <arena>}).
+ * {@link FfaArena} is a wide record with a copy method per field, and every copy has to carry
+ * the flag along: one that dropped it would silently stop forcing the toggle item into the
+ * ninth kit slot.
  *
- * <p>These tests need no server: the record's compact constructor only clamps and null-checks, and
- * {@code Cuboid.of(String, ...)} does not touch Bukkit.</p>
+ * <p>These tests need no server: the record's compact constructor only clamps and null-checks,
+ * and {@code Cuboid.of(String, ...)} does not touch Bukkit.</p>
  */
-final class FfaArenaBotFlagTest {
+final class FfaArenaLffFlagTest {
 
-    private static FfaArena arena(boolean botEnabled) {
+    private static FfaArena arena(boolean lffEnabled) {
         return new FfaArena(
                 "crystal",
                 "crystal-kit",
@@ -42,12 +42,12 @@ final class FfaArenaBotFlagTest {
                 true,
                 true,
                 List.of("STONE"),
-                botEnabled,
                 false,
-                false);
+                false,
+                lffEnabled);
     }
 
-    /** Every copy method of the record, so the loop below cannot miss one added later. */
+    /** Every copy method except withLff itself, so the loop cannot miss one. */
     private static Map<String, UnaryOperator<FfaArena>> copies() {
         Map<String, UnaryOperator<FfaArena>> all = new LinkedHashMap<>();
         all.put("withResetInterval", a -> a.withResetInterval(99));
@@ -64,23 +64,23 @@ final class FfaArenaBotFlagTest {
         all.put("withBreakPlayerPlacedOnly", a -> a.withBreakPlayerPlacedOnly(false));
         all.put("withCanBreak", a -> a.withCanBreak(List.of()));
         all.put("withIconMaterial", a -> a.withIconMaterial("GOLD_SWORD"));
+        all.put("withBot", a -> a.withBot(true));
         all.put("withFreehitGuard", a -> a.withFreehitGuard(true));
-        all.put("withLff", a -> a.withLff(true));
         return all;
     }
 
     @Test
     void arenaCarriesTheFlagItWasBuiltWith() {
-        assertFalse(arena(false).botEnabled(), "OFF stays OFF");
-        assertTrue(arena(true).botEnabled(), "ON stays ON");
+        assertFalse(arena(false).lffEnabled(), "OFF stays OFF");
+        assertTrue(arena(true).lffEnabled(), "ON stays ON");
     }
 
     @Test
-    void withBotFlipsOnlyTheBotFlag() {
+    void withLffFlipsOnlyThatFlag() {
         FfaArena before = arena(false);
-        FfaArena after = before.withBot(true);
+        FfaArena after = before.withLff(true);
 
-        assertTrue(after.botEnabled());
+        assertTrue(after.lffEnabled());
         assertEquals(before.id(), after.id());
         assertEquals(before.kitId(), after.kitId());
         assertEquals(before.world(), after.world());
@@ -96,17 +96,19 @@ final class FfaArenaBotFlagTest {
         assertEquals(before.blockBreak(), after.blockBreak());
         assertEquals(before.breakPlayerPlacedOnly(), after.breakPlayerPlacedOnly());
         assertEquals(before.canBreak(), after.canBreak());
+        assertEquals(before.botEnabled(), after.botEnabled());
+        assertEquals(before.freehitGuard(), after.freehitGuard());
 
-        assertFalse(before.withBot(false).botEnabled(), "switching off works too");
+        assertFalse(before.withLff(false).lffEnabled(), "switching off works too");
     }
 
     @Test
-    void everyCopyKeepsTheBotFlag() {
+    void everyCopyKeepsTheFlag() {
         for (Map.Entry<String, UnaryOperator<FfaArena>> copy : copies().entrySet()) {
-            assertTrue(copy.getValue().apply(arena(true)).botEnabled(),
-                    copy.getKey() + " dropped an enabled FFA Bot flag");
-            assertFalse(copy.getValue().apply(arena(false)).botEnabled(),
-                    copy.getKey() + " switched FFA Bot on by itself");
+            assertTrue(copy.getValue().apply(arena(true)).lffEnabled(),
+                    copy.getKey() + " dropped an enabled LFF flag");
+            assertFalse(copy.getValue().apply(arena(false)).lffEnabled(),
+                    copy.getKey() + " switched LFF on by itself");
         }
     }
 }

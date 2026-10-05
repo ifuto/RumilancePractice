@@ -30,6 +30,7 @@ public final class ItemKeys {
     public static final String EDITOR_HINT_COUNT = "editor_hint_count";
     public static final String QUEUE_SIGN_KIT = "queue_sign_kit";
     public static final String LOBBY_WEAR = "lobby_wear";
+    public static final String FFA_LFF = "ffa_lff";
 
     private static volatile Plugin plugin;
 
@@ -112,6 +113,10 @@ public final class ItemKeys {
 
     public static NamespacedKey editorHintCount() {
         return key(EDITOR_HINT_COUNT);
+    }
+
+    public static NamespacedKey ffaLff() {
+        return key(FFA_LFF);
     }
 
     public static NamespacedKey key(String name) {

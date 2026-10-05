@@ -21,7 +21,7 @@ import java.util.Locale;
 
 /**
  * Per-FFA settings (admin). First page lists every FFA arena; selecting one opens its detail
- * page with toggleable per-arena features (TPA, RTPQueue, FFA Bot, FreeHit 対策 — all default
+ * page with toggleable per-arena features (TPA, RTPQueue, FFA Bot, FreeHit 対策, LFF — all default
  * OFF) and the arena's top-down size ({@code X blocks x Z blocks}). Persisted to
  * {@code arenas.<id>.settings.*} in ffa.yml. Reached via {@code /ffa settings <arena>} or the
  * admin menu.
@@ -197,6 +197,15 @@ public final class FfaSettingsGui extends AbstractGui {
                 line(player, "gui.ffa-settings-freehit-lore"),
                 "toggle:freehit"));
 
+        // LFF（Looking For Fight）: 既定 OFF の任意 ON。ON にするとキットの9番目が
+        // 「募集中」トグル用の火薬になる。
+        inventory.setItem(MenuScaffold.gridSlot(20), toggleItem(player,
+                Material.GUNPOWDER,
+                line(player, "gui.ffa-settings-lff-name"),
+                arena.lffEnabled(),
+                line(player, "gui.ffa-settings-lff-lore"),
+                "toggle:lff"));
+
         inventory.setItem(MenuScaffold.gridSlot(22), ItemBuilder.of(Material.SPYGLASS)
                 .name(t(player, "gui.ffa-settings-size-title").color(UiTheme.SECONDARY))
                 .lore(
@@ -281,6 +290,7 @@ public final class FfaSettingsGui extends AbstractGui {
                         ffaService.setBreakPlayerPlacedOnly(arena.id(), !arena.breakPlayerPlacedOnly());
                 case "bot" -> ffaService.setBotEnabled(arena.id(), !arena.botEnabled());
                 case "freehit" -> ffaService.setFreehitGuard(arena.id(), !arena.freehitGuard());
+                case "lff" -> ffaService.setLffEnabled(arena.id(), !arena.lffEnabled());
                 default -> { }
             }
             sounds.play(player, "gui-click");

@@ -127,6 +127,10 @@ commands:
     description: Open FFA list GUI or manage FFA arenas.
     usage: /ffa [draft|pos1|pos2|selection|spawn|deletespawn|kit|save|enable|disable|delete|reset|resettime|leave]
     permission: rumilance.user
+  lff:
+    description: Toggle Looking For Fight inside an FFA arena (per-arena switch, default OFF).
+    usage: /lff
+    permission: rumilance.user
   regear:
     description: Crystal FFA only, out of combat - refill consumables from your last selected KIT slot (no armor/totems).
     usage: /regear

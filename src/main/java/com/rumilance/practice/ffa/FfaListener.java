@@ -397,6 +397,29 @@ public final class FfaListener implements Listener {
         }
     }
 
+    /**
+     * LFF トグルアイテム: 9番目の火薬 / グロウストーンダストをクリックすると状態が反転する。
+     * 右・左どちらのクリックでも反応させ、アイテム自体は消費・使用させない。
+     */
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onLffToggle(PlayerInteractEvent event) {
+        if (event.getHand() != EquipmentSlot.HAND || event.getItem() == null) {
+            return;
+        }
+        if (!FfaLookingForFight.isLffItem(event.getItem())) {
+            return;
+        }
+        Player player = event.getPlayer();
+        String arenaId = ffaService.arenaOf(player.getUniqueId()).orElse(null);
+        if (arenaId == null || !ffaService.lffEnabled(arenaId)) {
+            return;
+        }
+        event.setCancelled(true);
+        boolean nowLooking = ffaService.lookingForFight().toggle(player);
+        player.playSound(player.getLocation(),
+                nowLooking ? Sound.ENTITY_EXPERIENCE_ORB_PICKUP : Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onPickup(EntityPickupItemEvent event) {
         if (!(event.getEntity() instanceof Player player)) {

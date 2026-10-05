@@ -81,7 +81,13 @@ public final class FfaService {
              * 判定を持たず（ヒット音などの演出は通常どおり）、殴り返されて初めて本Combat に
              * なる。{@code settings.freehit-guard}。
              */
-            boolean freehitGuard
+            boolean freehitGuard,
+            /**
+             * LFF（Looking For Fight）: 既定 OFF。ON のアリーナではキットの9番目
+             * （ホットバー最後のスロット = レイアウト index 8）に LFF トグル用の火薬を
+             * 強制配置する。{@code settings.lff}。
+             */
+            boolean lffEnabled
     ) {
         public FfaArena {
             resetIntervalSeconds = Math.max(0, resetIntervalSeconds);
@@ -97,83 +103,90 @@ public final class FfaService {
 
         public FfaArena withResetInterval(int seconds) {
             return new FfaArena(id, kitId, world, region, spawn, enabled, Math.max(0, seconds), iconMaterial,
-                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled, freehitGuard);
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled, freehitGuard, lffEnabled);
         }
 
         public FfaArena withEnabled(boolean value) {
             return new FfaArena(id, kitId, world, region, spawn, value, resetIntervalSeconds, iconMaterial,
-                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled, freehitGuard);
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled, freehitGuard, lffEnabled);
         }
 
         public FfaArena withKit(String kit) {
             return new FfaArena(id, kit, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
-                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled, freehitGuard);
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled, freehitGuard, lffEnabled);
         }
 
         public FfaArena withRegion(Cuboid newRegion) {
             return new FfaArena(id, kitId, newRegion.worldName(), newRegion, spawn, enabled,
-                    resetIntervalSeconds, iconMaterial, tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled, freehitGuard);
+                    resetIntervalSeconds, iconMaterial, tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled, freehitGuard, lffEnabled);
         }
 
         public FfaArena withSpawn(Location newSpawn) {
             // null = back to "random standing spot far from occupants" spawning.
             return new FfaArena(id, kitId, world, region,
                     newSpawn != null ? newSpawn.clone() : null, enabled,
-                    resetIntervalSeconds, iconMaterial, tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled, freehitGuard);
+                    resetIntervalSeconds, iconMaterial, tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled, freehitGuard, lffEnabled);
         }
 
         public FfaArena withId(String newId) {
             return new FfaArena(newId, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
-                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled, freehitGuard);
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled, freehitGuard, lffEnabled);
         }
 
         public FfaArena withTpa(boolean value) {
             return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
-                    value, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled, freehitGuard);
+                    value, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled, freehitGuard, lffEnabled);
         }
 
         public FfaArena withRtp(boolean value) {
             return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
-                    tpaEnabled, value, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled, freehitGuard);
+                    tpaEnabled, value, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled, freehitGuard, lffEnabled);
         }
 
         public FfaArena withRtpQueue(boolean value) {
             return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
-                    tpaEnabled, rtpEnabled, value, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled, freehitGuard);
+                    tpaEnabled, rtpEnabled, value, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled, freehitGuard, lffEnabled);
         }
 
         public FfaArena withBlockPlace(boolean value) {
             return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
-                    tpaEnabled, rtpEnabled, rtpQueueEnabled, value, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled, freehitGuard);
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled, value, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled, freehitGuard, lffEnabled);
         }
 
         public FfaArena withBlockBreak(boolean value) {
             return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
-                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, value, breakPlayerPlacedOnly, canBreak, botEnabled, freehitGuard);
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, value, breakPlayerPlacedOnly, canBreak, botEnabled, freehitGuard, lffEnabled);
         }
 
         public FfaArena withBreakPlayerPlacedOnly(boolean value) {
             return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
-                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, value, canBreak, botEnabled, freehitGuard);
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, value, canBreak, botEnabled, freehitGuard, lffEnabled);
         }
 
         public FfaArena withCanBreak(List<String> value) {
             return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
-                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, value != null ? List.copyOf(value) : List.of(), botEnabled, freehitGuard);
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, value != null ? List.copyOf(value) : List.of(), botEnabled, freehitGuard, lffEnabled);
         }
 
         /** FFA Bot（マネキン BOT）の可否。既定 OFF。 */
         public FfaArena withBot(boolean value) {
             return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
                     tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly,
-                    canBreak, value, freehitGuard);
+                    canBreak, value, freehitGuard, lffEnabled);
         }
 
         /** FreeHit 対策の可否。既定 OFF の任意 ON 形式。 */
         public FfaArena withFreehitGuard(boolean value) {
             return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
                     tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly,
-                    canBreak, botEnabled, value);
+                    canBreak, botEnabled, value, lffEnabled);
+        }
+
+        /** LFF（Looking For Fight）の可否。既定 OFF の任意 ON 形式。 */
+        public FfaArena withLff(boolean value) {
+            return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, iconMaterial,
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly,
+                    canBreak, botEnabled, freehitGuard, value);
         }
 
         /** Region size seen from above: X x Z block counts. */
@@ -187,7 +200,7 @@ public final class FfaService {
 
         public FfaArena withIconMaterial(String material) {
             return new FfaArena(id, kitId, world, region, spawn, enabled, resetIntervalSeconds, material,
-                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled, freehitGuard);
+                    tpaEnabled, rtpEnabled, rtpQueueEnabled, blockPlace, blockBreak, breakPlayerPlacedOnly, canBreak, botEnabled, freehitGuard, lffEnabled);
         }
     }
 
@@ -292,6 +305,8 @@ public final class FfaService {
      * 持つ）。設定が OFF のアリーナでは参照されない。
      */
     private final FfaFreeHitGuard freeHitGuard = new FfaFreeHitGuard();
+    /** LFF（Looking For Fight）のトグルアイテムと頭上表示。 */
+    private final FfaLookingForFight lookingForFight = new FfaLookingForFight();
     /** Rejects joins while the player sits in an AFK practice/crystal session. */
     private java.util.function.Predicate<UUID> sessionGuard;
 
@@ -463,7 +478,8 @@ public final class FfaService {
                     breakPlayerPlacedOnly,
                     canBreak != null ? List.copyOf(canBreak) : List.of(),
                     entry.getBoolean("settings.bot", false),
-                    entry.getBoolean("settings.freehit-guard", false));
+                    entry.getBoolean("settings.freehit-guard", false),
+                    entry.getBoolean("settings.lff", false));
             arenas.put(id, arena);
             if (migratedFromKit) {
                 // Persist the inherited rules once so the arena block-settings become
@@ -704,6 +720,8 @@ public final class FfaService {
         lastLethalTick.remove(id);
         // 退出は Combat を解消する（仮Combat 中でもペナルティは無い）。
         freeHitGuard.clear(id);
+        // LFF の募集中表示も消す（頭上の TextDisplay を含めて）。
+        lookingForFight.clear(player);
         stateManager.resetToLobby(id);
         if (!returnToLobby || !player.isOnline()) {
             return;
@@ -806,6 +824,11 @@ public final class FfaService {
     /** FreeHit 対策の状態機械。{@code FfaListener} が攻撃ごとに判定するために使う。 */
     public FfaFreeHitGuard freeHitGuard() {
         return freeHitGuard;
+    }
+
+    /** LFF（Looking For Fight）の表示・アイテム管理。 */
+    public FfaLookingForFight lookingForFight() {
+        return lookingForFight;
     }
 
     public boolean inCombat(UUID playerId) {
@@ -1459,10 +1482,10 @@ public final class FfaService {
     public void create(String id, Cuboid region, Location spawn, String kitId) {
         // Block rules default to "no arena override" so the kit's own rules keep governing
         // until an admin opts in per-arena (block place/break stay kit-driven by default).
-        // FFA Bot and FreeHit 対策 are OFF for a brand-new arena too: both are opt-in per
-        // arena (FFA Config).
+        // FFA Bot, FreeHit 対策 and LFF are OFF for a brand-new arena too: all three are
+        // opt-in per arena (FFA Config).
         FfaArena arena = new FfaArena(id, kitId, region.worldName(), region, spawn.clone(), false, 0,
-                "IRON_SWORD", false, false, false, false, false, false, List.of(), false, false);
+                "IRON_SWORD", false, false, false, false, false, false, List.of(), false, false, false);
         arenas.put(arena.id(), arena);
         persist(arena);
         armResetTimer(arena, false);
@@ -1578,6 +1601,24 @@ public final class FfaService {
     public boolean freehitGuardEnabled(String id) {
         FfaArena arena = findArena(id);
         return arena != null && arena.freehitGuard();
+    }
+
+    /** LFF（Looking For Fight）をアリーナ単位で ON/OFF。既定 OFF の任意 ON 形式。 */
+    public boolean setLffEnabled(String id, boolean value) {
+        FfaArena existing = findArena(id);
+        if (existing == null) {
+            return false;
+        }
+        FfaArena updated = existing.withLff(value);
+        arenas.put(updated.id(), updated);
+        persist(updated);
+        return true;
+    }
+
+    /** このアリーナで LFF が有効か。未知のアリーナは OFF。 */
+    public boolean lffEnabled(String id) {
+        FfaArena arena = findArena(id);
+        return arena != null && arena.lffEnabled();
     }
 
     /** Arena definition lookup (lowercased id, exact). */
@@ -2133,6 +2174,11 @@ public final class FfaService {
         layoutCache.loadSyncIfAbsent(player.getUniqueId(), layoutKey);
         ItemStack[] layout = layoutCache.get(player.getUniqueId(), layoutKey).orElse(null);
         kitService.apply(player, kit, layout);
+        // LFF: 設定が ON のアリーナでは9番目を強制的にトグルアイテムにする。
+        // リスポーン後の頭上表示の復元もここで行う（passenger は死亡で外れる）。
+        if (lffEnabled(playerArena.get(player.getUniqueId()))) {
+            lookingForFight.refresh(player);
+        }
         PlayerVitals.applyCombatStart(player, kit.maxHealth());
         if (kit.totem()) {
             com.rumilance.practice.guard.PracticeGuards.enforceTotemCap(player, 14);
@@ -2168,6 +2214,7 @@ public final class FfaService {
         yaml.set(path + ".settings.rtpqueue", arena.rtpQueueEnabled());
         yaml.set(path + ".settings.bot", arena.botEnabled());
         yaml.set(path + ".settings.freehit-guard", arena.freehitGuard());
+        yaml.set(path + ".settings.lff", arena.lffEnabled());
         // Arena-level block interaction rules
         yaml.set(path + ".settings.block-place", arena.blockPlace());
         yaml.set(path + ".settings.block-break", arena.blockBreak());
