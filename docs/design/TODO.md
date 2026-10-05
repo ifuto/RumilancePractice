@@ -11,9 +11,9 @@
 - [x] **10. FFA の `lff` 設定 + `/lff`** — v1.92.53
 - [x] **11. Duel アリーナの貼り付けキュー** — v1.92.54
 - [x] **12. `/tps` を自前実装** — v1.92.55–56
-- [ ] **13. Duel Chat の書式 + 受信/送信の切り替え**
-- [ ] **14. `/setting` の整理** — 重複機能の統一（13と関係が深いので一緒にやる）
-- [ ] **15. `/block` `/ignore`** — Queue でブロック相手と当たらない
+- [x] **13. Duel Chat の書式 + 受信/送信の切り替え** — v1.92.58
+- [x] **14. `/setting` の整理** — 重複機能の統一 — v1.92.58
+- [x] **15. `/block` `/ignore`** — Queue でブロック相手と当たらない — v1.92.59
 
 ## 完了（8項目リスト + 追加2件）
 
@@ -113,6 +113,47 @@
 ---
 
 # 13〜15. 残り（仕様は上にそのまま記載）
+
+## 13. Duel Chat — 実装メモ（v1.92.58）
+
+- 書式: `<青>[Duel]</青> <頭> <白>名前</白> : 本文`。1v1 は `[Duel]`、パーティ戦は `[Match]`。
+- 頭は `HeadFontService.of(uuid)`（MiniMessage の `<head:uuid>`）。パック不要、
+  クライアントがスキンを解決する。アクションバーと同じ仕組み。
+- 判定は `MatchChatListener` が1箇所で行う（`AsyncChatEvent`、`EventPriority.NORMAL`）。
+  - 試合中 かつ 送信先=Duel Chat → 参加者+観戦者のみに配信し、上の書式で描画。
+  - それ以外 → 全体チャット。受信側の「全体チャットを受信」が OFF なら落とす
+    （チャットホワイトライストに入っていれば届く）。
+- 設定は `PlayerSettings` に2項目追加（DB 保存、再起動で残る）:
+  - `receiveDuelChat` — **既定 ON**
+  - `duelChatGlobal` — **既定 OFF**（= Duel Chat に送る）
+- `/matchchat` は同じ `duelChatGlobal` を書き換えるコマンド版ショートカット。
+  旧実装の static なメモリ Map は廃止。
+- マイグレーション 36 で `receive_duel_chat` / `duel_chat_global` を追加。
+
+## 14. `/setting` の整理 — 実装メモ（v1.92.58）
+
+- **重複を統一**: `gui.hide-chat`（旧 `hideOtherChat`）は
+  `receiveGlobalChat`（Chat Settings の「全体チャット」）と同じ意味だったので廃止。
+  `PracticeSideListener` の隠匿フィルタも削除し、`MatchChatListener` に一本化。
+  `hide_other_chat` 列は DB 互換のため残す（新規コードからは参照しない）。
+- Chat Settings は 2列目に Duel Chat 受信（`PLAYER_HEAD`）を追加し、行末に
+  送信先トグル（`ENDER_PEARL`、Duel Chat ⇔ 全体チャットの2者択一）を配置。
+- `/setting` の (1,7) は「チャット設定」へのショートカットに変更。(4,4) にあった
+  同じ入り口は削除して、操作はパネル行に集約した。
+
+## 15. `/block` `/ignore` — 実装メモ（v1.92.59）
+
+- `plugin.yml`: `block:` / エイリアス `[ignore, unblock]`。権限 `rumilance.user`。
+  サブコマンドなしで **トグル**（未登録なら追加、済みなら解除）。
+- `BlockListService`（`com.rumilance.practice.social`）:
+  - メモリ Map が本体。読み取りは DB を叩かない（マッチング tick が毎回走るため）。
+  - 書き込みは非同期で投げっぱなし。join で `load`、quit で `unload`。
+  - リポジトリ未接続ならメモリのみで動作する。
+- `BlockRepository` + マイグレーション 37 で `player_blocks` テーブル
+  （`blocker_uuid`, `blocked_uuid`, `created_ts`、複合主キー）。
+- **片方向で十分**: `isBlockedEitherWay` を `QueueService#pollMatches` の
+  `pairBlocked` に渡す。既存の alt 検知制限とは `QueueCoordinator#pairBlocked` で合成。
+  「2人しか待っていない」時の lonelyPair 救済は alt 側だけで、ブロックは常に有効。
 
 ## 10. FFA の `lff` 設定 + `/lff`
 
