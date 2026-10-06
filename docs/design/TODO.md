@@ -702,47 +702,73 @@
 
 ---
 
-# PacketEvents への移行（2026-10-06, v1.92.89〜）
+# PacketEvents への移行（2026-10-06, v1.92.89〜v1.92.94）
 
-ユーザー指示: 「ProtocolLib に依存している実装があったら、すべて PacketEvents ベースにしてください。」
+指示: 「ProtocolLib に依存している実装があったら、すべて PacketEvents ベースに。」
 
 ## 依存（build.gradle.kts）
 
 ```
 maven { name = "codemc-releases"; url = uri("https://repo.codemc.io/repository/maven-releases/") }
 compileOnly("com.github.retrooper:packetevents-spigot:2.14.0")
-compileOnly("net.dmulloy2:ProtocolLib:5.4.0")   // 過渡的（下記）
+compileOnly("net.dmulloy2:ProtocolLib:5.4.0")   // 過渡的（残り2本）
 ```
 
-ProtocolLib は **一時的に残している**。外すと残り5ファイルが落ちて jar が出なくなるため。
+## 状況
 
-## 移行済み（v1.92.89, CI green 37445803625）
-
-- `combat/LethalPresentationService` — 死亡演出を全面 PacketEvents 化（後述）。
-
-## 未移行（次のパスで対応）
-
-| ファイル | 難所 |
+| ファイル | 状態 |
 |---|---|
-| `replay/ReplayNpcService` | game profile / PlayerInfo / spawn player / NBT |
-| `security/sign/SignProbeService` | NBT・BlockData・sign 系パケット |
-| `practice/afk/AfkRoomIsolationPackets` | パケット種別15個 + BlockPosition 抽出 |
-| `sight/FfaChunkMaskService` | MAP_CHUNK の保持・再送（deepClone 相当） |
-| `spectator/SpectatorViewIsolationPackets` | パケット種別15個 + entity id 抽出 |
+| `combat/LethalPresentationService` | ✅ v1.92.89 |
+| `match/TeamGlowLosService` | ✅ v1.92.90 |
+| `combat/DuelHitSoundPackets` | ✅ v1.92.90 |
+| `sight/FfaChunkMaskService` | ✅ v1.92.90（キャッシュは座標保持→`World#refreshChunk`で再送） |
+| `spectator/SpectatorViewIsolationPackets` | ✅ v1.92.90 |
+| `practice/afk/AfkRoomIsolationPackets` | ✅ v1.92.90 |
+| `replay/ReplayNpcService` | ⏳ 未（NPC: GameProfile / PlayerInfo / spawn / NBT） |
+| `security/sign/SignProbeService` | ⏳ 未（NBT / BlockData / sign パケット） |
 
-いずれも **未確認の PacketEvents 定数名が多数**あり、このサンドボックスには
-JDK も jar 取得経路も無いため（api.github.com のみ到達可）1ターンでの安全な
-一括書き換えは不可。次ターンで1ファイルずつ CI 検証しながら進める。
+新規ヘルパ: `packets/PacketEntityIds` — パケット種別→エンティティ id→Bukkit Player。
+（`event.getPlayer()` は Object、`getPacketType()` は `PacketTypeCommon` を返す点に注意。）
+
+## 確定済み API 対応表（ProtocolLib → PacketEvents）
+
+| ProtocolLib | PacketEvents |
+|---|---|
+| `PacketType.Play.Server.MAP_CHUNK` | `CHUNK_DATA` |
+| `NAMED_ENTITY_SPAWN` | `SPAWN_PLAYER` |
+| `REL_ENTITY_MOVE` / `_LOOK` | `ENTITY_RELATIVE_MOVE` / `ENTITY_RELATIVE_MOVE_AND_ROTATION` |
+| `ENTITY_LOOK` | `ENTITY_ROTATION` |
+| `ANIMATION` | `ENTITY_ANIMATION` |
+| `ENTITY_HEAD_ROTATION` | `ENTITY_HEAD_LOOK` |
+| `TILE_ENTITY_DATA` | `BLOCK_ENTITY_DATA` |
+| `LIGHT_UPDATE` | `UPDATE_LIGHT` |
+| `NAMED_SOUND_EFFECT` | `NAMED_SOUND_EFFECT` |
+| `WrappedGameProfile` / `PlayerInfoData` | PE の `UserProfile` / `WrapperPlayServerPlayerInfoUpdate` |
+| `BuiltinSound`（存在しない） | **`Sounds`**（複数形。`protocol.sound.Sounds`） |
+| `packet.getIntegers().read(0/1)`（chunk） | `WrapperPlayServerChunkData#getColumn().getX()/getZ()` |
+
+## はまった点（次ターン用メモ）
+
+- `PacketWrapper#getChunkX()/getChunkZ()` は**引数あり**。chunk 座標は `getColumn()` 経由で取る。
+- `event.getPacketType()` の戻りは `PacketTypeCommon`。`PacketType.Play.Server` 変数に入れない。
+- `Set.of(...)` は `Set.<PacketTypeCommon>of(...)` と書かないと不変性で落ちる。
+- `WrapperPlayServerAttachEntity` に `getEntityId()` は無い → ATTACH_ENTITY は除外。
+- AFK のブロック系は検証済みの `CHUNK_DATA` + `BLOCK_CHANGE` のみに絞った
+  （`MULTI_BLOCK_CHANGE` の `getSectionPosition()` は API に無い）。
+- ローカルに JDK が無く Maven にも到達不可（api.github.com のみ）なので、
+  **javadoc を fetch して署名を確認してから書く**こと。推測で書くと CI 1往復2分を消費する。
 
 ## hideEntity と F3+B（ユーザー指摘）
 
-`Player#hideEntity` は「モデルを隠す」だけで、**当たり判定表示(F3+B)には効かない**
-場合がある、という指摘は正当。そのため死亡演出は次の3段構えにした:
+`hideEntity` はモデルを隠すだけで F3+B の箱が残り得る、という指摘は正当。
+死亡演出は3段構え:
 
-1. `WrapperPlayServerEntityStatus(entityId, 3)` — 死亡アニメ＋音（A だけに送信）
-2. `WrapperPlayServerDestroyEntities(entityId)` — **A のクライアントから実体を削除**。
-   これが F3+B の箱も消す。`hideEntity` 単体では消えない部分。
-3. `SPAWN_PLAYER` を A 宛てに限り cancel — チャンクリロード等での再出現を止める。
-   ＝「A のパケットを送信するのをやめる」を文字通り実装。
+1. `WrapperPlayServerEntityStatus(id, 3)` — 死亡アニメ＋音（A だけに送信）
+2. `WrapperPlayServerDestroyEntities(id)` — A のクライアントから実体を削除。F3+B の箱も消える。
+3. `SPAWN_PLAYER` を A 宛てに cancel — 再出現を遮断（＝「A のパケットを送るのをやめる」）
 
-B 側は一切不変。解除漏れ対策は `endMatch` / join / quit で `showEntity` + 抑制解除。
+B 側は不変。解除は `endMatch` / join / quit で `showEntity` + 抑制解除。
+
+## 「Thinking 中に Let me run を連呼する」について（ユーザー指摘）
+
+internal reasoning にツール呼び出しの前置きを書き込んでいたのが漏れていた。以降やらない。
