@@ -179,6 +179,40 @@
   自分の発言は `report.self`、二重は `report.duplicate`、成功で `report.filed`。
 - **未着手**: `/admin` → 「Cheat / Alt / Reports」の Reports 画面（項目18と一緒に作る）。
 
+## 18. `/admin` ハブ — 実装メモ（v1.92.62–63）
+
+- **`/admin` は既存コマンドと衝突していた**（`/admin reset point [player]` / `/admin orkit …`）。
+  → **共存で解決**: `args.length == 0` なら新ハブを開き、サブコマンドは従来どおり。
+  （ユーザー確認は取れていないので、別名にしたい場合は `/admintool` へ移すだけで済む。）
+- **`AdminHubGui`**（新規、`gui/menus/`）+ `GuiType.ADMIN_HUB`。6行、PURPLE テーマ。
+  - 配置は1列ずつ間を空けた7タイル:
+    - 2行目: Arena/FFA(1) / Player Data(3) / Punishment(5) / Cheat・Alt・Reports(7)
+    - 4行目: Match Management(2) / Statistics(4) / Server Settings(6)
+  - 遷移先は `Consumer<Player>` の setter 注入。**ハブ自身は遷移先を知らない**ので、
+    セクション画面が未実装でも落ちない（noop）。
+- **現在の委譲先**（すべて既存画面）:
+  | セクション | 委譲先 |
+  |---|---|
+  | Arena / FFA | `ArenaSourceGui` |
+  | Player Data | `AdminPlayersGui` |
+  | Punishment | `BanListGui` |
+  | Cheat / Alt / Reports | `ReportListGui`（**チャット通報はまだ未接続**） |
+  | Match Management | `AdminMatchesGui` |
+  | Statistics | `AdminStatsGui` |
+  | Server Settings | `AdminToggleGui` |
+- **ハマりどころ**: `UiTheme.line()` / `UiTheme.hint()` は **`Component` ではなく `String`**。
+  v1.92.62 はこれでコンパイル落ちした（v1.92.63 で修正）。
+
+## 残り（次にやること）
+
+- [ ] 19. **Player データ画面の完全管理** — `AdminPlayerDataGui` は現状リセット中心。
+      値の編集・配置の変更を追加する。
+- [ ] 20. **パーティの強制解散** — `TeamService` を `AdminPlayerDataGui` / Players 画面から呼ぶ。
+- [ ] 21 残り. **チャット通報の Reports 画面** — `ChatReportService#open()` を
+      「Cheat / Alt / Reports」配下に表示。投稿日時 + 前後の文を `Report.context` から描画。
+- [ ] `/practiceadmin menu` を新ハブに向ける（統合）。現状は旧 `AdminMenuGui` のまま。
+- [ ] 「Arena / FFA」専用ページ（現状は `ArenaSourceGui` に丸投げ）。
+
 ---
 
 # 13〜15. 残り（仕様は上にそのまま記載）
