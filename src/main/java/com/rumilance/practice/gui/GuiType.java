@@ -80,6 +80,10 @@ public enum GuiType {
     ADMIN_STATS,
     /** `/admin` — the seven-section admin home screen. */
     ADMIN_HUB,
+    /** `/admin` → Cheat / Alt / Reports section. */
+    CHEAT_REPORTS,
+    /** Chat reports filed from the click-to-report hover. */
+    CHAT_REPORTS,
     SIGN_KIT_SELECT,
     CHAT_SETTINGS,
     TOURNAMENT,

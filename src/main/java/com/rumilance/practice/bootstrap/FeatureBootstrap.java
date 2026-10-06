@@ -267,6 +267,8 @@ public final class FeatureBootstrap {
     private com.rumilance.practice.social.BlockListService blockListService;
     /** The `/admin` home screen; every admin sub-screen returns here. */
     private com.rumilance.practice.gui.menus.AdminHubGui adminHubGui;
+    /** `/admin` → Cheat / Alt / Reports; needed before the hub is built. */
+    private com.rumilance.practice.gui.menus.CheatReportsGui cheatReportsGui;
     private ChatBanService chatBanService;
     private BanService banService;
     private MatchActionRecorder matchActionRecorder;
@@ -2259,7 +2261,7 @@ public final class FeatureBootstrap {
         adminHubGui.setOpenArenaFfa(arenaSourceGui::open);
         adminHubGui.setOpenPlayerData(adminPlayersGui::open);
         adminHubGui.setOpenPunishment(banListGui::open);
-        adminHubGui.setOpenCheatReports(reportListGui::open);
+        adminHubGui.setOpenCheatReports(p -> this.cheatReportsGui.open(p));
         adminHubGui.setOpenMatchManagement(adminMatchesGui::open);
         adminHubGui.setOpenStats(adminStatsGui::open);
         adminHubGui.setOpenServerSettings(adminToggleGui::open);
@@ -2284,6 +2286,23 @@ public final class FeatureBootstrap {
         guiListener.register(adminToggleGui);
         guiListener.register(kbDefaultGui);
         guiListener.register(altFlagsGui);
+
+        // --- /admin → Cheat / Alt / Reports ---
+        com.rumilance.practice.gui.menus.CheatReportsGui cheatReportsGui =
+                new com.rumilance.practice.gui.menus.CheatReportsGui(guiSessions, soundService);
+        this.cheatReportsGui = cheatReportsGui;
+        com.rumilance.practice.gui.menus.ChatReportsGui chatReportsGui =
+                new com.rumilance.practice.gui.menus.ChatReportsGui(
+                        guiSessions, soundService, chatReportService);
+        chatReportsGui.setOnBack(cheatReportsGui::open);
+        cheatReportsGui.setOpenChatReports(chatReportsGui::open);
+        cheatReportsGui.setOpenAltFlags(altFlagsGui::open);
+        cheatReportsGui.setOpenMatchReports(reportListGui::open);
+        cheatReportsGui.setOnBack(adminHubGui::open);
+        // The hub was never registered, so its tiles did nothing when clicked.
+        guiListener.register(adminHubGui);
+        guiListener.register(cheatReportsGui);
+        guiListener.register(chatReportsGui);
 
         adminPlayerDataGui.setStatsResetService(statsResetService);
         adminPlayerDataGui.setChatBanService(chatBanService);
