@@ -1334,6 +1334,7 @@ public final class FeatureBootstrap {
         adminMenuGui.setOpenKitAdmin(kitAdminGui::open);
         com.rumilance.practice.gui.menus.FfaSettingsGui ffaSettingsGui =
                 new com.rumilance.practice.gui.menus.FfaSettingsGui(guiSessions, soundService, ffaService);
+        ffaSettingsGui.setInnerKitService(innerKits);
         ArenaSourceGui arenaSourceGui = new ArenaSourceGui(guiSessions, soundService, arenaStore, ffaService);
         adminMenuGui.setOpenFfaSettings(ffaSettingsGui::open);
         adminMenuGui.setOpenArenaSource(arenaSourceGui::open);

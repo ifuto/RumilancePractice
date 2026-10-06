@@ -33,6 +33,8 @@ import java.util.Locale;
 public final class FfaSettingsGui extends AbstractGui {
 
     private final FfaService ffaService;
+    /** Child kits (inner kits) available for this arena's kit; null just offers "none". */
+    private com.rumilance.practice.kit.InnerKitService innerKitService;
 
     public FfaSettingsGui(GuiSessionRegistry registry, SoundService sounds, FfaService ffaService) {
         super(registry, sounds, GuiType.FFA_SETTINGS, 6, false);
@@ -55,6 +57,10 @@ public final class FfaSettingsGui extends AbstractGui {
     }
 
     /** Arena id the next {@link #open()} call should pre-select, per player. */
+    public void setInnerKitService(com.rumilance.practice.kit.InnerKitService innerKitService) {
+        this.innerKitService = innerKitService;
+    }
+
     private final java.util.Map<java.util.UUID, String> pendingArena = new java.util.HashMap<>();
 
     /** Opens the detail page for a single arena directly (used by /ffa settings <arena>). */
@@ -206,6 +212,31 @@ public final class FfaSettingsGui extends AbstractGui {
                 line(player, "gui.ffa-settings-lff-lore"),
                 "toggle:lff"));
 
+        // 子Kit: このアリーナで強制する inner kit。未指定なら個人の K1..K4 → キット本体。
+        java.util.List<com.rumilance.practice.kit.InnerKitService.InnerKit> childKits =
+                innerKitService == null
+                        ? java.util.List.of()
+                        : innerKitService.list(arena.kitId());
+        String currentInner = arena.innerKitId();
+        boolean hasInner = currentInner != null && !currentInner.isBlank();
+        String innerLabel = !hasInner
+                ? "none"
+                : com.rumilance.practice.kit.InnerKitService.stripBadge(
+                        innerKitService == null
+                                ? currentInner
+                                : innerKitService.displayOf(arena.kitId(), currentInner, arena.kitId()));
+        inventory.setItem(MenuScaffold.gridSlot(21), ItemBuilder.of(Material.CHEST)
+                .name(Component.text("Child kit: " + innerLabel, UiTheme.HEADER))
+                .lore(
+                        UiTheme.divider(),
+                        UiTheme.line("Forces this child kit's layout on everyone in the arena."),
+                        UiTheme.labelValue("Available", String.valueOf(childKits.size())),
+                        UiTheme.blank(),
+                        UiTheme.hint("Click: cycle (wraps back to none)"))
+                .glint(hasInner)
+                .action("innerkit")
+                .build());
+
         inventory.setItem(MenuScaffold.gridSlot(22), ItemBuilder.of(Material.SPYGLASS)
                 .name(t(player, "gui.ffa-settings-size-title").color(UiTheme.SECONDARY))
                 .lore(
@@ -272,6 +303,27 @@ public final class FfaSettingsGui extends AbstractGui {
             session.setSelectedMap(null);
             session.setPage(0);
             sounds.play(player, "gui-back");
+            refresh(player, session, inventory);
+            return;
+        }
+        if ("innerkit".equals(action)) {
+            FfaService.FfaArena inner = ffaService.find(session.selectedMap()).orElse(null);
+            if (inner == null) {
+                return;
+            }
+            java.util.List<String> options = new java.util.ArrayList<>();
+            options.add("");
+            if (innerKitService != null) {
+                for (com.rumilance.practice.kit.InnerKitService.InnerKit child
+                        : innerKitService.list(inner.kitId())) {
+                    options.add(child.id());
+                }
+            }
+            String current = inner.innerKitId() == null ? "" : inner.innerKitId();
+            int index = options.indexOf(current);
+            String next = options.get((index + 1) % options.size());
+            ffaService.setInnerKit(inner.id(), next);
+            sounds.play(player, "gui-click");
             refresh(player, session, inventory);
             return;
         }

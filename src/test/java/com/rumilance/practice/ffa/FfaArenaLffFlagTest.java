@@ -44,7 +44,7 @@ final class FfaArenaLffFlagTest {
                 List.of("STONE"),
                 false,
                 false,
-                lffEnabled);
+                lffEnabled, null); // child kit
     }
 
     /** Every copy method except withLff itself, so the loop cannot miss one. */
@@ -66,6 +66,7 @@ final class FfaArenaLffFlagTest {
         all.put("withIconMaterial", a -> a.withIconMaterial("GOLD_SWORD"));
         all.put("withBot", a -> a.withBot(true));
         all.put("withFreehitGuard", a -> a.withFreehitGuard(true));
+        all.put("withInnerKit", a -> a.withInnerKit("preset-a"));
         return all;
     }
 

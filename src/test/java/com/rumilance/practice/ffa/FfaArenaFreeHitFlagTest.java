@@ -44,7 +44,7 @@ final class FfaArenaFreeHitFlagTest {
                 List.of("STONE"),
                 false,
                 freehitGuard,
-                false);
+                false, null); // child kit
     }
 
     /** Every copy method except withFreehitGuard itself, so the loop cannot miss one. */
@@ -66,6 +66,7 @@ final class FfaArenaFreeHitFlagTest {
         all.put("withIconMaterial", a -> a.withIconMaterial("GOLD_SWORD"));
         all.put("withBot", a -> a.withBot(true));
         all.put("withLff", a -> a.withLff(true));
+        all.put("withInnerKit", a -> a.withInnerKit("preset-a"));
         return all;
     }
 

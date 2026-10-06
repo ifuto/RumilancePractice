@@ -44,7 +44,7 @@ final class FfaArenaBotFlagTest {
                 List.of("STONE"),
                 botEnabled,
                 false,
-                false);
+                false, null); // child kit
     }
 
     /** Every copy method of the record, so the loop below cannot miss one added later. */
@@ -65,6 +65,7 @@ final class FfaArenaBotFlagTest {
         all.put("withCanBreak", a -> a.withCanBreak(List.of()));
         all.put("withIconMaterial", a -> a.withIconMaterial("GOLD_SWORD"));
         all.put("withFreehitGuard", a -> a.withFreehitGuard(true));
+        all.put("withInnerKit", a -> a.withInnerKit("preset-a"));
         all.put("withLff", a -> a.withLff(true));
         return all;
     }
