@@ -145,7 +145,10 @@ public final class RankIconCommand implements CommandExecutor, TabCompleter {
                 .append(Component.text("  = icons font + ABC (normal letters = font MISSING on client; squares = font loaded, glyphs broken)", NamedTextColor.DARK_GRAY)));
         sender.sendMessage(Component.text("Probe C ", NamedTextColor.DARK_GRAY)
                 .append(Component.text(pua))
-                .append(Component.text("  = default font + U+E001 (with the merged pack this shows the admin badge)", NamedTextColor.DARK_GRAY)));
+                .append(Component.text("  = default font + U+E001 (expected: NOTHING — the glyph only exists"
+                        + " in rumilance:icons; a visible badge here would mean some pack is"
+                        + " overriding minecraft:default, which blanks out all text)",
+                        NamedTextColor.DARK_GRAY)));
         if (sender instanceof Player player) {
             player.sendActionBar(Component.empty()
                     .append(admin)

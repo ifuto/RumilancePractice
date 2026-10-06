@@ -14,6 +14,10 @@ import net.kyori.adventure.text.Component;
  *   U+E001 admin badge   U+E002 VIP badge   U+E003 VIP+ badge   U+E004 PRO badge
  * </pre>
  *
+ * <p>The pack must NOT ship {@code assets/minecraft/font/default.json} /
+ * {@code uniform.json}: those are reserved ids and override the vanilla font instead of
+ * extending it.</p>
+ *
  * <p>Team identification during team fights is deliberately NOT a pack glyph — it is a plain
  * coloured {@code ●} (see the MatchTeamVisuals prefix resolver), so it works for everyone even
  * without the resource pack. Everything here is config-driven ({@code icons.*} in config.yml)
@@ -36,14 +40,22 @@ public final class IconFontService {
     }
 
     /**
-     * The font the icon glyphs render with. {@code default} / {@code minecraft:default} /
-     * blank = no font attribute — the pack merges the glyph providers into
-     * {@code minecraft:default} (and {@code minecraft:uniform}), so rendering never depends
-     * on a custom font id resolving. Any other value (e.g. {@code rumilance:icons}, still
-     * shipped in the pack) attaches that font explicitly.
+     * The font the icon glyphs render with.
+     *
+     * <p>{@code minecraft:default}, {@code minecraft:uniform} and {@code minecraft:alt} are
+     * <strong>reserved</strong> ids: a resource pack that ships one of those font files
+     * replaces the vanilla font outright rather than adding to it, so every ordinary glyph
+     * (letters, digits, spaces) loses its definition and all server text renders blank.
+     * The pack therefore only ever registers its glyphs under its own namespace,
+     * {@code rumilance:icons}, which is additive and cannot break vanilla text.</p>
+     *
+     * <p>Blank / {@code default} / {@code minecraft:default} means "send no font attribute",
+     * which only renders if the glyph happened to be merged into the vanilla font — it is
+     * not how this pack works, but an admin is free to point this at any font id they have
+     * registered themselves.</p>
      */
     public Key font() {
-        String raw = configService.config().getString("icons.font", "default");
+        String raw = configService.config().getString("icons.font", "rumilance:icons");
         if (raw == null || raw.isBlank() || "default".equalsIgnoreCase(raw.trim())
                 || "minecraft:default".equalsIgnoreCase(raw.trim())) {
             return null;
@@ -85,11 +97,11 @@ public final class IconFontService {
     private Component icon(String glyph) {
         Key font = font();
         if (font == null) {
-            // Default font: the pack merges the glyph providers into minecraft:default,
-            // so this renders on every client that applied the pack — no custom-font
-            // resolution involved.
             return Component.text(glyph);
         }
+        // The glyph is only defined in rumilance:icons, so the font has to be named
+        // explicitly — without it the client looks the codepoint up in the vanilla
+        // default font, where it does not exist.
         return Component.text(glyph).style(style -> style.font(font));
     }
 }

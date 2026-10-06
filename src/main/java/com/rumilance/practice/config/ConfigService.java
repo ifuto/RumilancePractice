@@ -54,9 +54,16 @@ public final class ConfigService {
     /** A top-level {@code key:} line (column 0) of a config file. */
     private static final Pattern TOP_LEVEL_KEY = Pattern.compile("^([A-Za-z0-9_.-]+):(?:[ \\t].*)?$");
 
-    /** The legacy icons.font default that fails to resolve on some 1.21.x clients. */
+    /**
+     * The superseded icons.font value. Rendering the badges through the vanilla default font
+     * once required the pack to override {@code minecraft:default}, but that id is reserved:
+     * shipping it replaces the vanilla font instead of extending it, so every ordinary glyph
+     * (letters, digits, spaces) loses its definition and all server text renders blank. The
+     * pack no longer does that, so configs still saying "default" are moved back onto the
+     * pack's own namespace.
+     */
     private static final Pattern LEGACY_ICON_FONT =
-            Pattern.compile("^(\\s*font:\\s*)\"?rumilance:icons\"?\\s*$", Pattern.MULTILINE);
+            Pattern.compile("^(\\s*font:\\s*)\"?default\"?\\s*$", Pattern.MULTILINE);
 
     private final JavaPlugin plugin;
     private final Map<String, FileConfiguration> configs = new LinkedHashMap<>();
@@ -256,8 +263,9 @@ public final class ConfigService {
      *   <li>the {@code resource-pack} section is replaced with the bundled version — its
      *       url/sha1 must always match the pack the plugin is currently shipping, and the
      *       server owner explicitly allowed this section to be overwritten on startup,</li>
-     *   <li>a one-time migration turns the legacy default {@code icons.font: "rumilance:icons"}
-     *       into {@code "default"} (custom font ids fail to resolve on some 1.21.x clients);
+     *   <li>a one-time migration repoints {@code icons.font: "default"} at the pack's own
+     *       {@code "rumilance:icons"} — the pack no longer overrides the reserved
+     *       {@code minecraft:default} font, so "default" renders nothing;
      *       any other configured font stays untouched.</li>
      * </ul>
      *
@@ -302,7 +310,7 @@ public final class ConfigService {
         Matcher legacyFont = LEGACY_ICON_FONT.matcher(updated);
         boolean migrated = legacyFont.find();
         if (migrated) {
-            updated = legacyFont.replaceAll("$1\"default\"");
+            updated = legacyFont.replaceAll("$1\"rumilance:icons\"");
         }
 
         if (updated.equals(normalized)) {
@@ -317,8 +325,9 @@ public final class ConfigService {
             plugin.getLogger().info("config.yml: added missing sections: " + String.join(", ", added));
         }
         if (migrated) {
-            plugin.getLogger().info("config.yml: icons.font migrated from the legacy default"
-                    + " \"rumilance:icons\" to \"default\" (glyphs are merged into the default font)");
+            plugin.getLogger().info("config.yml: icons.font migrated off the reserved default font"
+                    + " \"default\" to \"rumilance:icons\" (the pack no longer overrides the"
+                    + " reserved minecraft:default font, which blanked out all server text)");
         }
         return updated;
     }
