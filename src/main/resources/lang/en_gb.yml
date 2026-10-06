@@ -420,6 +420,10 @@ ffa-bot:
   failed: "<red>Could not spawn the mannequin bot."
   arena-disabled: "<red>FFA Bot is OFF in this arena.</red> <gray>Turn on</gray> <yellow>FFA Bot</yellow> <gray>under /practiceadmin → FFA Config to spawn</gray> <aqua><bold>NARENA BOT</bold></aqua><gray>.</gray>"
 
+player-list:
+  header: "<gold><count> online</gold>"
+  line: "<gray>- </gray><white><name></white> <dark_gray>[<state>]</dark_gray> <gray><ping>ms · <world></gray>"
+  empty: "<gray>Nobody is online.</gray>"
 tps:
   denied: "<red>You may not use /tps.</red>"
   cooldown: "<red>No spamming — wait <secs>s.</red>"

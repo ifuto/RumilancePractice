@@ -2492,6 +2492,9 @@ public final class FeatureBootstrap {
         // 素の /tps はこのプラグインの実装が優先される。
         pm.registerEvents(new com.rumilance.practice.command.TpsPaperGuard(), plugin);
         bind("tps", new com.rumilance.practice.command.TpsCommand(tpsTracker, messageService));
+        // /player — the online player list. CommandSender-based, so the console can run it.
+        bind("player", new com.rumilance.practice.command.PlayerListCommand(
+                messageService, stateManager));
         // Drop stale TPA requests / RTP queue entries on quit or when a player leaves an arena.
         pm.registerEvents(new org.bukkit.event.Listener() {
             @org.bukkit.event.EventHandler

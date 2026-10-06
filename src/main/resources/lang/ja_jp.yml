@@ -421,6 +421,10 @@ ffa-bot:
   failed: "<red>マネキン BOT をスポーンできませんでした。"
   arena-disabled: "<red>このアリーナでは FFA Bot は OFF です。</red> <gray>/practiceadmin</gray> <gray>→ FFA Config の</gray> <yellow>FFA Bot</yellow> <gray>を ON にすると</gray> <aqua><bold>NARENA BOT</bold></aqua> <gray>を出せます。</gray>"
 
+player-list:
+  header: "<gold>オンライン <count>人</gold>"
+  line: "<gray>- </gray><white><name></white> <dark_gray>[<state>]</dark_gray> <gray><ping>ms · <world></gray>"
+  empty: "<gray>オンラインのプレイヤーはいません。</gray>"
 tps:
   denied: "<red>/tps を使う権限がありません。</red>"
   cooldown: "<red>連打禁止 — <secs>秒待ってください。</red>"

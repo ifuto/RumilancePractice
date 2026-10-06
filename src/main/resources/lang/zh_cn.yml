@@ -420,6 +420,10 @@ ffa-bot:
   failed: "<red>无法生成假人。"
   arena-disabled: "<red>该竞技场的 FFA Bot 处于关闭状态。</red> <gray>在 /practiceadmin → FFA Config 中打开</gray> <yellow>FFA Bot</yellow> <gray>即可生成</gray> <aqua><bold>NARENA BOT</bold></aqua><gray>。</gray>"
 
+player-list:
+  header: "<gold>在线 <count> 人</gold>"
+  line: "<gray>- </gray><white><name></white> <dark_gray>[<state>]</dark_gray> <gray><ping>ms · <world></gray>"
+  empty: "<gray>当前没有在线玩家。</gray>"
 tps:
   denied: "<red>你没有使用 /tps 的权限。</red>"
   cooldown: "<red>请勿连打 — 请等待 <secs> 秒。</red>"

@@ -420,6 +420,10 @@ ffa-bot:
   failed: "<red>마네킹 봇을 소환하지 못했습니다."
   arena-disabled: "<red>이 아레나에서는 FFA Bot이 OFF입니다.</red> <gray>/practiceadmin → FFA Config에서</gray> <yellow>FFA Bot</yellow><gray>을 켜면</gray> <aqua><bold>NARENA BOT</bold></aqua><gray>을 소환할 수 있습니다.</gray>"
 
+player-list:
+  header: "<gold>접속 중 <count>명</gold>"
+  line: "<gray>- </gray><white><name></white> <dark_gray>[<state>]</dark_gray> <gray><ping>ms · <world></gray>"
+  empty: "<gray>접속 중인 플레이어가 없습니다.</gray>"
 tps:
   denied: "<red>/tps 를 사용할 권한이 없습니다.</red>"
   cooldown: "<red>연타 금지 — <secs>초 기다려 주세요.</red>"

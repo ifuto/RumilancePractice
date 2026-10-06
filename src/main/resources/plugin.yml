@@ -140,6 +140,10 @@ commands:
     description: Server TPS as a percentage (20-minute average) plus any dips in the last 24 hours.
     usage: /tps
     permission: rumilance.tps
+  player:
+    description: Lists the online players (name, state, ping, world). Runnable from the console.
+    usage: /player
+    permission: rumilance.player.list
   reportchat:
     description: Report a chat line (fired by the click-to-report hover, not meant to be typed).
     usage: /reportchat <id>
@@ -493,6 +497,9 @@ permissions:
   rumilance.tps:
     description: Allows /tps. Granted to everyone — this plugin's own percentage readout is meant to be public. Revoke per group with LuckPerms to make it staff-only.
     default: true
+  rumilance.player.list:
+    description: Allows /player (the online player list). The console always has it; OP by default, grant it to any group that should see the list.
+    default: op
   rumilance.duel.use:
     description: Allow duel/queue commands.
     default: true

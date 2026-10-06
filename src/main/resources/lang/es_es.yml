@@ -420,6 +420,10 @@ ffa-bot:
   failed: "<red>No se pudo generar el maniquí."
   arena-disabled: "<red>FFA Bot está OFF en esta arena.</red> <gray>Activa</gray> <yellow>FFA Bot</yellow> <gray>en /practiceadmin → FFA Config para generar</gray> <aqua><bold>NARENA BOT</bold></aqua><gray>.</gray>"
 
+player-list:
+  header: "<gold><count> en línea</gold>"
+  line: "<gray>- </gray><white><name></white> <dark_gray>[<state>]</dark_gray> <gray><ping>ms · <world></gray>"
+  empty: "<gray>No hay nadie en línea.</gray>"
 tps:
   denied: "<red>No puedes usar /tps.</red>"
   cooldown: "<red>Sin spam — espera <secs>s.</red>"
