@@ -4,12 +4,14 @@ import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.event.PacketListener;
 import com.github.retrooper.packetevents.event.PacketListenerPriority;
 import com.github.retrooper.packetevents.event.PacketReceiveEvent;
+import com.github.retrooper.packetevents.protocol.nbt.NBTByte;
 import com.github.retrooper.packetevents.protocol.nbt.NBTCompound;
+import com.github.retrooper.packetevents.protocol.nbt.NBTInt;
 import com.github.retrooper.packetevents.protocol.nbt.NBTList;
 import com.github.retrooper.packetevents.protocol.nbt.NBTString;
 import com.github.retrooper.packetevents.protocol.nbt.NBTType;
 import com.github.retrooper.packetevents.protocol.packettype.PacketType;
-import com.github.retrooper.packetevents.util.SpigotConversionUtil;
+import io.github.retrooper.packetevents.util.SpigotConversionUtil;
 import com.github.retrooper.packetevents.util.Vector3i;
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientUpdateSign;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerBlockChange;
@@ -341,11 +343,11 @@ public final class SignProbeService implements PacketListener {
 
     private static NBTCompound buildSignNbt(Vector3i pos, String[] messages) {
         NBTCompound root = new NBTCompound();
-        root.setString("id", "minecraft:sign");
-        root.setInt("x", pos.getX());
-        root.setInt("y", pos.getY());
-        root.setInt("z", pos.getZ());
-        root.setByte("is_waxed", (byte) 0);
+        root.setTag("id", new NBTString("minecraft:sign"));
+        root.setTag("x", new NBTInt(pos.getX()));
+        root.setTag("y", new NBTInt(pos.getY()));
+        root.setTag("z", new NBTInt(pos.getZ()));
+        root.setTag("is_waxed", new NBTByte((byte) 0));
         root.setTag("front_text", textSide(messages));
         root.setTag("back_text", textSide(new String[]{
                 "{\"text\":\"\"}", "{\"text\":\"\"}", "{\"text\":\"\"}", "{\"text\":\"\"}"}));
@@ -354,8 +356,8 @@ public final class SignProbeService implements PacketListener {
 
     private static NBTCompound textSide(String[] messages) {
         NBTCompound side = new NBTCompound();
-        side.setByte("has_glowing_text", (byte) 0);
-        side.setString("color", "black");
+        side.setTag("has_glowing_text", new NBTByte((byte) 0));
+        side.setTag("color", new NBTString("black"));
         side.setTag("messages", new NBTList<>(NBTType.STRING, java.util.List.of(
                 new NBTString(messages[0]), new NBTString(messages[1]),
                 new NBTString(messages[2]), new NBTString(messages[3]))));

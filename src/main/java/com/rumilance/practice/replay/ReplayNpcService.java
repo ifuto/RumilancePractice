@@ -10,6 +10,7 @@ import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEn
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPlayerInfoRemove;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPlayerInfoUpdate;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSpawnPlayer;
+import io.github.retrooper.packetevents.util.SpigotConversionUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
@@ -122,7 +123,8 @@ public final class ReplayNpcService {
             return;
         }
         try {
-            send(viewer, new WrapperPlayServerEntityTeleport(avatar.entityId, loc, false));
+            send(viewer, new WrapperPlayServerEntityTeleport(
+                    avatar.entityId, SpigotConversionUtil.fromBukkitLocation(loc), false));
             sendHeadRotation(viewer, avatar.entityId, loc.getYaw());
         } catch (Throwable t) {
             logger.log(Level.FINE, "[Replay] NPC teleport failed", t);
@@ -158,7 +160,8 @@ public final class ReplayNpcService {
     }
 
     private void sendSpawn(Player viewer, int entityId, UUID profileUuid, Location loc) {
-        send(viewer, new WrapperPlayServerSpawnPlayer(entityId, profileUuid, loc));
+        send(viewer, new WrapperPlayServerSpawnPlayer(
+                entityId, profileUuid, SpigotConversionUtil.fromBukkitLocation(loc)));
     }
 
     private void sendHeadRotation(Player viewer, int entityId, float yaw) {
