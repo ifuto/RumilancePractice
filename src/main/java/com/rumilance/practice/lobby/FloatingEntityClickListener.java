@@ -15,19 +15,16 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class FloatingEntityClickListener implements Listener {
 
-    public interface ClickAction {
-        void onClick(Player player);
-    }
-
-    private volatile Map<Integer, ClickAction> actions = new ConcurrentHashMap<>();
+    private volatile Map<Integer, java.util.function.Consumer<Player>> actions =
+            new ConcurrentHashMap<>();
 
     /** Set the shared action map (from LobbyFloatingEntitiesService). */
-    public void setClickActions(Map<Integer, ClickAction> actions) {
+    public void setClickActions(Map<Integer, java.util.function.Consumer<Player>> actions) {
         this.actions = actions != null ? actions : new ConcurrentHashMap<>();
     }
 
     /** Register an action for an interaction entity. */
-    public void register(Interaction entity, ClickAction action) {
+    public void register(Interaction entity, java.util.function.Consumer<Player> action) {
         if (entity != null && action != null) {
             actions.put(entity.getEntityId(), action);
         }
@@ -39,10 +36,14 @@ public final class FloatingEntityClickListener implements Listener {
 
     @EventHandler
     public void onInteract(PlayerInteractEntityEvent event) {
-        if (!(event.getRightClicked() instanceof Interaction interaction)) return;
-        ClickAction action = actions.get(interaction.getEntityId());
+        if (!(event.getRightClicked() instanceof Interaction interaction)) {
+            return;
+        }
+        java.util.function.Consumer<Player> action = actions.get(interaction.getEntityId());
         if (action != null) {
-            action.onClick(event.getPlayer());
+            // Swallow the interaction so a right-click never also swings/places.
+            event.setCancelled(true);
+            action.accept(event.getPlayer());
         }
     }
 }

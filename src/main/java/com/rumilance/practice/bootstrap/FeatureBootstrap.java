@@ -827,6 +827,15 @@ public final class FeatureBootstrap {
         com.rumilance.practice.lobby.LobbyFloatingEntitiesService floatingEntitiesService = this.floatingEntitiesService;
         // Load persisted floating entities from lobby.yml on startup.
         floatingEntitiesService.loadFromConfig(configService.lobby());
+        // Right-click on the floating lobby entities. Without this registration the listener
+        // is dead code and the floating queue item is pure decoration — it never opened
+        // anything. The action map is shared with the service, so entities spawned later
+        // (including the ones loaded above) are picked up.
+        com.rumilance.practice.lobby.FloatingEntityClickListener floatingEntityClickListener =
+                new com.rumilance.practice.lobby.FloatingEntityClickListener();
+        floatingEntityClickListener.setClickActions(floatingEntitiesService.clickActions());
+        plugin.getServer().getPluginManager()
+                .registerEvents(floatingEntityClickListener, plugin);
         // Hub gliding: firework-style boost on right-click (2s cooldown, silent while cooling)
         // and the mace-smash landing effect.
         plugin.getServer().getPluginManager().registerEvents(
@@ -1599,6 +1608,18 @@ public final class FeatureBootstrap {
                     .orElse(false);
             kitSelectGui.openForQueue(player, inRanked);
         });
+        // The floating lobby queue item does exactly what the lobby hotbar item does. It is
+        // wired here rather than at spawn time because kitSelectGui/queueService only exist
+        // from this point on; the service resolves it at click time, so entities spawned
+        // earlier (including those loaded from lobby.yml) still reach this.
+        if (this.floatingEntitiesService != null) {
+            this.floatingEntitiesService.setQueueAction(player -> {
+                boolean inRanked = queueService.get(player.getUniqueId())
+                        .map((QueueService.QueueEntry e) -> e.mode() == MatchMode.RANKED)
+                        .orElse(false);
+                kitSelectGui.openForQueue(player, inRanked);
+            });
+        }
         functionalItemListener.setOpenTitles(titleGui::open);
         functionalItemListener.setOpenParty(player -> {
             if (teamService.teamOf(player.getUniqueId()).isPresent()) {

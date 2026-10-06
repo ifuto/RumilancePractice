@@ -9,7 +9,9 @@ import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.Interaction;
 import org.bukkit.entity.ItemDisplay;
+import org.bukkit.entity.Player;
 import org.bukkit.entity.TextDisplay;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
@@ -20,6 +22,8 @@ import org.joml.Vector3f;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 
 /**
@@ -39,10 +43,24 @@ public final class LobbyFloatingEntitiesService {
     private BukkitTask animTask;
     private long tickCount;
     private final java.util.Map<Integer, Double> baseY = new java.util.concurrent.ConcurrentHashMap<>();
+    /** entityId -> what right-clicking it does. Shared with FloatingEntityClickListener. */
+    private final java.util.Map<Integer, Consumer<Player>> clickActions = new ConcurrentHashMap<>();
+    /** Opened when the floating QUEUE item is clicked; resolved at click time, not spawn time. */
+    private volatile Consumer<Player> queueAction;
     private volatile boolean shuttingDown;
 
     public LobbyFloatingEntitiesService(Plugin plugin) {
         this.plugin = plugin;
+    }
+
+    /** The map {@link FloatingEntityClickListener} reads; hand it over at registration. */
+    public java.util.Map<Integer, Consumer<Player>> clickActions() {
+        return clickActions;
+    }
+
+    /** Sets what right-clicking a floating QUEUE item opens (the kit/queue screen). */
+    public void setQueueAction(Consumer<Player> action) {
+        this.queueAction = action;
     }
 
     // ---- persistence ----
@@ -52,6 +70,10 @@ public final class LobbyFloatingEntitiesService {
         int index = 0;
         for (ManagedEntity me : managed) {
             if (me.entity == null || me.entity.isDead()) continue;
+            // CLICK hitboxes are derived from the queue item that owns them, not authored by
+            // an admin. Persisting them would turn each one back into a SWORD FFA indicator on
+            // the next load, because loadFromConfig only knows QUEUE vs "everything else".
+            if (me.type == EntityType.CLICK) continue;
             Location loc = me.entity.getLocation();
             String path = CONFIG_KEY + "." + index + ".";
             lobby.set(path + "world", loc.getWorld() != null ? loc.getWorld().getName() : "world");
@@ -95,7 +117,7 @@ public final class LobbyFloatingEntitiesService {
 
     // ---- spawn ----
 
-    public enum EntityType { QUEUE, SWORD_FFA }
+    public enum EntityType { QUEUE, SWORD_FFA, CLICK }
 
     private static class ManagedEntity {
         Entity entity;
@@ -119,6 +141,29 @@ public final class LobbyFloatingEntitiesService {
             d.setPersistent(false);
         });
         baseY.put(display.getEntityId(), safeLoc.getY());
+
+        // An ItemDisplay is decoration: it cannot be clicked. The hitbox is a separate
+        // invisible Interaction entity, which IS right-clickable. It is deliberately NOT
+        // animated — the item only bobs ±0.05 while this covers 2 blocks, so a static box
+        // around the base position catches every click aimed at the item.
+        Interaction hitbox = world.spawn(safeLoc.clone().subtract(0, 0.7, 0), Interaction.class, i -> {
+            i.setInteractionWidth(1.5f);
+            i.setInteractionHeight(2.0f);
+            i.setResponsive(true);
+            i.setPersistent(false);
+        });
+        clickActions.put(hitbox.getEntityId(), player -> {
+            Consumer<Player> action = queueAction;
+            if (action != null) {
+                action.accept(player);
+            }
+        });
+
+        ManagedEntity hit = new ManagedEntity();
+        hit.entity = hitbox;
+        hit.type = EntityType.CLICK;
+        hit.originalLocation = safeLoc.clone();
+        managed.add(hit);
 
         ManagedEntity me = new ManagedEntity();
         me.entity = display;
@@ -217,6 +262,7 @@ public final class LobbyFloatingEntitiesService {
     public void removeAll() {
         if (animTask != null) { animTask.cancel(); animTask = null; }
         for (ManagedEntity me : managed) {
+            if (me.entity != null) clickActions.remove(me.entity.getEntityId());
             if (me.entity != null && !me.entity.isDead()) me.entity.remove();
         }
         managed.clear();
