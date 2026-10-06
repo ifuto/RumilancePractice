@@ -699,3 +699,50 @@
 - ProtocolLib が無い場合は 2. だけ動く（縮退）。
 - 隠し状態の**解除漏れを防止**: `endMatch` で `restoreAll(participants)`、
   `PlayerJoinEvent` / `PlayerQuitEvent` でも解除（放置するとロビーで相手が見えなくなる）。
+
+---
+
+# PacketEvents への移行（2026-10-06, v1.92.89〜）
+
+ユーザー指示: 「ProtocolLib に依存している実装があったら、すべて PacketEvents ベースにしてください。」
+
+## 依存（build.gradle.kts）
+
+```
+maven { name = "codemc-releases"; url = uri("https://repo.codemc.io/repository/maven-releases/") }
+compileOnly("com.github.retrooper:packetevents-spigot:2.14.0")
+compileOnly("net.dmulloy2:ProtocolLib:5.4.0")   // 過渡的（下記）
+```
+
+ProtocolLib は **一時的に残している**。外すと残り5ファイルが落ちて jar が出なくなるため。
+
+## 移行済み（v1.92.89, CI green 37445803625）
+
+- `combat/LethalPresentationService` — 死亡演出を全面 PacketEvents 化（後述）。
+
+## 未移行（次のパスで対応）
+
+| ファイル | 難所 |
+|---|---|
+| `replay/ReplayNpcService` | game profile / PlayerInfo / spawn player / NBT |
+| `security/sign/SignProbeService` | NBT・BlockData・sign 系パケット |
+| `practice/afk/AfkRoomIsolationPackets` | パケット種別15個 + BlockPosition 抽出 |
+| `sight/FfaChunkMaskService` | MAP_CHUNK の保持・再送（deepClone 相当） |
+| `spectator/SpectatorViewIsolationPackets` | パケット種別15個 + entity id 抽出 |
+
+いずれも **未確認の PacketEvents 定数名が多数**あり、このサンドボックスには
+JDK も jar 取得経路も無いため（api.github.com のみ到達可）1ターンでの安全な
+一括書き換えは不可。次ターンで1ファイルずつ CI 検証しながら進める。
+
+## hideEntity と F3+B（ユーザー指摘）
+
+`Player#hideEntity` は「モデルを隠す」だけで、**当たり判定表示(F3+B)には効かない**
+場合がある、という指摘は正当。そのため死亡演出は次の3段構えにした:
+
+1. `WrapperPlayServerEntityStatus(entityId, 3)` — 死亡アニメ＋音（A だけに送信）
+2. `WrapperPlayServerDestroyEntities(entityId)` — **A のクライアントから実体を削除**。
+   これが F3+B の箱も消す。`hideEntity` 単体では消えない部分。
+3. `SPAWN_PLAYER` を A 宛てに限り cancel — チャンクリロード等での再出現を止める。
+   ＝「A のパケットを送信するのをやめる」を文字通り実装。
+
+B 側は一切不変。解除漏れ対策は `endMatch` / join / quit で `showEntity` + 抑制解除。

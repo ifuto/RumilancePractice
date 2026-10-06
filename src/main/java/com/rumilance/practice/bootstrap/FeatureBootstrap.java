@@ -562,20 +562,20 @@ public final class FeatureBootstrap {
         matchService.setTeamColoredArmorService(teamColoredArmor);
         spectatorService.setTeamColoredArmorService(teamColoredArmor);
 
-        // Team LOS glow rides ProtocolLib packets as well - same soft-depend rule as above.
-        if (hasPlugin("ProtocolLib")) {
+        // Team LOS glow rides PacketEvents packets as well - same soft-depend rule as above.
+        if (hasPlugin("packetevents")) {
             try {
                 teamGlowLosService = new TeamGlowLosService(plugin, matchRegistry, settingsService);
                 teamGlowLosService.start();
                 services.register(TeamGlowLosService.class, teamGlowLosService);
                 teamColoredArmor.setTeamGlowLosService(teamGlowLosService);
             } catch (LinkageError | RuntimeException e) {
-                plugin.getLogger().log(java.util.logging.Level.WARNING, "ProtocolLib detected but the "
+                plugin.getLogger().log(java.util.logging.Level.WARNING, "PacketEvents detected but the "
                         + "team-glow service failed to initialize; team LOS glow is off.", e);
                 teamGlowLosService = null;
             }
         } else {
-            plugin.getLogger().info("ProtocolLib not detected - team LOS glow is off.");
+            plugin.getLogger().info("PacketEvents not detected - team LOS glow is off.");
         }
 
         FfaService ffaService = new FfaService(
@@ -583,15 +583,15 @@ public final class FeatureBootstrap {
                 ffaStatsRepository, asyncExecutor, runtimeFlags, messageService, soundService);
         services.register(FfaService.class, ffaService);
         // FFA chunk privacy: block + cache MAP_CHUNK packets outside the FFA region while a
-        // player is inside it (ProtocolLib soft dependency — off without it).
+        // player is inside it (PacketEvents soft dependency — off without it).
         com.rumilance.practice.sight.FfaChunkMaskService ffaChunkMaskService = null;
-        if (hasPlugin("ProtocolLib")) {
+        if (hasPlugin("packetevents")) {
             try {
                 ffaChunkMaskService = new com.rumilance.practice.sight.FfaChunkMaskService(plugin);
                 ffaChunkMaskService.init();
             } catch (LinkageError | RuntimeException e) {
                 plugin.getLogger().log(java.util.logging.Level.WARNING,
-                        "ProtocolLib detected but the FFA chunk mask failed to initialize;"
+                        "PacketEvents detected but the FFA chunk mask failed to initialize;"
                                 + " FFA surroundings stay visible.",
                         e);
                 ffaChunkMaskService = null;

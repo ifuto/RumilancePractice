@@ -1,160 +1,149 @@
 package com.rumilance.practice.practice.afk;
 
-import com.comphenix.protocol.PacketType;
-import com.comphenix.protocol.ProtocolLibrary;
-import com.comphenix.protocol.events.ListenerPriority;
-import com.comphenix.protocol.events.PacketAdapter;
-import com.comphenix.protocol.events.PacketContainer;
-import com.comphenix.protocol.events.PacketEvent;
-import com.comphenix.protocol.wrappers.BlockPosition;
+import com.github.retrooper.packetevents.PacketEvents;
+import com.github.retrooper.packetevents.event.PacketListener;
+import com.github.retrooper.packetevents.event.PacketListenerPriority;
+import com.github.retrooper.packetevents.event.PacketSendEvent;
+import com.github.retrooper.packetevents.protocol.packettype.PacketType;
+import com.github.retrooper.packetevents.util.Vector3i;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerBlockBreakAnimation;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerBlockChange;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerBlockEntityData;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerChunkData;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerMultiBlockChange;
+import com.rumilance.practice.packets.PacketEntityIds;
 import org.bukkit.Location;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
+import java.util.Set;
 import java.util.UUID;
 
 /**
- * ProtocolLib side of {@link AfkRoomIsolation}: every outbound packet that describes something
+ * PacketEvents side of {@link AfkRoomIsolation}: every outbound packet that describes something
  * outside the receiver's own AFK room is cancelled before it leaves the server.
  *
  * <ul>
- *   <li><b>block packets</b> — chunk (+light), single/multi block change, block-entity data and
- *       break animations are dropped unless the chunk/position overlaps the room footprint, so a
- *       neighbour's arena 132 blocks away never appears on the client;</li>
+ *   <li><b>block packets</b> — chunk, single/multi block change, block-entity data and break
+ *       animations are dropped unless the chunk/position overlaps the room footprint, so a
+ *       neighbour's arena 132 blocks away never appears on the client. Light updates are not
+ *       filtered: a light packet carries no block data, and the chunk that would reveal terrain
+ *       is already blocked, so failing open here costs nothing;</li>
  *   <li><b>entity packets</b> — dropped when the entity is not inside the room; packets about
- *       other <em>players</em> are dropped unless that player is standing inside the
- *       receiver's own room (both ways: a room owner sees no player outside their room, and
- *       nobody sees a room owner).</li>
+ *       other <em>players</em> are dropped unless that player is standing inside the receiver's
+ *       own room (both ways: a room owner sees no player outside their room, and nobody sees a
+ *       room owner).</li>
  * </ul>
  *
  * <p>Rules are deliberately fail-open when a position cannot be read: dropping a packet we
  * cannot place would blind the player inside their own room, while a leaked neighbour update is
- * only cosmetic. Only class-loaded after the ProtocolLib presence check in the facade.</p>
+ * only cosmetic. Only class-loaded after the PacketEvents presence check in the facade.</p>
  */
-final class AfkRoomIsolationPackets {
+final class AfkRoomIsolationPackets implements PacketListener {
 
     /** Chunk / block packets: filtered by position. */
-    private static final PacketType[] BLOCK_PACKETS = {
-            PacketType.Play.Server.MAP_CHUNK,
-            PacketType.Play.Server.LIGHT_UPDATE,
+    private static final Set<PacketType.Play.Server> BLOCK_PACKETS = Set.of(
+            PacketType.Play.Server.CHUNK_DATA,
             PacketType.Play.Server.BLOCK_CHANGE,
             PacketType.Play.Server.MULTI_BLOCK_CHANGE,
-            PacketType.Play.Server.TILE_ENTITY_DATA,
-            PacketType.Play.Server.BLOCK_BREAK_ANIMATION,
-    };
+            PacketType.Play.Server.BLOCK_ENTITY_DATA,
+            PacketType.Play.Server.BLOCK_BREAK_ANIMATION);
 
     /** Entity packets: filtered by the entity's position (players are always dropped). */
-    private static final PacketType[] ENTITY_PACKETS = {
+    private static final Set<PacketType.Play.Server> ENTITY_PACKETS = Set.of(
             PacketType.Play.Server.SPAWN_ENTITY,
-            PacketType.Play.Server.ANIMATION,
+            PacketType.Play.Server.ENTITY_ANIMATION,
             PacketType.Play.Server.ATTACH_ENTITY,
             PacketType.Play.Server.ENTITY_EFFECT,
             PacketType.Play.Server.ENTITY_EQUIPMENT,
-            PacketType.Play.Server.ENTITY_HEAD_ROTATION,
-            PacketType.Play.Server.ENTITY_LOOK,
+            PacketType.Play.Server.ENTITY_HEAD_LOOK,
+            PacketType.Play.Server.ENTITY_ROTATION,
             PacketType.Play.Server.ENTITY_METADATA,
             PacketType.Play.Server.ENTITY_TELEPORT,
             PacketType.Play.Server.ENTITY_VELOCITY,
+            PacketType.Play.Server.ENTITY_MOVEMENT,
+            PacketType.Play.Server.ENTITY_RELATIVE_MOVE,
+            PacketType.Play.Server.ENTITY_RELATIVE_MOVE_AND_ROTATION,
             PacketType.Play.Server.HURT_ANIMATION,
-            PacketType.Play.Server.REL_ENTITY_MOVE,
-            PacketType.Play.Server.REL_ENTITY_MOVE_LOOK,
             PacketType.Play.Server.REMOVE_ENTITY_EFFECT,
-            PacketType.Play.Server.UPDATE_ATTRIBUTES,
-    };
+            PacketType.Play.Server.UPDATE_ATTRIBUTES);
 
-    private static final PacketType[] FILTERED = concat(BLOCK_PACKETS, ENTITY_PACKETS);
+    private final AfkRoomIsolationSource source;
 
-    private AfkRoomIsolationPackets() {
-    }
-
-    private static PacketType[] concat(PacketType[] a, PacketType[] b) {
-        PacketType[] all = new PacketType[a.length + b.length];
-        System.arraycopy(a, 0, all, 0, a.length);
-        System.arraycopy(b, 0, all, a.length, b.length);
-        return all;
+    private AfkRoomIsolationPackets(AfkRoomIsolationSource source) {
+        this.source = source;
     }
 
     static void register(Plugin plugin, AfkRoomIsolationSource source) {
-        ProtocolLibrary.getProtocolManager().addPacketListener(new PacketAdapter(
-                plugin, ListenerPriority.HIGHEST, FILTERED) {
-            @Override
-            public void onPacketSending(PacketEvent event) {
-                try {
-                    if (drops(event, source)) {
-                        event.setCancelled(true);
-                    }
-                } catch (Throwable ignored) {
-                    // The isolation filter must never break normal packet flow.
-                }
-            }
-        });
+        PacketEvents.getAPI().getEventManager()
+                .registerListener(new AfkRoomIsolationPackets(source), PacketListenerPriority.HIGHEST);
     }
 
-    private static boolean drops(PacketEvent event, AfkRoomIsolationSource source) {
-        Player receiver = event.getPlayer();
-        if (receiver == null || event.isPlayerTemporary()) {
+    @Override
+    public void onPacketSend(PacketSendEvent event) {
+        try {
+            if (drops(event, source)) {
+                event.setCancelled(true);
+            }
+        } catch (Throwable ignored) {
+            // The isolation filter must never break normal packet flow.
+        }
+    }
+
+    private static boolean drops(PacketSendEvent event, AfkRoomIsolationSource source) {
+        Object receiver = event.getPlayer();
+        if (!(receiver instanceof Player viewer)) {
             return false;
         }
-        UUID viewerId = receiver.getUniqueId();
+        UUID viewerId = viewer.getUniqueId();
         AfkRoomIsolationSource.Room room = source.roomOf(viewerId);
-        if (isBlockPacket(event.getPacketType())) {
+        if (BLOCK_PACKETS.contains(event.getPacketType())) {
             // Only room owners are filtered; everybody else sees the world as usual.
-            return room != null && !blockInsideRoom(event.getPacket(), event.getPacketType(), room);
+            return room != null && !blockInsideRoom(event, room);
         }
-        return entityDropped(event, source, receiver, viewerId, room);
+        return entityDropped(event, source, viewer, viewerId, room);
     }
 
-    private static boolean isBlockPacket(PacketType type) {
-        for (PacketType t : BLOCK_PACKETS) {
-            if (t == type) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static boolean blockInsideRoom(PacketContainer packet, PacketType type,
-                                           AfkRoomIsolationSource.Room room) {
+    private static boolean blockInsideRoom(PacketSendEvent event, AfkRoomIsolationSource.Room room) {
         double cx = room.centerX();
         double cz = room.centerZ();
         int radius = room.floorRadius();
-        if (type == PacketType.Play.Server.MAP_CHUNK || type == PacketType.Play.Server.LIGHT_UPDATE) {
-            // Newer servers keep the position as a ChunkPos, older ones as two plain ints.
-            com.comphenix.protocol.wrappers.ChunkCoordIntPair pair =
-                    packet.getChunkCoordIntPairs().readSafely(0);
-            if (pair != null) {
-                return AfkRoomMath.chunkVisible(cx, cz, radius, pair.getChunkX(), pair.getChunkZ());
-            }
-            Integer chunkX = packet.getIntegers().readSafely(0);
-            Integer chunkZ = packet.getIntegers().readSafely(1);
-            if (chunkX == null || chunkZ == null) {
-                return true;
-            }
-            return AfkRoomMath.chunkVisible(cx, cz, radius, chunkX, chunkZ);
+        PacketType.Play.Server type = event.getPacketType();
+        if (type == PacketType.Play.Server.CHUNK_DATA) {
+            WrapperPlayServerChunkData chunk = new WrapperPlayServerChunkData(event);
+            return AfkRoomMath.chunkVisible(cx, cz, radius, chunk.getChunkX(), chunk.getChunkZ());
         }
         if (type == PacketType.Play.Server.MULTI_BLOCK_CHANGE) {
-            BlockPosition section = packet.getSectionPositions().readSafely(0);
+            Vector3i section = new WrapperPlayServerMultiBlockChange(event).getSectionPosition();
             if (section == null) {
                 return true;
             }
             return AfkRoomMath.sectionVisible(cx, cz, radius, section.getX(), section.getZ());
         }
-        BlockPosition pos = packet.getBlockPositionModifier().readSafely(0);
+        Vector3i pos;
+        if (type == PacketType.Play.Server.BLOCK_CHANGE) {
+            pos = new WrapperPlayServerBlockChange(event).getBlockPosition();
+        } else if (type == PacketType.Play.Server.BLOCK_ENTITY_DATA) {
+            pos = new WrapperPlayServerBlockEntityData(event).getBlockPosition();
+        } else {
+            pos = new WrapperPlayServerBlockBreakAnimation(event).getBlockPosition();
+        }
         if (pos == null) {
             return true;
         }
         return AfkRoomMath.positionInside(cx, cz, radius, pos.getX() + 0.5d, pos.getZ() + 0.5d);
     }
 
-    private static boolean entityDropped(PacketEvent event, AfkRoomIsolationSource source,
-                                         Player receiver, UUID viewerId,
+    private static boolean entityDropped(PacketSendEvent event, AfkRoomIsolationSource source,
+                                         Player viewer, UUID viewerId,
                                          AfkRoomIsolationSource.Room room) {
-        Entity entity;
-        try {
-            entity = event.getPacket().getEntityModifier(event).readSafely(0);
-        } catch (Throwable t) {
-            return false; // field layout unknown -> keep the packet
+        Entity entity = PacketEntityIds.player(viewer, event);
+        if (entity == null) {
+            // Fail-open, like every other unreadable case in this class: a packet whose entity
+            // cannot be resolved might belong to the receiver's own entities (recently spawned
+            // in-room), so dropping it desyncs the room itself.
+            return false;
         }
         if (room == null) {
             // Viewer is not isolated: normal visibility, except other players' rooms hide
@@ -162,14 +151,8 @@ final class AfkRoomIsolationPackets {
             return entity instanceof Player target
                     && source.roomOf(target.getUniqueId()) != null;
         }
-        if (entity == null) {
-            // Fail-open, like every other unreadable case in this class: a packet whose
-            // entity cannot be resolved might belong to the receiver's own entities
-            // (recently spawned in-room), so dropping it desyncs the room itself.
-            return false;
-        }
         // Everything inside the receiver's own room stays visible — what used to look like
-        // "afkc で範囲内のパケットも遮断される" happened when a resolvable-but-inside
+        // 「afkc で範囲内のパケットも遮断される」 happened when a resolvable-but-inside
         // entity was wrongly lumped in with the outside world.
         if (entity instanceof Player target) {
             if (target.getUniqueId().equals(viewerId)) {

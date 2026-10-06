@@ -24,7 +24,7 @@ public final class AfkRoomIsolation {
 
     /** Registers the packet filter when ProtocolLib is present; a silent no-op otherwise. */
     public static boolean register(org.bukkit.plugin.Plugin plugin, AfkRoomIsolationSource source) {
-        if (plugin.getServer().getPluginManager().getPlugin("ProtocolLib") == null) {
+        if (plugin.getServer().getPluginManager().getPlugin("packetevents") == null) {
             plugin.getLogger().info("[AfkRoom] ProtocolLib missing - room isolation falls back to hidePlayer only.");
             return false;
         }

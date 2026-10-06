@@ -20,7 +20,7 @@ public final class DuelHitSoundService {
     /** Registers the sound swap when ProtocolLib is present; a silent no-op otherwise. */
     public static void register(org.bukkit.plugin.Plugin plugin,
                                 com.rumilance.practice.match.MatchRegistry matchRegistry) {
-        if (plugin.getServer().getPluginManager().getPlugin("ProtocolLib") == null) {
+        if (plugin.getServer().getPluginManager().getPlugin("packetevents") == null) {
             return;
         }
         try {

@@ -2,12 +2,10 @@ package com.rumilance.practice.match;
 
 import com.rumilance.practice.session.MatchSession;
 import com.rumilance.practice.settings.SettingsService;
-import com.comphenix.protocol.PacketType;
-import com.comphenix.protocol.ProtocolLibrary;
-import com.comphenix.protocol.ProtocolManager;
-import com.comphenix.protocol.events.PacketContainer;
-import com.comphenix.protocol.wrappers.WrappedDataValue;
-import com.comphenix.protocol.wrappers.WrappedDataWatcher;
+import com.github.retrooper.packetevents.PacketEvents;
+import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
+import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -23,7 +21,7 @@ import java.util.logging.Level;
 /**
  * Team glow without wallhack ESP. Vanilla {@code setGlowing(true)} always outlines through
  * walls; this service keeps the server flag off and only pushes glowing metadata to viewers
- * that currently have line-of-sight (ProtocolLib). Without ProtocolLib, glow is fully off.
+ * that currently have line-of-sight (PacketEvents). Without PacketEvents, glow is fully off.
  *
  * <p>Runs for every match that has RED/BLUE colours (1v1 and party), not only
  * {@link MatchSession#isTeamMatch()}.</p>
@@ -37,7 +35,6 @@ public final class TeamGlowLosService {
     private final MatchRegistry matchRegistry;
     private final SettingsService settingsService;
     private final Map<UUID, Set<UUID>> glowVisible = new ConcurrentHashMap<>();
-    private ProtocolManager protocolManager;
     private BukkitTask tickTask;
     private boolean enabled;
 
@@ -48,19 +45,19 @@ public final class TeamGlowLosService {
     }
 
     public void start() {
-        if (Bukkit.getPluginManager().getPlugin("ProtocolLib") == null) {
-            plugin.getLogger().info("[TeamGlow] ProtocolLib missing - outline glow disabled (anti-ESP).");
+        if (Bukkit.getPluginManager().getPlugin("packetevents") == null) {
+            plugin.getLogger().info("[TeamGlow] PacketEvents missing - outline glow disabled (anti-ESP).");
             enabled = false;
             return;
         }
         try {
-            protocolManager = ProtocolLibrary.getProtocolManager();
+            PacketEvents.getAPI();
             tickTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tickLos, 10L, 4L);
             enabled = true;
-            plugin.getLogger().info("[TeamGlow] LOS-only glow active (ProtocolLib).");
+            plugin.getLogger().info("[TeamGlow] LOS-only glow active (PacketEvents).");
         } catch (Throwable t) {
             enabled = false;
-            plugin.getLogger().log(Level.WARNING, "[TeamGlow] Failed to hook ProtocolLib; glow disabled.", t);
+            plugin.getLogger().log(Level.WARNING, "[TeamGlow] Failed to hook PacketEvents; glow disabled.", t);
         }
     }
 
@@ -193,17 +190,14 @@ public final class TeamGlowLosService {
     }
 
     private void sendGlowFlag(Player viewer, Player target, boolean glow) {
-        if (!enabled || protocolManager == null || viewer == null || target == null || !viewer.isOnline()) {
+        if (!enabled || viewer == null || target == null || !viewer.isOnline()) {
             return;
         }
         try {
-            PacketContainer packet = protocolManager.createPacket(PacketType.Play.Server.ENTITY_METADATA);
-            packet.getIntegers().write(0, target.getEntityId());
             byte flags = entityFlagByte(target, glow);
-            WrappedDataValue flagValue = new WrappedDataValue(
-                    0, WrappedDataWatcher.Registry.get(Byte.class), flags);
-            packet.getDataValueCollectionModifier().write(0, List.of(flagValue));
-            protocolManager.sendServerPacket(viewer, packet);
+            EntityData flagValue = new EntityData(0, EntityDataTypes.BYTE, flags);
+            PacketEvents.getAPI().getPlayerManager().sendPacket(viewer,
+                    new WrapperPlayServerEntityMetadata(target.getEntityId(), List.of(flagValue)));
         } catch (Throwable t) {
             plugin.getLogger().log(Level.FINE, "[TeamGlow] send failed", t);
         }

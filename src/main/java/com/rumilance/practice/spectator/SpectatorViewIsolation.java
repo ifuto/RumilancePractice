@@ -37,7 +37,7 @@ public final class SpectatorViewIsolation {
 
     /** Registers the packet filter + retrack hooks when ProtocolLib is present. */
     public static void register(Plugin plugin, SpectatorService service) {
-        if (plugin.getServer().getPluginManager().getPlugin("ProtocolLib") == null) {
+        if (plugin.getServer().getPluginManager().getPlugin("packetevents") == null) {
             plugin.getLogger().info(
                     "[Spectator] ProtocolLib missing - spectator-vs-spectator entity blocking is off.");
             return;
