@@ -702,7 +702,7 @@
 
 ---
 
-# PacketEvents への移行（2026-10-06, v1.92.89〜v1.92.94）
+# PacketEvents への移行（2026-10-06, v1.92.89〜v1.92.95）— 完了
 
 指示: 「ProtocolLib に依存している実装があったら、すべて PacketEvents ベースに。」
 
@@ -711,7 +711,7 @@
 ```
 maven { name = "codemc-releases"; url = uri("https://repo.codemc.io/repository/maven-releases/") }
 compileOnly("com.github.retrooper:packetevents-spigot:2.14.0")
-compileOnly("net.dmulloy2:ProtocolLib:5.4.0")   // 過渡的（残り2本）
+// ProtocolLib は v1.92.95 で完全に削除済み。ソース・依存・plugin.yml から一扫。
 ```
 
 ## 状況
@@ -724,8 +724,12 @@ compileOnly("net.dmulloy2:ProtocolLib:5.4.0")   // 過渡的（残り2本）
 | `sight/FfaChunkMaskService` | ✅ v1.92.90（キャッシュは座標保持→`World#refreshChunk`で再送） |
 | `spectator/SpectatorViewIsolationPackets` | ✅ v1.92.90 |
 | `practice/afk/AfkRoomIsolationPackets` | ✅ v1.92.90 |
-| `replay/ReplayNpcService` | ⏳ 未（NPC: GameProfile / PlayerInfo / spawn / NBT） |
-| `security/sign/SignProbeService` | ⏳ 未（NBT / BlockData / sign パケット） |
+| `replay/ReplayNpcService` | ✅ v1.92.95 |
+| `security/sign/SignProbeService` | ✅ v1.92.95 |
+
+**v1.92.95 / CI 37456129041 = success**。`src/main/java` から `com.comphenix.protocol` は 0 件。
+`plugin.yml` の softdepend も `ProtocolLib` → `PacketEvents`。全判定は小文字の
+`"packetevents"` プラグイン id を見る（大文字だと Bukkit は見つけない）。
 
 新規ヘルパ: `packets/PacketEntityIds` — パケット種別→エンティティ id→Bukkit Player。
 （`event.getPlayer()` は Object、`getPacketType()` は `PacketTypeCommon` を返す点に注意。）
@@ -746,6 +750,20 @@ compileOnly("net.dmulloy2:ProtocolLib:5.4.0")   // 過渡的（残り2本）
 | `WrappedGameProfile` / `PlayerInfoData` | PE の `UserProfile` / `WrapperPlayServerPlayerInfoUpdate` |
 | `BuiltinSound`（存在しない） | **`Sounds`**（複数形。`protocol.sound.Sounds`） |
 | `packet.getIntegers().read(0/1)`（chunk） | `WrapperPlayServerChunkData#getColumn().getX()/getZ()` |
+| `WrappedBlockData.createData(BlockData)` | `SpigotConversionUtil.fromBukkitBlockData(BlockData)` |
+| Bukkit `Location` | `SpigotConversionUtil.fromBukkitLocation(Location)` |
+| `NbtFactory.ofCompound` / `ofList` | `new NBTCompound()` / `new NBTList<>(NBTType.STRING, List.of(...))` |
+| `nbt.put("k", value)` | **`compound.setTag(key, tag)`**（`setString/setInt/setByte` は無い） |
+| `ENTITY_DESTROY` | `WrapperPlayServerDestroyEntities(int...)` |
+| `ENTITY_TELEPORT` | `WrapperPlayServerEntityTeleport(int, Location, boolean)` |
+| `ENTITY_HEAD_ROTATION` | `WrapperPlayServerEntityHeadLook(int, float)` |
+| `PLAYER_INFO`(add/remove) | `WrapperPlayServerPlayerInfoUpdate(Action.ADD_PLAYER, List<PlayerInfo>)` / `WrapperPlayServerPlayerInfoRemove(UUID...)` |
+
+**パッケージの罠**: `protocol.nbt.*`、`protocol.sound.Sounds`、
+`protocol.world.blockentity.BlockEntityTypes` は `com.github.retrooper.packetevents.*` だが、
+**`SpigotConversionUtil` だけ `io.github.retrooper.packetevents.util`**（spigot モジュール）。
+javadocs は API モジュールしか載っていないので、spigot 側は `gh api
+repos/retrooper/packetevents/contents/<path>` でソースを引いて確認する。
 
 ## はまった点（次ターン用メモ）
 
@@ -755,6 +773,9 @@ compileOnly("net.dmulloy2:ProtocolLib:5.4.0")   // 過渡的（残り2本）
 - `WrapperPlayServerAttachEntity` に `getEntityId()` は無い → ATTACH_ENTITY は除外。
 - AFK のブロック系は検証済みの `CHUNK_DATA` + `BLOCK_CHANGE` のみに絞った
   （`MULTI_BLOCK_CHANGE` の `getSectionPosition()` は API に無い）。
+- `NBTCompound` に `setString`/`setInt`/`setByte` は無い。`setTag(key, new NBTString(...))` 等を使う。
+- import 置換を `s.index("import com.comphenix...")` 〜 `s.index("import java.util.List;")` で
+  切ると Bukkit 側の import まで消える。**置換後は必ずコンパイルエラー行を確認する**。
 - ローカルに JDK が無く Maven にも到達不可（api.github.com のみ）なので、
   **javadoc を fetch して署名を確認してから書く**こと。推測で書くと CI 1往復2分を消費する。
 

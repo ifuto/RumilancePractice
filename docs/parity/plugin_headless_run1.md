@@ -88,7 +88,7 @@ BOT の上に乗ってしまい、密着状態が固定されてアンカー経�
 
 ## 補足: プラグイン側の前提が揃った経緯(v1.76.8 → 1.76.10)
 
-- 素の Paper ではソフト依存(FAWE / ProtocolLib / LuckPerms)の API 型をクラスロードした
+- 素の Paper ではソフト依存(FAWE / PacketEvents / LuckPerms)の API 型をクラスロードした
   時点で有効化に失敗していた(`NoClassDefFoundError` @ `FeatureBootstrap:379` /
   `RumilancePractice.enableInternal:110`)。v1.76.8/1.76.9 で呼び出し側にガードを入れ、
   素の Paper でも `NARENA has been enabled` まで到達。

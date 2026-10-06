@@ -88,7 +88,7 @@
 | サーバー | Paper `1.21.11-R0.1-SNAPSHOT`（Mojang マッピング = NMS 直接利用可） |
 | ビルド | Gradle 9.6.1 + **Shadow 9.6.0** + **paperweight userdev 2.0.0-beta.23** |
 | 依存（shade） | HikariCP 7.1.0 / sqlite-jdbc 3.53 / mariadb-java-client 3.5（ relocate 済み） |
-| 依存（compileOnly） | Paper API / WorldEdit 7.3 / ProtocolLib 5.4 / LuckPerms API 5.4 |
+| 依存（compileOnly） | Paper API / WorldEdit 7.3 / PacketEvents 2.14 / LuckPerms API 5.4 |
 | テスト | JUnit 6.1.2（Jupiter）+ 独自 `reportTestFailures` タスク |
 | 永続化 | SQLite（既定）/ MariaDB 切り替え可、`SchemaMigrator` による世代管理 |
 | クライアント Mod | `kb-probe/` — Fabric + fabric-loom 1.14.7（**専用 Gradle 8.13 wrapper**） |
