@@ -11,6 +11,7 @@ import com.github.retrooper.packetevents.protocol.nbt.NBTList;
 import com.github.retrooper.packetevents.protocol.nbt.NBTString;
 import com.github.retrooper.packetevents.protocol.nbt.NBTType;
 import com.github.retrooper.packetevents.protocol.packettype.PacketType;
+import com.github.retrooper.packetevents.protocol.world.blockentity.BlockEntityTypes;
 import io.github.retrooper.packetevents.util.SpigotConversionUtil;
 import com.github.retrooper.packetevents.util.Vector3i;
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientUpdateSign;
@@ -83,8 +84,6 @@ public final class SignProbeService implements PacketListener {
     private final Logger logger;
 
     private final Map<UUID, PendingProbe> pending = new ConcurrentHashMap<>();
-    /** Registry id of the sign block-entity, or -1 when it cannot be resolved. */
-    private int signBlockEntityType = -1;
     private boolean available;
 
     public SignProbeService(Plugin plugin, ConfigService configService, BanService banService,
@@ -104,7 +103,6 @@ public final class SignProbeService implements PacketListener {
             return;
         }
         try {
-            resolveSignBlockEntityType();
             PacketEvents.getAPI().getEventManager()
                     .registerListener(this, PacketListenerPriority.NORMAL);
             available = true;
@@ -337,8 +335,8 @@ public final class SignProbeService implements PacketListener {
         return new WrapperPlayServerOpenSignEditor(pos, true);
     }
 
-    private WrapperPlayServerBlockEntityData tileEntityData(Vector3i pos, String[] messages) {
-        return new WrapperPlayServerBlockEntityData(pos, signBlockEntityType, buildSignNbt(pos, messages));
+    private static WrapperPlayServerBlockEntityData tileEntityData(Vector3i pos, String[] messages) {
+        return new WrapperPlayServerBlockEntityData(pos, BlockEntityTypes.SIGN, buildSignNbt(pos, messages));
     }
 
     private static NBTCompound buildSignNbt(Vector3i pos, String[] messages) {
@@ -376,16 +374,4 @@ public final class SignProbeService implements PacketListener {
         }
     }
 
-    private void resolveSignBlockEntityType() {
-        try {
-            signBlockEntityType = com.github.retrooper.packetevents.protocol.world.BlockEntityTypes.SIGN
-                    .getId();
-        } catch (Throwable t) {
-            signBlockEntityType = -1;
-        }
-        if (signBlockEntityType < 0) {
-            logger.warning("[SignProbe] Could not resolve the SIGN block-entity type; probes may be "
-                    + "ignored by clients.");
-        }
-    }
 }
