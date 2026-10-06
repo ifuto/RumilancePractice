@@ -43,6 +43,11 @@ repositories {
         name = "sonatype-oss-snapshots"
         url = uri("https://oss.sonatype.org/content/repositories/snapshots/")
     }
+    // PacketEvents - the packet layer this plugin is written against (see PacketEventsCompat).
+    maven {
+        name = "codemc-releases"
+        url = uri("https://repo.codemc.io/repository/maven-releases/")
+    }
 }
 
 val hikariVersion = "7.1.0"
@@ -65,9 +70,14 @@ dependencies {
         isTransitive = true
     }
 
-    // ProtocolLib soft-dependency - powers the active sign-probe mod detector (MC-265322).
-    // Compile against the stable API; the server must run a build that supports the target MC
-    // version (1.21.11 support ships in ProtocolLib dev builds).
+    // PacketEvents is the packet layer of this server (the production box runs it alongside
+    // this plugin) and is what new packet work is written against — see
+    // com.rumilance.practice.combat.LethalPresentationService.
+    compileOnly("com.github.retrooper:packetevents-spigot:2.14.0")
+
+    // TRANSITIONAL: still compiled by the legacy packet sites (replay NPCs, sign probe, AFK
+    // room isolation, FFA chunk mask, team LOS glow, spectator isolation, duel hit sound).
+    // They move to PacketEvents next; removing this line before they are ported breaks the jar.
     compileOnly("net.dmulloy2:ProtocolLib:5.4.0")
 
     // LuckPerms soft-dependency - GSit permission bridge (strip GSit.*, grant GSit.SitClick on

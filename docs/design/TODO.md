@@ -645,3 +645,57 @@
   `icons.font: "rumilance:icons"` への切り替えは旧 zip でも動く。
 - `default.json` / `uniform.json` の削除は潜在的な危険の除去だが、
   ユーザー環境で「全フォントが壊れた」事実は無い（今回の □ の原因ではない）。
+
+---
+
+# 2026-10-06 一括対応（v1.92.83 – v1.92.88）
+
+## 26. 観戦中に /hub すると FFA 退出メッセージが出る — v1.92.83
+
+- **真の原因は lang のインデント崩れ**。`ffa-bot:` 見出しが `ffa:` ブロックの**途中に挿入**され、
+  FFA のメッセージ **12個**が全部 `ffa-bot.*` に吸い込まれていた（全7ロケール同一）。
+  - 影響: `ffa.left` `ffa.joined` `ffa.kills-bar` `ffa.kill-streak` `ffa.killed-by`
+    `ffa.lff-on/off` `ffa.lff-disabled` `ffa.teleport-failed` `ffa.leave-hint`
+    `ffa.repairing-title` `ffa.combat-bar` — **存在しないキー**だった。
+  - `ffa:` は `maintenance/unavailable/cannot-join/kit-missing/arena-full/no-arenas` の6個だけ。
+  - 全ロケールで `ffa`=18キー / `ffa-bot`=4キー に再構成。
+- `LobbyCommand` の `SPECTATING` 分岐は `ffa.left` → `lobby.teleported` に変更。
+  観戦者は FFA に居ないので「FFAから退出しました」は事実誤り。
+
+## 27. ロビーでエリトラ・革靴が配布されない — v1.92.84
+
+`LobbyWearService` の2つの欠陥。
+
+1. **`isInLobby` が `Cuboid.contains()`（Y軸まで厳密）で判定していた。**
+   Region の設定高さと実際に立つ高さが少しでもズレると（段上・ジャンプ中・滑空中）即 `strip()` 側に落ち、
+   革靴/エリトラが消え続ける。Region の本来の目的（遠くの AFK 部屋・練習場を除外）は**水平方向**で十分。
+   → `containsHorizontal()` に変更。
+2. **Region がロビースポーンを水平方向に含まない＝設定が古い**場合はワールド判定にフォールバック + 警告を1回だけ出す。
+3. `tick()` の `catch (Throwable t) {}` が**空**で、何も記録されなかった。
+   → プレイヤーごと30秒レート制限で WARNING 出力。
+4. ついでに `LobbyService.reload()` が `region` をクリアしていなかったのを修正。
+
+## 28. `/player` — v1.92.85
+
+- 新規 `command/PlayerListCommand.java`。**`CommandSender` ベース**なので Console から実行可。
+- 表示: 名前・状態・ping・ワールド。`RealPlayers.online()` で Bot を除外。
+- `plugin.yml` に `player:` コマンド + `rumilance.player.list`（既定 op。Console は常に可）。
+- lang に `player-list.header/line/empty` を7ロケール追加。
+
+## 29. End inventory を開く名前にホバー説明 — v1.92.86
+
+- "End inventory" という文字列は `killfeed.view-inventory-hover` にしか無く、
+  キルフィードの名前ホバーは**既に実装済み**だった。
+- もう一つの「名前をクリックして終了インベントリを開く」箇所＝
+  `MatchInventoryGui` の切替矢印（`→ <name>`）。ロアが「選手を切替」だけで
+  何が開くか書いてなかったので、`gui.inv-view-hint`（クリックで <name> の終了インベントリを表示）を追加（7ロケール）。
+
+## 30. 死亡時の挙動変更 — v1.92.87 / v1.92.88
+
+- 新規 `combat/LethalPresentationService.java`。A が B を倒したら **A にだけ**：
+  1. ProtocolLib で `ENTITY_STATUS`(byte 3) の**偽の死亡パケット**を B の entity id で送信 → A の画面で B が倒れる。
+  2. 20 tick 後に `killer.hideEntity(plugin, victim)` → A に B のパケットが一切届かなくなる。
+- **B 側は完全に不変**（装備クリア・無敵・以降の挙動すべて据え置き）。
+- ProtocolLib が無い場合は 2. だけ動く（縮退）。
+- 隠し状態の**解除漏れを防止**: `endMatch` で `restoreAll(participants)`、
+  `PlayerJoinEvent` / `PlayerQuitEvent` でも解除（放置するとロビーで相手が見えなくなる）。
