@@ -318,7 +318,70 @@
 **リセットのみ（仕様上これでよい）**: 対象プレイヤーのレイアウト全削除 / 全員分リセット。
 まとめて消す安全弁なので、編集対象にはしない。
 
+## LFF アイテムのスロット衝突（v1.92.73）
+
+- 症状: LFF トグル（9番目 = index 8）が、編集後のキットで同じ位置に置いたアイテムを
+  **無条件で上書きして消していた**。`FfaLookingForFight` の `setLooking` / `refresh` が
+  どちらも `inventory.setItem(SLOT, item(...))` を直接呼んでいたため。
+- 修正: `placeToggle()` を挟む。9番目に LFF アイテム**以外**のアイテムがあれば、
+  先に空き枠へ退避してから置く。
+  - 退避先は **ホットバー 0〜7 を優先**、埋まっていればストレージ 9〜35。
+    9番目（index 8）自体は退避先にしない。
+  - 空き枠が1つもなければ**破棄**（LFF が枠を取る）。
+  - 9番目にあるのが LFF アイテム本身なら退避しない（毎回の refresh で動かないように）。
+- `firstFreeSlot(boolean[])` は Bukkit を触らない純粋関数に分離。
+  `ItemStack` はテストで生成できないため「埋まっているか」の配列を受け取る。
+  単体テスト `FfaLffSlotRelocationTest` で優先順位を固定。
+
+## リソースパックのバグ — 判明した原因（v1.92.74）
+
+**根本原因: `assets/minecraft/font/default.json` と `uniform.json` を同梱していた。**
+
+- `minecraft:default` / `minecraft:uniform` / `minecraft:alt` は**予約済み id**。
+  これをリソースパックが置くと、バニラフォントに**追加**されるのではなく
+  **丸ごと置換**される。
+- 同梱していた2ファイルは U+E001〜E004 のビットマップ4件しか定義していなかったため、
+  バニラの全グリフ（英数字・記号・スペース）の定義が消え、
+  **サーバー内の全テキストが表示されなくなる**状態だった。
+  → config.yml の「the resource pack merges the glyph providers into minecraft:default」
+    というコメントは誤りだった。マージは「パック間」であって「バニラとは」ではない。
+- 修正:
+  - `resourcepack/assets/minecraft/font/{default,uniform}.json` を**削除**
+    （`assets/minecraft/` 自体がなくなった＝バニラを一切上書きしない）。
+  - グリフは自前名前空間 `rumilance:icons`（`assets/rumilance/font/icons.json`）のみに登録。
+    カスタム名前空間は**加算**なのでバニラを壊さない。
+  - `config.yml` の `icons.font` を `"default"` → `"rumilance:icons"` に変更。
+  - `IconFontService.font()` の既定値も `"rumilance:icons"` に。
+    バッジは**必ず font 属性を付けて送る**（グリフは icons にしか無いため）。
+  - `ConfigService` のマイグレーションを逆方向に
+    （`"default"` → `"rumilance:icons"`。「予約 id を上書きしない」ため）。
+- 検証: `tools/release/build-pack.sh` が通過。差分は
+  `assets/minecraft/font/default.json` / `uniform.json` の削除のみ（9 → 7 エントリ）。
+  `dist/RumilanceResourcePack.zip` と `.sha1` を再生成してコミット済み。
+  **再配布が必要**（`tools/release/attach-pack.sh <tag>`）。
+- テクスチャは正常（admin 27x8 / vip 16x8 / vip_plus 20x8 / pro 16x8、すべて1グリフ8px）。
+  pack.png 512x512、pack.mcmeta は pack_format=75 / min=[34,0] / max=[100,0] で妥当。
+- `/rankicon test` の Probe C の説明も修正（デフォルトフォントでは**何も出ない**のが正解。
+  出るなら別パックが minecraft:default を上書きしている＝全テキスト消失のサイン）。
+
+## port 1010 に入れない件
+
+- 1010 は Minecraft のポートではなく **Shield Web**（プラグイン内蔵 HTTP サーバー）のポート。
+- **既定値が `shield-web.enabled: false`**。だから何も待ち受けていない。
+  config.yml の `shield-web.enabled` を `true` にして再起動すれば繋がる。
+- `bind` は既定 `"0.0.0.0"` なので、有効化すれば LAN の `192.168.0.203:1010` も通る。
+  管理画面 URL は起動ログに出る: `http://<bind>:1010/admin?token=<64hex>`。
+- 繋がらないときの分岐: ログに `[ShieldWeb] 盾管理Webを開始しました` が出ていない
+  → enabled が false。出ているのに繋がらない → ファイアウォール / 別セグメント。
+
 ## 残り（次にやること）
+
+- [ ] リソースパック再配布: `tools/release/build-pack.sh` → `attach-pack.sh <tag>`。
+      配布しないとクライアントは旧 zip のまま。
+- [ ] まだ検証していない項目（ユーザーのチェックリスト残り）:
+      フォント描画そのものの目視確認、`/rankicon test` の Probe A/B の結果確認、
+      パック適用確認（`ResourcePackService#hasPack`）のバグ有無。
+
 
 - [x] 19 続き. **キット配置（layout）の編集**（v1.92.72）
 - [x] 19 続き. **Original kit のスロット個別操作**（v1.92.70/71）
