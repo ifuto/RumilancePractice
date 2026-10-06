@@ -87,9 +87,9 @@ public final class FfaChunkMaskService implements Listener, PacketListener {
         int chunkX;
         int chunkZ;
         try {
-            WrapperPlayServerChunkData chunk = new WrapperPlayServerChunkData(event);
-            chunkX = chunk.getChunkX();
-            chunkZ = chunk.getChunkZ();
+            var column = new WrapperPlayServerChunkData(event).getColumn();
+            chunkX = column.getX();
+            chunkZ = column.getZ();
         } catch (Throwable t) {
             return; // Never break the chunk pipeline over a read failure.
         }

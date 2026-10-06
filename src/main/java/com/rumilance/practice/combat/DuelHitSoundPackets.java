@@ -5,7 +5,7 @@ import com.github.retrooper.packetevents.event.PacketListener;
 import com.github.retrooper.packetevents.event.PacketListenerPriority;
 import com.github.retrooper.packetevents.event.PacketSendEvent;
 import com.github.retrooper.packetevents.protocol.packettype.PacketType;
-import com.github.retrooper.packetevents.protocol.sound.BuiltinSound;
+import com.github.retrooper.packetevents.protocol.sound.Sounds;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSoundEffect;
 import com.rumilance.practice.session.MatchSession;
 import com.rumilance.practice.state.MatchState;
@@ -48,7 +48,7 @@ final class DuelHitSoundPackets implements PacketListener {
         } catch (Throwable t) {
             return; // Never break sound playback because of the interceptor.
         }
-        if (sound.getSound() != BuiltinSound.ENTITY_PLAYER_ATTACK_NODAMAGE) {
+        if (sound.getSound() != Sounds.ENTITY_PLAYER_ATTACK_NODAMAGE) {
             return;
         }
         MatchSession session = matchRegistry.byPlayer(target.getUniqueId()).orElse(null);
@@ -56,6 +56,6 @@ final class DuelHitSoundPackets implements PacketListener {
                 || session.participants().size() != 2) {
             return;
         }
-        sound.setSound(BuiltinSound.ENTITY_PLAYER_ATTACK_STRONG);
+        sound.setSound(Sounds.ENTITY_PLAYER_ATTACK_STRONG);
     }
 }

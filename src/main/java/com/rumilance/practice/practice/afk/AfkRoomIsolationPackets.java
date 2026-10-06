@@ -5,7 +5,7 @@ import com.github.retrooper.packetevents.event.PacketListener;
 import com.github.retrooper.packetevents.event.PacketListenerPriority;
 import com.github.retrooper.packetevents.event.PacketSendEvent;
 import com.github.retrooper.packetevents.protocol.packettype.PacketType;
-import com.github.retrooper.packetevents.util.Vector3i;
+import com.github.retrooper.packetevents.protocol.packettype.PacketTypeCommon;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerBlockBreakAnimation;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerBlockChange;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerBlockEntityData;
@@ -43,7 +43,7 @@ import java.util.UUID;
 final class AfkRoomIsolationPackets implements PacketListener {
 
     /** Chunk / block packets: filtered by position. */
-    private static final Set<PacketType.Play.Server> BLOCK_PACKETS = Set.of(
+    private static final Set<PacketTypeCommon> BLOCK_PACKETS = Set.<PacketTypeCommon>of(
             PacketType.Play.Server.CHUNK_DATA,
             PacketType.Play.Server.BLOCK_CHANGE,
             PacketType.Play.Server.MULTI_BLOCK_CHANGE,
@@ -51,7 +51,7 @@ final class AfkRoomIsolationPackets implements PacketListener {
             PacketType.Play.Server.BLOCK_BREAK_ANIMATION);
 
     /** Entity packets: filtered by the entity's position (players are always dropped). */
-    private static final Set<PacketType.Play.Server> ENTITY_PACKETS = Set.of(
+    private static final Set<PacketTypeCommon> ENTITY_PACKETS = Set.<PacketTypeCommon>of(
             PacketType.Play.Server.SPAWN_ENTITY,
             PacketType.Play.Server.ENTITY_ANIMATION,
             PacketType.Play.Server.ATTACH_ENTITY,
@@ -109,30 +109,32 @@ final class AfkRoomIsolationPackets implements PacketListener {
         double cx = room.centerX();
         double cz = room.centerZ();
         int radius = room.floorRadius();
-        PacketType.Play.Server type = event.getPacketType();
+        PacketTypeCommon type = event.getPacketType();
         if (type == PacketType.Play.Server.CHUNK_DATA) {
-            WrapperPlayServerChunkData chunk = new WrapperPlayServerChunkData(event);
-            return AfkRoomMath.chunkVisible(cx, cz, radius, chunk.getChunkX(), chunk.getChunkZ());
+            var column = new WrapperPlayServerChunkData(event).getColumn();
+            return AfkRoomMath.chunkVisible(cx, cz, radius, column.getX(), column.getZ());
         }
         if (type == PacketType.Play.Server.MULTI_BLOCK_CHANGE) {
-            Vector3i section = new WrapperPlayServerMultiBlockChange(event).getSectionPosition();
+            var section = new WrapperPlayServerMultiBlockChange(event).getSectionPosition();
             if (section == null) {
                 return true;
             }
             return AfkRoomMath.sectionVisible(cx, cz, radius, section.getX(), section.getZ());
         }
-        Vector3i pos;
-        if (type == PacketType.Play.Server.BLOCK_CHANGE) {
-            pos = new WrapperPlayServerBlockChange(event).getBlockPosition();
-        } else if (type == PacketType.Play.Server.BLOCK_ENTITY_DATA) {
-            pos = new WrapperPlayServerBlockEntityData(event).getBlockPosition();
-        } else {
-            pos = new WrapperPlayServerBlockBreakAnimation(event).getBlockPosition();
-        }
+        int[] pos = blockPosition(event, type);
         if (pos == null) {
             return true;
         }
-        return AfkRoomMath.positionInside(cx, cz, radius, pos.getX() + 0.5d, pos.getZ() + 0.5d);
+        return AfkRoomMath.positionInside(cx, cz, radius, pos[0] + 0.5d, pos[1] + 0.5d);
+    }
+
+    private static int[] blockPosition(PacketSendEvent event, PacketTypeCommon type) {
+        var pos = type == PacketType.Play.Server.BLOCK_CHANGE
+                ? new WrapperPlayServerBlockChange(event).getBlockPosition()
+                : type == PacketType.Play.Server.BLOCK_ENTITY_DATA
+                ? new WrapperPlayServerBlockEntityData(event).getBlockPosition()
+                : new WrapperPlayServerBlockBreakAnimation(event).getBlockPosition();
+        return pos == null ? null : new int[]{pos.getX(), pos.getZ()};
     }
 
     private static boolean entityDropped(PacketSendEvent event, AfkRoomIsolationSource source,
