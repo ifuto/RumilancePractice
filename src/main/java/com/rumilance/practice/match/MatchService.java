@@ -95,7 +95,6 @@ public final class MatchService {
     private final int maxDurationSeconds;
     private final Map<UUID, BukkitTask> tasks = new ConcurrentHashMap<>();
     private volatile boolean shuttingDown;
-    private volatile boolean shuttingDown;
     /**
      * Kill presentation: shows a real death to the killer only (forged packet, then the victim
      * stops being sent to them). Null until the bootstrap wires it.
