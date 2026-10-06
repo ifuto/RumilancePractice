@@ -100,6 +100,8 @@ public final class MatchService {
      * stops being sent to them). Null until the bootstrap wires it.
      */
     private volatile com.rumilance.practice.combat.LethalPresentationService lethalPresentation;
+    /** Null-safe: without it a killed fighter simply stays on the ground. */
+    private volatile MatchFlightService matchFlight;
     /**
      * In-memory tally of consecutive pre-match-countdown leaves per player. Incremented when a
      * player runs {@code /leave} during the countdown, reset to 0 the moment one of their matches
@@ -474,6 +476,11 @@ public final class MatchService {
     public void setLethalPresentation(
             com.rumilance.practice.combat.LethalPresentationService lethalPresentation) {
         this.lethalPresentation = lethalPresentation;
+    }
+
+    /** Wires the post-death flight grant. Null-safe. */
+    public void setMatchFlight(MatchFlightService matchFlight) {
+        this.matchFlight = matchFlight;
     }
 
     public com.rumilance.practice.ffa.FfaService ffaService() {
@@ -1550,6 +1557,11 @@ public final class MatchService {
 
     private void beginCountdown(MatchSession session) {
         session.setState(MatchState.COUNTDOWN);
+        // 毎試合の開始時に飛行権限を確認する: 前の試合で付与した分が何らかの理由で残っていても、
+        // ここで確実に剥がれる(観戦やリプレイが別に与えた分は MatchFlightService が区別する)。
+        if (matchFlight != null) {
+            matchFlight.revokeAll(session.participants());
+        }
         if (!transitionAll(session, PlayerState.COUNTDOWN)) {
             failMatch(session, "Could not start countdown");
             return;
@@ -2013,6 +2025,10 @@ public final class MatchService {
             if (killer != null) {
                 lethalPresentation.stageKill(killer, victim);
             }
+        }
+        // 倒された側はその場で浮かせる: ENDING 中に立ち尽くす(あるいは奈落に落ち続ける)のを防ぐ。
+        if (victim != null && matchFlight != null) {
+            matchFlight.grantOnDeath(victim);
         }
 
         if (session.isTeamMatch()) {
@@ -2537,6 +2553,9 @@ public final class MatchService {
         // loser from their killer, and that has to be lifted before the next round / the lobby.
         if (lethalPresentation != null) {
             lethalPresentation.restoreAll(session.participants());
+        }
+        if (matchFlight != null) {
+            matchFlight.revokeAll(session.participants());
         }
         for (UUID id : session.participants()) {
             try {

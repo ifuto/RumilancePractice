@@ -813,6 +813,13 @@ public final class FeatureBootstrap {
                 new com.rumilance.practice.combat.LethalPresentationService(plugin);
         plugin.getServer().getPluginManager().registerEvents(lethalPresentation, plugin);
         matchService.setLethalPresentation(lethalPresentation);
+        // How a kill feels to the loser: they are lifted into the air instead of standing (or
+        // falling) around during the ENDING window. The grant is tracked so match start, match
+        // end and /hub can all take it back.
+        com.rumilance.practice.match.MatchFlightService matchFlight =
+                new com.rumilance.practice.match.MatchFlightService();
+        plugin.getServer().getPluginManager().registerEvents(matchFlight, plugin);
+        matchService.setMatchFlight(matchFlight);
         if (practiceService != null) {
             matchService.setPracticeService(practiceService);
         }

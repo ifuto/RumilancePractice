@@ -67,13 +67,11 @@ public final class CountdownMarkers implements Listener {
     private static final long READY_NOTICE_TICKS = 10L;
 
     /**
-     * Fallback palette, identical to the {@code countdown.*} lang values: brand-cyan/slate
-     * panels, success green for Ready, danger red for Leave, amber for the opponent's name.
+     * Fallback palette, identical to the {@code countdown.*} lang values: success green for
+     * Ready, slate for the filler words, amber for the opponent's name.
      */
     private static final TextColor READY = TextColor.color(0x4ADE80);
-    private static final TextColor LEAVE = TextColor.color(0xF87171);
     private static final TextColor MUTED = TextColor.color(0x94A3B8);
-    private static final TextColor SEPARATOR = TextColor.color(0x334155);
     private static final TextColor NAME = TextColor.color(0xFBBF24);
 
     private enum Kind {
@@ -293,22 +291,6 @@ public final class CountdownMarkers implements Listener {
         }
     }
 
-    /**
-     * How many DISTINCT fighters of this set have actually pressed Ready (0..2), read
-     * straight from the ready set. Previously the gaze line counted only the opponent via a
-     * "first marker not owned by me" guess, which could read 0/2 even after the opponent
-     * readied.
-     */
-    private static int readyTotal(MarkerSet set) {
-        List<UUID> counted = new ArrayList<>();
-        for (Marker marker : set.markers) {
-            if (!counted.contains(marker.owner) && set.ready.contains(marker.owner)) {
-                counted.add(marker.owner);
-            }
-        }
-        return counted.size();
-    }
-
     private static List<UUID> readyOwners(MarkerSet set) {
         List<UUID> owners = new ArrayList<>();
         for (Marker marker : set.markers) {
@@ -333,14 +315,8 @@ public final class CountdownMarkers implements Listener {
                 }
             }
         }
-        if (gazed != null) {
-            // The Ready emerald already glows lime while it is being looked at, so it needs no
-            // action bar hint - only the Leave block spells its action out.
-            if (gazed.kind != Kind.READY) {
-                player.sendActionBar(leaveLine(player, readyTotal(set)));
-            }
-            return;
-        }
+        // Where the player is looking must not touch the action bar at all: hovering the Ready
+        // emerald used to swap the line (and, later, blank it), which read as flicker.
         if (showReadyNotice) {
             UUID opponent = opponentOf(player.getUniqueId(), set);
             if (opponent != null && set.ready.contains(opponent) && !set.ready.contains(player.getUniqueId())) {
@@ -350,23 +326,6 @@ public final class CountdownMarkers implements Listener {
                 }
             }
         }
-    }
-
-    /**
-     * The line shown while looking at the Leave block: how many fighters are Ready, then the
-     * action of the block. The leading number turns green once it is 1.
-     */
-    private Component leaveLine(Player player, int readyCount) {
-        String number = (readyCount > 0 ? "<color:#4ADE80>" : "<color:#94A3B8>") + readyCount + "</color>";
-        // 数値は「色付きマークアップ」を値にしているので unparsed だとそのまま表示される。
-        Component rendered = render(player, "countdown.gaze-leave", MessageService.tagsParsed("n", number));
-        if (rendered != null) {
-            return rendered;
-        }
-        return Component.text(String.valueOf(readyCount), readyCount > 0 ? READY : MUTED)
-                .append(Component.text("/2 ", MUTED))
-                .append(Component.text("· ", SEPARATOR))
-                .append(Component.text("Leave ☓", LEAVE).decorate(TextDecoration.BOLD));
     }
 
     /** The line shown when the opponent pressed Ready and this player is not looking anywhere. */

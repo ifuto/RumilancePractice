@@ -1648,7 +1648,6 @@ afkcrystal:
   settings-delay: "<gold>[AFK BOT Crystal]</gold> <green>Délai de retour du bouclier réglé sur <seconds>s.</green>"
 
 countdown:
-  gaze-leave: "<n><color:#94A3B8>/2</color> <color:#334155>·</color> <color:#F87171><bold>Leave</bold></color> <color:#F87171>☓</color>"
   opponent-ready: "<color:#FBBF24><name></color> <color:#94A3B8>is</color> <color:#4ADE80><bold>Ready</bold></color> <color:#4ADE80>✓</color>"
 
 friend:
