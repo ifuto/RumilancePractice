@@ -262,7 +262,37 @@
 | Statistics | `AdminStatsGui` |
 | Server Settings | `AdminToggleGui` |
 
+## 19. Player データ画面の編集 — 実装メモ（v1.92.68〜）
+
+「リセットするだけじゃなくて値や配置をいじったり」への対応。既存で**編集できていた**ものと、
+**今回編集できるようにした**もの:
+
+| 項目 | 従来 | 現在 |
+|---|---|---|
+| Rank | 左右で上下（shift で逆） | 同じ（既存で編集可） |
+| Settings | sounds / scoreboard / locale | 同じ（既存で編集可） |
+| Ranked stats (W/L) | `openWlEditor` で数値編集 | 同じ（既存で編集可） |
+| **Name color** | **クリアのみ** | **単色8種 / グラデ4種を設定できる** |
+| Party | （なし） | **強制解散**（v1.92.64） |
+
+### Name color の編集
+
+- `AdminPlayerDataGui` にパレット定数 `NAME_SOLIDS` / `NAME_GRADIENTS` を追加。
+- 左クリック = 次の単色、右クリック = 次のグラデ、shift = クリア。
+- `nameColorService.save(target, next.withChangedAt(now))` し、オンラインなら
+  `applyToPlayer()` で即反映。
+- **3日クールダウンは管理者操作では無視する**（`canChange()` は通さない）。
+  プレイヤー自身の変更だけが制限対象。
+
 ## 残り（次にやること）
+
+- [ ] 19 続き. **キット配置（layout）の編集** — 「配置をいじったり」の本体。
+      `KitLayoutRepository` / `KitLayoutCache` を触る画面。対象プレイヤーのレイアウトを
+      管理者が直接並べ替えられるようにする。
+- [ ] 19 続き. **Original kit スロットの個別操作** — 現在は「全削除」のみ。
+      スロット単位の削除・閲覧・プラン（`Plan.DEFAULT/MEMBER/VIP/VIP_PLUS`）の変更。
+- [ ] 19 続き. **Chat whitelist の編集** — 現在は画面に出ているが操作内容を要確認。
+
 
 
 - [ ] 19. **Player データ画面の完全管理** — `AdminPlayerDataGui` は現状リセット中心。
