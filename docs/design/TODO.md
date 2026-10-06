@@ -1,6 +1,6 @@
 # RumilancePractice — やるべきことリスト
 
-更新: 2026-10-06 / ブランチ `arena/01a106b3-rumilancepractice` / v1.92.97
+更新: 2026-10-06 / ブランチ `arena/01a106b3-rumilancepractice` / v1.92.98
 
 > 定期自動要約で文脈が消えても追えるようにするためのメモ。
 > `/tmp/todo.md` にも同じものを置いているが、サンドボックスの /tmp はスナップショットに
@@ -11,13 +11,49 @@
 - [x] **ProtocolLib → PacketEvents 全面移行** — v1.92.89〜**v1.92.95**（CI 37456129041 success）。
       対象8ファイル + `build.gradle.kts` + `plugin.yml` softdepend。
       `src/main/java` から `com.comphenix.protocol` は **0 件**。詳細は下の専用セクション。
-- [x] **Ready エメラルドのホバーでアクションバーを出さない** — v1.92.96。
-      見つめるとライム色に光るので十分、という判断。Leave（レッドストーン）側の
-      「`N/2` · Leave ☓」はそのまま残す。未使用になった `countdown.gaze-ready` は7言語から削除。
+- [x] **Ready エメラルドのホバーでアクションバーを変えない** — v1.92.96 → **v1.92.98 でやり直し**。
+      v1.92.96 は「Ready を見ている時だけ出さない」だったが、それだと**見つめた瞬間に
+      アクションバーが消える**＝これも「変化」なので不十分（ユーザーから同じ指摘が2度来た）。
+      v1.92.98 で**ホバーとアクションバーの結合そのものを撤去**。
+      `updateViewer` から gaze 分岐を削除し、`readyTotal` / `leaveLine` と
+      `countdown.gaze-ready` + `countdown.gaze-leave`（7言語）を削除。
+      アクションバーは「相手が Ready を押した」通知だけになり、どこを見ているかは一切関係しない。
+- [x] **キルされたプレイヤーに飛行権限を与えて強制的に飛行状態へ** — v1.92.98。
+      新規 `match/MatchFlightService`。致死判定時に `setAllowFlight(true)` + `setFlying(true)`。
+      剥がす箇所は3系統 + 保険2つ（下記「飛行権限のリセット経路」）。
 - [x] **デッドコード一掃** — v1.92.97。
       `LethalPresentationService#animationAvailable` / `#stagedPairs`、
       `PlayerListCommand#serverMaxPlayers` を削除。`PlayerListCommand#sortedOnline` は
       public のテストシームをやめて実装から使う形にした。
+
+### 飛行権限のリセット経路（v1.92.98）
+
+`MatchFlightService` は「自分が付与した相手」だけを `Set<UUID> granted` に覚え、その分だけ剥がす。
+Creative / Spectator は最初から飛べるので**付与も剥奪もしない**（観戦やリプレイが与えた分を
+誤って奪わないため）。
+
+| タイミング | 箇所 |
+|---|---|
+| 試合開始（毎回） | `MatchService#beginCountdown` → `revokeAll(participants)` |
+| 試合終了 | `MatchService#endMatch` → `revokeAll(participants)` |
+| `/hub`・ロビー復帰 | `LobbyService#ensureHubReturn` が `setAllowFlight(false)` / `setFlying(false)`（既存） |
+| 再ログイン | `MatchFlightService#onJoin` で記録ごと破棄 |
+| ログアウト | `MatchFlightService#onQuit` で記録ごと破棄 |
+
+### 「A 宛のパケットをキャンセル」は再戦・ロビーで復活するか
+
+**復活する。** `LethalPresentationService` は抑制を「viewer → 相手の entity id」で持ち、
+以下の経路で必ず解除される（= `killer.showEntity` + `suppressed` からの削除）。
+
+| タイミング | 箇所 |
+|---|---|
+| 試合終了（再戦ウィンドウ含む） | `MatchService#endMatch` → `restoreAll(session.participants())` |
+| 相手側が再ログイン | `#onJoin`：その UUID を hidden/suppressed から外す |
+| 自分か相手がログアウト | `#onQuit`：両方向とも解除（`Player` オブジェクトが生きているうちに `showEntity`） |
+
+`restoreAll` は「参加者が加害者側に回っている場合」も全キーを走査して双向に解除する。
+つまり**再戦でもロビー戻りでも必ず元通り**。残る穴はサーバーの強制停止（= メモリ上のマップごと消えるので
+実質無害）と、試合を抜けずにサーバーだけリロードした場合（プラグイン無効化で全員ロビーに戻る）。
 
 ### 残っている宿題
 
