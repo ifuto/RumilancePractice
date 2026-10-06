@@ -189,7 +189,7 @@ public final class ResourcePackService implements Listener {
             }
             java.nio.file.Files.writeString(file.toPath(), ResourcePackJson.write(values),
                     StandardCharsets.UTF_8);
-        } catch (IOException e) {
+        } catch (java.io.IOException e) {
             logger.log(Level.WARNING, "Could not update " + JSON_FILE_NAME, e);
             return false;
         }
