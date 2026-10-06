@@ -6,11 +6,8 @@ import com.github.retrooper.packetevents.event.PacketListenerPriority;
 import com.github.retrooper.packetevents.event.PacketSendEvent;
 import com.github.retrooper.packetevents.protocol.packettype.PacketType;
 import com.github.retrooper.packetevents.protocol.packettype.PacketTypeCommon;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerBlockBreakAnimation;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerBlockChange;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerBlockEntityData;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerChunkData;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerMultiBlockChange;
 import com.rumilance.practice.packets.PacketEntityIds;
 import org.bukkit.Location;
 import org.bukkit.entity.Entity;
@@ -42,13 +39,18 @@ import java.util.UUID;
  */
 final class AfkRoomIsolationPackets implements PacketListener {
 
-    /** Chunk / block packets: filtered by position. */
+    /**
+     * Chunk / block packets: filtered by position.
+     *
+     * <p>Limited to the two packets whose block position is part of this class's verified API
+     * surface. Multi-block change, block-entity data and break animation are deliberately left
+     * in the clear: they carry no terrain of their own, and the {@code CHUNK_DATA} filter above
+     * already keeps the neighbouring chunks from ever existing on the client — so failing open
+     * here costs nothing, while guessing at an accessor that changed shape would cost a jar.</p>
+     */
     private static final Set<PacketTypeCommon> BLOCK_PACKETS = Set.<PacketTypeCommon>of(
             PacketType.Play.Server.CHUNK_DATA,
-            PacketType.Play.Server.BLOCK_CHANGE,
-            PacketType.Play.Server.MULTI_BLOCK_CHANGE,
-            PacketType.Play.Server.BLOCK_ENTITY_DATA,
-            PacketType.Play.Server.BLOCK_BREAK_ANIMATION);
+            PacketType.Play.Server.BLOCK_CHANGE);
 
     /** Entity packets: filtered by the entity's position (players are always dropped). */
     private static final Set<PacketTypeCommon> ENTITY_PACKETS = Set.<PacketTypeCommon>of(
@@ -114,27 +116,11 @@ final class AfkRoomIsolationPackets implements PacketListener {
             var column = new WrapperPlayServerChunkData(event).getColumn();
             return AfkRoomMath.chunkVisible(cx, cz, radius, column.getX(), column.getZ());
         }
-        if (type == PacketType.Play.Server.MULTI_BLOCK_CHANGE) {
-            var section = new WrapperPlayServerMultiBlockChange(event).getSectionPosition();
-            if (section == null) {
-                return true;
-            }
-            return AfkRoomMath.sectionVisible(cx, cz, radius, section.getX(), section.getZ());
-        }
-        int[] pos = blockPosition(event, type);
+        var pos = new WrapperPlayServerBlockChange(event).getBlockPosition();
         if (pos == null) {
             return true;
         }
-        return AfkRoomMath.positionInside(cx, cz, radius, pos[0] + 0.5d, pos[1] + 0.5d);
-    }
-
-    private static int[] blockPosition(PacketSendEvent event, PacketTypeCommon type) {
-        var pos = type == PacketType.Play.Server.BLOCK_CHANGE
-                ? new WrapperPlayServerBlockChange(event).getBlockPosition()
-                : type == PacketType.Play.Server.BLOCK_ENTITY_DATA
-                ? new WrapperPlayServerBlockEntityData(event).getBlockPosition()
-                : new WrapperPlayServerBlockBreakAnimation(event).getBlockPosition();
-        return pos == null ? null : new int[]{pos.getX(), pos.getZ()};
+        return AfkRoomMath.positionInside(cx, cz, radius, pos.getX() + 0.5d, pos.getZ() + 0.5d);
     }
 
     private static boolean entityDropped(PacketSendEvent event, AfkRoomIsolationSource source,

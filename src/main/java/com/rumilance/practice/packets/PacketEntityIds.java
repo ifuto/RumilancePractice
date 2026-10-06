@@ -2,6 +2,7 @@ package com.rumilance.practice.packets;
 
 import com.github.retrooper.packetevents.event.PacketSendEvent;
 import com.github.retrooper.packetevents.protocol.packettype.PacketType;
+import com.github.retrooper.packetevents.protocol.packettype.PacketTypeCommon;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerAttachEntity;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityAnimation;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityEffect;
@@ -40,7 +41,7 @@ public final class PacketEntityIds {
 
     /** Entity id carried by this outbound packet, or -1 when it has none (or cannot be read). */
     public static int of(PacketSendEvent event) {
-        PacketType.Play.Server type = event.getPacketType();
+        PacketTypeCommon type = event.getPacketType();
         try {
             if (type == PacketType.Play.Server.SPAWN_PLAYER) {
                 return new WrapperPlayServerSpawnPlayer(event).getEntityId();
