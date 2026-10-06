@@ -313,14 +313,15 @@
 **v1.92.70/71 で追加**: original kit の**スロット個別操作** —
 左クリックで保存済みスロットを巡回選択（選択中は `[#3]` のように括弧付きで表示）、
 右クリックで**そのスロットだけ**削除、Shift クリックで全削除（従来どおり）。
-**まだリセットのみ**: 全レイアウト削除・全 ekit リセット
+**v1.92.72 で追加**: **キット配置（layout）の編集** — 対象プレイヤーの保存済みレイアウトを
+エディタで開いて並べ替え、その人に保存し直せる。下記メモ参照。
+**リセットのみ（仕様上これでよい）**: 対象プレイヤーのレイアウト全削除 / 全員分リセット。
+まとめて消す安全弁なので、編集対象にはしない。
 
 ## 残り（次にやること）
 
-- [ ] 19 続き. **キット配置（layout）の編集** — 管理者が対象プレイヤーのレイアウトを
-      直接開いて並べ替えられるようにする。「配置をいじったり」の本体。
+- [x] 19 続き. **キット配置（layout）の編集**（v1.92.72）
 - [x] 19 続き. **Original kit のスロット個別操作**（v1.92.70/71）
-- [ ] 19 続き. **ekit スロット数の編集** — 現状リセットのみ。
 
 
 - [ ] 19 続き. **キット配置（layout）の編集** — 「配置をいじったり」の本体。
@@ -493,3 +494,27 @@
 - `FfaArenaFreeHitFlagTest` — 同じことを `freehitGuard` 側について検証（新規）。
 - `FfaFreeHitGuardTest` — 仕様そのものを固定（新規）。10秒の境界（9s で成立 / 10.001s で
   不成立）、組の排他、30秒の期限延長、退出・死亡での解放。
+
+## キット配置の管理者編集 — 実装メモ（v1.92.72）
+
+- `EditKitGui` に **`admin-edit` モード**を追加。既存の `view` モードと同じく
+  `session.setTargetPlayer(uuid)` を使うが、`isViewOnly()` は **false** のまま
+  （＝ドラッグも保存もできる）。
+- 所有者の解決を `layoutOwner(Player, GuiSession)` に一本化。
+  `view` と `admin-edit` のときだけ `session.targetPlayer()`、それ以外は自分。
+  - 読み込み: `loadLayout(layoutOwner, …)`
+  - 保存: `persistLayout(…)` の最終段で `KitLayoutSnapshot.create(owner, …)` /
+    `layoutCache.put(owner, …)`。**クリックした管理者の UUID には一切書き込まない**。
+- `openKitEditorFor(admin, targetId, targetName, kitName)` — キットが存在しない場合は
+  false を返し（空のエディタを開かない）。
+- 戻り先: `setOnAdminExit(BiConsumer<Player, UUID>)`。
+  FeatureBootstrap では `editKitGui.setOnAdminExit(adminPlayerDataGui::openFor)`。
+  `AdminPlayerDataGui` の open は `openFor(Player, UUID)` なので Consumer ではなく
+  BiConsumer にしてある（対象 UUID を戻す必要があるため）。
+- `AdminPlayerDataGui` の **(2,1)** に **Layout editor** タイル。
+  左クリックで対象キットを巡回選択、右クリックでエディタを開く。
+- **開けるのは素のキット行だけ**（キーに `#` を含まないもの）。
+  `kit#preset#x` / crystal `#v` / K1..K4 `#k` は、素のキットを開くと
+  **別の並びを表示して上書きしてしまう**ので、編集対象にせずリセット系に任せる。
+  黙って違う行を書き換えないための意図的な制限。
+- 「ekit スロット数」という概念はコードに存在しなかった（前回メモの誤り）。
