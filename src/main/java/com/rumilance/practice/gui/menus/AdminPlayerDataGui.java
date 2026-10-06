@@ -65,6 +65,16 @@ public final class AdminPlayerDataGui extends AbstractGui {
     private final NameColorService nameColorService;
     private final PunishmentRepository punishmentRepository;
     private final StatsService statsService;
+
+    /** Preset solid colours an admin can set directly, cycled with left-click. */
+    private static final String[] NAME_SOLIDS = {
+            "FF5555", "FFAA00", "FFFF55", "55FF55", "55FFFF", "5555FF", "AA55FF", "FF55FF"
+    };
+    /** Preset gradients, cycled with right-click. */
+    private static final String[][] NAME_GRADIENTS = {
+            {"FF5555", "FFFF55"}, {"55FF55", "55FFFF"},
+            {"5555FF", "AA55FF"}, {"FF55FF", "FF5555"}
+    };
     private java.util.function.Consumer<Player> backToAdminMenu = p -> { };
     /** Opens the per-kit W/L editor for the current target (wired from FeatureBootstrap). */
     private java.util.function.BiConsumer<Player, UUID> openWlEditor;
@@ -319,8 +329,10 @@ public final class AdminPlayerDataGui extends AbstractGui {
                                                 ? " -> " + color.secondaryHex() : ""))
                                         : UiTheme.line("inactive"),
                                 UiTheme.blank(),
-                                UiTheme.hint("Click: clear name color"))
-                        .action("act:clear_namecolor").build());
+                                UiTheme.hint("Left: next solid    Right: next gradient"),
+                                UiTheme.hint("Shift-click: clear"))
+                        .glint(color.active())
+                        .action("act:namecolor").build());
 
         // --- ranked stats (resettlable) ---
         List<RankedKitStats> stats = safeList(() -> statsService.allKits(target));
@@ -610,14 +622,36 @@ public final class AdminPlayerDataGui extends AbstractGui {
                 }
                 refresh(player, session, inventory);
             }
-            case "act:clear_namecolor" -> {
-                if (nameColorService != null) {
-                    nameColorService.save(target, NameColorSelection.DEFAULT);
-                    if (online != null) {
-                        nameColorService.applyToPlayer(online);
-                    }
-                    sounds.play(player, "select");
+            case "act:namecolor" -> {
+                if (nameColorService == null) {
+                    refresh(player, session, inventory);
+                    break;
                 }
+                NameColorSelection current = nameColorService.selection(target);
+                NameColorSelection next;
+                if (shift) {
+                    next = NameColorSelection.DEFAULT;
+                } else if (right) {
+                    String[] pair = NAME_GRADIENTS[
+                            (gradientIndexOf(current) + 1) % NAME_GRADIENTS.length];
+                    next = new NameColorSelection(
+                            NameColorSelection.Mode.GRADIENT, pair[0], pair[1], 0L);
+                } else {
+                    next = new NameColorSelection(NameColorSelection.Mode.SOLID,
+                            NAME_SOLIDS[(solidIndexOf(current) + 1) % NAME_SOLIDS.length], "", 0L);
+                }
+                nameColorService.save(target, next.withChangedAt(System.currentTimeMillis()));
+                if (online != null) {
+                    nameColorService.applyToPlayer(online);
+                }
+                sounds.play(player, "select");
+                player.sendMessage(Component.text(displayName(target) + " name color: "
+                        + (next.active()
+                                ? next.mode().name().toLowerCase() + " " + next.primaryHex()
+                                + (next.mode() == NameColorSelection.Mode.GRADIENT
+                                        ? " -> " + next.secondaryHex() : "")
+                                : "cleared"),
+                        UiTheme.SUCCESS));
                 refresh(player, session, inventory);
             }
             case "act:reset_stats" -> {
@@ -844,5 +878,32 @@ public final class AdminPlayerDataGui extends AbstractGui {
         } catch (Exception e) {
             sounds.play(admin, "error");
         }
+    }
+
+    /** Index of {@code selection} in {@link #NAME_SOLIDS}, or -1 so the next click starts at 0. */
+    private static int solidIndexOf(NameColorSelection selection) {
+        if (selection.mode() != NameColorSelection.Mode.SOLID) {
+            return -1;
+        }
+        for (int i = 0; i < NAME_SOLIDS.length; i++) {
+            if (NAME_SOLIDS[i].equalsIgnoreCase(selection.primaryHex())) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /** Index of {@code selection} in {@link #NAME_GRADIENTS}, or -1 to start at 0. */
+    private static int gradientIndexOf(NameColorSelection selection) {
+        if (selection.mode() != NameColorSelection.Mode.GRADIENT) {
+            return -1;
+        }
+        for (int i = 0; i < NAME_GRADIENTS.length; i++) {
+            if (NAME_GRADIENTS[i][0].equalsIgnoreCase(selection.primaryHex())
+                    && NAME_GRADIENTS[i][1].equalsIgnoreCase(selection.secondaryHex())) {
+                return i;
+            }
+        }
+        return -1;
     }
 }
