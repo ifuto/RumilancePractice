@@ -10,6 +10,7 @@ import org.bukkit.entity.Display;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.TextDisplay;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.util.Transformation;
@@ -73,7 +74,7 @@ public final class FfaLookingForFight {
         } else {
             looking.remove(player.getUniqueId());
         }
-        player.getInventory().setItem(SLOT, item(value));
+        placeToggle(player, value);
         updateTag(player, value);
     }
 
@@ -83,7 +84,7 @@ public final class FfaLookingForFight {
      */
     public void refresh(Player player) {
         boolean on = isLooking(player.getUniqueId());
-        player.getInventory().setItem(SLOT, item(on));
+        placeToggle(player, on);
         updateTag(player, on);
     }
 
@@ -91,6 +92,72 @@ public final class FfaLookingForFight {
     public void clear(Player player) {
         looking.remove(player.getUniqueId());
         removeTag(player);
+    }
+
+    /**
+     * 9番目に LFF アイテムを置く。そこに既存アイテムがあったら**先に退避**してから置く。
+     *
+     * <p>編集後のキットが9番目を使っていることは普通にあり、そのまま上書きすると
+     * プレイヤーが並べたアイテムが消えてしまう。なので:
+     *
+     * <ol>
+     *   <li>9番目にあるアイテムが LFF アイテム本身なら、そのまま置き換える（退避しない）。</li>
+     *   <li>そうでなければ、空いている枠へ移動させる。ホットバーの 0〜7 番を優先し、
+     *       そこが埋まっていればストレージ（9〜35）も使う。</li>
+     *   <li>空き枠が1つもなければ、そのアイテムは破棄する（LFF がスロットを取る）。</li>
+     * </ol>
+     */
+    private void placeToggle(Player player, boolean active) {
+        PlayerInventory inventory = player.getInventory();
+        ItemStack displaced = inventory.getItem(SLOT);
+        if (!isAir(displaced) && !isLffItem(displaced)) {
+            int free = firstFreeSlot(occupiedSlots(inventory.getStorageContents()));
+            if (free >= 0) {
+                inventory.setItem(free, displaced);
+            }
+            // 空き枠なし: 退避させず破棄（そのまま9番目を上書きする）
+        }
+        inventory.setItem(SLOT, item(active));
+    }
+
+    /** {@code getStorageContents()} を「埋まっているか」の配列に落とす。 */
+    private static boolean[] occupiedSlots(ItemStack[] contents) {
+        if (contents == null) {
+            return new boolean[0];
+        }
+        boolean[] occupied = new boolean[contents.length];
+        for (int slot = 0; slot < contents.length; slot++) {
+            occupied[slot] = !isAir(contents[slot]);
+        }
+        return occupied;
+    }
+
+    /**
+     * 退避先: ホットバーの 0〜7 を優先し、埋まっていればストレージ 9〜35。-1 は空き枠なし。
+     *
+     * <p>9番目（index 8）は LFF アイテムが入る枠なので退避先にしない。
+     * Bukkit を触らない純粋な関数（{@code ItemStack} はテストで作れないため、埋まっているか
+     * どうかだけを受け取る）。スロットの優先順位が仕様の肝なので単体テストしてある。
+     */
+    static int firstFreeSlot(boolean[] occupied) {
+        if (occupied == null) {
+            return -1;
+        }
+        for (int slot = 0; slot < SLOT; slot++) {
+            if (slot < occupied.length && !occupied[slot]) {
+                return slot;
+            }
+        }
+        for (int slot = 9; slot < 36 && slot < occupied.length; slot++) {
+            if (!occupied[slot]) {
+                return slot;
+            }
+        }
+        return -1;
+    }
+
+    private static boolean isAir(ItemStack stack) {
+        return stack == null || stack.getType().isAir();
     }
 
     /** 現在の状態に対応するトグルアイテム。 */
