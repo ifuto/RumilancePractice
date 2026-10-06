@@ -558,7 +558,12 @@ public final class FfaService {
         // while flying stayed floating (the reported "ボーダーよりの空中スポーン"). Snap the
         // point onto a standable same-column surface before using it.
         Location footing = com.rumilance.practice.util.SpawnFooting.standClearPearl(clamped, 6);
-        return footing != null ? footing : clamped;
+        if (footing != null) {
+            return footing;
+        }
+        // Never return the raw point: an uncorrected spawn is exactly the mid-air join.
+        Location emergency = emergencyFooting(arena);
+        return emergency != null ? emergency : clamped;
     }
 
     /** Re-applies per-player border / view distance for the player's current FFA arena. */
@@ -1369,7 +1374,9 @@ public final class FfaService {
         for (int attempt = 0; attempt < 24; attempt++) {
             int x = rng.nextInt(arena.region().minX(), arena.region().maxX() + 1);
             int z = rng.nextInt(arena.region().minZ(), arena.region().maxZ() + 1);
-            int top = Math.min(world.getHighestBlockYAt(x, z), maxY);
+            // +1: getHighestBlockYAt() gives the highest block, i.e. the GROUND itself —
+            // the spot a player stands on is one above it.
+            int top = Math.min(world.getHighestBlockYAt(x, z) + 1, maxY);
             Location spot = scanColumnSpawnable(world, x, z, minY, top);
             if (spot == null) {
                 continue;
@@ -1390,6 +1397,32 @@ public final class FfaService {
         }
         // 自然地面の最遠を最優先、なければ全候補の最遠。絶対に「誰かの真横」には出ない。
         return bestNatural != null ? bestNatural : bestAny;
+    }
+
+    /**
+     * Absolute last resort when every other search came up empty: the first genuinely
+     * standable surface in the arena's centre column, scanned up from the arena floor.
+     * Returns null only when the arena has no world at all. Used instead of falling back to
+     * the configured spawn, because an uncorrected point is precisely what leaves a player
+     * floating in mid-air.
+     */
+    private static Location emergencyFooting(FfaArena arena) {
+        if (arena == null || arena.region() == null) {
+            return null;
+        }
+        com.rumilance.practice.util.Cuboid region = arena.region();
+        World world = region.world();
+        if (world == null) {
+            return null;
+        }
+        int floor = Math.max(world.getMinHeight(), region.minY());
+        Location centre = new Location(world,
+                (region.minX() + region.maxX()) * 0.5d + 0.5d,
+                Math.max(floor + 1, region.minY()),
+                (region.minZ() + region.maxZ()) * 0.5d + 0.5d);
+        Location clear = com.rumilance.practice.util.SpawnFooting.standClearDeep(centre, floor);
+        return clear != null ? clear
+                : com.rumilance.practice.util.SpawnFooting.standClear(centre);
     }
 
     /** Top-down scan of one column for a standable surface (ground + clear feet + head). */
@@ -1445,7 +1478,15 @@ public final class FfaService {
         if (footing == null) {
             footing = FfaSpawnLocator.find(arena, occupied);
         }
-        Location base = footing != null && footing.getWorld() != null ? footing : arena.spawn();
+        Location base = footing;
+        if (base == null || base.getWorld() == null) {
+            // Last resort instead of the configured point: a raw spawn is what leaves
+            // players hanging in the air. emergencyFooting() scans for real ground.
+            base = emergencyFooting(arena);
+        }
+        if (base == null || base.getWorld() == null) {
+            base = arena.spawn();
+        }
         return LocationUtil.safeTeleportLocation(base, arena.region());
     }
 

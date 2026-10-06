@@ -92,6 +92,21 @@ public final class FfaSpawnLocator {
             if (clear != null) {
                 fallback = clear;
                 fallback.setWorld(world);
+            } else {
+                // Nothing standable anywhere: walking the region's centre column from the
+                // arena floor is the last thing to try before giving up. Returning the raw
+                // configured point here is what used to drop players into mid-air.
+                int floor = Math.max(world.getMinHeight(), region.minY());
+                Location centre = new Location(world,
+                        (region.minX() + region.maxX()) * 0.5d + 0.5d,
+                        Math.max(floor + 1, region.minY()),
+                        (region.minZ() + region.maxZ()) * 0.5d + 0.5d);
+                Location emergency =
+                        com.rumilance.practice.util.SpawnFooting.standClearDeep(centre, floor);
+                if (emergency != null) {
+                    fallback = emergency;
+                    fallback.setWorld(world);
+                }
             }
             randomYaw(fallback);
             return fallback;
