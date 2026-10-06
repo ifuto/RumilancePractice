@@ -401,12 +401,6 @@ ffa:
   arena-full: "<red>该 FFA 竞技场当前已满。"
   no-arenas: "<red>当前没有可用的 FFA 竞技场。"
 
-ffa-bot:
-  spawned: "<gray>已生成假人 </gray><aqua><bold>NARENA BOT</bold></aqua><gray>。再次输入 </gray><yellow>/bot</yellow><gray> 即可移除。"
-  removed: "<gray>已移除假人。"
-  failed: "<red>无法生成假人。"
-  arena-disabled: "<red>该竞技场的 FFA Bot 处于关闭状态。</red> <gray>在 /practiceadmin → FFA Config 中打开</gray> <yellow>FFA Bot</yellow> <gray>即可生成</gray> <aqua><bold>NARENA BOT</bold></aqua><gray>。</gray>"
-
   lff-disabled: "<red>此竞技场未启用 LFF。</red>"
   lff-on: "<gold>寻找对战：ON</gold>"
   lff-off: "<gray>寻找对战：OFF</gray>"
@@ -419,6 +413,13 @@ ffa-bot:
   kills-bar: "<gold>击杀: <kills>  死亡: <deaths>"
   kill-streak: "<gold><n>连杀!"
   combat-bar: "<red>战斗中: <secs>秒"
+
+ffa-bot:
+  spawned: "<gray>已生成假人 </gray><aqua><bold>NARENA BOT</bold></aqua><gray>。再次输入 </gray><yellow>/bot</yellow><gray> 即可移除。"
+  removed: "<gray>已移除假人。"
+  failed: "<red>无法生成假人。"
+  arena-disabled: "<red>该竞技场的 FFA Bot 处于关闭状态。</red> <gray>在 /practiceadmin → FFA Config 中打开</gray> <yellow>FFA Bot</yellow> <gray>即可生成</gray> <aqua><bold>NARENA BOT</bold></aqua><gray>。</gray>"
+
 tps:
   denied: "<red>你没有使用 /tps 的权限。</red>"
   cooldown: "<red>请勿连打 — 请等待 <secs> 秒。</red>"

@@ -401,12 +401,6 @@ ffa:
   arena-full: "<red>해당 FFA 아레나가 가득 찼습니다."
   no-arenas: "<red>현재 이용 가능한 FFA 아레나가 없습니다."
 
-ffa-bot:
-  spawned: "<gray>마네킹 </gray><aqua><bold>NARENA BOT</bold></aqua><gray>을(를) 소환했습니다. </gray><yellow>/bot</yellow><gray>을(를) 다시 입력하면 제거됩니다."
-  removed: "<gray>마네킹 봇을 제거했습니다."
-  failed: "<red>마네킹 봇을 소환하지 못했습니다."
-  arena-disabled: "<red>이 아레나에서는 FFA Bot이 OFF입니다.</red> <gray>/practiceadmin → FFA Config에서</gray> <yellow>FFA Bot</yellow><gray>을 켜면</gray> <aqua><bold>NARENA BOT</bold></aqua><gray>을 소환할 수 있습니다.</gray>"
-
   lff-disabled: "<red>이 아레나에서는 LFF가 비활성화되어 있습니다.</red>"
   lff-on: "<gold>대결 모집: ON</gold>"
   lff-off: "<gray>대결 모집: OFF</gray>"
@@ -419,6 +413,13 @@ ffa-bot:
   kills-bar: "<gold>킬: <kills>  데스: <deaths>"
   kill-streak: "<gold><n>킬 스트릭!"
   combat-bar: "<red>전투 중: <secs>초"
+
+ffa-bot:
+  spawned: "<gray>마네킹 </gray><aqua><bold>NARENA BOT</bold></aqua><gray>을(를) 소환했습니다. </gray><yellow>/bot</yellow><gray>을(를) 다시 입력하면 제거됩니다."
+  removed: "<gray>마네킹 봇을 제거했습니다."
+  failed: "<red>마네킹 봇을 소환하지 못했습니다."
+  arena-disabled: "<red>이 아레나에서는 FFA Bot이 OFF입니다.</red> <gray>/practiceadmin → FFA Config에서</gray> <yellow>FFA Bot</yellow><gray>을 켜면</gray> <aqua><bold>NARENA BOT</bold></aqua><gray>을 소환할 수 있습니다.</gray>"
+
 tps:
   denied: "<red>/tps 를 사용할 권한이 없습니다.</red>"
   cooldown: "<red>연타 금지 — <secs>초 기다려 주세요.</red>"

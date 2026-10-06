@@ -134,8 +134,10 @@ public final class LobbyCommand implements CommandExecutor {
             return true;
         }
         if (state == PlayerState.SPECTATING) {
+            // A spectator was never IN the FFA/match, so announcing "you left the FFA" is
+            // simply wrong — they were only watching.
             spectatorService.leave(player);
-            messageService.send(player, "ffa.left");
+            messageService.send(player, "lobby.teleported");
             return true;
         }
         if (afkExit != null && afkExit.test(player)) {

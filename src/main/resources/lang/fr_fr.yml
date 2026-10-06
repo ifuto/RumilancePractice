@@ -401,12 +401,6 @@ ffa:
   arena-full: "<red>Cette arène FFA est actuellement pleine."
   no-arenas: "<red>Aucune arène FFA disponible actuellement."
 
-ffa-bot:
-  spawned: "<gray>Mannequin </gray><aqua><bold>NARENA BOT</bold></aqua><gray> invoqué. Refaites </gray><yellow>/bot</yellow><gray> pour le retirer."
-  removed: "<gray>Mannequin retiré."
-  failed: "<red>Impossible d'invoquer le mannequin."
-  arena-disabled: "<red>FFA Bot est OFF dans cette arène.</red> <gray>Activez</gray> <yellow>FFA Bot</yellow> <gray>dans /practiceadmin → FFA Config pour faire apparaître</gray> <aqua><bold>NARENA BOT</bold></aqua><gray>.</gray>"
-
   lff-disabled: "<red>LFF n'est pas activé dans cette arène.</red>"
   lff-on: "<gold>Recherche de combat : ON</gold>"
   lff-off: "<gray>Recherche de combat : OFF</gray>"
@@ -419,6 +413,13 @@ ffa-bot:
   kills-bar: "<gold>Éliminations : <kills>  Morts : <deaths>"
   kill-streak: "<gold>Série de <n> éliminations !"
   combat-bar: "<red>Combat : <secs>s"
+
+ffa-bot:
+  spawned: "<gray>Mannequin </gray><aqua><bold>NARENA BOT</bold></aqua><gray> invoqué. Refaites </gray><yellow>/bot</yellow><gray> pour le retirer."
+  removed: "<gray>Mannequin retiré."
+  failed: "<red>Impossible d'invoquer le mannequin."
+  arena-disabled: "<red>FFA Bot est OFF dans cette arène.</red> <gray>Activez</gray> <yellow>FFA Bot</yellow> <gray>dans /practiceadmin → FFA Config pour faire apparaître</gray> <aqua><bold>NARENA BOT</bold></aqua><gray>.</gray>"
+
 tps:
   denied: "<red>Vous ne pouvez pas utiliser /tps.</red>"
   cooldown: "<red>Pas de spam — attends <secs>s.</red>"
