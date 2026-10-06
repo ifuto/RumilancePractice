@@ -66,6 +66,9 @@ public final class AdminPlayerDataGui extends AbstractGui {
     private final PunishmentRepository punishmentRepository;
     private final StatsService statsService;
 
+    /** Session key: which original-kit slot the admin has highlighted. */
+    private static final String ORIGINAL_SLOT = "admin_original_slot";
+
     /** Preset solid colours an admin can set directly, cycled with left-click. */
     private static final String[] NAME_SOLIDS = {
             "FF5555", "FFAA00", "FFFF55", "55FF55", "55FFFF", "5555FF", "AA55FF", "FF55FF"
@@ -297,21 +300,18 @@ public final class AdminPlayerDataGui extends AbstractGui {
                         .action("act:reset_ekits").build());
 
         // --- original kits (clearable) ---
-        List<String> originalSlots = new ArrayList<>();
-        if (originalKitService != null) {
-            for (int slot = 0; slot < 9; slot++) {
-                if (originalKitService.hasSaved(target, slot)) {
-                    originalSlots.add("#" + (slot + 1));
-                }
-            }
-        }
+        List<Integer> originalSlots = savedOriginalSlots(target);
+        int highlighted = highlightedOriginalSlot(originalSlots, session);
         inventory.setItem(GuiSlots.slot(1, 5),
                 ItemBuilder.of(Material.NETHER_STAR)
-                        .name(Component.text("Original kits: " + originalSlots.size(), UiTheme.PRIMARY))
+                        .name(Component.text("Original kits: " + originalSlots.size(),
+                                UiTheme.PRIMARY))
                         .lore(originalSlots.isEmpty()
                                         ? UiTheme.line("none saved")
-                                        : UiTheme.line(String.join(", ", originalSlots)),
+                                        : UiTheme.line(markSlot(originalSlots, highlighted)),
                                 UiTheme.blank(),
+                                UiTheme.hint("Left: select next slot"),
+                                UiTheme.hint("Right: delete the selected slot"),
                                 UiTheme.hint("Shift-click: delete ALL of this"),
                                 UiTheme.hint("player's original kit slots"))
                         .action("act:original_kits").build());
@@ -606,19 +606,40 @@ public final class AdminPlayerDataGui extends AbstractGui {
                 refresh(player, session, inventory);
             }
             case "act:original_kits" -> {
-                if (originalKitService != null) {
-                    if (shift) {
-                        int removed = originalKitService.deleteAllForPlayer(target);
-                        player.sendMessage(Component.text("Deleted " + removed
-                                + " original-kit slot(s) of " + displayName(target) + ".",
-                                NamedTextColor.YELLOW));
+                if (originalKitService == null) {
+                    refresh(player, session, inventory);
+                    break;
+                }
+                List<Integer> saved = savedOriginalSlots(target);
+                if (shift) {
+                    int removed = originalKitService.deleteAllForPlayer(target);
+                    session.put(ORIGINAL_SLOT, -1);
+                    player.sendMessage(Component.text("Deleted " + removed
+                            + " original-kit slot(s) of " + displayName(target) + ".",
+                            NamedTextColor.YELLOW));
+                    sounds.play(player, "select");
+                } else if (right) {
+                    int slot = highlightedOriginalSlot(saved, session);
+                    if (slot < 0) {
+                        sounds.play(player, "error");
+                        player.sendMessage(Component.text(
+                                "No original-kit slot selected.", NamedTextColor.YELLOW));
+                    } else if (originalKitService.deleteSlot(target, slot)) {
+                        session.put(ORIGINAL_SLOT, -1);
+                        player.sendMessage(Component.text("Deleted original-kit slot #"
+                                + (slot + 1) + " of " + displayName(target) + ".",
+                                NamedTextColor.GREEN));
                         sounds.play(player, "select");
                     } else {
                         sounds.play(player, "error");
-                        player.sendMessage(Component.text(
-                                "Shift-click to delete this player's original kit slots.",
-                                NamedTextColor.YELLOW));
                     }
+                } else {
+                    // Plain click walks the selection through the saved slots.
+                    int slot = highlightedOriginalSlot(saved, session);
+                    int at = saved.indexOf(slot);
+                    Integer next = saved.isEmpty() ? -1 : saved.get((at + 1) % saved.size());
+                    session.put(ORIGINAL_SLOT, next);
+                    sounds.play(player, "gui-click");
                 }
                 refresh(player, session, inventory);
             }
@@ -905,5 +926,42 @@ public final class AdminPlayerDataGui extends AbstractGui {
             }
         }
         return -1;
+    }
+
+    /** Slots 0..8 this player has an original kit saved in. */
+    private List<Integer> savedOriginalSlots(UUID target) {
+        List<Integer> saved = new ArrayList<>();
+        if (originalKitService == null) {
+            return saved;
+        }
+        for (int slot = 0; slot < 9; slot++) {
+            if (originalKitService.hasSaved(target, slot)) {
+                saved.add(slot);
+            }
+        }
+        return saved;
+    }
+
+    /** Keeps the highlight on a slot that still exists; falls back to the first saved one. */
+    private int highlightedOriginalSlot(List<Integer> saved, GuiSession session) {
+        Integer stored = session.get(ORIGINAL_SLOT, Integer.class);
+        int slot = stored == null ? -1 : stored;
+        if (saved.isEmpty()) {
+            return -1;
+        }
+        if (saved.contains(slot)) {
+            return slot;
+        }
+        return saved.get(0);
+    }
+
+    /** Wraps the highlighted entry in brackets so it stands out in the lore line. */
+    private static String markSlot(List<Integer> saved, int highlighted) {
+        List<String> out = new ArrayList<>();
+        for (int slot : saved) {
+            String entry = "#" + (slot + 1);
+            out.add(slot == highlighted ? "[" + entry + "]" : entry);
+        }
+        return String.join(", ", out);
     }
 }
