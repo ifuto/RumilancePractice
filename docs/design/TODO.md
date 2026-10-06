@@ -284,7 +284,42 @@
 - **3日クールダウンは管理者操作では無視する**（`canChange()` は通さない）。
   プレイヤー自身の変更だけが制限対象。
 
+## FFA 子Kit（inner kit）— 実装メモ（v1.92.69）
+
+- `FfaArena` レコードに19個目の項目 **`innerKitId`**（String、null/空 = 指定なし）を追加。
+  `withInnerKit()` を用意。呼び出し22箇所（本19 + テスト3）を paren-balanced スクリプトで更新。
+- 保存: `arenas.<id>.settings.inner-kit`（未指定なら `null` を書いてキーを消す）。
+- 読み込み: `blankToNull(entry.getString("settings.inner-kit"))`。
+  `blankToNull` を `FfaService` の private static ヘルパーとして追加（空文字と null を
+  同じ「未指定」にそろえるため）。
+- **適用の優先順位**（`FfaService#applyKit`）:
+  1. Crystal FFA の KIT1..K9（既存の経済の仕組みなので最優先）
+  2. **アリーナの子Kit**（今回追加）— `InnerKitService.layoutKey(kit.name(), arenaInner)`
+  3. 個人の K1..K4 バリアント
+  4. キット本体のレイアウト
+- GUI: `FfaSettingsGui` の `gridSlot(21)`（LFF の隣）に **Child kit** タイル。
+  クリックで `none → 子Kit1 → 子Kit2 → … → none` を巡回。
+  `InnerKitService` を `setInnerKitService()` で注入（FeatureBootstrap の `innerKits`）。
+- `FfaService#setInnerKit(arenaId, innerId)` / `innerKitOf(arenaId)`。
+  未知の子Kit id も保存する（リネーム・再構築で消えても選択が飛ばないように）。
+  スポーン時に解決できなければ上の3・4へフォールバックする。
+- テスト: `FfaArena*FlagTest` 3本の `copies()` に `withInnerKit` を追加し、
+  「どの with* も他のフラグを壊さない」網羅に子Kit を含めた。
+
+## 19 の現状（v1.92.69 時点）
+
+編集できるもの: Rank / Settings / Ranked stats (W/L) / **Name color** / Chat whitelist（追加・クリア両方）
+実行できるもの: Kick / Force-end match / **Party 強制解散** / 処分解除 / FULL WIPE
+**まだリセットのみ**: 全レイアウト削除・全 ekit リセット・original kit 全削除
+
 ## 残り（次にやること）
+
+- [ ] 19 続き. **キット配置（layout）の編集** — 管理者が対象プレイヤーのレイアウトを
+      直接開いて並べ替えられるようにする。「配置をいじったり」の本体。
+- [ ] 19 続き. **Original kit のスロット個別操作** — 現状「全削除」のみ。
+      スロット単位の閲覧・削除・プラン変更。
+- [ ] 19 続き. **ekit スロット数の編集** — 現状リセットのみ。
+
 
 - [ ] 19 続き. **キット配置（layout）の編集** — 「配置をいじったり」の本体。
       `KitLayoutRepository` / `KitLayoutCache` を触る画面。対象プレイヤーのレイアウトを
