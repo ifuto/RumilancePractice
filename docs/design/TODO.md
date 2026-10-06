@@ -151,12 +151,33 @@
   - 名前空間付きだけが Paper 側へ抜ける抜け道になる。
 
 ## 17. ブロック相手の tell は受信しない — 実装メモ（v1.92.60）
-
-- `TellCommand#deliver` の**一番最初**に判定を追加。
-  `BlockListService#isBlocked(to, from)` が true なら送信者に `tell.blocked-you` を出して
-  終了（受信者には届かない）。コンソール（`from == null`）は常に除外。
 - 既存の `ChatPolicy.receivesMessage`（`receiveStrangerMessages`）より**優先**。
   ブロックは「設定」ではなく「明示的な拒否」なので上に置く。
+- lang: `tell.blocked-you` を7ロケール追加。
+
+## 21. チャット通報 — 実装メモ（v1.92.61、Reports 画面は未着手）
+
+- **`ChatLogService`**（`com.rumilance.practice.chat`、純粋）:
+  - 直近N件のリングバッファ。`record()` が単調増加の **id** を返す。
+  - `find(id)` / `context(id, before, after)`。**前後の文はここから動的に引く**。
+  - 容量は `chat-log.capacity`（既定 2000）。前後件数は
+    `chat-log.context-before` / `context-after`（既定 5）。
+- **`ChatReportRepository`** + マイグレーション 38 で `chat_reports` テーブル
+  （`chat_line_id`, `reporter_uuid`, `reported_uuid`, `reported_name`, `reported_ts`, `status`、
+  複合主キー = 同一行の二重通報を防ぐ）。
+  - **本文は保存しない。id だけ。** これが「報告時セーブではなく動的取得」の実体。
+    バッファを流れた行は `find()` が empty を返し、UI 側で「古すぎる」と出す。
+- **`ChatReportService`**: `recent()` / `open()` が `Report` を返す。
+  `Report` は `Optional<ChatLine> line` と `List<ChatLine> context` を持つ。
+  `timestamp()` は本文の投稿時刻（行が消えていれば通報時刻）。
+- **ホバーとクリック**: `MatchChatListener#reportable` が、完成したチャット行に
+  `hoverEvent(showText(report.hint))` と `clickEvent(runCommand("/reportchat <id>"))` を付ける。
+  - **発言者本人には付けない**。`rumilance.user` 権限がない視点にも付けない。
+  - Duel Chat と全体チャットの**両方**に効く（Duel は自前レンダラ、
+    全体は元のレンダラをラップする）。
+- **`/reportchat <id>`**: バッファから引けなければ `report.expired`、
+  自分の発言は `report.self`、二重は `report.duplicate`、成功で `report.filed`。
+- **未着手**: `/admin` → 「Cheat / Alt / Reports」の Reports 画面（項目18と一緒に作る）。
 
 ---
 
