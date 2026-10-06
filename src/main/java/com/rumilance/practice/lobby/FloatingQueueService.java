@@ -1,6 +1,5 @@
 package com.rumilance.practice.lobby;
 
-import com.rumilance.practice.match.MatchMode;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;

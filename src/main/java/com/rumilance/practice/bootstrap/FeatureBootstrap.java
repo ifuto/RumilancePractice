@@ -835,7 +835,7 @@ public final class FeatureBootstrap {
         this.floatingQueueService.setKitService(kitService);
         this.floatingQueueService.setJoinUnranked((player, kitId) ->
                 queueCoordinator.join(player, kitId,
-                        com.rumilance.practice.match.MatchMode.UNRANKED));
+                        com.rumilance.practice.state.MatchMode.UNRANKED));
         this.floatingQueueService.loadFromConfig(configService.lobby());
 
         // Right-click on the floating lobby entities. Without this registration the listener
