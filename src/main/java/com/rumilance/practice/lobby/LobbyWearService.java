@@ -49,8 +49,18 @@ public final class LobbyWearService implements Listener {
     private final Plugin plugin;
     private final PlayerStateManager stateManager;
     private final RankService rankService;
+    /** Per-player rate limit for reconcile-failure logging. */
+    private final java.util.Map<java.util.UUID, Long> lastFailureLog =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static long nowMillis() {
+        return System.currentTimeMillis();
+    }
+
     /** Hub bounds: the wear belongs inside the lobby region only. */
     private volatile LobbyService lobbyService;
+    /** Set once the stale-region warning has been logged, so it cannot spam the console. */
+    private volatile boolean staleRegionWarned;
 
     public LobbyWearService(Plugin plugin, PlayerStateManager stateManager, RankService rankService) {
         this.plugin = plugin;
@@ -73,7 +83,15 @@ public final class LobbyWearService implements Listener {
                     strip(player);
                 }
             } catch (Throwable t) {
-                // One broken player (bad equipment, a vanished rank row) must not stop the loop.
+                // One broken player (bad equipment, a vanished rank row) must not stop the
+                // loop — but it must not be invisible either. An empty catch here is what let
+                // "hub boots/elytra are never given" survive every report: nothing was ever
+                // logged. Rate-limited to one line per player per 30s.
+                if (nowMillis() - lastFailureLog.getOrDefault(player.getUniqueId(), 0L) > 30_000L) {
+                    lastFailureLog.put(player.getUniqueId(), nowMillis());
+                    plugin.getLogger().log(java.util.logging.Level.WARNING,
+                            "[LobbyWear] reconcile failed for " + player.getName(), t);
+                }
             }
         }
     }
@@ -98,12 +116,39 @@ public final class LobbyWearService implements Listener {
             return true;
         }
         com.rumilance.practice.util.Cuboid region = service.region();
-        if (region != null) {
-            return region.contains(player.getLocation());
-        }
         org.bukkit.Location spawn = service.spawn();
-        return spawn == null || spawn.getWorld() == null
-                || spawn.getWorld().equals(player.getWorld());
+        if (region == null) {
+            return spawn == null || spawn.getWorld() == null
+                    || spawn.getWorld().equals(player.getWorld());
+        }
+        // Only the HORIZONTAL extent is enforced. The region exists to keep hub cosmetics out
+        // of the AFK rooms and practice plots, which sit far away on the same map. A full 3D
+        // test adds nothing for that, but it DOES drop the wear from anyone standing on a
+        // raised platform, gliding above the region or simply mid-jump — which is why hub
+        // boots / elytra used to never stay on.
+        if (region.containsHorizontal(player.getLocation())) {
+            return true;
+        }
+        // A region that does not even contain the lobby spawn horizontally is stale (the spawn
+        // moved, or the corners were set somewhere else). Obeying it would strip every hub
+        // player forever and silently, so fall back to the world test and say so once.
+        if (spawn != null && !region.containsHorizontal(spawn)) {
+            warnStaleRegion(region);
+            return spawn.getWorld() == null || spawn.getWorld().equals(player.getWorld());
+        }
+        return false;
+    }
+
+    private void warnStaleRegion(com.rumilance.practice.util.Cuboid region) {
+        if (staleRegionWarned) {
+            return;
+        }
+        staleRegionWarned = true;
+        plugin.getLogger().warning("[LobbyWear] The configured lobby region "
+                + region.worldName() + " " + region.minX() + "," + region.minZ() + " .. "
+                + region.maxX() + "," + region.maxZ()
+                + " does not contain the lobby spawn. Hub boots/elytra will fall back to a "
+                + "world-wide check — re-run /setlobbyregion (or re-set the lobby spawn).");
     }
 
     /**

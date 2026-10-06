@@ -57,6 +57,10 @@ public final class LobbyService {
                 (float) lobby.getDouble("spawn.pitch", 0.0d)
         );
         fallReturnY = lobby.getDouble("fall-return-y", 0.0d);
+        // Reset first: a region removed from lobby.yml must not survive a reload, otherwise a
+        // stale cuboid keeps gating hub features (lobby wear, glide) on a place that no longer
+        // exists.
+        region = null;
         if (lobby.isSet("region.world")) {
             region = Cuboid.of(
                     lobby.getString("region.world", worldName),
