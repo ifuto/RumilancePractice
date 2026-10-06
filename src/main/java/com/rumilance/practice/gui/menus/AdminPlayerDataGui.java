@@ -619,15 +619,15 @@ public final class AdminPlayerDataGui extends AbstractGui {
                             NamedTextColor.YELLOW));
                     sounds.play(player, "select");
                 } else if (right) {
-                    int slot = highlightedOriginalSlot(saved, session);
-                    if (slot < 0) {
+                    int chosen = highlightedOriginalSlot(saved, session);
+                    if (chosen < 0) {
                         sounds.play(player, "error");
                         player.sendMessage(Component.text(
                                 "No original-kit slot selected.", NamedTextColor.YELLOW));
-                    } else if (originalKitService.deleteSlot(target, slot)) {
+                    } else if (originalKitService.deleteSlot(target, chosen)) {
                         session.put(ORIGINAL_SLOT, -1);
                         player.sendMessage(Component.text("Deleted original-kit slot #"
-                                + (slot + 1) + " of " + displayName(target) + ".",
+                                + (chosen + 1) + " of " + displayName(target) + ".",
                                 NamedTextColor.GREEN));
                         sounds.play(player, "select");
                     } else {
@@ -635,8 +635,7 @@ public final class AdminPlayerDataGui extends AbstractGui {
                     }
                 } else {
                     // Plain click walks the selection through the saved slots.
-                    int slot = highlightedOriginalSlot(saved, session);
-                    int at = saved.indexOf(slot);
+                    int at = saved.indexOf(highlightedOriginalSlot(saved, session));
                     Integer next = saved.isEmpty() ? -1 : saved.get((at + 1) % saved.size());
                     session.put(ORIGINAL_SLOT, next);
                     sounds.play(player, "gui-click");
