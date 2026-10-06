@@ -374,10 +374,36 @@
 - 繋がらないときの分岐: ログに `[ShieldWeb] 盾管理Webを開始しました` が出ていない
   → enabled が false。出ているのに繋がらない → ファイアウォール / 別セグメント。
 
+## リソースパック配布 — **これが一番の根本原因**（v1.92.74 調査で判明）
+
+**既定の配布URLが 404 で、パックが1度もクライアントに届いていない。**
+
+- `ResourcePackService.DEFAULT_URL` =
+  `https://github.com/ifuto/RumilancePractice/releases/download/v1.76.61/RumilanceResourcePack.zip`
+- ところが **v1.76.61 は全リリース中で唯一アセットが空のタグ**（`gh api .../releases`
+  で確認: v1.92.17 / v1.92.3 / v1.92.2 / v1.92.1 / v1.76.60 / v1.76.59 / v1.76.58 /
+  v1.76.57 / v1.76.52 には zip があるが、**v1.76.61 だけ無い**）。
+  → `curl -sIL` の結果は **404**。
+- 結果: `fetchSha1(url)` が null を返し、`liveSha1` も `jsonSha1` も無ければ
+  「no pack is sent until a hash is known」で **パックが一切送信されない**。
+  つまり「リソースパックがバグってる」は、中身以前に**配布が生きていない**のが主因。
+- 直し方（`tools/release/attach-pack.sh` のコメントに書いてある想定手順）:
+  既定URLが指すタグへ `--clobber` でアップロードすれば、**設定変更なしで**起動中の
+  サーバーも次回再起動から直る。
+
+      tools/release/build-pack.sh
+      tools/release/attach-pack.sh v1.76.61
+
+- **この環境からは実行できない**: `uploads.github.com` がサンドボックスから遮断されている
+  （`curl` が exit 35 / http_code 000。`api.github.com` は 200）。
+  `gh release upload` は EOF で失敗する。**ユーザーがローカルで実行する必要あり。**
+
 ## 残り（次にやること）
 
-- [ ] リソースパック再配布: `tools/release/build-pack.sh` → `attach-pack.sh <tag>`。
-      配布しないとクライアントは旧 zip のまま。
+- [ ] **【最優先・ユーザー作業】`tools/release/attach-pack.sh v1.76.61` を実行**して
+      配布を復活させる。これをやらないと v1.92.74 のフォント修正はクライアントに届かない。
+- [ ] 配布後、`/rankicon test` で Probe A（icons フォント + U+E001 = バッジ）と
+      Probe B（icons フォント + "ABC" = 普通の文字）の両方が見えるか目視確認。
 - [ ] まだ検証していない項目（ユーザーのチェックリスト残り）:
       フォント描画そのものの目視確認、`/rankicon test` の Probe A/B の結果確認、
       パック適用確認（`ResourcePackService#hasPack`）のバグ有無。
