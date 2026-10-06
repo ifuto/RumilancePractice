@@ -3,7 +3,6 @@ package com.rumilance.practice.packets;
 import com.github.retrooper.packetevents.event.PacketSendEvent;
 import com.github.retrooper.packetevents.protocol.packettype.PacketType;
 import com.github.retrooper.packetevents.protocol.packettype.PacketTypeCommon;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerAttachEntity;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityAnimation;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityEffect;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityEquipment;
@@ -51,9 +50,6 @@ public final class PacketEntityIds {
             }
             if (type == PacketType.Play.Server.ENTITY_ANIMATION) {
                 return new WrapperPlayServerEntityAnimation(event).getEntityId();
-            }
-            if (type == PacketType.Play.Server.ATTACH_ENTITY) {
-                return new WrapperPlayServerAttachEntity(event).getEntityId();
             }
             if (type == PacketType.Play.Server.ENTITY_EFFECT) {
                 return new WrapperPlayServerEntityEffect(event).getEntityId();
