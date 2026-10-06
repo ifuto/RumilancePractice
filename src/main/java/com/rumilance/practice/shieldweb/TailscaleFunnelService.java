@@ -46,7 +46,7 @@ public final class TailscaleFunnelService {
 
     /** {@code "DNSName":"machine.tailnet.ts.net."} inside the {@code "Self"} block of status --json. */
     private static final Pattern SELF_BLOCK = Pattern.compile("\"Self\"\\s*:\\s*\\{");
-    private static final Pattern DNS_NAME = Pattern.compile("\"DNSName\"\\s*:\\s*\"([^\"]+)\"");
+    private static final Pattern DNS_NAME = Pattern.compile("\"DNSName\"\\s*:\\s*\"([^\"]*)\"");
     /** Any https URL in `tailscale funnel status` output, e.g. "https://host.ts.net". */
     private static final Pattern FUNNEL_URL = Pattern.compile("https://([A-Za-z0-9._-]+)");
 
