@@ -111,9 +111,9 @@ public final class AdminHubGui extends AbstractGui {
         return ItemBuilder.of(material)
                 .name(Component.text(name, UiTheme.HEADER))
                 .lore(UiTheme.divider(),
-                        UiTheme.line(Component.text(lore, UiTheme.MUTED)),
+                        UiTheme.line(lore),
                         UiTheme.blank(),
-                        UiTheme.hint(Component.text("Click to open", UiTheme.MUTED)))
+                        UiTheme.hint("Click to open"))
                 .action(action)
                 .build();
     }
