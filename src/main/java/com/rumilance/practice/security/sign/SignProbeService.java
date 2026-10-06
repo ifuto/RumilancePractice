@@ -373,5 +373,4 @@ public final class SignProbeService implements PacketListener {
             logger.log(Level.FINE, "[SignProbe] sendPacket failed", t);
         }
     }
-
 }
