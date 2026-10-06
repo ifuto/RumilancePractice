@@ -269,6 +269,8 @@ public final class FeatureBootstrap {
     private com.rumilance.practice.gui.menus.AdminHubGui adminHubGui;
     /** `/admin` → Cheat / Alt / Reports; needed before the hub is built. */
     private com.rumilance.practice.gui.menus.CheatReportsGui cheatReportsGui;
+    /** `/admin` → Arena / FFA; needed before the hub is built. */
+    private com.rumilance.practice.gui.menus.ArenaFfaGui arenaFfaGui;
     private ChatBanService chatBanService;
     private BanService banService;
     private MatchActionRecorder matchActionRecorder;
@@ -2258,7 +2260,7 @@ public final class FeatureBootstrap {
         com.rumilance.practice.gui.menus.AdminHubGui adminHubGui =
                 new com.rumilance.practice.gui.menus.AdminHubGui(guiSessions, soundService);
         this.adminHubGui = adminHubGui;
-        adminHubGui.setOpenArenaFfa(arenaSourceGui::open);
+        adminHubGui.setOpenArenaFfa(p -> this.arenaFfaGui.open(p));
         adminHubGui.setOpenPlayerData(adminPlayersGui::open);
         adminHubGui.setOpenPunishment(banListGui::open);
         adminHubGui.setOpenCheatReports(p -> this.cheatReportsGui.open(p));
@@ -2303,6 +2305,16 @@ public final class FeatureBootstrap {
         guiListener.register(adminHubGui);
         guiListener.register(cheatReportsGui);
         guiListener.register(chatReportsGui);
+
+        // --- /admin → Arena / FFA ---
+        com.rumilance.practice.gui.menus.ArenaFfaGui arenaFfaGui =
+                new com.rumilance.practice.gui.menus.ArenaFfaGui(guiSessions, soundService);
+        this.arenaFfaGui = arenaFfaGui;
+        arenaFfaGui.setOpenArenas(arenaSourceGui::open);
+        arenaFfaGui.setOpenFfaSettings(ffaSettingsGui::open);
+        arenaFfaGui.setOpenKitAdmin(kitAdminGui::open);
+        arenaFfaGui.setOnBack(adminHubGui::open);
+        guiListener.register(arenaFfaGui);
 
         adminPlayerDataGui.setStatsResetService(statsResetService);
         adminPlayerDataGui.setChatBanService(chatBanService);

@@ -84,6 +84,8 @@ public enum GuiType {
     CHEAT_REPORTS,
     /** Chat reports filed from the click-to-report hover. */
     CHAT_REPORTS,
+    /** `/admin` → Arena / FFA section. */
+    ARENA_FFA_ADMIN,
     SIGN_KIT_SELECT,
     CHAT_SETTINGS,
     TOURNAMENT,
