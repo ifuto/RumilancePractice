@@ -89,10 +89,6 @@ public final class LethalPresentationService implements Listener, PacketListener
         this.packetEvents = pe;
     }
 
-    public boolean animationAvailable() {
-        return packetEvents;
-    }
-
     /**
      * A killed B: play B's death on A's screen, then stop A from receiving B at all.
      *
@@ -281,17 +277,5 @@ public final class LethalPresentationService implements Listener, PacketListener
                 }
             }
         }
-    }
-
-    /** Exposed for tests: the pairs currently staged (killer → victims). */
-    public List<String> stagedPairs() {
-        List<String> out = new ArrayList<>();
-        hidden.forEach((killer, victims) -> {
-            for (UUID victim : victims) {
-                out.add(killer + "->" + victim);
-            }
-        });
-        out.sort(null);
-        return out;
     }
 }

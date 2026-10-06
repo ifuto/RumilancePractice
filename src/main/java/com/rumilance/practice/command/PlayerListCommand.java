@@ -4,7 +4,6 @@ import com.rumilance.practice.locale.MessageService;
 import com.rumilance.practice.session.PlayerStateManager;
 import com.rumilance.practice.state.PlayerState;
 import com.rumilance.practice.util.RealPlayers;
-import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -44,8 +43,7 @@ public final class PlayerListCommand implements CommandExecutor {
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command,
                              @NotNull String label, @NotNull String[] args) {
-        List<Player> online = new ArrayList<>(RealPlayers.online());
-        online.sort(Comparator.comparing(player -> player.getName().toLowerCase(Locale.ROOT)));
+        List<Player> online = sortedOnline();
 
         if (online.isEmpty()) {
             messages.send(sender, "player-list.empty");
@@ -86,15 +84,10 @@ public final class PlayerListCommand implements CommandExecutor {
         }
     }
 
-    /** Exposed for tests: the list the command would print, already sorted. */
-    public static List<Player> sortedOnline() {
+    /** The players the command prints, name-sorted and with bots filtered out. */
+    private static List<Player> sortedOnline() {
         List<Player> online = new ArrayList<>(RealPlayers.online());
         online.sort(Comparator.comparing(player -> player.getName().toLowerCase(Locale.ROOT)));
         return online;
-    }
-
-    /** Exposed for tests: the max player count shown in the header line. */
-    public static int serverMaxPlayers() {
-        return Bukkit.getMaxPlayers();
     }
 }

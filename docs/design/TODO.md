@@ -1,10 +1,28 @@
 # RumilancePractice — やるべきことリスト
 
-更新: 2026-10-05 / ブランチ `arena/01a106b3-rumilancepractice` / HEAD `3b053c1` (v1.92.51)
+更新: 2026-10-06 / ブランチ `arena/01a106b3-rumilancepractice` / v1.92.97
 
 > 定期自動要約で文脈が消えても追えるようにするためのメモ。
 > `/tmp/todo.md` にも同じものを置いているが、サンドボックスの /tmp はスナップショットに
 > 残らないので**本体はこのファイル**。
+
+## 2026-10-06 バッチ
+
+- [x] **ProtocolLib → PacketEvents 全面移行** — v1.92.89〜**v1.92.95**（CI 37456129041 success）。
+      対象8ファイル + `build.gradle.kts` + `plugin.yml` softdepend。
+      `src/main/java` から `com.comphenix.protocol` は **0 件**。詳細は下の専用セクション。
+- [x] **Ready エメラルドのホバーでアクションバーを出さない** — v1.92.96。
+      見つめるとライム色に光るので十分、という判断。Leave（レッドストーン）側の
+      「`N/2` · Leave ☓」はそのまま残す。未使用になった `countdown.gaze-ready` は7言語から削除。
+- [x] **デッドコード一掃** — v1.92.97。
+      `LethalPresentationService#animationAvailable` / `#stagedPairs`、
+      `PlayerListCommand#serverMaxPlayers` を削除。`PlayerListCommand#sortedOnline` は
+      public のテストシームをやめて実装から使う形にした。
+
+### 残っている宿題
+
+- [ ] **`docs/shield-web.md`**（タスク23のドキュメント。実装は v1.92.78 で完了済み）
+- [ ] タスク18 `/admin` 管理者 GUI、19 Player 紐付けデータ画面、21 チャット通報（上のリスト）
 
 ## 進行中（新バッチ 2026-10-05）
 
