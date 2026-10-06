@@ -14,6 +14,17 @@
 - [x] **13. Duel Chat の書式 + 受信/送信の切り替え** — v1.92.58
 - [x] **14. `/setting` の整理** — 重複機能の統一 — v1.92.58
 - [x] **15. `/block` `/ignore`** — Queue でブロック相手と当たらない — v1.92.59
+- [x] **16. `/tps` を一般開放**（Paper の `/tps` は塞ぐ） — v1.92.60
+- [x] **17. ブロックした相手からの tell は受信しない** — v1.92.60
+- [ ] **18. `/admin` 管理者 GUI** — `/practiceadmin` の上位互換。メイン画面に7ページ:
+      「Arena / FFA」「Player Data」「Punishment」「Cheat / Alt / Reports」
+      「Match Management」「Statics」「Server Settings」
+- [ ] **19. Player 紐付けデータ画面の完全管理** — リセットだけでなく値・配置の編集まで。
+      適度な間隔を開けて使いやすく。
+- [ ] **20. パーティの強制解散**
+- [ ] **21. チャット通報（一般ユーザー）** — チャットにホバーで "click to report"、
+      クリックで通報。`/admin` の Reports で確認。**投稿日時**と**前後のプレイヤー
+      メッセージ**は報告時の保存ではなく**動的取得**。
 
 ## 完了（8項目リスト + 追加2件）
 
@@ -109,6 +120,43 @@
   プレイヤーは10秒クールダウン、コンソールは対象外。
 - **履歴はメモリのみ。再起動で24時間の履歴は消える。**
 - テスト: `TpsTrackerTest`。
+
+---
+
+# 16〜21. 新バッチ（2026-10-06）
+
+ユーザー原文（要約）:
+
+> `/admin` で管理者用GUIページに行けるように。`/practiceadmin` の上位互換。
+> まず開いたら「Arena / FFA」「Player Data」「Punishment」「Cheat / Alt / Reports」
+> 「Match Management」「Statics」「Server Settings」のメイン画面がある。
+> あと Player に紐付けられたデータを見れる全画面だけど、リセットするだけじゃなくて
+> 値や配置をいじったりだとか、本当に全部管理できるようにして。適度な間隔を開けて
+> 使いやすくする。Party の強制解散だとかね。
+> また、一般ユーザーは他の人のチャットクリックでそのチャットを通報できる
+> （チャットにカーソル合わせたら "click to report" みたいなの出してもいいかも）。
+> `/admin` の Reports で確認できる。メッセージ投稿日時、その前後のプレイヤー
+> メッセージ（報告時セーブではなく動的取得）等々が見れる。
+> あと `/tps` は一般プレイヤー使用可。使えないのは Paper の `/tps`。
+> block したユーザーからの tell は受信しない。
+
+## 16. `/tps` 一般開放 — 実装メモ（v1.92.60）
+
+- `plugin.yml` の `rumilance.tps` を `default: op` → **`default: true`**。
+  `TpsCommand` 側に明示的な権限チェックは無く、plugin.yml の宣言だけに依存している。
+- **`TpsPaperGuard`**（新規）: `PlayerCommandPreprocessEvent` を `LOWEST` で受け、
+  `/minecraft:tps` `/paper:tps` `/bukkit:tps` `/spigot:tps` を cancel して
+  「Use /tps instead.」を出す。`rumilance.admin` は対象外（両方使える）。
+  - 素の `/tps` は plugin.yml の登録が優先されるので、こちらを塞ぐ必要はない。
+  - 名前空間付きだけが Paper 側へ抜ける抜け道になる。
+
+## 17. ブロック相手の tell は受信しない — 実装メモ（v1.92.60）
+
+- `TellCommand#deliver` の**一番最初**に判定を追加。
+  `BlockListService#isBlocked(to, from)` が true なら送信者に `tell.blocked-you` を出して
+  終了（受信者には届かない）。コンソール（`from == null`）は常に除外。
+- 既存の `ChatPolicy.receivesMessage`（`receiveStrangerMessages`）より**優先**。
+  ブロックは「設定」ではなく「明示的な拒否」なので上に置く。
 
 ---
 

@@ -768,6 +768,22 @@ public final class FeatureBootstrap {
         services.register(com.rumilance.practice.social.BlockListService.class, blockListService);
         queueCoordinator.setBlockListService(blockListService);
         this.blockListService = blockListService;
+
+        // --- チャット通報 (2026-10-06): ホバーで "click to report"、クリックで通報 ---
+        // 本文と前後の文は報告時に保存せず、閲覧時に ChatLogService から動的に引く。
+        com.rumilance.practice.chat.ChatLogService chatLogService =
+                new com.rumilance.practice.chat.ChatLogService(
+                        plugin.getConfig().getInt("chat-log.capacity", 2000));
+        com.rumilance.practice.database.repository.ChatReportRepository chatReportRepository =
+                new com.rumilance.practice.database.repository.ChatReportRepository(
+                        services.get(com.rumilance.practice.database.DatabaseService.class));
+        com.rumilance.practice.chat.ChatReportService chatReportService =
+                new com.rumilance.practice.chat.ChatReportService(
+                        plugin, chatReportRepository, chatLogService);
+        chatReportService.contextBefore = plugin.getConfig().getInt("chat-log.context-before", 5);
+        chatReportService.contextAfter = plugin.getConfig().getInt("chat-log.context-after", 5);
+        services.register(com.rumilance.practice.chat.ChatLogService.class, chatLogService);
+        services.register(com.rumilance.practice.chat.ChatReportService.class, chatReportService);
         DuelCommand.configureSameIp(plugin.getConfig().getBoolean("queue.block-same-ip", true));
         DuelCommand.setAltDetectionService(this.altDetection);
         plugin.getServer().getPluginManager().registerEvents(
@@ -1830,8 +1846,12 @@ public final class FeatureBootstrap {
                 playerPlacedBlockTracker, explosionSources, damageAttribution), plugin);
         pm.registerEvents(new MatchCommandGuardListener(stateManager, messageService), plugin);
         pm.registerEvents(new MatchCountdownLockListener(stateManager), plugin);
-        pm.registerEvents(new com.rumilance.practice.match.MatchChatListener(
-                matchRegistry, spectatorService, settingsService), plugin);
+        com.rumilance.practice.match.MatchChatListener matchChatListener =
+                new com.rumilance.practice.match.MatchChatListener(
+                        matchRegistry, spectatorService, settingsService);
+        matchChatListener.setChatLog(chatLogService);
+        matchChatListener.setMessages(messageService);
+        pm.registerEvents(matchChatListener, plugin);
         // /matchchat — duel chat scope toggle (local [Duel] channel vs global public chat).
 
         pm.registerEvents(new TeamColoredArmorListener(teamColoredArmor, settingsService), plugin);
@@ -2328,6 +2348,8 @@ public final class FeatureBootstrap {
         bind("tell", tellCommand);
         bind("matchchat", new com.rumilance.practice.command.MatchChatCommand(matchRegistry, settingsService));
         bind("block", new com.rumilance.practice.command.BlockCommand(blockListService, messageService));
+        bind("reportchat", new com.rumilance.practice.command.ReportChatCommand(
+                chatReportService, chatLogService, messageService));
         bind("reply", tellCommand);
         bind("ekitadmin", new EkitAdminCommand(ekitAdminGui,
                 services.get(com.rumilance.practice.originalkit.OriginalKitRoomService.class)));

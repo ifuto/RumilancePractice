@@ -486,6 +486,13 @@ queue:
   sign-waiting: "<aqua>Cola <kit> | <seconds>s | <count>/<capacity>"
   waiting-bar: "<aqua>Cola <kit> (<platform>) | <seconds>s | <waiting> en espera"
 
+report:
+  hint: "<gray>Clic para denunciar</gray>"
+  filed: "<green><target> denunciado.</green>"
+  duplicate: "<yellow>Ya has denunciado ese mensaje.</yellow>"
+  self: "<red>No puedes denunciar tu propio mensaje.</red>"
+  expired: "<red>Ese mensaje es demasiado antiguo.</red>"
+
 tell:
   usage: "<gray>Uso:</gray> <yellow>/tell \\<player> \\<message></yellow>"
   usage-reply: "<gray>Uso:</gray> <yellow>/reply \\<message></yellow>"

@@ -486,6 +486,13 @@ queue:
   sign-waiting: "<aqua>File <kit> | <seconds> s | <count>/<capacity>"
   waiting-bar: "<aqua>File <kit> (<platform>) | <seconds> s | <waiting> en attente"
 
+report:
+  hint: "<gray>Clic pour signaler</gray>"
+  filed: "<green><target> signale.</green>"
+  duplicate: "<yellow>Tu as deja signale ce message.</yellow>"
+  self: "<red>Tu ne peux pas signaler ton propre message.</red>"
+  expired: "<red>Ce message est trop ancien.</red>"
+
 tell:
   usage: "<gray>Utilisation :</gray> <yellow>/tell \\<player> \\<message></yellow>"
   usage-reply: "<gray>Utilisation :</gray> <yellow>/reply \\<message></yellow>"

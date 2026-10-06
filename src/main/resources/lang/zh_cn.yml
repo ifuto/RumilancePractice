@@ -486,6 +486,13 @@ queue:
   sign-waiting: "<aqua><kit> 队列 | 已等待 <seconds> 秒 | <count>/<capacity>"
   waiting-bar: "<aqua><kit> (<platform>) 队列 | 已等待 <seconds> 秒 | <waiting> 人等待中"
 
+report:
+  hint: "<gray>点击举报</gray>"
+  filed: "<green>已举报 <target>。</green>"
+  duplicate: "<yellow>你已经举报过该消息。</yellow>"
+  self: "<red>不能举报自己的消息。</red>"
+  expired: "<red>该消息太旧，无法举报。</red>"
+
 tell:
   usage: "<gray>用法：</gray> <yellow>/tell \\<player> \\<message></yellow>"
   usage-reply: "<gray>用法：</gray> <yellow>/reply \\<message></yellow>"

@@ -6,9 +6,14 @@ import com.rumilance.practice.session.MatchSession;
 import com.rumilance.practice.settings.SettingsService;
 import com.rumilance.practice.spectator.SpectatorService;
 import com.rumilance.practice.state.MatchState;
+import io.papermc.paper.chat.ChatRenderer;
 import io.papermc.paper.event.player.AsyncChatEvent;
+import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickEvent;
+import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -47,12 +52,26 @@ public final class MatchChatListener implements Listener {
     private final MatchRegistry registry;
     private final SpectatorService spectatorService;
     private final SettingsService settingsService;
+    /** Rolling chat buffer; gives every line an id the report click can carry. */
+    private com.rumilance.practice.chat.ChatLogService chatLog;
+    /** Used for the localised "click to report" hover; null leaves lines plain. */
+    private com.rumilance.practice.locale.MessageService messages;
 
     public MatchChatListener(MatchRegistry registry, SpectatorService spectatorService,
                              SettingsService settingsService) {
         this.registry = registry;
         this.spectatorService = spectatorService;
         this.settingsService = settingsService;
+    }
+
+    /** Wired from bootstrap; null disables chat logging. */
+    public void setChatLog(com.rumilance.practice.chat.ChatLogService chatLog) {
+        this.chatLog = chatLog;
+    }
+
+    /** Wired from bootstrap; null leaves the report hover off. */
+    public void setMessages(com.rumilance.practice.locale.MessageService messages) {
+        this.messages = messages;
     }
 
     /**
@@ -87,16 +106,39 @@ public final class MatchChatListener implements Listener {
     public void onChat(AsyncChatEvent event) {
         Player speaker = event.getPlayer();
         MatchSession session = routesToDuel(speaker) ? liveMatch(speaker.getUniqueId()) : null;
+        // Record before routing so both channels share one id space. The stored text is the
+        // plain rendering — the report UI wants what was said, not the styling around it.
+        long lineId = chatLog == null ? -1L : chatLog.record(speaker.getUniqueId(),
+                speaker.getName(),
+                PlainTextComponentSerializer.plainText().serialize(event.message()),
+                System.currentTimeMillis());
 
         if (session != null) {
-            routeDuelChat(event, speaker, session);
+            routeDuelChat(event, speaker, session, lineId);
         } else {
-            routeGlobalChat(event, speaker);
+            routeGlobalChat(event, speaker, lineId);
         }
     }
 
+    /**
+     * Wraps a finished chat line with the "click to report" hover, and only for viewers who can
+     * legitimately file one: never the speaker, and nobody without the player permission.
+     */
+    private Component reportable(Component rendered, UUID speakerId, Audience viewer, long lineId) {
+        if (lineId < 0 || messages == null || !(viewer instanceof Player player)) {
+            return rendered;
+        }
+        if (player.getUniqueId().equals(speakerId) || !player.hasPermission("rumilance.user")) {
+            return rendered;
+        }
+        return rendered
+                .hoverEvent(HoverEvent.showText(messages.render(player, "report.hint")))
+                .clickEvent(ClickEvent.runCommand("/reportchat " + lineId));
+    }
+
     /** Scopes the line to the match and renders it in the Duel Chat format. */
-    private void routeDuelChat(AsyncChatEvent event, Player speaker, MatchSession session) {
+    private void routeDuelChat(AsyncChatEvent event, Player speaker, MatchSession session,
+                               long lineId) {
         Set<UUID> allowed = new HashSet<>(session.participants());
         if (spectatorService != null) {
             allowed.addAll(spectatorService.spectatorsWatching(session.id()));
@@ -118,16 +160,21 @@ public final class MatchChatListener implements Listener {
         Component tag = Component.text(
                 session.isTeamMatch() ? MATCH_TAG : DUEL_TAG, NamedTextColor.AQUA);
         Component head = HeadFontService.of(speaker.getUniqueId()).color(NamedTextColor.WHITE);
-        event.renderer((source, sourceDisplayName, message, viewer) -> tag
-                .append(Component.space())
-                .append(head)
-                .append(Component.text(source.getName(), NamedTextColor.WHITE))
-                .append(Component.text(" : ", NamedTextColor.WHITE))
-                .append(message));
+        event.renderer((source, sourceDisplayName, message, viewer) ->
+                reportable(tag
+                        .append(Component.space())
+                        .append(head)
+                        .append(Component.text(source.getName(), NamedTextColor.WHITE))
+                        .append(Component.text(" : ", NamedTextColor.WHITE))
+                        .append(message), source.getUniqueId(), viewer, lineId));
     }
 
     /** Drops the viewers who turned Global Chat reception off (whitelist still wins). */
-    private void routeGlobalChat(AsyncChatEvent event, Player speaker) {
+    private void routeGlobalChat(AsyncChatEvent event, Player speaker, long lineId) {
+        ChatRenderer original = event.renderer();
+        event.renderer((source, sourceDisplayName, message, viewer) ->
+                reportable(original.render(source, sourceDisplayName, message, viewer),
+                        source.getUniqueId(), viewer, lineId));
         if (settingsService == null) {
             return;
         }

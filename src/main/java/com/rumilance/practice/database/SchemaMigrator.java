@@ -501,6 +501,14 @@ public final class SchemaMigrator {
                         + " PRIMARY KEY (blocker_uuid, blocked_uuid))"
         )));
 
+        migrations.add(new Migration(38, "create chat_reports table", List.of(
+                "CREATE TABLE IF NOT EXISTS " + databaseService.table("chat_reports") + " ("
+                        + "chat_line_id BIGINT NOT NULL, reporter_uuid CHAR(36) NOT NULL,"
+                        + " reported_uuid CHAR(36) NOT NULL, reported_name VARCHAR(32) NOT NULL,"
+                        + " reported_ts BIGINT NOT NULL, status VARCHAR(16) NOT NULL DEFAULT 'OPEN',"
+                        + " PRIMARY KEY (chat_line_id, reporter_uuid))"
+        )));
+
         return migrations;
     }
 

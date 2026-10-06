@@ -486,6 +486,13 @@ queue:
   sign-waiting: "<aqua><kit> 대기열 | <seconds>초 | <count>/<capacity>"
   waiting-bar: "<aqua><kit> (<platform>) 대기열 | <seconds>초 | <waiting>명 대기 중"
 
+report:
+  hint: "<gray>클릭하여 신고</gray>"
+  filed: "<green><target> 신고 완료.</green>"
+  duplicate: "<yellow>이미 신고한 메시지입니다.</yellow>"
+  self: "<red>자신의 메시지는 신고할 수 없습니다.</red>"
+  expired: "<red>너무 오래된 메시지입니다.</red>"
+
 tell:
   usage: "<gray>사용법:</gray> <yellow>/tell \\<player> \\<message></yellow>"
   usage-reply: "<gray>사용법:</gray> <yellow>/reply \\<message></yellow>"

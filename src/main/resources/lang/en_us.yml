@@ -488,6 +488,13 @@ queue:
   sign-waiting: "<aqua>Queue <kit> | <seconds>s | <count>/<capacity>"
   waiting-bar: "<aqua>Queue <kit> (<platform>) | <seconds>s | <waiting> waiting"
 
+report:
+  hint: "<gray>Click to report</gray>"
+  filed: "<green>Reported <target>.</green>"
+  duplicate: "<yellow>You already reported that message.</yellow>"
+  self: "<red>You cannot report your own message.</red>"
+  expired: "<red>That message is too old to report.</red>"
+
 tell:
   usage: "<gray>Usage:</gray> <yellow>/tell \\<player> \\<message></yellow>"
   usage-reply: "<gray>Usage:</gray> <yellow>/reply \\<message></yellow>"

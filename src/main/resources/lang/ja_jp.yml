@@ -487,6 +487,13 @@ queue:
   sign-waiting: "<aqua><kit> キュー | <seconds>秒 | <count>/<capacity>"
   waiting-bar: "<aqua><kit> (<platform>) キュー | <seconds>秒 | <waiting>人待ち"
 
+report:
+  hint: "<gray>クリックで通報</gray>"
+  filed: "<green>通報を受け付けました: <target></green>"
+  duplicate: "<yellow>そのメッセージはすでに通報済みです。</yellow>"
+  self: "<red>自分のメッセージは通報できません。</red>"
+  expired: "<red>その発言は古すぎて通報できません。</red>"
+
 tell:
   usage: "<gray>使い方:</gray> <yellow>/tell \\<player> \\<message></yellow>"
   usage-reply: "<gray>使い方:</gray> <yellow>/reply \\<message></yellow>"
