@@ -21,7 +21,7 @@
       「Match Management」「Statics」「Server Settings」
 - [ ] **19. Player 紐付けデータ画面の完全管理** — リセットだけでなく値・配置の編集まで。
       適度な間隔を開けて使いやすく。
-- [ ] **20. パーティの強制解散**
+- [x] **20. パーティの強制解散** — v1.92.64–65
 - [ ] **21. チャット通報（一般ユーザー）** — チャットにホバーで "click to report"、
       クリックで通報。`/admin` の Reports で確認。**投稿日時**と**前後のプレイヤー
       メッセージ**は報告時の保存ではなく**動的取得**。
@@ -203,7 +203,25 @@
 - **ハマりどころ**: `UiTheme.line()` / `UiTheme.hint()` は **`Component` ではなく `String`**。
   v1.92.62 はこれでコンパイル落ちした（v1.92.63 で修正）。
 
+## 20. パーティ強制解散 — 実装メモ（v1.92.64–65）
+
+- `TeamService#forceDisband(UUID memberId)` を追加。**所有者チェックを飛ばす**以外は
+  `disband(Player)` と同じで、必ず private の `disbandTeam(team, true)` を通るので
+  Queue / Duel の状態も消える（幽霊パーティと組まされる事故を防ぐ）。
+  パーティに入っていなければ `Result.NOT_IN_TEAM` を返し、呼び側が正直に報告する。
+- **`teamOf(UUID)` は既に存在した**（`Optional<Team>` を返す）。同じ名前を足して
+  コンパイルが落ちた（v1.92.65 で重複を削除して既存側に合わせた）。
+  **既存 API を足す前に必ず grep する。**
+- `AdminPlayerDataGui` の `GuiSlots.slot(3, 4)` に「Force disband party」タイル。
+  パーティ名とメンバー数を表示し、未所属なら灰色染料で `decorate`。
+- `/admin` ハブを FeatureBootstrap の**フィールド**にした（`private AdminHubGui adminHubGui`）。
+  生成が後ろ（2256行）でも、前方（1360行）の戻り先から参照できるようにするため。
+- 管理者サブ画面（`AdminPlayersGui` / `AdminMatchesGui` / `AdminToggleGui` /
+  `KbDefaultGui` / `AltFlagsGui`）と **`/practiceadmin menu`** の戻り先を
+  旧 `AdminMenuGui` から新ハブへ変更。
+
 ## 残り（次にやること）
+
 
 - [ ] 19. **Player データ画面の完全管理** — `AdminPlayerDataGui` は現状リセット中心。
       値の編集・配置の変更を追加する。
