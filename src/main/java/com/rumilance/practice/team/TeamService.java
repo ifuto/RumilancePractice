@@ -358,11 +358,6 @@ public final class TeamService {
         return Result.OK;
     }
 
-    /** The team this player is in, or {@code null}. Read-only view for admin tooling. */
-    public Team teamOf(UUID playerId) {
-        return byMember.get(playerId);
-    }
-
     /**
      * Admin override: disbands whatever team this player is in, whoever owns it.
      *

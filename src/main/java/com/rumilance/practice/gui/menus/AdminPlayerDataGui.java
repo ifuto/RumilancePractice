@@ -393,8 +393,9 @@ public final class AdminPlayerDataGui extends AbstractGui {
                         .action("act:full_wipe").build());
 
         // --- force disband party ---
-        com.rumilance.practice.team.Team team =
-                teamService == null ? null : teamService.teamOf(target);
+        com.rumilance.practice.team.Team team = teamService == null
+                ? null
+                : teamService.teamOf(target).orElse(null);
         inventory.setItem(GuiSlots.slot(3, 4),
                 ItemBuilder.of(team == null ? Material.GRAY_DYE : Material.RED_BED)
                         .name(Component.text("Force disband party",
@@ -693,7 +694,8 @@ public final class AdminPlayerDataGui extends AbstractGui {
                 if (teamService == null) {
                     return;
                 }
-                com.rumilance.practice.team.Team disbanded = teamService.teamOf(target);
+                com.rumilance.practice.team.Team disbanded =
+                        teamService.teamOf(target).orElse(null);
                 if (disbanded == null) {
                     sounds.play(player, "error");
                     player.sendMessage(Component.text(
