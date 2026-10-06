@@ -334,7 +334,11 @@ public final class CountdownMarkers implements Listener {
             }
         }
         if (gazed != null) {
-            player.sendActionBar(gazeLine(player, gazed, readyTotal(set)));
+            // The Ready emerald already glows lime while it is being looked at, so it needs no
+            // action bar hint - only the Leave block spells its action out.
+            if (gazed.kind != Kind.READY) {
+                player.sendActionBar(leaveLine(player, readyTotal(set)));
+            }
             return;
         }
         if (showReadyNotice) {
@@ -349,23 +353,20 @@ public final class CountdownMarkers implements Listener {
     }
 
     /**
-     * The line shown while looking at a block: how many fighters are Ready, then the action
-     * of the block being looked at. The leading number turns green once it is 1.
+     * The line shown while looking at the Leave block: how many fighters are Ready, then the
+     * action of the block. The leading number turns green once it is 1.
      */
-    private Component gazeLine(Player player, Marker marker, int readyCount) {
-        String key = marker.kind == Kind.READY ? "countdown.gaze-ready" : "countdown.gaze-leave";
+    private Component leaveLine(Player player, int readyCount) {
         String number = (readyCount > 0 ? "<color:#4ADE80>" : "<color:#94A3B8>") + readyCount + "</color>";
         // 数値は「色付きマークアップ」を値にしているので unparsed だとそのまま表示される。
-        Component rendered = render(player, key, MessageService.tagsParsed("n", number));
+        Component rendered = render(player, "countdown.gaze-leave", MessageService.tagsParsed("n", number));
         if (rendered != null) {
             return rendered;
         }
-        TextColor accent = marker.kind == Kind.READY ? READY : LEAVE;
         return Component.text(String.valueOf(readyCount), readyCount > 0 ? READY : MUTED)
                 .append(Component.text("/2 ", MUTED))
                 .append(Component.text("· ", SEPARATOR))
-                .append(Component.text(marker.kind == Kind.READY ? "Ready ✓" : "Leave ☓", accent)
-                        .decorate(TextDecoration.BOLD));
+                .append(Component.text("Leave ☓", LEAVE).decorate(TextDecoration.BOLD));
     }
 
     /** The line shown when the opponent pressed Ready and this player is not looking anywhere. */
