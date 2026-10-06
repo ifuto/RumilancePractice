@@ -2247,6 +2247,18 @@ public final class FeatureBootstrap {
                 new AltFlagsGui(guiSessions, soundService, this.altDetection);
         // W/L (wins & losses) editor for one player's ranked rows
         AdminStatsGui adminStatsGui = new AdminStatsGui(guiSessions, soundService, statsService);
+
+        // --- /admin ハブ (2026-10-06): /practiceadmin の上位互換 ---
+        // 7セクション。既存画面へそのまま委譲し、ハブ自体は遷移先を知らない。
+        com.rumilance.practice.gui.menus.AdminHubGui adminHubGui =
+                new com.rumilance.practice.gui.menus.AdminHubGui(guiSessions, soundService);
+        adminHubGui.setOpenArenaFfa(arenaSourceGui::open);
+        adminHubGui.setOpenPlayerData(adminPlayersGui::open);
+        adminHubGui.setOpenPunishment(banListGui::open);
+        adminHubGui.setOpenCheatReports(reportListGui::open);
+        adminHubGui.setOpenMatchManagement(adminMatchesGui::open);
+        adminHubGui.setOpenStats(adminStatsGui::open);
+        adminHubGui.setOpenServerSettings(adminToggleGui::open);
         adminStatsGui.setDataGui(adminPlayerDataGui);
         adminPlayerDataGui.setOpenWlEditor(adminStatsGui::openFor);
         adminPlayerLookupListener.setStatsService(statsService);
@@ -2278,6 +2290,7 @@ public final class FeatureBootstrap {
         AdminCommand adminCommand = new AdminCommand(
                 plugin, statsResetService, playerRepository, asyncExecutor, originalKitService);
         adminCommand.setScoreboardService(scoreboardService);
+        adminCommand.setAdminHub(adminHubGui::open);
 
         LobbyCommand lobbyCommand = new LobbyCommand(
                 lobbyService, stateManager, spectatorService, ffaService, messageService, practiceService);

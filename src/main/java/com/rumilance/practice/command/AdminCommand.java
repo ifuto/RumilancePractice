@@ -35,6 +35,8 @@ public final class AdminCommand implements CommandExecutor, TabCompleter {
     private final AsyncExecutor asyncExecutor;
     private final com.rumilance.practice.originalkit.OriginalKitService originalKitService;
     private com.rumilance.practice.scoreboard.ScoreboardService scoreboardService;
+    /** The `/admin` GUI home screen; opened when the command is used without arguments. */
+    private java.util.function.Consumer<Player> adminHub;
 
     public AdminCommand(
             Plugin plugin,
@@ -63,11 +65,26 @@ public final class AdminCommand implements CommandExecutor, TabCompleter {
         this.scoreboardService = scoreboardService;
     }
 
+    /** Wired from bootstrap; null keeps the old text-only usage message. */
+    public void setAdminHub(java.util.function.Consumer<Player> adminHub) {
+        this.adminHub = adminHub;
+    }
+
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command,
                              @NotNull String label, @NotNull String[] args) {
         if (!sender.hasPermission("rumilance.admin") && !sender.isOp()) {
             sender.sendMessage(Component.text("権限がありません。", NamedTextColor.RED));
+            return true;
+        }
+        // `/admin` on its own is the admin GUI; every existing subcommand keeps working.
+        if (args.length == 0) {
+            if (sender instanceof Player player && adminHub != null) {
+                adminHub.accept(player);
+            } else {
+                sender.sendMessage(Component.text("使い方: /admin reset point [プレイヤー]",
+                        NamedTextColor.YELLOW));
+            }
             return true;
         }
         if (args.length < 2

@@ -78,6 +78,8 @@ public enum GuiType {
     ADMIN_KB_DEFAULT,
     ADMIN_ALT_FLAGS,
     ADMIN_STATS,
+    /** `/admin` — the seven-section admin home screen. */
+    ADMIN_HUB,
     SIGN_KIT_SELECT,
     CHAT_SETTINGS,
     TOURNAMENT,
