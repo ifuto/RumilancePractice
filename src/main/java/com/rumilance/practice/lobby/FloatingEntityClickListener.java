@@ -17,21 +17,22 @@ public final class FloatingEntityClickListener implements Listener {
 
     private volatile Map<Integer, java.util.function.Consumer<Player>> actions =
             new ConcurrentHashMap<>();
+    /** Per-kit floating queue items carry a plain Runnable (they know their own target). */
+    private volatile Map<Integer, Runnable> floatActions = new ConcurrentHashMap<>();
 
     /** Set the shared action map (from LobbyFloatingEntitiesService). */
     public void setClickActions(Map<Integer, java.util.function.Consumer<Player>> actions) {
         this.actions = actions != null ? actions : new ConcurrentHashMap<>();
     }
 
-    /** Register an action for an interaction entity. */
-    public void register(Interaction entity, java.util.function.Consumer<Player> action) {
-        if (entity != null && action != null) {
-            actions.put(entity.getEntityId(), action);
-        }
+    /** Set the shared action map (from FloatingQueueService). */
+    public void setFloatActions(Map<Integer, Runnable> floatActions) {
+        this.floatActions = floatActions != null ? floatActions : new ConcurrentHashMap<>();
     }
 
     public void clear() {
         actions.clear();
+        floatActions.clear();
     }
 
     @EventHandler
@@ -39,11 +40,18 @@ public final class FloatingEntityClickListener implements Listener {
         if (!(event.getRightClicked() instanceof Interaction interaction)) {
             return;
         }
-        java.util.function.Consumer<Player> action = actions.get(interaction.getEntityId());
-        if (action != null) {
-            // Swallow the interaction so a right-click never also swings/places.
-            event.setCancelled(true);
-            action.accept(event.getPlayer());
+        int id = interaction.getEntityId();
+        java.util.function.Consumer<Player> action = actions.get(id);
+        if (action == null) {
+            Runnable plain = floatActions.get(id);
+            if (plain != null) {
+                // Swallow the interaction so a right-click never also swings/places.
+                event.setCancelled(true);
+                plain.run();
+            }
+            return;
         }
+        event.setCancelled(true);
+        action.accept(event.getPlayer());
     }
 }

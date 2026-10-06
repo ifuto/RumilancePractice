@@ -279,6 +279,7 @@ public final class FeatureBootstrap {
     private com.rumilance.practice.practice.afk.AfkCrystalManager afkCrystalManager;
     private com.rumilance.practice.shieldweb.ShieldWebService shieldWebService;
     private com.rumilance.practice.shieldweb.TailscaleFunnelService tailscaleFunnelService;
+    private com.rumilance.practice.lobby.FloatingQueueService floatingQueueService;
     private com.rumilance.practice.combat.KnockbackTuning knockbackTuning;
     /** {@code /bot} inside FFA: the unkillable mannequin training dummy. */
     private com.rumilance.practice.ffa.FfaMannequinService ffaMannequins;
@@ -827,6 +828,16 @@ public final class FeatureBootstrap {
         com.rumilance.practice.lobby.LobbyFloatingEntitiesService floatingEntitiesService = this.floatingEntitiesService;
         // Load persisted floating entities from lobby.yml on startup.
         floatingEntitiesService.loadFromConfig(configService.lobby());
+        // Per-kit floating queue items (/float spawn queue <kit>): the kit's own icon, spinning,
+        // glowing for whoever looks at it, joining that kit's unranked queue on click.
+        this.floatingQueueService =
+                new com.rumilance.practice.lobby.FloatingQueueService(plugin);
+        this.floatingQueueService.setKitService(kitService);
+        this.floatingQueueService.setJoinUnranked((player, kitId) ->
+                queueCoordinator.join(player, kitId,
+                        com.rumilance.practice.match.MatchMode.UNRANKED));
+        this.floatingQueueService.loadFromConfig(configService.lobby());
+
         // Right-click on the floating lobby entities. Without this registration the listener
         // is dead code and the floating queue item is pure decoration — it never opened
         // anything. The action map is shared with the service, so entities spawned later
@@ -834,6 +845,8 @@ public final class FeatureBootstrap {
         com.rumilance.practice.lobby.FloatingEntityClickListener floatingEntityClickListener =
                 new com.rumilance.practice.lobby.FloatingEntityClickListener();
         floatingEntityClickListener.setClickActions(floatingEntitiesService.clickActions());
+        // One listener, two producers: the legacy floating entities and the per-kit ones.
+        floatingEntityClickListener.setFloatActions(this.floatingQueueService.clickActions());
         plugin.getServer().getPluginManager()
                 .registerEvents(floatingEntityClickListener, plugin);
         // Hub gliding: firework-style boost on right-click (2s cooldown, silent while cooling)
@@ -2533,6 +2546,8 @@ public final class FeatureBootstrap {
             hiddenRankCommand.setShieldWeb(this.shieldWebService);
         }
         bind("urank", hiddenRankCommand);
+        bind("float", new com.rumilance.practice.command.FloatCommand(
+                this.floatingQueueService, configService));
         com.rumilance.practice.command.AdminMatchCommand adminMatchCommand =
                 new com.rumilance.practice.command.AdminMatchCommand(matchService, kitService, arenaService);
         bind("forceend", adminMatchCommand);
@@ -2675,6 +2690,9 @@ public final class FeatureBootstrap {
         if (this.shieldWebService != null) {
             this.shieldWebService.stop();
             this.shieldWebService = null;
+        }
+        if (this.floatingQueueService != null) {
+            this.floatingQueueService.shutdown();
         }
         if (afkCrystalManager != null) {
             afkCrystalManager.shutdown();

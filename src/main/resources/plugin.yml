@@ -326,6 +326,10 @@ commands:
     usage: /rank <player> <norm|VIP|VIP+|admin|owner> [duration e.g. 30d]
     aliases: [rank]
     permission: rumilance.admin
+  float:
+    description: Floating lobby items that join a kit's unranked queue.
+    usage: /float <spawn|remove|list>
+    permission: rumilance.admin
   urank:
     description: Manage hidden ranks that never display (OP), including custom_shield and tester.
     usage: /urank <custom_shield|tester|remove|shield|gui|web|list>
