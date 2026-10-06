@@ -1333,6 +1333,7 @@ gui:
   inv-fighters: "已保存 <n> 名选手"
   inv-next: "下一个：<name>"
   inv-swap: "切换选手"
+  inv-view-hint: "点击查看 <name> 的物品栏"
   inv-empty: "空"
   history-title: "比赛记录"
   history-empty: "暂无记录"

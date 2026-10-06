@@ -1335,6 +1335,7 @@ gui:
   inv-fighters: "<n> fighter(s) stored"
   inv-next: "Next: <name>"
   inv-swap: "Switch fighter"
+  inv-view-hint: "Click to view <name>'s inventory"
   inv-empty: "Empty"
   history-title: "Match History"
   history-empty: "No history yet"

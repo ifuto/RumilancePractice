@@ -1333,6 +1333,7 @@ gui:
   inv-fighters: "<n>명 저장됨"
   inv-next: "다음: <name>"
   inv-swap: "선수 전환"
+  inv-view-hint: "클릭하면 <name>의 인벤토리를 봅니다"
   inv-empty: "비어 있음"
   history-title: "경기 기록"
   history-empty: "아직 기록이 없습니다"

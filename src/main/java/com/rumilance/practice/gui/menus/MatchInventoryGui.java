@@ -126,9 +126,15 @@ public final class MatchInventoryGui extends AbstractGui {
         }
 
         if (snap.fighters().size() > 1) {
+            // The arrow's own label is the next fighter's NAME and clicking it opens that
+            // fighter's end inventory, so it carries the same "click to view inventory"
+            // explanation the kill feed hover gives — otherwise the only line under the name
+            // is 「選手を切替」 and nothing says what you are actually about to open.
             inventory.setItem(GuiSlots.slot(0, 7), ItemBuilder.of(Material.ARROW)
                     .name(Component.text("\u2192 " + otherName, UiTheme.WARNING))
-                    .lore(UiTheme.hint(line(player, "gui.inv-swap")))
+                    .lore(UiTheme.hint(line(player, "gui.inv-swap")),
+                            UiTheme.hint(line(player, "gui.inv-view-hint")
+                                    .replace("<name>", otherName)))
                     .action("swap").build());
         }
         inventory.setItem(GuiSlots.slot(0, 8), GuiDecorator.button(Material.BARRIER,

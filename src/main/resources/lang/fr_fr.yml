@@ -1333,6 +1333,7 @@ gui:
   inv-fighters: "<n> combattant(s) enregistré(s)"
   inv-next: "Suivant : <name>"
   inv-swap: "Changer de combattant"
+  inv-view-hint: "Cliquez pour voir l'inventaire de <name>"
   inv-empty: "Vide"
   history-title: "Historique des matchs"
   history-empty: "Pas encore d'historique"

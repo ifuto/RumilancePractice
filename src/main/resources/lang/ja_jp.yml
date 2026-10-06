@@ -1334,6 +1334,7 @@ gui:
   inv-fighters: "<n> 人分を保存"
   inv-next: "次: <name>"
   inv-swap: "選手を切替"
+  inv-view-hint: "クリックで <name> の終了インベントリを表示"
   inv-empty: "空"
   history-title: "試合履歴"
   history-empty: "履歴がありません"

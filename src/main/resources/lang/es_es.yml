@@ -1333,6 +1333,7 @@ gui:
   inv-fighters: "<n> combatiente(s) guardados"
   inv-next: "Siguiente: <name>"
   inv-swap: "Cambiar combatiente"
+  inv-view-hint: "Clic para ver el inventario de <name>"
   inv-empty: "Vacío"
   history-title: "Historial de partidas"
   history-empty: "Aún no hay historial"
