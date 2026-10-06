@@ -243,12 +243,31 @@
   AbstractGui は `guiListener.register()` しないとクリックを受け取れない。
   **`GuiType` を足したら必ず `guiListener.register()` する。**
 
+## Arena / FFA セクション画面 — 実装メモ（v1.92.67）
+
+- **`ArenaFfaGui`**（新規、`GuiType.ARENA_FFA_ADMIN`、6行 GREEN）:
+  Arenas(2,1) / FFA Settings(2,4) / Kits(2,7)、Back(5,4)。1列おきに配置。
+  遷移先は `ArenaSourceGui` / `FfaSettingsGui` / `KitAdminGui`。
+- これで **`/admin` ハブの7セクション全部が実画面につながった**（委譲スタブは解消）。
+
+### ハブ各セクションの行き先（v1.92.67 時点）
+
+| セクション | 行き先 |
+|---|---|
+| Arena / FFA | `ArenaFfaGui` → Arenas / FFA Settings / Kits |
+| Player Data | `AdminPlayersGui` |
+| Punishment | `BanListGui` |
+| Cheat / Alt / Reports | `CheatReportsGui` → Chat Reports / Alt Flags / Match Reports |
+| Match Management | `AdminMatchesGui` |
+| Statistics | `AdminStatsGui` |
+| Server Settings | `AdminToggleGui` |
+
 ## 残り（次にやること）
+
 
 - [ ] 19. **Player データ画面の完全管理** — `AdminPlayerDataGui` は現状リセット中心。
       値の編集（rank / 統計 / 設定 / キット配置）と配置の変更を追加する。
-- [ ] 「Arena / FFA」専用ページ（現状は `ArenaSourceGui` に丸投げ＝仮実装）。
-      arenas / FFA 設定 / アリーナコピー をまとめた画面を作る。
+- [x] 「Arena / FFA」専用ページ — v1.92.67
 
 
 - [ ] 19. **Player データ画面の完全管理** — `AdminPlayerDataGui` は現状リセット中心。
