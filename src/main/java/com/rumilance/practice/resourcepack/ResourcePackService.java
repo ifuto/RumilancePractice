@@ -155,6 +155,48 @@ public final class ResourcePackService implements Listener {
         resolveHashFromUrl();
     }
 
+    /**
+     * Persists a new pack {@code url} into {@code resource-pack.json} and re-resolves the hash.
+     *
+     * <p>Used by the Tailscale Funnel automation to point the pack at the URL the funnel just
+     * published. Every other key in the file (prompt, required, min-client-protocol, and the
+     * operator's own comments aside) is preserved; the stored SHA-1 is cleared because it
+     * describes the <em>old</em> file and a wrong hash is worse than none — the server then
+     * re-hashes whatever the new URL serves on this start.</p>
+     *
+     * <p>Must be called from the main thread: it re-applies the pack to everyone online.</p>
+     *
+     * @return false when the file could not be written
+     */
+    public boolean setPackUrl(String url) {
+        if (url == null || url.isBlank()) {
+            return false;
+        }
+        File file = jsonFile();
+        try {
+            java.util.Map<String, String> values;
+            if (file.isFile()) {
+                values = ResourcePackJson.parse(
+                        java.nio.file.Files.readString(file.toPath(), StandardCharsets.UTF_8));
+            } else {
+                values = new java.util.LinkedHashMap<>();
+            }
+            values.put("url", ResourcePackJson.quote(url.trim()));
+            values.put("sha1", ResourcePackJson.quote(""));
+            File parent = file.getParentFile();
+            if (parent != null) {
+                java.nio.file.Files.createDirectories(parent.toPath());
+            }
+            java.nio.file.Files.writeString(file.toPath(), ResourcePackJson.write(values),
+                    StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            logger.log(Level.WARNING, "Could not update " + JSON_FILE_NAME, e);
+            return false;
+        }
+        reload();
+        return true;
+    }
+
     /** Whether plugin-side distribution is enabled at all. */
     public boolean enabled() {
         return configService.config().getBoolean("resource-pack.enabled", true);

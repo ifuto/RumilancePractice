@@ -92,6 +92,29 @@ shield-web:
   # true  = any source IP may reach /admin (still requires the token) — needed only when you
   #         administer through a public proxy that is NOT Tailscale/localhost.
   admin-allow-external: false
+  # --- Tailscale Funnel automation -------------------------------------------------
+  # On startup: bring the node up if needed, publish Shield Web over HTTPS with
+  # `tailscale funnel --bg <port>`, read the public hostname back out of
+  # `tailscale status --json`, and write https://<host>/pack.zip into
+  # plugins/n-arena/resource-pack.json. Skipping any of that by hand is how the pack
+  # URL ends up dead — the server then resolves no SHA-1 and sends no pack at all,
+  # which is what makes the rank badges render as empty squares.
+  # NOTE: a funnel fronts the WHOLE Shield Web, not just /pack.zip. /pack.zip is open;
+  # /admin additionally needs the token and passes the private-source check because the
+  # funnel proxy connects from loopback — keep the token secret.
+  tailscale:
+    # Master switch for the automation. Does nothing while shield-web.enabled is false
+    # (there would be nothing behind the funnel).
+    enabled: true
+    # The tailscale binary. Absolute path if it is not on PATH.
+    command: "tailscale"
+    # Run `tailscale up` when the node is not logged in. An interactive login cannot be
+    # completed from here: it fails fast and tells you to finish it once by hand.
+    bring-up: true
+    # Write the resolved funnel URL into resource-pack.json. Set false to keep managing
+    # the url yourself (it is still logged on every start).
+    update-pack-url: true
+
   # Browser console tab: lets the web UI run server console commands with tab-complete.
   # Hard limits are always on (1 command/second, 300 chars, every command mirrored to the
   # server log). Set false to make the whole tab read-only state with no command exec.

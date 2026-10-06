@@ -278,6 +278,7 @@ public final class FeatureBootstrap {
     private PracticeService practiceService;
     private com.rumilance.practice.practice.afk.AfkCrystalManager afkCrystalManager;
     private com.rumilance.practice.shieldweb.ShieldWebService shieldWebService;
+    private com.rumilance.practice.shieldweb.TailscaleFunnelService tailscaleFunnelService;
     private com.rumilance.practice.combat.KnockbackTuning knockbackTuning;
     /** {@code /bot} inside FFA: the unkillable mannequin training dummy. */
     private com.rumilance.practice.ffa.FfaMannequinService ffaMannequins;
@@ -872,6 +873,18 @@ public final class FeatureBootstrap {
         services.register(com.rumilance.practice.shieldweb.ShieldWebService.class,
                 this.shieldWebService);
         this.shieldWebService.start();
+        // Publish that server through Tailscale Funnel and point the pack URL at it. Only
+        // meaningful once Shield Web is actually listening — otherwise there is nothing
+        // behind the funnel. Runs async; every failure is logged and non-fatal.
+        this.tailscaleFunnelService =
+                new com.rumilance.practice.shieldweb.TailscaleFunnelService(
+                        plugin, configService, resourcePackService);
+        if (this.shieldWebService.enabled()) {
+            this.tailscaleFunnelService.startAsync(this.shieldWebService.port());
+        } else {
+            plugin.getLogger().info("[Tailscale] Shield Web is off"
+                    + " (shield-web.enabled) — the funnel is not started.");
+        }
 
         final RankService rankServiceRef = rankService;
         com.rumilance.practice.match.MatchTeamVisuals.setPrefixResolver((viewer, player, session) -> {
