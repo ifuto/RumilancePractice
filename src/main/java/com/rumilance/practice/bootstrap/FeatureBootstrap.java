@@ -2323,6 +2323,7 @@ public final class FeatureBootstrap {
                 new com.rumilance.practice.command.TellCommand(messageService, chatBanService,
                         settingsService);
         tellCommand.setSoundService(soundService);
+        tellCommand.setBlockListService(blockListService);
         plugin.getServer().getPluginManager().registerEvents(tellCommand, plugin);
         bind("tell", tellCommand);
         bind("matchchat", new com.rumilance.practice.command.MatchChatCommand(matchRegistry, settingsService));
@@ -2367,6 +2368,9 @@ public final class FeatureBootstrap {
                         System.currentTimeMillis()),
                 com.rumilance.practice.util.TpsTracker.SAMPLE_PERIOD_TICKS,
                 com.rumilance.practice.util.TpsTracker.SAMPLE_PERIOD_TICKS);
+        // Paper の /tps は名前空間付き (/paper:tps 等) でまだ届くので塞ぐ。
+        // 素の /tps はこのプラグインの実装が優先される。
+        pm.registerEvents(new com.rumilance.practice.command.TpsPaperGuard(), plugin);
         bind("tps", new com.rumilance.practice.command.TpsCommand(tpsTracker, messageService));
         // Drop stale TPA requests / RTP queue entries on quit or when a player leaves an arena.
         pm.registerEvents(new org.bukkit.event.Listener() {

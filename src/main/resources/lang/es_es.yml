@@ -495,6 +495,7 @@ tell:
   to: "<gold>To <target></gold> <gray>»</gray> <white><message></white>"
   from: "<aqua>From <target></aqua> <gray>»</gray> <white><message></white>"
   blocked: "<gray><target> no acepta mensajes.</gray>"
+  blocked-you: "<red>No puedes enviar mensajes a <target>.</red>"
 
 block:
   usage: "<gray>Uso:</gray> <yellow>/block \\<jugador></yellow>"

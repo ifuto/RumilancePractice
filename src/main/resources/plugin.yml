@@ -483,8 +483,8 @@ permissions:
     description: Base practice player permission.
     default: true
   rumilance.tps:
-    description: Allows /tps. Deliberately not granted to normal players — grant it per group with LuckPerms.
-    default: op
+    description: Allows /tps. Granted to everyone — this plugin's own percentage readout is meant to be public. Revoke per group with LuckPerms to make it staff-only.
+    default: true
   rumilance.duel.use:
     description: Allow duel/queue commands.
     default: true

@@ -496,6 +496,7 @@ tell:
   to: "<gold>To <target></gold> <gray>»</gray> <white><message></white>"
   from: "<aqua>From <target></aqua> <gray>»</gray> <white><message></white>"
   blocked: "<gray><target> はメッセージを受け取っていません。</gray>"
+  blocked-you: "<red><target> にはメッセージを送れません。</red>"
 
 block:
   usage: "<gray>使い方:</gray> <yellow>/block \\<player></yellow>"

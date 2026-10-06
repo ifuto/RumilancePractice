@@ -28,7 +28,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * Private messages: {@code /tell /msg /w /whisper <player> <message>} and
  * {@code /reply|/r <message>}. Format (lang keys {@code tell.to} / {@code tell.from}):
  * the sender sees "To {Player} » {message}", the receiver "From {Player} » {message}".
- * Chat-banned players cannot whisper.
+ * Chat-banned players cannot whisper, and neither can anybody the receiver has blocked
+ * with {@code /block}.
  */
 public final class TellCommand implements CommandExecutor, TabCompleter, Listener {
 
@@ -40,10 +41,17 @@ public final class TellCommand implements CommandExecutor, TabCompleter, Listene
     private final Map<UUID, UUID> lastPartner = new ConcurrentHashMap<>();
     /** Soft chime when a whisper lands (settings-aware volume via SoundService). */
     private com.rumilance.practice.sound.SoundService soundService;
+    /** Block lists (`/block`); a blocked sender's whisper is dropped. */
+    private com.rumilance.practice.social.BlockListService blockListService;
 
     /** Wired from bootstrap; null keeps tells silent. */
     public void setSoundService(com.rumilance.practice.sound.SoundService soundService) {
         this.soundService = soundService;
+    }
+
+    /** Wired from bootstrap; null disables the block check. */
+    public void setBlockListService(com.rumilance.practice.social.BlockListService blockListService) {
+        this.blockListService = blockListService;
     }
 
     public TellCommand(MessageService messageService, ChatBanService chatBanService) {
@@ -122,6 +130,15 @@ public final class TellCommand implements CommandExecutor, TabCompleter, Listene
     }
 
     private void deliver(Player from, Player to, String message) {
+        // A `/block` beats every other preference: if the receiver blocked this sender, the
+        // whisper is dropped and the sender is told the target is unreachable. Console
+        // (from == null) is never blocked.
+        if (from != null && blockListService != null
+                && blockListService.isBlocked(to.getUniqueId(), from.getUniqueId())) {
+            from.sendMessage(messageService.render(from, "tell.blocked-you",
+                    MessageService.tags("target", to.getName())));
+            return;
+        }
         // メッセージの受信: the receiver decides whether a TELL/WHISPER from this kind of
         // sender reaches them at all. Console and staff bypass it (from == null).
         if (from != null && settingsService != null) {
