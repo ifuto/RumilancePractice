@@ -180,7 +180,7 @@ public final class PacketEventsCompat implements Listener {
     }
 
     /**
-     * ProtocolLib may replace the fake connection's raw EmbeddedChannel with its
+     * PacketEvents may replace the fake connection's raw EmbeddedChannel with its
      * NettyChannelProxy while the join event is being prepared. Refresh PE's maps at LOWEST,
      * before PE's own LOWEST join listener (this listener is registered while NARENA enables,
      * before PacketEvents enables), so PE sees the same channel that its injector sees.
@@ -199,7 +199,7 @@ public final class PacketEventsCompat implements Listener {
             }
             GameProfile profile = bot.getGameProfile();
             log().info("[PacketEventsCompat] join refresh " + profile.name()
-                    + ": registering the post-ProtocolLib channel " + describe(connection.channel()));
+                    + ": registering the post-PacketEvents channel " + describe(connection.channel()));
             preRegister(connection, profile);
         } catch (Throwable ignored) {
             // Non-bot players and API drift must never affect ordinary joins.

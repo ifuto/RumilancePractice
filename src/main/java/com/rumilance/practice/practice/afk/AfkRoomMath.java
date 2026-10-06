@@ -10,7 +10,7 @@ package com.rumilance.practice.practice.afk;
  *   <li><b>build box</b> — the floor footprint in X/Z plus a build-height cap in Y. The
  *       height cap is a <em>placement</em> rule only ("高度制限はブロックの設置高さだけ"):
  *       the player themselves is never restricted by it.</li>
- *   <li><b>visible footprint</b> — the same X/Z box, used by the ProtocolLib filter to drop
+ *   <li><b>visible footprint</b> — the same X/Z box, used by the PacketEvents filter to drop
  *       every block/entity packet that belongs to somebody else's room. No Y limit is
  *       applied there: rooms only ever neighbour each other horizontally (132 blocks apart
  *       on the +60k line), so a horizontal test is the whole isolation rule.</li>
@@ -93,7 +93,7 @@ public final class AfkRoomMath {
     }
 
     /**
-     * Section-position helper for {@code section_blocks_update}: ProtocolLib hands the section
+     * Section-position helper for {@code section_blocks_update}: PacketEvents hands the section
      * back either as block coordinates or as raw section coordinates depending on how the
      * server class stores it, so a section is treated as visible when either reading lands
      * inside the footprint. Guessing wrong in the "outside" direction only leaks a neighbour's

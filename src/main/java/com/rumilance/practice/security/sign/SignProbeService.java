@@ -1,17 +1,20 @@
 package com.rumilance.practice.security.sign;
 
-import com.comphenix.protocol.PacketType;
-import com.comphenix.protocol.ProtocolLibrary;
-import com.comphenix.protocol.ProtocolManager;
-import com.comphenix.protocol.events.ListenerPriority;
-import com.comphenix.protocol.events.PacketAdapter;
-import com.comphenix.protocol.events.PacketContainer;
-import com.comphenix.protocol.events.PacketEvent;
-import com.comphenix.protocol.utility.MinecraftReflection;
-import com.comphenix.protocol.wrappers.BlockPosition;
-import com.comphenix.protocol.wrappers.WrappedBlockData;
-import com.comphenix.protocol.wrappers.nbt.NbtCompound;
-import com.comphenix.protocol.wrappers.nbt.NbtFactory;
+import com.github.retrooper.packetevents.PacketEvents;
+import com.github.retrooper.packetevents.event.PacketListener;
+import com.github.retrooper.packetevents.event.PacketListenerPriority;
+import com.github.retrooper.packetevents.event.PacketReceiveEvent;
+import com.github.retrooper.packetevents.protocol.nbt.NBTCompound;
+import com.github.retrooper.packetevents.protocol.nbt.NBTList;
+import com.github.retrooper.packetevents.protocol.nbt.NBTString;
+import com.github.retrooper.packetevents.protocol.nbt.NBTType;
+import com.github.retrooper.packetevents.protocol.packettype.PacketType;
+import com.github.retrooper.packetevents.util.SpigotConversionUtil;
+import com.github.retrooper.packetevents.util.Vector3i;
+import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientUpdateSign;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerBlockChange;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerBlockEntityData;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerOpenSignEditor;
 import com.rumilance.practice.ban.BanDuration;
 import com.rumilance.practice.ban.BanService;
 import com.rumilance.practice.config.ConfigService;
@@ -26,7 +29,6 @@ import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
-import java.lang.reflect.Field;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -48,23 +50,23 @@ import java.util.logging.Logger;
  * the mod's own text, so any line whose response differs from the key it was sent proves the mod is
  * installed.</p>
  *
- * <p>Everything degrades gracefully: if ProtocolLib is missing, disabled in config, or the packet /
+ * <p>Everything degrades gracefully: if PacketEvents is missing, disabled in config, or the packet /
  * NMS shapes cannot be resolved on this server version, the detector simply turns itself off. It
  * never places real blocks and never crashes the server; auto-ban is opt-in to avoid false bans.</p>
  */
-public final class SignProbeService {
+public final class SignProbeService implements PacketListener {
 
     /** A single "Display Name -> translation key" mod signature. */
     public record Signature(String name, String key) {
     }
 
     private static final class PendingProbe {
-        final BlockPosition pos;
+        final Vector3i pos;
         final BlockData realBlock;
         final List<Signature> lineSignatures; // index 0..3, may hold nulls for padded lines
         long deadlineMillis;
 
-        PendingProbe(BlockPosition pos, BlockData realBlock, List<Signature> lineSignatures) {
+        PendingProbe(Vector3i pos, BlockData realBlock, List<Signature> lineSignatures) {
             this.pos = pos;
             this.realBlock = realBlock;
             this.lineSignatures = lineSignatures;
@@ -79,9 +81,8 @@ public final class SignProbeService {
     private final Logger logger;
 
     private final Map<UUID, PendingProbe> pending = new ConcurrentHashMap<>();
-    private ProtocolManager protocolManager;
-    private Object signBlockEntityType;
-    private Class<?> blockEntityTypeClass;
+    /** Registry id of the sign block-entity, or -1 when it cannot be resolved. */
+    private int signBlockEntityType = -1;
     private boolean available;
 
     public SignProbeService(Plugin plugin, ConfigService configService, BanService banService,
@@ -94,18 +95,18 @@ public final class SignProbeService {
         this.logger = logger;
     }
 
-    /** Wire up ProtocolLib. Safe to call even when ProtocolLib is absent. */
+    /** Wire up PacketEvents. Safe to call even when PacketEvents is absent. */
     public void init() {
-        if (Bukkit.getPluginManager().getPlugin("ProtocolLib") == null) {
-            logger.info("[SignProbe] ProtocolLib not found - active mod detector disabled.");
+        if (Bukkit.getPluginManager().getPlugin("packetevents") == null) {
+            logger.info("[SignProbe] PacketEvents not found - active mod detector disabled.");
             return;
         }
         try {
-            protocolManager = ProtocolLibrary.getProtocolManager();
             resolveSignBlockEntityType();
-            registerResponseListener();
+            PacketEvents.getAPI().getEventManager()
+                    .registerListener(this, PacketListenerPriority.NORMAL);
             available = true;
-            logger.info("[SignProbe] Active mod detector ready (ProtocolLib hooked).");
+            logger.info("[SignProbe] Active mod detector ready (PacketEvents hooked).");
         } catch (Throwable t) {
             available = false;
             logger.log(Level.WARNING, "[SignProbe] Failed to initialise; active mod detector disabled.", t);
@@ -184,7 +185,7 @@ public final class SignProbeService {
         try {
             var loc = target.getLocation();
             // Head-level block: usually air, never disturbs the ground; only sent to this client.
-            BlockPosition pos = new BlockPosition(loc.getBlockX(), Math.min(loc.getBlockY() + 1, 318), loc.getBlockZ());
+            Vector3i pos = new Vector3i(loc.getBlockX(), Math.min(loc.getBlockY() + 1, 318), loc.getBlockZ());
             BlockData realBlock = target.getWorld().getBlockAt(pos.getX(), pos.getY(), pos.getZ()).getBlockData();
 
             List<Signature> lines = new ArrayList<>(4);
@@ -199,7 +200,7 @@ public final class SignProbeService {
                 }
             }
 
-            sendPacket(target, blockChange(pos, WrappedBlockData.createData(Material.OAK_SIGN)));
+            sendPacket(target, blockChange(pos, Material.OAK_SIGN.createBlockData()));
             sendPacket(target, tileEntityData(pos, messages));
             sendPacket(target, openSignEditor(pos));
 
@@ -208,7 +209,7 @@ public final class SignProbeService {
             int revert = Math.max(1, configService.config().getInt("sign-guard.active-probe.revert-delay-ticks", 3));
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 if (target.isOnline()) {
-                    sendPacket(target, blockChange(pos, WrappedBlockData.createData(realBlock)));
+                    sendPacket(target, blockChange(pos, realBlock));
                 }
             }, revert);
         } catch (Throwable t) {
@@ -216,30 +217,25 @@ public final class SignProbeService {
         }
     }
 
-    private void registerResponseListener() {
-        protocolManager.addPacketListener(new PacketAdapter(plugin, ListenerPriority.NORMAL,
-                PacketType.Play.Client.UPDATE_SIGN) {
-            @Override
-            public void onPacketReceiving(PacketEvent event) {
-                handleResponse(event);
-            }
-        });
-    }
-
-    private void handleResponse(PacketEvent event) {
-        Player player = event.getPlayer();
-        if (player == null) {
+    @Override
+    public void onPacketReceive(PacketReceiveEvent event) {
+        if (event.getPacketType() != PacketType.Play.Client.UPDATE_SIGN) {
+            return;
+        }
+        Object sender = event.getPlayer();
+        if (!(sender instanceof Player player)) {
             return;
         }
         PendingProbe probe = pending.get(player.getUniqueId());
         if (probe == null) {
             return;
         }
-        BlockPosition pos;
+        Vector3i pos;
         String[] lines;
         try {
-            pos = event.getPacket().getBlockPositionModifier().read(0);
-            lines = event.getPacket().getStringArrays().read(0);
+            WrapperPlayClientUpdateSign update = new WrapperPlayClientUpdateSign(event);
+            pos = update.getBlockPosition();
+            lines = update.getTextLines();
         } catch (Throwable t) {
             return;
         }
@@ -330,53 +326,39 @@ public final class SignProbeService {
     // -------------------------------------------------------------------------------------------
     // Packet builders
 
-    private PacketContainer blockChange(BlockPosition pos, WrappedBlockData data) {
-        PacketContainer p = protocolManager.createPacket(PacketType.Play.Server.BLOCK_CHANGE);
-        p.getBlockPositionModifier().write(0, pos);
-        p.getBlockData().write(0, data);
-        return p;
+    private static WrapperPlayServerBlockChange blockChange(Vector3i pos, BlockData data) {
+        return new WrapperPlayServerBlockChange(pos, SpigotConversionUtil.fromBukkitBlockData(data));
     }
 
-    private PacketContainer openSignEditor(BlockPosition pos) {
-        PacketContainer p = protocolManager.createPacket(PacketType.Play.Server.OPEN_SIGN_EDITOR);
-        p.getBlockPositionModifier().write(0, pos);
-        // 1.20+: boolean selecting the front side of the sign.
-        if (!p.getBooleans().getFields().isEmpty()) {
-            p.getBooleans().write(0, true);
-        }
-        return p;
+    private static WrapperPlayServerOpenSignEditor openSignEditor(Vector3i pos) {
+        // Second arg is the 1.20+ flag selecting the front side of the sign.
+        return new WrapperPlayServerOpenSignEditor(pos, true);
     }
 
-    private PacketContainer tileEntityData(BlockPosition pos, String[] messages) {
-        PacketContainer p = protocolManager.createPacket(PacketType.Play.Server.TILE_ENTITY_DATA);
-        p.getBlockPositionModifier().write(0, pos);
-        if (signBlockEntityType != null && blockEntityTypeClass != null) {
-            p.getModifier().withType(blockEntityTypeClass).write(0, signBlockEntityType);
-        }
-        NbtCompound nbt = buildSignNbt(pos, messages);
-        p.getNbtModifier().write(0, nbt);
-        return p;
+    private WrapperPlayServerBlockEntityData tileEntityData(Vector3i pos, String[] messages) {
+        return new WrapperPlayServerBlockEntityData(pos, signBlockEntityType, buildSignNbt(pos, messages));
     }
 
-    @SuppressWarnings("unchecked")
-    private NbtCompound buildSignNbt(BlockPosition pos, String[] messages) {
-        NbtCompound root = NbtFactory.ofCompound("");
-        root.put("id", "minecraft:sign");
-        root.put("x", pos.getX());
-        root.put("y", pos.getY());
-        root.put("z", pos.getZ());
-        root.put("is_waxed", (byte) 0);
-        root.put(textSide("front_text", messages));
-        root.put(textSide("back_text", new String[]{
+    private static NBTCompound buildSignNbt(Vector3i pos, String[] messages) {
+        NBTCompound root = new NBTCompound();
+        root.setString("id", "minecraft:sign");
+        root.setInt("x", pos.getX());
+        root.setInt("y", pos.getY());
+        root.setInt("z", pos.getZ());
+        root.setByte("is_waxed", (byte) 0);
+        root.setTag("front_text", textSide(messages));
+        root.setTag("back_text", textSide(new String[]{
                 "{\"text\":\"\"}", "{\"text\":\"\"}", "{\"text\":\"\"}", "{\"text\":\"\"}"}));
         return root;
     }
 
-    private NbtCompound textSide(String name, String[] messages) {
-        NbtCompound side = NbtFactory.ofCompound(name);
-        side.put("has_glowing_text", (byte) 0);
-        side.put("color", "black");
-        side.put(NbtFactory.ofList("messages", messages[0], messages[1], messages[2], messages[3]));
+    private static NBTCompound textSide(String[] messages) {
+        NBTCompound side = new NBTCompound();
+        side.setByte("has_glowing_text", (byte) 0);
+        side.setString("color", "black");
+        side.setTag("messages", new NBTList<>(NBTType.STRING, java.util.List.of(
+                new NBTString(messages[0]), new NBTString(messages[1]),
+                new NBTString(messages[2]), new NBTString(messages[3]))));
         return side;
     }
 
@@ -384,38 +366,24 @@ public final class SignProbeService {
         return "{\"translate\":\"" + key.replace("\\", "\\\\").replace("\"", "\\\"") + "\"}";
     }
 
-    private void sendPacket(Player player, PacketContainer packet) {
+    private void sendPacket(Player player, com.github.retrooper.packetevents.wrapper.PacketWrapper<?> packet) {
         try {
-            protocolManager.sendServerPacket(player, packet);
+            PacketEvents.getAPI().getPlayerManager().sendPacket(player, packet);
         } catch (Throwable t) {
-            logger.log(Level.FINE, "[SignProbe] sendServerPacket failed", t);
+            logger.log(Level.FINE, "[SignProbe] sendPacket failed", t);
         }
     }
 
     private void resolveSignBlockEntityType() {
         try {
-            blockEntityTypeClass = MinecraftReflection.getMinecraftClass(
-                    "world.level.block.entity.BlockEntityType",
-                    "world.level.block.entity.TileEntityTypes");
+            signBlockEntityType = com.github.retrooper.packetevents.protocol.world.BlockEntityTypes.SIGN
+                    .getId();
         } catch (Throwable t) {
-            blockEntityTypeClass = null;
-            return;
+            signBlockEntityType = -1;
         }
-        // Paper ships Mojang mappings at runtime, so the static field is literally "SIGN".
-        for (Field field : blockEntityTypeClass.getDeclaredFields()) {
-            if (!blockEntityTypeClass.isAssignableFrom(field.getType())) {
-                continue;
-            }
-            if (field.getName().equalsIgnoreCase("SIGN")) {
-                try {
-                    field.setAccessible(true);
-                    signBlockEntityType = field.get(null);
-                    return;
-                } catch (Throwable ignored) {
-                    // fall through
-                }
-            }
+        if (signBlockEntityType < 0) {
+            logger.warning("[SignProbe] Could not resolve the SIGN block-entity type; probes may be "
+                    + "ignored by clients.");
         }
-        logger.warning("[SignProbe] Could not resolve the SIGN block-entity type; probes may be ignored by clients.");
     }
 }

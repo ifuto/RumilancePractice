@@ -13,8 +13,8 @@ package com.rumilance.practice.practice.afk;
  * <p>Movement is <em>not</em> restricted by any of this: the room only caps where blocks may be
  * placed, never where the player may go.</p>
  *
- * <p>Needs ProtocolLib (soft-depend); without it the rooms simply stay Bukkit-hidden only. All
- * ProtocolLib types live in {@link AfkRoomIsolationPackets}, which is only class-loaded through
+ * <p>Needs PacketEvents (soft-depend); without it the rooms simply stay Bukkit-hidden only. All
+ * PacketEvents types live in {@link AfkRoomIsolationPackets}, which is only class-loaded through
  * this guarded entry point.</p>
  */
 public final class AfkRoomIsolation {
@@ -22,10 +22,10 @@ public final class AfkRoomIsolation {
     private AfkRoomIsolation() {
     }
 
-    /** Registers the packet filter when ProtocolLib is present; a silent no-op otherwise. */
+    /** Registers the packet filter when PacketEvents is present; a silent no-op otherwise. */
     public static boolean register(org.bukkit.plugin.Plugin plugin, AfkRoomIsolationSource source) {
         if (plugin.getServer().getPluginManager().getPlugin("packetevents") == null) {
-            plugin.getLogger().info("[AfkRoom] ProtocolLib missing - room isolation falls back to hidePlayer only.");
+            plugin.getLogger().info("[AfkRoom] PacketEvents missing - room isolation falls back to hidePlayer only.");
             return false;
         }
         try {

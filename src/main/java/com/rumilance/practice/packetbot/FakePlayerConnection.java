@@ -22,7 +22,7 @@ public final class FakePlayerConnection extends Connection {
         super(flow);
         try {
             EmbeddedChannel channel = new EmbeddedChannel();
-            // Third-party packet injectors (ProtocolLib, PacketEvents) run
+            // Third-party packet injectors (PacketEvents, PacketEvents) run
             // {@code pipeline.addAfter("encoder", …)} on PlayerJoinEvent. A bare EmbeddedChannel
             // has no named handlers, so that lookup throws NoSuchElementException and the bot
             // gets kicked ("failed to inject into a channel"). Registering the real pipeline's

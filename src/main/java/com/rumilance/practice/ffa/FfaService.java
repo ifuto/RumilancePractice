@@ -273,7 +273,7 @@ public final class FfaService {
         this.viewControl = viewControl;
     }
 
-    /** ProtocolLib-backed chunk masking: while in FFA, chunks outside the arena are not sent. */
+    /** PacketEvents-backed chunk masking: while in FFA, chunks outside the arena are not sent. */
     private volatile com.rumilance.practice.sight.FfaChunkMaskService chunkMaskService;
 
     public void setChunkMaskService(

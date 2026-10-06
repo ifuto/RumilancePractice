@@ -94,7 +94,7 @@ class TabFightListServiceTest {
 
     @Test
     void serviceHasNoPacketPluginDependency() {
-        // Construction and the no-session path must not require ProtocolLib or any packet
+        // Construction and the no-session path must not require PacketEvents or any packet
         // plugin: the filler rows are built from the server's own classes.
         TabFightListService service = new TabFightListService(null);
         assertNotNull(service);

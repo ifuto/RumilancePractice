@@ -32,7 +32,7 @@ public final class SignCheckCommand implements CommandExecutor, TabCompleter {
         }
         if (!probeService.isAvailable()) {
             sender.sendMessage(Component.text(
-                    "看板プローブは無効です（ProtocolLib 未導入 / config で無効 / 未対応バージョン）。",
+                    "看板プローブは無効です（PacketEvents 未導入 / config で無効 / 未対応バージョン）。",
                     NamedTextColor.RED));
             return true;
         }

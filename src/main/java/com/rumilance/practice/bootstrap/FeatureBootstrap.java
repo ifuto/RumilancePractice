@@ -475,22 +475,22 @@ public final class FeatureBootstrap {
                 plugin.getLogger());
         services.register(ReportService.class, reportService);
 
-        // ProtocolLib is a soft dependency: the NPC-packet code lives in ReplayNpcService, so
+        // PacketEvents is a soft dependency: the NPC-packet code lives in ReplayNpcService, so
         // without it the plugin must still enable (replays then run avatar-less).
         com.rumilance.practice.replay.ReplayNpcService replayNpcService = null;
         ReplayService replayServiceRef = null;
-        if (hasPlugin("ProtocolLib")) {
+        if (hasPlugin("packetevents")) {
             try {
                 replayNpcService = new com.rumilance.practice.replay.ReplayNpcService(plugin);
                 replayNpcService.init();
                 replayServiceRef = new ReplayService(plugin, lobbyService, replayNpcService);
             } catch (LinkageError | RuntimeException e) {
-                plugin.getLogger().log(java.util.logging.Level.WARNING, "ProtocolLib detected but the "
+                plugin.getLogger().log(java.util.logging.Level.WARNING, "PacketEvents detected but the "
                         + "replay avatar service failed to initialize; replay runs without NPCs.", e);
                 replayServiceRef = null;
             }
         } else {
-            plugin.getLogger().info("ProtocolLib not detected - replay runs without NPC avatars.");
+            plugin.getLogger().info("PacketEvents not detected - replay runs without NPC avatars.");
         }
         if (replayServiceRef == null) {
             replayServiceRef = new ReplayService(plugin, lobbyService);
@@ -531,7 +531,7 @@ public final class FeatureBootstrap {
                 configService, banService, auditLogRepository, asyncExecutor, plugin.getLogger());
         services.register(SignGuardService.class, signGuardService);
         SignProbeService signProbeService = null;
-        if (hasPlugin("ProtocolLib")) {
+        if (hasPlugin("packetevents")) {
             try {
                 signProbeService = new SignProbeService(
                         plugin, configService, banService, auditLogRepository, asyncExecutor,
@@ -539,12 +539,12 @@ public final class FeatureBootstrap {
                 signProbeService.init();
                 services.register(SignProbeService.class, signProbeService);
             } catch (LinkageError | RuntimeException e) {
-                plugin.getLogger().log(java.util.logging.Level.WARNING, "ProtocolLib detected but the "
+                plugin.getLogger().log(java.util.logging.Level.WARNING, "PacketEvents detected but the "
                         + "sign-probe service failed to initialize; the mod detector stays off.", e);
                 signProbeService = null;
             }
         } else {
-            plugin.getLogger().info("ProtocolLib not detected - the active mod detector is off.");
+            plugin.getLogger().info("PacketEvents not detected - the active mod detector is off.");
         }
 
         SpectatorService spectatorService = new SpectatorService(
@@ -552,7 +552,7 @@ public final class FeatureBootstrap {
         services.register(SpectatorService.class, spectatorService);
         matchService.setSpectatorService(spectatorService);
         // 1.92.32: while spectating, other spectator-gamemode bodies never render (TAB keeps
-        // listing them). ProtocolLib soft-depend, like the AFK room isolation.
+        // listing them). PacketEvents soft-depend, like the AFK room isolation.
         com.rumilance.practice.spectator.SpectatorViewIsolation.register(plugin, spectatorService);
 
         TeamColoredArmorService teamColoredArmor =
@@ -643,7 +643,7 @@ public final class FeatureBootstrap {
         bind("afkpractice", afkCrystalManager);
         bind("afk", afkCrystalManager);
         // Private rooms: while a session runs, block and player packets outside the player's own
-        // footprint are dropped (ProtocolLib soft-depend; hidePlayer stays as the Bukkit layer).
+        // footprint are dropped (PacketEvents soft-depend; hidePlayer stays as the Bukkit layer).
         com.rumilance.practice.practice.afk.AfkRoomIsolation.register(plugin, afkCrystalManager);
         afkCrystalManager.setKitService(kitService);
         // /hub / /lobby during an AFK BOT Crystal session must really end it: hand the
@@ -2114,7 +2114,7 @@ public final class FeatureBootstrap {
         pm.registerEvents(partyIconListener, plugin);
         pm.registerEvents(new SpamFilterListener(spamFilterService), plugin);
         pm.registerEvents(new SignChangeGuardListener(signGuardService), plugin);
-        // The join/quit probe hooks live behind the same ProtocolLib guard: the anonymous
+        // The join/quit probe hooks live behind the same PacketEvents guard: the anonymous
         // listener names SignProbeService, whose class cannot load without the API present.
         final SignProbeService signProbe = signProbeService;
         if (signProbe != null) {
@@ -2616,7 +2616,7 @@ public final class FeatureBootstrap {
         } else {
             bind("signcheck", (CommandExecutor) (sender, command, label, args) -> {
                 sender.sendMessage(net.kyori.adventure.text.Component.text(
-                        "看板プローブは ProtocolLib 未導入のため無効です。",
+                        "看板プローブは PacketEvents 未導入のため無効です。",
                         net.kyori.adventure.text.format.NamedTextColor.RED));
                 return true;
             });
@@ -2788,7 +2788,7 @@ public final class FeatureBootstrap {
     }
 
     /**
-     * Soft-depend probe. {@code ProtocolLib}/{@code WorldEdit} APIs are only touched from their
+     * Soft-depend probe. {@code PacketEvents}/{@code WorldEdit} APIs are only touched from their
      * dedicated hook classes, and only after this check said the plugin is installed — a server
      * without them must still enable NARENA (the API classes are absent from its classpath).
      */

@@ -168,7 +168,7 @@ public final class TeamColoredArmorService {
     }
 
     private void syncGlow(Player player, MatchSession session) {
-        // Vanilla setGlowing is wallhack ESP - always clear; LOS glow is ProtocolLib-only.
+        // Vanilla setGlowing is wallhack ESP - always clear; LOS glow is PacketEvents-only.
         player.setGlowing(false);
         if (teamGlowLos != null && (session == null || !session.isTeamMatch())) {
             teamGlowLos.clearEntityGlow(player);

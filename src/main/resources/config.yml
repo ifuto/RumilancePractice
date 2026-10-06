@@ -538,14 +538,14 @@ sign-guard:
     - "itemscroller.gui."      # Item Scroller
 
   # ---------------------------------------------------------------------------------------------
-  # Active mod detector (DonutSMP-style, MC-265322). Requires ProtocolLib on the server.
+  # Active mod detector (DonutSMP-style, MC-265322). Requires PacketEvents on the server.
   # How it works: a fake sign is shown to the CLIENT ONLY (no world block is ever changed),
   # loaded with mod translation keys, the sign editor is force-opened, then the fake block is
   # reverted a couple ticks later so the editor auto-closes and the client echoes back the
   # resolved text. If the returned text differs from the raw key, the mod is installed.
   # Trigger manually with /signcheck <player> (or enable check-on-join below).
   active-probe:
-    enabled: false          # master switch (needs ProtocolLib)
+    enabled: false          # master switch (needs PacketEvents)
     auto-ban: false         # false = log/notify only (recommended until verified); true = ban on hit
     auto-ban-duration: "auto"
     check-on-join: false    # silently probe every player shortly after they join

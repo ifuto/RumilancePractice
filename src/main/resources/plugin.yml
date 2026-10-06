@@ -11,7 +11,7 @@ folia-supported: false
 softdepend:
   - FastAsyncWorldEdit
   - WorldEdit
-  - ProtocolLib
+  - PacketEvents
   - Apollo
   - LuckPerms
   - GSit
@@ -63,7 +63,7 @@ commands:
     usage: /replay <pause|rewind|forward|speed|restart|stop>
     permission: rumilance.admin
   signcheck:
-    description: Actively probe a player for disallowed client mods (needs ProtocolLib).
+    description: Actively probe a player for disallowed client mods (needs PacketEvents).
     usage: /signcheck <player>
     permission: rumilance.admin
   accept:

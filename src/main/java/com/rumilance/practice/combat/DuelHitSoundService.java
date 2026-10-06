@@ -8,8 +8,8 @@ package com.rumilance.practice.combat;
  * in an active 1v1 fight, purely cosmetically: no damage, knockback or attack-timing
  * mechanics change.
  *
- * <p>The packet interception needs ProtocolLib; servers without the soft-depend simply keep
- * the vanilla sound (all actual ProtocolLib classes live in {@link DuelHitSoundPackets},
+ * <p>The packet interception needs PacketEvents; servers without the soft-depend simply keep
+ * the vanilla sound (all actual PacketEvents classes live in {@link DuelHitSoundPackets},
  * which is only class-loaded through this guarded entry point).</p>
  */
 public final class DuelHitSoundService {
@@ -17,7 +17,7 @@ public final class DuelHitSoundService {
     private DuelHitSoundService() {
     }
 
-    /** Registers the sound swap when ProtocolLib is present; a silent no-op otherwise. */
+    /** Registers the sound swap when PacketEvents is present; a silent no-op otherwise. */
     public static void register(org.bukkit.plugin.Plugin plugin,
                                 com.rumilance.practice.match.MatchRegistry matchRegistry) {
         if (plugin.getServer().getPluginManager().getPlugin("packetevents") == null) {

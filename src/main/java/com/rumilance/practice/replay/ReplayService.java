@@ -67,9 +67,9 @@ public final class ReplayService {
     }
 
     /**
-     * ProtocolLib-less construction (see {@code FeatureBootstrap}'s soft-depend guard). This
+     * PacketEvents-less construction (see {@code FeatureBootstrap}'s soft-depend guard). This
      * overload deliberately keeps {@link ReplayNpcService} out of its descriptor: that class
-     * cannot even be loaded when ProtocolLib is absent, so resolving a constructor that names it
+     * cannot even be loaded when PacketEvents is absent, so resolving a constructor that names it
      * would throw {@link NoClassDefFoundError} before the guard could fall back.
      */
     public ReplayService(Plugin plugin, LobbyService lobbyService) {
@@ -258,7 +258,7 @@ public final class ReplayService {
                        List<ReplaySession.Avatar> avatars, Frame anchor) {
         if (npcService == null || !npcService.isAvailable()) {
             operator.sendMessage(Component.text(
-                    "リプレイ表示には ProtocolLib が必要です。", NamedTextColor.RED));
+                    "リプレイ表示には PacketEvents が必要です。", NamedTextColor.RED));
             return;
         }
         ReplaySession session = new ReplaySession(operator.getUniqueId(), id, world.getName(), avatars);

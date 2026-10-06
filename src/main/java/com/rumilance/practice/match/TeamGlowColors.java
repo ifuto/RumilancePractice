@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Syncs RED/BLUE scoreboard team colours onto a viewer's current scoreboard so ProtocolLib
+ * Syncs RED/BLUE scoreboard team colours onto a viewer's current scoreboard so PacketEvents
  * LOS glow outlines are coloured (not white). Prefers the same fight teams as
  * {@link MatchTeamVisuals} so nametag colours stay intact (one entry = one team).
  */

@@ -114,7 +114,7 @@ class AfkRoomMathTest {
     @Test
     void sectionUpdatesAreVisibleUnderBothCoordinateReadings() {
         int ownSection = BASE_X >> 4;
-        // ProtocolLib may hand back block coordinates or raw section coordinates.
+        // PacketEvents may hand back block coordinates or raw section coordinates.
         assertTrue(AfkRoomMath.sectionVisible(CENTER_X, CENTER_Z, RADIUS, BASE_X, BASE_Z),
                 "block-coordinate reading");
         assertTrue(AfkRoomMath.sectionVisible(CENTER_X, CENTER_Z, RADIUS, ownSection, ownSection),

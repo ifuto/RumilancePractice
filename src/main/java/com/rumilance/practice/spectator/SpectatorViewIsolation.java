@@ -19,7 +19,7 @@ import org.bukkit.plugin.Plugin;
  * <p>Why the packet layer: {@code Player#hideEntity} is already applied on every spectate
  * entry ({@code SpectatorService#hideInWorld}), yet the client keeps rendering
  * spectator-gamemode players for spectator viewers, so the heads kept showing. Cancelling
- * the outbound entity packets at ProtocolLib is unconditional and covers every path (late
+ * the outbound entity packets at PacketEvents is unconditional and covers every path (late
  * joins, spectate entries, eliminated fighters that never went through a spectate entry at
  * all).</p>
  *
@@ -27,7 +27,7 @@ import org.bukkit.plugin.Plugin;
  * the entity, a client that stops being blocked would never receive a fresh spawn. Two
  * transitions therefore force a retrack (hide + show pair, the only reliable re-send):
  * a spectator leaving spectate mode, and any player leaving spectator gamemode while
- * spectators are watching. Needs ProtocolLib (soft-depend); without it the previous
+ * spectators are watching. Needs PacketEvents (soft-depend); without it the previous
  * Bukkit-level hiding stays as the only layer.</p>
  */
 public final class SpectatorViewIsolation {
@@ -35,17 +35,17 @@ public final class SpectatorViewIsolation {
     private SpectatorViewIsolation() {
     }
 
-    /** Registers the packet filter + retrack hooks when ProtocolLib is present. */
+    /** Registers the packet filter + retrack hooks when PacketEvents is present. */
     public static void register(Plugin plugin, SpectatorService service) {
         if (plugin.getServer().getPluginManager().getPlugin("packetevents") == null) {
             plugin.getLogger().info(
-                    "[Spectator] ProtocolLib missing - spectator-vs-spectator entity blocking is off.");
+                    "[Spectator] PacketEvents missing - spectator-vs-spectator entity blocking is off.");
             return;
         }
         try {
             SpectatorViewIsolationPackets.register(plugin, service);
         } catch (Throwable t) {
-            // A ProtocolLib version without one of the packet types must not break the boot.
+            // A PacketEvents version without one of the packet types must not break the boot.
             plugin.getLogger().warning(
                     "[Spectator] entity blocking unavailable: " + t.getClass().getSimpleName());
         }

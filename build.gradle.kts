@@ -78,7 +78,6 @@ dependencies {
     // TRANSITIONAL: still compiled by the legacy packet sites (replay NPCs, sign probe, AFK
     // room isolation, FFA chunk mask, team LOS glow, spectator isolation, duel hit sound).
     // They move to PacketEvents next; removing this line before they are ported breaks the jar.
-    compileOnly("net.dmulloy2:ProtocolLib:5.4.0")
 
     // LuckPerms soft-dependency - GSit permission bridge (strip GSit.*, grant GSit.SitClick on
     // join). API only: the server provides the implementation, so nothing is shaded.
