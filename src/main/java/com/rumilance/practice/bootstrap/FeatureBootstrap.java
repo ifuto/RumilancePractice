@@ -2322,6 +2322,8 @@ public final class FeatureBootstrap {
         adminPlayerDataGui.setBanService(banService);
         adminPlayerDataGui.setMatchService(matchService);
         adminPlayerDataGui.setPlugin(plugin);
+        adminPlayerDataGui.setEditKitGui(editKitGui);
+        editKitGui.setOnAdminExit(adminPlayerDataGui::openFor);
         adminPlayerLookupListener.setSettingsService(settingsService);
         AdminCommand adminCommand = new AdminCommand(
                 plugin, statsResetService, playerRepository, asyncExecutor, originalKitService);

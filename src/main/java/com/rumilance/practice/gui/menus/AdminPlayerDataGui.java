@@ -66,6 +66,9 @@ public final class AdminPlayerDataGui extends AbstractGui {
     private final PunishmentRepository punishmentRepository;
     private final StatsService statsService;
 
+    /** Session key: which of the target's saved layouts the admin has highlighted. */
+    private static final String LAYOUT_PICK = "admin_layout_pick";
+
     /** Session key: which original-kit slot the admin has highlighted. */
     private static final String ORIGINAL_SLOT = "admin_original_slot";
 
@@ -146,6 +149,14 @@ public final class AdminPlayerDataGui extends AbstractGui {
     }
 
     /** Pending lookup targets handed into {@link #configureSession} (session is fresh there). */
+    /** Opens the kit editor on the target player's own layout, so an admin can rearrange it. */
+    private com.rumilance.practice.gui.menus.EditKitGui editKitGui;
+
+    /** Wires the kit editor used to rearrange the target player's layouts. */
+    public void setEditKitGui(com.rumilance.practice.gui.menus.EditKitGui editKitGui) {
+        this.editKitGui = editKitGui;
+    }
+
     private final java.util.Map<UUID, UUID> pendingTargets = new java.util.concurrent.ConcurrentHashMap<>();
 
     /** Opens the data screen for {@code target} (may be offline). */
@@ -293,6 +304,22 @@ public final class AdminPlayerDataGui extends AbstractGui {
         ekitLore.add(UiTheme.blank());
         ekitLore.add(UiTheme.hint("Click: reset THIS player's ekits"));
         ekitLore.add(UiTheme.hint("Shift-click: reset EVERY player's ekits"));
+        // --- layout editor: rearrange the target's own saved layout ---
+        List<String> editableKits = editableLayoutKits(layouts);
+        String picked = pickedLayout(editableKits, session);
+        inventory.setItem(GuiSlots.slot(2, 1),
+                ItemBuilder.of(Material.CRAFTING_TABLE)
+                        .name(Component.text("Layout editor: " + (picked == null ? "none" : picked),
+                                UiTheme.PRIMARY))
+                        .lore(editableKits.isEmpty()
+                                        ? UiTheme.line("no plain kit layout saved")
+                                        : UiTheme.line(markPick(editableKits, picked)),
+                                UiTheme.blank(),
+                                UiTheme.hint("Left: select next layout"),
+                                UiTheme.hint("Right: open the editor on it"))
+                        .glint(picked != null)
+                        .action("act:edit_layout").build());
+
         inventory.setItem(GuiSlots.slot(1, 4),
                 ItemBuilder.of(Material.ENDER_CHEST, Math.max(1, layouts.size()))
                         .name(Component.text("Ekit layouts: " + layouts.size(), UiTheme.PRIMARY))
@@ -584,6 +611,32 @@ public final class AdminPlayerDataGui extends AbstractGui {
                                     + "'s chat whitelist, or 'clear' to wipe it.",
                             NamedTextColor.LIGHT_PURPLE));
                 }
+            }
+            case "act:edit_layout" -> {
+                List<String> kits = editableLayoutKits(
+                        safeList(() -> kitLayoutRepository.findAllForPlayer(target)));
+                String selected = pickedLayout(kits, session);
+                if (right) {
+                    if (selected == null || editKitGui == null) {
+                        sounds.play(player, "error");
+                        player.sendMessage(Component.text(
+                                "No layout selected to edit.", NamedTextColor.YELLOW));
+                    } else {
+                        session.setNavigatingAway(true);
+                        if (!editKitGui.openKitEditorFor(player, target, displayName(target),
+                                selected)) {
+                            sounds.play(player, "error");
+                            player.sendMessage(Component.text(
+                                    "Kit no longer exists: " + selected, NamedTextColor.RED));
+                        }
+                    }
+                } else {
+                    int at = kits.indexOf(selected);
+                    String next = kits.isEmpty() ? null : kits.get((at + 1) % kits.size());
+                    session.put(LAYOUT_PICK, next);
+                    sounds.play(player, "gui-click");
+                }
+                refresh(player, session, inventory);
             }
             case "act:reset_ekits" -> {
                 if (shift) {
@@ -960,6 +1013,47 @@ public final class AdminPlayerDataGui extends AbstractGui {
         for (int slot : saved) {
             String entry = "#" + (slot + 1);
             out.add(slot == highlighted ? "[" + entry + "]" : entry);
+        }
+        return String.join(", ", out);
+    }
+
+    /**
+     * Saved layouts this screen can safely open: plain kit rows only.
+     *
+     * <p>Keys carrying a {@code #} suffix are preset ({@code kit#preset#x}), crystal FFA
+     * ({@code #v}) or K1..K4 ({@code #k}) variants. Those need their own context to reopen —
+     * loading the bare kit instead would show and then overwrite a different arrangement — so
+     * they are left to the reset action rather than silently editing the wrong row.</p>
+     */
+    private static List<String> editableLayoutKits(List<KitLayoutSnapshot> layouts) {
+        List<String> out = new ArrayList<>();
+        if (layouts == null) {
+            return out;
+        }
+        for (KitLayoutSnapshot snapshot : layouts) {
+            String key = snapshot.kit();
+            if (key != null && !key.isBlank() && key.indexOf('#') < 0 && !out.contains(key)) {
+                out.add(key);
+            }
+        }
+        java.util.Collections.sort(out);
+        return out;
+    }
+
+    /** The highlighted layout, falling back to the first one when the pick is stale. */
+    private String pickedLayout(List<String> kits, GuiSession session) {
+        if (kits.isEmpty()) {
+            return null;
+        }
+        String stored = session.get(LAYOUT_PICK, String.class);
+        return kits.contains(stored) ? stored : kits.get(0);
+    }
+
+    /** Brackets the highlighted entry so it stands out in the lore line. */
+    private static String markPick(List<String> kits, String picked) {
+        List<String> out = new ArrayList<>();
+        for (String kit : kits) {
+            out.add(kit.equals(picked) ? "[" + kit + "]" : kit);
         }
         return String.join(", ", out);
     }

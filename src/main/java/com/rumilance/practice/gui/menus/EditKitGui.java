@@ -249,6 +249,37 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         return session != null && "view".equals(session.get("mode", String.class));
     }
 
+    /** Session mode: an admin editing ANOTHER player's layout (writes back to that player). */
+    private static final String MODE_ADMIN_EDIT = "admin-edit";
+
+    /**
+     * Where an admin lands when leaving a target-player layout edit: receives the admin and the
+     * UUID whose layout they were editing.
+     */
+    private java.util.function.BiConsumer<Player, java.util.UUID> onAdminExit;
+
+    /** Sets where "back"/close returns to after an admin edits a target player's layout. */
+    public void setOnAdminExit(java.util.function.BiConsumer<Player, java.util.UUID> onAdminExit) {
+        this.onAdminExit = onAdminExit;
+    }
+
+    /**
+     * True when an admin has this editor open on somebody else's layout. Everything the admin
+     * saves then lands on {@link GuiSession#targetPlayer()}, never on the admin's own row.
+     */
+    public boolean isAdminEdit(GuiSession session) {
+        return session != null && MODE_ADMIN_EDIT.equals(session.get("mode", String.class));
+    }
+
+    /** Whose layout this session reads and writes. */
+    private UUID layoutOwner(Player player, GuiSession session) {
+        if (session != null && session.targetPlayer() != null
+                && (isViewOnly(session) || isAdminEdit(session))) {
+            return session.targetPlayer();
+        }
+        return player.getUniqueId();
+    }
+
     /** True when editing a kit with preset candidates enabled (hotbar palette + Q-drop delete). */
     /** Session key: the preset entry whose config screen is open in the bottom inventory. */
     private static final String K_PRESET_CONFIG = "preset_config";
@@ -490,6 +521,31 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         });
     }
 
+    /**
+     * Opens the full kit editor on ANOTHER player's saved layout. The admin sees and moves the
+     * target's arrangement exactly as that player left it, and Save writes it straight back to
+     * the target — the admin's own layout is not touched.
+     *
+     * @return false when the kit is unknown, so the caller can report it instead of opening a
+     *         blank editor.
+     */
+    public boolean openKitEditorFor(Player admin, UUID targetId, String targetName, String kitName) {
+        if (admin == null || targetId == null || kitName == null) {
+            return false;
+        }
+        String kitId = kitService.playableId(kitName);
+        if (kitId == null || kitService.get(kitId).isEmpty()) {
+            return false;
+        }
+        openWithSession(admin, session -> {
+            session.setSelectedKit(kitId);
+            session.setTargetPlayer(targetId);
+            session.put("mode", MODE_ADMIN_EDIT);
+            session.put("viewer-target-name", targetName == null ? "?" : targetName);
+        });
+        return true;
+    }
+
     public void applyTrimmedItem(Player player, String kitId, String preset, int layoutSlot, ItemStack trimmed) {
         ItemStack[] layout = kitEditStash == null ? null : kitEditStash.layoutCopy(player.getUniqueId());
         if (layout == null) {
@@ -596,8 +652,7 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             return;
         }
         // Keep in-session rearranges across re-render; reloading from disk wiped swaps before Save.
-        UUID layoutOwner = isViewOnly(session) && session.targetPlayer() != null
-                ? session.targetPlayer() : player.getUniqueId();
+        UUID layoutOwner = layoutOwner(player, session);
         ItemStack[] layout = KitLayoutContents.retainOrLoad(
                 session.get("layout", ItemStack[].class),
                 isOfficialEdit(session) ? KitLoadout.fromOfficial(kit)
@@ -1298,6 +1353,19 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
             }
         }
         if ("close".equals(action) || "back".equals(action)) {
+            if (isAdminEdit(session)) {
+                session.setNavigatingAway(true);
+                restoreLobbyHands(player);
+                if (kitEditStash != null) {
+                    kitEditStash.clear(player.getUniqueId());
+                }
+                if (onAdminExit != null && session.targetPlayer() != null) {
+                    onAdminExit.accept(player, session.targetPlayer());
+                } else {
+                    player.closeInventory();
+                }
+                return;
+            }
             if (isViewOnly(session)) {
                 if ("back".equals(action) && ekitSelectGui != null && session.targetPlayer() != null) {
                     session.setNavigatingAway(true);
@@ -1787,8 +1855,10 @@ public final class EditKitGui extends AbstractGui implements BottomInventoryClic
         // Delta storage: only the differences from the kit's official layout are persisted,
         // which keeps the DB rows tiny (legacy full base64 still decodes fine).
         String base64 = KitLayoutDelta.encode(layout, kit);
-        KitLayoutSnapshot snap = KitLayoutSnapshot.create(player.getUniqueId(), storeKey, base64);
-        layoutCache.put(player.getUniqueId(), storeKey, layout);
+        // Admin edit: the row belongs to the target player, not to whoever is clicking.
+        UUID owner = layoutOwner(player, current);
+        KitLayoutSnapshot snap = KitLayoutSnapshot.create(owner, storeKey, base64);
+        layoutCache.put(owner, storeKey, layout);
         asyncExecutor.execute(() -> {
             try {
                 layoutRepository.upsert(snap);
