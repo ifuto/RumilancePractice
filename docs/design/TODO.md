@@ -220,15 +220,44 @@
   `KbDefaultGui` / `AltFlagsGui`）と **`/practiceadmin menu`** の戻り先を
   旧 `AdminMenuGui` から新ハブへ変更。
 
+## 21. 通報の Reports 画面 — 実装メモ（v1.92.66）
+
+- **`ChatReportsGui`**（新規、`GuiType.CHAT_REPORTS`、6行 RED）:
+  - `ChatReportService#recent(45)` を `MenuScaffold.gridSlot()` に並べる。
+  - タイルの lore: 通報対象 / ステータス / **投稿日時**（`MM-dd HH:mm:ss`、
+    `ZoneId.systemDefault()`）/ **前後のプレイヤーメッセージ**（`» ` が通報行本体）。
+  - **前後の文は毎回 `ChatLogService` から取り直す**（保存しない）。
+    バッファを流れていれば `(original message expired)` と通報日時を出す。
+    窓が9行を超えたら古い側を切る。
+  - 左クリック = HANDLED、右クリック = DISMISS。どちらも DB に書く。
+- **`CheatReportsGui`**（新規、`GuiType.CHEAT_REPORTS`）:
+  「Cheat / Alt / Reports」のセクション画面。3タイルを1列おきに配置 —
+  Chat Reports(2,1) / Alt Flags(2,4) / Match Reports(2,7)。Back は(5,4)。
+- **`/admin` ハブの「Cheat / Alt / Reports」は `reportListGui` 直結（仮実装）だったのを、
+  このセクション画面を開くように変更。**
+
+### 見つけた不具合（v1.92.66 で修正）
+
+- **`AdminHubGui` を `guiListener.register()` し忘れていた。**
+  → ハブのタイルをクリックしても **何も起きない**状態で v1.92.62–65 が出ていた。
+  AbstractGui は `guiListener.register()` しないとクリックを受け取れない。
+  **`GuiType` を足したら必ず `guiListener.register()` する。**
+
 ## 残り（次にやること）
+
+- [ ] 19. **Player データ画面の完全管理** — `AdminPlayerDataGui` は現状リセット中心。
+      値の編集（rank / 統計 / 設定 / キット配置）と配置の変更を追加する。
+- [ ] 「Arena / FFA」専用ページ（現状は `ArenaSourceGui` に丸投げ＝仮実装）。
+      arenas / FFA 設定 / アリーナコピー をまとめた画面を作る。
 
 
 - [ ] 19. **Player データ画面の完全管理** — `AdminPlayerDataGui` は現状リセット中心。
       値の編集・配置の変更を追加する。
 - [ ] 20. **パーティの強制解散** — `TeamService` を `AdminPlayerDataGui` / Players 画面から呼ぶ。
-- [ ] 21 残り. **チャット通報の Reports 画面** — `ChatReportService#open()` を
-      「Cheat / Alt / Reports」配下に表示。投稿日時 + 前後の文を `Report.context` から描画。
-- [ ] `/practiceadmin menu` を新ハブに向ける（統合）。現状は旧 `AdminMenuGui` のまま。
+- [x] 21 残り. **チャット通報の Reports 画面** — v1.92.66
+- [ ] 19. **Player データ画面の完全管理** — `AdminPlayerDataGui` は現状リセット中心。
+      値の編集・配置の変更を追加する。
+- [x] `/practiceadmin menu` を新ハブに向ける（統合） — v1.92.64
 - [ ] 「Arena / FFA」専用ページ（現状は `ArenaSourceGui` に丸投げ）。
 
 ---
