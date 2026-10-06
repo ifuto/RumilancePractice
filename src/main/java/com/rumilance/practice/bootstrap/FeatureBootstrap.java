@@ -265,6 +265,8 @@ public final class FeatureBootstrap {
     private SettingsService settingsService;
     /** Block lists behind `/block` / `/ignore`; also consulted by the queue. */
     private com.rumilance.practice.social.BlockListService blockListService;
+    /** The `/admin` home screen; every admin sub-screen returns here. */
+    private com.rumilance.practice.gui.menus.AdminHubGui adminHubGui;
     private ChatBanService chatBanService;
     private BanService banService;
     private MatchActionRecorder matchActionRecorder;
@@ -1355,7 +1357,8 @@ public final class FeatureBootstrap {
                 guiSessions, soundService, playerRepository, rankService, settingsService,
                 kitLayoutRepository, layoutCache, originalKitService, nameColorService,
                 punishmentRepository, statsService);
-        adminPlayerDataGui.setBackToAdminMenu(adminMenuGui::open);
+        adminPlayerDataGui.setBackToAdminMenu(p -> adminHubGui.open(p));
+        adminPlayerDataGui.setTeamService(teamService);
         AdminPlayerLookupListener adminPlayerLookupListener = new AdminPlayerLookupListener(
                 plugin, guiSessions, playerRepository);
         adminPlayerLookupListener.setDataGui(adminPlayerDataGui);
@@ -2190,7 +2193,7 @@ public final class FeatureBootstrap {
         PracticeAdminCommand practiceAdmin = new PracticeAdminCommand(
                 plugin, configService, soundService, matchService, lobbyService, runtimeFlags, kitService,
                 arenaStore, arenaService, ffaService);
-        practiceAdmin.setOpenAdminMenu(adminMenuGui::open);
+        practiceAdmin.setOpenAdminMenu(p -> adminHubGui.open(p));
         practiceAdmin.setSignQueueService(signQueueService);
         practiceAdmin.setScoreboardService(scoreboardService);
         practiceAdmin.setPracticeService(practiceService);
@@ -2252,6 +2255,7 @@ public final class FeatureBootstrap {
         // 7セクション。既存画面へそのまま委譲し、ハブ自体は遷移先を知らない。
         com.rumilance.practice.gui.menus.AdminHubGui adminHubGui =
                 new com.rumilance.practice.gui.menus.AdminHubGui(guiSessions, soundService);
+        this.adminHubGui = adminHubGui;
         adminHubGui.setOpenArenaFfa(arenaSourceGui::open);
         adminHubGui.setOpenPlayerData(adminPlayersGui::open);
         adminHubGui.setOpenPunishment(banListGui::open);
@@ -2264,11 +2268,11 @@ public final class FeatureBootstrap {
         adminPlayerLookupListener.setStatsService(statsService);
         adminPlayerLookupListener.setStatsGui(adminStatsGui);
         guiListener.register(adminStatsGui);
-        adminPlayersGui.setBackToAdminMenu(adminMenuGui::open);
-        adminMatchesGui.setBackToAdminMenu(adminMenuGui::open);
-        adminToggleGui.setBackToAdminMenu(adminMenuGui::open);
-        kbDefaultGui.setBackToAdminMenu(adminMenuGui::open);
-        altFlagsGui.setBackToAdminMenu(adminMenuGui::open);
+        adminPlayersGui.setBackToAdminMenu(adminHubGui::open);
+        adminMatchesGui.setBackToAdminMenu(adminHubGui::open);
+        adminToggleGui.setBackToAdminMenu(adminHubGui::open);
+        kbDefaultGui.setBackToAdminMenu(adminHubGui::open);
+        altFlagsGui.setBackToAdminMenu(adminHubGui::open);
 
         adminMenuGui.setOpenPlayers(adminPlayersGui::open);
         adminMenuGui.setOpenMatches(adminMatchesGui::open);

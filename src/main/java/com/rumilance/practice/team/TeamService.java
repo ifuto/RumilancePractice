@@ -358,6 +358,28 @@ public final class TeamService {
         return Result.OK;
     }
 
+    /** The team this player is in, or {@code null}. Read-only view for admin tooling. */
+    public Team teamOf(UUID playerId) {
+        return byMember.get(playerId);
+    }
+
+    /**
+     * Admin override: disbands whatever team this player is in, whoever owns it.
+     *
+     * <p>Goes through the same {@link #disbandTeam} the owner's {@code /team disband} uses, so
+     * the party's queue / duel state is cleared and nobody can be paired with a ghost team.
+     * Answers {@link Result#NOT_IN_TEAM} when they are not in one, so the caller can say so
+     * honestly instead of pretending it worked.</p>
+     */
+    public Result forceDisband(UUID memberId) {
+        Team team = byMember.get(memberId);
+        if (team == null) {
+            return Result.NOT_IN_TEAM;
+        }
+        disbandTeam(team, true);
+        return Result.OK;
+    }
+
     /**
      * The one place a team stops existing: drops every member, wipes the team's queue / duel state
      * (a disbanded party left in the draw would pair somebody with a ghost) and removes it from the

@@ -72,6 +72,7 @@ public final class AdminPlayerDataGui extends AbstractGui {
     private ChatBanService chatBanService;
     private BanService banService;
     private com.rumilance.practice.match.MatchService matchService;
+    private com.rumilance.practice.team.TeamService teamService;
     private org.bukkit.plugin.Plugin plugin;
 
     public AdminPlayerDataGui(GuiSessionRegistry registry, SoundService sounds,
@@ -94,6 +95,11 @@ public final class AdminPlayerDataGui extends AbstractGui {
 
     public void setBackToAdminMenu(java.util.function.Consumer<Player> backToAdminMenu) {
         this.backToAdminMenu = backToAdminMenu == null ? p -> { } : backToAdminMenu;
+    }
+
+    /** Wires the party service so staff can force-disband a party from here. */
+    public void setTeamService(com.rumilance.practice.team.TeamService teamService) {
+        this.teamService = teamService;
     }
 
     /** Wires the W/L editor screen opened by the ranked-stats tile. */
@@ -386,6 +392,24 @@ public final class AdminPlayerDataGui extends AbstractGui {
                         .glint(true)
                         .action("act:full_wipe").build());
 
+        // --- force disband party ---
+        com.rumilance.practice.team.Team team =
+                teamService == null ? null : teamService.teamOf(target);
+        inventory.setItem(GuiSlots.slot(3, 4),
+                ItemBuilder.of(team == null ? Material.GRAY_DYE : Material.RED_BED)
+                        .name(Component.text("Force disband party",
+                                team == null ? UiTheme.MUTED : UiTheme.DANGER))
+                        .lore(team == null
+                                        ? UiTheme.line("not in a party")
+                                        : UiTheme.labelValue("Party", team.name()),
+                                team == null ? UiTheme.line("")
+                                        : UiTheme.labelValue("Members",
+                                                String.valueOf(team.members().size())),
+                                UiTheme.blank(),
+                                UiTheme.hint(team == null ? "-" : "Click: disband for everyone"))
+                        .glint(team != null)
+                        .action(team == null ? "decorate" : "act:disband_party").build());
+
         backToMenu(inventory, player);
     }
 
@@ -662,6 +686,31 @@ public final class AdminPlayerDataGui extends AbstractGui {
                             "Force-ended the match of " + displayName(target) + ".",
                             NamedTextColor.GREEN));
                     sounds.play(player, "select");
+                }
+                refresh(player, session, inventory);
+            }
+            case "act:disband_party" -> {
+                if (teamService == null) {
+                    return;
+                }
+                com.rumilance.practice.team.Team disbanded = teamService.teamOf(target);
+                if (disbanded == null) {
+                    sounds.play(player, "error");
+                    player.sendMessage(Component.text(
+                            displayName(target) + " is not in a party.", NamedTextColor.RED));
+                    refresh(player, session, inventory);
+                    break;
+                }
+                String partyName = disbanded.name();
+                int members = disbanded.members().size();
+                if (teamService.forceDisband(target) == com.rumilance.practice.team.TeamService.Result.OK) {
+                    sounds.play(player, "select");
+                    player.sendMessage(Component.text("Disbanded party '" + partyName
+                            + "' (" + members + " member(s)).", NamedTextColor.GREEN));
+                } else {
+                    sounds.play(player, "error");
+                    player.sendMessage(Component.text(
+                            "Could not disband that party.", NamedTextColor.RED));
                 }
                 refresh(player, session, inventory);
             }
