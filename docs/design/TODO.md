@@ -607,3 +607,41 @@
   **別の並びを表示して上書きしてしまう**ので、編集対象にせずリセット系に任せる。
   黙って違う行を書き換えないための意図的な制限。
 - 「ekit スロット数」という概念はコードに存在しなかった（前回メモの誤り）。
+
+## 配布元は Tailscale Funnel（Shield Web）— ユーザー確認済み（2026-10-06）
+
+ユーザー自己申告により、配布元は GitHub Release ではなく **Tailscale Funnel → Shield Web
+:1010 の `/pack.zip`**。`resource-pack.json` の url は `DEFAULT_URL` より優先される
+（`configuredUrl()`）ため、**v1.76.61 の 404 はこの環境の原因ではない**（別件の実バグではある）。
+
+### 3症状は全部これで説明できる
+
+| 症状 | 原因 |
+|---|---|
+| `localhost:1010` / `192.168.0.203:1010` に入れない | `shield-web.enabled` が**既定 false** → 待ち受け自体が無い |
+| バッジが □ | Shield Web が止まっている → Funnel の proxy 先が無く URL が取れない → `fetchSha1` が null → **パック未送信** |
+| （LFF の衝突） | 別件。v1.92.73 で修正済み |
+
+### 直し方（docs/shield-web.md の「有効化（初回のみ）」）
+
+1. `config.yml` の `shield-web.enabled: true`（`bind` は既定 `0.0.0.0` のままで良い）
+2. **サーバーを完全再起動**（`/rumireload` は HTTP サーバーを再開させない — ドキュメント明記）
+3. `tailscale funnel --bg 1010` → `tailscale funnel status` でホスト名確認
+4. `plugins/n-arena/resource-pack.json` の `url` を
+   `https://<マシン名>.<テールネット>.ts.net/pack.zip` に書き換えて `/rumireload`
+5. `/urank web` で管理URL+トークン確認
+
+### 上記で直らない場合の第2候補: `pack-src` が古い
+
+`ShieldWebService#unpackBaseIfNeeded()` は **`pack-src/pack.mcmeta` が既にあれば即 return**
+（作業コピー＝盾PNGを保持するため）。つまり **jar を更新してもパックの中身は更新されない**。
+古い `pack-src` に `assets/rumilance/font/icons.json` が無い/古い場合、
+パックは配られているのにグリフだけ欠けて □ になる。
+→ `plugins/n-arena/pack-src/` を確認し、グリフ定義が無ければ作り直す。
+
+### v1.92.74 のフォント変更は無害（ただし主因ではない）
+
+- `icons.json`（自前名前空間）は**当初から同梱**されているので、
+  `icons.font: "rumilance:icons"` への切り替えは旧 zip でも動く。
+- `default.json` / `uniform.json` の削除は潜在的な危険の除去だが、
+  ユーザー環境で「全フォントが壊れた」事実は無い（今回の □ の原因ではない）。
