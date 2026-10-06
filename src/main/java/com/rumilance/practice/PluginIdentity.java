@@ -59,9 +59,12 @@ public final class PluginIdentity {
      *
      * <p>The carry-over copies and never deletes, and only runs while the destination is missing,
      * so an existing server keeps its data through the update and a second boot is a no-op.
-     * Deliberately NOT applied to the Quantum side ({@code quantum.yml}, {@code quantum/}) or to
-     * {@code resource-pack.json}: those genuinely live in {@code plugins/NARENA} and are quoted
-     * that way by {@code tools/parity-runner/*} and by config.yml's own comments.</p>
+     * Deliberately NOT applied to the Quantum side ({@code quantum.yml}, {@code quantum/}), which
+     * genuinely lives in Paper's {@code plugins/NARENA} folder (see {@link
+     * com.rumilance.practice.quantum.QuantumRuntime}) and is quoted that way by
+     * {@code tools/parity-runner/*}. Note {@code resource-pack.json} is NOT in that group: it is
+     * built from {@link #dataFolder} (so {@code plugins/n-arena/resource-pack.json}) even though
+     * this javadoc once claimed otherwise.</p>
      */
     public static File dataFile(Plugin plugin, String fileName) {
         File folder = dataFolder(plugin);

@@ -45,7 +45,7 @@ icons:
 resource-pack:
   # Master switch. When false the plugin does not send any resource pack.
   #
-  # The pack itself is defined in plugins/NARENA/resource-pack.json (created on first start):
+  # The pack itself is defined in plugins/n-arena/resource-pack.json (created on first start):
   # edit its "url" by hand to point at your release asset. If the file has no url the shipped
   # Release URL below is used, and the SHA-1 is fetched from that URL on every server start
   # (then written back into the JSON) so the hash can never drift from the published zip.

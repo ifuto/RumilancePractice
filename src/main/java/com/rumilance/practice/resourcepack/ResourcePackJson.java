@@ -5,7 +5,8 @@ import java.util.Map;
 
 /**
  * Minimal flat-JSON reader/writer for {@code resource-pack.json} — the operator-owned file that
- * holds the pack URL ({@code plugins/NARENA/resource-pack.json}).
+ * holds the pack URL ({@code plugins/n-arena/resource-pack.json} — see
+ * {@link com.rumilance.practice.PluginIdentity#dataFolder}).
  *
  * <p>Deliberately dependency-free and flat: the file has a handful of scalar keys
  * ({@code url}, {@code prompt}, {@code sha1}, {@code required}, {@code min-client-protocol}),
