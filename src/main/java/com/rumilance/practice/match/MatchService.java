@@ -95,6 +95,12 @@ public final class MatchService {
     private final int maxDurationSeconds;
     private final Map<UUID, BukkitTask> tasks = new ConcurrentHashMap<>();
     private volatile boolean shuttingDown;
+    private volatile boolean shuttingDown;
+    /**
+     * Kill presentation: shows a real death to the killer only (forged packet, then the victim
+     * stops being sent to them). Null until the bootstrap wires it.
+     */
+    private volatile com.rumilance.practice.combat.LethalPresentationService lethalPresentation;
     /**
      * In-memory tally of consecutive pre-match-countdown leaves per player. Incremented when a
      * player runs {@code /leave} during the countdown, reset to 0 the moment one of their matches
@@ -460,6 +466,15 @@ public final class MatchService {
 
     public void setFfaService(com.rumilance.practice.ffa.FfaService ffaService) {
         this.ffaService = ffaService;
+    }
+
+    /**
+     * Wires the per-killer death staging. Null-safe: without it a kill simply looks the way it
+     * always did.
+     */
+    public void setLethalPresentation(
+            com.rumilance.practice.combat.LethalPresentationService lethalPresentation) {
+        this.lethalPresentation = lethalPresentation;
     }
 
     public com.rumilance.practice.ffa.FfaService ffaService() {
@@ -1991,6 +2006,15 @@ public final class MatchService {
         if (victim != null) {
             soundService.play(victim, "death");
         }
+        // 死亡演出: B keeps behaving exactly as before (gear cleared, invulnerable), but A is
+        // shown a real death — a forged death packet for B, after which B stops being sent to A
+        // entirely. B's own view is untouched; A just sees an opponent die.
+        if (creditedAttacker != null && victim != null && lethalPresentation != null) {
+            Player killer = Bukkit.getPlayer(creditedAttacker);
+            if (killer != null) {
+                lethalPresentation.stageKill(killer, victim);
+            }
+        }
 
         if (session.isTeamMatch()) {
             handleTeamLethal(session, victimId, creditedAttacker);
@@ -2510,6 +2534,11 @@ public final class MatchService {
             session.addSeriesWin(winnerId);
         }
         logMatchResult(session, winnerId, draw);
+        // Nobody may walk out of a match still hidden from somebody: the staging above hides the
+        // loser from their killer, and that has to be lifted before the next round / the lobby.
+        if (lethalPresentation != null) {
+            lethalPresentation.restoreAll(session.participants());
+        }
         for (UUID id : session.participants()) {
             try {
                 stateManager.transition(id, PlayerState.ENDING);

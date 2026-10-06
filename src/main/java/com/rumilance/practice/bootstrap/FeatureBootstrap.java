@@ -806,6 +806,13 @@ public final class FeatureBootstrap {
         queueCoordinator.setClickGuard(queueClickGuard);
         matchService.setQueueCoordinator(queueCoordinator);
         matchService.setFfaService(ffaService);
+
+        // How a kill looks to the killer: a forged death packet for the loser, after which the
+        // loser stops being sent to them. The loser's own behaviour is unchanged.
+        com.rumilance.practice.combat.LethalPresentationService lethalPresentation =
+                new com.rumilance.practice.combat.LethalPresentationService(plugin);
+        plugin.getServer().getPluginManager().registerEvents(lethalPresentation, plugin);
+        matchService.setLethalPresentation(lethalPresentation);
         if (practiceService != null) {
             matchService.setPracticeService(practiceService);
         }
